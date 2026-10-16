@@ -43,7 +43,9 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 
 1. `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java` and `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`
    are identical but for the package; so are `TableRow.java`, `TreeItem.java`, `Column.java`, `ListItem.java`,
-   `ModelChecks.java`, `ViewSpec.java` and `UiEvent.java`.
+   `ModelChecks.java`, `ViewSpec.java` and `UiEvent.java`. After 3a, `Nodes.java` differs too: 3a Task 4 adds Javadoc
+   to the SDK copy only (`TextRole`, `ButtonKind`, `ChoiceKind`, `ListKind`, `FormKind`, `ScrollPolicy`, `Toggle`,
+   `Empty` and others); `TableRow.java` and `ViewSpec.java` stay identical.
 2. `Nodes.Table` is `(id, state, columns, rows, selectedIds, activateAction, contextActions, selectionMode, scroll)`
    with 8- and 7-argument conveniences (`Nodes.java:591-613`); `Nodes.Tree` is `(id, state, roots, expandedIds,
    selectedIds, activateAction)` with no convenience (`:615-623`); `Nodes.ItemList` has 15 components ending in
@@ -63,10 +65,13 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
    `KitContent.children` (`jasper-app/.../plugins/KitContent.java:24-41`) feed both `KitIconNames` copies
    (`:48` in each), the fake's node index and anchors. Neither visits table rows.
 7. `KitContractTest` (testkit `testFixtures`) runs against the host (`HostedKitContractTest`) and the fake
-   (`FakeKitTest`); its `descriptorIconCases` map (`KitContractTest.java:148-173`) is the parity table for icon
+   (`FakeKitContractTest`, a top-level class declared in `FakeKitTest.java`, so a filter must be `FakeKit*`, not
+   `FakeKitTest*`); `PluginContractTest` runs on the host (`AppContractTest`) and the fake (`FakeContractTest`); its `descriptorIconCases` map (`KitContractTest.java:148-173`) is the parity table for icon
    validation; `browser(...)` and `browserDescriptorsMountUpdateAndReportSortsCrumbsAndMenus` (`:227-247`) are the
    pattern for a descriptor-family contract.
-8. Rendering: `ControlRegistry.validate` treats Table and Tree as leaves (`ControlRegistry.java:20`);
+8. Rendering: `ControlRegistry.validate` treats Table and Tree as leaves (`ControlRegistry.java:20`; 3b Task 5 appends
+   `Nodes.Separator _` to that line and 3b Task 7 `Nodes.Properties _`, so this plan replaces only its stable prefix
+   `case Nodes.Table _, Nodes.Tree _,`);
    `ControlRegistry.children` gives an ItemList its `addAction` (`:62`) and nothing for Table; the reconciler mounts
    exactly `ControlRegistry.children` (`ViewReconciler.java:338-340`) and hands them to `Control.children`
    (`:52`). Row content is mounted per row by `InteractiveRows.Row.control` (`InteractiveRows.java:915-985`), which inks
@@ -88,7 +93,10 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
     closed value is rendered by `optionLabel` (`:76-84`), but `BasicComboBoxUI.paintCurrentValue` then sets the
     renderer's foreground to the combo's own; `ChoiceCombo` paints the
     control face in `paintComponent` (`:382-384`), the chevron in its arrow button (`:318-330`) and sizes itself with
-    `naturalWidth()` (`:352-374`).
+    `naturalWidth()` (`:352-374`). 3b Task 3 rewrites `embeddedLabel` (`:30`) to `label.setVisible(labelShown())` and
+    adds `labelShown()` under it, so this plan inserts `inCell` before `firstLineHeight` (`:31`), which 3b leaves alone.
+    The closed value's text starts `getInsets().left` plus `FIELD_HORIZONTAL_PADDING` (the renderer's `EmptyBorder`,
+    `:202-203`) inside the combo.
 13. `Trees.TreeControl.data` measures `trailingWidths` over every item in CAPTION type, at least `TREE_DETAIL_COLUMN`
     and, for the last, `TREE_VALUE_COLUMN` (`Trees.java:265-275`); `populate` adds one CAPTION text per trailing value,
     right-aligned at that width, then the COUNT text (`:356-391`); a plain tree row's side inset is `ICON_GAP`, or
@@ -113,7 +121,9 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
     `KitKeyBindingAuditTest`; `KitMatrixTest` 3); and `KitGallery.main` for Slate Cobalt Dark and Light wrote 142 base
     files of which 140 were byte-identical, `manifest.json` and `sheet-9.png` changing and `tables-0-18.png`/`.json`
     added. 3a's and 3b's edits come in between, so the executor's runs are the evidence; the host contract
-    (`HostedKitContractTest`) was not run.
+    (`HostedKitContractTest`) was not run. A review the same day replayed the scripts on 3a's branch with 3b's applied:
+    the Choices and ControlRegistry anchors stopped on 3b's text and now quote text 3b leaves alone (facts 8 and 12);
+    with them, every script applied and its tests passed there.
 
 ## Global Constraints
 
@@ -122,7 +132,7 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 - Work only in the worktree above on `claude/enterprise-sdk-0-18-tables`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Scope is exactly spec 8.2's rows `Tree.columns`, `TableRow.cellNodes`, `TableRow.heading` (with `Heading` and `countNoun`), `Table.empty`, `Table.emptyText` and `ItemList.emptyText`. No plugin or app page adopts them (plans 3e, 9 and 10); no other 8.2 row is touched (3b and 3d own them).
 - Existing record constructors stay as conveniences with the new components at their empty values (`Map.of()`, `Optional.empty()`, `List.of()`, `""`); new components go last; no existing component is renamed or reordered.
-- The SDK and the jasper-ui model stay identical but for their package names: every edit to `Nodes.java`, `TableRow.java` or `ViewSpec.java` is applied to both copies by the same script.
+- The SDK and the jasper-ui model differ only by their package names and the Javadoc 3a adds to the SDK copy of `Nodes.java` (fact 1): every edit to `Nodes.java`, `TableRow.java` or `ViewSpec.java` is applied to both copies by the same script, and Task 1 Step 3 checks that the copies' difference is unchanged by this plan.
 - Pixel rule: every existing gallery fixture renders byte-identically for Slate Cobalt Dark and Light. The headless gallery may change only in: the new `tables-0-18.png` and `tables-0-18.json`; `manifest.json` (`fixtureCount` + 1); and the last contact sheet `sheet-N.png`, which gains the new fixture's cell (or a new `sheet-N.png` when the previous last sheet held eight). Task 6 proves it.
 - Javadoc doclint fails the build on errors: every `{@link}` resolves and no comment holds a raw `<`, `>` (outside HTML tags), `&` or `->`.
 - `docs/design/theme-engine/migration.csv`: every new or renamed candidate source under jasper-app, the SDK, the testkit or plugins gets its row in the same commit (`ThemeMigrationCoverageTest`); this plan creates none, and Task 7's full build confirms it.
@@ -132,8 +142,10 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 ## Review Focus
 
 1. A table whose rows arrive while its empty state shows, or vanish while a row is selected: the state unmounts and
-   leaves no stale component or focus target behind, and returns when the rows go again. Task 4:
-   `TableVocabularyTest.anEmptyTableKeepsItsHeadersAndCentresItsStateInTheBody`.
+   leaves no stale component or focus target behind, and returns when the rows go again; the host and the fake both
+   refuse focus and reveal into it meanwhile. Task 4:
+   `TableVocabularyTest.anEmptyTableKeepsItsHeadersAndCentresItsStateInTheBody`; Task 6:
+   `KitContractTest.tableVocabularyMountsUpdatesAndReportsCellChoicesSortsAndTheEmptyStateAction`.
 2. A selected row whose cell dropdown is bare: its value must take the selection's ink, or a dark-on-accent theme
    paints it unreadable; while hovered it shows the control face in the face's own colours. Task 3:
    `TableVocabularyTest.aSelectedRowsBareDropdownTakesTheSelectionInk`.
@@ -153,9 +165,9 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 
 Record each of these in `docs/STATUS.md` (Task 7) and in this plan's status banner when it is executed.
 
-1. **The contract cases live in `KitContractTest`.** Spec 16.1.9 lists "tree columns; cell nodes; heading rows; `empty`
-   and `emptyText`" under `PluginContractTest`; they are view-descriptor behaviour, which `KitContractTest` owns and
-   runs against the host and the fake, so Task 6 adds them there. `PluginContractTest` is unchanged.
+1. **Contract cases.** Spec 16.1.9 names the new cases in `PluginContractTest`; the plugin-facing admission and
+   refusal case is there (Task 6), and the per-view behaviour (mount, update, focus and reveal, the events) is in
+   `KitContractTest`, which both the host and the fake run, as 3b's ruling 14 splits them.
 2. **`cellNodes` iterates in column-id order.** The record keeps an unmodifiable sorted copy, so two equal rows print
    alike whatever map built them, which the lossless projection test relies on.
 3. **Heading validation the spec leaves open.** A `countNoun` needs a count and is lowercase with no surrounding spaces
@@ -166,9 +178,10 @@ Record each of these in `docs/STATUS.md` (Task 7) and in this plan's status bann
    mock's indent is the classic look's, plans 4 and 9).
 5. **The table's `empty` is mounted only while the table has no rows** (`ControlRegistry.children`); the descriptor
    walks (`FakeKitView.children`, `KitContent.children`) always include it, so ids and icons are checked either way.
-   Focusing the state's button while rows show succeeds in the fake and fails in the host; that call has no use.
+   While the table has rows, `focus` and `reveal` refuse the state's nodes on the host and the fake alike.
 6. **The empty line** (`emptyText`) shows only while the collection has no items at all (a heading is an item); it is
-   one row-height band, centred, in DESCRIPTION type and tertiary ink, above an ItemList's `addAction`.
+   one row-height band, centred, in DESCRIPTION type and tertiary ink, above an ItemList's `addAction`. A list that
+   keeps its visible-rows height lays the line inside the rows it reserves, so emptying it does not grow it.
 7. **Tree columns in the default look:** the first title starts at the rows' content inset, the others are
    right-aligned over right-aligned values; each column is as wide as its widest value or title; rows are padded
    with blank values; when any item has a count, a count column is reserved on every row. Trees with the app's keycap
@@ -176,7 +189,10 @@ Record each of these in `docs/STATUS.md` (Task 7) and in this plan's status bann
 8. **Muted rows and cell nodes:** a muted row dims its plain cells and its Text cell nodes; other cell nodes keep their
    colours; the row's glyph leads the first column only when that column is a plain cell.
 9. **The in-cell dropdown** is as wide as its selected value and chevron (plain options; rich options keep their
-   natural width), left-aligned and vertically centred in its cell; the selection ink applies only while it is bare.
+   natural width) and vertically centred in its cell; its value starts under the column's title, as the Notifications
+   mock's "Card" starts under "Display": the cell reaches back into the column gap by the combo's text inset (its
+   border inset and `FIELD_HORIZONTAL_PADDING`), so the hover face overhangs the gap (in the first column, which has
+   no gap, it starts at the cell's edge). The selection ink applies only while it is bare.
 10. **No README edit.** Spec 17 names `docs/plugin-ui.md` for the vocabulary; `jasper-sdk/README.md`'s version list is
     3a's and 3d's.
 
@@ -374,7 +390,30 @@ Expected: FAIL. Both `compileTestJava` tasks stop with "cannot find symbol" (`ce
 
 - [ ] **Step 3: Add the components and their checks to both copies**
 
-Run from the worktree root:
+First record how the copies differ at the rebased base (3a's SDK-only Javadoc in `Nodes.java`, fact 1), from the
+worktree root:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 3c Task 1 step 3: save the package-normalised difference of each SDK/model pair before this plan edits them."""
+import difflib, json, pathlib
+result = {}
+for name in ["Nodes", "TableRow", "ViewSpec"]:
+    sdk = pathlib.Path(f"jasper-sdk/src/main/java/dev/jasper/sdk/ui/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.sdk.ui", "P").splitlines()
+    ui = pathlib.Path(f"jasper-ui/src/main/java/dev/jasper/ui/model/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.ui.model", "P").splitlines()
+    # Only the differing lines, without hunk headers, so lines this plan adds to both copies above a difference do not count.
+    result[name] = [line for line in difflib.unified_diff(ui, sdk, lineterm="", n=0) if line[:1] in "+-" and line[:3] not in ("+++", "---")]
+    print(name, len(result[name]), "differing lines")
+if result["TableRow"] or result["ViewSpec"]: raise SystemExit("TableRow and ViewSpec must be identical at the base")
+out = pathlib.Path("jasper-sdk/build/plan-3c-mirrors.json"); out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(json.dumps(result), encoding="utf-8")
+PY
+```
+
+Expected: `TableRow 0 differing lines`, `ViewSpec 0 differing lines`, and a positive count for `Nodes` (3a's Javadoc).
+The snapshot lives under the SDK's `build/` directory, which git ignores.
+
+Then run from the worktree root:
 
 ```bash
 python3 -I - <<'PY'
@@ -632,20 +671,24 @@ for package, root in [("dev.jasper.sdk.ui", "jasper-sdk/src/main/java/dev/jasper
 PY
 ```
 
-Then confirm the mirrors are still identical but for their packages:
+Then confirm that the copies differ exactly as they did before the edit:
 
 ```bash
 python3 -I - <<'PY'
-import pathlib
+"""Plan 3c Task 1 step 3: the SDK/model difference is the base's alone."""
+import difflib, json, pathlib
+before = json.loads(pathlib.Path("jasper-sdk/build/plan-3c-mirrors.json").read_text(encoding="utf-8"))
 for name in ["Nodes", "TableRow", "ViewSpec"]:
-    sdk = pathlib.Path(f"jasper-sdk/src/main/java/dev/jasper/sdk/ui/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.sdk.ui", "P")
-    ui = pathlib.Path(f"jasper-ui/src/main/java/dev/jasper/ui/model/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.ui.model", "P")
-    print(name, "identical" if sdk == ui else "DIFFERENT")
+    sdk = pathlib.Path(f"jasper-sdk/src/main/java/dev/jasper/sdk/ui/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.sdk.ui", "P").splitlines()
+    ui = pathlib.Path(f"jasper-ui/src/main/java/dev/jasper/ui/model/{name}.java").read_text(encoding="utf-8").replace("dev.jasper.ui.model", "P").splitlines()
+    now = [line for line in difflib.unified_diff(ui, sdk, lineterm="", n=0) if line[:1] in "+-" and line[:3] not in ("+++", "---")]
+    print(name, "unchanged" if now == before[name] else "CHANGED", "(identical)" if not now else f"({len(now)} differing lines, the base's)")
 PY
 ```
 
-Expected: `Nodes identical`, `TableRow identical`, `ViewSpec identical`. (They are identical at `222969926`, and 3a and
-3b edit both copies alike; if one already differed at the rebased base, the difference must be the base's alone.)
+Expected: `Nodes unchanged (N differing lines, the base's)` with the same N the snapshot printed, `TableRow unchanged
+(identical)` and `ViewSpec unchanged (identical)`. Any `CHANGED` means an edit reached one copy only: fix the script
+and rerun it on a clean checkout of the two files.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -755,7 +798,7 @@ and defines `READY`, `text(id)` and `button(id)` (`KitValuesTest.java:1-11`).
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `./gradlew :jasper-app:test --tests dev.jasper.app.plugins.KitValuesTest --tests dev.jasper.app.plugins.HostedKitContractTest :jasper-sdk-testkit:test --tests 'dev.jasper.sdk.testing.FakeKitTest*' --continue`
+Run: `./gradlew :jasper-app:test --tests dev.jasper.app.plugins.KitValuesTest --tests dev.jasper.app.plugins.HostedKitContractTest :jasper-sdk-testkit:test --tests 'dev.jasper.sdk.testing.FakeKit*' --continue`
 Expected: FAIL. `KitValuesTest.zeroEighteenTableFieldsProjectWithoutLoss` fails on the `toString` comparison (the
 projection drops the new components through the conveniences); in both `HostedKitContractTest` and the fake's
 contract, `everyDescriptorIconPositionValidatesOwnershipBeforeCreateOrUpdateMutation` fails with "table-cell-node
@@ -827,13 +870,13 @@ EOF
 `Tables` mounts each column's cell node in its weighted column (a plain cell keeps today's synthetic text exactly), lets
 `KitView.focus` and `reveal` reach cell nodes, reads a Text cell node for type-ahead, and draws a heading row as a
 non-data row with its strong title and its muted count at the row's end. A DROPDOWN in a cell is bare: its value and
-chevron, as wide as the value, with the control face only while hovered, focused or open, and on a selected row its
-bare value and chevron take the selection's ink. `ControlRegistry.validate` and `Trees.validateDetail` walk cell nodes
+chevron, as wide as the value and starting under the column's title, with the control face only while hovered, focused
+or open, and on a selected row its bare value and chevron take the selection's ink. `ControlRegistry.validate` and `Trees.validateDetail` walk cell nodes
 and empty states. A plain table, list and dropdown paint exactly as before.
 
 **Files:**
 - Replace: `jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` (whole file)
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java:30,72,280-285,322-323,352-385`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java:31,72,280-285,322-323,352-385` (anchored on text; 3b rewrites `:30`)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:1175-1186` (`headingLayout`)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java:20`, `jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java:35-41`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java`
@@ -843,7 +886,8 @@ and empty states. A plain table, list and dropdown paint exactly as before.
 - Produces: `Tables.headerLabel(ControlRegistry.Control owner, String prefix, Column column)` (a header title reporting
   `UiEvent.Sorted`, used by Task 5); `Tables.countText(TableRow.Heading)`; `Tables.TableControl.cellText(TableRow,
   String)`; `Choices.ChoiceControl.inCell(InteractiveRows.Ink ink)`; `Choices.ChoiceCombo.cell`, `cellInk`, `bare()`,
-  `cellWidth()` and its `getForeground()` override; `Choices.CellLayout`. Task 4 adds its empty-state methods to the `TableControl` of this task's
+  `cellWidth()`, `textLead()` and its `getForeground()` override; `Choices.CellLayout`; `static int Choices.cellLead(Component)`, which
+  `Tables.WeightLayout` reads. Task 4 adds its empty-state methods to the `TableControl` of this task's
   file, anchored on its text.
 
 - [ ] **Step 1: Write the failing tests**
@@ -911,6 +955,15 @@ class TableVocabularyTest {
         return count;
     }
 
+    /** The first column, from the left, in which a component paints anything on a transparent image; -1 when it paints nothing. */
+    static int firstPainted(JComponent component) {
+        var image = new BufferedImage(Math.max(1, component.getWidth()), Math.max(1, component.getHeight()), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { component.paint(g); } finally { g.dispose(); }
+        for (int x = 0; x < image.getWidth(); x++) for (int y = 0; y < image.getHeight(); y++) if ((image.getRGB(x, y) >>> 24) != 0) return x;
+        return -1;
+    }
+
     @Test void cellNodesFillTheirColumnsAndTheCellDropdownReportsItsChoice() { Edt.run(() -> {
         var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
         try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(groups(Set.of()), tunnels()))), events::add)) {
@@ -948,6 +1001,12 @@ class TableVocabularyTest {
             assertThat(card.getWidth()).isLessThan(card.getParent().getWidth());
             int bare = painted(card);
             assertThat(bare).as("the value and chevron paint").isPositive();
+            // Ruling 9: the bare value starts under its column's title, as a plain cell's text does (glyph side bearings apart).
+            var title = find(view, "@table/groups/header/display", JLabel.class);
+            assertThat(SwingUtilities.convertPoint(card, firstPainted(card), 0, view).x).as("the value starts under its column's title")
+                .isCloseTo(SwingUtilities.convertPoint(title, firstPainted(title), 0, view).x, within(2));
+            assertThat(card.getParent().getX() + card.getParent().getWidth()).as("the cell still ends at its column's edge")
+                .isEqualTo(groups.mounted.get("errors").title.getComponent(2).getX());
             card.hover = true;
             assertThat(card.bare()).isFalse();
             assertThat(painted(card)).as("the control face shows on hover").isGreaterThan(bare);
@@ -1404,7 +1463,10 @@ final class Tables {
                     height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
             int[] sizes=allocation(width);int x=insets.left;var children=parent.getComponents();
             for(int i=0;i<children.length;i++){
-                int w=i<sizes.length?sizes[i]:0;children[i].setBounds(x,insets.top,w,height);x+=w;
+                int w=i<sizes.length?sizes[i]:0;
+                // A cell dropdown reaches back into the column gap by its text inset, so its value starts under the column's title.
+                int lead=w>0?Math.min(x-insets.left,Choices.cellLead(children[i])):0;
+                children[i].setBounds(x-lead,insets.top,w+lead,height);x+=w;
             }
         }
     }
@@ -1412,7 +1474,8 @@ final class Tables {
 ```
 
 The header labels, `measureColumns`, `usableWidth`, the plain-cell path of `populate` and `WeightLayout` are today's
-code: a table without cell nodes or headings builds the same components with the same calls.
+code: a table without cell nodes or headings builds the same components with the same calls (`Choices.cellLead` is 0
+for every component but a cell dropdown's, so `WeightLayout` places a header or a plain cell as before).
 
 Then run from the worktree root (the bare dropdown, the heading row's count, and the walks of cell nodes):
 
@@ -1427,9 +1490,8 @@ def edit(name, edits):
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java", [
-    ('''        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
-''', '''        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
-        /**
+    # 3b rewrites embeddedLabel and adds labelShown() under it; firstLineHeight follows them in either tree.
+    ('''        @Override int firstLineHeight()''', '''        /**
          * A DROPDOWN in a table cell (its row sets this on every populate): bare until hovered, focused or open, as wide
          * as its value and chevron, and while bare on a selected row its value and chevron take {@code ink}; null off one.
          */
@@ -1439,13 +1501,20 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java", [
             combo.cellInk = ink;
             component.revalidate(); component.repaint();
         }
-''', 1),
+        @Override int firstLineHeight()''', 1),
     ('''            if (input instanceof SegmentTrack) container.setLayout(new SegmentColumn());
 ''', '''            if (input instanceof SegmentTrack) container.setLayout(new SegmentColumn());
-            else if (node.kind() == Nodes.ChoiceKind.DROPDOWN) container.setLayout(new CellLayout((ChoiceCombo) input));
+            else if (node.kind() == Nodes.ChoiceKind.DROPDOWN) { container.setLayout(new CellLayout((ChoiceCombo) input)); container.putClientProperty(CellLayout.class, input); }
 ''', 1),
     ('''    static class ChoiceCombo extends JComboBox<Option> {
-''', '''    /** A choice's label, input and error, where a cell dropdown keeps its own width, centred on the line it is given. */
+''', '''    /**
+     * How far a table cell reaches back into the column gap so a cell dropdown's value starts under its column's title:
+     * the dropdown's text inset while it is in a cell, else 0 (every other cell, and every header title).
+     */
+    static int cellLead(Component cell) {
+        return cell instanceof JComponent panel && panel.getClientProperty(CellLayout.class) instanceof ChoiceCombo combo && combo.cell ? combo.textLead() : 0;
+    }
+    /** A choice's label, input and error, where a cell dropdown keeps its own width, centred on the line it is given. */
     static final class CellLayout extends BorderLayout {
         final ChoiceCombo combo;
         CellLayout(ChoiceCombo combo) { this.combo = combo; }
@@ -1487,6 +1556,10 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java", [
             return insets.left + insets.right + metrics.stringWidth(value) + 2 * ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
                 + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
         }
+        /** Where the closed value's text starts inside the combo: its border inset, then the renderer's padding. */
+        int textLead() {
+            return getInsets().left + ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+        }
 ''', 1),
     ('''        @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER''',
@@ -1522,10 +1595,9 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java", [
             trailing.doLayout();
         }''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java", [
-    ('''            case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _ -> {}
-''', '''            case Nodes.Table n -> { for (var row : n.rows()) row.cellNodes().values().forEach(ControlRegistry::validate); n.empty().ifPresent(ControlRegistry::validate); }
-            case Nodes.Tree _, Nodes.Breadcrumbs _ -> {}
-''', 1)])
+    # 3b appends Separator and Properties to this leaf line; only its stable prefix is replaced.
+    ('''            case Nodes.Table _, Nodes.Tree _,''', '''            case Nodes.Table n -> { for (var row : n.rows()) row.cellNodes().values().forEach(ControlRegistry::validate); n.empty().ifPresent(ControlRegistry::validate); }
+            case Nodes.Tree _,''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java", [
     ('''                    row.contextActions().ifPresent(menu->validateMenus(menu,icons));
                 }
@@ -1583,7 +1655,7 @@ before.
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:384,401-404,443-444,769-776,793-796`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ItemLists.java:148-151` (after `lines()`), `jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` (Task 3's `TableControl`), `jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java:62`
-- Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java` (two tests appended)
+- Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java` (three tests appended)
 
 **Interfaces:**
 - Consumes: Task 3's `Tables.TableControl` (its `dataRow` override is the anchor) and Task 1's `emptyText()` and
@@ -1598,7 +1670,7 @@ Run from the worktree root:
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 3c Task 4 step 1: the empty line and an empty table's state."""
+"""Plan 3c Task 4 step 1: the empty line, also inside a filter-driven list's reserved rows, and an empty table's state."""
 import pathlib
 def before_last_brace(name, block):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8").rstrip()
@@ -1663,6 +1735,27 @@ before_last_brace("jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTe
             var list = (InteractiveRows.RowsControl) view.control("keys");
             assertThat(list.emptyLine.isVisible()).isFalse();
             assertThat(list.emptyLineHeight()).isZero();
+        } finally { release(context); }
+    }); }
+
+    static ViewSpec filteredKeys(List<ListItem> items) {
+        var filter = new Field("filter", READY, FieldKind.SEARCH, "", "Filter", "Filter", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "keys");
+        return new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(filter, new ItemList("keys", READY, ListKind.COMPACT, items, Set.of(), "",
+            List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(3), "", "", "", "", "", "No matching keys"))));
+    }
+
+    @Test void aFilteredListLaysItsEmptyLineInsideItsReservedRows() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        var key = new ListItem("id_ed25519", Optional.empty(), List.of(new Text("key.name", READY, "id_ed25519", TextRole.BODY)), List.of(), List.of());
+        try (var view = new KitView(context, filteredKeys(List.of(key)), e -> {})) {
+            view.setSize(420, 360); InteractiveRowsTest.layout(view);
+            var list = (ItemLists.ListControl) view.control("keys");
+            int filled = list.canvas.getPreferredScrollableViewportSize().height;
+            assertThat(filled).as("a field names the list, so it keeps three rows").isEqualTo(3 * list.rowHeight);
+            view.update(filteredKeys(List.of())); InteractiveRowsTest.layout(view);
+            assertThat(list.emptyLine.isVisible()).isTrue();
+            assertThat(list.canvas.getPreferredScrollableViewportSize().height).as("emptied, it keeps the same height").isEqualTo(filled);
+            assertThat(list.emptyLine.getY()).as("the line is the first reserved row").isZero();
         } finally { release(context); }
     }); }
 ''')
@@ -1745,7 +1838,8 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java", [
     ('''            return new Dimension(360, owner.rowsHeight() + owner.footerHeight());''',
      '''            return new Dimension(360, owner.rowsHeight() + owner.emptyLineHeight() + owner.footerHeight());''', 1),
     ('''            return new Dimension(360, owner.viewportRowsHeight() + owner.footerHeight());''',
-     '''            return new Dimension(360, owner.viewportRowsHeight() + owner.emptyLineHeight() + owner.footerHeight());''', 1),
+     # The line lies inside the rows a filter-driven list reserves, so emptying such a list does not grow it.
+     '''            return new Dimension(360, Math.max(owner.viewportRowsHeight(), owner.emptyLineHeight()) + owner.footerHeight());''', 1),
     ('''        @Override
         public boolean getScrollableTracksViewportHeight() {
             return false;
@@ -1823,8 +1917,9 @@ today's.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-ui:test --tests dev.jasper.ui.swing.TableVocabularyTest --tests dev.jasper.ui.swing.InteractiveRowsTest --tests dev.jasper.ui.swing.TablesTest --tests dev.jasper.ui.swing.ItemListShortcutsTest --tests dev.jasper.ui.swing.EmptyStatesTest --tests dev.jasper.ui.swing.PanelCompositionTest --tests 'dev.jasper.ui.gallery.*' --continue`
-Expected: BUILD SUCCESSFUL; the seven `TableVocabularyTest` tests pass and the others stay green unchanged.
+Run: `./gradlew :jasper-ui:test --tests dev.jasper.ui.swing.TableVocabularyTest --tests dev.jasper.ui.swing.InteractiveRowsTest --tests dev.jasper.ui.swing.TablesTest --tests dev.jasper.ui.swing.ItemListShortcutsTest --tests dev.jasper.ui.swing.EditorKitTest --tests dev.jasper.ui.swing.EmptyStatesTest --tests dev.jasper.ui.swing.PanelCompositionTest --tests 'dev.jasper.ui.gallery.*' --continue`
+Expected: BUILD SUCCESSFUL; the eight `TableVocabularyTest` tests pass and the others stay green unchanged
+(`EditorKitTest`'s visible-rows case among them: with no empty text, `Math.max(viewportRowsHeight(), 0)` is today's height).
 
 - [ ] **Step 5: Commit**
 
@@ -2079,7 +2174,7 @@ it always was.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests dev.jasper.ui.swing.TableVocabularyTest --tests dev.jasper.ui.swing.TreesTest --tests dev.jasper.ui.swing.TreeDetailTest --tests dev.jasper.ui.swing.BrowserKitTest --tests dev.jasper.ui.swing.SettingsKitTest --tests 'dev.jasper.ui.gallery.*' :jasper-ui:javadoc --continue`
-Expected: BUILD SUCCESSFUL; the eight `TableVocabularyTest` tests pass and the tree, keycap-detail, browser, settings
+Expected: BUILD SUCCESSFUL; the nine `TableVocabularyTest` tests pass and the tree, keycap-detail, browser, settings
 navigation and gallery suites stay green unchanged.
 
 - [ ] **Step 5: Commit**
@@ -2104,19 +2199,23 @@ EOF
 ### Task 6: The shared contract, the gallery fixture and the pixel proof
 
 The shared kit contract mounts, updates and drives the whole vocabulary on the host and the fake alike (focus and
-reveal into cell nodes and the empty state, the cell dropdown's `Selected`, a tree header's `Sorted`, the state's
-action). The gallery gains one fixture with every addition, `GalleryCoverageTest` checks each has a real fixture (the
+reveal into cell nodes and the empty state, refused into the state while rows show, the cell dropdown's `Selected`, a
+tree header's `Sorted`, the state's action), and the fake learns to refuse that state as the host does.
+`PluginContractTest` checks that a plugin's own kit admits the view and refuses each misplaced cell node, selected
+heading, doubled empty state and extra tree value (ruling 1). The gallery gains one fixture with every addition, `GalleryCoverageTest` checks each has a real fixture (the
 in-cell DROPDOWN included) and walks map values, and the headless gallery proves no existing pixel moved.
 
 **Files:**
 - Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java` (one descriptor builder and one test appended)
+- Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java:37,134` (imports it lacks and one case, before `semanticPresentationIconsValidateOwnershipAtEveryBoundary`)
+- Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java:62,73,78` (focus and reveal refuse a table's dormant empty state)
 - Create: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/TableFixtures.java`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:66-67`, `jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java:143` (and one test appended)
 
 **Interfaces:**
 - Consumes: everything from Tasks 1 to 5.
-- Produces: `KitContractTest.tables(String display, boolean tunnels)` (a `ViewSpec`); `TableFixtures.create()` (a
-  `ViewSpec`); the gallery fixture `tables-0-18`.
+- Produces: `public static ViewSpec KitContractTest.tables(String display, boolean tunnels)`, which `PluginContractTest`
+  reuses; `TableFixtures.create()` (a `ViewSpec`); the gallery fixture `tables-0-18`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2184,11 +2283,12 @@ public final class TableFixtures {
 }
 ```
 
-Then run from the worktree root (the coverage test and the contract test; the gallery entry follows in Step 3):
+Then run from the worktree root (the coverage test and both contract tests; the gallery entry and the fake's fix follow
+in Step 3):
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 3c Task 6 step 1: gallery coverage of the table vocabulary and the shared contract."""
+"""Plan 3c Task 6 step 1: gallery coverage of the table vocabulary and the shared kit and plugin contracts."""
 import pathlib
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -2235,7 +2335,7 @@ before_last_brace(coverage, '''
     }
 ''')
 before_last_brace("jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java", '''    /** SDK 0.18 (plan 3c): a column tree, a grouped table with a cell dropdown and an inline cell, an empty table's state and two empty lines. */
-    static ViewSpec tables(String display, boolean tunnels) {
+    public static ViewSpec tables(String display, boolean tunnels) {
         var c=ControlState.READY;
         var sessions=new Nodes.Tree("sessions",c,List.of(new TreeItem("lan","Local Network",Optional.empty(),false,List.of(new TreeItem("mac","Mac",Optional.empty(),true,List.of(),
             OptionalInt.empty(),false,"",Optional.of(Nodes.StatusKind.SUCCESS),List.of("192.168.1.119","22"),Optional.empty())))),Set.of("lan"),Set.of("mac"),"connect",
@@ -2261,6 +2361,9 @@ before_last_brace("jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testi
             assertThat(view.spec()).isEqualTo(tables("card",false));
             view.focus("tunnels.new");
             view.update(tables("sticky",true));assertThat(view.spec()).isEqualTo(tables("sticky",true));
+            // Ruling 5: rows unmount the empty state, so neither runtime focuses or reveals into it.
+            assertThatIllegalArgumentException().as("focus into the state while rows show").isThrownBy(() -> view.focus("tunnels.new"));
+            assertThatIllegalArgumentException().as("reveal into the state while rows show").isThrownBy(() -> view.reveal("tunnels.empty.icon"));
             view.focus("errors.display");view.reveal("web.kind");
             emit(view,new UiEvent.Selected("errors.display",Set.of("card")));emit(view,new UiEvent.Sorted("sessions","host"));
             emit(view,new UiEvent.Selected("groups",Set.of("errors")));
@@ -2270,6 +2373,49 @@ before_last_brace("jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testi
         }finally{view.close();stop(kit);}
     }); }
 ''')
+CONTRACT = "jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java"
+# 3b adds some of these imports first; add only the ones still missing.
+contract = pathlib.Path(CONTRACT).read_text(encoding="utf-8")
+missing = "".join(f"import dev.jasper.sdk.ui.{name};\n" for name in ["Column", "ControlState", "Nodes", "TableRow", "TreeItem", "ViewSpec"]
+    if f"import dev.jasper.sdk.ui.{name};\n" not in contract)
+edit(CONTRACT, [
+    ("import dev.jasper.sdk.ui.WindowSpec;\n", "import dev.jasper.sdk.ui.WindowSpec;\n" + missing, 1),
+    ("    @Test void semanticPresentationIconsValidateOwnershipAtEveryBoundary() {\n", '''    /** Spec 16.1.9 (plan 3c): a plugin's kit admits SDK 0.18's table vocabulary and refuses misplaced cell nodes, selected headings, doubled empty states and extra tree values. */
+    @Test void aPluginsKitAdmitsZeroEighteenTablesAndRefusesMisplacedOnes() {
+        var context = started("test.tables", Set.of());
+        h.ui(() -> {
+            for (boolean rows : new boolean[] {false, true}) {
+                var spec = dev.jasper.sdk.testing.KitContractTest.tables("card", rows);
+                var view = context.kit().create(spec, event -> { });
+                assertThat(view.spec()).isEqualTo(spec);
+                view.close();
+            }
+            var ready = ControlState.READY;
+            var columns = List.of(new Column("c", "C", Nodes.TextRole.BODY, false), new Column("d", "D", Nodes.TextRole.BODY, false));
+            var go = new Nodes.Button("go", ready, "Go", "", Nodes.ButtonKind.SECONDARY, "go", "");
+            var more = new Nodes.Button("more", ready, "More", "", Nodes.ButtonKind.SECONDARY, "more", "");
+            var text = new Nodes.Text("t", ready, "T", Nodes.TextRole.BODY);
+            var heading = TableRow.heading("h", "Group", java.util.OptionalInt.of(1), "group");
+            var icon = new Nodes.Icon("e.icon", ready, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Servers");
+            var three = new TreeItem("x", "X", Optional.empty(), true, List.of(), java.util.OptionalInt.empty(), false, "", Optional.empty(), List.of("1", "2", "3"), Optional.empty());
+            List<java.util.function.Supplier<ViewSpec>> refused = List.of(
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", go), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", text), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(heading), Set.of("h"), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of())), "Nothing here")),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of(go, more))), "")),
+                () -> new ViewSpec(new Nodes.Tree("tree", ready, List.of(three), Set.of(), Set.of(), "", columns)));
+            for (var bad : refused)
+                assertThatIllegalArgumentException().isThrownBy(() -> context.kit().create(bad.get(), event -> { }));
+        });
+    }
+
+    @Test void semanticPresentationIconsValidateOwnershipAtEveryBoundary() {
+''', 1)])
 PY
 ```
 
@@ -2277,14 +2423,43 @@ PY
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `./gradlew :jasper-ui:test --tests dev.jasper.ui.gallery.GalleryCoverageTest :jasper-app:test --tests dev.jasper.app.plugins.HostedKitContractTest :jasper-sdk-testkit:test --tests 'dev.jasper.sdk.testing.FakeKitTest*' --continue`
-Expected: `GalleryCoverageTest.everyTableAdditionOfSdkZeroEighteenHasARealFixture` FAILS ("a tree with columns": no
-fixture has one yet). The two runs of `tableVocabularyMountsUpdatesAndReportsCellChoicesSortsAndTheEmptyStateAction`
-pass already (Tasks 2 to 5 built what they exercise); they are the contract's record of it.
+Run: `./gradlew :jasper-ui:test --tests dev.jasper.ui.gallery.GalleryCoverageTest :jasper-app:test --tests dev.jasper.app.plugins.HostedKitContractTest --tests dev.jasper.app.plugins.AppContractTest :jasper-sdk-testkit:test --tests 'dev.jasper.sdk.testing.FakeKit*' --tests dev.jasper.sdk.testing.FakeContractTest --continue`
+Expected: FAIL in two places. `GalleryCoverageTest.everyTableAdditionOfSdkZeroEighteenHasARealFixture` fails ("a tree
+with columns": no fixture has one yet). `FakeKitContractTest.tableVocabularyMountsUpdatesAndReportsCellChoicesSortsAndTheEmptyStateAction`
+fails on "focus into the state while rows show" (the fake indexes the state's button and accepts the call), while
+`HostedKitContractTest`'s run of it passes (the reconciler mounted no state, so `KitView.focus` throws "Unknown node").
+Both runs of `aPluginsKitAdmitsZeroEighteenTablesAndRefusesMisplacedOnes` pass already: Task 1's records and
+`ViewSpec` refuse each case, and the host and the fake admit the view; they are the plugin contract's record of it.
 
-- [ ] **Step 3: Add the fixture to the gallery**
+- [ ] **Step 3: Add the fixture to the gallery and make the fake refuse a dormant empty state**
 
-Run from the worktree root:
+Run from the worktree root (the fake first: the host leaves a table's `empty` unmounted while it has rows, so
+`KitView.focus` and `reveal` refuse its nodes then, and the fake now does the same):
+
+```bash
+python3 -I - <<'PY'
+"""Plan 3c Task 6 step 3: the fake refuses focus and reveal into a table's empty state while the table has rows, as the host does."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+edit("jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java", [
+    (' @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}\n',
+     ' @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");focused=id;}\n'
+     " /** Whether a node lies in a table's empty state while that table has rows: the host leaves the state unmounted then, though its ids and icons are still checked. */\n"
+     ' private boolean dormant(String id){for(var node:index(spec.root()).values())if(node instanceof Nodes.Table table&&!table.rows().isEmpty()&&table.empty().isPresent()&&index(table.empty().get()).containsKey(id))return true;return false;}\n', 1),
+    (' @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}',
+     ' @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");revealed=id;}', 1),
+    # Rows arriving unmount a focused state's node on the host; the fake's logical focus follows.
+    ('if(focused!=null&&!nodes.containsKey(focused))focused=null;', 'if(focused!=null&&(!nodes.containsKey(focused)||dormant(focused)))focused=null;', 1)])
+PY
+```
+
+`dormant` reads `spec`, which `update` assigns before it clears `focused`. Then add the gallery fixture:
+
 
 ```bash
 python3 -I - <<'PY'
@@ -2304,9 +2479,10 @@ PY
 
 - [ ] **Step 4: Run the tests and prove the pixel rule**
 
-Run: `./gradlew :jasper-ui:test :jasper-app:test --tests dev.jasper.app.plugins.HostedKitContractTest :jasper-sdk-testkit:test --continue`
+Run: `./gradlew :jasper-ui:test :jasper-app:test --tests dev.jasper.app.plugins.HostedKitContractTest --tests dev.jasper.app.plugins.AppContractTest :jasper-sdk-testkit:test --continue`
 Expected: BUILD SUCCESSFUL. `GalleryCoverageTest` (the new test included), `KitMatrixTest` (the new fixture under the
-default kit over the theme set, and no literal under `custom()`), `KitKeyBindingAuditTest` and both contract runs pass.
+default kit over the theme set, and no literal under `custom()`), `KitKeyBindingAuditTest`, both kit contract runs and
+both plugin contract runs pass.
 
 Then render the headless gallery here and at the branch's base, and compare. Every file of the base must be
 byte-identical here except `manifest.json` and the last contact sheet; the only new files are the fixture's two and,
@@ -2345,7 +2521,7 @@ Expected, for each theme: every base file byte-identical except `manifest.json` 
 and the added files exactly `tables-0-18.png`, `tables-0-18.json` (and the new sheet when the last was full). Open
 `$B/new-dark/tables-0-18.png` and `$B/new-light/tables-0-18.png` and look at them: the Sessions tree with Name, Host and
 Port over its values; the grouped table's bold group rows with "2 groups" and "1 group" at the right and "Card" /
-"Sticky card" values each followed by its chevron with no border, the selected row's in the selection ink; "test
+"Sticky card" values each followed by its chevron with no border, their text starting under the "Display" title, the selected row's in the selection ink; "test
 [HTTP]" and "● Running" cells; "No Tunnels" with [New Tunnel…] below the Type, Local and Remote headers; "Not
 Connected" under Name, Size and Modified; and the ordered list's "No keys". Compare with the mocks named in the
 header; the classic look (plan 4) is what makes them match, not this plan.
@@ -2354,14 +2530,18 @@ header; the classic look (plan 4) is what makes them match, not this plan.
 
 ```bash
 git add jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java \
+  jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java \
+  jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java \
   jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/TableFixtures.java jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java \
   jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java
 git commit -F - <<'EOF'
 SDK 0.18 tables: the shared contract and the gallery fixture
 
 The kit contract mounts, updates and drives tree columns, cell nodes,
-heading rows and the empty states on the host and the fake alike; the
-gallery's last fixture shows every addition, coverage checks each one
+heading rows and the empty states on the host and the fake alike, and
+the fake refuses focus into an empty state its table's rows replaced;
+the plugin contract admits the view and refuses misplaced cells,
+headings and empty states; the gallery's last fixture shows every addition, coverage checks each one
 (the in-cell DROPDOWN included), and every earlier fixture renders
 byte-identically.
 
@@ -2429,10 +2609,11 @@ print(f"{totals[0]:,} tests, {totals[1]} failures, {totals[2]} errors, {totals[3
 PY
 ```
 
-Expected: 0 failures and 0 errors, and 18 tests more than the base's count (the base is `main` after 3b; its count is
-in 3b's STATUS entry): five SDK `KitValuesTest`, one model `ViewSpecTest`, one jasper-app `KitValuesTest`, eight
-`TableVocabularyTest`, one `GalleryCoverageTest`, and the new kit contract test twice (host and fake); skipped as the
-base. Then run the AGENTS.md source-hygiene script over every Java source; it must print nothing.
+Expected: 0 failures and 0 errors, and 21 tests more than the base's count (the base is `main` after 3b; its count is
+in 3b's STATUS entry): five SDK `KitValuesTest`, one model `ViewSpecTest`, one jasper-app `KitValuesTest`, nine
+`TableVocabularyTest`, one `GalleryCoverageTest`, the new kit contract test twice (`HostedKitContractTest` and
+`FakeKitContractTest`) and the new plugin contract test twice (`AppContractTest` and `FakeContractTest`); skipped as
+the base. Then run the AGENTS.md source-hygiene script over every Java source; it must print nothing.
 
 - [ ] **Step 3: Record the plan in STATUS and in this plan**
 
@@ -2446,7 +2627,7 @@ the line Step 2's totals script printed in place of `TOTALS` and the first and l
 [plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18 gains spec 8.2's table
 vocabulary, mirrored in the jasper-ui model, projected losslessly by `KitValues`, walked by both runtimes' descriptor
-walks, and carried by the shared kit contract: `Tree.columns` (a header over the trailing values, header clicks report
+walks, and carried by the shared kit and plugin contracts: `Tree.columns` (a header over the trailing values, header clicks report
 `Sorted`), `TableRow.cellNodes` (Text, StatusDot, Icon, Chip, an INLINE stack of those, or a DROPDOWN `Choice`; one
 content per column), `TableRow.heading` with `Heading` and `countNoun` ("6 groups"), `Table.empty` (one action at
 most) or `Table.emptyText`, and `ItemList.emptyText`. Every former constructor stays with the new components empty.
@@ -2456,13 +2637,15 @@ that keys, clicks and type-ahead never land on, the empty line, an empty table's
 headers, and a column tree's header over right-aligned values with a reserved count column. Zero pixel change: the
 headless gallery's files for Slate Cobalt Dark and Light are byte-identical to the base but for `manifest.json`, the
 last contact sheet and the new `tables-0-18` fixture. Planned deviations and rulings (plan, "Planned deviations and
-rulings"): (1) the contract cases are in `KitContractTest`, not `PluginContractTest`; (2) `cellNodes` iterates in
+rulings"): (1) the admission and refusal case is in `PluginContractTest`, the per-view behaviour in
+`KitContractTest`; (2) `cellNodes` iterates in
 column-id order; (3) a `countNoun` needs a count and is lowercase with no surrounding spaces, and a heading row has
 nothing but its heading; (4) a heading row is BODY_STRONG with a CAPTION count and no indent below it; (5) a table's
-`empty` is mounted only while it has no rows; (6) the empty line shows only with no items, one row tall, above an
+`empty` is mounted only while it has no rows, and both runtimes refuse focus and reveal into it while rows show; (6)
+the empty line shows only with no items, one row tall (inside a filter-driven list's reserved rows), above an
 ItemList's add action; (7) tree columns right-align the values, pad missing ones and reserve the count column, and
 keycap-presented trees are plan 9's; (8) a muted row dims plain cells and Text cell nodes; (9) the cell dropdown is as
-wide as its selected plain value; (10) no README edit. Hand-offs: plan 4's classic faces draw the same descriptors
+wide as its selected plain value and its value starts under the column's title; (10) no README edit. Hand-offs: plan 4's classic faces draw the same descriptors
 (grid lines, the indent under headings, the mocks' header strip); plans 9 and 10 adopt them (Notifications, Keymap,
 Sessions, Tunnels, File Servers, SFTP, Add Host's keys); 3e owns the default-look changes of section 13.
 `./gradlew check --continue`: **TOTALS**. GUI checks for the user: none new (no plugin or page uses the vocabulary
