@@ -220,4 +220,31 @@ class JasperThemeTest {
             assertThat(JasperTheme.validId(bad)).as(bad).isFalse();
         assertThatThrownBy(() -> JasperTheme.parse(GRUVBOX, "Gruvbox")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    /** Slate Cobalt with its Light variant listing two override keys after its roles. */
+    static String withOverrides() throws Exception {
+        return bundledJson().replace("\"hue.neutral\": \"#5A6270\"",
+            "\"hue.neutral\": \"#5A6270\", \"surface.tableHeader\": \"#F0F1F3\", \"warning.ground\": \"#FBF1DA\"");
+    }
+
+    @Test void aVariantMayListOverrideKeysWhichAreDerivedRolesNotSemanticOnes() throws Exception {
+        var theme = JasperTheme.parse(withOverrides(), "t");
+        assertThat(theme.generated(false).derivedOverrides()).containsOnly(
+            entry(DerivedColor.SURFACE_TABLE_HEADER, new Color(0xF0F1F3)), entry(DerivedColor.WARNING_GROUND, new Color(0xFBF1DA)));
+        assertThat(theme.generated(true).derivedOverrides()).as("the other variant lists none").isEmpty();
+        assertThat(theme.palette(false)).as("the semantic palette is untouched").isEqualTo(JasperTheme.bundled().palette(false));
+        assertThat(JasperTheme.DERIVED_OVERRIDES).hasSize(8).allSatisfy((key, role) -> {
+            assertThat(role.key()).isEqualTo(key);
+            assertThat(role.overridable()).isTrue();
+        });
+    }
+
+    @Test void anOverrideKeyTakesAnOpaqueColourAndOnlyTheEightAreKeys() throws Exception {
+        String json = withOverrides();
+        assertThat(failure(json.replace("\"#F0F1F3\"", "\"#F0F1F380\""))).hasMessageContaining("ui.light.surface.tableHeader: Expected #RRGGBB, got \"#F0F1F380\"");
+        assertThat(failure(json.replace("\"#F0F1F3\"", "3"))).hasMessageContaining("ui.light.surface.tableHeader: Expected a colour");
+        assertThat(failure(json.replace("\"surface.tableHeader\"", "\"border.divider\""))).as("a derived role without an override key")
+            .hasMessageContaining("ui.light: Unknown colour \"border.divider\"");
+        assertThat(failure(json.replace("\"surface.tableHeader\"", "\"surface.tableHeaders\""))).hasMessageContaining("ui.light: Unknown colour \"surface.tableHeaders\"");
+    }
 }

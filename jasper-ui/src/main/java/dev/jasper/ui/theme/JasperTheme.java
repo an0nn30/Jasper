@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
  * own colours, {@code surface.titlebar} and {@code text.titlebar}: they are then {@code surface.app} and
- * {@code text.primary}. A variant's matching terminal scheme is
+ * {@code text.primary}. A variant may also list the {@linkplain DerivedColor#overridable() overridable} derived roles,
+ * opaque ({@link GeneratedTheme#derivedOverrides()}). A variant's matching terminal scheme is
  * the scheme with its key, {@code dark} or {@code light}. A missing, unknown or malformed entry fails loading with a
  * {@link ThemeFileException} naming the file and the entry. Immutable.
  */
@@ -49,9 +50,14 @@ public final class JasperTheme {
     /** Roles a variant may leave out, and the role each then is: the title bar's own colours ({@link TitleBarTheme}). */
     private static final Map<SemanticColor, SemanticColor> OPTIONAL = Map.of(SemanticColor.SURFACE_TITLEBAR, SemanticColor.SURFACE_APP,
         SemanticColor.TEXT_TITLEBAR, SemanticColor.TEXT_PRIMARY);
+    /** The override keys a variant may list, read before the roles: the overridable derived roles, by key. */
+    static final Map<String, DerivedColor> DERIVED_OVERRIDES = java.util.Arrays.stream(DerivedColor.values())
+        .filter(DerivedColor::overridable).collect(java.util.stream.Collectors.toUnmodifiableMap(DerivedColor::key, role -> role));
 
     /** One UI variant with every value filled in. */
     private record Variant(SemanticPalette palette, EditorColors editor, Map<SyntaxRole, SyntaxStyle> syntax, GeneratedTheme generated) { }
+    /** A variant's roles and the derived roles it authors, as read. */
+    private record Colours(SemanticPalette palette, Map<DerivedColor, Color> overrides) { }
 
     private final String id, origin, name, author;
     private final Map<String, Object> ui, editor;
@@ -167,20 +173,30 @@ public final class JasperTheme {
     }
 
     private Variant build(boolean dark) {
-        var palette = palette(dark ? DARK : LIGHT);
+        var read = colours(dark ? DARK : LIGHT);
+        var palette = read.palette();
         var styles = new EnumMap<SyntaxRole, SyntaxStyle>(SyntaxRole.class);
         var colors = editor(dark, palette, styles);
         var syntax = Map.copyOf(styles);
         var scheme = schemes.get(dark ? DARK : LIGHT);
-        var generated = new GeneratedTheme(name, dark, author, palette, scheme.colors(), colors, syntax, GlassLevels.OPAQUE);
+        var generated = new GeneratedTheme(name, dark, author, palette, scheme.colors(), colors, syntax, GlassLevels.OPAQUE,
+            read.overrides());
         return new Variant(palette, colors, syntax, generated);
     }
 
-    private SemanticPalette palette(String variant) {
+    private Colours colours(String variant) {
         @SuppressWarnings("unchecked") var values = (Map<String, Object>) ui.get(variant);
         String where = "ui." + variant;
         var colors = new EnumMap<SemanticColor, Color>(SemanticColor.class);
+        var overrides = new EnumMap<DerivedColor, Color>(DerivedColor.class);
         values.forEach((key, value) -> {
+            var derived = DERIVED_OVERRIDES.get(key);
+            if (derived != null) {
+                if (!(value instanceof String text)) throw error(where + "." + key + ": Expected a colour");
+                if (!RGB.matcher(text).matches()) throw error(where + "." + key + ": Expected #RRGGBB, got \"" + text + "\"");
+                overrides.put(derived, color(text, origin, where + "." + key));
+                return;
+            }
             var role = SemanticColor.of(key).filter(r -> !RULED.contains(r))
                 .orElseThrow(() -> error(where + ": Unknown colour \"" + key + "\""));
             if (!(value instanceof String text)) throw error(where + "." + key + ": Expected a colour");
@@ -199,7 +215,7 @@ public final class JasperTheme {
         colors.put(SemanticColor.HUE_AMBER_SURFACE, colors.get(SemanticColor.HUE_AMBER));
         colors.put(SemanticColor.HUE_PURPLE_SURFACE, colors.get(SemanticColor.HUE_PURPLE));
         colors.put(SemanticColor.HUE_NEUTRAL_SURFACE, colors.get(SemanticColor.HUE_NEUTRAL));
-        return new SemanticPalette(colors);
+        return new Colours(new SemanticPalette(colors), overrides);
     }
 
     static final List<String> ANSI = List.of("black", "red", "green", "yellow", "blue", "magenta", "cyan", "white");

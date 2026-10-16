@@ -7,7 +7,8 @@ import java.util.EnumMap;
  * The window header's theme: the theme itself, unless its variant gives the title bar its own colours
  * ({@code surface.titlebar} other than {@code surface.app}, or {@code text.titlebar} other than {@code text.primary}).
  * Then the roles the header paints with follow those two: its surface, the text levels, the hover and pressed fills and
- * the search field's fill and borders, and the theme is dark when the title bar is. Everything else is the theme's.
+ * the search field's fill and borders, and the theme is dark when the title bar is. Everything else is the theme's,
+ * the derived roles it authors included.
  */
 public final class TitleBarTheme {
     private static GeneratedTheme lastIn, lastOut;
@@ -50,6 +51,6 @@ public final class TitleBarTheme {
         colors.put(SemanticColor.BORDER_SUBTLE, ColorMath.opacity(ink, .06));
         boolean dark = ColorMath.lightness(surface) < 50;
         return new GeneratedTheme(theme.name(), dark, theme.author(), new SemanticPalette(colors), theme.terminal(), theme.editor(),
-            theme.syntax(), theme.glass());
+            theme.syntax(), theme.glass(), theme.derivedOverrides());
     }
 }

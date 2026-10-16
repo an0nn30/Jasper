@@ -96,7 +96,7 @@ class UiColorKeysTest {
         var base = JasperTheme.bundled().generated(true);
         var t = base.terminal();
         return new GeneratedTheme(base.name(), base.dark(), base.author(), palette,
-            new TerminalColors(t.background(), t.foreground(), t.cursor(), selection, t.ansi()), base.editor(), base.syntax(), base.glass());
+            new TerminalColors(t.background(), t.foreground(), t.cursor(), selection, t.ansi()), base.editor(), base.syntax(), base.glass(), base.derivedOverrides());
     }
 
     @Test void everyKeyIsARolesColour() {

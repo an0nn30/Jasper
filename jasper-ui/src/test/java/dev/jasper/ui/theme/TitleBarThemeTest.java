@@ -43,4 +43,12 @@ class TitleBarThemeTest {
         assertThat(palette.color(SemanticColor.SURFACE_PANEL)).isEqualTo(light.semantic().color(SemanticColor.SURFACE_PANEL));
         assertThat(TitleBarTheme.of(light)).as("derived once per theme").isSameAs(header);
     }
+
+    @Test void theHeaderThemeCarriesTheDerivedRolesTheVariantAuthors() throws Exception {
+        var light = JasperTheme.parse(JasperThemeTest.withOverrides().replace("\"accent\": \"#2563C9\"",
+            "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
+        var header = TitleBarTheme.of(light);
+        assertThat(header).isNotSameAs(light);
+        assertThat(header.derivedOverrides()).isEqualTo(light.derivedOverrides()).isNotEmpty();
+    }
 }

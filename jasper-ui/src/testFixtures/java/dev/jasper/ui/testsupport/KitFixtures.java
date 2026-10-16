@@ -103,13 +103,13 @@ public final class KitFixtures {
     /** {@code base} named {@code name}. */
     private static GeneratedTheme withName(GeneratedTheme base, String name) {
         return new GeneratedTheme(name, base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(), base.syntax(),
-            base.glass());
+            base.glass(), base.derivedOverrides());
     }
 
     /** {@code base} with its semantic palette replaced. */
     public static GeneratedTheme withSemantic(GeneratedTheme base, SemanticPalette palette) {
         return new GeneratedTheme(base.name(), base.dark(), base.author(), palette, base.terminal(), base.editor(), base.syntax(),
-            base.glass());
+            base.glass(), base.derivedOverrides());
     }
 
     /** {@code top} painted over opaque {@code bottom} as Java2D composites it: what an alpha-carrying role shows on a surface. */
@@ -123,7 +123,7 @@ public final class KitFixtures {
     /** {@code base} reporting {@code dark}. */
     public static GeneratedTheme withDark(GeneratedTheme base, boolean dark) {
         return new GeneratedTheme(base.name(), dark, base.author(), base.semantic(), base.terminal(), base.editor(), base.syntax(),
-            base.glass());
+            base.glass(), base.derivedOverrides());
     }
 
     /**

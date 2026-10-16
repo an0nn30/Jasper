@@ -21,7 +21,7 @@ class HostedPalettesTest {
         var editor = new dev.jasper.ui.theme.EditorColors(new java.awt.Color(1, 2, 3), new java.awt.Color(4, 5, 6), new java.awt.Color(7, 8, 9),
             new java.awt.Color(10, 11, 12), new java.awt.Color(13, 14, 15), new java.awt.Color(16, 17, 18), new java.awt.Color(19, 20, 21));
         var theme = new dev.jasper.ui.theme.GeneratedTheme(base.name(), base.dark(), base.author(), base.semantic(), base.terminal(), editor,
-            base.syntax(), base.glass());
+            base.syntax(), base.glass(), base.derivedOverrides());
         assertThat(HostedPalettes.workspace(theme)).isEqualTo(new WorkspacePalette(roles.get(SURFACE_PANEL), roles.get(SURFACE_PANEL_RAISED),
             roles.get(SURFACE_CARD), roles.get(TEXT_PRIMARY), roles.get(TEXT_SECONDARY), roles.get(BORDER_WINDOW), roles.get(SELECTION_BG),
             roles.get(TEXT_ONSELECTION), roles.get(SURFACE_CONTROL_HOVER), roles.get(ACCENT), roles.get(STATUS_SUCCESS),
