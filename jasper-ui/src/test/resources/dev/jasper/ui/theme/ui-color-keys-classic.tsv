@@ -1,0 +1,18 @@
+# The classic overlay on ui-color-keys.tsv (spec 6.5, plan 4 Rulings 15): FlatLaf key, then a SemanticColor or a derived role key.
+TableHeader.background	surface.tableHeader
+TableHeader.foreground	TEXT_SECONDARY
+TableHeader.separatorColor	border.divider
+TableHeader.bottomSeparatorColor	border.divider
+Table.alternateRowColor	surface.zebra
+Table.gridColor	border.divider
+Table.selectionBackground	SELECTION_BG
+Table.selectionForeground	TEXT_ONSELECTION
+Tree.selectionBackground	SELECTION_BG
+Tree.selectionForeground	TEXT_ONSELECTION
+Button.startBackground	BUTTON_SECONDARY_BG
+Button.endBackground	button.end
+Button.hoverBorderColor	border.hover
+Button.default.borderColor	accent.edge
+MenuBar.selectionBackground	ACCENT
+MenuBar.selectionForeground	TEXT_ONACCENT
+ToolBar.separatorColor	border.divider
