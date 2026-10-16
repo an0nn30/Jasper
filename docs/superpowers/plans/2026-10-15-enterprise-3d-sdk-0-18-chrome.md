@@ -49,7 +49,10 @@ grep -c 'cellNodes' jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java
 ```
 
 Expected: the rebase replays only this plan's commit; each `grep -c` prints a number of at least 1 (3a's version, 3b's
-`Nodes.Separator`, 3c's `TableRow.cellNodes`). If any prints 0, stop: this plan needs 3a, 3b and 3c on `main`.
+`Nodes.Separator`, 3c's `TableRow.cellNodes`). If any prints 0, stop: this plan needs 3a, 3b and 3c on `main`. Task 5
+uses 3b's `Nodes.Separator` directly. No task uses a 3c type; the 3c check holds because plan 3's parts run in sequence
+(spec 19.1: "1 to 11 in sequence", plan 3 delivered as 3a to 3e) and because Task 7's test-count base is `main` after
+3c.
 
 ## Global Constraints
 
@@ -80,7 +83,11 @@ Expected: the rebase replays only this plan's commit; each `grep -c` prints a nu
    `WindowToolbarTest.aViewHidesWhileTheRowIsTooNarrowAndNeverEntersTheOverflowMenu` and
    `aLowerPriorityButtonOverflowsBeforeAViewHides`.
 4. The plugin closes its registration, stops, or the user closes the window while views are showing: each view closes
-   exactly once and its controls leave the toolbar. Task 4: `WindowToolbarViewsTest.aViewClosesWhenItsEntryGoesAndWhenItsWindowCloses`;
+   exactly once and its controls leave the toolbar, also when the factory itself changes the contributions (registers
+   or enables an action), which re-renders the toolbar from inside the pass that asked it: `renderContributedToolbar`
+   defers that nested pass, as `renderContributedMenus` does, and reserves the window's slot before the factory runs.
+   Task 4: `WindowToolbarViewsTest.aViewClosesWhenItsEntryGoesAndWhenItsWindowCloses` and
+   `aFactoryThatChangesTheContributionsIsAskedOnceAndItsViewClosesOnce`;
    Task 5: `PluginContractTest.aToolbarViewIsBuiltOncePerWindowAndClosesWithItsWindowAndItsRegistration`.
 5. A scope whose split verb comes first, or that has two, or a noun such as "Session" or " session": refused when the
    `ScopeSpec` is made, and the app registry refuses the same verbs; a scope with no hue or noun reaches the app with
@@ -172,15 +179,22 @@ At `222969926` unless marked "after 3a".
     (`jasper-ui/src/testFixtures/.../KitFixtures.java:196-233`); `NativeShellsChromeTest` builds a title bar headlessly
     with `NativeShells.installTitleBar(root, surface, true)` (`NativeShellsChromeTest.java:33-52`).
 
-## Rulings (where the spec is silent)
+## Rulings (where the spec is silent) and one deviation
 
-Record each in `docs/STATUS.md` (Task 7) and in this plan's status banner when it is executed.
+Record each in `docs/STATUS.md` (Task 7) and in this plan's status banner when it is executed. Ruling 1 is not
+gap-filling: it departs from binding spec text (10.3's first bullet, "refused at registration with a message naming
+the node", and section 15's row "A toolbar view's root breaks admission": "`IllegalArgumentException` at registration
+naming the node"). It needs the user's approval, or a spec amendment line, before this plan merges; the status banner
+and the STATUS entry record it as a deviation awaiting that approval.
 
-1. **"Refused at registration" means when the view is mounted, and on every update.** `Toolbar.add` receives only a
-   factory, so the tree exists only once a window asks for it: the host checks it when it mounts the factory's view
-   (the refusal is contained like a throwing factory, logged against the plugin, the refused view closed and that
-   window shows no view) and on every later `update` (an `IllegalArgumentException` naming the node to the caller;
-   the view keeps its tree). The message names the node by kind and id.
+1. **Deviation (spec 10.3, 15; awaiting the user's approval): admission runs when the view is mounted, and on every
+   update, not at registration.** `Toolbar.add` receives only a factory, so the tree exists only once a window asks for
+   it: the host checks it when it mounts the factory's view (the refusal is contained like a throwing factory, logged
+   against the plugin, the refused view closed and that window shows no view, so the plugin never receives the
+   exception spec 15 names) and on every later `update` (an `IllegalArgumentException` naming the node to the caller;
+   the view keeps its tree). The message names the node by kind and id. If the user rejects it, the spec's reading
+   needs a factory call at `Toolbar.add`, which spec 10.3's second bullet ("never for the rehearsal") rules out for a
+   real window.
 2. **"At most one PRIMARY Button" admits PRIMARY buttons only.** Buttons in a toolbar view must be PRIMARY, at most one;
    a SECONDARY, GHOST or LINK button is refused.
 3. **The window's open event is `WindowContent.connectTerminals`.** `WindowChrome.windowOpened()` runs from there, and a
@@ -304,8 +318,9 @@ PY
 
 Run: `./gradlew :jasper-sdk-testkit:test --tests dev.jasper.sdk.testing.FakeContractTest :jasper-app:test --tests dev.jasper.app.workspace.WindowChromeContributionsTest --continue`
 Expected: FAIL. `:jasper-sdk-testkit:compileTestFixturesJava` stops with "cannot find symbol … SESSION" in
-`PluginContractTest`, and `:jasper-app:compileTestJava` with "cannot find symbol … SESSION" in
-`WindowChromeContributionsTest`.
+`PluginContractTest`. `:jasper-app:compileTestJava` depends on those test fixtures (`AppContractTest` extends
+`PluginContractTest`), so Gradle does not run it, even with `--continue`, and reports it as not run because its
+dependency failed; `WindowChromeContributionsTest` first compiles in Step 4.
 
 - [ ] **Step 3: Add the menus**
 
@@ -1179,8 +1194,10 @@ PY
 
 Run: `./gradlew :jasper-sdk:test --tests dev.jasper.sdk.ui.PanelAndWindowValuesTest :jasper-app:test --tests dev.jasper.app.windows.NativeShellsChromeTest --continue`
 Expected: FAIL. `:jasper-sdk:compileTestJava` stops with "cannot find symbol … swatch()" (and the five-argument
-constructor) in `PanelAndWindowValuesTest`; `:jasper-app:compileTestJava` stops on `swatch` in `NativeShellsChromeTest`
-(after the testFixtures compile also stops on `dialogSwatch` in `PluginContractTest`).
+constructor) in `PanelAndWindowValuesTest`, and `:jasper-sdk-testkit:compileTestFixturesJava` stops on the five-argument
+`DialogSpec` and `dialogSwatch` in `PluginContractTest`. `:jasper-app:compileTestJava` depends on those test fixtures
+(`AppContractTest` extends `PluginContractTest`), so Gradle does not run it, even with `--continue`;
+`NativeShellsChromeTest` first compiles in Step 5.
 
 - [ ] **Step 3: The SDK record**
 
@@ -1355,7 +1372,8 @@ r'''        return context.ui.windows.stream().filter(w -> !w.closed && w.title.
      * UI thread.
      * @param pluginId dialog owner
      * @param title exact dialog title
-     * @return the swatch while the dialog is open; empty for windows, overlays, closed or absent dialogs
+     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for plugin
+     *     windows, {@code Windows.overlay} surfaces and closed or absent dialogs
      * @since 0.18.0
      */
     public java.util.Optional<dev.jasper.sdk.ui.Nodes.Hue> dialogSwatch(String pluginId, String title) {
@@ -1602,6 +1620,35 @@ class WindowToolbarViewsTest {
             owner.chrome().renderContributedToolbar();
             assertThat(asked).hasValue(1);
             assertThat(WindowTabsTest.named(owner.toolbar(), "pluginSeparator").isVisible()).as("nothing shown, no plugin group").isFalse();
+        });
+    }
+
+    /** A factory that changes the contributions while it runs re-renders the toolbar from inside the pass that asked it. */
+    @Test void aFactoryThatChangesTheContributionsIsAskedOnceAndItsViewClosesOnce() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            var asked = new AtomicInteger();
+            var closed = new AtomicInteger();
+            List<JComponent> components = new ArrayList<>();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            owner.connectTerminals(new TerminalRegistry(), () -> { });
+            var registration = model.addToolbar(new ToolbarEntry.View(window -> {
+                int call = asked.incrementAndGet();
+                // Both fire Contributions.Kind.ACTIONS synchronously, which renders the toolbar again.
+                var action = model.addAction("dev.x.connect" + call, "Connect", null, List.of(), Optional.empty(), invocation -> { });
+                action.setEnabled(false);
+                var component = new JPanel();
+                component.setPreferredSize(new Dimension(120, 24));
+                components.add(component);
+                return Optional.of(new ToolbarEntry.Mounted(component, closed::incrementAndGet));
+            }));
+            assertThat(asked).as("the nested pass does not ask the factory again").hasValue(1);
+            assertThat(components).hasSize(1);
+            assertThat(inToolbar(owner, components.getFirst())).isTrue();
+            registration.close();
+            assertThat(closed).as("the one view closes once").hasValue(1);
+            assertThat(inToolbar(owner, components.getFirst())).isFalse();
         });
     }
 
@@ -2003,6 +2050,9 @@ edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java", [
     private final java.util.Map<ToolbarEntry.View, ToolbarEntry.Mounted> views = new java.util.IdentityHashMap<>();
     /** Whether this window's open event fired, so that it builds toolbar views. */
     private boolean opened;
+    /** Whether a toolbar pass is running, and whether a change during it asked for another. */
+    private boolean renderingToolbar;
+    private boolean toolbarDirty;
 ''', 1),
 (r'''    void connect(WindowContributions source) {
         contributions = source;
@@ -2032,9 +2082,26 @@ edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java", [
 ''',
  r'''    /**
      * Rebuilds the plugin section after the built-in controls. A contributed view is built once, after this window
-     * opened, and closed here when its entry goes or the window lets go of its contributions.
+     * opened, and closed here when its entry goes or the window lets go of its contributions. A view's factory and its
+     * close are contributor code that may change the contributions (register an action, enable one, add a toolbar
+     * item), which renders the toolbar again from inside this pass: that nested call only marks the toolbar dirty, and
+     * this pass then runs again with the latest model, as {@code renderContributedMenus} does.
      */
     void renderContributedToolbar() {
+        toolbarDirty = true;
+        if (renderingToolbar) return;
+        renderingToolbar = true;
+        try {
+            do {
+                toolbarDirty = false;
+                rebuildContributedToolbar();
+            } while (toolbarDirty);
+        } finally {
+            renderingToolbar = false;
+        }
+    }
+
+    private void rebuildContributedToolbar() {
         contributedToolbar.forEach(toolbar::remove);
         contributedToolbar.clear();
         List<ToolbarEntry> entries = contributions == null ? List.of() : contributions.model().toolbar();
@@ -2059,7 +2126,11 @@ edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java", [
                     case ToolbarEntry.View view -> {
                         // Built once per window and only after it opened, so never for the warm-up rehearsal's window.
                         if (!opened) break;
-                        if (!views.containsKey(view)) views.put(view, view.factory().apply(owner.id()).orElse(null));
+                        if (!views.containsKey(view)) {
+                            // Reserve the slot before the contributor's factory runs, so that no pass asks it twice.
+                            views.put(view, null);
+                            views.put(view, view.factory().apply(owner.id()).orElse(null));
+                        }
                         ToolbarEntry.Mounted mounted = views.get(view);
                         if (mounted == null) break;
                         if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) kit.toolbarStrip(true);
@@ -2097,7 +2168,7 @@ PY
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test :jasper-ui:javadoc :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests dev.jasper.app.plugins.AppContractTest --tests dev.jasper.app.appearance.ThemeMigrationCoverageTest --tests dev.jasper.app.architecture.StaticDefaultTest --continue`
-Expected: BUILD SUCCESSFUL. Both `KitViewToolbarStripTest` cases, the two new `WindowToolbarTest` cases and the four
+Expected: BUILD SUCCESSFUL. Both `KitViewToolbarStripTest` cases, the two new `WindowToolbarTest` cases and the five
 `WindowToolbarViewsTest` cases pass; every existing toolbar, header and chrome test (`WindowToolbarTest`,
 `WindowHeaderTest`, `WindowChromeContributionsTest`, `MacTitleBarTest`, `ViewModeChromeTest`) passes unchanged, since a
 row without views lays out exactly as before.
@@ -2161,7 +2232,8 @@ cover admission refusals, one view per window, closing with the window and the r
 
 **Interfaces:**
 - Consumes: Task 4's `ToolbarEntry.View(Function<UUID, Optional<ToolbarEntry.Mounted>>)`,
-  `ToolbarEntry.Mounted(JComponent, Runnable)` and its `close()`.
+  `ToolbarEntry.Mounted(JComponent, Runnable)` and its `close()`; plan 3b's `Nodes.Separator(String id, ControlState state)`
+  (both `ToolbarViewAdmission` switches and the `ToolbarItem.View` javadoc's `{@link Nodes.Separator}`).
 - Produces: `dev.jasper.sdk.ui.ToolbarViewFactory` (`UiView create(WindowHandle window)`), `ToolbarItem.View(ToolbarViewFactory factory)`,
   `ToolbarItem.view(ToolbarViewFactory)`; `FakePluginHost.toolbarViews(UUID windowId)` (`List<FakeKitView>`) and
   `closeToolbarViews(UUID windowId)`; harness `openToolbarViews(UUID)` (`List<String>` of root ids),
@@ -2580,12 +2652,17 @@ r'''    Toolbar toolbar() {
         });
     }
 
-    /** One window's view, contained: empty when the factory threw or the toolbar does not admit its tree. */
+    /**
+     * One window's view, contained: empty when the factory threw or the toolbar does not admit its tree, and empty for
+     * a window that already holds this registration's view (one built while the factory ran is kept, the newer closed).
+     */
     private Optional<ToolbarEntry.Mounted> buildToolbarView(dev.jasper.sdk.ui.ToolbarViewFactory factory, java.util.UUID windowId,
                                                             java.util.Map<java.util.UUID, HostedKitView> built) {
+        if (built.containsKey(windowId)) return Optional.empty();
         var mounted = new java.util.concurrent.atomic.AtomicReference<HostedKitView>();
         containment.run(pluginId, "toolbar view", () -> {
             var view = kit.requireOwned(java.util.Objects.requireNonNull(factory.create(terminals.windowHandle(windowId)), "view"));
+            if (built.containsKey(windowId)) { view.close(); return; }
             view.mount(new ToolbarMount(windowId));
             try {
                 ToolbarViewAdmission.require(view.spec());
@@ -3055,7 +3132,7 @@ vocabulary, the SDK README's package table), `docs/app-maintenance.md` records t
 `docs/STATUS.md` records the plan. The whole build runs and its counts are recorded.
 
 **Files:**
-- Modify: `docs/plugin-authoring.md:122-124` (the Tools bullet and two bullets after it), `docs/plugin-authoring.md:401` (one paragraph), `docs/plugin-ui.md:175` (two bullets), `jasper-sdk/README.md:21`, `docs/app-maintenance.md:522-524`
+- Modify: `docs/plugin-authoring.md:122-124` (the Tools bullet and two bullets after it), `docs/plugin-authoring.md:401` (one paragraph), `docs/plugin-authoring.md:638-639,659,1010-1011` (the fake's new helpers), `docs/plugin-ui.md:175` (two bullets), `jasper-sdk/README.md:21`, `docs/app-maintenance.md:522-524`
 - Modify: `docs/STATUS.md:2` (a new entry above the previous top entry), `docs/superpowers/plans/2026-10-15-enterprise-3d-sdk-0-18-chrome.md:1` (the status banner)
 
 **Interfaces:**
@@ -3093,7 +3170,18 @@ edit("docs/plugin-authoring.md", [
      "`ScopeSpec.withHue` and `withItemNoun` (SDK 0.18) describe your rows to presentations that colour and label them by\n"
      "scope: the hue of the scope's row squares (NONE takes your manifest's `icon_hue`) and what one row is, as a lowercase\n"
      "singular noun (\"session\"; blank uses the label). A verb made with `PaletteVerb.Role.SPLIT` is the split-pane variant\n"
-     "of your first verb; a scope has at most one, never first. The palette card draws none of them.\n", 1)])
+     "of your first verb; a scope has at most one, never first. The palette card draws none of them.\n", 1),
+    ("`host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.\n",
+     "`host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.\n"
+     "`host.toolbarViews(windowId)` builds and returns a window's toolbar views, as the window does when it opens, and\n"
+     "`closeToolbarViews(windowId)` closes them, as closing the window does.\n", 1),
+    ("drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`\n",
+     "drive a contributed scope as the palette would, and `scopePresentation(scopeId)` reports its hue, item noun and\n"
+     "verb roles as `HUE|noun|ROLE,ROLE`; `paletteOpens()`, `openedInEditor()`\n", 1),
+    # 3a moved this range to 0.18's.
+    ("`sdk = \">=0.18.0, <0.19\"` or later to use it.\n",
+     "`sdk = \">=0.18.0, <0.19\"` or later to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports\n"
+     "the swatch an open dialog asked for.\n", 1)])
 edit("docs/plugin-ui.md", [(
     "- **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a\n",
     "- **Toolbar views.** An INLINE `Stack` of LABEL `Text`, choices, one PRIMARY `Button`, `MenuButton`s and `Separator`s,\n"
@@ -3132,20 +3220,20 @@ print(f"{totals[0]:,} tests, {totals[1]} failures, {totals[2]} errors, {totals[3
 PY
 ```
 
-Expected: 0 failures, 0 errors, and 29 more tests than the base (`main` after 3c), with its skipped count unchanged:
+Expected: 0 failures, 0 errors, and 30 more tests than the base (`main` after 3c), with its skipped count unchanged:
 Task 1's contract (2 runs) and workspace test (3), Task 2's two SDK, one registry, one translation and one contract
-(2 runs) tests (6), Task 3's SDK, title-row and contract (2 runs) tests (4), Task 4's two strip, two row and four
-window tests (8), Task 5's SDK test and three contracts (2 runs each) (7), and Task 6's Commands scope test (1). Then
+(2 runs) tests (6), Task 3's SDK, title-row and contract (2 runs) tests (4), Task 4's two strip, two row and five
+window tests (9), Task 5's SDK test and three contracts (2 runs each) (7), and Task 6's Commands scope test (1). Then
 run the AGENTS.md source-hygiene script over every Java source; it must print nothing.
 
 - [ ] **Step 3: Record the plan in STATUS and in this plan**
 
 In `docs/STATUS.md`, insert after line 2 (the blank line under the title) this entry, with the line Step 2's totals
-script printed in place of `TOTALS` and the first and last commit of Tasks 1-6 in place of `FIRST..LAST`, followed by a
-blank line:
+script printed in place of `TOTALS`, the first and last commit of Tasks 1-6 in place of `FIRST..LAST` and the day the
+plan is executed (local time, `date +%F`) in place of `DATE`, followed by a blank line:
 
 ```markdown
-**Enterprise presentation, plan 3d: SDK 0.18 chrome — 2026-10-15** (`claude/enterprise-sdk-0-18-chrome`, worktree
+**Enterprise presentation, plan 3d: SDK 0.18 chrome — DATE** (`claude/enterprise-sdk-0-18-chrome`, worktree
 `.claude/worktrees/enterprise-3d`, `FIRST..LAST`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3d-sdk-0-18-chrome.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18's chrome additions (spec 8.2),
@@ -3164,9 +3252,10 @@ noun the label); nothing draws them until plan 8's Run window. `DialogSpec.swatc
 and `MacTitleBar.setTitleSwatch` draws it before a window or dialog title. The bundled scopes carry spec 14.6's nouns
 and hues and Remote's split verb is SPLIT. The testkit gains `FakePluginHost.toolbarViews`, `closeToolbarViews`,
 `scopePresentation` and `dialogSwatch`. Zero pixel change: no addition is a node, and the headless gallery's files for
-Slate Cobalt Dark and Light are byte-identical to the base. Rulings (plan, "Rulings"): (1) admission runs when a
-window mounts the view (contained, the refused view closed) and on every update (an exception to the plugin), since
-`Toolbar.add` sees only the factory; (2) a toolbar view's buttons are PRIMARY, at most one; (3) the open event is
+Slate Cobalt Dark and Light are byte-identical to the base. Deviation from spec 10.3 and 15, awaiting the user's
+approval (plan, ruling 1): admission runs when a window mounts the view (contained and logged, the refused view
+closed, no exception to the plugin) and on every update (an exception to the plugin), not at registration, since
+`Toolbar.add` sees only the factory. Rulings (plan, "Rulings"): (2) a toolbar view's buttons are PRIMARY, at most one; (3) the open event is
 `connectTerminals`, and a failed factory is not asked again for that window; (4) views give way at priority 40; (5)
 `toolbarStrip` keeps the kit's 24 px control height, the default toolbar's button side; (6) the default look draws a
 swatch only in `MacTitleBar`'s title row (overlays draw no title, sheets have no title bar, Windows and Linux title bars
@@ -3184,11 +3273,12 @@ Then insert, after this plan's first line (`# Enterprise presentation 3d: SDK 0.
 blank line:
 
 ```markdown
-> **Status (2026-10-15): executed on `claude/enterprise-sdk-0-18-chrome` (`FIRST..LAST`).** Deviations from this
-> plan's text: none beyond its "Rulings".
+> **Status (DATE): executed on `claude/enterprise-sdk-0-18-chrome` (`FIRST..LAST`).** Deviation from the spec,
+> awaiting the user's approval: ruling 1 (toolbar view admission at mount and on update, not at registration; spec
+> 10.3 and 15). Deviations from this plan's text: none beyond its "Rulings".
 ```
 
-replacing `FIRST..LAST` the same way, and naming any step whose text had to change instead of "none" (and the same in
+replacing `FIRST..LAST` and `DATE` the same way, and naming any step whose text had to change instead of "none" (and the same in
 the STATUS entry).
 
 - [ ] **Step 4: Commit**
@@ -3202,7 +3292,8 @@ SDK 0.18 chrome: documentation and status
 The plugin guides describe the Session and Transfer menus, toolbar views,
 the palette's hue, item noun and split verb, and the dialog swatch; the
 SDK README lists ToolbarViewFactory and the app maintenance guide the
-toolbar's view rule. STATUS records plan 3d with its rulings.
+toolbar's view rule; the testing text names the fake's new helpers.
+STATUS records plan 3d with its rulings and its deviation.
 
 🤖 Generated with Claude Code at The Home Depot
 
