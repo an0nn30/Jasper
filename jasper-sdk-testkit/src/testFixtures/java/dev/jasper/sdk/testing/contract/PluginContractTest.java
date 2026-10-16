@@ -607,6 +607,23 @@ public abstract class PluginContractTest {
         assertThat(h.menu("TOOLS")).containsExactly("item:test.alpha.run", "===", "item:test.beta.run");
     }
 
+    /** SDK 0.18: Session and Transfer are built-in menus with no items of their own, taking sections as Tools does. */
+    @Test void theSessionAndTransferMenusTakeSectionsLikeTools() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.alpha.connect", "Connect"), invoked -> { });
+            context.actions().register(ActionSpec.of("test.alpha.upload", "Upload"), invoked -> { });
+            context.menus().standard(StandardMenu.SESSION).add("test.alpha.connect");
+            context.menus().standard(StandardMenu.TRANSFER).add("test.alpha.upload");
+        });
+        h.start(info("test.beta"), Set.of(), Set.of(), context -> {
+            context.actions().register(ActionSpec.of("test.beta.connect", "Connect"), invoked -> { });
+            context.menus().standard(StandardMenu.SESSION).add("test.beta.connect");
+        });
+        assertThat(h.menu("SESSION")).containsExactly("item:test.alpha.connect", "===", "item:test.beta.connect");
+        assertThat(h.menu("TRANSFER")).containsExactly("item:test.alpha.upload");
+        assertThat(h.menu("TOOLS")).isEmpty();
+    }
+
     @Test void statusItemsAreOrderedGlobalAndInertAfterClose() {
         var late = new AtomicReference<StatusItem>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {

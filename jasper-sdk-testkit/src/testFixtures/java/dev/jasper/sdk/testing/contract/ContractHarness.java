@@ -46,7 +46,8 @@ public interface ContractHarness extends AutoCloseable {
     List<String> toolbar();
 
     /**
-     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code context},
+     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
+     * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
      * spaces, sections separated by {@code ===}; items of closed actions omitted.
      */

@@ -250,9 +250,11 @@ final class WindowChrome {
         contributedMenus.clear();
         if (contributions != null) {
             var sections = contributions.model().menus();
-            // Tools holds only plugin entries and, like a plugin's own menu, is built fresh on every pass and added
-            // to the bar only while it has any: a stale one would keep an old look and feel, and one JMenu would be
-            // re-inserted into the macOS screen menu bar.
+            // Session, Transfer and Tools hold only plugin entries and, like a plugin's own menu, are built fresh on
+            // every pass and added to the bar only while they have any: a stale one would keep an old look and feel,
+            // and one JMenu would be re-inserted into the macOS screen menu bar.
+            standardMenus.put(MenuTarget.Slot.SESSION, menu("Session"));
+            standardMenus.put(MenuTarget.Slot.TRANSFER, menu("Transfer"));
             standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
@@ -260,16 +262,18 @@ final class WindowChrome {
                 if (built.isEmpty()) continue;
                 JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
                 List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
-                // Tools has no items of its own, so its first section needs no separator.
+                // Session, Transfer and Tools have no items of their own, so a first section there needs no separator.
                 if (menu.getMenuComponentCount() > 0) {
                     var separator = new JPopupMenu.Separator();
                     menu.add(separator); added.add(separator);
                 }
                 for (Component child : built) { menu.add(child); added.add(child); }
             }
-            // The bar orders menus as they are added: Tools after Tab, then plugins' own menus.
-            JMenu tools = standardMenus.get(MenuTarget.Slot.TOOLS);
-            if (tools.getMenuComponentCount() > 0) { menuBar.add(tools); contributedMenus.add(tools); }
+            // The bar orders menus as they are added: Session, Transfer and Tools after Tab, then plugins' own menus.
+            for (MenuTarget.Slot slot : List.of(MenuTarget.Slot.SESSION, MenuTarget.Slot.TRANSFER, MenuTarget.Slot.TOOLS)) {
+                JMenu built = standardMenus.get(slot);
+                if (built.getMenuComponentCount() > 0) { menuBar.add(built); contributedMenus.add(built); }
+            }
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);

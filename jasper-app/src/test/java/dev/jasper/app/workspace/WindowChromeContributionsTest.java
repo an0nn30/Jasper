@@ -198,6 +198,31 @@ class WindowChromeContributionsTest {
         });
     }
 
+    /** Plan 3d: Session and Transfer show after Tab and before Tools, each only while a plugin has entries in it. */
+    @Test void sessionAndTransferAppearAfterTabBeforeToolsOnlyWhileAPluginHasEntriesInThem() throws Exception {
+        edt(() -> {
+            var model = new Contributions();
+            WindowContent owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
+            owner.connectContributions(model);
+            model.addAction("dev.x.connect", "Connect", null, List.of(), Optional.empty(), invocation -> { });
+            model.addAction("dev.x.upload", "Upload", null, List.of(), Optional.empty(), invocation -> { });
+            model.addMenuSection(MenuTarget.topLevel("dev.x.menu", "Own")).set(List.of(new MenuEntry.Item("dev.x.connect")));
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS)).set(List.of(new MenuEntry.Item("dev.x.upload")));
+            assertThat(titles(owner)).as("no entries, no menus").doesNotContain("Session", "Transfer");
+            MenuSection session = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.SESSION));
+            session.set(List.of(new MenuEntry.Item("dev.x.connect")));
+            MenuSection transfer = model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TRANSFER));
+            transfer.set(List.of(new MenuEntry.Item("dev.x.upload")));
+            assertThat(titles(owner)).containsSubsequence("Tab", "Session", "Transfer", "Tools", "Own");
+            assertThat(items(menu(owner, "Session"))).as("no separator before the first section").containsExactly("Connect");
+            assertThat(items(menu(owner, "Transfer"))).containsExactly("Upload");
+            session.close();
+            assertThat(titles(owner)).doesNotContain("Session").containsSubsequence("Tab", "Transfer", "Tools");
+            transfer.close();
+            assertThat(titles(owner)).doesNotContain("Transfer");
+        });
+    }
+
     private static List<String> titles(WindowContent owner) {
         return owner.chrome().menuBar().menus().stream().map(JMenu::getText).toList();
     }
