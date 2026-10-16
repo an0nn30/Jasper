@@ -21,7 +21,7 @@ paint the frame, title and footer bands, the Open field's box and the list's box
 3.27.7, Python 3.11+ (`python3 -I`) with Pillow for the edit scripts and the mock measurements.
 
 **Spec:** [`docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md`](../specs/2026-10-15-jasper-enterprise-presentation-design.md)
-(sections 1, 3, 5.5, 9.1, 11.1 to 11.4, 13 (`RECENT_ROWS`), 16.1.1, 16.1.4, 16.1.7, 16.1.9, 17 and 19.1 row 8). This is
+(sections 1, 3, 5.5, 7.3, 9.1, 11.1 to 11.4, 13 (`RECENT_ROWS`), 16.1.1, 16.1.2, 16.1.4, 16.1.7, 16.1.9, 17 and 19.1 row 8). This is
 the first of two plans for row 8 (Rulings 1); [8b](2026-10-16-enterprise-8b-run-window.md) executes after it on the same
 branch: `PaletteHome` and its two homes, the saved place per home kind, the modeless window and focus hand-back,
 Browse…, the landing of `Presentation.Landed.RUN_WINDOW` and the workspace renders.
@@ -128,11 +128,13 @@ At `deafed424` unless marked with the plan that changes it.
    (`:348`) and each scope's label under a query (`:370`), with "More in…" rows from a one-row probe (`:354-373`).
    Tests make one-argument headers in `CommandPaletteTest` (14 sites) and `PaletteTestSupport.describe` prints
    `"# " + header.label()` (`PaletteTestSupport.java:68`).
-4. `PaletteTestSupport` takes `CommandPalette` in 40 public methods (`PaletteTestSupport.java:25-191`), which the
+4. `PaletteTestSupport` takes `CommandPalette` in 35 public methods (`PaletteTestSupport.java:25-191`), which the
    workspace tests call with `owner.commandPalette().component()` (`WindowCommandPaletteTest` 52 calls,
    `PaletteScopesTest` 20, `CommandPaletteShortcutsTest` 9, `CommandPalettePreview` 7, `ShortcutEditorIntegrationTest` 4,
    `PaletteKeyRouterTest` 3, `WindowContributionsTest` 2, `HostedContentPreview` 1); `WindowCommandPaletteTest:458,466,477`
-   call `palette.component().revealedHeight()`. `CommandPaletteTest` builds the card with the six-argument constructor
+   call `palette.component().revealedHeight()`, and `theCardDripsOpenFastThenSlow…` holds `var card = palette.component();`
+   (`:277`) and calls `card.revealedHeight()` four times (`:280`, `:287`, `:288`, `:291`); no other `card.` call in that file
+   needs more than `JComponent`. `CommandPaletteTest` builds the card with the six-argument constructor
    at `:66`, `:133`, `:158`, `:207` and calls `setChip(String, Icon)` at `:161`, `:168`, `:209`.
 5. Kit text colours: LABEL and DESCRIPTION draw `text.secondary`, CAPTION, COUNT, SECTION_LABEL, MONO_CAPTION and
    SUPPORTING draw `text.tertiary`, the rest `text.primary` (`Labels.java:130-134`); DESCRIPTION's wrapped line height is
@@ -255,11 +257,22 @@ this plan's status banner.
 7. **The help tile is `Icon("play.filled", BLUE, PROMPT)` in a PROMPT_HEADER stack**, which plan 4b's classic prompt face
    already draws as an accent tile beside its message; under `runWindow` the tile is `RUN_WINDOW_TILE` (the Run mock's
    32, against the Unlock Vault mock's 30) and the gap `RUN_WINDOW_TILE_GAP`. Cost if wrong: two values.
-8. **Run window text colours.** Under `runWindow`, LABEL, DESCRIPTION and BODY_STRONG text draws
-   `text.strong.secondary` (the mocks' #3A3D42), DESCRIPTION at BODY's size with an 18 px line, BODY_STRONG at
-   PANEL_TITLE (12/600), MONO at RUN_DETAIL in `text.secondary`; list details and tags draw `text.placeholder` (the
-   mocks' #7A808A), unguarded like today's card details in `text.tertiary` (3.98:1 on white, as the mock paints it).
-   Cost if wrong: one mapping.
+8. **Run window text colours, as declared pairs** (spec 7.3, 16.1.1). Under `runWindow`, LABEL, DESCRIPTION and
+   BODY_STRONG text draws `text.strong.secondary` (the mocks' #3A3D42), DESCRIPTION at BODY's size with an 18 px line,
+   BODY_STRONG at PANEL_TITLE (12/600), MONO at RUN_DETAIL in `text.secondary`, the title WINDOW_TITLE in `text.primary`
+   and the title row's CAPTION shortcut in `text.tertiary`. Each is painted through a pair `RunWindowPresentation.pairs(Kit)`
+   declares with the TEXT guard: the title and the shortcut on `surface.header.active`, the labels, help and detail label
+   and the detail value on the kit's dialog surface, a heading on `surface.tableHeader`, a selected row's title on the
+   accent and a "More in…" row's title on `surface.card`. Enterprise Light meets every guard as authored (the shortcut's
+   #5C6370 on #D9DFEA is 4.52:1), so the mock comparison is unaffected. Three pairs are painted as authored, unguarded
+   (`RunWindowPresentation.authored()`): list details and tags in `text.placeholder` on `surface.card` (the mocks'
+   #7A808A, 3.98:1 on white, like today's card details in `text.tertiary`), the matches count in `text.placeholder` on
+   `surface.tableHeader`, and a selected row's detail and tag in the selection's supporting ink, `text.onAccent.secondary`
+   on the accent (the card's ink; 4.33:1 in Enterprise Light, as the mock paints it). The empty line inside the list box
+   is DESCRIPTION text guarded against the dialog surface, not `surface.card` (a residual, recorded). Surfaces and rules
+   are fills, not pairs: the title band's `border.window` rule on `surface.header.active` is 1.27:1 in Enterprise Light,
+   which a STRUCTURAL guard would repaint away from the mock. `PaintedContrastTest` paints every pair over the theme set
+   and the degenerate palettes (Task 4). Cost if wrong: one mapping or one guard.
 9. **The Open field shows no placeholder** (the mocks' empty field), its query is in the data face, and the chip sits in
    the box before it; the ▼ opens "All" and each scope, with its shortcut, and choosing one sets the chip. Cost if
    wrong: copy.
@@ -279,7 +292,14 @@ this plan's status banner.
     and (c) luminance-edge agreement of at least 0.70 per band, computed as `compare_mock.py` does, with the area under
     the list compared 12 device px lower (Rulings 5), the count text of B and the scrollbar column masked. Dark renders
     are written and checked for structure only, as no Dark mock shows the window. `pairs.json` gains the two opt-in
-    pairs for `check_pairs.py`. Cost if wrong: floors tuned once in Task 7, recorded.
+    pairs for `check_pairs.py`. Every comparison runs on the EDT inside `KitGallery.installed`, whose context closes when
+    the action returns. Cost if wrong: floors tuned once in Task 7, recorded.
+13. **The matches count is the heading's second title node.** A list heading has a title only (`ListItem`, kept by
+    plan 3c), so the "i of n" text is `title().get(1)` (id `entry.N.count`); under `runWindow` the heading's title panel
+    lays its first node at the row inset and its second at the band's end. The model is unchanged. Cost if wrong: none.
+14. **The title text drags.** The "Run" title and the shortcut are kit labels with tooltips, so a press on them stops
+    at the label; `RunWindowView` forwards their mouse events to itself, where plan 8b's drag listens, so the whole title
+    row drags (spec 11.2). Cost if wrong: one listener.
 
 ## File structure
 
@@ -297,7 +317,8 @@ this plan's status banner.
 - Tests: `palette/RunCopyTest`, `palette/PaletteHeadingsTest`, `palette/RunWindowViewTest`,
   `palette/PaletteViewContractTest`, `palette/RunWindowRenderTest`, `palette/RunWindowFixtures`, `testsupport/MockComparison`
   (jasper-app); `swing/RunWindowPresentationTest`, `swing/RunWindowSurfacesTest`, `metrics/RunWindowRolesTest` (jasper-ui);
-  edits to `CommandPaletteTest`, `PaletteTestSupport`, `WindowCommandPaletteTest`, `NewRolesTest`, `IconRegistryTest`.
+  edits to `CommandPaletteTest`, `PaletteTestSupport`, `WindowCommandPaletteTest`, `NewRolesTest`, `TypographyTest`,
+  `IconRegistryTest`, and jasper-app's `appearance/PaintedContrastTest` (the Run window's declared pairs, Task 4).
 - `tools/visual/pairs.json` (two pairs), `docs/design/theme-engine/migration.csv`, docs (Task 8).
 
 ---
@@ -312,7 +333,7 @@ behaviour or copy changes, and the card's tests pass unchanged but for the renam
 - Rename: `jasper-app/src/main/java/dev/jasper/app/palette/CommandPalette.java` to `CardView.java` (then replace it whole, Step 3)
 - Create: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java`, `StepForm.java`, `QueryEdits.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteController.java:25,49,80,118,135,411`, `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java:11,35,62-65,98,140-163,172`
-- Modify (tests): `jasper-app/src/test/java/dev/jasper/app/palette/PaletteTestSupport.java` (every `CommandPalette` parameter), `CommandPaletteTest.java` (the type name), `jasper-app/src/test/java/dev/jasper/app/workspace/WindowCommandPaletteTest.java:458,466,477`
+- Modify (tests): `jasper-app/src/test/java/dev/jasper/app/palette/PaletteTestSupport.java` (every `CommandPalette` parameter), `CommandPaletteTest.java` (the type name), `jasper-app/src/test/java/dev/jasper/app/workspace/WindowCommandPaletteTest.java:280,287,288,291,458,466,477`
 - Test: `jasper-app/src/test/java/dev/jasper/app/palette/PaletteViewSeamTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (the renamed row; rows for the four new files)
 
@@ -407,7 +428,7 @@ import javax.swing.JComponent;
 /**
  * What the palette's controller drives (Enterprise presentation spec 11.1): the query and chip, the list and its
  * selection, a step's small form and the view's own surface. Two implementations exist, the card ({@link CardView}) and
- * the Run window ({@link RunWindowView}), built by {@link PaletteViews}. EDT only.
+ * the Run window ({@code RunWindowView}), built by {@code PaletteViews}. EDT only.
  */
 public interface PaletteView extends AutoCloseable {
     /**
@@ -1358,7 +1379,9 @@ for name in ("CommandPaletteTest.java", "PaletteHeadingsTest.java"):
     path = pathlib.Path(T + name)
     if path.exists(): path.write_text(re.sub(r"\bCommandPalette\b", "CardView", path.read_text(encoding="utf-8")), encoding="utf-8")
 edit("jasper-app/src/test/java/dev/jasper/app/workspace/WindowCommandPaletteTest.java", [
-    ("palette.component().revealedHeight()", "palette.view().revealedHeight()", 3)])
+    ("palette.component().revealedHeight()", "palette.view().revealedHeight()", 3),
+    # theCardDripsOpenFastThenSlow... holds `var card = palette.component();`, now a JComponent.
+    ("card.revealedHeight()", "palette.view().revealedHeight()", 4)])
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
 old = "jasper-app/src/main/java/dev/jasper/app/palette/CommandPalette.java,app.palette,CommandPalette,"
 if text.count(old) != 1: raise SystemExit("migration.csv: the CommandPalette row moved")
@@ -1366,7 +1389,7 @@ text = text.replace(old, "jasper-app/src/main/java/dev/jasper/app/palette/CardVi
 rows = [
     "jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java,app.palette,PaletteView,nonvisual-helper,none,none,"
     "jasper-app/src/test/java/dev/jasper/app/palette/PaletteViewSeamTest.java,New in Enterprise plan 8a Task 1; the palette view seam (spec 11.1); names JComponent only",
-    "jasper-app/src/main/java/dev/jasper/app/palette/StepForm.java,app.palette,StepForm,standard-ui,none,none,"
+    "jasper-app/src/main/java/dev/jasper/app/palette/StepForm.java,app.palette,StepForm,standard-ui,8,8,"
     "jasper-app/src/test/java/dev/jasper/app/palette/CommandPaletteTest.java,New in Enterprise plan 8a Task 1; the card's step form moved unchanged; layout-only shell rows hosting kit views",
     "jasper-app/src/main/java/dev/jasper/app/palette/QueryEdits.java,app.palette,QueryEdits,nonvisual-helper,none,none,"
     "jasper-app/src/test/java/dev/jasper/app/palette/CommandPaletteTest.java,New in Enterprise plan 8a Task 1; the card's prefix-to-chip edit moved unchanged; no Swing",
@@ -1376,8 +1399,10 @@ ledger.write_text(text + ("" if text.endswith("\n") else "\n") + "\n".join(rows)
 PY
 ```
 
-Expected: the script prints `PaletteTestSupport parameters:` followed by a number (40 at `deafed424`) and stops on no
-anchor. The test sources still name `CommandPaletteTest` (the class keeps its name, Rulings 2).
+Expected: the script prints `PaletteTestSupport parameters:` followed by a number (35 at `deafed424`) and stops on no
+anchor. A `standard-ui` ledger row needs numeric migration and composition task fields (`ThemeMigrationCoverageTest`
+matches `[0-9]+(;[0-9]+)*`), so `StepForm` (and Task 5's `RunWindowView`) carry `8,8` for this plan's row 8; the
+nonvisual helpers keep `none,none`. The test sources still name `CommandPaletteTest` (the class keeps its name, Rulings 2).
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1769,19 +1794,24 @@ without the flag paint exactly as before.
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (the `Role` enum's last constant), `jasper-ui/src/main/java/dev/jasper/ui/metrics/Typography.java:27,74`, `jasper-ui/src/main/java/dev/jasper/ui/metrics/TypeScale.java` (`classicRow`)
-- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`, `default-type.tsv`, `classic-type.tsv` (rows appended), `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java` (`theAddedRolesCloseTheEnumInOrder`)
+- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`, `default-type.tsv`, `classic-type.tsv` (rows appended), `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java` (`ADDED`, the thirty names appended as plans 4c, 6a and 7 append theirs), `jasper-ui/src/test/java/dev/jasper/ui/metrics/TypographyTest.java:144-145` (`former`'s data-face roles)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/icons/IconRegistry.java:21,402`, `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKit.java:21`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:330`, `Labels.java:143,167` and the SWATCH branch (3b), `Stacks.java:62-66,170,92`, `ClassicPromptFace.java` (`BesideLayout.gap`, 4b), `ItemLists.java:169-172,188-190,420-421,446-447`, `InteractiveRows.java:1176,1193-1199,1218-1219`, `TextFields.java:262,277-278,301,373,429`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:330`, `Labels.java:143,167` and the SWATCH branch (3b), `Stacks.java:62-66,170,92`, `ClassicPromptFace.java` (`BesideLayout.gap`, 4b), `ItemLists.java:169-172,188-190,420-421,446-447`, `InteractiveRows.java:1176,1193-1199,1218-1219`, `TextFields.java:262,277-278,301,373` and 4b's `FieldSurface.paintDefault`
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/RunWindowPresentation.java`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/metrics/RunWindowRolesTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/swing/RunWindowPresentationTest.java`
 
 **Interfaces:**
-- Consumes: 4a's catalog and `classic-roles.tsv`, 4b's `ClassicPromptFace`, 3b's SWATCH branch, 4c's `KitFixtures.enterpriseLight()`.
+- Consumes: 4a's catalog, `classic-roles.tsv` and `Kit.colors().dialogSurface()`, 4b's `ClassicPromptFace` and `FieldSurface.paintDefault`, 3b's SWATCH branch, 4c's `KitFixtures.enterpriseLight()`; plan 2's `PaintPair`, `SurfaceContrast.painted` and `SurfaceContrast.Guard`.
 - Produces: `DesignMetrics.Role.RUN_WINDOW_RADIUS` … `RUN_WINDOW_BUTTON_GAP` (the thirty roles of the "Mock measurements"
   table, values below); `Typography.Role.RUN_HEADING`, `RUN_DETAIL` (a data-face role); built-in icons `play.filled` and
-  `triangle.down`; `public void KitView.runWindow(boolean)` and `public boolean KitView.runWindow()`; package-private
-  `RunWindowPresentation.text(…)`, `.row(…)`, `.rowHeight(KitContext, boolean)`, `.headingLayout(InteractiveRows.Row)`,
-  `.paintHeading(InteractiveRows.Row, Graphics)`.
+  `triangle.down`; `public void KitView.runWindow(boolean)` and `public boolean KitView.runWindow()`; `public final class
+  RunWindowPresentation` with the declared pairs (Rulings 8): the `PaintPair` constants `TITLE`, `SHORTCUT`, `HEADING`,
+  `SELECTED_TITLE`, `LIST_TEXT`, `static PaintPair labelPair(Kit)`, `static PaintPair valuePair(Kit)`, `static
+  List<PaintPair> pairs(Kit)` (in that order: TITLE, SHORTCUT, labelPair, valuePair, HEADING, SELECTED_TITLE, LIST_TEXT),
+  `record Authored(ColorRole slot, ColorRole against)`, the `Authored` constants `ROW_DETAIL`, `COUNT`,
+  `SELECTED_DETAIL` and `static List<Authored> authored()`; and package-private `RunWindowPresentation.text(…)`,
+  `.row(…)`, `.rowHeight(KitContext, boolean)`, `.headingLayout(InteractiveRows.Row)`,
+  `.paintHeading(InteractiveRows.Row, Graphics)`. A Run window heading's count is its second title node (Rulings 13).
 
 - [ ] **Step 1: Capture the gallery base**
 
@@ -1819,9 +1849,12 @@ class RunWindowRolesTest {
         for (String row : rows) ROLES.put("RUN_WINDOW_" + row.split(" ")[0], Integer.parseInt(row.split(" ")[1]));
     }
 
-    @Test void theRunWindowRolesCloseTheEnumWithTheMocksValuesInBothCatalogs() {
+    /** One block in order (later plans may append their own roles after it), with the mocks' values in both catalogs. */
+    @Test void theRunWindowRolesAreOneBlockWithTheMocksValuesInBothCatalogs() {
         var names = Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        assertThat(names.subList(names.size() - ROLES.size(), names.size())).containsExactlyElementsOf(ROLES.keySet());
+        int start = names.indexOf("RUN_WINDOW_RADIUS");
+        assertThat(start).as("the block's first role").isNotNegative();
+        assertThat(names.subList(start, Math.min(names.size(), start + ROLES.size()))).containsExactlyElementsOf(ROLES.keySet());
         ROLES.forEach((name, value) -> {
             var role = DesignMetrics.Role.valueOf(name);
             assertThat(DesignMetrics.DEFAULT.value(role)).as(name).isEqualTo(value);
@@ -1880,11 +1913,11 @@ class RunWindowPresentationTest {
 
     static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, READY, value, role); }
 
-    /** A heading with a count, a selected session row and a snippet row with a tag. */
+    /** A heading with a count (its second title node: a heading has a title only), a selected session row and a snippet row with a tag. */
     static ViewSpec list() {
         var items = List.of(
-            new ListItem("h", Optional.empty(), List.of(text("h.title", "Matches", Nodes.TextRole.CAPTION)), List.of(),
-                List.of(text("h.count", "1 of 2", Nodes.TextRole.CAPTION)), true),
+            new ListItem("h", Optional.empty(), List.of(text("h.title", "Matches", Nodes.TextRole.CAPTION),
+                text("h.count", "1 of 2", Nodes.TextRole.CAPTION)), List.of(), List.of(), true),
             new ListItem("a", Optional.of(new Nodes.Icon("a.swatch", READY, "file", Nodes.Hue.GREEN, Nodes.IconSize.SWATCH, "Session")),
                 List.of(text("a.title", "Mac", Nodes.TextRole.BODY)), List.of(text("a.detail", "dustin@192.168.1.119:22", Nodes.TextRole.MONO)), List.of()),
             new ListItem("b", Optional.of(new Nodes.Icon("b.swatch", READY, "file", Nodes.Hue.PURPLE, Nodes.IconSize.SWATCH, "Snippet")),
@@ -2006,22 +2039,23 @@ class RunWindowPresentationTest {
 }
 ```
 
-Edit `NewRolesTest` so 4a's roles stay a contiguous block now that later roles follow them:
+Append the thirty names to `NewRolesTest.ADDED`, as plans 4c, 6a and 7 append theirs (its test keeps requiring that
+`ADDED` closes the enum in order, which the Run window's roles now end):
 
 ```bash
 python3 -I - <<'PY'
-import pathlib
+"""Plan 8a Task 3 step 2: NewRolesTest.ADDED gains the Run window's thirty roles, in enum order."""
+import pathlib, re
+NAMES = ["RADIUS", "TITLE_HEIGHT", "TITLE_SIDE", "CLOSE", "CLOSE_SIDE", "SHORTCUT_GAP", "SIDE", "HELP_TOP", "TILE", "TILE_GLYPH",
+         "TILE_GAP", "HELP_LINE", "FIELD_TOP", "LABEL_COLUMN", "FIELD_SIDE", "MENU_WIDTH", "LIST_TOP", "ROW_HEIGHT", "HEADING_HEIGHT",
+         "ROW_SIDE", "SWATCH", "ROW_GAP", "DETAIL_GAP", "DETAIL_TOP", "DETAIL_LABEL_GAP", "CHECK_TOP", "BOTTOM", "FOOTER_HEIGHT",
+         "BUTTON_WIDTH", "BUTTON_GAP"]
 path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java"); text = path.read_text(encoding="utf-8")
-old = '''    @Test void theAddedRolesCloseTheEnumInOrder() {
-        var roles = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        assertThat(roles.subList(roles.size() - ADDED.size(), roles.size())).containsExactlyElementsOf(ADDED);'''
-new = '''    /** Plan 4's roles stay one block in order; later plans' roles (plan 8a's Run window) follow it. */
-    @Test void theAddedRolesStayOneBlockInOrder() {
-        var roles = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        int start = roles.indexOf(ADDED.getFirst());
-        assertThat(roles.subList(start, start + ADDED.size())).containsExactlyElementsOf(ADDED);'''
-if text.count(old) != 1: raise SystemExit("NewRolesTest: the enum-order test moved")
-path.write_text(text.replace(old, new), encoding="utf-8")
+match = re.search(r"static final List<String> ADDED = List\.of\(([^;]*)\);", text)
+if match is None: raise SystemExit("NewRolesTest: ADDED moved")
+if "RUN_WINDOW_RADIUS" in match.group(1): raise SystemExit("NewRolesTest: ADDED already lists the Run window roles")
+text = text[:match.end(1)] + ", " + ", ".join(f'"RUN_WINDOW_{name}"' for name in NAMES) + text[match.end(1):]
+path.write_text(text, encoding="utf-8")
 PY
 ```
 
@@ -2071,6 +2105,10 @@ text = text[:last.start()] + last.group(1) + ",\n        // The Run window's hea
 old = "role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO"
 if text.count(old) != 1: raise SystemExit("Typography: the data-face roles moved (plan 5b may list them elsewhere; add RUN_DETAIL there)")
 path.write_text(text.replace(old, old + " || role == Role.RUN_DETAIL"), encoding="utf-8")
+# TypographyTest's former() oracle runs over every role with default-type.tsv; RUN_DETAIL is a data-face role there too.
+edit("jasper-ui/src/test/java/dev/jasper/ui/metrics/TypographyTest.java", [
+    ("            || role == Typography.Role.PANEL_DETAIL_MONO ? Font.MONOSPACED : family;",
+     "            || role == Typography.Role.PANEL_DETAIL_MONO || role == Typography.Role.RUN_DETAIL ? Font.MONOSPACED : family;", 1)])
 for table, rows in (("default-type.tsv", "RUN_HEADING\t12\t600\nRUN_DETAIL\t11.5\t400\n"), ("classic-type.tsv", "RUN_HEADING\t11\t600\nRUN_DETAIL\t10.5\t400\n")):
     path = pathlib.Path(M + table); text = path.read_text(encoding="utf-8")
     path.write_text(text + rows, encoding="utf-8")
@@ -2094,7 +2132,8 @@ PY
 
 If a script stops because an earlier plan wrote the enums' last constants differently, re-find the last constant of
 `DesignMetrics.Role` (or `Typography.Role`) and append the same constants after it; if plan 5b replaced the data-face
-condition with a set or a method, add `Role.RUN_DETAIL` to it.
+condition with a set or a method, add `Role.RUN_DETAIL` to it (5b's `boolean data = …` line keeps the quoted condition).
+If `TypographyTest.former`'s condition was rewritten, add `Typography.Role.RUN_DETAIL` to its data-face roles the same way.
 
 - [ ] **Step 5: The flag and its presentation**
 
@@ -2103,44 +2142,110 @@ Create `jasper-ui/src/main/java/dev/jasper/ui/swing/RunWindowPresentation.java`:
 ```java
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.ListItem;
 import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.theme.ColorRole;
 import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.LayoutManager;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import javax.swing.JLabel;
 
 /**
  * The Run window's presentation (Enterprise presentation spec 11.2, the 06 Run Dialog mocks), applied to the controls of
  * a view whose host called {@link KitView#runWindow(boolean)}: its text colours and faces, its RESULTS rows, heading
- * bands and counts. Every value is a kit role; nothing here is read for a view without the flag.
+ * bands and counts. Every value is a kit role; nothing here is read for a view without the flag. Every text colour is a
+ * declared pair (spec 7.3 and 16.1.1): {@link #pairs(Kit)} painted through their guards, and {@link #authored()} painted
+ * as authored (plan 8a Rulings 8). Public for those tables, which jasper-app's PaintedContrastTest paints.
  */
-final class RunWindowPresentation {
+public final class RunWindowPresentation {
     private RunWindowPresentation() { }
 
     /**
-     * {@code text}'s Run window face and colour, after its control set the role's own: LABEL, DESCRIPTION and BODY_STRONG
-     * read {@code text.strong.secondary}, DESCRIPTION at BODY's size on the help's line, BODY_STRONG semibold, MONO in the
-     * small data face in {@code text.secondary}. A selected row's ink and a severity keep their colour.
+     * A pair the Run window paints as authored, with no guard (plan 8a Rulings 8).
+     *
+     * @param slot the role painted
+     * @param against the role it is painted on
+     */
+    public record Authored(ColorRole slot, ColorRole against) {
+        /** Both roles are required. */
+        public Authored { Objects.requireNonNull(slot, "slot"); Objects.requireNonNull(against, "against"); }
+    }
+
+    /** The title row's "Run" on the title band. */
+    public static final PaintPair TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
+    /** The opener's shortcut on the title band. */
+    public static final PaintPair SHORTCUT = new PaintPair(SemanticColor.TEXT_TERTIARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
+    /** A list heading's title on its band. */
+    public static final PaintPair HEADING = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_TABLE_HEADER, SurfaceContrast.Guard.TEXT);
+    /** A selected row's title on the accent. */
+    public static final PaintPair SELECTED_TITLE = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
+    /** A "More in" row's (or a disabled row's) title in the list box. */
+    public static final PaintPair LIST_TEXT = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.TEXT);
+    /** A row's detail and tag in the list box, as authored. */
+    public static final Authored ROW_DETAIL = new Authored(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_CARD);
+    /** The matches count on a heading band, as authored. */
+    public static final Authored COUNT = new Authored(SemanticColor.TEXT_PLACEHOLDER, DerivedColor.SURFACE_TABLE_HEADER);
+    /** A selected row's detail and tag in the selection's supporting ink, as the card paints them. */
+    public static final Authored SELECTED_DETAIL = new Authored(SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT);
+
+    /** "Open:", the checkbox's label, the help text and the detail line's label on {@code kit}'s dialog surface. */
+    public static PaintPair labelPair(Kit kit) {
+        return new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, kit.colors().dialogSurface(), SurfaceContrast.Guard.TEXT);
+    }
+
+    /** The detail line's value on {@code kit}'s dialog surface. */
+    public static PaintPair valuePair(Kit kit) {
+        return new PaintPair(SemanticColor.TEXT_SECONDARY, kit.colors().dialogSurface(), SurfaceContrast.Guard.TEXT);
+    }
+
+    /** Every guarded pair the Run window paints under {@code kit}: TITLE, SHORTCUT, the label pair, the value pair, HEADING, SELECTED_TITLE, LIST_TEXT. */
+    public static List<PaintPair> pairs(Kit kit) {
+        return List.of(TITLE, SHORTCUT, labelPair(kit), valuePair(kit), HEADING, SELECTED_TITLE, LIST_TEXT);
+    }
+
+    /** Every pair the Run window paints as authored: ROW_DETAIL, COUNT, SELECTED_DETAIL. */
+    public static List<Authored> authored() { return List.of(ROW_DETAIL, COUNT, SELECTED_DETAIL); }
+
+    /**
+     * {@code text}'s Run window face and colour, after its control set the role's own: WINDOW_TITLE and the title row's
+     * CAPTION through {@link #TITLE} and {@link #SHORTCUT}; LABEL, DESCRIPTION and BODY_STRONG through the label pair,
+     * DESCRIPTION at BODY's size on the help's line, BODY_STRONG semibold; MONO in the small data face through the value
+     * pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by {@link #row}. A selected row's ink and a
+     * severity keep their colour.
      */
     static void text(KitContext context, Nodes.Text text, Labels.LiteralLabel label, boolean inked) {
         if (text.severity().isPresent()) return;
-        var strong = ThemePainting.color(context, SemanticColor.TEXT_STRONG_SECONDARY);
+        var theme = context.theme();
+        Kit kit = context.kit();
         switch (text.role()) {
-            case LABEL -> { if (!inked) label.setForeground(strong); }
+            case WINDOW_TITLE -> { if (!inked) label.setForeground(SurfaceContrast.painted(theme, TITLE)); }
+            case CAPTION -> { if (!inked) label.setForeground(SurfaceContrast.painted(theme, SHORTCUT)); }
+            case LABEL -> { if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit))); }
             case DESCRIPTION -> {
                 var font = ThemePainting.font(context, Typography.Role.BODY);
                 label.setFont(font);
                 label.wrapped.lineHeight = Math.round(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HELP_LINE) * font.getSize2D() / 12f);
-                if (!inked) label.setForeground(strong);
+                if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
-            case BODY_STRONG -> { label.setFont(ThemePainting.font(context, Typography.Role.PANEL_TITLE)); if (!inked) label.setForeground(strong); }
+            case BODY_STRONG -> {
+                label.setFont(ThemePainting.font(context, Typography.Role.PANEL_TITLE));
+                if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
+            }
             case MONO -> {
                 label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
-                if (!inked) label.setForeground(ThemePainting.color(context, SemanticColor.TEXT_SECONDARY));
+                if (!inked) label.setForeground(SurfaceContrast.painted(theme, valuePair(kit)));
             }
             default -> { }
         }
@@ -2152,25 +2257,37 @@ final class RunWindowPresentation {
             : ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT);
     }
 
-    /** A heading's title semibold in {@code text.strong.secondary} and its count in {@code text.placeholder}; a row's detail in the small data face and, unselected, its detail and tag in {@code text.placeholder}. */
+    /**
+     * A heading's title semibold through {@link #HEADING} and its count (its second title node: a heading has a title
+     * only) at the band's end as {@link #COUNT}; a row's title through {@link #SELECTED_TITLE} when selected, or
+     * {@link #LIST_TEXT} for a DESCRIPTION title; its detail in the small data face, and its detail and tag as
+     * {@link #ROW_DETAIL}, or {@link #SELECTED_DETAIL} when selected.
+     */
     static void row(KitContext context, InteractiveRows.Row row, ListItem item, boolean selected) {
-        var faint = ThemePainting.color(context, SemanticColor.TEXT_PLACEHOLDER);
+        var theme = context.theme();
         if (item.heading()) {
-            for (var node : item.title()) label(row, node).ifPresent(label -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.RUN_HEADING));
-                label.setForeground(ThemePainting.color(context, SemanticColor.TEXT_STRONG_SECONDARY));
-            });
-            for (var node : item.trailing()) label(row, node).ifPresent(label -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.CAPTION));
-                label.setForeground(faint);
-            });
+            var title = item.title();
+            for (int i = 0; i < title.size(); i++) {
+                boolean count = i > 0;
+                label(row, title.get(i)).ifPresent(label -> {
+                    label.setFont(ThemePainting.font(context, count ? Typography.Role.CAPTION : Typography.Role.RUN_HEADING));
+                    label.setForeground(count ? COUNT.slot().color(theme) : SurfaceContrast.painted(theme, HEADING));
+                });
+            }
+            // The row's slot gave the title panel an inline layout this populate; the heading's replaces it until the next.
+            row.title.setLayout(new HeadingLayout(ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_ROW_GAP)));
             return;
         }
+        for (var node : item.title()) label(row, node).ifPresent(label -> {
+            if (selected) label.setForeground(SurfaceContrast.painted(theme, SELECTED_TITLE));
+            else if (((Nodes.Text) node).role() == Nodes.TextRole.DESCRIPTION) label.setForeground(SurfaceContrast.painted(theme, LIST_TEXT));
+        });
+        var faint = (selected ? SELECTED_DETAIL : ROW_DETAIL).slot().color(theme);
         for (var node : item.subtitle()) label(row, node).ifPresent(label -> {
             label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
-            if (!selected) label.setForeground(faint);
+            label.setForeground(faint);
         });
-        if (!selected) for (var node : item.trailing()) label(row, node).ifPresent(label -> label.setForeground(faint));
+        for (var node : item.trailing()) label(row, node).ifPresent(label -> label.setForeground(faint));
     }
 
     private static Optional<JLabel> label(InteractiveRows.Row row, Nodes.Node node) {
@@ -2178,18 +2295,16 @@ final class RunWindowPresentation {
         return node instanceof Nodes.Text && control != null && control.component instanceof JLabel label ? Optional.of(label) : Optional.empty();
     }
 
-    /** A heading's title at the row inset and its count right-aligned at the same inset, above the band's rule. */
+    /** A heading's title panel across the row, inset on both sides, above the band's rule; its layout places the count. */
     static void headingLayout(InteractiveRows.Row row) {
         var context = row.owner.context();
         int side = ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_ROW_SIDE);
         int band = Math.max(0, row.getHeight() - ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
-        int count = Math.min(row.trailing.getPreferredSize().width, Math.max(0, row.getWidth() - 2 * side));
         row.leading.setBounds(0, 0, 0, 0);
         row.subtitle.setBounds(0, 0, 0, 0);
-        row.trailing.setBounds(row.getWidth() - side - count, 0, count, band);
-        row.title.setBounds(side, 0, Math.max(0, row.getWidth() - 2 * side - count), band);
+        row.trailing.setBounds(0, 0, 0, 0);
+        row.title.setBounds(side, 0, Math.max(0, row.getWidth() - 2 * side), band);
         row.title.doLayout();
-        row.trailing.doLayout();
     }
 
     /** A heading's band on {@code surface.tableHeader} over a {@code border.row} rule. */
@@ -2200,6 +2315,40 @@ final class RunWindowPresentation {
         g.fillRect(0, 0, row.getWidth(), Math.max(0, row.getHeight() - hair));
         g.setColor(DerivedColor.BORDER_ROW.color(theme));
         g.fillRect(0, row.getHeight() - hair, row.getWidth(), hair);
+    }
+
+    /** A Run window heading's title panel: the heading at its start and the count, its last child, at its end. */
+    private static final class HeadingLayout implements LayoutManager {
+        private final int gap;
+
+        HeadingLayout(int gap) { this.gap = gap; }
+
+        @Override public void addLayoutComponent(String name, Component component) { }
+        @Override public void removeLayoutComponent(Component component) { }
+
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            int width = 0, height = 0, n = parent.getComponentCount();
+            for (int i = 0; i < n; i++) {
+                var size = parent.getComponent(i).getPreferredSize();
+                width += size.width; height = Math.max(height, size.height);
+            }
+            return new Dimension(width + Math.max(0, n - 1) * gap, height);
+        }
+
+        @Override public Dimension minimumLayoutSize(Container parent) { return new Dimension(0, preferredLayoutSize(parent).height); }
+
+        @Override public void layoutContainer(Container parent) {
+            int n = parent.getComponentCount(), w = parent.getWidth(), h = parent.getHeight();
+            if (n == 0) return;
+            int count = 0;
+            if (n > 1) {
+                var last = parent.getComponent(n - 1);
+                count = Math.min(last.getPreferredSize().width, w);
+                last.setBounds(w - count, 0, count, h);
+            }
+            var heading = parent.getComponent(0);
+            heading.setBounds(0, 0, Math.max(0, Math.min(heading.getPreferredSize().width, w - (n > 1 ? count + gap : 0))), h);
+        }
     }
 }
 ```
@@ -2310,23 +2459,28 @@ edit(S + "TextFields.java", [
         /** A Run window's query (plan 8a): its host's field box paints the edge and the focus, so this surface paints nothing. */
         boolean quiet;
 ''', 1),
-    ('''                if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(''',
-     '''                if (quiet) { putClientProperty("Jasper.kit.halo", null); return; }
-                if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(''', 1)])
+    # Plan 4b moved the surface's painting into paintDefault (12-space body), which paintComponent reaches through
+    # context.faces().fields.paintField and ClassicFieldPolicy calls for every transparent field.
+    ('''        void paintDefault(Graphics2D g) {
+            if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(''',
+     '''        void paintDefault(Graphics2D g) {
+            if (quiet) { putClientProperty("Jasper.kit.halo", null); return; }
+            if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(''', 1)])
 PY
 ```
 
 If an anchor moved because plan 4b or 4c rewrote the line (the field font role, the field border, the row floor), re-find
-the quoted text in its new form and make the same change.
+the quoted text in its new form and make the same change. The quiet surface returns first in `paintDefault`, so both the
+default and the classic field policies leave a Run window query unpainted.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.RunWindowPresentationTest' --tests 'dev.jasper.ui.swing.ResultsKitTest' --tests 'dev.jasper.ui.icons.IconRegistryTest' --tests 'dev.jasper.ui.gallery.*' :jasper-sdk-testkit:test :jasper-ui:javadoc`
 Expected: PASS. `RunWindowRolesTest` 2, `RunWindowPresentationTest` 3; the frozen-table tests (`DesignMetricsTest`,
-`ClassicCatalogTest`, `TypeScaleTest`, `ClassicTypeTest`) read the appended rows; `ResultsKitTest` and the gallery tests are
-unchanged. If `theListTakesTheRunWindowsRowsBandsAndHueSquares` reports the count's right edge or the title's start one
-pixel off, the row's trailing or title panel carries an inset: subtract it in `RunWindowPresentation.headingLayout` (never
-change the test's expected value).
+`ClassicCatalogTest`, `TypeScaleTest`, `ClassicTypeTest`, `TypographyTest`, `NewRolesTest`) read the appended rows and
+names; `ResultsKitTest` and the gallery tests are unchanged. If `theListTakesTheRunWindowsRowsBandsAndHueSquares` reports
+the count's right edge or the title's start one pixel off, the title panel or a label carries an inset: subtract it in
+`RunWindowPresentation.headingLayout` or its `HeadingLayout` (never change the test's expected value).
 
 - [ ] **Step 7: Commit**
 
@@ -2354,14 +2508,19 @@ EOF
 `border.hover` at `RUN_WINDOW_RADIUS` on the kit's dialog surface, a title band on `surface.header.active` above a
 `border.window` rule, a footer band on `surface.footer` under one), `FIELD` (an input's box at `FIELD_RADIUS` around a
 composite of views, its edge and halo following focus inside it) and `BOX` (a list's box: `surface.card` inside a 1 px
-`border.control`). The default look builds none of them.
+`border.control`). The default look builds none of them. With the surfaces in place, `PaintedContrastTest` paints the
+Run window's declared pairs (Task 3, Rulings 8) on them over every palette (spec 16.1.2), as plan 7 does for
+`ChromePainter.DOCK_PAIRS`.
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SurfacePanel.java:16-100`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/RunWindowSurfacesTest.java`
+- Modify (test): `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java` (one test and two helpers, before `searchHint`)
 
 **Interfaces:**
-- Consumes: Task 3's roles; 4a's `KitContext.kit().colors().dialogSurface()`.
+- Consumes: Task 3's roles and `RunWindowPresentation.pairs(Kit)`, `.authored()`; 4a's `KitContext.kit().colors().dialogSurface()`;
+  `KitFixtures.enterprise()`, `.enterpriseLight()`, `.render(…)`; `PaintedContrastTest`'s `palettes()` (the theme set and
+  the degenerate palettes) and `name(theme)`.
 - Produces: `SurfacePanel.Kind.RUN_WINDOW`, `FIELD`, `BOX`; `public SurfacePanel(KitContext, Kind, IntSupplier header,
   IntSupplier footer)`; `public void focusShown(Boolean shown)` (null follows keyboard focus; headless renders force it);
   `public boolean focusWithin()`.
@@ -2453,6 +2612,112 @@ class RunWindowSurfacesTest {
     }
 }
 ```
+
+Then add the painted-contrast case to jasper-app's `PaintedContrastTest`, before `searchHint` (plan 7 inserts its dock
+case at the same place; the anchor stays unique):
+
+```bash
+python3 -I - <<'PY'
+"""Plan 8a Task 4 step 1: the Run window's declared pairs over every palette (spec 16.1.2)."""
+import pathlib
+path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java"); text = path.read_text(encoding="utf-8")
+anchor = '''    private static boolean searchHint(GeneratedTheme theme, Color expected) {'''
+if text.count(anchor) != 1: raise SystemExit("PaintedContrastTest: searchHint moved")
+block = '''    /**
+     * Plan 8a and spec 16.1.2: the Run window paints each pair RunWindowPresentation declares as its guard makes it, and
+     * each unguarded pair as authored, on the surfaces the pairs name, over every palette.
+     */
+    @Test void theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette() throws Exception {
+        record Sampled(String name, KitView view, String id) { }
+        var enterprise = KitFixtures.enterprise();
+        var initial = KitFixtures.enterpriseLight();
+        var original = UIManager.getLookAndFeel();
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            var kit = KitContext.of(enterprise, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+            var texts = new ViewSpec(new Nodes.Stack("run", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                runText("run.title", "Run", Nodes.TextRole.WINDOW_TITLE), runText("run.shortcut", "\\u21e7\\u2318P", Nodes.TextRole.CAPTION),
+                runText("run.label", "Open:", Nodes.TextRole.LABEL), runText("run.value", "dustin@192.168.1.119:22", Nodes.TextRole.MONO)), ""));
+            var list = new ViewSpec(new Nodes.ItemList("results", ControlState.READY, Nodes.ListKind.RESULTS, List.of(
+                new ListItem("h", Optional.empty(), List.of(runText("h.title", "Matches", Nodes.TextRole.CAPTION),
+                    runText("h.count", "1 of 2", Nodes.TextRole.CAPTION)), List.of(), List.of(), true),
+                new ListItem("a", Optional.empty(), List.of(runText("a.title", "Mac", Nodes.TextRole.BODY)),
+                    List.of(runText("a.detail", "dustin@host", Nodes.TextRole.MONO)), List.of(runText("a.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("b", Optional.empty(), List.of(runText("b.title", "gcloud auth", Nodes.TextRole.BODY)),
+                    List.of(runText("b.detail", "gcloud auth login", Nodes.TextRole.MONO)), List.of(runText("b.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("m", Optional.empty(), List.of(runText("m.title", "More in SSH", Nodes.TextRole.DESCRIPTION)), List.of(), List.of())),
+                java.util.Set.of("a"), "run", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), java.util.OptionalInt.of(4)));
+            try (var textView = new KitView(kit, texts, event -> { }); var listView = new KitView(kit, list, event -> { })) {
+                var guarded = List.of(new Sampled("title", textView, "run.title"), new Sampled("shortcut", textView, "run.shortcut"),
+                    new Sampled("label", textView, "run.label"), new Sampled("detail value", textView, "run.value"),
+                    new Sampled("heading", listView, "h.title"), new Sampled("selected title", listView, "a.title"),
+                    new Sampled("list text", listView, "m.title"));
+                var authored = List.of(new Sampled("row detail", listView, "b.detail"), new Sampled("count", listView, "h.count"),
+                    new Sampled("selected detail", listView, "a.detail"));
+                var pairs = RunWindowPresentation.pairs(enterprise);
+                assertThat(guarded).as("every declared Run window pair is sampled").hasSameSizeAs(pairs);
+                assertThat(authored).as("every unguarded Run window pair is sampled").hasSameSizeAs(RunWindowPresentation.authored());
+                var window = new SurfacePanel(kit, SurfacePanel.Kind.RUN_WINDOW, () -> 24, () -> 40);
+                var box = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
+                var field = new SurfacePanel(kit, SurfacePanel.Kind.FIELD);
+                field.focusShown(false);
+                for (var theme : palettes()) {
+                    FlatLafInstaller.install(theme, enterprise); binding.publish(new ThemePair(theme, theme));
+                    for (var view : List.of(textView, listView)) {
+                        SwingUtilities.updateComponentTreeUI(view);
+                        // Re-reconciles under this theme, so every control refreshes its colours.
+                        view.runWindow(false); view.runWindow(true);
+                    }
+                    var rendered = KitFixtures.render(listView, 436, 100, 1);
+                    String where = name(theme);
+                    // The surfaces the pairs name are the ones painted under them.
+                    var frame = surface(window, 462, 427);
+                    assertThat(frame.getRGB(200, 12)).as(where + ", title band").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme).getRGB());
+                    assertThat(frame.getRGB(200, 200)).as(where + ", dialog surface").isEqualTo(enterprise.colors().dialogSurface().color(theme).getRGB());
+                    assertThat(surface(box, 436, 208).getRGB(100, 100)).as(where + ", list box").isEqualTo(theme.semantic().color(SURFACE_CARD).getRGB());
+                    assertThat(surface(field, 392, 26).getRGB(100, 13)).as(where + ", field box").isEqualTo(theme.semantic().color(SURFACE_INPUT).getRGB());
+                    assertThat(rendered.getRGB(200, 5)).as(where + ", heading band").isEqualTo(DerivedColor.SURFACE_TABLE_HEADER.color(theme).getRGB());
+                    assertThat(rendered.getRGB(300, 19 + 10)).as(where + ", selected row").isEqualTo(theme.semantic().color(ACCENT).getRGB());
+                    for (int i = 0; i < guarded.size(); i++) {
+                        var pair = pairs.get(i);
+                        var sample = guarded.get(i);
+                        Color expected = SurfaceContrast.painted(theme, pair);
+                        assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(where + ", " + sample.name() + " meets its guard").isTrue();
+                        assertThat(KitTestSupport.require(sample.view(), sample.id(), JLabel.class).getForeground())
+                            .as(where + ", " + sample.name() + " is painted " + ColorMath.hex(expected)).isEqualTo(expected);
+                    }
+                    for (int i = 0; i < authored.size(); i++) {
+                        var pair = RunWindowPresentation.authored().get(i);
+                        var sample = authored.get(i);
+                        assertThat(KitTestSupport.require(sample.view(), sample.id(), JLabel.class).getForeground())
+                            .as(where + ", " + sample.name() + " as authored").isEqualTo(pair.slot().color(theme));
+                    }
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    private static Nodes.Text runText(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
+
+    /** {@code panel} painted at {@code width} by {@code height}. */
+    private static BufferedImage surface(SurfacePanel panel, int width, int height) {
+        panel.setSize(width, height);
+        var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { panel.paint(graphics); } finally { graphics.dispose(); }
+        return image;
+    }
+
+'''
+path.write_text(text.replace(anchor, block + anchor), encoding="utf-8")
+PY
+```
+
+The guarded samples follow `pairs(Kit)`'s order (TITLE, SHORTCUT, label, value, HEADING, SELECTED_TITLE, LIST_TEXT) and
+the unguarded ones `authored()`'s (ROW_DETAIL, COUNT, SELECTED_DETAIL). `PaintedContrastTest` already imports
+`dev.jasper.ui.model.*`, `dev.jasper.ui.swing.*`, `dev.jasper.ui.theme.*`, `KitFixtures`, `KitTestSupport`, `IconRegistry`,
+`java.awt.*`, `java.awt.image.BufferedImage`, `javax.swing.*` and `java.util.Optional`, and statically `SemanticColor.*`.
+The Java source spells the shortcut as `⇧⌘P` (the script's `\\u` writes one backslash).
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -2614,8 +2879,12 @@ edge, as the `Area` difference is a ring.
 
 - [ ] **Step 4: Run the tests to verify they pass, and the gallery to verify nothing moved**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.RunWindowSurfacesTest' --tests 'dev.jasper.ui.swing.*Surface*' :jasper-ui:javadoc`
-Expected: PASS (`RunWindowSurfacesTest` 3 tests; the existing surface tests unchanged).
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.RunWindowSurfacesTest' --tests 'dev.jasper.ui.swing.*Surface*' :jasper-ui:javadoc :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --continue`
+Expected: PASS (`RunWindowSurfacesTest` 3 tests; the existing surface tests unchanged; `PaintedContrastTest` with
+`theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette` over the theme set and the eight degenerate palettes). A
+pair that misses its guard on a degenerate palette is a colour painted with its raw role somewhere: route it through
+`SurfaceContrast.painted` in `RunWindowPresentation`, never loosen the guard. If a surface sample lands on text, move the
+sample, not the surface.
 
 Then prove the pixel rule for Tasks 3 and 4:
 
@@ -2630,7 +2899,8 @@ Expected: `IDENTICAL`. Any difference means a default view read a Run window val
 - [ ] **Step 5: Commit**
 
 ```bash
-git add jasper-ui/src/main/java/dev/jasper/ui/swing/SurfacePanel.java jasper-ui/src/test/java/dev/jasper/ui/swing/RunWindowSurfacesTest.java
+git add jasper-ui/src/main/java/dev/jasper/ui/swing/SurfacePanel.java jasper-ui/src/test/java/dev/jasper/ui/swing/RunWindowSurfacesTest.java \
+  jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java
 git commit -F - <<'EOF'
 Run window: the kit's frame, field box and list box surfaces
 
@@ -2638,7 +2908,8 @@ SurfacePanel's RUN_WINDOW kind paints the Run window's frame in the hover
 border on the kit's dialog surface, its title band and its footer band;
 FIELD paints an input's box around a composite of views with the focused
 edge and halo; BOX paints a list's card inside a control edge. The
-headless gallery is byte-identical.
+painted-contrast suite paints the Run window's declared pairs on them over
+every palette. The headless gallery is byte-identical.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2657,7 +2928,7 @@ views out. Steps render in the list box through Task 1's `StepForm`.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/palette/RunWindowView.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java` (`sealed … permits CardView, RunWindowView`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java` (`sealed … permits CardView, RunWindowView`, and its class comment's `{@link RunWindowView}`)
 - Create (tests): `jasper-app/src/test/java/dev/jasper/app/palette/RunWindowFixtures.java`, `RunWindowViewTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (rows for the three new files)
 
@@ -2806,8 +3077,8 @@ class RunWindowViewTest {
         var texts = new ArrayList<String>();
         for (ListItem item : list(view).items()) {
             var line = new StringBuilder(item.heading() ? "# " : "");
-            for (var node : item.title()) line.append(((Nodes.Text) node).text());
-            for (var node : item.trailing()) line.append(" | ").append(((Nodes.Text) node).text());
+            // A heading's count is its second title node (Rulings 13).
+            for (int i = 0; i < item.title().size(); i++) line.append(i > 0 ? " | " : "").append(((Nodes.Text) item.title().get(i)).text());
             texts.add(line.toString());
         }
         return texts;
@@ -2824,6 +3095,32 @@ class RunWindowViewTest {
     }
 
     static boolean enabled(RunWindowView view, String id) { return view.viewFor(id).spec().root().state().enabled(); }
+
+    static List<String> scopeLabels(RunWindowView view) {
+        return ((Nodes.MenuButton) view.viewFor(RunWindowView.SCOPES).spec().root()).items().stream().map(dev.jasper.ui.model.MenuItem::label).toList();
+    }
+
+    /** Spec 11.2: the live COMMAND_PALETTE keycap and each scope registered by the time the window opens. */
+    @Test void openingReadsTheLiveShortcutAndTheScopesRegisteredSince() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var scopes = new ArrayList<PaletteScope>(List.of(RunWindowFixtures.COMMANDS));
+            var shortcut = new String[] {""};
+            var host = new PaletteView.Host(query -> { }, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { },
+                () -> List.copyOf(scopes), () -> shortcut[0], () -> { }, () -> { });
+            try (var view = new RunWindowView(enterprise(), true, host)) {
+                assertThat(text(view, RunWindowView.SHORTCUT)).as("unbound when built").isEmpty();
+                assertThat(scopeLabels(view)).containsExactly("All", "Commands");
+                scopes.add(RunWindowFixtures.SNIPPETS);
+                shortcut[0] = "\u21e7\u2318P";
+                view.opened();
+                assertThat(text(view, RunWindowView.SHORTCUT)).isEqualTo("\u21e7\u2318P");
+                assertThat(scopeLabels(view)).as("a scope registered after the window was built").containsExactly("All", "Commands", "Snippets");
+                shortcut[0] = "\u2318K";
+                view.refreshTheme();
+                assertThat(text(view, RunWindowView.SHORTCUT)).as("a rebinding").isEqualTo("\u2318K");
+            }
+        });
+    }
 
     @Test void theRegionsSitWhereTheMockPutsThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
@@ -3168,6 +3465,20 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         view(SPLIT_LABEL).addMouseListener(toggleByLabel);
         var label = CardView.find(view(SPLIT_LABEL), SPLIT_LABEL, javax.swing.JLabel.class);
         if (label != null) label.addMouseListener(toggleByLabel);
+        // The title row drags the window (spec 11.2), its text included: the title and shortcut labels carry tooltips, so a
+        // press stops at them; they hand their mouse events to the view, where the host's drag listens (Rulings 14).
+        var toView = new MouseAdapter() {
+            private void pass(MouseEvent event) { dispatchEvent(javax.swing.SwingUtilities.convertMouseEvent(event.getComponent(), event, RunWindowView.this)); }
+            @Override public void mousePressed(MouseEvent event) { pass(event); }
+            @Override public void mouseReleased(MouseEvent event) { pass(event); }
+            @Override public void mouseClicked(MouseEvent event) { pass(event); }
+            @Override public void mouseDragged(MouseEvent event) { pass(event); }
+        };
+        for (String id : List.of(TITLE, SHORTCUT)) {
+            view(id).addMouseListener(toView); view(id).addMouseMotionListener(toView);
+            var text = CardView.find(view(id), id, javax.swing.JLabel.class);
+            if (text != null) { text.addMouseListener(toView); text.addMouseMotionListener(toView); }
+        }
         themeSubscription = kit.binding().subscribe(pair -> refreshTheme());
     }
 
@@ -3239,11 +3550,12 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             switch (entries.get(i)) {
                 case PaletteEntry.Header header -> {
                     if (header.kind() == PaletteEntry.Header.Kind.MATCHES) {
-                        // One "Matches" heading for every scope's matches, its count on the right (spec 11.3).
+                        // One "Matches" heading for every scope's matches, its count on the right (spec 11.3). A heading has a
+                        // title only, so the count is its second title node, which the kit lays at the band's end (Rulings 13).
                         if (matches) continue;
                         matches = true;
-                        items.add(new ListItem(id, Optional.empty(), List.of(text(id + ".title", RunCopy.heading(header), Nodes.TextRole.CAPTION)),
-                            List.of(), List.of(text(id + ".count", RunCopy.position(entries, selected), Nodes.TextRole.CAPTION)), true));
+                        items.add(new ListItem(id, Optional.empty(), List.of(text(id + ".title", RunCopy.heading(header), Nodes.TextRole.CAPTION),
+                            text(id + ".count", RunCopy.position(entries, selected), Nodes.TextRole.CAPTION)), List.of(), List.of(), true));
                     } else items.add(new ListItem(id, Optional.empty(), List.of(text(id + ".title", RunCopy.heading(header), Nodes.TextRole.CAPTION)),
                         List.of(), List.of(), true));
                 }
@@ -3331,8 +3643,11 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
 
     @Override public JComponent component() { return this; }
     @Override public boolean modeless() { return true; }
-    /** Each opening clears the checkbox (spec 11.2). */
-    @Override public void opened() { split = false; render(SPLIT); }
+    /**
+     * Each opening clears the checkbox (spec 11.2) and reads the opener's live COMMAND_PALETTE shortcut and the scopes
+     * registered now (plugin scopes usually arrive after the window is built).
+     */
+    @Override public void opened() { split = false; render(SHORTCUT, SCOPES, SPLIT); }
     @Override public void focusQuery() { if (!view(QUERY).isClosed()) view(QUERY).focus(QUERY); }
     @Override public boolean composing() { return !view(QUERY).isClosed() && view(QUERY).composing(QUERY); }
     @Override public String queryText() { return query; }
@@ -3415,7 +3730,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     @Override public void focusStepField(int delta) { step.focusField(delta); }
     @Override public Map<String, String> stepValues() { return step.values(); }
     @Override public void setStepError(String message) { step.setError(message); revalidate(); repaint(); }
-    @Override public void refreshTheme() { step.applyGeometry(); revalidate(); repaint(); }
+    /** Follows a theme change; the title row's shortcut and the scope menu are read again, as a rebinding may come with it. */
+    @Override public void refreshTheme() { step.applyGeometry(); render(SHORTCUT, SCOPES); }
     /** The Run window has no reveal (spec 11.6). */
     @Override public void setReveal(double fraction) { }
     @Override public int revealedHeight() { return getHeight(); }
@@ -3547,10 +3863,13 @@ import pathlib
 path = pathlib.Path("jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java"); text = path.read_text(encoding="utf-8")
 old = "public interface PaletteView extends AutoCloseable {"
 if text.count(old) != 1: raise SystemExit("PaletteView: the declaration moved")
-path.write_text(text.replace(old, "public sealed interface PaletteView extends AutoCloseable permits CardView, RunWindowView {"), encoding="utf-8")
+text = text.replace(old, "public sealed interface PaletteView extends AutoCloseable permits CardView, RunWindowView {")
+old = "the Run window ({@code RunWindowView})"
+if text.count(old) != 1: raise SystemExit("PaletteView: the class comment moved")
+path.write_text(text.replace(old, "the Run window ({@link RunWindowView})"), encoding="utf-8")
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
 rows = [
-    "jasper-app/src/main/java/dev/jasper/app/palette/RunWindowView.java,app.palette,RunWindowView,standard-ui,none,none,"
+    "jasper-app/src/main/java/dev/jasper/app/palette/RunWindowView.java,app.palette,RunWindowView,standard-ui,8,8,"
     "jasper-app/src/test/java/dev/jasper/app/palette/RunWindowViewTest.java,New in Enterprise plan 8a Task 5; the Run window (spec 11.2); layout only: kit views on the kit's RUN_WINDOW; FIELD and BOX surfaces",
     "jasper-app/src/test/java/dev/jasper/app/palette/RunWindowViewTest.java,app.palette,RunWindowViewTest,nonvisual-helper,none,none,"
     "jasper-app/src/test/java/dev/jasper/app/palette/RunWindowViewTest.java,Test/fixture ownership; New in Enterprise plan 8a Task 5",
@@ -3567,7 +3886,7 @@ through its width layout (`SurfacePanel.java:333-350`), which the classic prompt
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.palette.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS: `RunWindowViewTest` 8 tests and every earlier palette test. A geometry assertion that is off by the
+Expected: PASS: `RunWindowViewTest` 9 tests and every earlier palette test. A geometry assertion that is off by the
 toggle's focus reserve or a label's inset is fixed in `WindowLayout` (the mock's numbers in the test stay).
 
 - [ ] **Step 5: Commit**
@@ -3602,7 +3921,7 @@ the SPLIT box gates, "i of n" counts, and steps behave the same.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteViews.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/PaletteLook.java` (two constants), `jasper-app/src/main/java/dev/jasper/app/palette/PaletteController.java:42-51`, `jasper-app/src/main/java/dev/jasper/app/palette/package-info.java:3`, `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java:59-61`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/PaletteLook.java` (two constants), `jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java` (the class comment's `{@link PaletteViews}`), `jasper-app/src/main/java/dev/jasper/app/palette/PaletteController.java:42-51`, `jasper-app/src/main/java/dev/jasper/app/palette/package-info.java:3`, `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java:59-61`
 - Test: `jasper-app/src/test/java/dev/jasper/app/palette/PaletteViewContractTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (rows for `PaletteViews.java` and the test)
 
@@ -3761,7 +4080,7 @@ class PaletteViewContractTest {
                 var list = (Nodes.ItemList) view.viewFor(RunWindowView.RESULTS).spec().root();
                 var heading = list.items().getFirst();
                 assertThat(((Nodes.Text) heading.title().getFirst()).text()).isEqualTo("Matches");
-                assertThat(((Nodes.Text) heading.trailing().getFirst()).text()).as("mac, minecraft, gcloud auth and make match").isEqualTo("1 of 4");
+                assertThat(((Nodes.Text) heading.title().get(1)).text()).as("mac, minecraft, gcloud auth and make match").isEqualTo("1 of 4");
                 assertThat(((Nodes.Text) view.viewFor(RunWindowView.SHORTCUT).spec().root()).text()).isEqualTo("⇧⌘P");
                 view.handle(new dev.jasper.ui.model.UiEvent.Action(RunWindowView.BROWSE));
                 assertThat(h.browsed()).containsExactly("browse");
@@ -3858,6 +4177,7 @@ edit(P + "PaletteController.java", [
             scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, () -> "", this::dismiss, () -> { }));''',
      '''        palette = PaletteViews.of(look, kit, macOs, new PaletteView.Host(this::queryChanged, this::execute, this::prefix,
             scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, openerShortcut, this::dismiss, browse));''', 1)])
+edit(P + "PaletteView.java", [("built by {@code PaletteViews}", "built by {@link PaletteViews}", 1)])
 edit(P + "package-info.java", [
     (" * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.commands, dev.jasper.app.config, dev.jasper.app.lifecycle, dev.jasper.app.platform.",
      " * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.commands, dev.jasper.app.config, dev.jasper.app.lifecycle, dev.jasper.app.platform,\n"
@@ -3926,7 +4246,8 @@ checked for structure and contrast (no Dark mock shows the window). The images a
 - Consumes: Task 5's `RunWindowView`, `RunWindowFixtures`; Task 4's `SurfacePanel.focusShown`; 5b's `EnterpriseResources`;
   `KitGallery.installed` (jasper-ui test fixtures).
 - Produces: `static void RunWindowRenderTest.check(BufferedImage render, String state, KitContext c, Path directory)` (8b
-  reuses it), `static void RunWindowRenderTest.fonts()`; `public final class MockComparison` with `static double deltaE(Color, Color)`, `static int edge(BufferedImage,
+  reuses it; on the EDT with `c` open), `static BufferedImage RunWindowRenderTest.render(boolean dark, String state,
+  RunWindowRenderTest.Drawn then)`, `static void RunWindowRenderTest.fonts()`; `public final class MockComparison` with `static double deltaE(Color, Color)`, `static int edge(BufferedImage,
   int x, int y, int dx, int dy, int steps, Color background)`, `static boolean[][] edges(BufferedImage, Rectangle,
   List<Rectangle> masks)`, `static double agreement(boolean[][], boolean[][])`, `static double bestAgreement(BufferedImage
   mock, Rectangle mockArea, BufferedImage render, Rectangle renderArea, List<Rectangle> masks, int search)`, `static
@@ -4105,7 +4426,8 @@ import org.junit.jupiter.api.Test;
  * Plan 8a Rulings 12: the Run window under the shipped Enterprise kit, IBM Plex and Enterprise Light against the two 06
  * Run Dialog mocks, at 2x. The mocks draw the window's frame at x 60-983, y 854-1695; the render is the window alone.
  * The part under the list is compared 12 device pixels lower (plan 8a Rulings 5). Images go to
- * {@code jasper-app/build/run-window/}.
+ * {@code jasper-app/build/run-window/}. Every comparison runs on the EDT inside {@code KitGallery.installed}, while the
+ * context that drew the render is open (installed closes its binding when its action returns).
  */
 public class RunWindowRenderTest {
     static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/run-window");
@@ -4170,38 +4492,50 @@ public class RunWindowRenderTest {
         new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false), new Sample("checkbox inside", 38, 721, true),
         new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true), new Sample("primary", 462, 800, true));
 
-    static KitContext[] context = new KitContext[1];
-
     /** Registers the shipped Plex files, as the application does for the look (5b's LookFonts). */
     @BeforeAll public static void fonts() throws Exception {
         for (var file : EnterpriseResources.facts().parsed().orElseThrow().faces().files())
             GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(Font.createFont(Font.TRUETYPE_FONT, new ByteArrayInputStream(file.bytes())));
     }
 
-    /** {@code state} rendered at 2x under the shipped kit in {@code dark} or Light, and the context it was drawn with. */
-    static BufferedImage render(boolean dark, String state) throws Exception {
+    /** What runs with a render on the EDT, while the context that drew it is still open. */
+    @FunctionalInterface interface Drawn { void accept(BufferedImage render, KitContext context) throws Exception; }
+
+    /**
+     * {@code state} rendered at 2x under the shipped kit in {@code dark} or Light, written to {@code build/}, and handed
+     * with the context that drew it to {@code then} on the EDT before {@code KitGallery.installed} closes that context.
+     */
+    static BufferedImage render(boolean dark, String state, Drawn then) throws Exception {
         var parsed = EnterpriseResources.facts().parsed().orElseThrow();
         var theme = EnterpriseResources.theme().generated(dark);
-        var image = new BufferedImage[1];
-        SwingUtilities.invokeAndWait(() -> KitGallery.installed(theme, parsed.kit(), (kit, focus) -> {
-            context[0] = kit;
-            try (var view = RunWindowFixtures.view(kit, new ArrayList<>())) {
-                if (state.equals("typing-auth")) { view.setQueryText("auth"); view.setEntries(RunWindowFixtures.typingAuth(), null, "Nothing found"); }
-                else view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
-                view.fieldBox().focusShown(true);
-                view.setSize(view.getPreferredSize());
-                for (int i = 0; i < 3; i++) dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(view);
-                var out = new BufferedImage(view.getWidth() * 2, view.getHeight() * 2, BufferedImage.TYPE_INT_ARGB);
-                var g = out.createGraphics();
-                try {
-                    g.setColor(semantic(kit, SemanticColor.SURFACE_APP)); g.fillRect(0, 0, out.getWidth(), out.getHeight());
-                    g.scale(2, 2); view.paint(g);
-                } finally { g.dispose(); }
-                image[0] = out;
-            }
-        }));
         Path directory = Files.createDirectories(OUT.resolve(dark ? "dark" : "light"));
-        ImageIO.write(image[0], "png", directory.resolve(state + "@2x.png").toFile());
+        var image = new BufferedImage[1];
+        var failure = new Exception[1];
+        try {
+            SwingUtilities.invokeAndWait(() -> KitGallery.installed(theme, parsed.kit(), (kit, focus) -> {
+                try (var view = RunWindowFixtures.view(kit, new ArrayList<>())) {
+                    if (state.equals("typing-auth")) { view.setQueryText("auth"); view.setEntries(RunWindowFixtures.typingAuth(), null, "Nothing found"); }
+                    else view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+                    view.fieldBox().focusShown(true);
+                    view.setSize(view.getPreferredSize());
+                    for (int i = 0; i < 3; i++) dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(view);
+                    var out = new BufferedImage(view.getWidth() * 2, view.getHeight() * 2, BufferedImage.TYPE_INT_ARGB);
+                    var g = out.createGraphics();
+                    try {
+                        g.setColor(semantic(kit, SemanticColor.SURFACE_APP)); g.fillRect(0, 0, out.getWidth(), out.getHeight());
+                        g.scale(2, 2); view.paint(g);
+                    } finally { g.dispose(); }
+                    image[0] = out;
+                    ImageIO.write(out, "png", directory.resolve(state + "@2x.png").toFile());
+                    then.accept(out, kit);
+                } catch (Exception thrown) { failure[0] = thrown; }
+            }));
+        } catch (java.lang.reflect.InvocationTargetException wrapped) {
+            // An assertion inside then fails the test with its own message.
+            if (wrapped.getCause() instanceof Error error) throw error;
+            throw wrapped;
+        }
+        if (failure[0] != null) throw failure[0];
         return image[0];
     }
 
@@ -4216,11 +4550,12 @@ public class RunWindowRenderTest {
         return found < 0 ? -1 : (feature.dx() != 0 ? feature.x() + found * feature.dx() : feature.y() + found * feature.dy());
     }
 
-    void compare(String state) throws Exception { check(render(false, state), state, context[0], OUT.resolve("light")); }
+    void compare(String state) throws Exception { render(false, state, (image, c) -> check(image, state, c, OUT.resolve("light"))); }
 
     /**
      * {@code render}, the Run window alone at 2x drawn with {@code c}, against {@code state}'s mock; the side image goes to
-     * {@code directory}. Plan 8b's workspace render checks the window it crops from a whole window the same way.
+     * {@code directory}. Call it on the EDT while {@code c} is open: from {@link #render}'s {@code then}, or, as plan 8b's
+     * workspace render does for the window it crops from a whole window, inside the theme controller's lifetime.
      */
     public static void check(BufferedImage render, String state, KitContext c, Path directory) throws Exception {
         var mock = mock(state);
@@ -4261,32 +4596,37 @@ public class RunWindowRenderTest {
 
     @Test void typingAuthMatchesItsMock() throws Exception { compare("typing-auth"); }
 
+    /** The horizontal one-pixel probes: the structure Dark keeps. */
+    static List<Feature> structure() { return FEATURES.stream().filter(f -> f.dy() == 0 && f.tolerance() <= 1).toList(); }
+
     /** No Dark mock shows the window: Dark keeps the Light geometry and its declared pairs readable. */
     @Test void enterpriseDarkKeepsTheGeometryAndTheTextReadable() throws Exception {
-        var light = render(false, "just-opened");
-        var dark = render(true, "just-opened");
-        var c = context[0];
-        assertThat(dark.getWidth()).isEqualTo(light.getWidth());
-        assertThat(dark.getHeight()).isEqualTo(light.getHeight());
-        assertThat(c.theme().dark()).isTrue();
-        var palette = c.theme().semantic();
-        assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_PRIMARY), derived(c, DerivedColor.SURFACE_HEADER_ACTIVE))).as("the title").isGreaterThanOrEqualTo(4.5);
-        assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), dialog(c))).as("labels and help").isGreaterThanOrEqualTo(4.5);
-        assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), derived(c, DerivedColor.SURFACE_TABLE_HEADER))).as("headings").isGreaterThanOrEqualTo(4.5);
-        assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT))).as("the selected row").isGreaterThanOrEqualTo(4.5);
-        for (var feature : FEATURES) {
-            if (feature.dy() != 0 || feature.tolerance() > 1) continue;
-            assertThat(probe(dark, 0, 0, feature, feature.lower() ? SHIFT : 0, c)).as("dark: " + feature.name())
-                .isEqualTo(probe(light, 0, 0, feature, feature.lower() ? SHIFT : 0, lightContext()));
-        }
+        var light = new java.util.LinkedHashMap<String, Integer>();
+        var lightImage = render(false, "just-opened", (image, c) -> {
+            for (var feature : structure()) light.put(feature.name(), probe(image, 0, 0, feature, feature.lower() ? SHIFT : 0, c));
+        });
+        render(true, "just-opened", (dark, c) -> {
+            assertThat(dark.getWidth()).isEqualTo(lightImage.getWidth());
+            assertThat(dark.getHeight()).isEqualTo(lightImage.getHeight());
+            assertThat(c.theme().dark()).isTrue();
+            var palette = c.theme().semantic();
+            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_PRIMARY), derived(c, DerivedColor.SURFACE_HEADER_ACTIVE))).as("the title").isGreaterThanOrEqualTo(4.5);
+            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), dialog(c))).as("labels and help").isGreaterThanOrEqualTo(4.5);
+            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), derived(c, DerivedColor.SURFACE_TABLE_HEADER))).as("headings").isGreaterThanOrEqualTo(4.5);
+            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT))).as("the selected row").isGreaterThanOrEqualTo(4.5);
+            for (var feature : structure())
+                assertThat(probe(dark, 0, 0, feature, feature.lower() ? SHIFT : 0, c)).as("dark: " + feature.name()).isEqualTo(light.get(feature.name()));
+        });
     }
-
-    private static KitContext lightContext() throws Exception { render(false, "just-opened"); return context[0]; }
 }
 ```
 
-The Dark structure loop renders Light again for its context; this costs one render. `ColorMath.hex` and
-`ColorMath.contrast` are jasper-ui's (`ColorMath.java`).
+Each render's checks run inside its own `KitGallery.installed` call, on the EDT, while its `KitContext` is open:
+`ThemeBinding.current()` (reached through `KitContext.theme()`) refuses a closed binding and any thread but the EDT, so a
+context must never be kept past the callback. The Light probes are kept as numbers, which Dark's callback compares.
+An `AssertionError` raised in a callback reaches the test through `invokeAndWait`'s `InvocationTargetException`, which
+`render` unwraps. `ColorMath.hex` and `ColorMath.contrast` are jasper-ui's (`ColorMath.java`); every pair the Run
+window declares is also painted over every palette by Task 4's `PaintedContrastTest` case.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -4425,7 +4765,8 @@ PY
 ```
 
 Expected: "failures 0, errors 0", and a test count above the base recorded in "Before you start" by this plan's new
-tests (2 + 4 + 1 + 2 + 3 + 3 + 8 + 5 + 3 = 31).
+tests (2 + 4 + 1 + 2 + 3 + 3 + 1 + 9 + 5 + 3 = 33: headings, copy, seam, roles, presentation, surfaces, the painted-contrast
+case, view, contract, render).
 
 - [ ] **Step 3: STATUS and the banner**
 
@@ -4455,9 +4796,13 @@ comparison: <tuned>. Rulings (plan, "Rulings"): (1) two plans, 8b lands the wind
 (3) the step form and prefix edit shared; (4) the Run window's roles, two type roles and two filled icons; (5) the list is
 8 × 21 + 2 × 19 = 206 inside its box, 6 px taller than the mock's cut box, so the window is 427 tall; (6) the title
 shortcut and row tags are plain CAPTION text, as drawn; (7) the help tile is a PROMPT_HEADER `play.filled` icon at the
-Run mock's 32; (8) the Run window's text colours, its list details and tags in `text.placeholder` unguarded; (9) no
-placeholder in the Open field, the query in the data face; (10) the copy; (11) the second and third verbs in each row's
-context menu; (12) the JUnit comparison with its floors. Deviations: <deviations>. Default look byte-identical: the
+Run mock's 32; (8) the Run window's text colours as declared pairs (`RunWindowPresentation.pairs(Kit)`, TEXT-guarded,
+painted over every palette by `PaintedContrastTest`), its list details, tags and count in `text.placeholder` and a
+selected row's detail in the card's supporting ink unguarded, the empty line guarded against the dialog surface (a
+residual); (9) no placeholder in the Open field, the query in the data face; (10) the copy; (11) the second and third
+verbs in each row's context menu; (12) the JUnit comparison with its floors, run on the EDT while each context is open;
+(13) the matches count is the heading's second title node (a heading has a title only); (14) the title row's labels hand
+their presses to the view, so the title text drags. Deviations: <deviations>. Default look byte-identical: the
 headless gallery's files for Slate Cobalt Dark and Light match the base (Task 4). `./gradlew check --continue`:
 **<counts>**. GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not merged, not pushed.
 ```

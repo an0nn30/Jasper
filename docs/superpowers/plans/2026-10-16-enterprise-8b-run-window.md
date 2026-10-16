@@ -10,10 +10,13 @@ Browse… while staying open, and has no reveal; `Presentation.Landed.RUN_WINDOW
 
 **Architecture:** `dev.jasper.app.workspace` gains `PaletteHome` with two implementations, `TitleFieldHome` (today's
 drop from the title field, guides and `[palette] center_x/top`) and `CornerHome`, chosen by
-`WorkspaceChrome.paletteHome(PaletteLook)` (spec 11.5: `palette` cannot depend on `workspace`, so the home is the
-workspace's). `WindowCommandPalette` asks its home for every placement, drag, attach and save, and asks its view whether
-it is modeless for every dismissal, the overlay's hit test, the key routing and the reveal. The window receives its
-`PaletteLook` from the presentation's projections through `TerminalWindow` and `WindowContent`.
+`WorkspaceChrome.of(WorkspaceLook, TitleFormat, PaletteLook)` (spec 11.5: "`WorkspaceChrome.of` picks them from
+`PaletteLook.home`"; `palette` cannot depend on `workspace`, so the home is the workspace's). `WindowCommandPalette` asks
+its home for every placement, drag, attach and save, and asks its view whether it is modeless for every dismissal, the
+overlay's hit test, the key routing and the reveal. The window receives its palette look through plan 6a's values:
+`WindowLook.of(projections)` passes `projections.palette()` to `WorkspaceChrome.of`, which keeps it and its home
+(`palette()`, `paletteHome()`), and `WindowContent` reads both from its `look()`; 6a's `TerminalWindow(…, WindowLook)`
+and `JasperApplication.windowLook()` already carry that value to every window, the start-up rehearsal's included.
 
 **Tech Stack:** Java 25 on JetBrains Runtime 25, Swing and FlatLaf 3.7, tomlj 1.1.1, Gradle 9.7 (Kotlin DSL), JUnit 6.1.3
 and AssertJ 3.27.7, Python 3.11+ (`python3 -I`) for the edit scripts.
@@ -37,25 +40,34 @@ ls jasper-app/src/main/java/dev/jasper/app/palette/RunWindowView.java jasper-app
 ls jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java                  # plan 6
 grep -n 'LANDED' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java     # 5a, plans 6 and 7 add their groups
 grep -n 'new WindowContent(\|new TerminalWindow(' -r jasper-app/src/main/java
+grep -c 'WorkspaceChrome.of(projections.workspace(), projections.title())' jasper-app/src/main/java/dev/jasper/app/workspace/WindowLook.java   # 6a: 1
+grep -c 'boolean paletteOpen()\|void paletteChanged()' jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java                # 6b: 2
+grep -c 'Optional<DockStripe> bottomStrip()' jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java                          # 7: 1
+grep -c '!owner.lookAnimates()) return;' jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java                        # 6a: 1
 ```
 
 If 8a is not on the branch, execute it first. This plan was written while plans 6 and 7 were being written; re-anchor
 against what they built:
 
-- **The window's projections.** Plan 6 gives `TerminalWindow` and `WindowContent` the presentation's chrome
-  (`ShellLook.unifiedTitle` for `TerminalWindow.java:66`, `WorkspaceLook` for `WorkspaceChrome.of`). If they already
-  receive the whole `Projections` (or a value carrying `PaletteLook`), Task 2 and Task 5 read `palette()` from it instead
-  of adding the `PaletteLook` parameter this plan adds; keep the delegating constructors the tests use either way.
-- **`WorkspaceChrome`.** Plan 6 creates it with `of(…)`. Task 2 adds the static `paletteHome(PaletteLook)` beside `of`;
-  if `of` already takes the `PaletteLook`, have `of` store the home and keep `paletteHome` as the one reader of
-  `PaletteLook.home()`.
-- **The bottom strip.** Plan 7 adds the BOTTOM_LEFT/BOTTOM_RIGHT strip. Task 2's `WindowContent.paletteWorkArea` takes
-  the `ToolWindowArea` bounds and subtracts `area.bottomStripHeight()`; if plan 7 placed the strip inside `area`, give
-  that accessor the strip's height (plan 7 may already have one under another name; use it); if the strip lies outside
-  `area`, the accessor returns 0.
-- **"▶ Run…".** Plan 6 adds the leading status item and its active look (spec 10.6). Task 4 gives it the open state
-  through `WindowContent.paletteOpen()` and a repaint when it changes; if plan 6 already follows
-  `commandPalette().isOpen()`, Task 4's hook only repaints.
+- **The window's look (plan 6a).** `WindowContent(…, boolean macOs, WorkspaceChrome look)` assigns `look` right after
+  `super(new BorderLayout())` (its ten-argument form delegates with `this(…, WorkspaceChrome.STANDARD)`); `WindowLook.of
+  (Projections)` builds `WorkspaceChrome.of(projections.workspace(), projections.title())`; `TerminalWindow(…,
+  CommandHistory, WindowLook)` passes `look.chrome()` to `WindowContent`; `JasperApplication` passes `windowLook()` at
+  both `TerminalWindow` sites; `startReveal` reads `if (!animations.enabled() || !owner.lookAnimates()) return;`. This
+  plan adds no `WindowContent`, `TerminalWindow` or `JasperApplication` constructor or argument: Task 2 gives
+  `WorkspaceChrome.of` a three-argument form carrying the `PaletteLook`, and `WindowLook.of` calls it. Check each quoted
+  text (`grep -n 'WorkspaceChrome.of(projections.workspace(), projections.title())' jasper-app/src/main/java/dev/jasper/app/workspace/WindowLook.java`).
+- **`WorkspaceChrome` (plans 6a, 6b, 7).** Its private constructor grows with each plan (`…, Supplier<StatusCells>,
+  boolean runItem, DockChrome dock)` after plan 7); Task 2 does not touch it: the palette's look and home are two fields
+  the three-argument `of` sets on the value the two-argument `of` returns, before it leaves `WorkspaceChrome`. The test
+  helpers build the default look's `WorkspaceLook` with 5a's seven components; if a later plan added one, use its
+  default value and record it.
+- **The bottom strip (plan 7).** Plan 7 mounts the strip beside the tool window area (`stripes.bottom().ifPresent(strip
+  -> body.add(strip, BorderLayout.SOUTH))`), so `area`'s bounds already end above it; `WindowContent.paletteWorkArea`
+  returns those bounds, and `WindowContent.bottomStrip()` (plan 7) is what the test checks against.
+- **"▶ Run…" (plan 6b Task 5).** 6b adds `boolean WindowContent.paletteOpen()` and `void paletteChanged()` (the run
+  item's repaint) and calls `owner.paletteChanged()` at the end of `WindowCommandPalette.open(String, String, String)`
+  and `restoreAndHide`. This plan uses them and adds no open-state hook of its own (Task 4).
 - **Plan 6's chrome renders** (spec 16.1.4: test forms of `commandPalettePreview` and the others "under both palette
   views"). Task 6 extends them with the Run window; find the render test plan 6 added
   (`git grep -ln 'commandPalettePreview\|CommandPalettePreview' jasper-app/src/test`) and add the RUN_WINDOW look to its
@@ -70,7 +82,9 @@ Record every substitution in the status banner. Record `./gradlew check --contin
 | `PaletteView` (`modeless()`, `component()`, `focusQuery()`), `CardView`, `RunWindowView` (`viewFor`, `handle`, `TITLE`, `SPLIT`, `BROWSE`, `CANCEL`, `CLOSE`), `PaletteViews.of`, `PaletteLook.DEFAULT`, `PaletteLook.RUN_WINDOW`, `PaletteController(KitContext, PaletteLook, …, Supplier<String>, Runnable)`, `WindowCommandPalette.view()`, `RunWindowRenderTest.check`, `RunWindowRenderTest.fonts`, `RunWindowFixtures` | 8a Tasks 1 to 7 |
 | `PaletteLook(View, Home)`, `Projections.palette()`, `Presentation.Landed.RUN_WINDOW`, `Presentation.LANDED`, `JasperApplication.presentation()` | 5a Tasks 8 and 9 |
 | `EnterpriseResources.facts()`, `.theme()`; `ThemeController.startup(boolean, ThemeSelection, Kit, Consumer)` | 5b Task 4, 5a Task 10 |
-| `WorkspaceChrome`, the "▶ Run…" status item | plan 6 |
+| `WorkspaceChrome` with `STANDARD` and `of(WorkspaceLook, TitleFormat)`; `WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean followThemeAppearance)` and `WindowLook.of(Projections)`; `WindowContent(…, boolean macOs, WorkspaceChrome look)` and `look()`; `WindowContent.lookAnimates()`; `TerminalWindow(…, CommandHistory, WindowLook)`; `JasperApplication.windowLook()` | 6a Tasks 4 to 6 |
+| `WindowContent.paletteOpen()`, `WindowContent.paletteChanged()` and the calls at the end of `WindowCommandPalette.open` and `restoreAndHide`; the "▶ Run…" status item | 6b Task 5 |
+| `WindowContent.bottomStrip()` (`Optional<DockStripe>`), the strip mounted beside `area` | 7 Task 3 |
 | `VariantReadTest.jars()`, `StrategyIsolationTest.Scanned` | 4b Task 1 |
 | `ActionId.OPEN_FILE`, `WindowContent.openFile()`, `WindowContent.fileChooser`, `WindowContent.onOpenFile` | 3e Task 2 |
 | `RunWindowView.listHeight()`, the `RUN_WINDOW_*` roles | 8a Tasks 3 and 5 |
@@ -139,7 +153,8 @@ Record every substitution in the status banner. Record `./gradlew check --contin
    and writes it after `[main_window]` (`:281-282`); `PalettePosition.fraction` is package-private (`:98`).
 7. `TerminalWindow` builds `WindowContent` with ten arguments (`TerminalWindow.java:60-61`);
    `JasperApplication.composeWindow` builds `TerminalWindow` (`JasperApplication.java:409`) and the rehearsal builds one
-   (`:809`).
+   (`:809`). Plan 6a gives `TerminalWindow` a `WindowLook` and passes `windowLook()` at both sites, so every window, the
+   rehearsal's included, is built from `WindowLook.of(presentation.projections())`.
 8. The mocks place the window 6 px right of the left stripe's rule and 5 px above the bottom strip's rule (2× pixels:
    stripe rule x 46-47, window frame x 60; bottom strip rule y 1706, window bottom y 1695), against spec 5.5's
    `PALETTE_WINDOW_MARGIN` 8 (Rulings 3).
@@ -147,7 +162,10 @@ Record every substitution in the status banner. Record `./gradlew check --contin
 ## Rulings
 
 1. **The home is the workspace's** (spec 11.5): `PaletteHome`, `TitleFieldHome` and `CornerHome` live in
-   `dev.jasper.app.workspace`, and `WorkspaceChrome.paletteHome(PaletteLook)` is the one reader of `PaletteLook.home()`.
+   `dev.jasper.app.workspace`, and `WorkspaceChrome.of(WorkspaceLook, TitleFormat, PaletteLook)` is the one reader of
+   `PaletteLook.home()`; it keeps the look and the home it picked (`palette()`, `paletteHome()`), and `WindowContent`
+   hands both to `WindowCommandPalette`. The palette look travels in 6a's `WindowLook`, never as a new constructor
+   argument.
    `TitleFieldHome` calls `WindowCommandPalette`'s existing statics, so the card's arithmetic is unchanged. Cost if
    wrong: none.
 2. **The Run window's saved place is fractions of the workspace** (spec 11.5's words), the same rectangle the card's
@@ -166,28 +184,31 @@ Record every substitution in the status banner. Record `./gradlew check --contin
 6. **An opener focuses**: ⇧⌘P, the COMMAND_PALETTE action (the "▶ Run…" item and the Search everywhere field run it) and
    the active scope's shortcut focus an open Run window's field; another scope's shortcut switches the chip and focuses.
    Cost if wrong: none.
-7. **"▶ Run…"'s active look is plan 6's** (spec 10.6); this plan supplies `WindowContent.paletteOpen()` and repaints the
-   status bar when the Run window opens or closes. Cost if wrong: one call.
+7. **"▶ Run…"'s active look is plan 6's** (spec 10.6): plan 6b's `WindowContent.paletteOpen()` and `paletteChanged()`,
+   called at the end of `WindowCommandPalette.open` and `restoreAndHide`, already follow the Run window, which opens and
+   closes through those two methods. This plan adds no hook. Cost if wrong: none.
 8. **The list fits the home**: `RunWindowView.fitHeight(available)` drops rows (never below one) until the window fits
    the dock work area's height less two margins; `CardView` ignores it. Cost if wrong: one method.
-9. **The rehearsal window takes the presentation's palette look** like any other window, so a start-up rehearsal under
-   Enterprise builds the Run window's classes. Cost if wrong: none.
+9. **The rehearsal window takes the presentation's palette look** like any other window (6a's `windowLook()` at the
+   rehearsal's `TerminalWindow`, whose `WindowLook` now carries it), so a start-up rehearsal under Enterprise builds the
+   Run window's classes. Cost if wrong: none.
 
 ## File structure
 
 - `jasper-app/src/main/java/dev/jasper/app/persistence/UiState.java`: `RunWindowPosition` and `[palette.run_window]` (Task 1).
 - `jasper-app/src/main/java/dev/jasper/app/workspace/`: new `PaletteHome`, `TitleFieldHome`, `CornerHome`;
-  `WorkspaceChrome` (`paletteHome`); `WindowCommandPalette` (homes, modeless); `WindowContent` (the look, the work area,
-  dismissals, `paletteOpen`); `ToolWindowArea` (`bottomStripHeight`); `TerminalWindow` (the look);
-  `WorkspaceActions`, `WindowContributions`, `WindowCommands` (`blocksActions`).
+  `WorkspaceChrome` (`of` with the palette look, `palette()`, `paletteHome()`); `WindowLook` (`of` passes the palette
+  look); `WindowCommandPalette` (homes, modeless, Browse…'s focus); `WindowContent` (the palette's look and home from
+  `look()`, the work area, dismissals); `WorkspaceActions`, `WindowContributions`, `WindowCommands` (`blocksActions`).
 - `jasper-app/src/main/java/dev/jasper/app/palette/`: `PaletteView.fitHeight`, `RunWindowView.fitHeight`,
   `PaletteController` (`follow`, `modeless`, `owns`, an opener focusing), `PaletteKeyRouter` (owned keys).
-- `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java`, `presentation/Presentation.java` (landing).
+- `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (landing).
 - Tests: `persistence/UiStateTest`, `workspace/CornerHomeTest`, `workspace/RunWindowModelessTest`,
   `workspace/RunWindowOpenersTest`, `workspace/RunWindowWorkspaceRenderTest`, `architecture/PaletteVariantReadTest`,
   `workspace/PaletteStrategiesTest`.
-- Docs (Task 7): `docs/command-palette.md`, `docs/configuration.md` (ui-state is not configuration; only if it lists
-  ui-state tables), `docs/app-architecture.md`, `docs/STATUS.md`.
+- Docs (Task 7): `docs/command-palette.md`, `docs/configuration.md` (its `ui-state.toml` paragraph names `[palette]`),
+  `docs/app-architecture.md`, `docs/STATUS.md`, and the two status banners spec 19.2 gives the command palette and
+  palette scopes specifications.
 
 ---
 
@@ -344,27 +365,33 @@ Spec 11.5. `PaletteHome` is where the palette's view lives in its window and how
 `CornerHome` is the bottom-left of the dock work area (right of the left stripe, above the bottom strip and the status
 bar, inset by `PALETTE_WINDOW_MARGIN`, `RUN_WINDOW_WIDTH` wide), attaches when a drag ends at or below it
 (`|left − home.left| ≤ reach && bottom ≥ home.bottom − reach`), has no guides and saves `[palette.run_window]`.
-`WorkspaceChrome.paletteHome` picks one from `PaletteLook.home()`. The window receives its `PaletteLook`; the Run
-window's list fits the home's height (Rulings 8).
+`WorkspaceChrome.of(WorkspaceLook, TitleFormat, PaletteLook)` picks one from `PaletteLook.home()` and keeps both;
+`WindowLook.of` passes the projections' palette look, so plan 6a's `WindowLook` carries it to every window (until Task 5
+lands it, `projections.palette()` is `PaletteLook.DEFAULT`, so nothing changes yet). The Run window's list fits the
+home's height (Rulings 8).
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/PaletteHome.java`, `TitleFieldHome.java`, `CornerHome.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java` (`paletteHome`), `WindowCommandPalette.java:55-66,216-229,258-263,281-332,375-407`, `WindowContent.java:216-217,240-241,697` (the look, the work area), `ToolWindowArea.java` (`bottomStripHeight`, if plan 7 gave it none)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java` (`of(…, PaletteLook)`, `palette()`, `paletteHome()`), `WindowLook.java` (6a's `of`), `WindowCommandPalette.java:55-66,216-229,258-263,281-332,375-407`, `WindowContent.java:240-241,697` (the palette's look and home from `look()`, the work area)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/palette/PaletteView.java` (`fitHeight`), `CardView.java`, `RunWindowView.java` (`fitHeight`, `shownRows`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/CornerHomeTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (rows for the four new files)
 
 **Interfaces:**
-- Consumes: Task 1's `UiState.RunWindowPosition`; 8a's `PaletteLook.DEFAULT`/`RUN_WINDOW`, `RunWindowView`, `PaletteView`.
+- Consumes: Task 1's `UiState.RunWindowPosition`; 8a's `PaletteLook.DEFAULT`/`RUN_WINDOW`, `RunWindowView`, `PaletteView`,
+  and its title row's press forwarding (8a Rulings 14); 6a's `WorkspaceChrome.of(WorkspaceLook, TitleFormat)`,
+  `WindowLook.of`, `WindowContent(…, WorkspaceChrome look)` and `look()`; 5a's `WorkspaceLook` and `TitleFormat`; plan
+  7's `WindowContent.bottomStrip()`.
 - Produces: `sealed interface PaletteHome permits TitleFieldHome, CornerHome` with `record Geometry(Rectangle window,
   Rectangle workspace, Rectangle field, Rectangle titleClear, Rectangle workArea, int margin, boolean compact)`, `Rectangle
   home(Geometry, Dimension)`, `boolean attaches(Rectangle home, Rectangle bounds, int reach)`, `boolean guides()`,
   `Dimension detachedSize(Geometry, Dimension)`, `Optional<Rectangle> saved(UiState, Geometry, Dimension)`, `void
   save(UiState, Geometry, Rectangle, boolean snappedX, boolean snappedY)`, `void forget(UiState)`, `Rectangle
-  fallback(Geometry, Dimension)`, `int available(Geometry)`; `static PaletteHome WorkspaceChrome.paletteHome(PaletteLook)`;
-  the eleven-argument `WindowContent(…, CommandHistory, boolean macOs, PaletteLook)`; `Rectangle
-  WindowContent.paletteWorkArea(Component)`; `int ToolWindowArea.bottomStripHeight()`; `void PaletteView.fitHeight(int)`;
-  `public int RunWindowView.shownRows()`.
+  fallback(Geometry, Dimension)`, `int available(Geometry)`; `public static WorkspaceChrome
+  WorkspaceChrome.of(WorkspaceLook, TitleFormat, PaletteLook)` with package-private `PaletteLook palette()` and
+  `PaletteHome paletteHome()` (`STANDARD` and the two-argument `of` give `PaletteLook.DEFAULT` and `TitleFieldHome`);
+  `Rectangle WindowContent.paletteWorkArea(Component)`; `void PaletteView.fitHeight(int)`; `public int
+  RunWindowView.shownRows()`; `CornerHomeTest.chrome(PaletteLook)` and `CornerHomeTest.owner(PaletteLook)` (test).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -382,6 +409,8 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.presentation.PaletteLook;
+import dev.jasper.app.presentation.TitleFormat;
+import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.ui.metrics.DesignMetrics;
 import java.awt.Point;
@@ -396,9 +425,16 @@ import org.junit.jupiter.api.Test;
 
 /** Spec 11.5: the Run window's corner home, its attach rule, its saved place and its fit. */
 class CornerHomeTest {
+    /** The default look's workspace chrome (5a's default WorkspaceLook) carrying {@code look}'s palette. */
+    static WorkspaceChrome chrome(PaletteLook look) {
+        return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS,
+            WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"), look);
+    }
+
+    /** A window under {@link #chrome(PaletteLook)}, through plan 6a's constructor. */
     static WindowContent owner(PaletteLook look) {
         return new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> { }, () -> { }, () -> { },
-            ThemeTestSupport.controller(true), KeyBindings.defaults(true), new CommandHistory(), true, look);
+            ThemeTestSupport.controller(true), KeyBindings.defaults(true), new CommandHistory(), true, chrome(look));
     }
 
     static int margin() { return UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_WINDOW_MARGIN)); }
@@ -437,8 +473,10 @@ class CornerHomeTest {
                 assertThat(o.window().getY() + o.window().getHeight()).as("above the bottom strip and the status bar").isEqualTo(work.y + work.height - margin());
                 assertThat(o.window().getWidth()).isEqualTo(UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RUN_WINDOW_WIDTH)) + 2 * UIScale.scale(1));
                 var area = SwingUtilities.convertRectangle(o.owner().area().getParent(), o.owner().area().getBounds(), o.overlay());
-                assertThat(work.x).isEqualTo(area.x);
-                assertThat(work.y + work.height).isEqualTo(area.y + area.height - o.owner().area().bottomStripHeight());
+                assertThat(work).as("the tool window area between the stripes, above the status bar").isEqualTo(area);
+                // Plan 7 mounts the bottom strip under the area, so the area already ends above it.
+                o.owner().bottomStrip().ifPresent(strip -> assertThat(work.y + work.height)
+                    .isLessThanOrEqualTo(SwingUtilities.convertRectangle(strip.getParent(), strip.getBounds(), o.overlay()).y));
             }
         });
     }
@@ -503,21 +541,42 @@ class CornerHomeTest {
         });
     }
 
-    /** Review Focus 3. */
+    /** Review Focus 3: a 500 px tall window with eight visible rows. */
     @Test void aShortWindowShrinksTheListToFitTheHome() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var o = open(1400, 900)) {
                 var view = (dev.jasper.app.palette.RunWindowView) o.owner().commandPalette().view();
                 int rows = view.shownRows();
                 assertThat(rows).isEqualTo(view.visibleRows());
-                o.root().setSize(1400, 360); LayoutTestSupport.layoutTree(o.root());
+                o.root().setSize(1400, 500); LayoutTestSupport.layoutTree(o.root());
                 o.overlay().doLayout(); LayoutTestSupport.layoutTree(o.root());
                 var work = o.work();
-                assertThat(view.shownRows()).isLessThan(rows).isGreaterThanOrEqualTo(1);
-                if (view.shownRows() > 1) assertThat(o.window().getHeight()).isLessThanOrEqualTo(work.height - 2 * margin());
+                int room = work.height - 2 * margin(), row = UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT));
+                assertThat(view.shownRows()).as("the 427 px window does not fit: rows go").isLessThan(rows).isGreaterThanOrEqualTo(1);
+                assertThat(o.window().getHeight() <= room || view.shownRows() == 1)
+                    .as("the window, " + o.window().getHeight() + " px, fits " + room + " px, or shows exactly one row").isTrue();
+                assertThat(o.window().getHeight() + row).as("only the rows that do not fit go").isGreaterThan(room);
                 o.root().setSize(1400, 900); LayoutTestSupport.layoutTree(o.root());
                 o.overlay().doLayout(); LayoutTestSupport.layoutTree(o.root());
                 assertThat(view.shownRows()).as("it grows back").isEqualTo(rows);
+            }
+        });
+    }
+
+    /** Spec 11.2 and 8a Rulings 14: a press on the title text drags the window like the rest of the title row. */
+    @Test void aPressOnTheTitleTextDragsTheWindow() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var o = open(1400, 900)) {
+                var palette = o.owner().commandPalette();
+                var title = dev.jasper.app.testsupport.KitTestSupport.require(o.window(), "run.title", javax.swing.JLabel.class);
+                Rectangle home = o.window().getBounds();
+                int x = title.getWidth() / 2, y = title.getHeight() / 2;
+                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false, MouseEvent.BUTTON1));
+                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_DRAGGED, 0, InputEvent.BUTTON1_DOWN_MASK, x + 200, y - 150, 1, false, MouseEvent.BUTTON1));
+                assertThat(palette.dragging()).as("the title text drags").isTrue();
+                assertThat(o.window().getLocation()).isEqualTo(new Point(home.x + 200, home.y - 150));
+                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_RELEASED, 0, 0, x + 200, y - 150, 1, false, MouseEvent.BUTTON1));
+                assertThat(o.state().runWindowPosition()).as("and the drop saves its place").isPresent();
             }
         });
     }
@@ -538,8 +597,8 @@ class CornerHomeTest {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.CornerHomeTest'`
-Expected: FAIL: `compileTestJava` reports "cannot find symbol … paletteWorkArea", "… bottomStripHeight", "… shownRows" and
-the eleven-argument constructor.
+Expected: FAIL: `compileTestJava` reports "cannot find symbol … paletteWorkArea", "… shownRows" and "… method
+of(WorkspaceLook,TitleFormat,PaletteLook)".
 
 - [ ] **Step 3: The homes**
 
@@ -556,7 +615,8 @@ import java.util.Optional;
 /**
  * Where the palette's view lives in its window and how a drag attaches it there (Enterprise presentation spec 11.5):
  * dropped from the title field ({@link TitleFieldHome}) or at the bottom-left of the dock work area ({@link CornerHome}).
- * {@link WorkspaceChrome#paletteHome} picks one. Every rectangle is in the palette overlay's coordinates. EDT only.
+ * The three-argument {@code WorkspaceChrome.of} picks one from the look's palette. Every rectangle is in the palette
+ * overlay's coordinates. EDT only.
  */
 sealed interface PaletteHome permits TitleFieldHome, CornerHome {
     /**
@@ -715,7 +775,7 @@ Then wire the homes in, give the window its look and the work area, and let the 
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 8b Task 2 step 3: WorkspaceChrome.paletteHome, WindowCommandPalette's homes, the window's look and work area, fitHeight."""
+"""Plan 8b Task 2 step 3: WorkspaceChrome.of with the palette look, WindowLook, WindowCommandPalette's homes, the work area, fitHeight."""
 import pathlib
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -728,22 +788,40 @@ def append_member(name, member):
     if not text.endswith("}"): raise SystemExit(name + ": no closing brace")
     path.write_text(text[:-1].rstrip() + "\n\n" + member + "}\n", encoding="utf-8")
 W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
-append_member(W + "WorkspaceChrome.java", '''    /**
-     * The palette's home the look names (Enterprise presentation spec 11.5): the title field's, or the dock work area's
-     * corner. The one reader of {@link dev.jasper.app.presentation.PaletteLook#home()}.
+# The palette's look and home ride on the value the two-argument of returns (plans 6a, 6b and 7 grow its constructor;
+# this plan leaves the constructor alone).
+append_member(W + "WorkspaceChrome.java", '''    /** The look's palette (spec 11.5); only the three-argument {@code of} sets it, before the value leaves this class. */
+    private dev.jasper.app.presentation.PaletteLook palette = dev.jasper.app.presentation.PaletteLook.DEFAULT;
+    /** The palette's home that palette names. */
+    private PaletteHome paletteHome = new TitleFieldHome();
+
+    /**
+     * The strategies for {@code look}, with {@code palette}'s view and home (Enterprise presentation spec 11.5: "picks them
+     * from PaletteLook.home"). The one reader of {@link dev.jasper.app.presentation.PaletteLook#home()}.
+     *
+     * @param look the workspace's projection
+     * @param title the frame title template
+     * @param palette the palette's projection
+     * @return the chrome; never throws for a projection the presentation package builds
      */
-    static PaletteHome paletteHome(dev.jasper.app.presentation.PaletteLook look) {
-        return switch (look.home()) {
+    public static WorkspaceChrome of(WorkspaceLook look, TitleFormat title, dev.jasper.app.presentation.PaletteLook palette) {
+        var chrome = of(look, title);
+        chrome.palette = Objects.requireNonNull(palette, "palette");
+        chrome.paletteHome = switch (palette.home()) {
             case TITLE_FIELD -> new TitleFieldHome();
             case CORNER -> new CornerHome();
         };
+        return chrome;
     }
+
+    /** The palette's projection: the view PaletteViews builds from it, and its home. */
+    dev.jasper.app.presentation.PaletteLook palette() { return palette; }
+    /** Where the palette's view lives in this window and how a drag attaches it there. */
+    PaletteHome paletteHome() { return paletteHome; }
 ''')
-area = pathlib.Path(W + "ToolWindowArea.java")
-if "bottomStripHeight" not in area.read_text(encoding="utf-8"):
-    append_member(W + "ToolWindowArea.java", '''    /** The bottom strip's height inside this area; 0 while it has none (the Run window's home sits above it). */
-    int bottomStripHeight() { return 0; }
-''')
+edit(W + "WindowLook.java", [
+    ('''WorkspaceChrome.of(projections.workspace(), projections.title())''',
+     '''WorkspaceChrome.of(projections.workspace(), projections.title(), projections.palette())''', 1)])
 edit(W + "WindowCommandPalette.java", [
     ('''    WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history,
                          String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit) {
@@ -891,33 +969,20 @@ edit(W + "WindowCommandPalette.java", [
             // its rail and tool panels, so panel dividers never move or narrow it).
             palette.setBounds(at != null ? at : home.fallback(geometry, preferred));''', 1)])
 edit(W + "WindowContent.java", [
-    ('''    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        super(new BorderLayout());''',
-     '''    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, dev.jasper.app.presentation.PaletteLook.DEFAULT);
-    }
-
-    /** As above, with the look's palette: its view and its home (Enterprise presentation spec 11.1 and 11.5). */
-    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
-                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs,
-                  dev.jasper.app.presentation.PaletteLook paletteLook) {
-        super(new BorderLayout());''', 1),
+    # 6a assigns look right after super(new BorderLayout()), so the palette is built under it.
     ('''        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
             themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));''',
      '''        commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
-            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), paletteLook, WorkspaceChrome.paletteHome(paletteLook));''', 1),
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.palette(), look.paletteHome());''', 1),
     ('''    WindowChrome chrome() { return chrome; }
 ''', '''    /**
      * The dock work area in {@code target}'s coordinates: between the stripes, above the bottom strip and the status bar
-     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root.
+     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root. Plan 7 mounts the bottom
+     * strip under the area, so the area's own bounds end above it.
      */
     java.awt.Rectangle paletteWorkArea(Component target) {
         if (area.getParent() == null || SwingUtilities.getRootPane(area) != SwingUtilities.getRootPane(target)) return null;
-        var bounds = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
-        bounds.height = Math.max(0, bounds.height - area.bottomStripHeight());
-        return bounds;
+        return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
     }
     WindowChrome chrome() { return chrome; }
 ''', 1)])
@@ -976,14 +1041,18 @@ PY
 
 `WindowCommandPalette` already imports `java.awt.*`, `javax.swing.*` and `ViewMode`; the removed `fraction` lives in
 `PaletteHome` now. If plan 6 changed `margin()` or the constructor's arguments, re-find the anchors in their new form.
+`WorkspaceChrome` imports `WorkspaceLook`, `TitleFormat` and `Objects` (6a). The palette's two fields are not `final`
+because the private constructor belongs to plans 6a, 6b and 7; they are written once, inside the three-argument `of`, on
+the fresh value the two-argument `of` returns; `STANDARD` keeps the defaults.
 `WindowCommandPaletteTest`'s static references to `anchored`, `placed` and `positioned` keep working (they stay where
 they were).
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.palette.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture`
-Expected: PASS: `CornerHomeTest` 5 tests and every existing workspace and palette test (the card's placements, drags,
-guides, saves and Compact case run through `TitleFieldHome` with the same numbers).
+Expected: PASS: `CornerHomeTest` 6 tests and every existing workspace and palette test (the card's placements, drags,
+guides, saves and Compact case run through `TitleFieldHome` with the same numbers; 6a's `WindowLook` tests still see
+`PaletteLook.DEFAULT`, which the projections give until Task 5).
 
 - [ ] **Step 5: Commit**
 
@@ -997,8 +1066,8 @@ PaletteHome places the palette's view: TitleFieldHome is today's card
 under the title field with its guides and [palette] place; CornerHome puts
 the Run window at the bottom-left of the dock work area, attaches a drag
 that ends at or below it, has no guides, saves [palette.run_window] and
-fits its list to a short window. WorkspaceChrome.paletteHome picks one
-from the look; windows receive their palette look.
+fits its list to a short window. WorkspaceChrome.of picks one from the
+look's palette, which WindowLook carries to every window.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -1024,7 +1093,8 @@ and with its window. The card keeps every one of today's dismissals.
 - Modify: `docs/design/theme-engine/migration.csv` (the test's row)
 
 **Interfaces:**
-- Consumes: Task 2's homes and the eleven-argument `WindowContent`; 8a's `PaletteView.modeless()`, `RunWindowView.handle`.
+- Consumes: Task 2's homes and `CornerHomeTest.owner`; 8a's `PaletteView.modeless()`, `RunWindowView.handle`; 6a's
+  `WindowContent.lookAnimates()` in `startReveal`.
 - Produces: `boolean PaletteController.modeless()`, `boolean PaletteController.owns(Component)`, `void
   PaletteController.follow(Supplier<PaletteTarget>)`; `boolean PaletteKeyRouter.claimsShortcut(KeyStroke, Component)`;
   `void WindowCommandPalette.tabChanged()`, `void windowDeactivated()`, `boolean blocksActions()`.
@@ -1307,11 +1377,12 @@ edit(W + "WindowCommandPalette.java", [
     boolean blocksActions() { return isOpen() && !view.modeless(); }
 
     private boolean validOrigin() {''', 1),
+    # Plan 6a's text: the look's motion already gates the reveal (spec 10.9).
     ('''        stopReveal();
-        if (!animations.enabled()) return;''',
+        if (!animations.enabled() || !owner.lookAnimates()) return;''',
      '''        stopReveal();
         // The Run window has no reveal or other motion (spec 11.6).
-        if (!animations.enabled() || view.modeless()) return;''', 1),
+        if (!animations.enabled() || !owner.lookAnimates() || view.modeless()) return;''', 1),
     ('''        /** The workspace, which spans the window including its rail and tool panels. */''',
      '''        /** The card's overlay takes every press; the Run window's passes every press outside the window through (spec 11.6). */
         @Override public boolean contains(int x, int y) {
@@ -1377,18 +1448,19 @@ EOF
 Spec 11.6's openers and 11.7. ⇧⌘P, the COMMAND_PALETTE action (which the "▶ Run…" status item and the Search everywhere
 field run) and the title field focus an open Run window (Task 3). Browse… runs File › Open File… (3e): the chooser from
 the active pane's folder, then the route a Cmd-click takes; the Run window stays open whether the person picks a file
-or cancels, and its field takes focus back. The window repaints its status bar when the Run window opens or closes, and
-`WindowContent.paletteOpen()` says whether it is open, for plan 6's "▶ Run…" active look (Rulings 7).
+or cancels, and its field takes focus back. The "▶ Run…" item's active look follows plan 6b's
+`WindowContent.paletteOpen()` and `paletteChanged()`, which `WindowCommandPalette.open` and `restoreAndHide` already
+call (Rulings 7); this task adds nothing to it.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java` (`open`, `restoreAndHide`, the
-  controller's `browse` callback), `WindowContent.java` (`paletteOpen`, `paletteOpenChanged`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java` (the controller's `browse` callback, `browse()`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/RunWindowOpenersTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (the test's row)
 
 **Interfaces:**
-- Consumes: Task 3's modeless open; 3e's `WindowContent.openFile()`, `fileChooser` and `onOpenFile`.
-- Produces: `boolean WindowContent.paletteOpen()`; `void WindowContent.paletteOpenChanged()` (repaints the status bar).
+- Consumes: Task 3's modeless open; 3e's `WindowContent.openFile()`, `fileChooser` and `onOpenFile`; 6b's
+  `WindowContent.paletteOpen()`.
+- Produces: the private `WindowCommandPalette.browse()` (Browse… with the focus hand-back).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1459,15 +1531,17 @@ everywhere field and "▶ Run…" item run the same COMMAND_PALETTE action.
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.RunWindowOpenersTest'`
-Expected: FAIL: `compileTestJava` reports "cannot find symbol … paletteOpen".
+Expected: the tests compile (6b's `paletteOpen()` exists) and may already pass: Task 3 keeps the Run window open for its
+openers, and 8a's Browse… runs `owner::openFile`, which leaves it open. They pin what Step 3 keeps while it adds the
+focus hand-back, which a headless test cannot observe (no window holds keyboard focus); the GUI check in Task 7 covers it.
 
-- [ ] **Step 3: The open state and Browse…'s focus**
+- [ ] **Step 3: Browse…'s focus**
 
 Run from the worktree root:
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 8b Task 4 step 3: WindowContent.paletteOpen, a status repaint on open and close, Browse… hands focus back."""
+"""Plan 8b Task 4 step 3: Browse… hands focus back to the Run window (6b's paletteOpen and paletteChanged stay as they are)."""
 import pathlib
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -1476,23 +1550,7 @@ def edit(name, edits):
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
-edit(W + "WindowContent.java", [('''    WindowCommandPalette commandPalette() { return commandPalette; }
-''', '''    WindowCommandPalette commandPalette() { return commandPalette; }
-    /** Whether the palette is open: the "\\u25b6 Run\\u2026" status item shows as an active toggle while the Run window is (spec 10.6). */
-    public boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
-    /** The palette opened or closed: the status bar repaints so its Run item follows. */
-    void paletteOpenChanged() { var status = chrome.status(); status.revalidate(); status.repaint(); }
-''', 1)])
 edit(W + "WindowCommandPalette.java", [
-    ('''                if (!wasOpen) startReveal();
-                view.focusQuery();''',
-     '''                if (!wasOpen) { startReveal(); owner.paletteOpenChanged(); }
-                view.focusQuery();''', 1),
-    ('''        priorFocus = null; originTab = null; originPane = null;
-    }''',
-     '''        priorFocus = null; originTab = null; originPane = null;
-        owner.paletteOpenChanged();
-    }''', 1),
     ('''            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, owner::openFile);''',
      '''            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, this::browse);''', 1),
     ('''    PaletteController controller() { return controller; }''',
@@ -1510,14 +1568,11 @@ ledger.write_text(text + ("" if text.endswith("\n") else "\n") + row + "\n", enc
 PY
 ```
 
-Then find plan 6's "▶ Run…" item (`git grep -n 'u2026' jasper-app/src/main/java/dev/jasper/app/workspace | grep -i run`).
-If its active look reads `commandPalette().isOpen()` or `paletteOpen()` when it paints, nothing more is needed; if it
-holds its own selected flag, set it from `paletteOpenChanged()` (one line), and add that line to this commit.
-
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS: `RunWindowOpenersTest` 2 tests and the workspace tests (3e's File › Open File… tests unchanged).
+Expected: PASS: `RunWindowOpenersTest` 2 tests and the workspace tests (3e's File › Open File… tests and 6b's run item
+tests unchanged).
 
 - [ ] **Step 5: Commit**
 
@@ -1525,13 +1580,12 @@ Expected: PASS: `RunWindowOpenersTest` 2 tests and the workspace tests (3e's Fil
 git add jasper-app/src/main/java/dev/jasper/app/workspace jasper-app/src/test/java/dev/jasper/app/workspace/RunWindowOpenersTest.java \
   docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
-Run window: Browse, the openers and the Run item's state
+Run window: Browse and the openers
 
 Browse runs File, Open File: the chooser from the pane's folder and the
 route a Cmd-click takes, with the Run window staying open and its field
-taking focus back. Every opener focuses an open Run window. The window
-says whether the palette is open and repaints its status bar when that
-changes, for the Run status item.
+taking focus back. Every opener focuses an open Run window; the Run
+status item follows it through the window's existing open state.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -1542,21 +1596,21 @@ EOF
 ### Task 5: The Run window lands
 
 `Presentation.LANDED` gains `RUN_WINDOW` (5a Rulings 2), so the Enterprise kit's `palette = "run_window"` reaches
-`PaletteLook` (RUN_WINDOW, CORNER); every window, the start-up rehearsal's included (Rulings 9), is built with the
-presentation's palette look. The variant-read scan keeps `PaletteLook.view()` in `PaletteViews` and `PaletteLook.home()`
+`PaletteLook` (RUN_WINDOW, CORNER); every window, the start-up rehearsal's included (Rulings 9), is already built from
+`WindowLook.of(presentation.projections())` (6a), whose chrome carries that palette look since Task 2. The variant-read scan keeps `PaletteLook.view()` in `PaletteViews` and `PaletteLook.home()`
 in `WorkspaceChrome` (spec 16.1.7), and the palette's strategies never name the kit; every strategy builds for every
 `PaletteLook` value (spec 16.1.8).
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (`LANDED`), `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalWindow.java:46-61`, `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:409-413,809`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (`LANDED`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/architecture/PaletteVariantReadTest.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/PaletteStrategiesTest.java`, `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java` (one test appended)
 - Modify: `docs/design/theme-engine/migration.csv` (rows for the tests)
 
 **Interfaces:**
 - Consumes: Tasks 2 to 4; 5a's `Presentation.LANDED`, `Projections.of`, `JasperApplication.presentation()`; 4b's
   `VariantReadTest.jars()`, `StrategyIsolationTest.Scanned`.
-- Produces: `Presentation.LANDED` containing `Landed.RUN_WINDOW`; `TerminalWindow(WindowCallbacks, ShellLauncher, Path,
-  boolean detached, ThemeController, ConfigSnapshot, CommandHistory, PaletteLook)`.
+- Produces: `Presentation.LANDED` containing `Landed.RUN_WINDOW`. No window, `TerminalWindow` or `JasperApplication`
+  signature changes: 6a's `WindowLook` already reaches every window.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1683,7 +1737,7 @@ Run from the worktree root:
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 8b Task 5 step 3: LANDED gains RUN_WINDOW; windows and the rehearsal take the presentation's palette look."""
+"""Plan 8b Task 5 step 3: LANDED gains RUN_WINDOW (6a's WindowLook already gives every window the palette look)."""
 import pathlib, re
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -1698,30 +1752,6 @@ members = [m.strip() for m in match.group(1).split(",") if m.strip()]
 if not any(m.endswith("RUN_WINDOW") for m in members): members.append("Landed.RUN_WINDOW")
 text = text[:match.start()] + "public static final Set<Landed> LANDED = Set.of(" + ", ".join(members) + ");" + text[match.end():]
 path.write_text(text, encoding="utf-8")
-W = "jasper-app/src/main/java/dev/jasper/app/workspace/TerminalWindow.java"
-edit(W, [
-    ('''    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
-                   ThemeController themes, ConfigSnapshot initial, CommandHistory history) {
-        this.callbacks = callbacks;''',
-     '''    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
-                   ThemeController themes, ConfigSnapshot initial, CommandHistory history) {
-        this(callbacks, launcher, directory, detached, themes, initial, history, dev.jasper.app.presentation.PaletteLook.DEFAULT);
-    }
-
-    /** As above, with the look's palette (Enterprise presentation spec 11.1 and 11.5). */
-    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
-                   ThemeController themes, ConfigSnapshot initial, CommandHistory history, dev.jasper.app.presentation.PaletteLook paletteLook) {
-        this.callbacks = callbacks;''', 1),
-    ('''            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS);''',
-     '''            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS, paletteLook);''', 1)])
-edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java", [
-    ('''                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);''',
-     '''                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history,
-                presentation().projections().palette());''', 1),
-    ('''        TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
-            new CommandHistory());''',
-     '''        TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
-            new CommandHistory(), presentation().projections().palette());''', 1)])
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
 rows = [
     "jasper-app/src/test/java/dev/jasper/app/architecture/PaletteVariantReadTest.java,app.architecture,PaletteVariantReadTest,nonvisual-helper,none,none,"
@@ -1732,9 +1762,9 @@ ledger.write_text(text + ("" if text.endswith("\n") else "\n") + "\n".join(rows)
 PY
 ```
 
-If plan 6 already passes the window a `Projections` value (see "Before you start"), pass `palette()` from it in the
-same place instead of the new `TerminalWindow` parameter. A test that pinned `Presentation.LANDED` to the earlier
-groups (plans 6 and 7 met the same) now expects `RUN_WINDOW` too; update its expectation and record it.
+A test that pinned `Presentation.LANDED` to the earlier groups (plans 6 and 7 met the same) now expects `RUN_WINDOW`
+too; update its expectation and record it. A 6a test that compared `WindowLook.of(projections)` with a chrome built by
+the two-argument `of` still holds for its own fields; if it compares the chrome itself, compare `palette()` too.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1745,14 +1775,13 @@ Expected: PASS: `theRunWindowHasLanded`, `PaletteVariantReadTest` 3, `PaletteStr
 - [ ] **Step 5: Commit**
 
 ```bash
-git add jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java jasper-app/src/main/java/dev/jasper/app/workspace/TerminalWindow.java \
-  jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java jasper-app/src/test docs/design/theme-engine/migration.csv
+git add jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Run window: landed
 
 Presentation.LANDED gains the Run window, so a look whose kit says
 palette = "run_window" opens the Run window at the corner home; every
-window and the start-up rehearsal take the presentation's palette look.
+window and the start-up rehearsal get it through their WindowLook.
 The variant-read scan keeps the palette's view in PaletteViews and its
 home in WorkspaceChrome, and every strategy builds for every value.
 
@@ -1775,8 +1804,9 @@ for inspection. Plan 6's chrome render test gains the RUN_WINDOW look on its pal
 - Modify: `docs/design/theme-engine/migration.csv` (the test's row)
 
 **Interfaces:**
-- Consumes: Tasks 2 to 5; 8a's `RunWindowRenderTest.check`, `RunWindowRenderTest.fonts`, `RunWindowFixtures`; 5b's
-  `EnterpriseResources`; `ThemeController.startup(boolean, ThemeSelection, Kit, Consumer)`.
+- Consumes: Tasks 2 to 5; 8a's `RunWindowRenderTest.check` (called on the EDT while the theme controller is open),
+  `RunWindowRenderTest.fonts`, `RunWindowFixtures`; 5b's `EnterpriseResources`; `ThemeController.startup(boolean,
+  ThemeSelection, Kit, Consumer)`; 6a's `WindowLook.of`; 5a's `Projections.of`, `ChromeSpec.CLASSIC`, `Presentation.LANDED`.
 - Produces: `PaletteTestSupport.showRunWindowState(PaletteView, String state)` and `focusRunWindowField(PaletteView)`.
 
 - [ ] **Step 1: Write the test**
@@ -1795,8 +1825,10 @@ Append to `PaletteTestSupport` before its closing brace:
     public static void focusRunWindowField(PaletteView view) { ((RunWindowView) view).fieldBox().focusShown(true); }
 ```
 
-`RunWindowFixtures` is a test class in the palette package; `PaletteTestSupport` reaches it. Create
-`jasper-app/src/test/java/dev/jasper/app/workspace/RunWindowWorkspaceRenderTest.java`:
+`RunWindowFixtures` is a test class in the palette package; `PaletteTestSupport` reaches it. The render's window is
+built as the application builds an Enterprise window: 6a's `WindowLook.of` over the classic chrome's projections with
+every group landed, so the Run window sits in the Enterprise workspace (classic menus, header, stripes and status bar),
+not the standard one. Create `jasper-app/src/test/java/dev/jasper/app/workspace/RunWindowWorkspaceRenderTest.java`:
 
 ```java
 package dev.jasper.app.workspace;
@@ -1811,7 +1843,9 @@ import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.palette.PaletteTestSupport;
 import dev.jasper.app.palette.RunWindowRenderTest;
-import dev.jasper.app.presentation.PaletteLook;
+import dev.jasper.app.presentation.ChromeSpec;
+import dev.jasper.app.presentation.Presentation;
+import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.ui.metrics.DesignMetrics;
@@ -1835,9 +1869,13 @@ class RunWindowWorkspaceRenderTest {
         try {
             DesktopTestSupport.edt(() -> {
                 var selection = new ThemeSelection(ThemeLibrary.bundledOnly(), theme, theme, TerminalSchemeChoice.MATCH);
+                // The Enterprise workspace as the application builds it: the classic chrome's projections, every group landed.
+                var look = WindowLook.of(Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(true, true),
+                    Presentation.LANDED));
+                assertThat(look.chrome().palette()).as("the classic chrome's palette is the Run window").isEqualTo(dev.jasper.app.presentation.PaletteLook.RUN_WINDOW);
                 try (var themes = ThemeController.startup(false, selection, parsed.kit(), failure -> { throw new AssertionError(failure); });
                      var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME, false, path -> { }, () -> { },
-                         () -> { }, themes, KeyBindings.defaults(true), new CommandHistory(), true, PaletteLook.RUN_WINDOW)) {
+                         () -> { }, themes, KeyBindings.defaults(true), new CommandHistory(), true, look.chrome())) {
                     var root = WindowCommandPaletteTest.install(owner); root.setSize(1442, 902); LayoutTestSupport.layoutTree(root);
                     owner.commandPalette().toggle();
                     owner.commandPalette().setVisibleRows(8);
@@ -1914,15 +1952,15 @@ Expected: the workspace tests pass.
 
 ### Task 7: Documentation, STATUS and the whole build
 
-The smallest accurate edits (spec 17): `docs/command-palette.md` describes the Run window, `docs/app-architecture.md`
-names the homes, and `docs/STATUS.md` gains this plan's entry. The spec's banners for the amended specifications
-(19.2: command palette and palette scopes) are plan 3a's or the final plan's; if their lines are not yet in
-`docs/superpowers/specs/2026-09-12-jasper-command-palette-design.md` and `2026-09-15-jasper-palette-scopes-design.md`,
-add them here, exactly as spec 19.2 words them.
+The smallest accurate edits (spec 17): `docs/command-palette.md` describes the Run window, `docs/configuration.md`
+names its `ui-state.toml` table beside the card's, `docs/app-architecture.md` names the homes, and `docs/STATUS.md`
+gains this plan's entry. Spec 19.2's status-banner lines for the command palette and palette scopes specifications
+(this row's amendments; plan 3a and plan 3e added other rows' lines, not these) are added here, word for word, after
+each document's status line, as plans 3e, 6a and 7 add theirs.
 
 **Files:**
-- Modify: `docs/command-palette.md` (a section after the introduction), `docs/app-architecture.md:161,220`, `docs/STATUS.md`
-- Modify (if missing): `docs/superpowers/specs/2026-09-12-jasper-command-palette-design.md`, `docs/superpowers/specs/2026-09-15-jasper-palette-scopes-design.md` (status banners)
+- Modify: `docs/command-palette.md` (a section after the introduction), `docs/configuration.md:323-327` (one sentence), `docs/app-architecture.md:161,220`, `docs/STATUS.md`
+- Modify: `docs/superpowers/specs/2026-09-12-jasper-command-palette-design.md:3`, `docs/superpowers/specs/2026-09-15-jasper-palette-scopes-design.md:3` (status banners, spec 19.2)
 - Modify: this plan's status banner
 
 **Interfaces:**
@@ -1960,21 +1998,45 @@ the Run window stays open.
 
 ## Commands
 """, 1)])
+edit("docs/configuration.md", [
+    ('''Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
+again and Compact mode centres it.
+''',
+     '''Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
+again and Compact mode centres it. Under the Enterprise look the palette is the Run window, which keeps its own place in
+`[palette.run_window]` (`left`, `bottom`: its left and bottom edges as fractions of the window).
+''', 1)])
 edit("docs/app-architecture.md", [
     ("and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |",
-     "and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.paletteHome`). WindowContent closes subscriptions/panes; each pane closes its session. |", 1),
+     "and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |", 1),
     ("`WindowCommandPalette` anchors to the field's bounds.", "`WindowCommandPalette` places through its `PaletteHome` (the field's bounds for the card).", 1)])
+# Spec 19.2's banner lines, after each status line (plans 3e, 6a and 7 add theirs the same way).
+banner = ("Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): "
+          "{what}; everything else in this document stands.")
+S = "docs/superpowers/specs/"
+for name, status_end, what in (
+        ("2026-09-12-jasper-command-palette-design.md", "with equivalent classic-dark/light treatments.\n",
+         "under the Enterprise look the palette is the Run window, with its own home, saved place and closing rules"),
+        ("2026-09-15-jasper-palette-scopes-design.md", "No GUI, merge or push.\n",
+         "the Run window closes only on Escape, \u00d7, Cancel or running a row")):
+    path = pathlib.Path(S + name); text = path.read_text(encoding="utf-8")
+    line = banner.format(what=what)
+    if line in text: continue
+    if text.count(status_end) != 1: raise SystemExit(f"{name}: expected one status line ending {status_end!r}")
+    path.write_text(text.replace(status_end, status_end + line + "\n"), encoding="utf-8")
 PY
+grep -n 'Amended on 2026-10-15' docs/superpowers/specs/2026-09-12-jasper-command-palette-design.md docs/superpowers/specs/2026-09-15-jasper-palette-scopes-design.md
 ```
 
-If plan 3e changed the introduction's "the last two rows" to three, or an earlier plan reworded either architecture
-sentence, re-find the anchor.
+Expected: one banner line in each specification, directly under its status line. If plan 3e changed the
+introduction's "the last two rows" to three, or an earlier plan reworded either architecture sentence or the
+configuration paragraph, re-find the anchor.
 
 - [ ] **Step 2: The whole build**
 
 Run: `./gradlew check --continue`, then count the results with the script of 8a's Task 8 Step 2.
 Expected: BUILD SUCCESSFUL, "failures 0, errors 0", and a count above the base recorded in "Before you start" by
-this plan's new tests (1 + 5 + 4 + 2 + 1 + 3 + 1 + 1 = 18, plus any plan 6 render cases Task 6 added).
+this plan's new tests (1 + 6 + 4 + 2 + 1 + 3 + 1 + 1 = 19, plus any plan 6 render cases Task 6 added).
 
 - [ ] **Step 3: STATUS and the banner**
 
@@ -1988,15 +2050,18 @@ the Run window: `Presentation.LANDED` gains `RUN_WINDOW`, so the kit's `palette 
 `PaletteLook(RUN_WINDOW, CORNER)`. `PaletteHome` places the view: `TitleFieldHome` is the card's (today's arithmetic and
 `[palette] center_x/top`), `CornerHome` the Run window's at the bottom-left of the dock work area, inset by
 `PALETTE_WINDOW_MARGIN`, attaching a drag that ends at or below it, with no guides, `[palette.run_window] left/bottom`
-and a list that drops rows to fit a short window; `WorkspaceChrome.paletteHome` reads `PaletteLook.home()`. The Run
+and a list that drops rows to fit a short window; `WorkspaceChrome.of` reads `PaletteLook.home()` and keeps the palette
+look and its home, which plan 6a's `WindowLook` carries to every window (no new window constructor). The Run
 window is modeless: a tab switch, focus leaving the window and presses outside it leave it open, the window's actions
 run, a clicked pane gets its keys, an opener focuses it, a row runs in the current pane, and it closes on Escape inside
 it, ×, Cancel or running a row; it has no reveal. Browse… runs File › Open File… and the window stays open.
-`WindowContent.paletteOpen()` and a status repaint serve "▶ Run…"'s active look. The in-workspace render passes 8a's
+Plan 6b's `WindowContent.paletteOpen()` and `paletteChanged()` serve "▶ Run…"'s active look. The in-workspace render, an
+Enterprise window built through `WindowLook.of` over the classic chrome, passes 8a's
 comparison: <agreements>. Rulings (plan, "Rulings"): (1) the homes are the workspace's; (2) the Run window's place is
 fractions of the workspace; (3) `PALETTE_WINDOW_MARGIN` stays 8 against the mocks' 6 and 5; (4) the target follows the
 window; (5) modeless means no capture; (6) an opener focuses; (7) "▶ Run…"'s look is plan 6's; (8) the list fits the
-home; (9) the rehearsal takes the look. Deviations: <deviations>. Default look unchanged: every card test passes as
+home; (9) the rehearsal takes the look. `[palette.run_window]` is in `docs/configuration.md`; the command palette and
+palette scopes specifications carry spec 19.2's banners. Deviations: <deviations>. Default look unchanged: every card test passes as
 before. `./gradlew check --continue`: **<counts>**. GUI checks for the user (spec 16.2): with Enterprise on, open the Run
 window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
 re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
@@ -2014,13 +2079,15 @@ Set this plan's status banner under the title:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/command-palette.md docs/app-architecture.md docs/STATUS.md docs/superpowers
+git add docs/command-palette.md docs/configuration.md docs/app-architecture.md docs/STATUS.md docs/superpowers
 git commit -F - <<'EOF'
 Run window: documentation and status for plan 8b
 
-The command palette guide describes the Run window; the architecture notes
-name the palette's homes; STATUS records the plan, its rulings, the
-in-workspace comparison, the build and the GUI checks for the user.
+The command palette guide describes the Run window and the configuration
+guide its saved place; the architecture notes name the palette's homes;
+the command palette and palette scopes specifications carry their
+amendment banners; STATUS records the plan, its rulings, the in-workspace
+comparison, the build and the GUI checks for the user.
 
 🤖 Generated with Claude Code at The Home Depot
 
