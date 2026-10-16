@@ -369,7 +369,7 @@ final class InteractiveRows {
                     Math.max(
                             ThemePainting.height(
                                     context(),
-                                    DesignMetrics.Role.BUTTON_HEIGHT,
+                                    DesignMetrics.Role.ROW_HEIGHT,
                                     Typography.Role.LABEL),
                             // A row's lines take the one-line row padding (as menus and navigation do), not a form's row gap.
                             line * lines()

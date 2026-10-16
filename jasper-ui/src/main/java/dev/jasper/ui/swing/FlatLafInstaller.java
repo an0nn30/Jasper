@@ -59,7 +59,7 @@ public final class FlatLafInstaller {
         var metrics = kit.metrics();
         String control = Integer.toString(metrics.value(DesignMetrics.Role.CONTROL_RADIUS) * 2);
         fixed.put("Component.arc", control);
-        fixed.put("TextComponent.arc", control);
+        fixed.put("TextComponent.arc", Integer.toString(metrics.value(DesignMetrics.Role.FIELD_RADIUS) * 2));
         fixed.put("Button.arc", control);
         fixed.put("Component.focusWidth", Integer.toString(metrics.value(DesignMetrics.Role.FOCUS_RING)));
         fixed.put("Button.minimumHeight", Integer.toString(metrics.value(DesignMetrics.Role.BUTTON_HEIGHT)));

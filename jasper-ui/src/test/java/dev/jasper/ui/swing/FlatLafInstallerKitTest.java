@@ -18,10 +18,22 @@ import org.junit.jupiter.api.Test;
 
 /** The kit an appearance is installed under travels with its look and feel, like the theme, and gives FlatLaf's geometry. */
 class FlatLafInstallerKitTest {
-    /** The default kit with other geometry: radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
+    /** The default kit with other geometry: control and field radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
     private static Kit other() {
-        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FOCUS_RING, 2)
-            .with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FIELD_RADIUS, 2)
+            .with(DesignMetrics.Role.FOCUS_RING, 2).with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+    }
+
+    /** Enterprise presentation plan 4: a field's arc follows FIELD_RADIUS, and the control arcs keep CONTROL_RADIUS. */
+    @Test void theTextComponentArcFollowsTheFieldRadiusAlone() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                FlatLafInstaller.install(KitFixtures.dark(), KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.FIELD_RADIUS, 1)));
+                assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2);
+                for (var key : List.of("Button.arc", "Component.arc")) assertThat(UIManager.getInt(key)).as(key).isEqualTo(8);
+            } finally { set(prior); }
+        });
     }
 
     /** Review Focus 1: before any Jasper look and feel the installed kit is the default; it never throws. */
