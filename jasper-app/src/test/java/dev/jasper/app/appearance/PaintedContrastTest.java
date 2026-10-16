@@ -26,8 +26,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * as the guard makes it, over the theme set and the eight degenerate palettes; the three repairs it does not reach
  * (the connected dot in {@code PanelHeaders}, the status bar's configuration text and notification counts) keep
  * {@code PanelHostHeaderTest}, {@code ConfigurationStatusTest} and {@code NotificationCardTest}. The off switch, which
- * no guard repairs, is painted as authored. The default look declares no other pair (spec 7.3), so it stays
- * pixel-identical.
+ * no guard repairs, is painted as authored. The default look declares no other pair for the controls it had (spec 7.3),
+ * so they stay pixel-identical; SDK 0.18's Notice declares its own.
  */
 @ExtendWith(EdtTestExtension.class)
 class PaintedContrastTest {
@@ -59,7 +59,20 @@ class PaintedContrastTest {
         new Declared("selected segment label", new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
             PaintedContrastTest::selectedSegment),
         new Declared("selected preview caption", new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedPreview));
+            PaintedContrastTest::selectedPreview),
+        // Plan 3b: a Notice's text on its severity's ground, and its border held apart from that ground.
+        new Declared("information notice text", new PaintPair(TEXT_PRIMARY, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeText(theme, expected, Nodes.Severity.INFO)),
+        new Declared("warning notice text", new PaintPair(TEXT_PRIMARY, DerivedColor.WARNING_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeText(theme, expected, Nodes.Severity.WARNING)),
+        new Declared("error notice text", new PaintPair(TEXT_PRIMARY, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeText(theme, expected, Nodes.Severity.DANGER)),
+        new Declared("information notice border", new PaintPair(DerivedColor.INFO_BORDER, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.STRUCTURAL),
+            (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.INFO)),
+        new Declared("warning notice border", new PaintPair(DerivedColor.WARNING_BORDER, DerivedColor.WARNING_GROUND, SurfaceContrast.Guard.STRUCTURAL),
+            (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.WARNING)),
+        new Declared("error notice border", new PaintPair(DerivedColor.DANGER_BORDER, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.STRUCTURAL),
+            (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.DANGER)));
 
     /** The theme set, then the degenerate palettes. */
     private static List<GeneratedTheme> palettes() {
@@ -182,6 +195,29 @@ class PaintedContrastTest {
                     if (argb >>> 24 > strongest) { strongest = argb >>> 24; ink = argb & 0xFFFFFF; }
                 }
             return strongest > 0 && ink == (expected.getRGB() & 0xFFFFFF);
+        } finally { context.icons().close(); context.binding().close(); }
+    }
+
+    /** A notice of {@code severity}: its text label's colour. */
+    private static boolean noticeText(GeneratedTheme theme, Color expected, Nodes.Severity severity) {
+        return withNotice(theme, severity, view -> KitTestSupport.require(view, "notice.text", JLabel.class).getForeground().equals(expected));
+    }
+
+    /** The middle of a notice's top edge, where its border is drawn over its ground. */
+    private static boolean noticeBorder(GeneratedTheme theme, Color expected, Nodes.Severity severity) {
+        return withNotice(theme, severity, view -> {
+            var surface = KitTestSupport.require(view, "notice", JComponent.class);
+            return paint(surface).getRGB(surface.getWidth() / 2, 0) == expected.getRGB();
+        });
+    }
+
+    private static boolean withNotice(GeneratedTheme theme, Nodes.Severity severity, java.util.function.Predicate<KitView> check) {
+        var context = KitFixtures.context(theme);
+        var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL,
+            List.of(new Nodes.Notice("notice", ControlState.READY, severity, "Plain FTP sends the password unencrypted"))));
+        try (var view = new KitView(context, spec, event -> { })) {
+            KitFixtures.render(view, 400, 80, 1);
+            return check.test(view);
         } finally { context.icons().close(); context.binding().close(); }
     }
 

@@ -116,6 +116,7 @@ public final class FakeKitView implements UiView {
             case Nodes.SettingRow n -> result.add(n.control());
             case Nodes.Section n -> result.add(n.body());
             case Nodes.Empty n -> { result.add(n.icon()); result.addAll(n.actions()); }
+            case Nodes.Notice n -> result.addAll(n.actions());
             case Nodes.Form n -> { n.hero().ifPresent(result::add); result.addAll(n.sections()); n.preview().ifPresent(result::add); result.addAll(n.actions()); }
             default -> {}
         }

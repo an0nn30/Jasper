@@ -78,6 +78,30 @@ class KitValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(new Nodes.Stack("line", ControlState.READY,
             LayoutRole.INLINE, List.of(text("a"), rule, text("b")))), List.of(), List.of())).withMessageContaining("Unsupported inline row node: Separator");
     }
+    /** Plan 3b (spec 8.2): a Notice is one sentence with at most one SECONDARY or LINK action, in a form's sections or a VERTICAL stack. */
+    @Test void noticesAreValidatedAndPlacedInFormsOrVerticalStacks() {
+        var link = new Button("details", ControlState.READY, "Details", "", ButtonKind.LINK, "details", "");
+        var notice = new Notice("notice", ControlState.READY, Severity.WARNING, "Plain FTP sends the password unencrypted", List.of(link));
+        assertThat(new Notice("plain", ControlState.READY, Severity.INFO, "Saved").actions()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Notice("blank", ControlState.READY, Severity.INFO, " "));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Notice("two", ControlState.READY, Severity.INFO, "Saved", List.of(link,
+            new Button("more", ControlState.READY, "More", "", ButtonKind.LINK, "more", "")))).withMessageContaining("at most one action");
+        for (var kind : List.of(ButtonKind.PRIMARY, ButtonKind.GHOST, ButtonKind.DESTRUCTIVE_GHOST))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Notice("kind", ControlState.READY, Severity.INFO, "Saved",
+                List.of(new Button("go", ControlState.READY, "Go", "", kind, "go", "")))).withMessageContaining("SECONDARY or LINK");
+        assertThatCode(() -> new ViewSpec(new Nodes.Stack("body", ControlState.READY, LayoutRole.VERTICAL, List.of(notice)))).doesNotThrowAnyException();
+        assertThatCode(() -> new ViewSpec(new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(notice),
+            Optional.empty(), List.of()))).doesNotThrowAnyException();
+        for (Node misplaced : List.<Node>of(notice, new Nodes.Stack("bar", ControlState.READY, LayoutRole.INLINE, List.of(notice)),
+                new Card("card", ControlState.READY, CardKind.FORM, List.of(notice)),
+                new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.of(notice), List.of(), Optional.empty(), List.of())))
+            assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(misplaced)).withMessageContaining("form's sections or a VERTICAL stack");
+        // The action is a node of the view: its id is checked with the others, and list rows take no notice.
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Nodes.Stack("details", ControlState.READY, LayoutRole.VERTICAL, List.of(notice))))
+            .withMessageContaining("Duplicate node: details");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(notice), List.of(), List.of()))
+            .withMessageContaining("Unsupported inline row node: Notice");
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

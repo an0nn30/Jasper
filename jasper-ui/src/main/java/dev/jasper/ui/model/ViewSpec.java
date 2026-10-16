@@ -20,8 +20,14 @@ public record ViewSpec(Node root) {
     private static void references(Set<String> selected, Set<String> ids) {
         if (!ids.containsAll(selected)) throw new IllegalArgumentException("Unknown item reference");
     }
-    /** Spec 8.2: where a node may stand ({@code parent} is null at the root). A Separator belongs only in an INLINE or ACTIONS stack. */
+    /**
+     * Spec 8.2: where a node may stand ({@code parent} is null at the root). A Notice belongs in a form's sections or a
+     * VERTICAL stack, a Separator only in an INLINE or ACTIONS stack.
+     */
     private static void place(Node parent, Node child) {
+        if (child instanceof Notice && !(parent instanceof Form form && form.sections().contains(child)
+                || parent instanceof Stack stack && stack.role() == LayoutRole.VERTICAL))
+            throw new IllegalArgumentException("A Notice belongs in a form's sections or a VERTICAL stack");
         if (child instanceof Separator && !(parent instanceof Stack stack && (stack.role() == LayoutRole.INLINE || stack.role() == LayoutRole.ACTIONS)))
             throw new IllegalArgumentException("A Separator belongs only in an INLINE or ACTIONS stack");
     }
@@ -52,6 +58,7 @@ public record ViewSpec(Node root) {
             case SettingRow n -> children.add(n.control());
             case Section n -> children.add(n.body());
             case Empty n -> { children.add(n.icon()); children.addAll(n.actions()); }
+            case Notice n -> children.addAll(n.actions());
             case Header n -> { n.context().ifPresent(children::add); n.primary().ifPresent(children::add); }
             case Panel n -> { children.add(n.header()); n.searchOrNavigation().ifPresent(children::add); children.add(n.body()); n.footer().ifPresent(children::add); }
             case Form n -> { n.hero().ifPresent(children::add); children.addAll(n.sections()); n.preview().ifPresent(children::add); children.addAll(n.actions()); }

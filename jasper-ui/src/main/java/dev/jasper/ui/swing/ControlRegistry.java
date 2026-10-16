@@ -18,7 +18,7 @@ final class ControlRegistry {
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
             case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _ -> {}
-            case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _ -> children(node).forEach(ControlRegistry::validate);
+            case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _, Nodes.Notice _ -> children(node).forEach(ControlRegistry::validate);
         }
     }
     static Control create(KitView view, Nodes.Node node) {
@@ -51,6 +51,7 @@ final class ControlRegistry {
             case Nodes.Table table -> new Tables.TableControl(view,table);
             case Nodes.Tree tree -> new Trees.TreeControl(view,tree);
             case Nodes.Breadcrumbs crumbs -> new BreadcrumbControls.BreadcrumbsControl(view, crumbs);
+            case Nodes.Notice notice -> new Notices.NoticeControl(view, notice);
             case Nodes.Separator separator -> new Separators.SeparatorControl(view, separator);
         };
     }
@@ -67,6 +68,7 @@ final class ControlRegistry {
             case Nodes.SettingRow n -> result.add(n.control());
             case Nodes.Section n -> result.add(n.body());
             case Nodes.Empty n -> { result.add(n.icon()); result.addAll(n.actions()); }
+            case Nodes.Notice n -> result.addAll(n.actions());
             case Nodes.Form n -> { n.hero().ifPresent(result::add); result.addAll(n.sections()); n.preview().ifPresent(result::add); result.addAll(n.actions()); }
             default -> {}
         }

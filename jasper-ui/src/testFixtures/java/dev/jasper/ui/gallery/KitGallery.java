@@ -94,6 +94,12 @@ public final class KitGallery {
             new Nodes.Separator("toolbar-second", ControlState.READY),
             new MenuButton("toolbar-upload", ControlState.READY, "Upload", "upload", ButtonKind.GHOST, "",
                 List.of(new dev.jasper.ui.model.MenuItem("upload-files", "Files…", "", "files", true, false)), ""))))));
+        // Plan 3b (SDK 0.18): a notice of each severity, the last with its action.
+        var notices = new ArrayList<Nodes.Node>();
+        for (var severity : Nodes.Severity.values()) notices.add(new Nodes.Notice("notice-" + severity, ControlState.READY, severity,
+            switch (severity) { case INFO -> "Changes apply when the server restarts"; case WARNING -> "Plain FTP sends the password unencrypted"; case DANGER -> "The folder no longer exists"; },
+            severity == Nodes.Severity.DANGER ? List.of(new Nodes.Button("notice-choose", ControlState.READY, "Choose…", "", ButtonKind.SECONDARY, "choose", "")) : List.of()));
+        result.add(new Fixture("notice-severities", "", "normal", 420, 170, new ViewSpec(new Nodes.Stack("notice-severities", ControlState.READY, LayoutRole.VERTICAL, notices))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

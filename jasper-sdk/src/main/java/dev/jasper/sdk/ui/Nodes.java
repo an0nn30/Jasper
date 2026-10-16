@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice {
         String id();
         ControlState state();
     }
@@ -683,6 +683,27 @@ public final class Nodes {
      */
     public record Separator(String id, ControlState state) implements Node {
         public Separator { ModelChecks.id(id); Objects.requireNonNull(state); }
+    }
+
+    /**
+     * A message for the person reading a form or a pane: a severity, one sentence and at most one SECONDARY or LINK
+     * action. The presentation shows the severity as a glyph and its word ("Warning") before the text. A Notice is a
+     * section of a form or a child of a VERTICAL stack, nowhere else.
+     *
+     * @since 0.18.0
+     */
+    public record Notice(String id, ControlState state, Severity severity, String text, List<Button> actions) implements Node {
+        public Notice {
+            ModelChecks.id(id); Objects.requireNonNull(state);
+            Objects.requireNonNull(severity);
+            ModelChecks.label(text, "text");
+            actions = List.copyOf(actions);
+            if (actions.size() > 1) throw new IllegalArgumentException("A Notice has at most one action");
+            if (actions.stream().anyMatch(button -> button.kind() != ButtonKind.SECONDARY && button.kind() != ButtonKind.LINK))
+                throw new IllegalArgumentException("A Notice's action is SECONDARY or LINK");
+        }
+        /** A notice without an action. */
+        public Notice(String id, ControlState state, Severity severity, String text) { this(id, state, severity, text, List.of()); }
     }
 
     public record Custom(String id, ControlState state, String contentId, CustomKind kind, String accessibleName) implements Node {

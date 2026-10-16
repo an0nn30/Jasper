@@ -33,6 +33,8 @@ class KitValuesTest {
    new Tree("tree",READY,List.of(new TreeItem("branch","Title",Optional.of("folder"),false,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of())))),Set.of("branch"),Set.of("leaf"),"activate"),
    new Breadcrumbs("path",READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",menu)),"Location",true,"/tmp","edit","go","done"),
    new Nodes.Stack("separated",READY,LayoutRole.INLINE,List.of(text("before"),new Separator("separator",READY),text("after"))),
+   new Nodes.Stack("noticed",READY,LayoutRole.VERTICAL,List.of(new Notice("notice",READY,Severity.WARNING,"Plain FTP sends the password unencrypted",
+    List.of(new Button("details",READY,"Details","",ButtonKind.LINK,"details",""))))),
    new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
   assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
