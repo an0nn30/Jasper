@@ -24,6 +24,8 @@
       "default": { "startBackground": "wave", "foreground": "#FFFFFF" }
     },
     "ActionButton.hoverBackground": "#FFFFFF1A",
+    "ToolWindow.Header": { "background": "#1D3445", "inactiveBackground": "sea" },
+    "Table.hoverBackground": "#3A9AD933",
     "Component.borderColor": "#2E4A60",
     "Component.errorFocusColor": "coral",
     "Label.infoForeground": "#8FA6B6",

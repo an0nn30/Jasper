@@ -93,7 +93,12 @@ python3 tools/themes/jasper_theme.py Dracula.jar gruvbox_dark.toml -o ~/Desktop/
   becomes a UI theme with its one variant, Dark or Light: its colours resolved through its parent themes (IntelliJ's
   own, in `tools/themes/intellij/`), its console colours as its terminal scheme and its editor scheme's colours for the
   Editor. Jasper's tool windows are islands, so when the plugin also ships an Islands variant of a theme (an Islands
-  theme with the same name apart from the word "Islands"), the theme's window chrome comes from that variant. Every
+  theme with the same name apart from the word "Islands"), the theme's window chrome comes from that variant. A
+  theme that sets `ToolWindow.Header.inactiveBackground`, `ToolWindow.Header.background`, `TableHeader.background`,
+  `Table.stripeColor`, `Table.hoverBackground`, `Banner.warningBackground` or `Banner.warningBorderColor` itself, or
+  through a parent theme in its plugin, also gets the matching derived role (`surface.header`,
+  `surface.header.active`, `surface.tableHeader`, `surface.zebra`, `surface.rowHover`, `warning.ground`,
+  `warning.border`). Every
   theme in a plugin is written; `--list` shows them and `--theme NAME` (a name or id that `--list`
   shows; it can be repeated) converts only those.
 - `--name` sets the display name (it needs exactly one converted theme), `--scheme FILE` gives a loose `.theme.json`

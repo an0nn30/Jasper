@@ -53,6 +53,9 @@ ROLES = [
 ]
 # Roles a variant may add after ROLES: the title bar's own colours (left out, they are surface.app and text.primary).
 OPTIONAL_ROLES = ["surface.titlebar", "text.titlebar"]
+# Keys a variant may add after those: derived roles the theme gives itself instead of their recipes, always opaque.
+OVERRIDE_KEYS = ["surface.header", "surface.header.active", "surface.stripe", "surface.tableHeader", "surface.zebra",
+                 "surface.rowHover", "warning.ground", "warning.border"]
 ANSI = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
 TERMINAL_KEYS = ["bg", "fg", "fg.bold", "cursor", "selection"] + ANSI + ["bright." + name for name in ANSI]
 EDITOR_SURFACES = ["background", "foreground", "caret", "selection", "currentLine", "gutter", "lineNumbers"]
@@ -181,10 +184,12 @@ def validate(doc: dict, where: str) -> None:
     for variant, roles in ui.items():
         if variant not in terminal:
             fail(f"ui.{variant} has no matching scheme")
-        if list(roles) not in (ROLES, ROLES + OPTIONAL_ROLES):
+        keys = list(roles)
+        extra = keys[len(ROLES):]
+        if keys[:len(ROLES)] != ROLES or extra != [key for key in OPTIONAL_ROLES + OVERRIDE_KEYS if key in extra]:
             fail(f"ui.{variant} roles")
         for role, value in roles.items():
-            if not HEX.fullmatch(value):
+            if not HEX.fullmatch(value) or (role in OVERRIDE_KEYS and len(value) != 7):
                 fail(f"ui.{variant}.{role} = {value!r}")
         editor = doc["editor"][variant]
         if list(editor) != EDITOR_SURFACES + SYNTAX_ROLES:
@@ -525,6 +530,7 @@ class Effective:
     scheme: ElementTree.Element | None
     scheme_from: str
     chain: list[str]
+    authored: list[dict] = field(default_factory=list)  # the flattened ui of the theme and its parents in its plugin
 
 
 def flatten(prefix: str, value: dict, out: dict) -> None:
@@ -577,7 +583,7 @@ def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], sc
         for key, value in item.data.get("colors", {}).items():
             if isinstance(value, str):
                 colors[key] = value
-    levels = []
+    levels, authored = [], []
     for item in chain:
         flat: dict = {}
         try:
@@ -585,8 +591,10 @@ def resolve(theme: ThemeFile, siblings: list[ThemeFile], warnings: list[str], sc
         except RecursionError:
             raise ConversionError(f'{item.where}: "ui" is nested too deeply') from None
         levels.append(("theme" if item is theme else str(item.data.get("name", item.id)), flat))
+        if item.files is not None:
+            authored.append(flat)
     scheme, scheme_from = find_scheme(chain, theme, warnings, scheme_file, loose_dir, dark)
-    return Effective(dark, colors, levels, scheme, scheme_from, [str(t.data.get("name", t.id)) for t in chain])
+    return Effective(dark, colors, levels, scheme, scheme_from, [str(t.data.get("name", t.id)) for t in chain], authored)
 
 
 def find_scheme(chain, theme, warnings, scheme_file, loose_dir, dark):
@@ -953,6 +961,34 @@ def title_bar(lookup: Lookup, roles: dict, dark: bool) -> dict:
     return {"surface.titlebar": hex_of(surface), "text.titlebar": hex_of(ink)}
 
 
+# The override keys an IntelliJ theme fills (docs/themes.md): each from one IntelliJ key, a translucent colour laid over
+# the role it stands on. surface.stripe has no IntelliJ key.
+OVERRIDES = [
+    ("surface.header", "ToolWindow.Header.inactiveBackground", "surface.app"),
+    ("surface.header.active", "ToolWindow.Header.background", "surface.app"),
+    ("surface.tableHeader", "TableHeader.background", "surface.card"),
+    ("surface.zebra", "Table.stripeColor", "surface.card"),
+    ("surface.rowHover", "Table.hoverBackground", "surface.card"),
+    ("warning.ground", "Banner.warningBackground", "surface.card"),
+    ("warning.border", "Banner.warningBorderColor", "surface.card"),
+]
+
+
+def overrides(effective: Effective, roles: dict) -> tuple[dict, list[str]]:
+    """The override keys whose IntelliJ key the theme, or a parent in its plugin, sets itself, and one provenance line
+    each. IntelliJ's own themes and "*." wildcards do not count: without the key, the role follows its recipe."""
+    lookup = Lookup(effective)
+    values, provenance = {}, []
+    for key, intellij, under in OVERRIDES:
+        for ui in effective.authored:
+            colour = lookup.colour(ui[intellij]) if intellij in ui else None
+            if colour is not None:
+                values[key] = hex_of(colour if colour[3] == 255 else over(colour, parse_hex(roles[under])))
+                provenance.append(f"{key}: {values[key]} from {intellij}")
+                break
+    return values, provenance
+
+
 def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: str | None,
                            scheme_file: pathlib.Path | None = None, loose_dir: pathlib.Path | None = None,
                            roles: dict[str, str] | None = None) -> Result:
@@ -989,7 +1025,8 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     doc = {"jasper-theme": FORMAT, "name": display}
     if isinstance(theme.data.get("author"), str) and theme.data["author"]:
         doc["author"] = theme.data["author"]
-    doc["ui"] = {variant: roles | title_bar(Lookup(effective), roles, effective.dark)}
+    authored, provenance_overrides = overrides(effective, roles)
+    doc["ui"] = {variant: roles | title_bar(Lookup(effective), roles, effective.dark) | authored}
     doc["terminal"] = {variant: terminal}
     doc["editor"] = {variant: editor}
     validate(doc, theme.path)
@@ -1000,7 +1037,7 @@ def convert_intellij_theme(theme: ThemeFile, siblings: list[ThemeFile], name: st
     summary = (f"{display} ({variant}): {own} roles from the theme, {inherited} from {parent}, {derived} derived; "
                f"editor {from_scheme} of {len(EDITOR_SURFACES) + len(SYNTAX_ROLES)} from the scheme"
                + (f"; chrome from {islands[0]}" if islands is not None else ""))
-    return Result(doc, summary, warnings, provenance)
+    return Result(doc, summary, warnings, provenance + provenance_overrides)
 
 
 # ---------------------------------------------------------------------------------------------------------------

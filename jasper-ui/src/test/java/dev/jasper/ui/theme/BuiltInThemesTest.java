@@ -31,4 +31,16 @@ class BuiltInThemesTest {
         assertThat(JasperTheme.builtIn("ocean")).isEmpty();
         assertThat(JasperTheme.builtIn("Catppuccin-Mocha")).isEmpty();
     }
+
+    /** The vendored Catppuccin plugin sets five of the IntelliJ keys the converter reads; Slate Cobalt authors none. */
+    @Test void catppuccinAuthorsFiveDerivedRolesAndSlateCobaltNone() {
+        for (boolean dark : new boolean[] {true, false}) assertThat(JasperTheme.bundled().generated(dark).derivedOverrides()).isEmpty();
+        for (var theme : JasperTheme.builtIns().subList(1, 5)) {
+            var variant = theme.generated(!theme.id().equals("catppuccin-latte"));
+            assertThat(variant.derivedOverrides()).as(theme.id()).containsOnlyKeys(DerivedColor.SURFACE_HEADER,
+                DerivedColor.SURFACE_HEADER_ACTIVE, DerivedColor.SURFACE_ROW_HOVER, DerivedColor.WARNING_GROUND, DerivedColor.WARNING_BORDER);
+            assertThat(DerivedPalette.of(variant).color(DerivedColor.SURFACE_HEADER_ACTIVE)).as("%s: as authored, one with the header", theme.id())
+                .isEqualTo(DerivedPalette.of(variant).color(DerivedColor.SURFACE_HEADER));
+        }
+    }
 }

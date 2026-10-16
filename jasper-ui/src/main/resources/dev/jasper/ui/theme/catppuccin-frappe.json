@@ -63,7 +63,12 @@
       "hue.green": "#B0D1A9",
       "hue.amber": "#DCCAAE",
       "hue.purple": "#E6BFE9",
-      "hue.neutral": "#B6BEE2"
+      "hue.neutral": "#B6BEE2",
+      "surface.header": "#292C3C",
+      "surface.header.active": "#292C3C",
+      "surface.rowHover": "#44495D",
+      "warning.ground": "#3D3842",
+      "warning.border": "#3D3842"
     }
   },
   "terminal": {

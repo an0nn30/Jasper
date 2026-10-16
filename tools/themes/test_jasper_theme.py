@@ -502,6 +502,53 @@ class Plugins(unittest.TestCase):
         self.assertGreater(tool.contrast(tool.parse_hex(day["text.titlebar"]), tool.parse_hex(day["surface.titlebar"])), 7)
         self.assertEqual(list(even), tool.ROLES, "a main toolbar like the chrome adds nothing")
 
+    def test_keys_the_theme_sets_itself_become_override_keys_after_the_roles(self):
+        """Dawn sets three of the IntelliJ keys; ExperimentalLight, its IntelliJ parent, sets others that do not count."""
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(plugin_jar(pathlib.Path(scratch) / "ocean.jar")))
+            dawn = tool.convert_intellij_theme(next(t for t in themes if t.id == "ocean-dawn"), themes, None)
+        light = dawn.doc["ui"]["light"]
+        self.assertEqual(list(light), tool.ROLES + ["surface.tableHeader", "warning.ground", "warning.border"])
+        self.assertEqual(light["surface.tableHeader"], "#F2EBE1")
+        self.assertEqual(light["warning.ground"],
+                         tool.hex_of(tool.over(tool.parse_hex("#E0A0301A"), tool.parse_hex(light["surface.card"]))), "laid over the card")
+        self.assertIn("surface.tableHeader: #F2EBE1 from TableHeader.background", dawn.sources)
+
+    def test_a_wildcard_or_an_intellij_parent_fills_no_override_and_a_parent_in_the_plugin_does(self):
+        night = {"name": "Night", "dark": True, "parentTheme": "ExperimentalDark",
+                 "ui": {"*": {"stripeColor": "#123456", "hoverBackground": "#654321"}}}
+        base = {"name": "Base Theme", "dark": True,
+                "ui": {"ToolWindow.background": "#102030", "TableHeader.background": "#203040", "Table.stripeColor": "#151515"}}
+        child = {"name": "Child Theme", "parentTheme": "Base Theme", "ui": {"Table.stripeColor": "#181818"}}
+        with tempfile.TemporaryDirectory() as scratch:
+            themes = tool.plugin_themes(tool.Files.archive(theme_jar(pathlib.Path(scratch) / "t.jar",
+                                                                     {"night": night, "base": base, "child": child})))
+            converted = {theme.id: tool.convert_intellij_theme(theme, themes, None).doc["ui"]["dark"] for theme in themes}
+        self.assertFalse(set(converted["night"]) & set(tool.OVERRIDE_KEYS), "wildcards and IntelliJ's own keys do not count")
+        self.assertEqual(converted["child"]["surface.tableHeader"], "#203040", "from its parent in the plugin")
+        self.assertEqual(converted["child"]["surface.zebra"], "#181818", "its own key first")
+
+    def test_the_check_takes_override_keys_after_the_roles_in_order_and_opaque(self):
+        themes, loose = tool.themes_in(DATA / "intellij" / "loose" / "Ocean.theme.json")
+        doc = tool.convert_intellij_theme(themes[0], themes, None, loose_dir=loose).doc
+        dark = doc["ui"]["dark"]
+        self.assertEqual(list(dark)[len(tool.ROLES):], ["surface.header", "surface.header.active", "surface.rowHover"])
+        tool.validate(doc, "ocean.json")
+        def check(roles, message):
+            doc["ui"]["dark"] = roles
+            with self.assertRaisesRegex(tool.ConversionError, message):
+                tool.validate(doc, "ocean.json")
+        keys = list(dark)
+        check({key: dark[key] for key in keys[:-3] + [keys[-2], keys[-3], keys[-1]]}, "internal: ui.dark roles")
+        check({key: dark[key] for key in [keys[-1]] + keys[:-1]}, "internal: ui.dark roles")
+        check(dict(dark, **{"surface.header": "#16242F80"}), "internal: ui.dark.surface.header")
+        titled = {key: dark[key] for key in tool.ROLES} | {"surface.titlebar": "#000000", "text.titlebar": "#FFFFFF"} \
+            | {key: dark[key] for key in keys[len(tool.ROLES):]}
+        doc["ui"]["dark"] = titled
+        tool.validate(doc, "ocean.json")
+        check({key: dark[key] for key in tool.ROLES} | {"surface.header": "#16242F", "surface.titlebar": "#000000"},
+              "internal: ui.dark roles")
+
     def test_chosen_roles_take_a_colour_of_the_themes_own_palette_or_a_hex_colour(self):
         night = {"name": "Night", "dark": True, "colors": {"deep": "#0A0B0C"},
                  "ui": {"Panel.background": "#333333", "SidePanel.background": "#333333"}}

@@ -50,4 +50,15 @@ class ConvertedThemesTest {
         assertThat(ocean.syntax(true).get(SyntaxRole.KEYWORD)).isEqualTo(new SyntaxStyle(new Color(0xC792EA), true, false));
         assertThat(ocean.matching(true).name()).isEqualTo("Ocean");
     }
+
+    @Test void theOverrideKeysTheConverterFillsLoadAsDerivedRoles() throws Exception {
+        var ocean = JasperTheme.parse(Files.readString(EXPECTED.resolve("ocean.json")), "ocean").generated(true);
+        assertThat(ocean.derivedOverrides()).containsOnly(entry(DerivedColor.SURFACE_HEADER, new Color(0x16242F)),
+            entry(DerivedColor.SURFACE_HEADER_ACTIVE, new Color(0x1D3445)), entry(DerivedColor.SURFACE_ROW_HOVER, new Color(0x1D3C51)));
+        var dawn = JasperTheme.parse(Files.readString(EXPECTED.resolve("ocean-dawn.json")), "ocean-dawn").generated(false);
+        assertThat(dawn.derivedOverrides()).containsOnly(entry(DerivedColor.SURFACE_TABLE_HEADER, new Color(0xF2EBE1)),
+            entry(DerivedColor.WARNING_GROUND, new Color(0xF8EEDE)), entry(DerivedColor.WARNING_BORDER, new Color(0xD9A441)));
+        var stray = JasperTheme.parse(Files.readString(EXPECTED.resolve("stray.json")), "stray").generated(true);
+        assertThat(stray.derivedOverrides()).as("Stray sets none of the keys").isEmpty();
+    }
 }
