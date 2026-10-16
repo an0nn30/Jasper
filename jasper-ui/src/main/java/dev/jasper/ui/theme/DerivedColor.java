@@ -1,12 +1,13 @@
 package dev.jasper.ui.theme;
 
 /**
- * Colours the classic shapes paint that a theme does not list, each computed from the variant's palette. Host-private:
+ * Colours the classic shapes paint that a theme does not list, each computed from the variant's palette by
+ * {@link DerivedPalette}. Host-private:
  * {@link SemanticPalette} does not hold them and the SDK does not see them. A variant may list an
  * {@linkplain #overridable() overridable} role's colour itself ({@link GeneratedTheme#derivedOverrides()}). Declared in
  * the order they are computed: a role is computed from semantic roles and the derived roles declared before it.
  */
-public enum DerivedColor {
+public enum DerivedColor implements ColorRole {
     SURFACE_HEADER("surface.header", true),
     SURFACE_HEADER_ACTIVE("surface.header.active", true),
     SURFACE_STRIPE("surface.stripe", true),
@@ -39,8 +40,7 @@ public enum DerivedColor {
         this.overridable = overridable;
     }
 
-    /** The case-sensitive key theme files and frozen tables name the role by. */
-    public String key() { return key; }
+    @Override public String key() { return key; }
 
     /** Whether a theme variant may list this role (an override key) instead of taking its computed colour. */
     public boolean overridable() { return overridable; }

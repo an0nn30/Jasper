@@ -7,8 +7,8 @@ import java.util.Objects;
  * The one readability rule for colors painted on a specific surface: the generator's derived-token floors, chrome
  * status text on {@code surface.status}, rail badges on {@code surface.app} and surface-tinted icons all use it.
  * {@link #on} applies a floor only where a role is painted; the resolved role itself is never changed, so shared
- * roles stay as resolved on every other surface. A {@link Guard} is the repair a face applies where it paints a pair.
- * Pure: no Swing state.
+ * roles stay as resolved on every other surface. A face declares each pair it paints ({@link PaintPair}) with its
+ * {@link Guard} and paints it with {@link #painted}. Pure: no Swing state.
  */
 public final class SurfaceContrast {
     /** Text and status text, as the generator's derived status/link tokens. */
@@ -83,6 +83,15 @@ public final class SurfaceContrast {
                 case APART -> Math.abs(ColorMath.lightness(color) - ColorMath.lightness(against)) >= floor;
             };
         }
+    }
+
+    /**
+     * {@code pair}'s slot as painted in {@code theme}: its guard applied against the pair's other role, toward
+     * {@code text.primary} first. The roles themselves are never changed.
+     */
+    public static Color painted(GeneratedTheme theme, PaintPair pair) {
+        return pair.guard().apply(pair.slot().color(theme), pair.against().color(theme),
+            theme.semantic().color(SemanticColor.TEXT_PRIMARY));
     }
 
     /** {@code role} as painted on {@code surface}: unchanged when it meets {@code minimum}, else made readable there. */

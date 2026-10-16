@@ -6,7 +6,7 @@ import java.util.Optional;
  * Stable canonical theme roles. A role that carries opacity is painted as given; the kit applies treatments such as
  * focus rings and hovers on top, and owns all geometry.
  */
-public enum SemanticColor {
+public enum SemanticColor implements ColorRole {
     SURFACE_APP("surface.app"),
     SURFACE_STATUS("surface.status"),
     SURFACE_PANEL("surface.panel"),
@@ -81,7 +81,7 @@ public enum SemanticColor {
     private final String key;
     SemanticColor(String key) { this.key = key; }
     /** The case-sensitive native TOML key. */
-    public String key() { return key; }
+    @Override public String key() { return key; }
     /** Finds a standard semantic name. */
     public static Optional<SemanticColor> of(String key) {
         for (var role : values()) if (role.key.equals(key)) return Optional.of(role);
