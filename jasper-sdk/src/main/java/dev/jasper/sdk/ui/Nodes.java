@@ -16,6 +16,7 @@ public final class Nodes {
     /** The MONO roles mark data values (hosts, ports, paths, commands), drawn in the data face. */
     public enum TextRole { PROMPT_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, SUPPORTING, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
     public enum Hue { BLUE, GREEN, AMBER, PURPLE, NEUTRAL, NONE }
+    /** PROMPT is the large icon: a prompt's header, a detail heading or a sheet's title. */
     public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }
     /** GHOST is a quiet button. */
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }

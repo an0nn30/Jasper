@@ -23,14 +23,16 @@ header id is `existing.header`; (6) jasper-app's test task declares every source
 Beyond the plan's text: Task 2's review found bare `hero` still naming the prompt kind, so `5450058d0` renamed the
 per-control prompt flag (`Control.prompt(boolean)`, its fields and `Forms`' local), `IconRegistry.prompt(...)` and
 `FormFixtures.header(...)`, and `PromptVocabularyTest` also flags a bare `hero` called with arguments or used as a
-boolean flag. The gate cannot see a constant named by a string (`valueOf`, a qualified constant label in a pattern
-`switch`); linkage containment still applies. THD Sourcing Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`,
-branch `jasper-sdk-0.17.1` at `3740e4e`) is skipped on 0.18 until it is rebuilt there: `CryptoForm.java:112` and
-`CryptoFormTest.java:61` read `Nodes.ChoiceKind.SEGMENTED` (now `EXCLUSIVE`), and its `plugin.toml`
-(`sdk = ">=0.16.1, <0.18"`) and `PluginPackagingTest.java:49` move to `>=0.18.0, <0.19`, built against the 0.18.0 jars
-`sdkRelease` publishes; rebuild once plans 3b to 3d have settled 0.18's additions (its Mode choice has two options,
-within 3b's rule of two to four for EXCLUSIVE). `./gradlew check --continue`: **10,508 tests, 0 failures, 0 errors, 25
-skipped**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
+boolean flag. The `KitCompatibility` gate cannot see a constant named by a string (`valueOf`, a qualified constant label
+in a pattern `switch`); linkage containment still applies. THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at `3740e4e`) is skipped on 0.18 until it is
+rebuilt there: `CryptoForm.java:112` and `CryptoFormTest.java:61` read `Nodes.ChoiceKind.SEGMENTED` (now `EXCLUSIVE`),
+and its `plugin.toml` (`sdk = ">=0.16.1, <0.18"`) and `PluginPackagingTest.java:49` move to `>=0.18.0, <0.19`, and its
+`build.gradle.kts:8` default `jasperSdkVersion` and `README.md:28`, which name 0.17.1, move to 0.18.0, built against the
+0.18.0 jars `sdkRelease` publishes; rebuild once plans 3b to 3d have settled 0.18's additions (its Mode choice has two
+options, within 3b's rule of two to four for EXCLUSIVE). `./gradlew check --continue`:
+**10,508 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing visible changed). Merged
+to local `main`; not pushed.
 
 **Enterprise presentation, plan 2: derived roles — 2026-10-15** (`claude/enterprise-derived-roles`, worktree
 `.claude/worktrees/enterprise-derived-roles`, `b30872f4a..5056f88dc`, then this documentation commit;
