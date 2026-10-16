@@ -2,6 +2,7 @@ package dev.jasper.sdk.ui;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import static dev.jasper.sdk.ui.Nodes.*;
@@ -12,11 +13,23 @@ public record ViewSpec(Node root) {
         Objects.requireNonNull(root);
         // One traversal validates ids and collects the ItemLists that fields name with their arrow keys.
         var lists = new HashSet<String>(); var listRefs = new HashSet<String>();
+        place(null, root);
         validate(root, new HashSet<>(), new HashSet<>(), lists, listRefs, 0, new int[]{0});
         if (!lists.containsAll(listRefs)) throw new IllegalArgumentException("A field's list must be an ItemList in the same view");
     }
     private static void references(Set<String> selected, Set<String> ids) {
         if (!ids.containsAll(selected)) throw new IllegalArgumentException("Unknown item reference");
+    }
+    /** Spec 8.2: where a node may stand ({@code parent} is null at the root). A Separator belongs only in an INLINE or ACTIONS stack. */
+    private static void place(Node parent, Node child) {
+        if (child instanceof Separator && !(parent instanceof Stack stack && (stack.role() == LayoutRole.INLINE || stack.role() == LayoutRole.ACTIONS)))
+            throw new IllegalArgumentException("A Separator belongs only in an INLINE or ACTIONS stack");
+    }
+    /** A Separator stands between two items: never a stack's first or last child, never beside another separator. */
+    private static void separators(List<Node> children) {
+        for (int i = 0; i < children.size(); i++)
+            if (children.get(i) instanceof Separator && (i == 0 || i == children.size() - 1 || children.get(i - 1) instanceof Separator))
+                throw new IllegalArgumentException("A Separator stands between two items, never first, last or beside another separator");
     }
     private static void tree(TreeItem item, Set<String> ids, Set<String> branches, int depth) {
         if (depth > 128) throw new IllegalArgumentException("Tree too deep");
@@ -32,7 +45,7 @@ public record ViewSpec(Node root) {
         if (node instanceof Field field && !field.listId().isBlank()) listRefs.add(field.listId());
         var children = new ArrayList<Node>();
         switch (node) {
-            case Stack n -> children.addAll(n.children());
+            case Stack n -> { children.addAll(n.children()); separators(n.children()); }
             case Card n -> children.addAll(n.children());
             case Split n -> children.addAll(n.children());
             case FormRow n -> { children.add(n.control()); n.trailing().ifPresent(children::add); }
@@ -66,8 +79,9 @@ public record ViewSpec(Node root) {
                 for (var item : n.roots()) tree(item, itemIds, branches, 0);
                 references(n.selectedIds(), itemIds); references(n.expandedIds(), branches);
             }
-            case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _ -> { }
+            case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _, Separator _ -> { }
         }
+        for (var child : children) place(node, child);
         for (var child : children) validate(child, ids, contentIds, lists, listRefs, depth + 1, count);
     }
 }

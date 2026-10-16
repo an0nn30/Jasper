@@ -33,6 +33,7 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.Tree n -> new dev.jasper.ui.model.Nodes.Tree(n.id(), toModule(n.state()), n.roots().stream().map(KitValues::toModule).toList(), n.expandedIds(), n.selectedIds(), n.activateAction());
  case dev.jasper.sdk.ui.Nodes.Breadcrumbs n -> new dev.jasper.ui.model.Nodes.Breadcrumbs(n.id(), toModule(n.state()), n.crumbs().stream().map(KitValues::toModule).toList(), n.label(), n.editing(), n.value(), n.editAction(), n.submitAction(), n.cancelAction());
  case dev.jasper.sdk.ui.Nodes.Custom n -> new dev.jasper.ui.model.Nodes.Custom(n.id(), toModule(n.state()), n.contentId(), dev.jasper.ui.model.Nodes.CustomKind.valueOf(n.kind().name()), n.accessibleName());
+ case dev.jasper.sdk.ui.Nodes.Separator n -> new dev.jasper.ui.model.Nodes.Separator(n.id(), toModule(n.state()));
  }; }
  static dev.jasper.ui.model.ControlState toModule(dev.jasper.sdk.ui.ControlState n) { return new dev.jasper.ui.model.ControlState(n.visible(), n.enabled(), n.busy(), n.error()); }
  static dev.jasper.ui.model.Option.Palette toModule(dev.jasper.sdk.ui.Option.Palette p) { return new dev.jasper.ui.model.Option.Palette(p.background(), p.sidebar(), p.control(), p.text(), p.accent()); }

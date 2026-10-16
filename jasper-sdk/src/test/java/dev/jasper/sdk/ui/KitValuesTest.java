@@ -60,6 +60,24 @@ class KitValuesTest {
             .withMessageContaining("severity");
         assertThat(new Icon("glyph", ControlState.READY, "file", Hue.NONE, IconSize.CAPTION, "File").hue()).isEqualTo(Hue.NONE);
     }
+    /** Plan 3b (spec 8.2): a Separator stands between two items of an INLINE or ACTIONS stack, and nowhere else. */
+    @Test void separatorsStandBetweenTwoItemsOfAnInlineOrActionsStack() {
+        var rule = new Separator("rule", ControlState.READY);
+        for (var role : List.of(LayoutRole.INLINE, LayoutRole.ACTIONS))
+            assertThatCode(() -> new ViewSpec(new Nodes.Stack("bar", ControlState.READY, role, List.of(text("a"), rule, text("b"))))).doesNotThrowAnyException();
+        for (var children : List.of(List.<Node>of(rule, text("a")), List.<Node>of(text("a"), rule),
+                List.<Node>of(text("a"), rule, new Separator("again", ControlState.READY), text("b"))))
+            assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Nodes.Stack("bar", ControlState.READY, LayoutRole.INLINE, children)))
+                .withMessageContaining("between two items");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Nodes.Stack("bar", ControlState.READY, LayoutRole.VERTICAL,
+            List.of(text("a"), rule, text("b"))))).withMessageContaining("INLINE or ACTIONS");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(rule)).withMessageContaining("INLINE or ACTIONS");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Card("card", ControlState.READY, CardKind.FORM,
+            List.of(text("a"), rule, text("b"))))).withMessageContaining("INLINE or ACTIONS");
+        // List rows hold presentation nodes only; a separator is not one, even inside a row's INLINE stack.
+        assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(new Nodes.Stack("line", ControlState.READY,
+            LayoutRole.INLINE, List.of(text("a"), rule, text("b")))), List.of(), List.of())).withMessageContaining("Unsupported inline row node: Separator");
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

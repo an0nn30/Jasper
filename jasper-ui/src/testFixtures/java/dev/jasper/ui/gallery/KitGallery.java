@@ -84,6 +84,16 @@ public final class KitGallery {
             swatches.add(new Nodes.Text("swatch-label-" + hue, ControlState.READY, hue.name(), TextRole.CAPTION));
         }
         result.add(new Fixture("swatches", "", "normal", 420, 40, new ViewSpec(new Nodes.Stack("swatches", ControlState.READY, LayoutRole.INLINE, swatches))));
+        // Plan 3b (SDK 0.18): SFTP's navigation row, its groups divided by separators.
+        result.add(new Fixture("separators", "", "normal", 420, 44, new ViewSpec(new Nodes.Stack("sftp-toolbar", ControlState.READY, LayoutRole.INLINE, List.of(
+            new Nodes.Button("toolbar-back", ControlState.READY, "", "back", ButtonKind.GHOST, "back", "Back"),
+            new Nodes.Button("toolbar-forward", ControlState.READY, "", "forward", ButtonKind.GHOST, "forward", "Forward"),
+            new Nodes.Button("toolbar-refresh", ControlState.READY, "", "refresh", ButtonKind.GHOST, "refresh", "Refresh"),
+            new Nodes.Separator("toolbar-first", ControlState.READY),
+            new Nodes.Button("toolbar-hidden", ControlState.READY, "Hidden files", "", ButtonKind.GHOST, "hidden", ""),
+            new Nodes.Separator("toolbar-second", ControlState.READY),
+            new MenuButton("toolbar-upload", ControlState.READY, "Upload", "upload", ButtonKind.GHOST, "",
+                List.of(new dev.jasper.ui.model.MenuItem("upload-files", "Files…", "", "files", true, false)), ""))))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

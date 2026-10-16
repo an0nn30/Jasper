@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator {
         String id();
         ControlState state();
     }
@@ -672,6 +672,17 @@ public final class Nodes {
             Objects.requireNonNull(editAction); Objects.requireNonNull(submitAction); Objects.requireNonNull(cancelAction);
             if (editing && (submitAction.isBlank() || cancelAction.isBlank())) throw new IllegalArgumentException("Editing needs submit and cancel actions");
         }
+    }
+
+    /**
+     * A thin rule between two items of an INLINE or ACTIONS stack, dividing a toolbar row into groups; never a stack's
+     * first or last child and never beside another separator. It is not shown while every item on one side of it is
+     * hidden.
+     *
+     * @since 0.18.0
+     */
+    public record Separator(String id, ControlState state) implements Node {
+        public Separator { ModelChecks.id(id); Objects.requireNonNull(state); }
     }
 
     public record Custom(String id, ControlState state, String contentId, CustomKind kind, String accessibleName) implements Node {

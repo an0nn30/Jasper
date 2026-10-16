@@ -9,6 +9,8 @@ class KitValuesTest {
  static Text text(String id){return new Text(id,READY,"content",TextRole.CAPTION);}
  static Button button(String id){return new Button(id,READY,"Save","add",ButtonKind.PRIMARY,"save","");}
  static Header header(){return new Header("header",READY,"Title",OptionalInt.of(2),Optional.of(text("context")),Optional.of(button("primary")),List.of());}
+ /** The node classes in {@code nodes}, those inside their stacks and their forms' sections included (a Separator or a Notice is never a root). */
+ static Set<Class<?>> classes(List<Node> nodes){var found=new HashSet<Class<?>>();for(var node:nodes){found.add(node.getClass());if(node instanceof Nodes.Stack stack)found.addAll(classes(stack.children()));if(node instanceof Form form)found.addAll(classes(form.sections()));}return found;}
  @Test void everyNodeAndSupportFieldProjectsWithoutLoss() {
   var menu=List.of(new MenuItem("menu","Item","add","act",true,false));
   List<Node> nodes=List.of(text("text"),new Icon("icon",READY,"add",Hue.BLUE,IconSize.CONTROL,"Add"),button("button"),
@@ -30,8 +32,9 @@ class KitValuesTest {
    new Table("table",READY,List.of(new Column("column","Title",TextRole.MONO,true)),List.of(new TableRow("row",Map.of("column","42"),Optional.of("add"))),Set.of("row"),"activate",menu,SelectionMode.MULTIPLE),
    new Tree("tree",READY,List.of(new TreeItem("branch","Title",Optional.of("folder"),false,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of())))),Set.of("branch"),Set.of("leaf"),"activate"),
    new Breadcrumbs("path",READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",menu)),"Location",true,"/tmp","edit","go","done"),
+   new Nodes.Stack("separated",READY,LayoutRole.INLINE,List.of(text("before"),new Separator("separator",READY),text("after"))),
    new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
-  assertThat(nodes.stream().map(Object::getClass).distinct()).hasSize(Node.class.getPermittedSubclasses().length);
+  assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
  }
  /** Plan 3b: a read-only field crosses the projection unchanged. */

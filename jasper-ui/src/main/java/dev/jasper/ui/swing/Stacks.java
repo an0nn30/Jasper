@@ -145,6 +145,7 @@ final class Stacks {
                     wanted.add(tile);
                 } else wanted.add(c.component);
             mount(component, wanted);
+            Separators.settle(controls);
             captions = controls.stream().filter(c -> c.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION).map(c -> (Component)c.component).collect(java.util.stream.Collectors.toSet());
             if (component.getLayout() instanceof StackLayout layout) layout.captions = captions;
             barFields = controls.stream().filter(c -> c.node instanceof Nodes.Field || c.node instanceof Nodes.Text).map(c -> (Component)c.component)
