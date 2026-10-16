@@ -106,6 +106,12 @@ class AppContractTest extends PluginContractTest {
     /** UI thread: {@link #headlessWindows(UiState)} over state that is never saved. */
     static AuxiliaryWindows headlessWindows() { return headlessWindows(UiState.inMemory()); }
 
+    /** UI thread: {@link #headlessWindows()} whose file chooser is {@code chooser}, for tests that pick files. */
+    static AuxiliaryWindows headlessWindows(dev.jasper.app.windows.PathChooser chooser) {
+        return new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
+            () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()), chooser);
+    }
+
     /** UI thread: plugin windows over shells that touch no native window. */
     static AuxiliaryWindows headlessWindows(UiState state) {
         return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },

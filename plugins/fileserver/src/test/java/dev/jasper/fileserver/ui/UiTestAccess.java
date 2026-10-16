@@ -39,7 +39,8 @@ public final class UiTestAccess {
     public static Label cardHostKey(FileServersPanel panel) { return new Label(fake(panel.view()), "fileserver.card.hostkey"); }
     public static Label cardTls(FileServersPanel panel) { return new Label(fake(panel.view()), "fileserver.card.tls"); }
     public static Field name(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.NAME); }
-    public static Field folder(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.FOLDER); }
+    /** Choose… beside the read-only folder: the host's next queued directory, or the editor's own chooser. */
+    public static Button chooseFolder(ServerEditor editor) { return button(editor.view(), ServerEditor.CHOOSE_FOLDER); }
     public static Field port(ServerEditor editor) { return new Field(fake(editor.view()), ServerEditor.PORT); }
     public static Button save(ServerEditor editor) { return button(editor.view(), ServerEditor.SAVE); }
     public static Label message(ConfirmPanel panel) { return new Label(fake(panel.view()), "fileserver.confirm.message"); }

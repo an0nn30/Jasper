@@ -123,6 +123,8 @@ public final class KitViewTestAccess implements AutoCloseable {
     public KitView view() { return onEdtValue(() -> StagedVaultHost.kitView(surface)); }
     public Component component(String id) { return onEdtValue(() -> StagedVaultHost.require(surface, id)); }
     public void type(String id, String text) { onEdt(() -> StagedVaultHost.type(surface, id + ".input", text)); }
+    /** Chooses {@code folder} for New File Server through its Choose… button and the host's chooser. */
+    public void chooseFolder(Path folder) { onEdt(() -> StagedVaultHost.chooseFolder(vault, surface, folder)); }
     public void click(String id) { onEdt(() -> StagedVaultHost.click(surface, id)); }
     public void theme(ResolvedTheme theme) { onEdt(() -> appearance.setPair(theme)); }
     public void error() throws InterruptedException {

@@ -287,7 +287,8 @@ class FileServerPluginTest {
             int port = Ports.free();
             var editor = plugin.currentEditor();
             UiTestAccess.name(editor).setText("docs");
-            UiTestAccess.folder(editor).setText(shared.toString());
+            host.queuePathSelection(List.of(shared));
+            UiTestAccess.chooseFolder(editor).doClick();
             UiTestAccess.port(editor).setText(String.valueOf(port));
             UiTestAccess.save(editor).doClick();
             settle(host);

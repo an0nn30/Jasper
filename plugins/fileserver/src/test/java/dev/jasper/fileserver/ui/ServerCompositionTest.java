@@ -13,6 +13,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class ServerCompositionTest {
     @TempDir Path root;
+    /** What Choose… answers; nothing (a cancelled chooser) when null. */
+    private Path nextFolder;
     @Test void groupedFormUsesRealProtocolsConditionalAccountAndExplicitSubmissionPolicy() {
         UiTestAccess.edt(() -> {
             try (var editor = editor(Optional.empty())) {
@@ -53,7 +55,7 @@ class ServerCompositionTest {
                 assertThat(node(editor,ServerEditor.SAVE).state().enabled()).isFalse();
                 assertThatThrownBy(editor::build).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Require TLS");
                 emit(editor,new UiEvent.Toggled(ServerEditor.TLS,true));
-                emit(editor,new UiEvent.Edited(ServerEditor.FOLDER,root.resolve("not-present").toString()));
+                nextFolder=root.resolve("not-present");emit(editor,new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));
                 assertThat(node(editor,ServerEditor.SAVE).state().enabled()).as("readiness does not inspect the filesystem").isTrue();
                 assertThatThrownBy(editor::build).hasMessageContaining("does not exist");
             }
@@ -69,26 +71,30 @@ class ServerCompositionTest {
             }
         });
     }
-    @Test void explicitBrowseCancellationKeepsLongDraftAndPerformsNoImplicitChooserRead() {
+    @Test void explicitBrowseCancellationKeepsTheChosenFolderAndPerformsNoImplicitChooserRead() {
         UiTestAccess.edt(()->{
+            String chosenPath=root.resolve("very-long-synthetic-folder/another-segment/still-chosen").toString();
+            var answers=new java.util.ArrayDeque<Optional<Path>>(List.of(Optional.of(Path.of(chosenPath)),Optional.empty()));
             int[] requests={0};var kit=new FakeKit("dev.jasper.fileserver");
             try(var editor=new ServerEditor(kit,List.of(),Optional.empty(),false,Set.of(Protocol.HTTP),List.of(),false,id->Optional.empty(),
-                ()->CompletableFuture.completedFuture(Optional.empty()),()->{requests[0]++;return Optional.empty();},ServerEditor.KeySources.NONE,false,d->{},()->{})) {
+                ()->CompletableFuture.completedFuture(Optional.empty()),()->{requests[0]++;return answers.remove();},ServerEditor.KeySources.NONE,false,d->{},()->{})) {
                 // One offered protocol is a fact, not a choice (spec 8.2: an EXCLUSIVE choice has 2 to 4 options).
                 assertThat(node(editor, ServerEditor.PROTOCOL)).isInstanceOfSatisfying(Nodes.Field.class, protocol -> {
                     assertThat(protocol.readOnly()).isTrue();
                     assertThat(protocol.value()).isEqualTo("HTTP");
                 });
-                String longPath=root.resolve("very-long-synthetic-folder/another-segment/still-editable").toString();
-                emit(editor,new UiEvent.Edited(ServerEditor.FOLDER,longPath));assertThat(requests[0]).isZero();
-                emit(editor,new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));assertThat(requests[0]).isEqualTo(1);
-                assertThat(((Nodes.Field)node(editor,ServerEditor.FOLDER)).value()).isEqualTo(longPath);
+                assertThat(requests[0]).as("opening the editor reads no folder").isZero();
+                emit(editor,new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));
+                assertThat(((Nodes.Field)node(editor,ServerEditor.FOLDER)).value()).isEqualTo(chosenPath);
+                emit(editor,new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));assertThat(requests[0]).isEqualTo(2);
+                assertThat(((Nodes.Field)node(editor,ServerEditor.FOLDER)).value()).as("a cancelled Choose… keeps the folder").isEqualTo(chosenPath);
+                assertThat(((Nodes.Field)node(editor,ServerEditor.FOLDER)).readOnly()).isTrue();
             }
         });
     }
     private ServerEditor editor(Optional<ServerDefinition> initial) {
         return new ServerEditor(new FakeKit("dev.jasper.fileserver"), List.of(),initial,initial.isPresent(),EnumSet.allOf(Protocol.class),List.of(),true,
-            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()),Optional::empty,ServerEditor.KeySources.NONE,false,d -> {},() -> {});
+            id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()),()->Optional.ofNullable(nextFolder),ServerEditor.KeySources.NONE,false,d -> {},() -> {});
     }
     private static Nodes.Node node(ServerEditor editor,String id) {return UiTestAccess.node((FakeKitView)editor.view(),id);}
     private static void emit(ServerEditor editor,UiEvent event) {((FakeKitView)editor.view()).emit(event);}

@@ -22,7 +22,7 @@ public final class SurfaceFixtures {
             if (surfaceId.equals("fileserver-add")) {
                 if (state.equals("vault")) { owner.click("server.login.option.vault"); owner.click("server.writable"); }
                 else if (!java.util.Set.of("empty", "disabled", "focus").contains(state)) {
-                    owner.type("server.name", "synthetic-preview-server");owner.type("server.folder",home.toString());
+                    owner.type("server.name", "synthetic-preview-server");owner.chooseFolder(home);
                 }
                 if(state.equals("error"))owner.error();opened.layout();return opened;
             }
