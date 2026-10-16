@@ -3,8 +3,10 @@ package dev.jasper.ui.theme;
 import dev.jasper.ui.testsupport.KitFixtures;
 import java.awt.Color;
 import java.util.EnumMap;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 class SurfaceContrastTest {
@@ -56,5 +58,44 @@ class SurfaceContrastTest {
         var badge = SurfaceContrast.on(palette, SemanticColor.ACCENT, SemanticColor.SURFACE_APP, SurfaceContrast.INDICATOR);
         assertThat(ColorMath.contrast(badge, new Color(0x1c1c1c))).isGreaterThanOrEqualTo(3);
         assertThat(palette.color(SemanticColor.STATUS_SUCCESS)).as("the shared role is not floored").isEqualTo(new Color(0x2e5d32));
+    }
+
+    @Test void theGuardsAreSpecSevenThreesFloors() {
+        assertThat(SurfaceContrast.Guard.TEXT).isEqualTo(new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, 4.5));
+        assertThat(SurfaceContrast.Guard.INDICATOR).isEqualTo(new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, 3));
+        assertThat(SurfaceContrast.Guard.STRUCTURAL).isEqualTo(new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, 1.3));
+        assertThat(SurfaceContrast.Guard.CONTROL).isEqualTo(new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, 1.5));
+        assertThat(SurfaceContrast.Guard.apart(9)).isEqualTo(new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.APART, 9));
+    }
+
+    @Test void aGuardTakesOnlyAFloorEveryOpaqueColourReaches() {
+        for (double floor : new double[] {.99, 4.59, Double.NaN})
+            assertThatThrownBy(() -> new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, floor))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("CONTRAST floor out of range");
+        for (double distance : new double[] {-.01, 50.01, Double.NaN})
+            assertThatThrownBy(() -> SurfaceContrast.Guard.apart(distance))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("APART floor out of range");
+        assertThatThrownBy(() -> new SurfaceContrast.Guard(null, 3)).isInstanceOf(NullPointerException.class);
+    }
+
+    /** Spec 7.3: every guard terminates and holds, for every pair of roles of every degenerate palette, at the extreme floors too. */
+    @Test void everyGuardHoldsForEveryPairOfEveryDegeneratePalette() {
+        var guards = List.of(SurfaceContrast.Guard.TEXT, SurfaceContrast.Guard.INDICATOR, SurfaceContrast.Guard.STRUCTURAL,
+            SurfaceContrast.Guard.CONTROL, new SurfaceContrast.Guard(SurfaceContrast.Guard.Kind.CONTRAST, SurfaceContrast.REACHABLE),
+            SurfaceContrast.Guard.apart(SurfaceContrast.TAB_LIGHTNESS), SurfaceContrast.Guard.apart(SurfaceContrast.REACHABLE_LIGHTNESS));
+        for (var theme : KitFixtures.degenerate()) {
+            var palette = theme.semantic();
+            Color ink = palette.color(SemanticColor.TEXT_PRIMARY);
+            for (var slot : SemanticColor.values()) for (var against : SemanticColor.values()) for (var guard : guards) {
+                Color painted = guard.apply(palette.color(slot), palette.color(against), ink);
+                assertThat(guard.holds(painted, palette.color(against))).as("%s: %s on %s, %s", theme.name(), slot, against, guard).isTrue();
+            }
+        }
+    }
+
+    @Test void aGuardThatHoldsLeavesTheColourAsItIs() {
+        var translucent = new Color(0x10, 0x20, 0x30, 0x80);
+        assertThat(SurfaceContrast.Guard.TEXT.apply(translucent, Color.WHITE, Color.BLACK)).isSameAs(translucent);
+        assertThat(SurfaceContrast.Guard.apart(3).apply(Color.BLACK, Color.WHITE, Color.BLACK)).isSameAs(Color.BLACK);
     }
 }
