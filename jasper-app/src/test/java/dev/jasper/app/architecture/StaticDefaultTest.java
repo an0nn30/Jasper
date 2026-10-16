@@ -45,7 +45,7 @@ class StaticDefaultTest {
     static final int DEPTH = 4;
     /** The catalogs that only their owners may read: the defaults and the classic base. */
     static final Set<String> CATALOGS = Set.of(METRICS + ".DEFAULT", METRICS + ".CLASSIC", "dev/jasper/ui/metrics/TypeScale.DEFAULT",
-        "dev/jasper/ui/metrics/FaceSet.PLATFORM");
+        "dev/jasper/ui/metrics/TypeScale.CLASSIC", "dev/jasper/ui/metrics/FaceSet.PLATFORM");
     /** Calls that read a metric; a static initializer makes none. */
     static final Set<String> METRIC_READS = Set.of(METRICS + ".value", METRICS + ".contentHeight", METRICS + ".contentPadding",
         METRICS + ".with", "dev/jasper/ui/kit/Kit.metrics", "dev/jasper/ui/kit/Kit.type", "dev/jasper/ui/swing/KitContext.metrics",
