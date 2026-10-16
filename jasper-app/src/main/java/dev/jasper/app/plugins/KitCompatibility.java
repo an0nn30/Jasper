@@ -4,19 +4,24 @@ import java.lang.classfile.ClassFile;
 import java.lang.classfile.constantpool.ClassEntry;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.constantpool.NameAndTypeEntry;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-/** SDK 0.15 admission: exact removed JVM members, never plugin execution or reflective linking.
- * Generic erasure and reflective names are not provable here; normal linkage containment still applies.
+/** Admission across SDK breaks: exact removed JVM members and types, never plugin execution or reflective linking.
+ * Each entry names the SDK version that removed it. A plugin reads an enum constant with {@code getstatic}, as a classic
+ * or arrow {@code switch} does through its switch map. Generic erasure and names held as strings (an enum constant
+ * looked up by {@code valueOf}, or a qualified constant label in a pattern {@code switch}) are not provable here;
+ * normal linkage containment still applies.
  */
 final class KitCompatibility {
     private KitCompatibility() {}
-    private static final Set<String> TYPES = Set.of(
+    private static final Map<String, String> TYPES = removed(Map.of("0.15", List.of(
         "dev/jasper/sdk/settings/SettingsPanel$View",
         "dev/jasper/sdk/ui/BundledIcon",
         "dev/jasper/sdk/ui/IconName",
-        "dev/jasper/sdk/ui/PanelFactory$View");
-    private static final Set<String> MEMBERS = Set.of(
+        "dev/jasper/sdk/ui/PanelFactory$View")));
+    private static final Map<String, String> MEMBERS = removed(Map.of("0.15", List.of(
         "dev/jasper/sdk/notifications/NotificationSpec#withIcon(Ljavax/swing/Icon;)Ldev/jasper/sdk/notifications/NotificationSpec;",
         "dev/jasper/sdk/palette/PaletteRow#withIcon(Ljavax/swing/Icon;)Ldev/jasper/sdk/palette/PaletteRow;",
         "dev/jasper/sdk/palette/ScopeSpec#withIcon(Ljavax/swing/Icon;)Ldev/jasper/sdk/palette/ScopeSpec;",
@@ -50,20 +55,35 @@ final class KitCompatibility {
         "dev/jasper/sdk/ui/WindowSurface#setContent(Ljavax/swing/JComponent;)V",
         "dev/jasper/sdk/ui/Windows#openTab(Ldev/jasper/sdk/ui/ContentSpec;Ldev/jasper/sdk/WindowOwner;Ljavax/swing/JComponent;)Ldev/jasper/sdk/ui/ContentTab;",
         "dev/jasper/sdk/ui/WorkspacePalette#current()Ldev/jasper/sdk/ui/WorkspacePalette;",
-        "dev/jasper/sdk/ui/WorkspacePalette#current(Ljava/awt/Component;)Ldev/jasper/sdk/ui/WorkspacePalette;");
+        "dev/jasper/sdk/ui/WorkspacePalette#current(Ljava/awt/Component;)Ldev/jasper/sdk/ui/WorkspacePalette;"),
+        // The constants SDK 0.18 renamed.
+        "0.18", List.of(
+        "dev/jasper/sdk/ui/Nodes$ChoiceKind#SEGMENTEDLdev/jasper/sdk/ui/Nodes$ChoiceKind;",
+        "dev/jasper/sdk/ui/Nodes$ButtonPresentation#CIRCULARLdev/jasper/sdk/ui/Nodes$ButtonPresentation;",
+        "dev/jasper/sdk/ui/Nodes$FormKind#HEROLdev/jasper/sdk/ui/Nodes$FormKind;",
+        "dev/jasper/sdk/ui/Nodes$FormKind#HERO_COMPACTLdev/jasper/sdk/ui/Nodes$FormKind;",
+        "dev/jasper/sdk/ui/Nodes$LayoutRole#HEROLdev/jasper/sdk/ui/Nodes$LayoutRole;",
+        "dev/jasper/sdk/ui/Nodes$TextRole#HERO_TITLELdev/jasper/sdk/ui/Nodes$TextRole;",
+        "dev/jasper/sdk/ui/Nodes$IconSize#HEROLdev/jasper/sdk/ui/Nodes$IconSize;")));
+
+    private static Map<String, String> removed(Map<String, List<String>> byVersion) {
+        var removed = new HashMap<String, String>();
+        byVersion.forEach((version, names) -> names.forEach(name -> removed.put(name, version)));
+        return Map.copyOf(removed);
+    }
 
     static void check(byte[] bytes, String source) throws PluginLoader.LoadFailure {
         try {
             var model=ClassFile.of().parse(bytes);
             for(var entry:model.constantPool()) {
                 if(entry instanceof ClassEntry type) {
-                    if(TYPES.contains(type.asInternalName())) fail(source,type.asInternalName());
+                    if(TYPES.containsKey(type.asInternalName())) fail(source,"type",type.asInternalName(),TYPES);
                     descriptor(source,type.asInternalName()); // Array class constants carry descriptors.
                 }
                 if(entry instanceof NameAndTypeEntry value) descriptor(source,value.type().stringValue());
                 if(entry instanceof MemberRefEntry member) {
                     String reference=member.owner().asInternalName()+"#"+member.name().stringValue()+member.type().stringValue();
-                    if(MEMBERS.contains(reference))fail(source,reference);
+                    if(MEMBERS.containsKey(reference))fail(source,"member",reference,MEMBERS);
                 }
             }
             for(var field:model.fields())descriptor(source,field.fieldType().stringValue());
@@ -73,7 +93,7 @@ final class KitCompatibility {
                 // An old factory implementation may never reference its interface's removed member.
                 for(var implemented:model.interfaces()) {
                     String reference=implemented.asInternalName()+"#"+signature;
-                    if(MEMBERS.contains(reference))fail(source,reference);
+                    if(MEMBERS.containsKey(reference))fail(source,"member",reference,MEMBERS);
                 }
             }
         } catch(IllegalArgumentException failure) {
@@ -81,9 +101,9 @@ final class KitCompatibility {
         }
     }
     private static void descriptor(String source,String descriptor) throws PluginLoader.LoadFailure {
-        for(var type:TYPES)if(descriptor.contains("L"+type+";"))fail(source,type);
+        for(var type:TYPES.keySet())if(descriptor.contains("L"+type+";"))fail(source,"type",type,TYPES);
     }
-    private static void fail(String source,String member) throws PluginLoader.LoadFailure {
-        throw new PluginLoader.LoadFailure(source+" references removed SDK member/type "+member+"; requires migration to SDK 0.15 kit UI",null);
+    private static void fail(String source,String kind,String name,Map<String, String> removedIn) throws PluginLoader.LoadFailure {
+        throw new PluginLoader.LoadFailure(source+" references removed SDK "+kind+" "+name+"; rebuild it for SDK "+removedIn.get(name),null);
     }
 }

@@ -892,8 +892,10 @@ The manifest `icon` remains an identity image preview; it is separate from prese
 
 Old truthful SDK ranges are rejected by the pure resolver. Before initializing a plugin class,
 the loader checks effective multi-release class files for exact removed SDK members and types,
-including obsolete factory implementations. Errors identify the class and member to migrate.
-Erased generic icon values and reflective member lookup cannot all be detected statically;
+including obsolete factory implementations, and SDK 0.18's renamed constants. Errors identify the class, the
+member and the SDK version that removed it.
+Erased generic icon values, reflective member lookup and enum constants named by strings (`valueOf`, a
+qualified constant label in a pattern `switch`) cannot all be detected statically;
 existing lifecycle and callback linkage containment remains in place.
 
 ### Enforced custom source ownership
