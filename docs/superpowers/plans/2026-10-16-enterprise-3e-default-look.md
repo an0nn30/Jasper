@@ -33,8 +33,9 @@ in that order before this plan executes; their rulings bind this plan (3b Ruling
 Plans 4 and 5 execute after this one.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-3e`, branch
-`claude/enterprise-default-look`, cut from `main` at `222969926` and holding only this plan's commit. Before Task 1,
-bring it up to `main` and check that 3a to 3d are in it:
+`claude/enterprise-default-look`, cut from `main` at `222969926` and holding only commits to this plan file (it is
+written, reviewed and re-anchored there, so their number varies). Before Task 1, bring it up to `main` and check that
+3a to 3d are in it:
 
 ```bash
 git rebase main
@@ -51,15 +52,73 @@ exact text it replaces, and the edit scripts stop with a message when that text 
 times. If a script stops, re-find the quoted text (it moves, it does not change) and re-run; never edit around a
 missing anchor, and record any anchor you had to re-quote in the status banner.
 
+Then record the reference pairs' baseline: the render and the `compare_all.py` summary of every pair in
+`tools/visual/pairs.json` before this plan changes anything (Global Constraints, pixel rule). The render commands are
+the theme-engine acceptance's ("Regenerate" in `docs/design/theme-engine/acceptance.md`); the preview tasks set
+`java.awt.headless=true` and open no window. Run from the worktree root:
+
+```bash
+./gradlew :jasper-app:themeSurfacePreview :jasper-app:settingsSurfacePreview :jasper-app:settings9bPreview :jasper-app:workspaceSurfacePreview
+./gradlew :jasper-app:commandPalettePreview --args="$PWD/jasper-app/build/palette-surfaces --task9c"
+./gradlew :jasper-app:test --tests '*StagedAnchoredPickerTest' --tests '*VaultSheetRenderTest' --tests '*StagedAddHostTest' --tests '*StagedFileServerFormTest' --tests '*SessionsCompositionTest'
+mkdir -p build/plan-3e-pairs
+cat > build/plan-3e-pairs/measure.py <<'PY'
+"""Plan 3e: every reference pair's render and edge agreement, before Task 1 ("before") and in Task 9 ("after")."""
+import json, pathlib, shutil, subprocess, sys
+phase = sys.argv[1] if len(sys.argv) == 2 else ""
+if phase not in ("before", "after"): raise SystemExit("usage: measure.py before|after")
+root = pathlib.Path(".").resolve()
+out = root / "build/plan-3e-pairs" / phase
+if out.exists(): shutil.rmtree(out)
+(out / "renders").mkdir(parents=True)
+pairs = json.loads((root / "tools/visual/pairs.json").read_text(encoding="utf-8"))
+missing = [pair["name"] for pair in pairs if not (root / pair["render"]).exists()]
+if missing: raise SystemExit(f"renders missing for {missing}; run the render commands first")
+for render in sorted({pair["render"] for pair in pairs}):
+    target = out / "renders" / render; target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / render, target)
+result = subprocess.run([sys.executable, "-I", "tools/visual/compare_all.py", str(out / "compare")],
+                        capture_output=True, text=True, check=True)
+summaries = {}
+for line in result.stdout.splitlines():
+    name, _, summary = line.partition(": ")
+    summaries[name] = summary.split(" (note: ")[0]
+(out / "summaries.json").write_text(json.dumps(summaries, indent=2) + "\n", encoding="utf-8")
+print(f"{phase}: {len(summaries)} pairs measured")
+if phase == "after":
+    from PIL import Image, ImageChops
+    before_dir = root / "build/plan-3e-pairs/before"
+    before = json.loads((before_dir / "summaries.json").read_text(encoding="utf-8"))
+    changes = {}
+    for pair in pairs:
+        name, render = pair["name"], pair["render"]
+        old, new = before_dir / "renders" / render, out / "renders" / render
+        changed, where = False, ""
+        if old.read_bytes() != new.read_bytes():  # a pair changes when a pixel does (RGB; alpha alone hides it), not its bytes
+            with Image.open(old) as a, Image.open(new) as b:
+                box = None if a.size != b.size else ImageChops.difference(a.convert("RGB"), b.convert("RGB")).getbbox()
+                changed = a.size != b.size or box is not None
+                where = f"size {a.size} -> {b.size}" if a.size != b.size else f"pixels differ in {box}" if box else ""
+        changes[name] = {"changed": changed, "where": where, "before": before.get(name, ""), "after": summaries.get(name, "")}
+        print(f"{name}: {'CHANGED (' + where + ')' if changed else 'same'}; {changes[name]['before']} -> {changes[name]['after']}")
+    (out / "changes.json").write_text(json.dumps(changes, indent=2) + "\n", encoding="utf-8")
+PY
+python3 -I build/plan-3e-pairs/measure.py before
+```
+
+Expected: `before: N pairs measured`, N the number of entries in `pairs.json` (34 at `222969926`). `build/` is
+ignored by git; Task 9 Step 4 runs the same script with `after` (if `build/plan-3e-pairs/measure.py` is gone by then,
+write it again from this block, but never re-run `before`).
+
 ## Global Constraints
 
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
-- Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md); `packageDist`, `trainAotCache` and `-Pjasper.aot=true` are off limits. `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run.
+- Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md); `packageDist`, `trainAotCache` and `-Pjasper.aot=true` are off limits. `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run, as may the render tasks of the baseline and Task 9 (`themeSurfacePreview`, `settingsSurfacePreview`, `settings9bPreview`, `workspaceSurfacePreview`, `commandPalettePreview`), which set it too.
 - Work only in the worktree above on `claude/enterprise-default-look`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Scope is spec section 13 and the 12.2 bullet it names, both looks, with spec 19.2's banner lines for Snippets, Palette plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault. TFTP's login and a single offered protocol are already read-only fields (3b Task 3, Rulings 1): do not touch them. No SDK type, no jasper-ui file and no `Composition` branch changes here (the classic compositions are plans 9 and 10).
 - "Every action stays reachable" (spec 14.7): every entry of Remote's former SSH menu is in the Session or Transfer menu, File › Open File… is also a palette command, and nothing loses its shortcut. The Editor plugin's Open in Editor… keeps `cmd+o`; File › Open File… has no default binding on any platform.
 - The copy is exactly spec 13's: "Connect to SSH Host…" and the other menu entries keep their labels; "Share Folder…"; "Open File…" with the description "Open a file with the default editor"; "Vault: Locked", "Vault: Unlocked"; "Insert"; "General"; "No folder selected", "Choose…"; "Via host", "Jump host", "Reachable from", "Listen on", "Forward to".
-- Pixel rule: no file under `jasper-ui/` changes, so every file the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves the inputs unchanged). Of the reference pairs in `tools/visual/pairs.json`, exactly `fileserver-add` (the "Reachable from" label; the folder field drawn read-only), `host-add` ("Jump host"), `tunnel-new` ("Via host", "Listen on", "Forward to") and `workspace-palette` (a third recent row, so Most used starts one row lower) change, as section 13 asks; each keeps its mock and crop and gains a `note` (Task 9). Other default-look surfaces that change by design and have no pair: the menu bar (Session and Transfer instead of SSH; File gains Open File…), the Vault status item's text, the New File Server editor's FTP and writable states (the Notice), the Settings pages Command Palette, Desk Buddy, System Settings, Terminal, Cursor, Shell and generated plugin pages (a heading over their first card), and Project Index's page (ordered lists, the mono Location column). Everything else renders as before.
+- Pixel rule: no file under `jasper-ui/` changes, so every file the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves the inputs unchanged). The reference pairs in `tools/visual/pairs.json` are measured, not assumed: every pair's render and `compare_all.py` summary is recorded before Task 1 (Workspace) and again in Task 9 Step 4. Section 13 is expected to change `fileserver-add` (the "Reachable from" label; the folder field drawn read-only), `host-add` ("Jump host"), `tunnel-new` ("Via host", "Listen on", "Forward to") and `workspace-palette` (a third recent row, so Most used starts one row lower). Every pair whose render changes keeps its mock and crop and gains a `note` naming the change and its measured edge agreement before and after (Task 9 Step 5). Another pair may change only through one of the by-design surfaces listed next (the workspace renders draw the Vault status item, for example); it then gets a note too and a line among the deviations. Any other change stops the executor. Other default-look surfaces that change by design and have no pair: the menu bar (Session and Transfer instead of SSH; File gains Open File…), the Vault status item's text, the New File Server editor's FTP and writable states (the Notice), the Settings pages Command Palette, Desk Buddy, System Settings, Terminal, Cursor, Shell and generated plugin pages (a heading over their first card), and Project Index's page (ordered lists, the mono Location column). Everything else renders as before.
 - MVP rule (memory: no compat shims): `RemotePlugin.MENU` and the SSH top-level menu are removed outright, as are the host rows' text-area handling of `stringList` values; no alias, no migration.
 - SDK types appear in the app only inside `dev.jasper.app.plugins` (AGENTS.md); `dev.jasper.app.application` must not depend on `dev.jasper.app.files`, so the Open File chooser lives in `dev.jasper.app.windows` (`AuxiliaryWindows`). `verifyApplicationArchitecture` and `verifyPluginArchitecture` stay green.
 - Javadoc doclint fails the build on errors: the SDK, the testkit and jasper-app run `-Xdoclint:all`; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->` (write "item-N" rather than an angle-bracketed placeholder).
@@ -75,7 +134,8 @@ missing anchor, and record any anchor you had to re-quote in the status banner.
    `PluginPanelPageTest.aStringListHostRowIsTheGeneratedPagesOrderedList`.
 2. An ordered list's rows change underneath an event (a stale `item-9`, a move to a position past the end): nothing
    moves, nothing throws, no error shows. Task 7: the same two tests.
-3. File › Open File… cancelled: nothing opens and no error shows; the action is enabled and needs no shortcut. Task 2:
+3. File › Open File… cancelled: nothing opens and no error shows; the action is enabled, needs no shortcut and is also a
+   palette command (`open_file`, found by "open file"). Task 2:
    `ApplicationActionsTest.openFileAsksTheChooserAndOpensTheChosenFileAsACmdClickDoes`.
 4. Editing a saved server: its folder shows read-only, a cancelled Choose… keeps it, and typing into the field changes
    nothing (in the real host too, where the input is not editable). Task 5:
@@ -88,10 +148,14 @@ missing anchor, and record any anchor you had to re-quote in the status banner.
 ## Rulings
 
 Decisions where the spec is silent, each as "what — why — cost if wrong". Record them in `docs/STATUS.md` (Task 9).
+Ruling 4's chooser is not gap-filling: it interprets binding text (spec 11.7 and 13 say "the native file chooser" and
+"opens the native chooser"). It needs the user's confirmation, or a spec amendment line, before this plan merges; the
+STATUS entry and the status banner record it as a deviation awaiting that ruling.
 
-1. **The reference pairs are `tools/visual/pairs.json`'s entries whose renders this plan changes** (`fileserver-add`,
-   `host-add`, `tunnel-new`, `workspace-palette`); each keeps its theme-engine mock and crop and gains a `note` naming
-   the intended difference, which `compare_all.py` prints — the default look's references stay the theme-engine mocks
+1. **The reference pairs are `tools/visual/pairs.json`'s entries whose renders this plan changes, as measured** against
+   the baseline taken before Task 1 (expected: `fileserver-add`, `host-add`, `tunnel-new`, `workspace-palette`); each
+   keeps its theme-engine mock and crop and gains a `note` naming the intended difference and its edge agreement before
+   and after, which `compare_all.py` prints — the default look's references stay the theme-engine mocks
    (the Enterprise mocks show the classic look and are paired by plans 5 to 10, spec 16.1.4) — cost if wrong: a
    reviewer wanted new crops or new mocks; the notes say where to look.
 2. **Session and Transfer contents and order.** Session: Connect to SSH Host…, Toggle SSH hosts, Split with Same Host,
@@ -104,11 +168,13 @@ Decisions where the spec is silent, each as "what — why — cost if wrong". Re
    `dev.jasper.fileserver.share-folder`, the server icon, no default binding — spec 13 names that behaviour — cost: two
    entries with one effect, until a later plan makes Share Folder… pick the folder first.
 4. **File › Open File…** is `ActionId.OPEN_FILE` (`open_file`, "Open File…", `none` on both platforms, Global), placed
-   after New Window in File and offered as a palette command; its description is the action's tooltip. "The native
-   chooser" is the file chooser Jasper's host shows for plugins (`AuxiliaryWindows.choose`, `NativeShells.choosePaths`):
-   one existing local file, titled "Open File", starting in the active pane's folder. Before plugins start (no auxiliary
-   windows yet) the action opens nothing — the app has one chooser and every other file pick uses it — cost: swapping in
-   an AWT `FileDialog` is one method.
+   after New Window in File and offered as a palette command; its description is the action's tooltip.
+   **Deviation (spec 11.7 and 13, awaiting the user's ruling): "the native chooser" is read as Jasper's own chooser**,
+   the one its host shows for plugins (`AuxiliaryWindows.choose`, `NativeShells.choosePaths`, documented as "Jasper's
+   own chooser"), not a platform file dialog: one existing local file, titled "Open File", starting in the active pane's
+   folder. Every other file pick in the app uses it, and the app has no native file dialog. Before plugins start (no
+   auxiliary windows yet) the action opens nothing — cost if the user wants the platform dialog: swapping in an AWT
+   `FileDialog` in `AuxiliaryWindows.openFile` is one method, and the tests that script the chooser stay as they are.
 5. **Vault with no vault file keeps "Vault"**: it is neither locked nor unlocked, and the tooltip already says "No
    vault — click to create one"; the padlock icon stays — cost: one string.
 6. **Snippets' first verb keeps its id `paste`** (palette history and the `paste_run` sibling key on it) and the
@@ -199,7 +265,10 @@ Read at `222969926`; the later plans move lines but not these facts, except wher
     field with the hint "No folder selected" and a separate Choose… trailing button (`ServerEditor.java:399-401`), and
     an `Edited` of FOLDER sets the draft (`:170`). Folders are typed in `ServerEditorTest.java:53,81`,
     `ServerCompositionTest.java:48,70`, `ServerLifetimeTest.java:59`, `FileServerPluginTest.java:276`,
-    `StagedFileServerFormTest.java:91,95,96` and `SurfaceFixtures.java:25`.
+    `StagedFileServerFormTest.java:91,95,96`, `SurfaceFixtures.java:25` and `FileServerRenderEvidenceTest.java:98`
+    (`((JTextComponent) StagedVaultHost.named(editor.holder(), "server.folder.input")).setText(home.toString())`, then
+    Save and `await(editor::closed, "server saved")`, over `AppContractTest::headlessWindows` at `:54`, whose chooser
+    answers nothing).
 14. 3b: `Nodes.Notice(String id, ControlState state, Severity severity, String text)` is allowed as a form section, its
     text a non-blank sentence the presentation prefixes with the severity's word (3b Task 6, Rulings 2 and 5); the
     13-argument `Nodes.Field(…, boolean readOnly)` is focusable and never edited, and the fake drops an `Edited` sent to
@@ -421,8 +490,12 @@ PY
 Run: `./gradlew :jasper-plugin-remote:test :jasper-plugin-fileserver:test :jasper-app:test --tests dev.jasper.app.plugins.RemoteShortcutConfigTest --tests dev.jasper.app.plugins.AppContractTest --tests dev.jasper.app.workspace.WindowChromeContributionsTest --tests dev.jasper.app.appearance.ThemeMigrationCoverageTest verifyPluginArchitecture --continue`
 Expected: BUILD SUCCESSFUL.
 
-Run: `git grep -n 'remote\.menu\|RemotePlugin\.MENU' -- '*.java'`
-Expected: no output.
+Run: `git grep -n 'remote\.menu\|RemotePlugin\.MENU' -- '*/src/main/*.java'`
+Expected: no output (no production source names the SSH menu).
+
+Run: `git grep -n 'remote\.menu\|RemotePlugin\.MENU' -- '*/src/test/*.java'`
+Expected: exactly one line, the new test's `host.menu("top:dev.jasper.remote.menu")).as("no SSH menu any more")`
+assertion in `RemotePluginTest.java`.
 
 - [ ] **Step 5: Commit**
 
@@ -517,6 +590,11 @@ edit("jasper-app/src/test/java/dev/jasper/app/workspace/ApplicationActionsTest.j
             var labels = new ArrayList<String>();
             for (var child : fileMenu.getMenuComponents()) if (child instanceof JMenuItem item) labels.add(item.getText());
             assertThat(labels).containsSubsequence("New Window", "Open File…");
+            var command = ui.commands().find("open_file").orElseThrow();
+            assertThat(command.title()).as("spec 14.7: also a palette command").isEqualTo("Open File…");
+            assertThat(command.keywords()).contains("open file", "open", "editor", "browse");
+            assertThat(dev.jasper.app.commands.CommandSearch.find(ui.commands().entries(), "open file", List.of(), 5).stream()
+                .map(dev.jasper.app.commands.Command::id)).as("the palette finds it").contains("open_file");
             ui.invoke(ActionId.OPEN_FILE);
             assertThat(asked).singleElement().as("the chooser starts in the pane's folder").isEqualTo(Optional.ofNullable(ui.directory()));
             assertThat(opened).containsExactly(file + ":0");
@@ -1009,7 +1087,8 @@ fake's queued selection, and a scripted chooser in the staged host.
   `jasper-app/src/test/java/dev/jasper/app/plugins/StagedVaultHost.java:52,196`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/KitViewTestAccess.java:125`,
   `jasper-app/src/test/java/dev/jasper/app/appearance/SurfaceFixtures.java:25`,
-  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java:91,95,96`
+  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java:91,95,96`,
+  `jasper-app/src/test/java/dev/jasper/app/plugins/FileServerRenderEvidenceTest.java:54,98`
 
 **Interfaces:**
 - Consumes: 3b's `Nodes.Notice(String, ControlState, Severity, String)` and 13-argument `Nodes.Field(…, boolean readOnly)`.
@@ -1168,6 +1247,12 @@ edit(A + "plugins/StagedFileServerFormTest.java", [
      'chooseFolder(vault,form,root.resolve("home/very-long-synthetic-folder-path/with-many-segments/that-stays-in-the-input"));', 1),
     ('type(form,"server.folder.input",root.resolve("home").toString());captureServer("short"',
      'chooseFolder(vault,form,root.resolve("home"));captureServer("short"', 1)])
+# The render evidence saves a server too: its chooser answers the synthetic home, and Choose… sets the folder.
+edit(A + "plugins/FileServerRenderEvidenceTest.java", [
+    ("        var auxiliary = onEdtValue(AppContractTest::headlessWindows);\n",
+     "        var auxiliary = onEdtValue(() -> AppContractTest.headlessWindows((choice, cancellation) -> List.of(dev.jasper.app.files.Location.local(home))));\n", 1),
+    ('                    ((JTextComponent) StagedVaultHost.named(editor.holder(), "server.folder.input")).setText(home.toString());\n',
+     '                    ((javax.swing.AbstractButton) StagedVaultHost.named(editor.holder(), "server.folder.choose")).doClick(0);\n', 1)])
 PY
 ```
 
@@ -1221,8 +1306,8 @@ Run: `./gradlew :jasper-plugin-fileserver:test :jasper-app:test --tests 'dev.jas
 Expected: BUILD SUCCESSFUL. The staged form chooses its folders through the host's chooser and saves for real;
 `StagedFileServerFormTest` writes its captures under `jasper-app/build/theme-migration-evidence/fileserver-add/actual/`.
 
-Run: `git grep -n 'Edited(ServerEditor.FOLDER\|"server.folder.input",' -- '*.java'`
-Expected: no output.
+Run: `git grep -n 'Edited(ServerEditor.FOLDER\|server.folder.input")).setText\|"server.folder.input",' -- '*.java'`
+Expected: no output (no test types a folder any more, whichever helper it used).
 
 - [ ] **Step 5: Commit**
 
@@ -1861,9 +1946,10 @@ EOF
 ### Task 9: Documentation, spec banners, reference pairs, STATUS and the whole build
 
 The guides say what changed (spec 17, smallest edits); the six specifications spec 19.2 names gain their banner
-lines; the four reference pairs whose renders changed gain notes; the jasper-ui inputs are proven unchanged;
-`./gradlew check --continue` runs everything; `docs/STATUS.md` gains this plan's entry with the counts from the result
-XML; the plan's status banner records the execution.
+lines; the jasper-ui inputs are proven unchanged; `./gradlew check --continue` runs everything; every reference pair is
+measured against the baseline, and each whose render changed gains a note with its measured edge agreement;
+`docs/STATUS.md` gains this plan's entry with the counts from the result XML and the measured pairs; the plan's status
+banner records the execution.
 
 **Files:**
 - Modify: `docs/remote.md:42-43,171,234,288,299,301,307`, `docs/file-server.md:13`, `docs/credential-vault.md:43,96`,
@@ -1874,7 +1960,7 @@ XML; the plan's status banner records the execution.
   `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md:6`,
   `docs/superpowers/specs/2026-10-13-sdk-clipboard-and-tools-menu-design.md:4`,
   `docs/superpowers/specs/2026-09-22-jasper-vault-design.md:9`
-- Modify: `tools/visual/pairs.json` (four `note`s), `tools/visual/compare_all.py:4-7,36`, `tools/visual/README.md`
+- Modify: `tools/visual/pairs.json` (a `note` on each measured change), `tools/visual/compare_all.py:4-7,36`, `tools/visual/README.md`
 - Modify: `docs/STATUS.md:2` (a new entry at the top), `docs/superpowers/plans/2026-10-16-enterprise-3e-default-look.md:1` (the status banner)
 
 **Interfaces:**
@@ -1926,15 +2012,17 @@ edit("docs/editor.md", [
 edit("docs/plugin-authoring.md", [
     ("generated from your declarations: rows in declaration order, a\nheading wherever `section` changes,",
      "generated from your declarations: rows in declaration order, a\nheading wherever `section` changes (the page's name heads rows before the first one),", 1),
-    ("and so do `EditorHint.font` (the font family picker)",
-     "a `stringList` is an ordered list with an entry that adds a value, and so do `EditorHint.font` (the font family picker)", 1)])
+    # After 3b Task 10 the editor-hint sentence ends with EditorHint.technical(); the new sentence follows it unchanged.
+    ("`EditorHint.technical()` (SDK 0.18: a text field in the data face).",
+     "`EditorHint.technical()` (SDK 0.18: a text field in the data face). A `stringList` is an ordered list with an entry\n"
+     "below it that adds a value, on generated pages and in `host.row` rows alike.", 1)])
 edit("docs/plugin-ui.md", [("as New Tunnel's Via Host does.", "as New Tunnel's Via host does.", 1)])
 PY
 ```
 
-If an anchor stops the script because 3b or 3d changed the sentence (`docs/plugin-authoring.md`'s editor-hint
-sentence gains `EditorHint.technical()` in 3b Task 10), re-quote the current text and insert the same words; record it
-in the status banner.
+If an anchor stops the script because 3b or 3d changed a sentence differently from their plan text (the
+`docs/plugin-authoring.md` anchor is the end of the editor-hint sentence as 3b Task 10 leaves it), re-quote the current
+text and insert the same words, leaving the existing sentence as it is; record it in the status banner.
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.documentation.*'`
 Expected: BUILD SUCCESSFUL (links resolve and compiled examples are unchanged).
@@ -1974,28 +2062,14 @@ PY
 Expected: six lines ending in "amended". Read each banner once: the new paragraph sits right after the status
 paragraph (for the SDK clipboard design, after its Date and Branch lines).
 
-- [ ] **Step 3: The reference pairs' notes**
+- [ ] **Step 3: Let `compare_all.py` print a pair's note**
 
 Run from the worktree root:
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 3e Task 9 step 3: the four reference pairs whose renders spec 13 changes say so (Rulings 1)."""
-import json, pathlib
-path = pathlib.Path("tools/visual/pairs.json"); text = path.read_text(encoding="utf-8")
-pairs = json.loads(text)
-if json.dumps(pairs, indent=2) + "\n" != text: raise SystemExit("pairs.json does not round-trip; stop and inspect it")
-NOTES = {
-    "fileserver-add": "Spec 13 (plan 3e): the label \"Reachable from\" is sentence case and the folder is a read-only field; FTP and writable states show the Warning notice.",
-    "host-add": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case.",
-    "tunnel-new": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case.",
-    "workspace-palette": "Spec 13 (plan 3e): the empty query shows three recent rows, so Most used starts one row lower.",
-}
-seen = set()
-for pair in pairs:
-    if pair["name"] in NOTES: pair["note"] = NOTES[pair["name"]]; seen.add(pair["name"])
-if seen != set(NOTES): raise SystemExit(f"missing pairs: {sorted(set(NOTES) - seen)}")
-path.write_text(json.dumps(pairs, indent=2) + "\n", encoding="utf-8")
+"""Plan 3e Task 9 step 3: pairs.json entries may carry a note, which compare_all.py prints (Rulings 1)."""
+import pathlib
 def edit(name, old, new):
     p = pathlib.Path(name); t = p.read_text(encoding="utf-8")
     if t.count(old) != 1: raise SystemExit(f"{name}: expected 1 of {old!r}, found {t.count(old)}")
@@ -2006,14 +2080,12 @@ edit("tools/visual/compare_all.py", '        print(f"{pair[\'name\']}: {summary}
      '        note = f" (note: {pair[\'note\']})" if pair.get("note") else ""\n        print(f"{pair[\'name\']}: {summary}{note}")')
 edit("tools/visual/README.md", "- `compare_all.py OUT_DIR [FILTER]` runs every pair in `pairs.json` (mock path, content crop, render path\n  under `*/build/`).",
      "- `compare_all.py OUT_DIR [FILTER]` runs every pair in `pairs.json` (mock path, content crop, render path\n  under `*/build/`, and an optional `note` naming a deliberate difference, which it prints).")
-print("notes written:", sorted(seen))
+print("compare_all.py and README updated")
 PY
 ```
 
-Expected: `notes written: ['fileserver-add', 'host-add', 'tunnel-new', 'workspace-palette']`.
-
 Run: `python3 -I -c "import ast,sys; ast.parse(open('tools/visual/compare_all.py').read())" && git diff --stat -- tools/visual`
-Expected: no error; three files changed.
+Expected: no error; two files changed (`compare_all.py`, `README.md`).
 
 - [ ] **Step 4: Prove the pixel rule, run the whole build and read the counts**
 
@@ -2047,7 +2119,7 @@ print(f"{totals['tests']:,} tests, {totals['failures']} failures, {totals['error
 PY
 ```
 
-Expected: one line such as `10,7xx tests, 0 failures, 0 errors, 25 skipped`; Step 5 writes it into STATUS.
+Expected: one line such as `10,7xx tests, 0 failures, 0 errors, 25 skipped`; Step 6 writes it into STATUS.
 
 Then check source hygiene (AGENTS.md):
 
@@ -2063,24 +2135,94 @@ PY
 
 Expected: no output.
 
-- [ ] **Step 5: Write the STATUS entry and the status banner**
+Then measure every reference pair against the baseline taken before Task 1. `check` has just run the capture tests;
+the same render commands as the baseline's bring every render up to date. Run from the worktree root:
+
+```bash
+./gradlew :jasper-app:themeSurfacePreview :jasper-app:settingsSurfacePreview :jasper-app:settings9bPreview :jasper-app:workspaceSurfacePreview
+./gradlew :jasper-app:commandPalettePreview --args="$PWD/jasper-app/build/palette-surfaces --task9c"
+./gradlew :jasper-app:test --tests '*StagedAnchoredPickerTest' --tests '*VaultSheetRenderTest' --tests '*StagedAddHostTest' --tests '*StagedFileServerFormTest' --tests '*SessionsCompositionTest'
+python3 -I build/plan-3e-pairs/measure.py after
+```
+
+Expected: `after: N pairs measured` (the same N), then one line per pair, `same` or
+`CHANGED (pixels differ in (x0, y0, x1, y1))`, with its summary before and after; `build/plan-3e-pairs/after/changes.json` keeps them for Steps 5 and 6.
+`fileserver-add`, `host-add`, `tunnel-new` and `workspace-palette` should read CHANGED. Then:
+
+- For every other pair that reads CHANGED, open its two renders (`build/plan-3e-pairs/before/renders/<render>` and
+  `build/plan-3e-pairs/after/renders/<render>`) at the printed box. If the difference is one of the by-design surfaces
+  of the Global Constraints' pixel rule (the Vault status item's text, the Session and Transfer menus, File's Open
+  File…, a Settings page's new heading, the Notice, an ordered list, the read-only folder, a sentence-case label), give
+  the pair one sentence in Step 5's `EXTRA_NOTES` naming it and add one to Step 6's `DEVIATIONS`. Anything else is a defect:
+  stop and find its cause before going on.
+- If one of the four reads `same`, its section 13 change lies outside that render: delete it from Step 5's `NOTES`
+  and add a sentence saying so to Step 6's `DEVIATIONS`.
+
+- [ ] **Step 5: The reference pairs' notes, as measured**
+
+Run from the worktree root, with `EXTRA_NOTES` and `NOTES` as Step 4 left them:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 3e Task 9 step 5: each reference pair whose render changed names the change and its measured edge agreement."""
+import json, pathlib, re
+path = pathlib.Path("tools/visual/pairs.json"); text = path.read_text(encoding="utf-8")
+pairs = json.loads(text)
+if json.dumps(pairs, indent=2) + "\n" != text: raise SystemExit("pairs.json does not round-trip; stop and inspect it")
+changes = json.loads(pathlib.Path("build/plan-3e-pairs/after/changes.json").read_text(encoding="utf-8"))
+NOTES = {
+    "fileserver-add": "Spec 13 (plan 3e): the label \"Reachable from\" is sentence case and the folder is a read-only field; FTP and writable states show the Warning notice.",
+    "host-add": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case.",
+    "tunnel-new": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case.",
+    "workspace-palette": "Spec 13 (plan 3e): the empty query shows three recent rows, so Most used starts one row lower.",
+}
+EXTRA_NOTES = {}  # pair name -> "Spec 13 (plan 3e): <the by-design change Step 4 found in it>."
+NOTES.update(EXTRA_NOTES)
+changed = {name for name, change in changes.items() if change["changed"]}
+if changed != set(NOTES): raise SystemExit(f"changed but not noted: {sorted(changed - set(NOTES))}; noted but unchanged: {sorted(set(NOTES) - changed)}")
+def score(summary):
+    found = re.search(r"edge_agreement=([0-9.]+)", summary)
+    if not found: raise SystemExit(f"no edge agreement in {summary!r}")
+    return found.group(1)
+for pair in pairs:
+    if pair["name"] in NOTES:
+        change = changes[pair["name"]]
+        pair["note"] = f"{NOTES[pair['name']]} Edge agreement {score(change['before'])} before, {score(change['after'])} after."
+path.write_text(json.dumps(pairs, indent=2) + "\n", encoding="utf-8")
+print("notes written:", sorted(NOTES))
+PY
+```
+
+Expected: `notes written: [...]`, the pairs left in `NOTES` plus any `EXTRA_NOTES`. Run
+`python3 -I tools/visual/compare_all.py build/plan-3e-pairs/noted` and check that each noted pair's line ends with its
+note.
+
+- [ ] **Step 6: Write the STATUS entry and the status banner**
 
 Run from the worktree root, with `COUNTS` set to the line Step 4 printed and `DEVIATIONS` listing anything an earlier
 step told you to record (leave it empty when there is none):
 
 ```bash
 COUNTS='<the line Step 4 printed>' python3 -I - <<'PY'
-"""Plan 3e Task 9 step 5: the STATUS entry at the top and the plan's status banner."""
-import datetime, os, pathlib, subprocess
+"""Plan 3e Task 9 step 6: the STATUS entry at the top and the plan's status banner."""
+import datetime, json, os, pathlib, re, subprocess
 DEVIATIONS = []  # one sentence each, for example "Task 4: SettingsDialogTest read the first card directly; it now reads the Section's body."
 def git(*args): return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
 counts = os.environ["COUNTS"].strip()
 if not counts or counts.startswith("<"): raise SystemExit("set COUNTS to the line the count script printed")
 base = git("merge-base", "HEAD", "main")
-commits = git("log", "--reverse", "--format=%h", f"{base}..HEAD").split()
-first, last = commits[1], commits[-1]          # commits[0] is this plan's own commit
+# The plan's own commits (writing, review, re-anchoring) come first and vary in number: find Task 1's by its subject.
+TASK1 = "Session and Transfer take Remote's SSH menu and File Server's sharing"
+commits = [line.split(" ", 1) for line in git("log", "--reverse", "--format=%h %s", f"{base}..HEAD").splitlines()]
+starts = [sha for sha, subject in commits if subject == TASK1]
+if len(starts) != 1: raise SystemExit(f"expected one Task 1 commit ({TASK1!r}), found {len(starts)}")
+first, last = starts[0], commits[-1][0]
 date = datetime.date.today().isoformat()
 deviations = " ".join(DEVIATIONS) if DEVIATIONS else "none beyond the plan's Rulings"
+changes = json.loads(pathlib.Path("build/plan-3e-pairs/after/changes.json").read_text(encoding="utf-8"))
+def score(summary): return re.search(r"edge_agreement=([0-9.]+)", summary).group(1)
+measured = ", ".join(f"`{name}` {score(change['before'])} → {score(change['after'])}"
+                     for name, change in changes.items() if change["changed"])
 entry = f"""**Enterprise presentation, plan 3e: the default-look changes — {date}** (`claude/enterprise-default-look`, worktree
 `.claude/worktrees/enterprise-3e`, `{first}..{last}`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-3e-default-look.md),
@@ -2099,19 +2241,23 @@ and the testkit's fake. Project Index's Location column uses `MONO_SMALL`. Plugi
 host, Jump host, Reachable from, Listen on, Forward to). The palette's empty query shows three recent rows. The
 banners of the Snippets, Palette plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault
 specifications carry spec 19.2's lines. Pixels: no jasper-ui file changed, so the headless gallery is byte-identical;
-the reference pairs `fileserver-add`, `host-add`, `tunnel-new` and `workspace-palette` change as section 13 asks and
-carry a `note` in `tools/visual/pairs.json`. Rulings (plan, "Rulings"): the reference pairs keep their mocks and gain
-notes; Session and Transfer keep the SSH menu's order; Share Folder… runs what New File Server… runs; Open File… uses
-the plugins' file chooser and opens nothing before plugins start; "Vault" with no vault; the verb id stays `paste`;
+measured against renders taken before Task 1, the reference pairs whose renders changed, all as section 13 asks, are
+{measured} (edge agreement before → after), each with a `note` in `tools/visual/pairs.json`; every other pair's
+render is pixel-identical. Rulings (plan, "Rulings"): the reference pairs keep their mocks and gain
+notes; Session and Transfer keep the SSH menu's order; Share Folder… runs what New File Server… runs; Open File…
+opens nothing before plugins start; "Vault" with no vault; the verb id stays `paste`;
 one `SchemaPage` rule titles leading groups, plugin-built pages excepted; one Notice joins the warnings; the folder is
 set only through the chooser, in tests too; sentence case covers exactly the five labels, and jasper-ui fixtures keep
 their Title Case copies; the host list is `Editors.textList()`'s node; Location takes `MONO_SMALL`; `SUGGESTED_ROWS`
-stays 10; the banner lines follow each status paragraph. Deviations from the plan's text: {deviations}. Hand-offs:
+stays 10; the banner lines follow each status paragraph. Deviation from the spec (spec 11.7 and 13, awaiting the
+user's ruling): File › Open File… shows Jasper's own chooser, which every other file pick uses, for "the native
+chooser"; the app has no native file dialog (Rulings 4). Deviations from the plan's text: {deviations}. Hand-offs:
 plan 9's classic Settings compositions draw the new leading headings as titled group boxes; plan 10's classic File
 Servers table reuses Share Folder… for its empty state; plan 8's Browse… runs `ActionId.OPEN_FILE`.
 `./gradlew check --continue`: **{counts}**. GUI checks for the user: the menu bar reads File, Edit, View, Pane, Tab,
 Session, Transfer, Tools, … with no SSH menu, and every former SSH entry works from Session or Transfer; File › Open
-File… opens a chosen file in the default editor and Cancel opens nothing; the Vault status item reads Vault: Locked
+File… opens a chosen file in the default editor and Cancel opens nothing, and the user rules on Jasper's chooser
+there (Rulings 4); the Vault status item reads Vault: Locked
 and Vault: Unlocked as you lock and unlock; New File Server with FTP shows the Warning notice, and Choose… sets the
 read-only folder; Settings › Command Palette, Terminal and System Settings show their first headings; Settings › Tools
 › Project Index edits its lists as ordered lists; the palette's empty query shows three recent rows. Not merged, not
@@ -2125,19 +2271,21 @@ status.write_text(header + entry + text[len(header):], encoding="utf-8")
 plan = pathlib.Path("docs/superpowers/plans/2026-10-16-enterprise-3e-default-look.md"); body = plan.read_text(encoding="utf-8")
 title = "# Enterprise presentation 3e: the default-look changes Implementation Plan\n"
 if not body.startswith(title): raise SystemExit("plan: unexpected title")
-banner = f"\n> **Status:** executed {date} (`{first}..{last}`); deviations from the text: {deviations}; `./gradlew check --continue`: {counts}.\n"
+banner = (f"\n> **Status:** executed {date} (`{first}..{last}`). Deviation from the spec (spec 11.7 and 13, awaiting the user's "
+          f"ruling): File › Open File… shows Jasper's own chooser for \"the native chooser\" (Rulings 4). Deviations from the "
+          f"text: {deviations}; `./gradlew check --continue`: {counts}.\n")
 plan.write_text(title + banner + body[len(title):], encoding="utf-8")
 print("STATUS entry and banner written for", f"{first}..{last}")
 PY
 ```
 
 Expected: `STATUS entry and banner written for <first>..<last>`. Read the new entry once: it sits above the previous
-top entry (plan 3d's) and names the right range.
+top entry (plan 3d's), names the right range and lists the measured pairs.
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.documentation.*'`
 Expected: BUILD SUCCESSFUL (the STATUS entry's and the banners' links resolve).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add docs tools/visual
@@ -2148,8 +2296,9 @@ The Remote, File Server, Credential Vault, command palette, Editor and
 plugin guides name the Session and Transfer menus, Share Folder, Open
 File, the Vault status text, Insert, three recents, sentence-case labels
 and ordered-list host rows. The six specifications spec 19.2 names carry
-their amendment lines, the four reference pairs whose renders changed
-carry notes, and STATUS records plan 3e with the whole build's counts.
+their amendment lines, the reference pairs whose renders changed carry
+notes with their measured edge agreement, and STATUS records plan 3e
+with the whole build's counts.
 
 🤖 Generated with Claude Code at The Home Depot
 
