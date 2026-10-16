@@ -1,11 +1,13 @@
 import java.util.jar.JarFile
 
-plugins { `java-library` }
+plugins { `java-library`; `java-test-fixtures` }
 
 dependencies {
     implementation("com.formdev:flatlaf:3.7")
     implementation("com.formdev:flatlaf-extras:3.7")
     implementation("com.github.weisj:jsvg:2.0.0")
+    // The gallery and the kit fixtures, shared with jasper-app's tests (spec 16.1.3); never in the production jar.
+    testFixturesImplementation("com.formdev:flatlaf:3.7")
 }
 
 // Exercise the same logical geometry in a separately scaled Swing process.

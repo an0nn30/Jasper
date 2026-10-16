@@ -2,8 +2,11 @@ package dev.jasper.ui.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SemanticPalette;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class KitFixturesTest {
@@ -18,4 +21,50 @@ class KitFixturesTest {
             if (base.getAlpha() == 255) assertThat(custom.semantic().color(role)).as(role.key()).isNotEqualTo(base);
         }
     }
+
+    /** Spec 16.1.2's theme set: the shipped variants, then the converter goldens that have a UI variant. */
+    @Test void theThemeSetIsTheShippedVariantsThenTheConvertedOnes() {
+        assertThat(KitFixtures.themes()).extracting(theme -> theme.name() + (theme.dark() ? " Dark" : " Light")).containsExactly(
+            "Slate Cobalt Dark", "Slate Cobalt Light", "Catppuccin Latte Light", "Catppuccin Frappé Dark",
+            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ocean Dark", "Ocean Dawn Light", "Stray Dark");
+        assertThat(KitFixtures.themes().getFirst()).isSameAs(KitFixtures.dark());
+    }
+
+    /** Spec 16.1.2's eight degenerate palettes, each a Slate Cobalt variant with its terminal, editor and alpha kept. */
+    @Test void theDegeneratePalettesAreTheEightNamedOnes() {
+        var palettes = KitFixtures.degenerate();
+        assertThat(palettes).extracting(GeneratedTheme::name).containsExactly("Degenerate: one grey", "Degenerate: all black",
+            "Degenerate: all white", "Degenerate: accent on the surfaces", "Degenerate: maximum chroma",
+            "Degenerate: text on the surfaces", "Degenerate: borders on the surfaces", "Degenerate: light under the dark flag");
+        for (var role : SemanticColor.values()) {
+            assertThat(rgb(palettes.get(0).semantic(), role)).as("one grey " + role.key()).isEqualTo(0x808080);
+            assertThat(rgb(palettes.get(1).semantic(), role)).as("all black " + role.key()).isZero();
+            assertThat(rgb(palettes.get(2).semantic(), role)).as("all white " + role.key()).isEqualTo(0xFFFFFF);
+            assertThat(Set.of(0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00, 0xFF00FF, 0x00FFFF)).as("maximum chroma " + role.key())
+                .contains(rgb(palettes.get(4).semantic(), role));
+            assertThat(palettes.get(0).semantic().color(role).getAlpha()).as("alpha kept " + role.key())
+                .isEqualTo(KitFixtures.dark().semantic().color(role).getAlpha());
+        }
+        assertThat(KitFixtures.degenerate().get(4).semantic()).as("seeded").isEqualTo(palettes.get(4).semantic());
+        var accent = palettes.get(3).semantic();
+        int card = rgb(KitFixtures.light().semantic(), SemanticColor.SURFACE_CARD);
+        for (var role : new SemanticColor[] {SemanticColor.ACCENT, SemanticColor.SELECTION_BG, SemanticColor.SURFACE_APP, SemanticColor.SURFACE_INPUT})
+            assertThat(rgb(accent, role)).as("accent on the surfaces " + role.key()).isEqualTo(card);
+        assertThat(accent.color(SemanticColor.TEXT_PRIMARY)).isEqualTo(KitFixtures.light().semantic().color(SemanticColor.TEXT_PRIMARY));
+        var text = palettes.get(5).semantic();
+        for (var role : new SemanticColor[] {SemanticColor.TEXT_PRIMARY, SemanticColor.TEXT_ONACCENT, SemanticColor.STATUS_WARNING, SemanticColor.SURFACE_PANEL})
+            assertThat(rgb(text, role)).as("text on the surfaces " + role.key()).isEqualTo(card);
+        var borders = palettes.get(6).semantic();
+        for (var role : new SemanticColor[] {SemanticColor.BORDER_WINDOW, SemanticColor.BORDER_CONTROL, SemanticColor.BUTTON_SECONDARY_BORDER, SemanticColor.SURFACE_APP})
+            assertThat(rgb(borders, role)).as("borders on the surfaces " + role.key()).isEqualTo(card);
+        assertThat(borders.color(SemanticColor.ACCENT)).isEqualTo(KitFixtures.light().semantic().color(SemanticColor.ACCENT));
+        var flagged = palettes.get(7);
+        assertThat(flagged.dark()).isTrue();
+        assertThat(flagged.semantic()).isEqualTo(KitFixtures.light().semantic());
+        for (int i = 0; i < palettes.size(); i++)
+            assertThat(palettes.get(i).terminal()).as(palettes.get(i).name())
+                .isEqualTo((i < 3 || i == 4 ? KitFixtures.dark() : KitFixtures.light()).terminal());
+    }
+
+    private static int rgb(SemanticPalette palette, SemanticColor role) { return palette.color(role).getRGB() & 0xFFFFFF; }
 }

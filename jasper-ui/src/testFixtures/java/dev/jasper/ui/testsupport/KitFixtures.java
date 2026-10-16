@@ -39,6 +39,73 @@ public final class KitFixtures {
         return withSemantic(dark(), new SemanticPalette(values));
     }
 
+    /**
+     * The theme set every look is checked over (spec 16.1.2): Slate Cobalt Dark and Light, the four Catppuccin flavours and
+     * the converter goldens' UI variants (ocean, ocean-dawn, stray), in that order.
+     */
+    public static java.util.List<GeneratedTheme> themes() {
+        var themes = new java.util.ArrayList<GeneratedTheme>();
+        for (var theme : JasperTheme.builtIns())
+            for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) themes.add(theme.generated(dark));
+        var expected = java.nio.file.Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
+            .resolve("tools/themes/testdata/expected");
+        for (String id : java.util.List.of("ocean", "ocean-dawn", "stray")) {
+            try {
+                var theme = JasperTheme.parse(java.nio.file.Files.readString(expected.resolve(id + ".json")), id);
+                for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) themes.add(theme.generated(dark));
+            } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        }
+        return java.util.List.copyOf(themes);
+    }
+
+    /**
+     * Eight palettes no theme should have (spec 16.1.2), each Slate Cobalt's with its terminal, editor and syntax kept, and
+     * each role's alpha kept: every role one grey; all black; all white; the accent equal to the surfaces; maximum chroma,
+     * seeded; each text equal to its surface; each border equal to its surface; Light's colours under the dark flag. A
+     * name says which.
+     */
+    public static java.util.List<GeneratedTheme> degenerate() {
+        var grey = new java.awt.Color(0x808080);
+        var card = light().semantic().color(SemanticColor.SURFACE_CARD);
+        var chroma = java.util.List.of(new java.awt.Color(0xFF0000), new java.awt.Color(0x00FF00), new java.awt.Color(0x0000FF),
+            new java.awt.Color(0xFFFF00), new java.awt.Color(0xFF00FF), new java.awt.Color(0x00FFFF));
+        var seeded = new java.util.Random(0x5EEDL);
+        var maximum = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) maximum.put(role, chroma.get(seeded.nextInt(chroma.size())));
+        return java.util.List.of(
+            degenerate("one grey", dark(), role -> grey),
+            degenerate("all black", dark(), role -> java.awt.Color.BLACK),
+            degenerate("all white", dark(), role -> java.awt.Color.WHITE),
+            degenerate("accent on the surfaces", light(), role -> role.key().startsWith("surface.") || role == SemanticColor.ACCENT
+                || role == SemanticColor.ACCENT_HOVER || role == SemanticColor.SELECTION_BG || role == SemanticColor.BORDER_FOCUS
+                || role == SemanticColor.TAB_INDICATOR ? card : null),
+            degenerate("maximum chroma", dark(), maximum::get),
+            degenerate("text on the surfaces", light(), role -> role.key().startsWith("surface.") || role.key().startsWith("text.")
+                || role.key().startsWith("status.") ? card : null),
+            degenerate("borders on the surfaces", light(), role -> role.key().startsWith("surface.") || role.key().startsWith("border.")
+                || role == SemanticColor.BUTTON_SECONDARY_BG || role == SemanticColor.BUTTON_SECONDARY_BORDER ? card : null),
+            withName(withDark(light(), true), "Degenerate: light under the dark flag"));
+    }
+
+    /** {@code base} named for a degenerate palette, each role {@code colour}'s value with its own alpha, or kept when null. */
+    private static GeneratedTheme degenerate(String name, GeneratedTheme base,
+                                             java.util.function.Function<SemanticColor, java.awt.Color> colour) {
+        var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
+        for (var role : SemanticColor.values()) {
+            var own = base.semantic().color(role);
+            var replaced = colour.apply(role);
+            values.put(role, replaced == null ? own
+                : new java.awt.Color(replaced.getRed(), replaced.getGreen(), replaced.getBlue(), own.getAlpha()));
+        }
+        return withName(withSemantic(base, new SemanticPalette(values)), "Degenerate: " + name);
+    }
+
+    /** {@code base} named {@code name}. */
+    private static GeneratedTheme withName(GeneratedTheme base, String name) {
+        return new GeneratedTheme(name, base.dark(), base.author(), base.semantic(), base.terminal(), base.editor(), base.syntax(),
+            base.glass());
+    }
+
     /** {@code base} with its semantic palette replaced. */
     public static GeneratedTheme withSemantic(GeneratedTheme base, SemanticPalette palette) {
         return new GeneratedTheme(base.name(), base.dark(), base.author(), palette, base.terminal(), base.editor(), base.syntax(),
