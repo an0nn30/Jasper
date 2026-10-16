@@ -205,6 +205,9 @@ column of the crop (`MockMatch.bands`), as in plan 10a. The manager crop is the 
 | Unlock Vault body and footer | "1 - Unlock Vault (over Workstation).png" `1106,838,800,310` (400 × 155), x 14 | `0+114 #ECEDEF, 114+1 #C4C7CC, 115+40 #E6E7EA`; the focused field at x 394: `0+54 #ECEDEF, 54+2 #C9D7F2, 56+1 #2F65CA, 57+20 #FFFFFF, 77+1 #2F65CA, 78+2 #C9D7F2` (a headless render has no focus owner: not compared) |
 
 The sheet and overlay crops start under the dialog's 26 px header strip (plan 6), so they hold the form and its footer.
+The footer band (`surface.footer` under a `border.window` rule) is plan 6b's `Forms` band, which the host turns on with
+`KitView.dialogBand` for the dialogs it draws in their window; `ClassicVaultRenderTest.render` sets that flag and
+`hostTitled` as the host does, because the test's headless windows run no shell.
 
 | What | Value (logical px, ±1) |
 |---|---|
@@ -1373,10 +1376,17 @@ class ClassicVaultRenderTest {
     /**
      * The surface's kit view and everything below it in its holder, {@code width} by {@code height} logical pixels,
      * painted at 2x over {@code surface.dialog}: what the mock crops show under a title bar or a dialog's header strip.
+     * The headless windows run no shell, so a dialog's view first takes the flags the Enterprise host gives the dialogs it
+     * draws in their window (plan 6b's {@code NativeShells.inWindow}: {@code hostTitled} and {@code dialogBand}); the
+     * manager window's view keeps its own.
      */
     static BufferedImage render(AuxiliarySurface surface, int width, int height) {
         return onEdtValue(() -> {
             var holder = surface.holder();
+            if (surface.kind() != AuxiliarySurface.Kind.WINDOW) {
+                var content = StagedVaultHost.kitView(holder);
+                content.hostTitled(true); content.dialogBand(true);
+            }
             holder.setSize(width, height);
             for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(holder);
             var view = StagedVaultHost.kitView(holder);
@@ -2501,9 +2511,10 @@ Expected: PASS: `ClassicEditorsTest` (4), `EntryEditorTest` unchanged ("Password
 
 A sheet band other than the mock's is the form's height: `206` (Add Login) is the two groups' rows (30 apart, the
 classic `SHEET_SECTION_GAP` 12 between groups, `FORM_TOP` 12); `174` (Add SSH Key) one group of four rows. A footer other
-than 40 on `#E6E7EA` under a `#C4C7CC` rule is plan 6's classic dialog footer. If `render` finds the header strip inside
-the holder, it starts the crop below it (its `above`); if the footer is drawn outside the holder, render the surface plan 6
-names and record it in the banner. Fix the composition or a classic value, never the expected bands, and record the
+than 40 on `#E6E7EA` under a `#C4C7CC` rule is plan 6b's `Forms` band (`dialogBand`, `DIALOG_FOOTER_VERTICAL` and
+`FORM_SIDES`), which `render` turns on as `NativeShells.inWindow` does; a footer with no band means the flag did not reach
+the view. If `render` finds the header strip inside the holder, it starts the crop below it (its `above`); if the footer
+is drawn outside the holder, render the surface plan 6 names and record it in the banner. Fix the composition or a classic value, never the expected bands, and record the
 measured edge agreement of both sheets.
 
 - [ ] **Step 5: Commit**
