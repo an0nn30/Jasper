@@ -104,7 +104,8 @@ class PaletteScopesTest {
             try (var owner = owner(true)) {
                 install(owner);
                 var fake = new FakeScope();
-                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"));
+                fake.rows = List.of(PaletteRow.of("alpha", "Alpha"), PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"),
+                    PaletteRow.of("delta", "Delta"));
                 var quiet = new FakeScope() {
                     @Override public String id() { return "test.quiet"; }
                     @Override public String label() { return "Quiet"; }
@@ -113,7 +114,7 @@ class PaletteScopesTest {
                 owner.scopes().register(fake);
                 owner.scopes().register(quiet);
                 var palette = owner.commandPalette(); var card = palette.component();
-                for (String row : new String[] {"gamma", "gamma", "gamma", "beta", "alpha"}) {
+                for (String row : new String[] {"delta", "delta", "delta", "gamma", "beta", "alpha"}) {
                     palette.open("test.fake"); dev.jasper.app.palette.PaletteTestSupport.query(card).setText("");
                     PaletteTestSupport.selectRow(card, row); palette.enterPressed(0);
                 }
@@ -122,10 +123,11 @@ class PaletteScopesTest {
                 assertThat(palette.history().uses()).extracting(dev.jasper.app.commands.PaletteUse::scopeId).doesNotContain("test.quiet");
                 palette.toggle();
                 var entries = PaletteTestSupport.entries(card);
-                assertThat(entries.subList(0, 3)).containsExactly("# Recently used", "test.fake/alpha", "test.fake/beta");
-                assertThat(entries.subList(3, 5)).as("ranked by use, without repeating the recents").containsExactly("# Most used", "test.fake/gamma");
+                assertThat(entries.subList(0, 4)).as("spec 13: three recent rows")
+                    .containsExactly("# Recently used", "test.fake/alpha", "test.fake/beta", "test.fake/gamma");
+                assertThat(entries.subList(4, 6)).as("ranked by use, without repeating the recents").containsExactly("# Most used", "test.fake/delta");
                 assertThat(entries).noneMatch(entry -> entry.startsWith("test.quiet/"));
-                fake.rows = List.of(PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"));
+                fake.rows = List.of(PaletteRow.of("beta", "Beta"), PaletteRow.of("gamma", "Gamma"), PaletteRow.of("delta", "Delta"));
                 List.copyOf(fake.listeners).forEach(Runnable::run);
                 assertThat(PaletteTestSupport.entries(card)).as("a row that is gone drops out").doesNotContain("test.fake/alpha")
                     .containsSubsequence("# Recently used", "test.fake/beta", "test.fake/gamma");
