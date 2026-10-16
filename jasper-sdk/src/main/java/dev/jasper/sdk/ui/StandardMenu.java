@@ -1,6 +1,7 @@
 package dev.jasper.sdk.ui;
 
-/** The application's built-in menus; a plugin's entries form a section at the end of one. */
+/** The application's built-in menus; a plugin's entries form a section at the end of one. A presentation may show the
+ * PANE and TAB items in a Window menu. */
 public enum StandardMenu {
     /** The File menu. */
     FILE,

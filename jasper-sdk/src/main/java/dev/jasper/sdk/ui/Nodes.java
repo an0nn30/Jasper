@@ -13,12 +13,15 @@ public final class Nodes {
         String id();
         ControlState state();
     }
+    /** The MONO roles mark data values (hosts, ports, paths, commands), drawn in the data face. */
     public enum TextRole { PROMPT_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, SUPPORTING, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
     public enum Hue { BLUE, GREEN, AMBER, PURPLE, NEUTRAL, NONE }
     public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }
+    /** GHOST is a quiet button. */
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
+    /** EXCLUSIVE is a choice among two to four options, all of them visible. */
     public enum ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS }
     public enum CardKind { FORM, SETTINGS, MIXED }
     /** NONE keeps rows readable and scrollable but removes row selection, activation and the canvas focus stop.
@@ -26,10 +29,14 @@ public final class Nodes {
     public enum SelectionMode { NONE, SINGLE, MULTIPLE }
     /**
      * RESULTS is a one-line result list driven by an external field (a command palette): it never takes focus, the host
-     * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady.
+     * moves its selection, a left press activates a row, and fixed row and heading heights keep it steady. SINGLE,
+     * DOUBLE and COMPACT are density hints.
      */
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
-    /** WINDOW has exactly one full-bleed content section, no hero, and a shared pinned footer. */
+    /**
+     * PROMPT is a short, focused question (unlock, create) and PROMPT_COMPACT its compact form. WINDOW has exactly one
+     * full-bleed content section, no hero, and a shared pinned footer.
+     */
     public enum FormKind { PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
     /**
      * SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. ROUTE is a read-only
@@ -51,7 +58,7 @@ public final class Nodes {
      */
     public enum SplitKind { SIDEBAR_DETAIL, THREE_COLUMN, DOCUMENT }
     public enum CustomKind { EDITOR, TERMINAL, CHART, PREVIEW }
-    /** STANDARD reserves the scroll bar's width; OVERLAY shows a transient thumb over the rows only while scrolling. */
+    /** A hint: STANDARD reserves the scroll bar's width; OVERLAY shows a transient thumb over the rows only while scrolling. */
     public enum ScrollPolicy { STANDARD, OVERLAY }
 
     /**
@@ -103,7 +110,8 @@ public final class Nodes {
      * focus still shows, as a hairline in the focus colour inside the button's bounds.
      * CONTEXTUAL_EMBEDDED reserves the same mounted, focusable and accessible control, but paints it only while its
      * containing item row is selected, hovered or keyboard-active, or while the button itself is hovered/focused.
-     * Outside an item row it behaves like EMBEDDED. It never changes action dispatch or selection.
+     * Outside an item row it behaves like EMBEDDED. It never changes action dispatch or selection. HELP is a button that
+     * opens help; the default look draws it round.
      */
     public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED, HELP }
 
@@ -185,8 +193,9 @@ public final class Nodes {
      * How a field sits in its composition. STANDARD shows the kit label (a SEARCH field never does) over a filled input.
      * EMBEDDED leaves the visible label to the host's own arrangement (the label stays the accessible name). TRANSPARENT
      * is EMBEDDED on a host surface that is the field's backdrop: no input fill, the outline and focus ring kept.
-     * TECHNICAL uses standard geometry with the monospaced technical-value font.
-     * PLAIN_PATH keeps PATH semantics and Browse with no leading folder; other kinds reject it.
+     * TECHNICAL marks a data value (a host, port, path or command): standard geometry in the data face.
+     * PLAIN_PATH keeps PATH semantics and Browse with no leading folder; other kinds reject it. STEPPER and SLIDER
+     * (NUMBER only) are hints for how the number is offered.
      */
     public enum FieldPresentation { STANDARD, EMBEDDED, TRANSPARENT, TECHNICAL, PLAIN_PATH, STEPPER, SLIDER }
 
@@ -280,7 +289,7 @@ public final class Nodes {
         public ChoiceSearch(int pinned, String noMatches, Optional<String> entry) { this(pinned, noMatches, entry, ""); }
     }
 
-    /** The full form and inline picker share one renderer at two explicit densities. */
+    /** A hint: the full form and inline picker share one renderer at two densities. */
     public enum PickerDensity { DEFAULT, COMPACT }
     /**
      * Grant-free display metadata. Empty primary means the placeholder face. A PICKER's face is its whole control; a
@@ -338,10 +347,11 @@ public final class Nodes {
     }
 
     /**
-     * {@code tooltip} is the switch's literal tooltip (blank shows the label); a validation error still takes precedence.
-     * A {@code pending} switch shows its knob midway on the warning colour while the domain confirms a change (for
-     * example a tunnel starting); it stays operable and reports the opposite of {@code checked}, which is always the
-     * confirmed state.
+     * A boolean, drawn as a switch or a checkbox; {@code compact} is a size hint. {@code tooltip} is the control's literal
+     * tooltip (blank shows the label); a validation error still takes precedence. {@code pending} means a change is in
+     * flight while the domain confirms it (for example a tunnel starting): the control stays operable and reports the
+     * opposite of {@code checked}, which is always the confirmed state, and the default look shows the switch's knob
+     * midway on the warning colour.
      */
     public record Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip, boolean pending) implements Node {
         public Toggle {
@@ -350,7 +360,7 @@ public final class Nodes {
             ModelChecks.label(action, "action");
             Objects.requireNonNull(tooltip);
         }
-        /** A switch that is not pending. */
+        /** A toggle that is not pending. */
         public Toggle(String id, ControlState state, String label, boolean checked, String action, boolean compact, String tooltip) {
             this(id, state, label, checked, action, compact, tooltip, false);
         }
@@ -400,7 +410,7 @@ public final class Nodes {
         }
     }
 
-    /** {@code highlighted} marks a row matching the host's current search. */
+    /** {@code label} carries no colon: the presentation punctuates it. {@code highlighted} marks a row matching the host's current search. */
     public record FormRow(String id, ControlState state, String label, String caption, Node control, Optional<Node> trailing, boolean highlighted) implements Node {
         public FormRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
@@ -439,6 +449,7 @@ public final class Nodes {
         }
     }
 
+    /** With a {@link Card} as its body, a titled group. */
     public record Section(String id, ControlState state, String title, Node body) implements Node {
         public Section {
             ModelChecks.id(id); Objects.requireNonNull(state);
@@ -447,6 +458,7 @@ public final class Nodes {
         }
     }
 
+    /** Nothing to show yet, or a disconnected state. {@code icon} is drawn only by presentations that draw an icon tile. */
     public record Empty(String id, ControlState state, Node icon, String title, String description, List<Node> actions) implements Node {
         public Empty {
             ModelChecks.id(id); Objects.requireNonNull(state);

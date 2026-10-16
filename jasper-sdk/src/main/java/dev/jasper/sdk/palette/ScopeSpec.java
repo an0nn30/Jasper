@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * @param description      one line, shown as the tab's tooltip
  * @param placeholder      the query field's hint while this scope's tab is open
  * @param verbs            one to three verbs with distinct ids, bound to Enter, Cmd/Ctrl+Enter, Shift+Enter
- * @param monospaceRows    whether rows are painted in the terminal font (commands, paths)
+ * @param monospaceRows    whether rows are data values (commands, paths), drawn in the data face
  * @param icon             the tab icon
  * @param shortcutActionId one of the plugin's own actions: while the palette is open, that action's
  *                         shortcut switches to or dismisses this scope's tab instead of running the handler
@@ -52,7 +52,7 @@ public record ScopeSpec(String id, String label, String description, String plac
      * @param description      the tooltip line
      * @param placeholder      the query hint
      * @param verbs            the verbs
-     * @param monospaceRows    whether rows use the terminal font
+     * @param monospaceRows    whether rows are data values
      * @param icon             the tab icon
      * @param shortcutActionId the plugin's action whose shortcut reaches this scope
      * @param inAll            whether the All tab searches this scope
@@ -86,7 +86,7 @@ public record ScopeSpec(String id, String label, String description, String plac
     /**
      * Derives a value.
      *
-     * @param value whether rows use the terminal font
+     * @param value whether rows are data values
      * @return a copy with that setting
      */
     public ScopeSpec withMonospaceRows(boolean value) { return new ScopeSpec(id, label, description, placeholder, verbs, value, icon, shortcutActionId, inAll, inRecents); }

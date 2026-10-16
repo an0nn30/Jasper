@@ -13,7 +13,7 @@ import java.util.Objects;
  * @param modal whether the dialog blocks its owner; {@link WindowSurface#show()} then returns only after it closes
  */
 public record DialogSpec(String title, WindowOwner owner, boolean modal, Presentation presentation) {
-    /** Placement, independent of the form's content kind. */
+    /** Placement, independent of the form's content kind; a hint the presentation may place another way. */
     public enum Presentation {
         /** A native dialog centred over its owner, sized to its content; the user cannot resize it. */
         CENTERED,

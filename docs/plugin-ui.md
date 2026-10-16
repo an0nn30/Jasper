@@ -54,10 +54,18 @@ Inside cards:
 
 Controls: `Field` (TEXT, SEARCH, PORT, PATH with Browse, TEXTAREA, NUMBER with steppers or a slider), `Secret`
 (masked input with reveal, confirmation, read-only detail with copy), `Choice` (DROPDOWN, EXCLUSIVE for two to four
-visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS), `Toggle` (a switch; settings never use checkboxes),
+visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS), `Toggle` (a boolean, drawn as a switch or a checkbox),
 `Button` (one PRIMARY per surface, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), `MenuButton`, `Chip`, `StatusDot`,
 `Progress`, `Strength`, `Icon`, `Text` with a semantic `TextRole`, `ItemList`, `Table`, `Tree` and `Breadcrumbs`.
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).
+
+Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
+opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.
+`FormRow` labels carry no colon (the presentation punctuates), `Empty.icon` shows only where the presentation draws an
+icon tile, and `PanelHeader.detail` takes a count as digits. `DialogSpec.Presentation`, the list kinds' densities,
+`ScrollPolicy`, `PickerDensity`, `Toggle.compact` and STEPPER versus SLIDER are hints. `ScopeSpec.monospaceRows` and
+the MONO roles mean data values in the data face, not the terminal font. A menu from `Menus.create` goes where the
+presentation puts plugin menus, and the PANE and TAB items may appear in a Window menu.
 
 ### A grouped dialog
 
