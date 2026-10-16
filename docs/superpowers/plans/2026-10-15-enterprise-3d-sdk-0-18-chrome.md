@@ -24,45 +24,47 @@ drawn by `MacTitleBar` before the dialog title, the only dialog title the defaul
 **Spec:** [`docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md`](../specs/2026-10-15-jasper-enterprise-presentation-design.md)
 (sections 8.2 rows `StandardMenu.SESSION`, `TRANSFER`, `ToolbarItem.View`, `ScopeSpec.hue`, `ScopeSpec.itemNoun`,
 `PaletteVerb.role` and `DialogSpec.swatch`; 10.2's last paragraph; 10.3's toolbar-view rules; 10.8's swatch; 14.4's
-last line and 14.6; 15's two toolbar-view rows; 16.1.9; 17; 19.1 row 3d). Plans 1 and 2 are merged on `main`; plan 3a
-(SDK 0.18 renames) is merged before this plan executes, and so are plans 3b (controls) and 3c (tables), in that order.
+last line and 14.6; 15's two toolbar-view rows; 16.1.9; 17; 19.1 row 3d). Plans 1, 2 and 3a (SDK 0.18 renames) are merged on
+`main` (`deafed424`). Plan 3b (controls) executes in parallel in its own worktree and plan 3c (tables) later, so this
+plan uses no 3b or 3c API (Execution notes, R1); shared files are reconciled when the second of 3b and 3d merges.
 Moving Remote's SSH menu entries into Session and Transfer is plan 3e (section 13), not this plan; the palette draws
 `hue`, `itemNoun` and `role` only in plan 8's Run window.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-3d`, branch
-`claude/enterprise-sdk-0-18-chrome`, cut from `main` at `222969926`. Run every command from the worktree root, never in
-`~/projects/moray` itself. Line numbers below are from `222969926`; every edit quotes the exact text it replaces, in the
-form it has after plan 3a (where 3a changed it), and the edit scripts stop with a message when that text is not found
-the stated number of times. Plans 3b and 3c edit some of the same shared files (`PluginContractTest`, `ContractHarness`,
-the fake, `docs/plugin-ui.md`, `migration.csv`, `docs/STATUS.md`): if a script stops on an anchor, re-find the quoted
-text (it moves, it does not change) and re-run; never edit around a missing anchor.
+`claude/enterprise-sdk-0-18-chrome`, based on `main` at `deafed424` (plan 3a merged). Run every command from the
+worktree root, never in `~/projects/moray` itself. Line numbers below are from `deafed424`, re-verified on 2026-10-16;
+every edit quotes the exact text it replaces as it is at `deafed424`, and the edit scripts stop with a message when that
+text is not found the stated number of times. If a script stops on an anchor, re-find the quoted text (it moves, it
+does not change) and re-run; never edit around a missing anchor. Plan 3b, running in parallel, edits some of the same
+shared files (`PluginContractTest`, `KitView`, `docs/plugin-ui.md`, `docs/plugin-authoring.md`, `jasper-sdk/README.md`,
+`docs/STATUS.md`); this branch never takes 3b's commits, and the second of the two to merge reconciles them (Execution
+notes, R1 and R8).
 
 ## Before you start
 
-Bring the branch up to `main` and check that 3a, 3b and 3c are in it:
+Do not rebase or merge: the branch stays on its base. Check the base and that this plan needs nothing beyond 3a:
 
 ```bash
-git rebase main
+git status --short
+git merge-base HEAD main
 grep -c 'VERSION = "0.18.0"' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java
 grep -c 'record Separator(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java
-grep -c 'cellNodes' jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java
 ```
 
-Expected: the rebase replays only this plan's commit; each `grep -c` prints a number of at least 1 (3a's version, 3b's
-`Nodes.Separator`, 3c's `TableRow.cellNodes`). If any prints 0, stop: this plan needs 3a, 3b and 3c on `main`. Task 5
-uses 3b's `Nodes.Separator` directly. No task uses a 3c type; the 3c check holds because plan 3's parts run in sequence
-(spec 19.1: "1 to 11 in sequence", plan 3 delivered as 3a to 3e) and because Task 7's test-count base is `main` after
-3c.
+Expected: no output from `git status --short`; the merge base starts `deafed424` (if `main` has moved on, still work
+from this base and say so in the status banner); the version check prints 1 (3a's 0.18.0) and the `Separator` check
+prints 0 (3b is not on this branch, and no task needs it: Execution notes, R1). No task uses a 3b or 3c type, and
+Task 7's test-count base is this branch's base, `deafed424`.
 
 ## Global Constraints
 
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md). `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run.
-- Work only in the worktree above on `claude/enterprise-sdk-0-18-chrome`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
+- Work only in the worktree above on `claude/enterprise-sdk-0-18-chrome`, every command from its root; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push, merge or rebase, and never run a bare `git stash`.
 - Zero pixel change for every existing fixture: no metric, type, colour or layout of an existing control changes. None of this plan's additions is a `Nodes` node, so the jasper-ui gallery gains no fixture and **no gallery file may change**: every PNG and JSON file the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 4 checks it). A new code path paints only when a plugin asks for it (a toolbar view, a non-NONE swatch, a Session or Transfer entry).
 - The additions are exactly spec 8.2's rows for this plan, with spec 8.2's names and shapes: `StandardMenu.SESSION`, `TRANSFER`; `record View(ToolbarViewFactory factory) implements ToolbarItem` and `@FunctionalInterface interface ToolbarViewFactory { UiView create(WindowHandle window); }`; `ScopeSpec.hue` (`Nodes.Hue hue`) and `ScopeSpec.itemNoun` (`String itemNoun`); `PaletteVerb.role` (`Role role`, `enum Role { STANDARD, SPLIT }`); `DialogSpec.swatch` (`Nodes.Hue swatch`); app mirrors `PaletteScope.hue()`, `itemNoun()` and `PaletteVerb.role()` in `dev.jasper.app.palette`, translated in `dev.jasper.app.plugins`.
 - "Existing record constructors stay as conveniences with the new components at their empty values" (spec 8.2): `NONE`, `""` and `STANDARD`. SDK 0.18.0 is already the version (3a); every new member says `@since 0.18.0` or "(since 0.18.0)" and `JasperSdk.VERSION` does not change.
-- Toolbar view admission and lifetime are spec 10.3's: the root is an INLINE `Stack` of LABEL `Text`, `Choice` (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY `Button`, `MenuButton` and `Separator`; the factory runs once per window when the window's open event fires, never for the rehearsal; the view closes with its window or its registration; it never goes into the overflow menu and hides while the toolbar is too narrow for it; a factory that throws is contained (spec 15) and that window shows no view.
+- Toolbar view admission and lifetime are spec 10.3's: the root is an INLINE `Stack` of LABEL `Text`, `Choice` (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY `Button`, and `MenuButton`s (spec 10.3's `Separator` is admitted once plan 3b's `Nodes.Separator` exists: Execution notes, R1); the factory runs once per window when the window's open event fires, never for the rehearsal; the view closes with its window or its registration; it never goes into the overflow menu and hides while the toolbar is too narrow for it; a factory that throws is contained (spec 15) and that window shows no view.
 - SDK types appear in the app only inside `dev.jasper.app.plugins` (AGENTS.md); `dev.jasper.app.palette`, `contributions`, `workspace`, `windows` and `platform` use jasper-ui model values (`dev.jasper.ui.model.Nodes.Hue`). The SDK's new `palette` → `ui` edge must keep the SDK package graph acyclic (`verifySdkArchitecture`); `ui` never imports `palette`.
 - Javadoc doclint runs in `check`: the SDK and jasper-app with `-Xdoclint:all`, jasper-ui with `-Xdoclint:all,-missing`; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->`.
 - Every new candidate source under jasper-app, the SDK, the testkit or plugins gets its `docs/design/theme-engine/migration.csv` row in the same commit (`ThemeMigrationCoverageTest`); a CSV row has exactly eight comma-separated fields, so the disposition text uses semicolons, never commas. Edits to existing files use fully qualified names (`dev.jasper.sdk.ui.Nodes.Hue.GREEN`) instead of new imports, so no existing file becomes a new candidate.
@@ -97,11 +99,11 @@ uses 3b's `Nodes.Separator` directly. No task uses a 3c type; the 3c check holds
 
 ## Verified facts
 
-At `222969926` unless marked "after 3a".
+At `deafed424` (`main` after plan 3a), re-verified on 2026-10-16.
 
 1. `StandardMenu` is FILE, EDIT, VIEW, PANE, TAB, TOOLS, TOOLS documented as shown "only while a plugin has entries in
-   it, after Tab and before plugins' own menus" (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:4-20`);
-   3a changes only its line 3 class comment. The app maps it by name: `MenuTarget.Slot` is `{ FILE, EDIT, VIEW, PANE,
+   it, after Tab and before plugins' own menus" (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:5-21`);
+   3a changed only its class comment, now lines 3-4. The app maps it by name: `MenuTarget.Slot` is `{ FILE, EDIT, VIEW, PANE,
    TAB, TOOLS }` (`jasper-app/.../contributions/MenuTarget.java:17`) and `HostedUi.menus().standard` calls
    `MenuTarget.Slot.valueOf(menu.name())` (`HostedUi.java:241-245`); the fake keys a section by `menu.name()`
    (`FakeUi.java:214`).
@@ -110,7 +112,7 @@ At `222969926` unless marked "after 3a".
    (`WindowChrome.java:246-283`).
 3. `ToolbarItem` permits `Button` and `Dropdown` (`ToolbarItem.java:7`); `HostedUi.toolbar` translates both into
    `ToolbarEntry` and tracks the model registration (`HostedUi.java:224-238`); the fake validates and keeps the items
-   (`FakeUi.java:200-210`) and prints them in `FakePluginHost.toolbar()` (`FakePluginHost.java:530-548`); the app
+   (`FakeUi.java:200-210`) and prints them in `FakePluginHost.toolbar()` (`FakePluginHost.java:529-548`); the app
    harness prints `contributions.toolbar()` (`AppContractTest.java:229-245`).
 4. `ToolbarEntry` permits `Button` and `Dropdown` (`contributions/ToolbarEntry.java:7`). `Contributions.addToolbar`
    notifies listeners synchronously and removes by identity (`Contributions.java:90-99`); a window re-renders its
@@ -122,12 +124,12 @@ At `222969926` unless marked "after 3a".
    `TOOLBAR_BUTTON_TRIM` (`:48-51`): 30 − 6 = 24, the kit's `BUTTON_HEIGHT` and `FIELD_HEIGHT`
    (`jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv:35-36,372`).
 6. A window's open event is `TerminalEvent.WindowOpened`, published when `WindowContent.connectTerminals` creates its
-   `WindowTerminals` (`WindowContent.java:750-754`, `WindowTerminals.java:31`, `TerminalRegistry.java:32-36`).
-   `composeWindow` connects contributions (`JasperApplication.java:413`) before terminals (`:422`) and shows the window
-   at `:445`; the rehearsal window connects contributions but never terminals (`JasperApplication.java:808-829`).
+   `WindowTerminals` (`WindowContent.java:750-754`, `WindowTerminals.java:31`, `TerminalRegistry.java:31-36`).
+   `composeWindow` (`JasperApplication.java:396`) connects contributions (`:415`) before terminals (`:422`) and shows the
+   window at `:446`; the rehearsal window connects contributions (`:820`) but never terminals (`JasperApplication.java:808-829`).
    No pre-built window exists on `main` (`git grep -i prebuilt` finds none).
 7. A window lets go of its contributions with `owner.chrome().connect(null)` at the end of
-   `WindowContributions.close` (`WindowContributions.java:466`), which `WindowContent.close` calls (`:1407`).
+   `WindowContributions.close` (`WindowContributions.java:460`), which `WindowContent.close` calls (`:1407`).
 8. Plugins build views only with `UiKit.create` (`UiKit.java:10`); `HostedKit.requireOwned` rejects a foreign view
    (`HostedKit.java:66`); `HostedKitView.mount` refuses a second mount target (`HostedKitView.java:21`), and `update`
    applies `hostSpec` before the view changes, keeping the old tree when it throws (`:25`, `:34`); `close` is
@@ -136,13 +138,13 @@ At `222969926` unless marked "after 3a".
 9. `KitView.titleStrip` is an app-only flag (`KitView.java:319-330`) that `Menus` reads to draw an icon-only menu's
    indicator on the borderless control surface (`jasper-ui/.../swing/Menus.java:234-235`); `AuxiliarySurface` sets it
    on kit title actions (`AuxiliarySurface.java:61`). A `KitView` is not opaque and paints no surface unless asked
-   (`KitView.java:46`, `:139-148`). Kit buttons emit `Action(node.action())` on click (`Buttons.java:58-62`), and kit
+   (`KitView.java:47`, `:331-332`). Kit buttons emit `Action(node.action())` on click (`Buttons.java:58-62`), and kit
    components are named by node id (`WorkspaceContentRouteTest.named`, `WorkspaceContentRouteTest.java:26-31`).
 10. The SDK `ui` package already depends on `terminal` (`ActionContext.java:3-4`, `ui/package-info.java:4`), so
     `ToolbarViewFactory` may take a `WindowHandle`; `palette` depends on `sdk` and `terminal` only
     (`palette/package-info.java:5`) and nothing in `ui` imports `palette`, so `palette` → `ui` stays acyclic;
     `verifySdkArchitecture` checks only that and JDK-only types (`gradle/sdk-architecture.gradle.kts:39-55`).
-11. `ScopeSpec` is a 10-component record with a 9-argument 0.9.1 constructor, `of` and seven derivers
+11. `ScopeSpec` is a 10-component record with a 9-argument 0.9.1 constructor, `of` and six derivers
     (`ScopeSpec.java:28-127`); after 3a its `monospaceRows` docs read "whether rows are data values". SDK `PaletteVerb`
     is `(id, label)` (`PaletteVerb.java:10-16`); app `PaletteVerb` is `(id, label)` (`app/palette/PaletteVerb.java:4-9`);
     app `PaletteScope` has defaults for icon, description, monospace rows, All and recents (`PaletteScope.java:14-60`);
@@ -157,9 +159,10 @@ At `222969926` unless marked "after 3a".
 14. `DialogSpec` is `(title, owner, modal, presentation)` with a 3-argument convenience (`DialogSpec.java:15-41`); after
     3a its `Presentation` comment ends "a hint the presentation may place another way". `HostedUi.dialog` builds an
     `AuxiliarySurface` and sets `attachedSheet` from the presentation (`HostedUi.java:720-750`, the line at `:742`);
-    `NativeShells.installTitleBar` gives a dialog `MacTitleBar.Style.DIALOG` and its title (`NativeShells.java:346-349`);
-    `MacTitleBar` shows its title label only for WINDOW and DIALOG (`MacTitleBar.java:169-174`) and colours it through
-    `ThemeZone.color` (`:297-302`). The modal overlay draws no title (`ModalOverlay.java:28-37`); an attached sheet is
+    `NativeShells.installTitleBar` (`NativeShells.java:331`) gives a dialog `MacTitleBar.Style.DIALOG` (`:346`) and its
+    title (`:350`);
+    `MacTitleBar` shows its title label only for WINDOW and DIALOG (`MacTitleBar.java:172`) and colours it through
+    `ThemeZone.color` (`:298-300`). The modal overlay draws no title (`ModalOverlay.java:28-37`); an attached sheet is
     undecorated (`NativeShells.java:212-218`); off macOS there is no `MacTitleBar` (`MacTitleBar.java:69`, `:72-74`).
     The fake keeps a dialog's presentation (`FakeUi.java:276`, `:565-566`) and answers `dialogPresentation`
     (`FakePluginHost.java:1069-1074`).
@@ -174,7 +177,7 @@ At `222969926` unless marked "after 3a".
     (`FileServerScope.java:41-44`). Each plugin's tests already print its scopes with `host.scopes()`.
 18. `ThemeMigrationCoverageTest` makes a file a candidate when it imports Swing, AWT, FlatLaf, `dev.jasper.sdk.ui` or
     `dev.jasper.ui`, or names `new J…` or `new …View` and the like (`ThemeMigrationCoverageTest.java:17-18`), under
-    jasper-app, the SDK, the testkit and plugins (`:62-67`); jasper-ui is not scanned.
+    jasper-app, the SDK, the testkit and plugins (`:61-66`); jasper-ui is not scanned.
 19. `KitFixtures.context()` and `render(view, w, h, scale)` give jasper-ui tests a headless kit
     (`jasper-ui/src/testFixtures/.../KitFixtures.java:196-233`); `NativeShellsChromeTest` builds a title bar headlessly
     with `NativeShells.installTitleBar(root, surface, true)` (`NativeShellsChromeTest.java:33-52`).
@@ -234,7 +237,7 @@ has entries in them, after Tab and before Tools, exactly as Tools does today (sp
 name; the fake already keys sections by name.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:15-19`
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java:16-20`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/contributions/MenuTarget.java:17`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java:253-272`
 - Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/ContractHarness.java:48-53` (doc), `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakePluginHost.java:550-555` (doc)
@@ -1096,7 +1099,7 @@ title row, the only dialog title the default look draws itself (ruling 6). The f
 
 **Files:**
 - Modify (whole file): `jasper-sdk/src/main/java/dev/jasper/sdk/ui/DialogSpec.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/AuxiliarySurface.java:77-80`, `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:742`, `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java:349`, `jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java:145-150`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/AuxiliarySurface.java:79-82`, `jasper-app/src/main/java/dev/jasper/app/plugins/HostedUi.java:742`, `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java:350`, `jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBar.java:145-150`
 - Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeUi.java:276,566`, `FakePluginHost.java` (after `dialogPresentation`), `ContractHarness.java` (after `windows()`), `FakeContractTest.java`, `AppContractTest.java` (after `windows()`)
 - Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/PanelAndWindowValuesTest.java` (one test), `jasper-app/src/test/java/dev/jasper/app/windows/NativeShellsChromeTest.java` (one test), `PluginContractTest.java` (one test)
 
@@ -1467,6 +1470,17 @@ too narrow hides it instead of moving it into the overflow menu. No SDK change: 
   harness calls `View.factory()` and `Mounted.close()`.
 
 - [ ] **Step 1: Write the failing tests**
+
+First, before any Task 4 edit, record the gallery baseline in this worktree. Tasks 1 to 3 change nothing under
+`jasper-ui`, and the gallery runs on jasper-ui's test classpath only, so this is the base's gallery (Execution notes, R6):
+
+```bash
+for theme in dark light; do
+  rm -rf jasper-ui/build/gallery/$theme-1x jasper-ui/build/plan3d-gallery-base/$theme-1x
+  ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme
+  mkdir -p jasper-ui/build/plan3d-gallery-base && cp -R jasper-ui/build/gallery/$theme-1x jasper-ui/build/plan3d-gallery-base/$theme-1x
+done
+```
 
 Create `jasper-ui/src/test/java/dev/jasper/ui/swing/KitViewToolbarStripTest.java`:
 
@@ -2105,11 +2119,12 @@ edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java", [
         contributedToolbar.forEach(toolbar::remove);
         contributedToolbar.clear();
         List<ToolbarEntry> entries = contributions == null ? List.of() : contributions.model().toolbar();
-        var live = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ToolbarEntry.View, Boolean>());
-        for (ToolbarEntry entry : entries) if (entry instanceof ToolbarEntry.View view) live.add(view);
+        // Not "live": the Dropdown case below declares its own local of that name.
+        var liveViews = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ToolbarEntry.View, Boolean>());
+        for (ToolbarEntry entry : entries) if (entry instanceof ToolbarEntry.View view) liveViews.add(view);
         for (var built = views.entrySet().iterator(); built.hasNext(); ) {
             var next = built.next();
-            if (live.contains(next.getKey())) continue;
+            if (liveViews.contains(next.getKey())) continue;
             if (next.getValue() != null) next.getValue().close();
             built.remove();
         }
@@ -2173,16 +2188,14 @@ Expected: BUILD SUCCESSFUL. Both `KitViewToolbarStripTest` cases, the two new `W
 `WindowHeaderTest`, `WindowChromeContributionsTest`, `MacTitleBarTest`, `ViewModeChromeTest`) passes unchanged, since a
 row without views lays out exactly as before.
 
-Then check that nothing painted changed: render the headless gallery here and at the base and compare:
+Then check that nothing painted changed: render the headless gallery again and compare it with Step 1's baseline:
 
 ```bash
-B=$(mktemp -d) && git worktree add --detach "$B/base" "$(git merge-base HEAD main)"
 for theme in dark light; do
-  (cd "$B/base" && ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R jasper-ui/build/gallery/$theme-1x "$B/base-$theme")
-  ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R jasper-ui/build/gallery/$theme-1x "$B/new-$theme"
-  diff -r "$B/base-$theme" "$B/new-$theme" && echo "$theme: identical"
+  rm -rf jasper-ui/build/gallery/$theme-1x
+  ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme
+  diff -r jasper-ui/build/plan3d-gallery-base/$theme-1x jasper-ui/build/gallery/$theme-1x && echo "$theme: identical"
 done
-git worktree remove --force "$B/base"
 ```
 
 Expected: `dark: identical` and `light: identical`, with no `diff` output.
@@ -2232,8 +2245,8 @@ cover admission refusals, one view per window, closing with the window and the r
 
 **Interfaces:**
 - Consumes: Task 4's `ToolbarEntry.View(Function<UUID, Optional<ToolbarEntry.Mounted>>)`,
-  `ToolbarEntry.Mounted(JComponent, Runnable)` and its `close()`; plan 3b's `Nodes.Separator(String id, ControlState state)`
-  (both `ToolbarViewAdmission` switches and the `ToolbarItem.View` javadoc's `{@link Nodes.Separator}`).
+  `ToolbarEntry.Mounted(JComponent, Runnable)` and its `close()`. No 3b type: `Nodes.Separator` joins both admission
+  switches when 3b and 3d are reconciled (Execution notes, R1).
 - Produces: `dev.jasper.sdk.ui.ToolbarViewFactory` (`UiView create(WindowHandle window)`), `ToolbarItem.View(ToolbarViewFactory factory)`,
   `ToolbarItem.view(ToolbarViewFactory)`; `FakePluginHost.toolbarViews(UUID windowId)` (`List<FakeKitView>`) and
   `closeToolbarViews(UUID windowId)`; harness `openToolbarViews(UUID)` (`List<String>` of root ids),
@@ -2311,7 +2324,7 @@ r'''    /** A toolbar view tree the toolbar admits: a label, a host choice and a
         h.ui(() -> assertThatIllegalStateException().as("and with its registration").isThrownBy(() -> made.get(1).spec()));
     }
 
-    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button, menu buttons and separators. */
+    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button and menu buttons. */
     @Test void aToolbarViewHoldsOnlyAnInlineStackOfAdmittedControls() {
         var ready = dev.jasper.sdk.ui.ControlState.READY;
         List<dev.jasper.sdk.ui.UiView> refused = Collections.synchronizedList(new ArrayList<>());
@@ -2446,9 +2459,8 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
      * A small group of the plugin's own controls, one per window, such as a session choice with a Connect button. The
      * factory runs when a window opens, never for a window nobody sees, and the view closes with its window or with this
      * registration. Its root is an INLINE {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or
-     * PICKER {@link Nodes.Choice}s, at most one PRIMARY {@link Nodes.Button}, {@link Nodes.MenuButton}s and
-     * {@link Nodes.Separator}s: the host refuses any other tree, naming the node, when it mounts the view and on every
-     * {@link UiView#update}. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
+     * PICKER {@link Nodes.Choice}s, at most one PRIMARY {@link Nodes.Button} and {@link Nodes.MenuButton}s: the host
+     * refuses any other tree, naming the node, when it mounts the view and on every {@link UiView#update}. A view never moves into the overflow menu: it hides while the toolbar is too narrow for it.
      *
      * @param factory builds one window's view
      * @since 0.18.0
@@ -2499,8 +2511,7 @@ import dev.jasper.sdk.ui.ViewSpec;
 
 /**
  * What a toolbar view may hold (spec 10.3): an INLINE stack of LABEL text, DROPDOWN, SEARCHABLE or PICKER choices, at
- * most one PRIMARY button, menu buttons and separators. The testkit keeps the same rule; the shared contracts check
- * both.
+ * most one PRIMARY button and menu buttons. The testkit keeps the same rule; the shared contracts check both.
  */
 final class ToolbarViewAdmission {
     private ToolbarViewAdmission() { }
@@ -2517,7 +2528,6 @@ final class ToolbarViewAdmission {
                     || choice.kind() == Nodes.ChoiceKind.PICKER;
                 case Nodes.Button button -> button.kind() == Nodes.ButtonKind.PRIMARY;
                 case Nodes.MenuButton ignored -> true;
-                case Nodes.Separator ignored -> true;
                 default -> false;
             };
             if (!admitted) throw new IllegalArgumentException("A toolbar view does not admit " + describe(child));
@@ -2549,7 +2559,7 @@ import dev.jasper.sdk.ui.ViewSpec;
 
 /**
  * The fake's copy of the host's toolbar view rule (spec 10.3): an INLINE stack of LABEL text, DROPDOWN, SEARCHABLE or
- * PICKER choices, at most one PRIMARY button, menu buttons and separators. The shared contracts keep the two in step.
+ * PICKER choices, at most one PRIMARY button and menu buttons. The shared contracts keep the two in step.
  */
 final class ToolbarViewAdmission {
     private ToolbarViewAdmission() { }
@@ -2566,7 +2576,6 @@ final class ToolbarViewAdmission {
                     || choice.kind() == Nodes.ChoiceKind.PICKER;
                 case Nodes.Button button -> button.kind() == Nodes.ButtonKind.PRIMARY;
                 case Nodes.MenuButton ignored -> true;
-                case Nodes.Separator ignored -> true;
                 default -> false;
             };
             if (!admitted) throw new IllegalArgumentException("A toolbar view does not admit " + describe(child));
@@ -2939,8 +2948,8 @@ SDK 0.18: toolbar views
 ToolbarItem gains View, a ToolbarViewFactory the host asks once per
 window when the window opens. HostedUi contains each call, mounts the
 plugin's view on that window's toolbar and admits its tree: an INLINE
-stack of labels, choices, at most one PRIMARY button, menu buttons and
-separators, at mount and on every update, naming any refused node. The
+stack of labels, choices, at most one PRIMARY button and menu buttons,
+at mount and on every update, naming any refused node. The
 registration's close, and the window's, close the view. The fake builds
 views the same way (FakePluginHost.toolbarViews) and the shared contracts
 cover admission, lifetime and event routing in both runtimes.
@@ -3132,7 +3141,7 @@ vocabulary, the SDK README's package table), `docs/app-maintenance.md` records t
 `docs/STATUS.md` records the plan. The whole build runs and its counts are recorded.
 
 **Files:**
-- Modify: `docs/plugin-authoring.md:122-124` (the Tools bullet and two bullets after it), `docs/plugin-authoring.md:401` (one paragraph), `docs/plugin-authoring.md:638-639,659,1010-1011` (the fake's new helpers), `docs/plugin-ui.md:175` (two bullets), `jasper-sdk/README.md:21`, `docs/app-maintenance.md:522-524`
+- Modify: `docs/plugin-authoring.md:123-125` (the Tools bullet and two bullets after it), `docs/plugin-authoring.md:401` (one paragraph), `docs/plugin-authoring.md:639,660,1012-1013` (the fake's new helpers), `docs/plugin-ui.md:183` (two bullets), `jasper-sdk/README.md:21`, `docs/app-maintenance.md:523`
 - Modify: `docs/STATUS.md:2` (a new entry above the previous top entry), `docs/superpowers/plans/2026-10-15-enterprise-3d-sdk-0-18-chrome.md:1` (the status banner)
 
 **Interfaces:**
@@ -3162,8 +3171,8 @@ edit("docs/plugin-authoring.md", [
      "- **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group\n"
      "  of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your\n"
      "  registration. Its root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one\n"
-     "  PRIMARY `Button`, `MenuButton`s and `Separator`s; the host refuses any other tree, naming the node, when it mounts\n"
-     "  the view and on every `update`. A view never moves into the overflow menu: it hides while the toolbar is too narrow.\n"
+     "  PRIMARY `Button` and `MenuButton`s; the host refuses any other tree, naming the node, when it mounts the view and\n"
+     "  on every `update`. A view never moves into the overflow menu: it hides while the toolbar is too narrow.\n"
      "- **Status items** are global: one handle updates the item in every window.\n", 1),
     ("row, no step or nothing done, and the palette keeps working.\n",
      "row, no step or nothing done, and the palette keeps working.\n\n"
@@ -3178,14 +3187,14 @@ edit("docs/plugin-authoring.md", [
     ("drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`\n",
      "drive a contributed scope as the palette would, and `scopePresentation(scopeId)` reports its hue, item noun and\n"
      "verb roles as `HUE|noun|ROLE,ROLE`; `paletteOpens()`, `openedInEditor()`\n", 1),
-    # 3a moved this range to 0.18's.
-    ("`sdk = \">=0.18.0, <0.19\"` or later to use it.\n",
-     "`sdk = \">=0.18.0, <0.19\"` or later to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports\n"
-     "the swatch an open dialog asked for.\n", 1)])
+    # 3a moved this range to 0.18's and dropped "or later"; the line ends the dialogPresentation paragraph.
+    ("`sdk = \">=0.18.0, <0.19\"` to use it.\n",
+     "`sdk = \">=0.18.0, <0.19\"` to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports the swatch\n"
+     "an open dialog asked for.\n", 1)])
 edit("docs/plugin-ui.md", [(
     "- **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a\n",
-    "- **Toolbar views.** An INLINE `Stack` of LABEL `Text`, choices, one PRIMARY `Button`, `MenuButton`s and `Separator`s,\n"
-    "  placed in the main toolbar with `ToolbarItem.view` (see [actions](plugin-authoring.md#actions-and-where-they-appear)).\n"
+    "- **Toolbar views.** An INLINE `Stack` of LABEL `Text`, choices, one PRIMARY `Button` and `MenuButton`s, placed in\n"
+    "  the main toolbar with `ToolbarItem.view` (see [actions](plugin-authoring.md#actions-and-where-they-appear)).\n"
     "- **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the\n"
     "  title (the macOS window title row); `Hue.NONE`, the default, draws none.\n"
     "- **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a\n", 1)])
@@ -3220,7 +3229,8 @@ print(f"{totals[0]:,} tests, {totals[1]} failures, {totals[2]} errors, {totals[3
 PY
 ```
 
-Expected: 0 failures, 0 errors, and 30 more tests than the base (`main` after 3c), with its skipped count unchanged:
+Expected: 0 failures, 0 errors, and 30 more tests than the base (`deafed424`, `main` after 3a; neither 3b nor 3c is on
+this branch), with its skipped count unchanged:
 Task 1's contract (2 runs) and workspace test (3), Task 2's two SDK, one registry, one translation and one contract
 (2 runs) tests (6), Task 3's SDK, title-row and contract (2 runs) tests (4), Task 4's two strip, two row and five
 window tests (9), Task 5's SDK test and three contracts (2 runs each) (7), and Task 6's Commands scope test (1). Then
@@ -3244,7 +3254,8 @@ builds its view once when its open event fires (`WindowChrome.windowOpened`, fro
 never the warm-up rehearsal's window), closes it with the window or the registration, shows a kit view as a toolbar
 strip (`KitView.toolbarStrip`) at its preferred size, and hides it rather than moving it into the overflow menu when
 the row is too narrow. `ToolbarViewAdmission` (host and testkit) admits an INLINE stack of LABEL text, DROPDOWN,
-SEARCHABLE or PICKER choices, one PRIMARY button, menu buttons and separators, at mount and on every update.
+SEARCHABLE or PICKER choices, one PRIMARY button and menu buttons, at mount and on every update (separators join
+when plan 3b's `Nodes.Separator` is reconciled with this plan).
 `ScopeSpec.hue` and `itemNoun` and `PaletteVerb.role` (STANDARD or SPLIT: at most one, never the first verb) are
 validated by the SDK and the app registry and mirrored as `PaletteScope.hue()`, `itemNoun()` and `PaletteVerb.role()`
 with effective values (a scope's NONE becomes its manifest `icon_hue` through the new `HostedPlugin.iconHue`; a blank
@@ -3275,7 +3286,7 @@ blank line:
 ```markdown
 > **Status (DATE): executed on `claude/enterprise-sdk-0-18-chrome` (`FIRST..LAST`).** Deviation from the spec,
 > awaiting the user's approval: ruling 1 (toolbar view admission at mount and on update, not at registration; spec
-> 10.3 and 15). Deviations from this plan's text: none beyond its "Rulings".
+> 10.3 and 15). Deviations from this plan's text: none beyond its "Rulings" and its "Execution notes (2026-10-16)".
 ```
 
 replacing `FIRST..LAST` and `DATE` the same way, and naming any step whose text had to change instead of "none" (and the same in
@@ -3300,3 +3311,60 @@ STATUS records plan 3d with its rulings and its deviation.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-16)
+
+Pre-flight for execution on `claude/enterprise-sdk-0-18-chrome` at `deafed424` (`main` after plan 3a). Plan 3b
+(controls) executes in parallel in `.claude/worktrees/enterprise-3b` and plan 3c (tables) later, so nothing here may
+use a 3b or 3c API. How this was checked: every edit script and every whole-file block of Tasks 1 to 7 was replayed,
+in task order, on an exported copy of `deafed424`. Every anchor was found the stated number of times except Task 7's
+`plugin-authoring.md` dialog sentence (R4). The replayed tree compiled with plain `javac` (no Gradle) for jasper-sdk,
+jasper-ui, jasper-terminal, jasper-buddy and jasper-app (main and tests), and for the testkit's main, fixtures and tests
+and jasper-ui's fixtures and tests; the original Task 4 text failed with "variable live is already defined" (R3).
+`javadoc -Xdoclint:all` over the replayed SDK reports no error, the ledger scan finds a row for every candidate, and
+the AGENTS.md hygiene scan is clean. The plugins were not compiled: their edits only append `ScopeSpec` deriver calls.
+No test has been run. The text above now carries R1 to R7; ruling 1 (admission at mount and on update) still needs the
+user's approval, or a spec amendment line, before this branch merges.
+
+### Pre-flight scan
+
+| Row | Shared file or interface | Finding | Ruling |
+|---|---|---|---|
+| Task 1 / Task 2 | `PluginContractTest`, `ContractHarness`, `FakePluginHost` | Different anchors (before `statusItemsAreOrderedGlobalAndInertAfterClose` and `aScopeGetsItsOwnRows…`; the menu-target doc and `scopes()`; `menu()`'s doc and `scopes()`); replay passes | none |
+| Task 1 / Task 3 | `PluginContractTest`, `ContractHarness`, `FakePluginHost` | Different anchors; replay passes | none |
+| Task 1 / Task 4 | `WindowChrome.java` | Task 1 edits `rebuildContributedMenus` (`:246-283`); Task 4 edits the fields (`:47`), `connect` (`:143-147`) and the toolbar pass (`:164-204`); no hunk overlaps | none |
+| Task 1 / Task 5 | `ContractHarness`, `FakePluginHost` | Task 5's `toolbar()` anchors end on the line before Task 1's menu-target doc; both apply in order | none |
+| Task 1 / Task 7 | `docs/plugin-authoring.md` Tools bullet; STATUS entry | Both say Session and Transfer come after Tab and before Tools (ruling 9) | none |
+| Task 2 / Task 3 | testkit, both harnesses, `AppContractTest` | Different anchors (`scopes()` and `windows()`, `dialogPresentation`, `FakeUi`'s dialog lines); replay passes | none |
+| Task 2 / Task 5 | `PluginContractTest`, `ContractHarness`, `FakeContractTest`, `AppContractTest` | Different anchors; replay passes | none |
+| Task 2 / Task 6 | `withHue`, `withItemNoun`, `PaletteVerb.Role.SPLIT`, app `hue()` and `itemNoun()`, `scopePresentation` (`HUE\|noun\|ROLE,…`, NONE read as NEUTRAL in the fake) | Task 6's expectations follow ruling 8: Tunnels, Sample and Vault read NEUTRAL in the fake although the app gives their manifest `icon_hue`; File Server checks its spec's NONE; Remote's verbs are `connect,split,edit`, hence `STANDARD,SPLIT,STANDARD` | none |
+| Task 2 / Task 7 | guide and STATUS wording | Matches the SDK docs (NONE takes the manifest's `icon_hue`; a blank noun is the label) | none |
+| Task 3 / Task 5 | `HostedUi`, `FakeUi`, `FakePluginHost`, `ContractHarness`, `FakeContractTest`, `AppContractTest` | `HostedUi` `:742` and `:225-238`; `FakeUi` `:276`/`:566` and `:134`/`:157`/`:200-210`; in `AppContractTest`, Task 5 inserts before `rail()` and Task 3 after `windows()`, which follows `rail()`; no overlap | none |
+| Task 3 / Task 7 | the guide's `dialogSwatch` sentence | Anchor missing at `deafed424` | R4 |
+| Task 3 (fake / app) | `dialogSwatch` for `Windows.overlay` surfaces | The app harness reports an overlay surface's swatch (NONE); the fake answers `-`. No contract asks | R9 |
+| Task 4 / Task 5 | `ToolbarEntry.View(Function<UUID, Optional<Mounted>>)`, `Mounted.close()`, `KitView.toolbarStrip`, the `view` toolbar line, `migration.csv` | `HostedKitView.component()` is a `KitView`, so the chrome's strip flag applies. The chrome reserves a window's slot and `HostedUi` returns empty for a window it already holds, so no second factory call. The app harness drives `TerminalFixture` windows, which have no `WindowChrome`, so it and a real window never both build a view. Task 4 appends 1 ledger row and Task 5 appends 3 | none |
+| Task 4 / Task 7 | `docs/app-maintenance.md`, STATUS | Priority 40, built once on open, hides rather than overflows: these match `WindowToolbar.view` and `windowOpened` | none |
+| Task 5 / Task 7 | toolbar-view guide bullets | The guides would name `Separator`s, which this branch lacks | R1 |
+| Task 6 / Task 7 | `docs/plugin-authoring.md` | Task 6 edits the `pluginpalette` copy (`:443`); Task 7 edits `:123-125`, `:401`, `:639`, `:660` and `:1012-1013` | none |
+| 3d / 3b (parallel) | `KitView.java`, `PluginContractTest`, `docs/plugin-ui.md`, `docs/plugin-authoring.md`, `jasper-sdk/README.md`, `docs/STATUS.md`, `migration.csv`; `Nodes.Separator`, `IconSize.SWATCH` | 3b edits `KitView:163-166` (3d edits `:319-330`), `plugin-ui.md:165-177,199-205` (3d inserts before `:183`), `README.md:45` (3d edits `:21`), `plugin-authoring.md:611`; it adds no ledger row | R1, R5, R8 |
+| Task 1 | itself | Files, interfaces, tests and commit agree; `StandardMenu` lines moved to `:16-20` | R10 |
+| Task 2 | itself | Agrees; the noun rule in code is ruling 7; fact 11 has six derivers, not seven | R10 |
+| Task 3 | itself | Agrees; line numbers moved (`AuxiliarySurface:79-82`, `NativeShells:350`) | R5, R10 |
+| Task 4 | itself | `rebuildContributedToolbar` declared `live` twice (compile error). The gallery check used a temporary second worktree at the merge base | R3, R6 |
+| Task 5 | itself | Used 3b's `Nodes.Separator` in both admission switches and in the `ToolbarItem.View` javadoc | R1 |
+| Task 6 | itself | Agrees; all ten anchors are present | none |
+| Task 7 | itself | One stale anchor, line numbers moved, and the test-count base named `main` after 3c | R4, R7, R10 |
+| Before you start | itself | Asked for `git rebase main` and stopped unless 3b and 3c were on `main` | R2 |
+
+### Rulings
+
+- **R1.** What: this plan uses no plan 3b API. Both `ToolbarViewAdmission` copies drop `case Nodes.Separator ignored -> true;`, the `ToolbarItem.View` javadoc drops `{@link Nodes.Separator}`, and the guides, the commit message and the STATUS entry stop naming separators. Why: 3b runs in parallel and this branch must compile on `deafed424`, where `Nodes.Separator` does not exist; with no such node there is nothing to admit. Cost if wrong: once both branches merge, the `default -> false` arm compiles but refuses separators. So the second of 3b and 3d to merge restores the case in both copies, the javadoc link and the guide words, and adds a separator to `sessionBar` in `aToolbarViewHoldsOnlyAnInlineStackOfAdmittedControls`.
+- **R2.** What: "Before you start" checks the base (`deafed424`), a clean tree, 3a's 0.18.0 and that 3b's `Separator` is absent, and it does not rebase. Why: the workflow forbids rebasing, and 3b and 3c are not on `main`. Cost if wrong: if `main` moves, this branch is merged onto it later; the code is the same.
+- **R3.** What: in Task 4's `rebuildContributedToolbar`, the set of live view entries is `liveViews`, not `live`. Why: the Dropdown case declares a local `List<Action> live` in the same method, and `javac` rejects the redeclaration (checked on the replayed tree). Cost if wrong: none; it is a rename.
+- **R4.** What: Task 7's dialog-swatch sentence attaches to "`sdk = \">=0.18.0, <0.19\"` to use it.", which ends the `dialogPresentation` paragraph (`plugin-authoring.md:1012-1013`) and occurs once. Why: 3a removed "or later". Cost if wrong: the sentence lands in another paragraph, which the documentation tests would not catch; the anchor is unique, so this is unlikely.
+- **R5.** What: `DialogSpec.swatch` is drawn by `MacTitleBar`'s private `TitleSwatch`. It is a solid square at `ICON_CAPTION`, filled through `ThemeZone.color` with the existing `SemanticColor.HUE_*` roles, so it works on today's `main` without 3b's `IconSize.SWATCH`. Why: 3b's SWATCH is the same square (caption size, the hue's glyph colour), and it is not on this branch. Cost if wrong: two painters of one square could drift. After both merge, `TitleSwatch` can be replaced by the kit's SWATCH icon as a follow-up; nothing requires it.
+- **R6.** What: Task 4's gallery check renders a baseline in this worktree before any Task 4 edit (Step 1) and compares against it in Step 4. It no longer creates a temporary detached worktree at the merge base. Why: every command runs from this worktree's root, Tasks 1 to 3 touch nothing under `jasper-ui`, and the gallery runs on jasper-ui's test classpath only. Cost if wrong: if an earlier task had changed jasper-ui, the baseline would include that change. The Files lists show that none does.
+- **R7.** What: Task 7's test count is measured against `deafed424`, still +30. Why: neither 3b nor 3c is on this branch. Cost if wrong: a miscount shows at once in the totals.
+- **R8.** What: the second of 3b and 3d to merge reconciles the shared files. `migration.csv`: keep 3d's four appended rows; 3b adds none. `docs/STATUS.md`: keep both top entries, the later merge on top. `PluginContractTest`: the two plans add different tests. `KitView.java`: 3b removes `setFieldReadOnly` and 3d adds `toolbarStrip` after `titleStrip`. `docs/plugin-ui.md`: 3d's two bullets go before "Settings pages", next to 3b's 165-177 edits, so keep both. `plugin-authoring.md` and `jasper-sdk/README.md` take different lines. R1 and R5 apply there too. Why: the plans run in parallel and edit these files independently. Cost if wrong: merge conflicts in documents, resolved by keeping both sides; R1's restore is the only semantic step.
+- **R9.** What: the app harness's `dialogSwatch` keeps its `kind() != WINDOW` filter, so a `Windows.overlay` surface reports `NONE`, where the fake (which tracks dialogs by presentation) answers `-`. Why: an OVERLAY-presented dialog is an OVERLAY surface just as `Windows.overlay` is, so the app harness cannot tell them apart without new state; no contract asks about overlay surfaces, and the fake's javadoc names them out. Cost if wrong: a future contract about overlay swatches would fail under the app harness until it records which surfaces are dialogs.
+- **R10.** What: the verified facts and file lists now cite `deafed424` lines: facts 1, 3, 6, 7, 9, 11 ("six derivers"), 14 and 18, and the file lists of Tasks 1, 3 and 7. Why: the plan's lines were taken at `222969926`, and some were already off there (for example `WindowContributions.java:466`, which is `:460`). Cost if wrong: an executor looks a few lines away; every edit anchors on quoted text, not on line numbers.
