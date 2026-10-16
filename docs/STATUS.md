@@ -57,8 +57,7 @@ strip (`KitView.toolbarStrip`) on the title bar's theme (`ThemeRoute.TITLE_BAR`,
 preferred size, keeps it in the toolbar across passes (moved with `setComponentZOrder`, so that it keeps its focus and
 an open dropdown), and hides it rather than moving it into the overflow menu when the row is too narrow; buttons that
 gave way before a view hid come back when they fit. `ToolbarViewAdmission` (host and testkit) admits an INLINE stack of LABEL text, DROPDOWN,
-SEARCHABLE or PICKER choices, at most one PRIMARY button and menu buttons, at mount and on every update (separators join
-when plan 3b's `Nodes.Separator` is reconciled with this plan).
+SEARCHABLE or PICKER choices, at most one PRIMARY button, menu buttons and separators, at mount and on every update.
 `ScopeSpec.hue` and `itemNoun` and `PaletteVerb.role` (STANDARD or SPLIT: at most one, never the first verb) are
 validated by the SDK and the app registry and mirrored as `PaletteScope.hue()`, `itemNoun()` and `PaletteVerb.role()`
 with effective values (a scope's NONE becomes its manifest `icon_hue` through the new `HostedPlugin.iconHue`; a blank

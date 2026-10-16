@@ -886,13 +886,14 @@ public abstract class PluginContractTest {
         }));
     }
 
-    /** A toolbar view tree the toolbar admits: a label, a host choice and a PRIMARY Connect. */
+    /** A toolbar view tree the toolbar admits: a label, a host choice, a separator and a PRIMARY Connect. */
     private static dev.jasper.sdk.ui.ViewSpec sessionBar(String id) {
         var ready = dev.jasper.sdk.ui.ControlState.READY;
         return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack(id, ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
             new dev.jasper.sdk.ui.Nodes.Text(id + ".label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL),
             new dev.jasper.sdk.ui.Nodes.Choice(id + ".host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN,
                 List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty())), "mac", "Session", "host"),
+            new dev.jasper.sdk.ui.Nodes.Separator(id + ".rule", ready),
             new dev.jasper.sdk.ui.Nodes.Button(id + ".connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""))));
     }
 
@@ -931,7 +932,7 @@ public abstract class PluginContractTest {
         h.ui(() -> assertThatIllegalStateException().as("and with its registration").isThrownBy(() -> made.get(1).spec()));
     }
 
-    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button and menu buttons. */
+    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button, menu buttons and separators. */
     @Test void aToolbarViewHoldsOnlyAnInlineStackOfAdmittedControls() {
         var ready = dev.jasper.sdk.ui.ControlState.READY;
         List<dev.jasper.sdk.ui.UiView> refused = Collections.synchronizedList(new ArrayList<>());
@@ -1007,8 +1008,14 @@ public abstract class PluginContractTest {
         refused.put("plain", new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("plain", ready, "Session",
             dev.jasper.sdk.ui.Nodes.TextRole.LABEL)));
         refused.put("bar.body", inline.apply(new dev.jasper.sdk.ui.Nodes.Text("bar.body", ready, "Body", dev.jasper.sdk.ui.Nodes.TextRole.BODY)));
+        // An EXCLUSIVE or TABS choice needs two options before the SDK makes the view at all.
+        var pair = List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty()), new dev.jasper.sdk.ui.Option("linux", "Linux", Optional.empty()));
         refused.put("bar.mode", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.mode", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.EXCLUSIVE,
-            options, "mac", "Mode", "mode")));
+            pair, "mac", "Mode", "mode")));
+        refused.put("bar.tabs", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.tabs", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.TABS,
+            pair, "mac", "Tabs", "tabs")));
+        refused.put("bar.facts", inline.apply(new dev.jasper.sdk.ui.Nodes.Properties("bar.facts", ready, "", List.of(
+            new dev.jasper.sdk.ui.Nodes.PropertyRow("Host", "mac", false, Optional.empty())))));
         refused.put("bar.look", inline.apply(new dev.jasper.sdk.ui.Nodes.Choice("bar.look", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.PREVIEWS,
             options, "mac", "Look", "look")));
         for (var kind : List.of(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST,
@@ -1052,22 +1059,39 @@ public abstract class PluginContractTest {
     }
 
     /**
-     * Review guard (plan 3d, R1): once plan 3b's {@code Nodes.Separator} exists, both admission copies must admit it, as
-     * spec 10.3 does. Built reflectively, since this branch has no such node; a merge that forgets R1's restore fails here.
+     * Plans 3b and 3d merged (3d, R1): separators between admitted controls are admitted on update too, and a separator
+     * the SDK would place first, last or beside another never reaches a toolbar, since the SDK refuses the view itself.
      */
-    @Test void aToolbarViewAdmitsASeparatorOnceTheSdkHasOne() throws Exception {
-        Class<?> type;
-        try { type = Class.forName("dev.jasper.sdk.ui.Nodes$Separator"); } catch (ClassNotFoundException absent) { return; }
+    @Test void aToolbarViewAdmitsSeparatorsBetweenItsControlsOnUpdate() {
         var ready = dev.jasper.sdk.ui.ControlState.READY;
-        var separator = (dev.jasper.sdk.ui.Nodes.Node) type.getConstructor(String.class, dev.jasper.sdk.ui.ControlState.class).newInstance("ruled.rule", ready);
-        var ruled = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("ruled", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
-            new dev.jasper.sdk.ui.Nodes.Text("ruled.label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL), separator,
-            new dev.jasper.sdk.ui.Nodes.Button("ruled.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""))));
-        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
-            context.toolbar().add(ToolbarItem.view(window -> context.kit().create(ruled, event -> { }))));
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            admitted.set(view);
+            return view;
+        })));
         var window = new AtomicReference<UUID>();
         h.ui(() -> window.set(h.addTerminalWindow()));
-        h.ui(() -> assertThat(h.openToolbarViews(window.get())).as("a separator between admitted controls").containsExactly("ruled"));
+        var label = new dev.jasper.sdk.ui.Nodes.Text("bar.label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL);
+        var connect = new dev.jasper.sdk.ui.Nodes.Button("bar.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", "");
+        var more = new dev.jasper.sdk.ui.Nodes.MenuButton("bar.more", ready, "More", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "more",
+            List.of(new dev.jasper.sdk.ui.MenuItem("bar.more.edit", "Edit", "", "edit", true, false)), "");
+        java.util.function.Function<List<dev.jasper.sdk.ui.Nodes.Node>, dev.jasper.sdk.ui.ViewSpec> inline = children -> new dev.jasper.sdk.ui.ViewSpec(
+            new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, children));
+        var ruled = inline.apply(List.of(label, new dev.jasper.sdk.ui.Nodes.Separator("bar.first", ready), connect,
+            new dev.jasper.sdk.ui.Nodes.Separator("bar.second", ready), more));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            admitted.get().update(ruled);
+            assertThat(admitted.get().spec()).isEqualTo(ruled);
+        });
+        var rule = new dev.jasper.sdk.ui.Nodes.Separator("bar.rule", ready);
+        var twice = new dev.jasper.sdk.ui.Nodes.Separator("bar.again", ready);
+        List<List<dev.jasper.sdk.ui.Nodes.Node>> misplaced = List.of(List.of(rule, label, connect), List.of(label, connect, rule),
+            List.of(label, rule, twice, connect));
+        for (var children : misplaced)
+            assertThatIllegalArgumentException().as(children.toString()).isThrownBy(() -> inline.apply(children)).withMessageContaining("Separator");
+        assertThat(h.active("test.alpha")).isTrue();
     }
 
     /** Review fix (plan 3d): stopping the plugin closes the views its windows built and removes the entry. */

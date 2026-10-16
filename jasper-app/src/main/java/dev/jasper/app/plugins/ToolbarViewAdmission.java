@@ -5,7 +5,8 @@ import dev.jasper.sdk.ui.ViewSpec;
 
 /**
  * What a toolbar view may hold (spec 10.3): an INLINE stack of LABEL text, DROPDOWN, SEARCHABLE or PICKER choices, at
- * most one PRIMARY button and menu buttons. The testkit keeps the same rule; the shared contracts check both.
+ * most one PRIMARY button, menu buttons and separators (placed as {@link ViewSpec} requires: between two items, never
+ * first, last or beside another). The testkit keeps the same rule; the shared contracts check both.
  */
 final class ToolbarViewAdmission {
     private ToolbarViewAdmission() { }
@@ -22,6 +23,7 @@ final class ToolbarViewAdmission {
                     || choice.kind() == Nodes.ChoiceKind.PICKER;
                 case Nodes.Button button -> button.kind() == Nodes.ButtonKind.PRIMARY;
                 case Nodes.MenuButton ignored -> true;
+                case Nodes.Separator ignored -> true;
                 default -> false;
             };
             if (!admitted) throw new IllegalArgumentException("A toolbar view does not admit " + describe(child));

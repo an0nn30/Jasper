@@ -34,6 +34,41 @@ class KitViewToolbarStripTest {
         });
     }
 
+    /** Plans 3b and 3d merged: a toolbar strip draws a Separator as a hairline centred between two controls. */
+    @Test void aToolbarStripDrawsASeparatorBetweenItsControlsWithoutGrowingTaller() {
+        Edt.run(() -> {
+            var ready = ControlState.READY;
+            var label = new Nodes.Text("bar.label", ready, "Session", Nodes.TextRole.LABEL);
+            var connect = new Nodes.Button("bar.connect", ready, "Connect", "", Nodes.ButtonKind.PRIMARY, "connect", "");
+            var context = KitFixtures.context(KitFixtures.marked());
+            try {
+                int plainHeight;
+                try (var plain = new KitView(context, new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(label, connect))), event -> { })) {
+                    plain.toolbarStrip(true);
+                    plainHeight = plain.getPreferredSize().height;
+                }
+                var ruled = new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(label, new Nodes.Separator("bar.rule", ready), connect)));
+                try (var view = new KitView(context, ruled, event -> { })) {
+                    view.toolbarStrip(true);
+                    var size = view.getPreferredSize();
+                    assertThat(size.height).as("the rule does not make the strip taller").isEqualTo(plainHeight);
+                    var image = KitFixtures.render(view, size.width, size.height, 1);
+                    var rule = KitViewTest.find(view, "bar.rule", javax.swing.JComponent.class);
+                    var before = KitViewTest.find(view, "bar.label", javax.swing.JComponent.class);
+                    var after = KitViewTest.find(view, "bar.connect", javax.swing.JComponent.class);
+                    assertThat(rule.isVisible()).isTrue();
+                    assertThat(rule.getWidth()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE)));
+                    assertThat(rule.getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_CONTROL)))
+                        .isLessThan(after.getHeight());
+                    assertThat(rule.getX()).isGreaterThanOrEqualTo(before.getX() + before.getWidth()).isLessThan(after.getX());
+                    assertThat(rule.getY() + rule.getHeight() / 2).as("centred on the button").isCloseTo(after.getY() + after.getHeight() / 2, within(1));
+                    var at = javax.swing.SwingUtilities.convertPoint(rule.getParent(), rule.getX(), rule.getY() + rule.getHeight() / 2, view);
+                    assertThat(image.getRGB(at.x, at.y)).isEqualTo(KitFixtures.marker(dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE).getRGB());
+                }
+            } finally { context.binding().close(); context.icons().close(); }
+        });
+    }
+
     @Test void theFlagIsReportedAndAClosedViewRefusesIt() {
         Edt.run(() -> {
             var context = KitFixtures.context();
