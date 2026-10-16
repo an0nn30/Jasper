@@ -638,6 +638,43 @@ class PluginPanelPageTest {
         onEdt(page::dispose);
     }
 
+    /** Spec 8.2: a settings panel's form keeps its footnote, and its submission, through the host rows' projection. */
+    @Test void aPanelFormsFootnoteSurvivesTheHostRowProjection() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var name = new AtomicReference<Setting<String>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                name.set(plugin.settings().declare(SettingSpec.of("name", SettingKind.text(), "files").label("Name")));
+                plugin.settings().page((SettingsPanel) panelHost -> {
+                    var made = (HostedKitView) plugin.kit().create(footnoted(panelHost.row(name.get())), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var context = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
+            () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            view.get().update(footnoted(hostControlRow(view.get())));
+            var form = (dev.jasper.sdk.ui.Nodes.Form) view.get().spec().root();
+            assertThat(form.footnote()).isEqualTo("Saved to the plugin's settings file");
+            assertThat(form.submission()).isEqualTo(dev.jasper.sdk.ui.Nodes.FormSubmission.NONE);
+        });
+        onEdt(page::dispose);
+    }
+
+    /** A FULL form around one host row, with a footnote and no Enter submission. */
+    private static dev.jasper.sdk.ui.ViewSpec footnoted(dev.jasper.sdk.ui.Nodes.Node row) {
+        return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Form("form", dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.FormKind.FULL,
+            "Panel", Optional.empty(), List.of(row), Optional.empty(), List.of(), "", dev.jasper.sdk.ui.Nodes.FormSubmission.NONE, "Saved to the plugin's settings file"));
+    }
+
+    /** The host row a {@link #footnoted} form holds. */
+    private static dev.jasper.sdk.ui.Nodes.Node hostControlRow(HostedKitView view) {
+        return ((dev.jasper.sdk.ui.Nodes.Form) view.spec().root()).sections().getFirst();
+    }
+
     /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
     private static dev.jasper.sdk.ui.Nodes.Node hostControl(HostedKitView view, int index) {
         var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);

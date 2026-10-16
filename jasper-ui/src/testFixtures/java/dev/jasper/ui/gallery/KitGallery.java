@@ -104,6 +104,12 @@ public final class KitGallery {
         result.add(new Fixture("properties", "", "normal", 320, 170, new ViewSpec(new Nodes.Properties("properties", ControlState.READY, "Properties — minecraft-local", List.of(
             new Nodes.PropertyRow("Host", "192.168.1.124", true), new Nodes.PropertyRow("User", "dustin", true), new Nodes.PropertyRow("Port", "22", true),
             new Nodes.PropertyRow("Credentials", "Vault locked", false, Optional.of(Nodes.Severity.WARNING)))))));
+        // Plan 3b (SDK 0.18): a prompt with a footnote, which takes the line above its full-width actions.
+        result.add(new Fixture("form-footnote", "", "normal", 380, 200, new ViewSpec(new Form("unlock-footnote", ControlState.READY, FormKind.PROMPT_COMPACT, "Unlock Vault",
+            Optional.empty(), List.of(new Secret("footnote-password", ControlState.READY, "Master password", "Master password", "")), Optional.empty(),
+            List.of(new Nodes.Button("footnote-cancel", ControlState.READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", ""),
+                new Nodes.Button("footnote-unlock", ControlState.READY, "Unlock", "", ButtonKind.PRIMARY, "unlock", "")),
+            "cancel", FormSubmission.PRIMARY, "Auto-locks after 15 min idle"))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

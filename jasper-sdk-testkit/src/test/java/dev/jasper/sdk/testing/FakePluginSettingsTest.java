@@ -183,6 +183,23 @@ class FakePluginSettingsTest {
         assertThat(host.failures()).isEmpty();
     }); }
 
+    /** As the host: a panel's form keeps its footnote, and its submission, through the row projection. */
+    @Test void aPanelFormsFootnoteSurvivesTheRowProjection() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        var name = new AtomicReference<Setting<String>>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            name.set(context.settings().declare(SettingSpec.of("name", SettingKind.text(), "files").label("Name")));
+            context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Form("form",
+                dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.FormKind.FULL, "Panel", Optional.empty(), List.of(rows.row(name.get())),
+                Optional.empty(), List.of(), "", dev.jasper.sdk.ui.Nodes.FormSubmission.NONE, "Saved to the plugin's settings file")), e -> {}));
+        });
+        host.settingsPanel("test.fake").orElseThrow();
+        var view = host.settingsPanelView("test.fake").orElseThrow();
+        view.update(view.sourceSpec());
+        var form = (dev.jasper.sdk.ui.Nodes.Form) view.spec().root();
+        assertThat(form.footnote()).isEqualTo("Saved to the plugin's settings file");
+        assertThat(form.submission()).isEqualTo(dev.jasper.sdk.ui.Nodes.FormSubmission.NONE);
+    }); }
+
     /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
     private static dev.jasper.sdk.ui.Nodes.Node control(FakeKitView view, int index) {
         var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);

@@ -119,6 +119,22 @@ class KitValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(properties), List.of(), List.of()))
             .withMessageContaining("Unsupported inline row node: Properties");
     }
+    /** Plan 3b (spec 8.2): a footnote is one line beside the actions, and it shares the footer's leading edge with no preview. */
+    @Test void footnotesAreOneLineAndExcludeAPreview() {
+        var unlock = new Button("unlock", ControlState.READY, "Unlock", "", ButtonKind.PRIMARY, "unlock", "");
+        assertThat(new Form("form", ControlState.READY, FormKind.PROMPT_COMPACT, "Unlock", Optional.empty(), List.of(text("body")), Optional.empty(), List.of(unlock))
+            .footnote()).isEmpty();
+        var noted = new Form("form", ControlState.READY, FormKind.PROMPT_COMPACT, "Unlock", Optional.empty(), List.of(text("body")), Optional.empty(), List.of(unlock),
+            "cancel", FormSubmission.PRIMARY, "Auto-locks after 15 min idle");
+        assertThat(noted.footnote()).isEqualTo("Auto-locks after 15 min idle");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(text("body")),
+            Optional.of(text("preview")), List.of(unlock), "cancel", FormSubmission.PRIMARY, "Saved")).withMessageContaining("preview");
+        for (String broken : List.of("One" + (char) 10 + "Two", "One" + (char) 13 + "Two"))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(text("body")),
+                Optional.empty(), List.of(unlock), "cancel", FormSubmission.PRIMARY, broken)).withMessageContaining("one line");
+        assertThat(new Form("form", ControlState.READY, FormKind.FULL, "Form", Optional.empty(), List.of(text("body")), Optional.of(text("preview")),
+            List.of(unlock), "cancel", FormSubmission.PRIMARY, " ").footnote()).isBlank();
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

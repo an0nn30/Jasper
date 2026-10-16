@@ -569,8 +569,12 @@ public final class Nodes {
     /** Form-level Enter behavior; NONE leaves explicit field actions and button activation intact. */
     public enum FormSubmission { PRIMARY, NONE }
 
-    /** Form content only; cancellation uses an explicit action key, blank means none. */
-    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction, FormSubmission submission) implements Node {
+    /**
+     * Form content only; cancellation uses an explicit action key, blank means none. A nonblank {@code footnote} (since
+     * 0.18.0) is one plain line drawn muted at the leading edge of the footer, beside the actions (an auto-lock note); a
+     * form with a footnote has no preview, which takes the same place.
+     */
+    public record Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero, List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction, FormSubmission submission, String footnote) implements Node {
         public Form {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -585,6 +589,15 @@ public final class Nodes {
                 throw new IllegalArgumentException("WINDOW requires one body section and no hero");
             if (actions.stream().filter(button -> button.kind() == ButtonKind.PRIMARY).count() > 1)
                 throw new IllegalArgumentException("Form supports at most one primary action");
+            Objects.requireNonNull(footnote);
+            if (footnote.chars().anyMatch(c -> c == 10 || c == 13)) throw new IllegalArgumentException("A footnote is one line");
+            if (!footnote.isBlank() && preview.isPresent())
+                throw new IllegalArgumentException("A footnote and a preview share the footer's leading edge; a form has one or the other");
+        }
+        /** A form without a footnote. */
+        public Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero,
+                    List<Node> sections, Optional<Node> preview, List<Button> actions, String cancelAction, FormSubmission submission) {
+            this(id, state, kind, title, hero, sections, preview, actions, cancelAction, submission, "");
         }
         /** Existing forms submit their primary action on Enter. NONE keeps explicit field actions and button activation. */
         public Form(String id, ControlState state, FormKind kind, String title, Optional<Node> hero,

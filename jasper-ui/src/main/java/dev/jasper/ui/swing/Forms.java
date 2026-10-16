@@ -30,6 +30,8 @@ final class Forms {
         final java.util.Map<Buttons.ButtonControl, java.awt.event.FocusListener> focusReveal = new java.util.IdentityHashMap<>();
         List<ControlRegistry.Control> controls = List.of();
         final JLabel title = Labels.literal();
+        /** The form's footnote, mounted in the preview's place only while it is not blank (spec 8.2). */
+        final JLabel footnote = Labels.literal();
 
         FormControl(KitView view, Nodes.Form node) {
             super(view, node, new Surface(view));
@@ -53,6 +55,7 @@ final class Forms {
                 focusReveal.clear();
             });
             KitOwnership.mark(title, node.id() + ".title");
+            KitOwnership.mark(footnote, node.id() + ".footnote");
             body.add(title);
             body.setOpaque(false);
             footer.setOpaque(false);
@@ -188,6 +191,8 @@ final class Forms {
             state();
             var form = (Nodes.Form) node;
             title.setText(form.title());
+            footnote.setText(form.footnote());
+            Composition.style(footnote, context(), Typography.Role.CAPTION, SemanticColor.TEXT_TERTIARY);
             title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty());
             Composition.style(
                     title, context(), Typography.Role.PROMPT_TITLE, SemanticColor.TEXT_PRIMARY);
@@ -293,12 +298,10 @@ final class Forms {
                             .filter(c -> childParent(c.node) == actions)
                             .map(c -> c.component)
                             .toList());
-            Stacks.mount(
-                    preview,
-                    controls.stream()
-                            .filter(c -> childParent(c.node) == preview)
-                            .map(c -> c.component)
-                            .toList());
+            var leading = new java.util.ArrayList<JComponent>();
+            if (!f.footnote().isBlank()) leading.add(footnote);
+            controls.stream().filter(c -> childParent(c.node) == preview).forEach(c -> leading.add(c.component));
+            Stacks.mount(preview, leading);
             boolean valid = valid(node);
             for (var control : controls)
                 if (control.node instanceof Nodes.Button action
@@ -306,7 +309,7 @@ final class Forms {
                     control.parentEnabled &= valid;
                     control.refresh();
                 }
-            preview.setVisible(f.preview().isPresent());
+            preview.setVisible(f.preview().isPresent() || !f.footnote().isBlank());
         }
     }
 

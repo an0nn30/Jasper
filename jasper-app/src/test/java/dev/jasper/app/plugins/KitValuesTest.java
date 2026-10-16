@@ -76,6 +76,13 @@ class KitValuesTest {
   assertThat(Arrays.stream(LayoutRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.LayoutRole.values()).map(Enum::name).toArray(String[]::new));
   assertThat(Arrays.stream(TextRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.TextRole.values()).map(Enum::name).toArray(String[]::new));
  }
+ /** Plan 3b: a footnote crosses the projection unchanged. */
+ @Test void footnotesProjectWithoutLoss(){
+  var spec=new ViewSpec(new Form("unlock-form",READY,FormKind.PROMPT_COMPACT,"Unlock Vault",Optional.empty(),List.of(text("password")),Optional.empty(),List.of(button("unlock")),
+   "cancel",FormSubmission.NONE,"Auto-locks after 15 min idle"));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  assertThat(((dev.jasper.ui.model.Nodes.Form)KitValues.toModule(spec).root()).footnote()).isEqualTo("Auto-locks after 15 min idle");
+ }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
   for(String icon:List.of("lock","")){
    var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);
