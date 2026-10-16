@@ -1,5 +1,9 @@
 # Enterprise presentation 3d: SDK 0.18 chrome Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-chrome` (`d6210499e..9f7a43ae8`).** Deviation from the spec,
+> awaiting the user's approval: ruling 1 (toolbar view admission at mount and on update, not at registration; spec
+> 10.3 and 15). Deviations from this plan's text: none beyond its "Rulings" and its "Execution notes (2026-10-16)".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** SDK 0.18 gains its chrome additions of spec 8.2, each carried by the host, the testkit fake and the shared

@@ -120,8 +120,15 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **The Tools menu** (SDK 0.16.1) is the home for utility commands: `context.menus().standard(StandardMenu.TOOLS).add(id)`.
-  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it, after Tab and before
+  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it, after Tab, Session and Transfer and before
   plugins' own top-level menus.
+- **The Session and Transfer menus** (SDK 0.18) hold commands for hosts and sessions and for moving files:
+  `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab.
+- **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group
+  of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your
+  registration. Its root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one
+  PRIMARY `Button` and `MenuButton`s; the host refuses any other tree, naming the node, when it mounts the view and
+  on every `update`. A view never moves into the overflow menu: it hides while the toolbar is too narrow.
 - **Status items** are global: one handle updates the item in every window.
 - **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
   Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
@@ -400,6 +407,11 @@ on the scope that is already showing it dismisses instead. A scope that names on
 Cmd+P/R/J behave. The host contains every call: a scope that throws shows no rows, an unavailable
 row, no step or nothing done, and the palette keeps working.
 
+`ScopeSpec.withHue` and `withItemNoun` (SDK 0.18) describe your rows to presentations that colour and label them by
+scope: the hue of the scope's row squares (NONE takes your manifest's `icon_hue`) and what one row is, as a lowercase
+singular noun ("session"; blank uses the label). A verb made with `PaletteVerb.Role.SPLIT` is the split-pane variant
+of your first verb; a scope has at most one, never first. The palette card draws none of them.
+
 The bundled History and Snippets plugins (`plugins/history`, `plugins/snippets`) are the worked
 example: Snippets publishes `dev.jasper.snippets.api.SnippetService` and exports that package;
 History declares `requires = [{ id = "dev.jasper.snippets", optional = true }]`, looks the service up
@@ -637,6 +649,8 @@ try (var host = new FakePluginHost()) {
 
 `host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
+`host.toolbarViews(windowId)` builds and returns a window's toolbar views, as the window does when it opens, and
+`closeToolbarViews(windowId)` closes them, as closing the window does.
 `host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
 `<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
@@ -657,7 +671,8 @@ A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`
 `cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
 and closes inline where Jasper uses its cleanup thread.
 `host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
-drive a contributed scope as the palette would; `paletteOpens()`, `openedInEditor()`
+drive a contributed scope as the palette would, and `scopePresentation(scopeId)` reports its hue, item noun and
+verb roles as `HUE|noun|ROLE,ROLE`; `paletteOpens()`, `openedInEditor()`
 (the files no provided editor opened) and `browsed()` record what the plugin asked for. `host.clipboard()` is the
 clipboard every plugin's `Platform` writes to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
 set it as the user would, `failWrites(true)` makes it busy, and `expireSecrets()` runs the 30-second clear now. The fake
@@ -1010,7 +1025,8 @@ dialog.show();
 ```
 
 `FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
-`sdk = ">=0.18.0, <0.19"` to use it.
+`sdk = ">=0.18.0, <0.19"` to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports the swatch
+an open dialog asked for.
 
 ### Slate Steel colours (SDK 0.15.5)
 
