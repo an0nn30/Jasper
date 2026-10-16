@@ -26,28 +26,31 @@ AssertJ 3.27.7, Python 3.11+ standard library for the mechanical edit scripts (a
 (section 13 in full; the 12.2 bullet "Untitled leading groups" that section 13 refers to; 1 decisions 15 and 17; 3.5 and
 3.9; 8.2 for the Notice and `Field.readOnly`; 11.3's `RECENT_ROWS`; 11.7 and 13 for File › Open File…; 14.4 to 14.7 for
 "in both looks" and "every action stays reachable"; 17 for the documents; 19.1 row 3e; 19.2's rows for Snippets, Palette
-plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault). Plans 1 and 2 are merged on `main`; plans 3a
-(`2026-10-15-enterprise-3a-sdk-0-18-renames.md`), 3b (`2026-10-15-enterprise-3b-sdk-0-18-controls.md`), 3c
-(`2026-10-15-enterprise-3c-sdk-0-18-tables.md`) and 3d (`2026-10-15-enterprise-3d-sdk-0-18-chrome.md`) merge to `main`
-in that order before this plan executes; their rulings bind this plan (3b Rulings 1, 2, 5 and 7; 3d Rulings 9 and 11).
+plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault). Plans 1 and 2 and plans 3a
+(`2026-10-15-enterprise-3a-sdk-0-18-renames.md`), 3b (`2026-10-15-enterprise-3b-sdk-0-18-controls.md`) and 3d
+(`2026-10-15-enterprise-3d-sdk-0-18-chrome.md`) are merged on `main` (`149cd8fb9`); plan 3c
+(`2026-10-15-enterprise-3c-sdk-0-18-tables.md`) executes in parallel in `.claude/worktrees/enterprise-3c`, and this plan
+uses none of its APIs (Execution notes, Ruling E1). The merged plans' rulings bind this plan (3b Rulings 1, 2, 5 and 7;
+3d Rulings 9 and 11).
 Plans 4 and 5 execute after this one.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-3e`, branch
-`claude/enterprise-default-look`, cut from `main` at `222969926` and holding only commits to this plan file (it is
-written, reviewed and re-anchored there, so their number varies). Before Task 1, bring it up to `main` and check that
-3a to 3d are in it:
+`claude/enterprise-default-look`, on `main` at `149cd8fb9` (3a, 3b and 3d merged) and holding only commits to this
+plan file (it is written, reviewed and re-anchored there, so their number varies). Do not rebase or merge: the base
+stays `149cd8fb9` for the pixel baseline and Task 9's ranges, even when `main` moves (plan 3c may merge meanwhile).
+Before Task 1, check that the base and 3a, 3b and 3d are in it:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 149cd8fb9 HEAD && echo "base 149cd8fb9 present"         # expect the line
 grep -c 'VERSION = "0.18.0"' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java      # 3a: expect 1
 grep -c 'record Notice(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java            # 3b: expect 1
 grep -c 'boolean readOnly' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java          # 3b: expect at least 1
-grep -c 'cellNodes' jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java              # 3c: expect at least 1
 grep -c 'TRANSFER' jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java           # 3d: expect 1
 ```
 
-If any prints 0, stop: this plan needs 3a to 3d on `main`. Run every command from the worktree root, never in
-`~/projects/moray`. Line numbers below are from `222969926` and move with the earlier plans; every edit quotes the
+If the first prints nothing or any grep prints 0, stop: this plan needs 3a, 3b and 3d. It needs nothing from 3c (no
+`cellNodes` check). Run every command from the worktree root, never in `~/projects/moray`. Line numbers below were
+re-verified at `149cd8fb9` (2026-10-16); every edit quotes the
 exact text it replaces, and the edit scripts stop with a message when that text is not found the stated number of
 times. If a script stops, re-find the quoted text (it moves, it does not change) and re-run; never edit around a
 missing anchor, and record any anchor you had to re-quote in the status banner.
@@ -106,7 +109,7 @@ PY
 python3 -I build/plan-3e-pairs/measure.py before
 ```
 
-Expected: `before: N pairs measured`, N the number of entries in `pairs.json` (34 at `222969926`). `build/` is
+Expected: `before: N pairs measured`, N the number of entries in `pairs.json` (34 at `149cd8fb9`). `build/` is
 ignored by git; Task 9 Step 4 runs the same script with `after` (if `build/plan-3e-pairs/measure.py` is gone by then,
 write it again from this block, but never re-run `before`).
 
@@ -121,7 +124,7 @@ write it again from this block, but never re-run `before`).
 - Pixel rule: no file under `jasper-ui/` changes, so every file the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves the inputs unchanged). The reference pairs in `tools/visual/pairs.json` are measured, not assumed: every pair's render and `compare_all.py` summary is recorded before Task 1 (Workspace) and again in Task 9 Step 4. Section 13 is expected to change `fileserver-add` (the "Reachable from" label; the folder field drawn read-only), `host-add` ("Jump host"), `tunnel-new` ("Via host", "Listen on", "Forward to") and `workspace-palette` (a third recent row, so Most used starts one row lower). Every pair whose render changes keeps its mock and crop and gains a `note` naming the change and its measured edge agreement before and after (Task 9 Step 5). Another pair may change only through one of the by-design surfaces listed next (the workspace renders draw the Vault status item, for example); it then gets a note too and a line among the deviations. Any other change stops the executor. Other default-look surfaces that change by design and have no pair: the menu bar (Session and Transfer instead of SSH; File gains Open File…), the Vault status item's text, the New File Server editor's FTP and writable states (the Notice), the Settings pages Command Palette, Desk Buddy, System Settings, Terminal, Cursor, Shell and generated plugin pages (a heading over their first card), and Project Index's page (ordered lists, the mono Location column). Everything else renders as before.
 - MVP rule (memory: no compat shims): `RemotePlugin.MENU` and the SSH top-level menu are removed outright, as are the host rows' text-area handling of `stringList` values; no alias, no migration.
 - SDK types appear in the app only inside `dev.jasper.app.plugins` (AGENTS.md); `dev.jasper.app.application` must not depend on `dev.jasper.app.files`, so the Open File chooser lives in `dev.jasper.app.windows` (`AuxiliaryWindows`). `verifyApplicationArchitecture` and `verifyPluginArchitecture` stay green.
-- Javadoc doclint fails the build on errors: the SDK, the testkit and jasper-app run `-Xdoclint:all`; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->` (write "item-N" rather than an angle-bracketed placeholder).
+- Javadoc doclint fails the build on errors: the SDK and jasper-app run `-Xdoclint:all` and the testkit's javadoc the JDK's default doclint; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->` (write "item-N" rather than an angle-bracketed placeholder).
 - `ThemeMigrationCoverageTest`: this plan creates no source file. Every file it edits already has a `docs/design/theme-engine/migration.csv` row except `ActionId.java` and `SnippetsScopeTest.java`, which are not candidates and must stay so: add to them no Swing, AWT, FlatLaf or `dev.jasper.ui`/`dev.jasper.sdk.ui` import, no `new J…`, and no `new …List`, `new …Panel` and the like (use `List.of`). The test runs in every task's Step 4.
 - Documentation edits are the smallest that make each document accurate (AGENTS.md); `docs/superpowers/` history and earlier `docs/STATUS.md` entries are not rewritten, except the six status banners spec 19.2 names.
 - Source hygiene (AGENTS.md): no raw control, private-use or unpaired surrogate characters in any source file. The ellipsis, middle dot, em dash and › used in copy are ordinary characters, as the existing sources use them.
@@ -208,7 +211,8 @@ STATUS entry and the status banner record it as a deviation awaiting that ruling
 
 ## Verified facts
 
-Read at `222969926`; the later plans move lines but not these facts, except where a plan task is named.
+Read at `222969926` and re-verified at `149cd8fb9` (2026-10-16, with 3a, 3b and 3d merged); line numbers are
+`149cd8fb9`'s.
 
 1. Remote builds a top-level "SSH" menu: `PluginMenu menu = context.menus().create(MENU, "SSH")` with Connect, Hosts,
    Split, a separator, New Host, Import, a separator, `SFTP`, `TransferUi.SHOW`, then `tunnelsUi.addToMenu(menu)`
@@ -219,92 +223,95 @@ Read at `222969926`; the later plans move lines but not these facts, except wher
    `TransferUi.SHOW = "dev.jasper.remote.transfers"` (`TransferUi.java:14`).
 3. 3d Task 1 adds `StandardMenu.SESSION` and `TRANSFER`, mapped by name to `MenuTarget.Slot.SESSION`/`TRANSFER`, built
    fresh each pass and shown after Tab, before Tools, only while they have entries (3d Rulings 9); the fake keys their
-   sections `"SESSION"` and `"TRANSFER"` (3d's `theSessionAndTransferMenusTakeSectionsLikeTools`). `Menus.standard`
+   sections `"SESSION"` and `"TRANSFER"` (3d's `theSessionAndTransferMenusTakeSectionsLikeTools`, in the contract suite,
+   `PluginContractTest.java:643-658`). `Menus.standard`
    appends "a new section at the end of a built-in menu, after a separator" (`Menus.java:5-11`); the fake renders a
-   separator as `---` and plugin sections apart with `===` (`FakePluginHost.java:556-568`, `FakeUi.java:84-93`).
-4. Tests naming the SSH menu: `RemotePluginTest.java:87,297`, `TunnelsPluginTest.java:86-87`, `SftpPluginTest.java:25`
+   separator as `---` and plugin sections apart with `===` (`FakePluginHost.java:590-601`, `FakeUi.java:84-92`; the fake lists an item only while its action exists).
+4. Tests naming the SSH menu: `RemotePluginTest.java:87,298`, `TunnelsPluginTest.java:87`, `SftpPluginTest.java:25`
    and the staged `RemoteShortcutConfigTest.java:79-82` (`menu.target().key()` equal to `"dev.jasper.remote.menu"`).
 5. File Server registers `NEW` ("New File Server…", `FileServerPlugin.java:153-155`) and no menu entry for it; the
    empty File Servers panel's "Share Folder…" button runs `actions.edit().accept(Optional.empty())`
    (`FileServersPanel.java:138,213-214`), which `createPanel` maps to `edit(window, Optional.empty(), false)`
    (`FileServerPlugin.java:246-247`), the same call NEW makes.
 6. `ActionId` is the built-in catalog, each with a macOS and an other-platform default and a context
-   (`ActionId.java:10-50`); `NEW_WINDOW` is at `:13`. `KeyBindingsTest.actionCatalogCoversEveryPhaseOneActionAndUsesStableIds`
-   lists the catalog in order (`KeyBindingsTest.java:18-32`) and `KeymapDefaultsTest` needs a row per action
+   (`ActionId.java:10-52`); `NEW_WINDOW` is at `:13`. `KeyBindingsTest.actionCatalogCoversEveryPhaseOneActionAndUsesStableIds`
+   lists the catalog in order (`KeyBindingsTest.java:18-31`) and `KeymapDefaultsTest` needs a row per action
    (`KeymapDefaultsTest.java:21-75`).
 7. `WorkspaceActions` builds one `Action` per `ActionId` (`WorkspaceActions.java:18-24`), sets tooltips on Settings and
-   Reload (`:25-27`), dispatches in `invoke` (`:33-90`, NEW_WINDOW at `:51`) and enables in `update`, where COMMAND_PALETTE,
+   Reload (`:26-27`), dispatches in `invoke` (`:33-90`, NEW_WINDOW at `:51`) and enables in `update`, where COMMAND_PALETTE,
    NEW_TAB, NEW_WINDOW, QUIT and TOGGLE_ZEN_MODE are always on (`:119`). `WindowChrome` builds File from NEW_TAB,
-   NEW_WINDOW, CLOSE_TAB, CLOSE_PANE, OPEN_SETTINGS, RELOAD_CONFIG, QUIT (`WindowChrome.java:66-67`). `WindowCommands`
-   registers every ActionId but the palette as a palette command with keywords (`WindowCommands.java:39-58`).
-8. A Cmd-click reaches `WindowContent.onOpenFile` (`WindowContent.java:163`, `:1005-1014`), which the application sets to
+   NEW_WINDOW, CLOSE_TAB, CLOSE_PANE, OPEN_SETTINGS, RELOAD_CONFIG, QUIT (`WindowChrome.java:75-76`; 3d's Session and Transfer menus are built at `:330-331`). `WindowCommands`
+   registers every ActionId but the palette as a palette command with keywords (`WindowCommands.java:39-59`).
+8. A Cmd-click reaches `WindowContent.onOpenFile` (`WindowContent.java:163`, `:1005-1015`), which the application sets to
    `openFileAt(file, line, windowId)` (`JasperApplication.java:420`), routing an existing regular file to the default
    editor (`:534-551`); `Rehearsal.silence` and `WindowContent.close` reset it (`Rehearsal.java:145`,
-   `WindowContent.java:1434`). `WindowContent.directory()` is the active pane's inheritable folder (`:897`).
+   `WindowContent.java:1435`). `WindowContent.directory()` is the active pane's inheritable folder (`:898`).
 9. The application's auxiliary windows exist once plugins start: `auxiliary = new AuxiliaryWindows(uiState,
    shells::create, shells::choosePaths)` (`JasperApplication.java:849`). `AuxiliaryWindows.choose(PathChoice, …)`
    delegates to its `PathChooser` (`AuxiliaryWindows.java:28-33`); `PathChoice` takes a terminal owner, a title, a mode,
-   `multiple`, a terminal folder and sources (`PathChoice.java:15-29`); `NativeShells.choosePaths` shows Jasper's file
-   chooser document-modally over the terminal window (`NativeShells.java:378-390`). `application`'s allowed edges
+   `multiple`, a terminal folder and sources (`PathChoice.java:15-27`); `NativeShells.choosePaths` shows Jasper's file
+   chooser document-modally over the terminal window (`NativeShells.java:378-391`). `application`'s allowed edges
    include `windows` but not `files` (`application/package-info.java:3`).
 10. Vault sets its status text once to "Vault" (`VaultPlugin.java:160`) and `refreshStatus` sets the icon, tooltip and
     action by `LockState` (`:349-355`); `LockState` is `NO_VAULT, LOCKED, UNLOCKED` (`LockState.java:4`);
-    `VaultPluginTest.java:247,253,258` pin the status lines; `BundledSamplePluginTest.java:61` expects "Vault" in a
+    `VaultPluginTest.java:248,254,259` pin the status lines; `BundledSamplePluginTest.java:61` expects "Vault" in a
     fresh home (no vault).
 11. Snippets' verbs are `PASTE = new PaletteVerb("paste", "Paste")`, `PASTE_RUN` ("Paste and run") and `EDIT` ("Edit
     file") (`SnippetsScope.java:24-26`); 3d Task 6 edits only its `ScopeSpec` line.
 12. `SchemaPage.viewSpec` groups items into cards: a `SectionItem` closes the run and starts a titled one, a full-span
     row stands alone, `close` adds nothing for an untitled empty run and an untitled card otherwise
-    (`SchemaPage.java:293-331`); `sectionShown` hides a section whose rows are all hidden (`:242-252`). The pages with
+    (`SchemaPage.java:294-332`); 3b's `NoticeItem` joins the current run like an action row (`:319`); `sectionShown` hides
+    a section whose rows are all hidden (`:242-251`). The pages with
     untitled leading rows are Command Palette, Desk Buddy, System Settings, Terminal, Cursor and Shell
-    (`CorePages.java:138-170,184-185`); generated plugin pages emit a section only when a declaration names one
-    (`PluginSettingsPage.java:54-66`). `PageKit.sectionTitles` reads the mounted `section-N.title` labels
+    (`CorePages.java:138-172,184-185`); generated plugin pages emit a section only when a declaration names one
+    (`PluginSettingsPage.java:55-66`). `PageKit.sectionTitles` reads the mounted `section-N.title` labels
     (`PageKit.java:46-56`).
 13. New File Server shows its warnings as one DESCRIPTION line "Warning · a · b", blank when there are none
-    (`ServerEditor.java:451`), from `ServerRows.warnings` (`ServerRows.java:67-75`); its folder is an editable PATH
-    field with the hint "No folder selected" and a separate Choose… trailing button (`ServerEditor.java:399-401`), and
-    an `Edited` of FOLDER sets the draft (`:170`). Folders are typed in `ServerEditorTest.java:53,81`,
-    `ServerCompositionTest.java:48,70`, `ServerLifetimeTest.java:59`, `FileServerPluginTest.java:276`,
-    `StagedFileServerFormTest.java:91,95,96`, `SurfaceFixtures.java:25` and `FileServerRenderEvidenceTest.java:98`
+    (`ServerEditor.java:458`), from `ServerRows.warnings` (`ServerRows.java:67-75`); its folder is an editable PATH
+    field with the hint "No folder selected" and a separate Choose… trailing button (`ServerEditor.java:404-406`), and
+    an `Edited` of FOLDER sets the draft (`:170`); 3b's read-only helper already builds the 13-argument Field (`:376`). Folders are typed in `ServerEditorTest.java:53,81`,
+    `ServerCompositionTest.java:56,83`, `ServerLifetimeTest.java:59`, `FileServerPluginTest.java:276`,
+    `StagedFileServerFormTest.java:93,97,98`, `SurfaceFixtures.java:25` and `FileServerRenderEvidenceTest.java:98`
     (`((JTextComponent) StagedVaultHost.named(editor.holder(), "server.folder.input")).setText(home.toString())`, then
     Save and `await(editor::closed, "server saved")`, over `AppContractTest::headlessWindows` at `:54`, whose chooser
     answers nothing).
 14. 3b: `Nodes.Notice(String id, ControlState state, Severity severity, String text)` is allowed as a form section, its
-    text a non-blank sentence the presentation prefixes with the severity's word (3b Task 6, Rulings 2 and 5); the
+    text a non-blank sentence the presentation prefixes with the severity's word (3b Task 6, Rulings 2 and 5;
+    `Nodes.java:701-720`, whose four-argument constructor gives no actions); the
     13-argument `Nodes.Field(…, boolean readOnly)` is focusable and never edited, and the fake drops an `Edited` sent to
     a read-only field (3b Task 1, Rulings 7).
 15. The staged host's auxiliary windows choose nothing: `AppContractTest.headlessWindows(UiState)` builds
-    `AuxiliaryWindows(state, shells)`, whose chooser returns an empty list (`AppContractTest.java:107-113`,
-    `AuxiliaryWindows.java:18-20`); `StagedVaultHost` uses it (`StagedVaultHost.java:52`); `HostedUi.chooseDirectory`
-    goes through `windows.choose` for a live terminal owner (`HostedUi.java:539-575,677-679`). `Location.local(Path)`
+    `AuxiliaryWindows(state, shells)`, whose chooser returns an empty list (`AppContractTest.java:106-113`,
+    `AuxiliaryWindows.java:18-20`); `StagedVaultHost` uses it (`StagedVaultHost.java:53`); `HostedUi.chooseDirectory`
+    goes through `windows.choose` for a live terminal owner (`HostedUi.java:583-640,722-724`). `Location.local(Path)`
     and `localPath()` exist (`Location.java:22,28`).
-16. Plugin form labels in Title Case: "Reachable From" (`ServerEditor.java:402,405`), "Jump Host" (`HostEditor.java:358`,
+16. Plugin form labels in Title Case: "Reachable From" (`ServerEditor.java:407,410`), "Jump Host" (`HostEditor.java:358`,
     twice), "Via Host" (`TunnelEditor.java:269`, twice), "Listen On" (`:280`) and "Forward To" (`:283`); tests pin them
     at `TunnelEditorTest.java:81-82` and `TunnelsCompositionTest.java:110,117`. A scan of every `FormRow` and form-row
     helper in `plugins/` finds no other multi-word Title Case label.
 17. Host rows (`KitSettingRows`, app) render a `stringList` as a TEXTAREA joined by newlines and stage it from an
-    `Edited` split on newlines (`KitSettingRows.java:41-48,116`); the testkit's mirror does the same
-    (`jasper-sdk-testkit/.../KitSettingRows.java:33-40`, `FakeSetting.java:105`) and its `FakeSettingsPanelHost.event`
-    routes owned row events (`FakeSettingsPanelHost.java:86-120`). The generated pages' editor for a `stringList` is
+    `Edited` split on newlines (`KitSettingRows.java:41-53,117`); the testkit's mirror does the same
+    (`jasper-sdk-testkit/.../KitSettingRows.java:33-46`, `FakeSetting.java:105`) and its `FakeSettingsPanelHost.event`
+    routes owned row events (`FakeSettingsPanelHost.java:87-124`). The generated pages' editor for a `stringList` is
     `Editors.textList()`'s `Items`: an ORDERED `ItemList` of `item-N` rows over an INLINE entry Field `<id>:new` ("Add…",
     "Add to <label>") and an Add button `<id>:add`, handling `Edited`, `Action`, `Removed` and `Reordered`
-    (`Editors.java:176-178,386-450`). Plugin panels get host rows through `SettingsPanelHost.row`; Project Index's
+    (`Editors.java:180-182,395-448`). Plugin panels get host rows through `SettingsPanelHost.row`; Project Index's
     markers, ignored paths and excludes are `stringList` host rows (`IndexerSettingsPanel.java:121-122`,
     `IndexerSettings.java:41-51`). `PluginPanelPage` re-renders after a handled host event and reads validity from the
     rows (`PluginPanelPage.java:96-97,122`).
 18. Project Index's Location column is BODY and its Files column MONO_SMALL (`IndexerSettingsPanel.java:139-143`).
 19. `PaletteController.RECENT_ROWS = 2, SUGGESTED_ROWS = 10` (`PaletteController.java:21`); the empty query shows the
-    last `RECENT_ROWS` distinct rows run, then ranked ones up to `SUGGESTED_ROWS` (`:187-217`);
+    last `RECENT_ROWS` distinct rows run, then ranked ones up to `SUGGESTED_ROWS` (`:183-215`);
     `PaletteScopesTest.java:106-131` and `CommandPalettePreview.java:248` assume two recents.
 20. `tools/visual/pairs.json` round-trips byte for byte through `json.dumps(…, indent=2) + "\n"`, and
-    `compare_all.py` reads `name`, `mock`, `crop`, `render` and `render_crop` (`compare_all.py:4-7,23-36`).
+    `compare_all.py` reads `name`, `mock`, `crop`, `render` and `render_crop` (`compare_all.py:6-7,23-37`).
 21. The spec banners to amend: Snippets (`2026-09-15-jasper-snippets-design.md:3`), Palette plugins
     (`2026-09-21-jasper-palette-plugins-design.md:3-4`), Remote (`2026-09-22-jasper-remote-design.md:3-5`), Remote tunnels
     (`2026-09-30-jasper-remote-tunnels-design.md:3-6`), SDK clipboard and Tools menu
     (`2026-10-13-sdk-clipboard-and-tools-menu-design.md:3-4`), Vault (`2026-09-22-jasper-vault-design.md:7-9`).
-22. Documents naming what changes: `docs/remote.md:42-43,171,234,288,299,301,307`, `docs/file-server.md:13`,
+22. Documents naming what changes: `docs/remote.md:42-43,171,234,288,299,301,307`, `docs/file-server.md:14`,
     `docs/credential-vault.md:43,96`, `docs/command-palette.md:10,39,157`, `docs/editor.md:9-10`,
-    `docs/plugin-authoring.md:607-610`, `docs/plugin-ui.md:170`.
+    `docs/plugin-authoring.md:623-626`, `docs/plugin-ui.md:178`.
 23. Every file this plan edits has a `migration.csv` row except `ActionId.java` and `SnippetsScopeTest.java`, which are
     not candidates (checked against `ThemeMigrationCoverageTest.CANDIDATE`, `ThemeMigrationCoverageTest.java:17-18`).
 24. Dry run (2026-10-16, while writing this plan): every edit script of Tasks 1 to 9 applied cleanly, in order, to a copy
@@ -312,7 +319,9 @@ Read at `222969926`; the later plans move lines but not these facts, except wher
     `StandardMenu.SESSION` and 3b's Notice and read-only field), jasper-app, the testkit and the plugins compiled, and
     the full jasper-app and testkit suites passed but for the assertions that need those edits; the staged File Server
     form chose its folders through the scripted chooser and saved. 3b to 3d come in between, so the executor's runs are
-    the evidence.
+    the evidence. Re-anchor dry run (2026-10-16, at `149cd8fb9`, no Gradle): every edit script of Tasks 1 to 8 and of
+    Task 9 Steps 1 to 3 applied cleanly, in order, to an archive copy of the branch, and the verification greps of Task 1
+    Step 4, Task 5 Step 4, Task 6 Step 4 and Task 7 Step 4 gave their expected results on that copy.
 
 ## File structure
 
@@ -526,8 +535,8 @@ auxiliary windows (Rulings 4).
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java:13`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceActions.java:27,51,119`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java:163,669,1434`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java:66`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java:163,669,1435`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java:75`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommands.java:51`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/windows/AuxiliaryWindows.java:34` (a method before `window`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:420`
@@ -777,7 +786,7 @@ Rulings 5), and the Snippets scope's first verb reads "Insert" (id `paste`, Ruli
 **Files:**
 - Modify: `plugins/vault/src/main/java/dev/jasper/vault/VaultPlugin.java:160,349-357`
 - Modify: `plugins/snippets/src/main/java/dev/jasper/snippets/SnippetsScope.java:22-24`
-- Test: `plugins/vault/src/test/java/dev/jasper/vault/VaultPluginTest.java:253,258`,
+- Test: `plugins/vault/src/test/java/dev/jasper/vault/VaultPluginTest.java:254,259-260`,
   `plugins/snippets/src/test/java/dev/jasper/snippets/SnippetsScopeTest.java` (one test)
 
 **Interfaces:**
@@ -897,8 +906,8 @@ Command Palette, Desk Buddy, Terminal, Cursor, Shell and every generated plugin 
 Settings' first group is titled "General". One rule in `SchemaPage.viewSpec` (Rulings 7).
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:301-304,309-312,321,324`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/CorePages.java:179-185`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:302-304,311-313,322,326`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/CorePages.java:180-185`
 - Test: `jasper-app/src/test/java/dev/jasper/app/settingsui/SchemaPageTest.java:170` (and one test),
   `jasper-app/src/test/java/dev/jasper/app/settingsui/CorePagesTest.java` (one test),
   `jasper-app/src/test/java/dev/jasper/app/plugins/PluginSettingsPageTest.java` (one test and a helper)
@@ -1077,17 +1086,17 @@ separate Choose… changes (Rulings 9). Tests that typed a folder choose it inst
 fake's queued selection, and a scripted chooser in the staged host.
 
 **Files:**
-- Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:56,170,400,448-452`
+- Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:56,170,405,455-459`
 - Test: `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerEditorTest.java:23,36,52-53,81-84,175,228,231`
-  (two new tests), `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerCompositionTest.java:15,48,64-74,76-78`,
+  (two new tests), `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerCompositionTest.java:15,56,72-87,89-91`,
   `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerLifetimeTest.java:51,59`,
-  `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/UiTestAccess.java:40`,
+  `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/UiTestAccess.java:42`,
   `plugins/fileserver/src/test/java/dev/jasper/fileserver/FileServerPluginTest.java:276`
-- Test (staged host): `jasper-app/src/test/java/dev/jasper/app/plugins/AppContractTest.java:110-113`,
-  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedVaultHost.java:52,196`,
+- Test (staged host): `jasper-app/src/test/java/dev/jasper/app/plugins/AppContractTest.java:109-113`,
+  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedVaultHost.java:44,53,196`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/KitViewTestAccess.java:125`,
   `jasper-app/src/test/java/dev/jasper/app/appearance/SurfaceFixtures.java:25`,
-  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java:91,95,96`,
+  `jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java:93,97,98`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/FileServerRenderEvidenceTest.java:54,98`
 
 **Interfaces:**
@@ -1336,7 +1345,7 @@ Rulings 10): "Via host", "Jump host", "Reachable from", "Listen on", "Forward to
 **Files:**
 - Modify: `plugins/remote/src/main/java/dev/jasper/remote/ui/HostEditor.java:358`
 - Modify: `plugins/remote/src/main/java/dev/jasper/remote/ui/tunnels/TunnelEditor.java:269,280,283`
-- Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:402,405`
+- Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:407,410`
 - Test: `plugins/remote/src/test/java/dev/jasper/remote/ui/tunnels/TunnelEditorTest.java:81-82`,
   `plugins/remote/src/test/java/dev/jasper/remote/ui/tunnels/TunnelsCompositionTest.java:110,117`,
   `plugins/remote/src/test/java/dev/jasper/remote/ui/HostEditorTest.java:110`,
@@ -1462,11 +1471,11 @@ node, in the host's `KitSettingRows` and the testkit's mirror alike (Rulings 11)
 entry below adds one, a rejected value keeps its entry and shows the row's error, and stale events change nothing.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitSettingRows.java:15,27,36-48,96,116`
-- Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/KitSettingRows.java:12,28,33-37,51`
-- Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeSettingsPanelHost.java:27-33,50,89,123`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitSettingRows.java:15,27,38-57,93,117`
+- Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/KitSettingRows.java:12,26,36-39,57`
+- Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeSettingsPanelHost.java:27-33,50,91,126`
 - Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeSetting.java:105`
-- Test: `jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeKitMountingTest.java:42` (and one test),
+- Test: `jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeKitMountingTest.java:41` (and one test),
   `jasper-app/src/test/java/dev/jasper/app/plugins/PluginPanelPageTest.java` (one test and a helper),
   `plugins/indexer/src/test/java/dev/jasper/indexer/ui/IndexerSettingsPanelTest.java:60`
 
@@ -1621,7 +1630,8 @@ PY
 Run: `./gradlew :jasper-sdk-testkit:test --tests dev.jasper.sdk.testing.FakeKitMountingTest :jasper-app:test --tests dev.jasper.app.plugins.PluginPanelPageTest --continue`
 Expected: FAIL. `aStringListRowIsTheOrderedListEditor` fails with a `ClassCastException` (the row's control is a
 TEXTAREA `Field`, not a `Stack`); `independentFakeRowsUseDeclaredKindsValidationAndNestedProjection` fails because
-the list events are not handled ("Owned setting event leaked"); `aStringListHostRowIsTheGeneratedPagesOrderedList`
+the list events are not handled: they reach the plugin's handler, whose "Owned setting event leaked" the fake view
+records as a failure, and the saved list stays `[before]`; `aStringListHostRowIsTheGeneratedPagesOrderedList`
 fails on the node comparison (a TEXTAREA field against the generated `Stack`).
 
 - [ ] **Step 3: Render and edit the list as the generated pages do**
@@ -1952,15 +1962,15 @@ measured against the baseline, and each whose render changed gains a note with i
 banner records the execution.
 
 **Files:**
-- Modify: `docs/remote.md:42-43,171,234,288,299,301,307`, `docs/file-server.md:13`, `docs/credential-vault.md:43,96`,
-  `docs/command-palette.md:10,39,157`, `docs/editor.md:10`, `docs/plugin-authoring.md:607-610`, `docs/plugin-ui.md:170`
+- Modify: `docs/remote.md:42-43,171,234,288,299,301,307`, `docs/file-server.md:14`, `docs/credential-vault.md:43,96`,
+  `docs/command-palette.md:10,39,157`, `docs/editor.md:10`, `docs/plugin-authoring.md:623-626`, `docs/plugin-ui.md:178`
 - Modify: `docs/superpowers/specs/2026-09-15-jasper-snippets-design.md:3`,
   `docs/superpowers/specs/2026-09-21-jasper-palette-plugins-design.md:4`,
   `docs/superpowers/specs/2026-09-22-jasper-remote-design.md:5`,
   `docs/superpowers/specs/2026-09-30-jasper-remote-tunnels-design.md:6`,
   `docs/superpowers/specs/2026-10-13-sdk-clipboard-and-tools-menu-design.md:4`,
   `docs/superpowers/specs/2026-09-22-jasper-vault-design.md:9`
-- Modify: `tools/visual/pairs.json` (a `note` on each measured change), `tools/visual/compare_all.py:4-7,36`, `tools/visual/README.md`
+- Modify: `tools/visual/pairs.json` (a `note` on each measured change), `tools/visual/compare_all.py:6,37`, `tools/visual/README.md:13-14`
 - Modify: `docs/STATUS.md:2` (a new entry at the top), `docs/superpowers/plans/2026-10-16-enterprise-3e-default-look.md:1` (the status banner)
 
 **Interfaces:**
@@ -2280,7 +2290,7 @@ PY
 ```
 
 Expected: `STATUS entry and banner written for <first>..<last>`. Read the new entry once: it sits above the previous
-top entry (plan 3d's), names the right range and lists the measured pairs.
+top entry (plan 3b's at `149cd8fb9`), names the right range and lists the measured pairs.
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.documentation.*'`
 Expected: BUILD SUCCESSFUL (the STATUS entry's and the banners' links resolve).
@@ -2307,3 +2317,111 @@ EOF
 ```
 
 Then stop: do not push or merge. The user reviews the branch and the GUI checks above.
+
+## Execution notes (2026-10-16)
+
+Re-anchored at `149cd8fb9` (plans 3a, 3b and 3d merged; 3c running in parallel in `.claude/worktrees/enterprise-3c`).
+Every quoted anchor, path and signature above was checked against the code there, and every edit script of Tasks 1 to
+8 and Task 9 Steps 1 to 3 was applied, in order, to an archive copy of the branch with no misses (Verified facts 24).
+The APIs the tasks consume exist as quoted: `StandardMenu.SESSION`/`TRANSFER`, `Menus.standard`,
+`MenuTarget.standard(Slot.SESSION)`, the fake's `"SESSION"`/`"TRANSFER"` keys; `Nodes.Notice` with its four-argument
+constructor and `actions()`; the 13-argument `Nodes.Field` (`…, presentation, alternateAction, cancelAction, listId,
+readOnly`) and the fake's drop of an `Edited` sent to a read-only field; `PathChoice`'s nine components;
+`Location.isLocal`/`localPath`; `AuxiliarySurface.Shell`'s six components; the seven-argument `Nodes.ItemList`
+convenience; `Editors.Items` node for node as Task 7 mirrors it; `PluginPanelPageTest.hostControl` (added by 3b);
+`IndexerSettingsPanelTest.table`; `PaletteVerb`'s two-argument constructor (3d added `role`). Only line numbers moved;
+they are updated in place. Shared-file and machine notes follow the table.
+
+### Pre-flight scan
+
+| Pair or task | Shared file or interface | Conflict? | Ruling |
+|---|---|---|---|
+| Task 1 / Task 5 | `FileServerPluginTest.java` | No: Task 1 inserts a test before `keyFilesSkipsLargeFilesAndFolders` (`:219`), Task 5 rewrites `:276` | E4 |
+| Task 1 / Task 2 | the menu bar (Session, Transfer from 3d; File gains Open File…) | No: Task 1 adds plugin sections, Task 2 edits `WindowChrome`'s File list only | none needed |
+| Task 1 / Task 9 | `docs/remote.md`, `docs/file-server.md`, the Remote, Remote tunnels and SDK clipboard banners | No: Task 9 documents what Task 1 did | none needed |
+| Task 2 / Task 5 | `AuxiliaryWindows` | No: Task 2 adds `openFile`; Task 5 builds `AuxiliaryWindows` through the existing three-argument constructor in `AppContractTest.headlessWindows(PathChooser)`, a new overload beside `headlessWindows()` and `headlessWindows(UiState)` that `onEdtValue(AppContractTest::headlessWindows)` (a `Supplier`) still resolves to the no-argument one | none needed |
+| Task 2 / Task 8 | the palette (`open_file` becomes a command; `RECENT_ROWS` 3) | No: `CommandPalettePreview` fills its ten rows from history, so the new command adds no filler row; `workspace-palette` is measured in Task 9 either way | E9 |
+| Task 3 / Task 9 | `docs/credential-vault.md`, `docs/command-palette.md`, the Snippets, Palette plugins and Vault banners | No | none needed |
+| Task 4 / Task 7 | plugin settings pages (`PluginSettingsPageTest` generated pages; `PluginPanelPageTest` plugin-built pages) | No: Task 4's rule lives in `SchemaPage` (Rulings 7), Task 7's in the host rows; Task 4 Step 4 runs `PluginPanelPageTest` before Task 7 changes it | none needed |
+| Task 4 / Task 9 | `docs/plugin-authoring.md:623-626` | No: two edits in one Task 9 script, applied in order | none needed |
+| Task 5 / Task 6 | `ServerEditor.java`, `ServerEditorTest.java` | No: different lines; Task 6's insertion anchor (`protocolChangesPreserveExplicitPortAndHiddenValues`) survives Task 5's insertion before it; no Task 5 test reads the "Reachable From" label | E4 |
+| Task 5 / Task 9 | `fileserver-add` pair; `docs/file-server.md` | No: Task 9 measures it (Tasks 5 and 6 both change it) | none needed |
+| Task 6 / Task 9 | `docs/plugin-ui.md:178`; `host-add`, `tunnel-new` pairs | No | none needed |
+| Task 7 / Task 8 | `IndexerSettingsPanelTest.java` | No: Task 7 rewrites `:60`, Task 8 inserts after `:65-66` | E4 |
+| Task 7 / Task 9 | `docs/plugin-authoring.md:626` | No | none needed |
+| Task 8 / Task 9 | `docs/command-palette.md:10`; `workspace-palette` pair | No | none needed |
+| Task 1 (alone) | Step 4 expects one test line naming `remote.menu` | Agrees (dry run: `RemotePluginTest.java:93`) | none needed |
+| Task 2 (alone) | Files list, Interfaces, Step 1 to Step 4 | Agrees: `fileChooser`, `openFile()` and `AuxiliaryWindows.openFile(UUID, Optional<Path>)` are used as declared; `OPEN_FILE` before `SPLIT_RIGHT` shifts the `SELECT_TAB_*` ordinals equally, which `update` compares only with each other | none needed |
+| Task 3 (alone) | `SnippetsScopeTest` stays a non-candidate | Agrees: the new test imports nothing from `dev.jasper.sdk.ui` | none needed |
+| Task 4 (alone) | `everyCorePagesFirstGroupIsTitled` lists all ten core pages | Agrees with `CorePages.java:94-200` | E10 |
+| Task 5 (alone) | Step 4's "no test types a folder" grep | Agrees (dry run: no output) | none needed |
+| Task 6 (alone) | Step 4's label scan | Agrees: at `149cd8fb9` it prints exactly the five labels, after Step 3 nothing | none needed |
+| Task 7 (alone) | Rulings 11 versus Step 3's code for an `Edited` of the list's own id; Step 2's expected failure of the existing fake test | Text disagreed with the code; corrected | E7, E8 |
+| Task 8 (alone) | `PaletteScopesTest` third recent; `CommandPalettePreview` index 4 | Agrees: ten history rows give three recents then Most used at index 4 | none needed |
+| Task 9 (alone) | Step 6's "above the previous top entry" | Corrected: the top entry at `149cd8fb9` is plan 3b's | E3 |
+| 3e / 3c: `Nodes.ItemList` | Task 7 builds the seven-argument convenience; 3c adds `ItemList.emptyText` | No compile conflict: 3c keeps every existing constructor as a convenience with new components last and empty | E2 |
+| 3e / 3c: shared files | `docs/STATUS.md`, `docs/plugin-ui.md`, the testkit fake, `migration.csv`, `docs/plugin-authoring.md`, `KitValuesTest.java` | Only `docs/STATUS.md` overlaps textually | E3 |
+
+### Rulings
+
+E1. **No rebase and nothing from 3c.** The Workspace check drops `git rebase main` and the `cellNodes` check: the branch
+already sits on `main` at `149cd8fb9`, and this plan's base stays there. Spec 13 needs only 3b's Notice and
+`Field.readOnly` and 3d's Session and Transfer menus. No task uses `Tree.columns`, `TableRow.cellNodes`/`heading`,
+`Table.empty`/`emptyText` or `ItemList.emptyText`: Project Index's Location column changes its `Column` role
+(`MONO_SMALL`) and keeps its plain cells, and the host's ordered list mirrors `Editors.textList()`, which has no empty
+line today — why: the computed task forbids rebasing, 3c runs in parallel, and section 13 asks for none of 3c's
+vocabulary — cost if wrong: a reviewer who wants an empty line on the host lists or on Project Index's table gets it
+in plans 9 and 10, and `aStringListHostRowIsTheGeneratedPagesOrderedList` makes the host list follow
+`Editors.textList()` if that ever gains one.
+
+E2. **Task 7's `ItemList` survives 3c's merge.** It uses the seven-argument convenience, which 3c keeps, with
+`emptyText` defaulting to `""` on both sides of the node comparison — why: 3c's Global Constraints keep existing
+constructors with new components last and empty — cost if wrong: one compile error at the second merge, fixed there.
+
+E3. **Shared files are reconciled by the second of the 3c and 3e merges.** `docs/STATUS.md`: both plans add a top
+entry; keep both, newest first (Task 9 Step 6 inserts below the title, above plan 3b's entry at `149cd8fb9`).
+`migration.csv`: this plan adds no row (it creates no source file). `docs/plugin-ui.md`: this plan edits `:178`, 3c
+inserts a bullet after `:182`; they should merge cleanly, otherwise keep both. The testkit fake: 3c edits
+`FakeKitView.java`, this plan `KitSettingRows.java`, `FakeSettingsPanelHost.java` and `FakeSetting.java`, so nothing
+overlaps. `docs/plugin-authoring.md`: this plan only. `KitValuesTest.java:116` keeps its "Via Host" projection fixture
+(it is not a plugin form, so Rulings 10 leaves it, as it leaves jasper-ui's fixtures; 3c appends a test to that file)
+— why: the computed task's reconciliation rule — cost if wrong: one hand-merged STATUS hunk.
+
+E4. **Tasks run in order 1 to 9.** The file pairs in the table touch disjoint lines and the dry run applied them in
+that order; running a later task first could move an anchor — why: one commit per task, in plan order — cost if wrong:
+an edit script stops on a moved anchor, which the plan already handles (re-quote and record).
+
+E5. **The Ruling 4 deviation still awaits the user.** Re-anchoring changes nothing about it: File › Open File… uses
+`AuxiliaryWindows.choose` (Jasper's chooser, `NativeShells.java:378`), and the STATUS entry and banner record the
+deviation — cost if wrong: as Rulings 4 says.
+
+E6. **Doclint wording.** The Global Constraint now says the SDK and jasper-app run `-Xdoclint:all` and the testkit's
+javadoc uses the JDK's default doclint (`jasper-sdk-testkit/build.gradle.kts` sets no option); Task 7 Step 4's
+`:jasper-sdk-testkit:javadoc` still runs, and the new comments carry no raw angle brackets or ampersands either way —
+cost: none.
+
+E7. **An `Edited` of an ordered list's own id stages nothing but marks the row.** In the host, Step 3 removes the
+`StringList` case, so such an edit reaches the edit switch's `default` ("Unexpected edit") and sets the row error; in
+the fake, `FakeSetting.edited` no longer splits text, so the conversion fails and sets the row error. Rulings 11
+("no longer stages anything") holds; no kit control emits an `Edited` for an `ItemList` id, so only a malformed event
+shows the error — why: refusing a value the editor never produces is safer than ignoring it silently — cost if wrong:
+one `return true` in each `listEvent` for an `Edited` of the list's own id.
+
+E8. **Task 7 Step 2's expected failure, corrected.** `FakeKitView.emit` catches what the plugin's handler throws and
+counts it as a view failure, so `independentFakeRowsUseDeclaredKindsValidationAndNestedProjection` fails on the saved
+list (`[before]`, not `[one, two]`), not with an `AssertionError` reading "Owned setting event leaked". The step's text
+now says so — cost: none.
+
+E9. **`open_file` in the palette changes no expected palette rows.** `CommandPalettePreview` runs ten history rows, so
+the empty query has no Suggested filler, and `PaletteScopesTest` asserts only the leading recent and Most used rows. If another render shows the
+command, Task 9 Step 4 measures it and the pixel rule's by-design list covers it ("File's Open File…") — cost: one
+EXTRA_NOTES line.
+
+E10. **3b's settings `NoticeItem`s and the leading-heading rule.** A `NoticeItem` before a page's first section would
+join the leading run and take the page's name as its heading. No page has one: System Settings' VM notices sit under
+"Java Virtual Machine", after the new "General" section — why: the rule titles a leading card, whatever it holds —
+cost if wrong: one more `heading` condition if a future page starts with a notice.
+
+E11. **Concurrent builds on this machine.** Another plan's Gradle builds run at the same time. If a timing-sensitive
+test fails once, re-run that test alone before treating it as a failure, and record a confirmed flake in the status
+banner. Never run `./gradlew --stop`, which would stop the other sessions' daemons — cost: one re-run.
