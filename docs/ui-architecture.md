@@ -6,7 +6,7 @@ Plan 3 owns final surface composition; the [completion record](design/theme-engi
 
 | Package | Allowed outgoing UI packages | Ownership |
 | --- | --- | --- |
-| `theme` | none | Jasper theme files (Slate Cobalt is bundled), semantic palettes, terminal and editor schemes, syntax, glass and FlatLaf keys; EDT appearance binding |
+| `theme` | none | Jasper theme files (Slate Cobalt is bundled), semantic palettes and derived roles, terminal and editor schemes, syntax, glass, FlatLaf keys and paint-time contrast guards; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
 | `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`), type scales and faces, central typography/motion roles |
 | `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces and FlatLaf key set; `Kit.DEFAULT` is the default look |
@@ -107,6 +107,12 @@ variant (`EditorColors` and syntax styles, written as colours or as references i
 palette, the matching terminal scheme, the editor scheme and syntax and the glass; `FlatLafInstaller.install(theme, kit)`
 derives FlatLaf's UI keys from the roles when it installs one (`UiColorKeys.flatLaf(theme, kit.uiKeys())`). Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
 apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.
+A variant may also list eight of its derived roles (`GeneratedTheme.derivedOverrides()`); `DerivedPalette.of(theme)`
+gives all 23 `DerivedColor`s, each the override or its recipe over semantic roles and the derived roles before it,
+kept by theme identity (header chrome passes `TitleBarTheme.of(theme)`). `PaintPair` declares a pair a painter paints,
+naming either kind of `ColorRole`, with its `SurfaceContrast.Guard` (text 4.5:1, indicator 3:1, structural boundary
+1.3:1, control boundary 1.5:1, or a CIE L* distance); `SurfaceContrast.painted` applies the guard where the pair is
+painted and never changes a role.
 `ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-cobalt.json`. Shadows are black at the kit's shadow
 metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
 small to slice gets its own cached mask), and a hollow mask has the face cut out so nothing of the shadow lies under a

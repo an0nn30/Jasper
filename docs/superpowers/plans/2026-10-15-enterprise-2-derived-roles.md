@@ -1,5 +1,8 @@
 # Enterprise presentation 2: derived roles Implementation Plan
 
+> **Status (2026-10-15): executed on `claude/enterprise-derived-roles` (`b30872f4a..5056f88dc`, then this documentation commit).** Deviations from this plan's
+> text: none beyond its "Planned deviations".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The theme engine gains the colour side of the Enterprise look: host-private derived roles computed from every

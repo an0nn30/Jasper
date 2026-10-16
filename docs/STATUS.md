@@ -1,5 +1,38 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 2: derived roles — 2026-10-15** (`claude/enterprise-derived-roles`, worktree
+`.claude/worktrees/enterprise-derived-roles`, `b30872f4a..5056f88dc`, then this documentation commit;
+[plan](superpowers/plans/2026-10-15-enterprise-2-derived-roles.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The theme engine gains the colour side
+of the Enterprise look. `DerivedColor` names spec 7.1's 23 host-private derived roles; `DerivedPalette.of(theme)`
+computes them in order from the palette (each recipe reads only semantic roles and earlier derived roles, checked
+over every palette by `DerivedColorTest`), or takes the variant's override, and keeps the last four themes by identity.
+A variant may list the eight overridable roles as `#RRGGBB` (`JasperTheme.DERIVED_OVERRIDES`, read before
+`SemanticColor.of`), carried as `GeneratedTheme.derivedOverrides()` and by `TitleBarTheme`. `SurfaceContrast` gains the
+structural (1.3) and control (1.5) boundary floors and `Guard`, the paint-time repair a face declares for a
+`PaintPair` (over the sealed `ColorRole` of both enums), applied by `SurfaceContrast.painted`. The converter writes the
+override keys from IntelliJ keys the theme or a parent in its plugin sets; the Ocean and Dawn fixtures exercise them,
+the goldens and the four built-in Catppuccin themes are regenerated (each flavour now authors five derived roles), and
+`derived-roles.tsv` freezes the built-in variants' derived roles (Slate Cobalt Light meets spec 7.1's calibration:
+#DFE2E6, #F1F2F2, #EEF3FB), and `KnownRepairsTest` measures spec 7.3's known repairs on the theme set (Latte's
+warning pair is 2.09:1 with its authored ground, against the spec's 2.06:1 from the recipe). jasper-ui's gallery and kit fixtures are a `testFixtures` source set shared with
+jasper-app; `KitFixtures.themes()` and `degenerate()` (eight palettes) feed `KitMatrixTest` (every gallery fixture under
+`Kit.DEFAULT` over the theme set, and no literal under `custom()`) and `PaintedContrastTest` (formerly
+`ShippedControlReadabilityTest`: the default look's eight declared pairs painted exactly as their guards make them over
+every palette, and the unguarded off switch as authored). Zero pixel change: no default painter reads a derived role,
+and the headless gallery's 142 files for Slate Cobalt Dark and Light are byte-identical to the base. Planned
+deviations (plan, "Planned deviations"): (1) the default look's pair declarations live in `PaintedContrastTest` until
+plan 4's faces, with `PaintSpecTest`; repairs public API does not reach keep their package tests; (2) the theme set
+takes ocean, ocean-dawn and stray (`paper-light` has no palette), Enterprise joins in plan 5; (3) `KitMatrixTest` is the
+default kit's part of 16.1.3; (4) recipe details: translucent inputs laid over the recipe's surface, the primed borders
+guarded on `surface.card`, the zebra's halfway fallback, `accent.edge`'s direction, a four-theme identity cache; (5) the
+Java loader accepts override keys in any order, the converter writes and checks them after the roles; (6) the converter
+counts only keys the theme or its plugin's parents set, and lays translucent values over `surface.app` or
+`surface.card`; (7) `KitGallery.main` splits into `installed` and `capture`. For plan 7's review: Slate Cobalt Dark's
+active header (#232B3C) comes out darker than its inactive header (#2D3036), as `apart` moves toward black, and each
+Catppuccin flavour authors one colour for both headers. `./gradlew check --continue`: **10,500 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the
+user: none new (nothing visible changed). Not merged, not pushed.
+
 **Enterprise presentation, plan 1: the kit seam — 2026-10-15** (`claude/enterprise-presentation`, worktree
 `.claude/worktrees/enterprise-presentation`, `d4598cfac..96ca2e236`;
 [plan](superpowers/plans/2026-10-15-enterprise-1-kit-seam.md),

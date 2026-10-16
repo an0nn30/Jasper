@@ -6,7 +6,8 @@ and library APIs into these values; plugins use SDK contracts and host adapters.
 
 The engine is `dev.jasper.ui.theme`: `JasperTheme` reads a Jasper theme file (the bundled Slate Cobalt is `slate-cobalt.json`) and gives
 each variant's semantic palette, terminal and editor schemes, syntax styles and glass levels as an immutable
-`GeneratedTheme` (`UiColorKeys` derives FlatLaf's UI keys from its roles when it is installed); the app reads installed theme files with the same
+`GeneratedTheme` (`UiColorKeys` derives FlatLaf's UI keys from its roles when it is installed); `DerivedPalette` computes its
+derived roles and `SurfaceContrast` holds the paint-time contrast guards; the app reads installed theme files with the same
 loader. The app and plugins use this authority; [completion evidence](../docs/design/theme-engine/completion.md)
 separates source migration from Plan 3 composition.
 

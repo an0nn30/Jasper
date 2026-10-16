@@ -17,6 +17,10 @@ contact sheets and a manifest under `jasper-ui/build/gallery/<theme>-<scale>x`. 
 state, typed descriptor busy/error/visibility state, route, central font and scale. It excludes values
 and secrets. Coverage tests require all 26 nodes, enum variants, nine originals and real panel
 transitions. Test and gallery classes stay out of the production jar.
+The gallery and the kit fixtures (`KitFixtures`, `Edt` and the `dev.jasper.ui.gallery` builders) are jasper-ui's
+`testFixtures` source set, which jasper-app's tests use through `testFixtures(project(":jasper-ui"))`. Inside
+`check`, `KitMatrixTest` renders every fixture under `Kit.DEFAULT` over `KitFixtures.themes()`, and jasper-app's
+`PaintedContrastTest` samples every declared pair over the theme set and `KitFixtures.degenerate()`.
 
 Install `FlatLafInstaller.install(theme, kit)` before constructing fixtures. Logical sizes go through `UIScale` once;
 the capture's device transform is 1. Do not scale both component geometry and capture graphics.
@@ -38,6 +42,8 @@ Keep fixed geometry in named metrics read through a kit (`KitContext.metrics()`,
 `StaticDefaultTest` rejects other `DesignMetrics.DEFAULT` reads and static metric finals. Preserve central font changes and logical scaling.
 
 When changing appearance, test contrasting chrome/workspace colors, replay/rollback and disposal.
+A derived role's recipe lives in `DerivedPalette`: changing one, or a built-in theme, updates `DerivedColorTest.INPUTS`
+and `derived-roles.tsv` in the same commit. A painter that repairs a pair declares it in `PaintedContrastTest`.
 When changing layout, test normal and enlarged fonts, narrow/short hosts, real viewport boundaries
 and 1×/2× geometry. Focus rings must remain external to full nominal fill bounds. Field placeholders
 have one paint owner. Validate actual FlatLaf delegates and scrollbars rather than fallback Metal.
