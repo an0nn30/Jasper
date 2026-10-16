@@ -231,8 +231,8 @@ final class Menus {
             arrow.setToolTipText("Open menu");
             arrow.getAccessibleContext().setAccessibleName("Open menu");
             arrow.setVisible(!menu.action().isBlank());
-            // A title strip's icon-only menu shows its indicator on the borderless control surface.
-            boolean strip = view.titleStrip() && menu.action().isBlank() && !embedded && menu.label().isBlank() && !menu.icon().isEmpty();
+            // A title or toolbar strip's icon-only menu shows its indicator on the borderless control surface.
+            boolean strip = (view.titleStrip() || view.toolbarStrip()) && menu.action().isBlank() && !embedded && menu.label().isBlank() && !menu.icon().isEmpty();
             ((Main) main).menuOnly = menu.action().isBlank() && !embedded && (!menu.label().isBlank() || strip);
             if (strip) {
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);

@@ -24,6 +24,49 @@ class WindowToolbarTest {
         };
     }
 
+    private JComponent view(WindowToolbar bar, int width, int height, int priority) {
+        var view = new JPanel();
+        view.setPreferredSize(new Dimension(width, height));
+        WindowToolbar.view(view, priority);
+        bar.add(view);
+        return view;
+    }
+
+    /** Plan 3d: a contributed view lays out at its preferred size, hides when the row is too narrow and never overflows. */
+    @Test void aViewHidesWhileTheRowIsTooNarrowAndNeverEntersTheOverflowMenu() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var view = view(bar, 200, 24, 40);
+        var settings = button(bar, action("Settings", calls), 100);
+        bar.finish();
+        assertThat(bar.fullWidth()).as("the view counts toward the full width").isEqualTo(16 + 200 + 4 + 60);
+        assertThat(bar.minimumWidth()).as("not toward the minimum: it can hide").isEqualTo(16 + 24);
+        bar.setSize(400, 30); bar.doLayout();
+        assertThat(view.isVisible()).isTrue();
+        assertThat(view.getBounds()).as("its preferred size, centred in the row").isEqualTo(new java.awt.Rectangle(128, 3, 200, 24));
+        assertThat(settings.getX()).isEqualTo(332);
+        bar.setSize(200, 30); bar.doLayout();
+        assertThat(view.isVisible()).as("too narrow: the view hides").isFalse();
+        assertThat(settings.isVisible()).isTrue();
+        assertThat(bar.overflowButton().isVisible()).as("a hidden view needs no overflow button").isFalse();
+        assertThat(bar.overflowMenu().getComponentCount()).as("and leaves nothing in the overflow menu").isZero();
+        bar.setSize(400, 30); bar.doLayout();
+        assertThat(view.isVisible()).as("room again: it shows").isTrue();
+    }
+
+    @Test void aLowerPriorityButtonOverflowsBeforeAViewHides() {
+        var calls = new AtomicInteger();
+        var bar = new WindowToolbar(() -> {});
+        var zoom = button(bar, action("Zoom", calls), 10);
+        var view = view(bar, 100, 24, 40);
+        button(bar, action("Settings", calls), 100);
+        bar.finish();
+        bar.setSize(16 + 100 + 4 + 60 + 4 + 24, 30); bar.doLayout();
+        assertThat(zoom.isVisible()).isFalse();
+        assertThat(view.isVisible()).isTrue();
+        assertThat(bar.overflowButton().isVisible()).isTrue();
+    }
+
     @Test void overflowRetainsActionsSelectionShortcutsAndLiveEnabledState() {
         var calls = new AtomicInteger();
         var bar = new WindowToolbar(() -> {});

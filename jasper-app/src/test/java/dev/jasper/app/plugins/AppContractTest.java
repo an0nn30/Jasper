@@ -238,6 +238,7 @@ class AppContractTest extends PluginContractTest {
                                 List<String> live = dropdown.actionIds().stream().filter(id -> contributions.action(id).isPresent()).toList();
                                 if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
                             }
+                            case dev.jasper.app.contributions.ToolbarEntry.View view -> lines.add("view");
                         }
                     }
                     return lines;

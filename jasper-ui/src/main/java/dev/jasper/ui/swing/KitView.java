@@ -328,6 +328,19 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Whether this view is presented as a window title action strip. */
     public boolean titleStrip() { return titleStrip; }
     private boolean titleStrip;
+    /**
+     * App-only: this view is a toolbar strip, a contributed view in a window's main toolbar. Its icon-only menu buttons
+     * show their menu indicator on the borderless control surface, as a title strip's do, and its controls keep the
+     * kit's control height, which the toolbar row centres. EDT confined.
+     */
+    public void toolbarStrip(boolean value) {
+        requireOpen();
+        if (toolbarStrip == value) return;
+        toolbarStrip = value; refresh(); repaint();
+    }
+    /** Whether this view is presented as a toolbar strip. */
+    public boolean toolbarStrip() { return toolbarStrip; }
+    private boolean toolbarStrip;
     @Override protected void paintComponent(Graphics graphics) {
         if (!surface) { super.paintComponent(graphics); return; }
         graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));

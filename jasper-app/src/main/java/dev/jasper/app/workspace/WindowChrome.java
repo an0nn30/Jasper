@@ -45,6 +45,15 @@ final class WindowChrome {
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
     private final List<JMenu> contributedMenus = new ArrayList<>();
     private final ToolbarSeparator pluginSeparator = new ToolbarSeparator();
+    /** When a contributed view gives way on a narrow row: after contributed buttons (30), before dropdowns (80). */
+    private static final int VIEW_PRIORITY = 40;
+    /** This window's built toolbar views by entry; null where the contributor's factory failed. */
+    private final java.util.Map<ToolbarEntry.View, ToolbarEntry.Mounted> views = new java.util.IdentityHashMap<>();
+    /** Whether this window's open event fired, so that it builds toolbar views. */
+    private boolean opened;
+    /** Whether a toolbar pass is running, and whether a change during it asked for another. */
+    private boolean renderingToolbar;
+    private boolean toolbarDirty;
     private WindowContributions contributions;
     private boolean renderingMenus;
     private boolean menusDirty;
@@ -146,6 +155,13 @@ final class WindowChrome {
         renderContributedMenus();
     }
 
+    /** This window's open event fired (its terminals are registered): it builds its toolbar views now. */
+    void windowOpened() {
+        if (opened) return;
+        opened = true;
+        renderContributedToolbar();
+    }
+
     private ReferenceButton contributedButton(Action action, String label, Icon icon) {
         ReferenceButton button = new ReferenceButton(action, null);
         button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
@@ -161,12 +177,42 @@ final class WindowChrome {
         return button;
     }
 
-    /** Rebuilds the plugin section after the built-in controls. */
+    /**
+     * Rebuilds the plugin section after the built-in controls. A contributed view is built once, after this window
+     * opened, and closed here when its entry goes or the window lets go of its contributions. A view's factory and its
+     * close are contributor code that may change the contributions (register an action, enable one, add a toolbar
+     * item), which renders the toolbar again from inside this pass: that nested call only marks the toolbar dirty, and
+     * this pass then runs again with the latest model, as {@code renderContributedMenus} does.
+     */
     void renderContributedToolbar() {
+        toolbarDirty = true;
+        if (renderingToolbar) return;
+        renderingToolbar = true;
+        try {
+            do {
+                toolbarDirty = false;
+                rebuildContributedToolbar();
+            } while (toolbarDirty);
+        } finally {
+            renderingToolbar = false;
+        }
+    }
+
+    private void rebuildContributedToolbar() {
         contributedToolbar.forEach(toolbar::remove);
         contributedToolbar.clear();
+        List<ToolbarEntry> entries = contributions == null ? List.of() : contributions.model().toolbar();
+        // Not "live": the Dropdown case below declares its own local of that name.
+        var liveViews = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ToolbarEntry.View, Boolean>());
+        for (ToolbarEntry entry : entries) if (entry instanceof ToolbarEntry.View view) liveViews.add(view);
+        for (var built = views.entrySet().iterator(); built.hasNext(); ) {
+            var next = built.next();
+            if (liveViews.contains(next.getKey())) continue;
+            if (next.getValue() != null) next.getValue().close();
+            built.remove();
+        }
         if (contributions != null) {
-            for (ToolbarEntry entry : contributions.model().toolbar()) {
+            for (ToolbarEntry entry : entries) {
                 switch (entry) {
                     case ToolbarEntry.Button placed -> {
                         Action action = contributions.action(placed.actionId());
@@ -193,6 +239,20 @@ final class WindowChrome {
                             popup.show(button, 0, button.getHeight());
                         });
                         contributedToolbar.add(button);
+                    }
+                    case ToolbarEntry.View view -> {
+                        // Built once per window and only after it opened, so never for the warm-up rehearsal's window.
+                        if (!opened) break;
+                        if (!views.containsKey(view)) {
+                            // Reserve the slot before the contributor's factory runs, so that no pass asks it twice.
+                            views.put(view, null);
+                            views.put(view, view.factory().apply(owner.id()).orElse(null));
+                        }
+                        ToolbarEntry.Mounted mounted = views.get(view);
+                        if (mounted == null) break;
+                        if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) kit.toolbarStrip(true);
+                        WindowToolbar.view(mounted.component(), VIEW_PRIORITY);
+                        contributedToolbar.add(mounted.component());
                     }
                 }
             }
