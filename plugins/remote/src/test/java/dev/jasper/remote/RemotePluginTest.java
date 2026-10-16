@@ -294,6 +294,7 @@ class RemotePluginTest {
                 "dev.jasper.remote.panel|Sessions|LEFT|dev.jasper.remote.hosts");
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.tunnels.scope|Tunnels|toggle,browse,edit",
                 "dev.jasper.remote.scope|SSH|connect,split,edit");
+            assertThat(host.scopePresentation("dev.jasper.remote.scope")).as("spec 14.4").isEqualTo("GREEN|session|STANDARD,SPLIT,STANDARD");
             assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
             assertThat(host.menu("VIEW")).as("View > Tool Windows already lists the three panel toggles").isEmpty();
             assertThat(host.status()).as("hidden at zero").isEmpty();

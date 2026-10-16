@@ -520,7 +520,10 @@ toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the sa
 geometry; standalone dialog titles remain 28px tall.
 
 `WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
-from the same Actions as their original placements. Do not retain a second plugin registry
+from the same Actions as their original placements. A contributed toolbar view (`ToolbarEntry.View`) is built once per
+window, when `WindowContent.connectTerminals` reports the window open (never for the warm-up rehearsal), and closed
+with its window or its entry; it lays out at its preferred size and hides, never overflows, when the row is too
+narrow. Do not retain a second plugin registry
 for overflow. Theme changes must retain selected-tab contrast when terminal colors differ
 from chrome. Host icons choose their authored light/dark variants for that surface; custom
 plugin icons remain plugin-owned.

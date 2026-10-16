@@ -751,6 +751,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed || terminals != null) return;
         bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
+        chrome.windowOpened();
     }
 
     java.util.List<TerminalTab> terminalTabs() {

@@ -69,7 +69,8 @@ public final class RecentFilesScope implements PaletteScope {
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(ID, "Recent files", "Search recently opened files", List.of(OPEN, REMOVE))
             .withDescription("Reopen a file the Editor opened recently, local or remote").withIcon(icon)
-            .withShortcutActionId(ACTION).withInAll(true).withInRecents(true);
+            .withShortcutActionId(ACTION).withInAll(true).withInRecents(true)
+            .withHue(dev.jasper.sdk.ui.Nodes.Hue.AMBER).withItemNoun("file");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

@@ -93,6 +93,7 @@ class VaultPluginTest {
                 "dev.jasper.vault.search|Search Vault Logins|true");
             assertThat(host.notifications().groups()).contains("dev.jasper.vault.copies|Vault copies|CARD");
             assertThat(host.scopes()).containsExactly("dev.jasper.vault.scope|Vault|copy_password,copy_username,open");
+            assertThat(host.scopePresentation("dev.jasper.vault.scope")).as("spec 14.6").isEqualTo("NEUTRAL|login|STANDARD,STANDARD,STANDARD");
             assertThat(host.scopesInAll()).as("secrets stay out of the All tab").isEmpty();
             UUID window = host.addTerminalWindow();
             assertThat(api.get().lockState()).isEqualTo(LockState.NO_VAULT);

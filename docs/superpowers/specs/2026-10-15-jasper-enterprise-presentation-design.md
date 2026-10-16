@@ -3,6 +3,8 @@
 Status: **Approved on 2026-10-15** (the user: "The spec is approved; left-aligned colon labels and keeping Form.hero are fine.").
 Amended late on 2026-10-15 for the second mock set (reference folders 07 to 10) under the user's overnight instruction "make
 decisions on my behalf": 5.1, 5.2, 5.9, 7.6, 8.2, 9.1, 10.8, 10.11, 14.1, 14.3, 14.6, 14.8, 16.2, 18 and 19.1.
+Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority: 8.2 (`DialogSpec.swatch`), 10.3 and 15
+(toolbar view admission).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -1052,7 +1054,7 @@ additions `hue`, `itemNoun` and `role` are drawn only by the Run window (11.2), 
 | `EditorHint.technical()` | `record Technical() implements EditorHint` | Host rows and generated pages draw the field with `FieldPresentation.TECHNICAL` | FTP passive ports, host rows |
 | `Nodes.Separator` | `Separator(String id, ControlState state)` | Only in INLINE and ACTIONS stacks, never first, last or beside another | SFTP ← → ⟳ \| Hidden files \| Upload ▾ |
 | `Form.footnote` | `String footnote` | One plain line drawn muted at the leading edge of the form's footer, beside its actions; blank draws none | Unlock Vault "Auto-locks after 15 min idle" |
-| `DialogSpec.swatch` | `Nodes.Hue swatch` | A SWATCH square of the hue before the dialog's title wherever the presentation draws the title (a native title bar draws none); NONE draws none | "■ Add Login", "■ Add SSH Key" |
+| `DialogSpec.swatch` | `Nodes.Hue swatch` | A SWATCH square of the hue before the dialog's title wherever the presentation draws the title (a native title bar, or FlatLaf's on Windows and Linux, draws none); NONE draws none | "■ Add Login", "■ Add SSH Key" |
 | `IconSize.SWATCH` | enum constant | A solid square of the icon's hue at caption size; the hue must not be NONE; the name stays a valid icon name | Run window hue squares; radio swatches |
 | `StandardMenu.SESSION`, `TRANSFER` | enum constants | Built-in menus with no items of their own, shown only while a plugin has entries in them, as TOOLS is | Session and Transfer menus |
 | `ToolbarItem.View` | `record View(ToolbarViewFactory factory)`; `@FunctionalInterface interface ToolbarViewFactory { UiView create(WindowHandle window); }` | Admission and lifetime in 10.3 | "Session: [combo] [Connect]" |
@@ -1212,7 +1214,9 @@ toolbar row's height.
 **`ToolbarItem.View` admission and lifetime:**
 
 - the root is an INLINE Stack of LABEL Text, Choice (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY Button,
-  MenuButton and Separator; anything else is refused at registration with a message naming the node;
+  MenuButton and Separator; anything else is refused with a message naming the node, when a window mounts the view
+  (contained and logged against the plugin; the view closes and that window shows none) and on every update (an
+  `IllegalArgumentException` to the caller), since `Toolbar.add` receives only the factory;
 - the factory runs when a window's open event fires, once per window, never for the rehearsal or a pre-built window
   until it is shown; the view closes with its window or its registration;
 - a view never goes into the overflow menu: it hides while the toolbar is too narrow for it;
@@ -1654,7 +1658,7 @@ Keychain" (section 18).
 | Import of a reserved plugin theme id | Refused: "<Theme> is provided by the <Plugin> plugin and can't be replaced" |
 | A saved pick of a dormant theme | The default theme, silently; the pick is kept |
 | A font fails to register | That face falls back to the platform face; a notice; the look stays |
-| A toolbar view's root breaks admission | `IllegalArgumentException` at registration naming the node |
+| A toolbar view's root breaks admission | At mount: contained, logged against the plugin naming the node, and the window shows no view; on update: `IllegalArgumentException` naming the node |
 | A toolbar view factory throws | Contained by `Containment` (logged against the plugin, counted and reported as an incident); that window shows no view |
 | A plugin built on 0.17 claims `<0.19` and uses a renamed member | Refused at load: "references removed SDK member <member>; rebuild it for SDK 0.18" |
 

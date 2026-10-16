@@ -44,6 +44,49 @@ reconcile them when the second of 3b and 3d merges. `./gradlew check --continue`
 New File Server, choose TFTP and see "No login (TFTP has none)" as a read-only field in the Access card; nothing else
 visible changed in the shipped surfaces. Not merged, not pushed.
 
+**Enterprise presentation, plan 3d: SDK 0.18 chrome — 2026-10-16** (`claude/enterprise-sdk-0-18-chrome`, worktree
+`.claude/worktrees/enterprise-3d`, `d6210499e..9f7a43ae8`, then this documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-15-enterprise-3d-sdk-0-18-chrome.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18's chrome additions (spec 8.2),
+each carried by the host, the testkit fake and the shared contracts. `StandardMenu.SESSION` and `TRANSFER` are
+built-in menus with no items of their own, shown after Tab and before Tools only while a plugin has entries in them.
+`ToolbarItem.View` with a `ToolbarViewFactory` places a plugin's own control group in the main toolbar: each window
+builds its view once when its open event fires (`WindowChrome.windowOpened`, from `WindowContent.connectTerminals`;
+never the warm-up rehearsal's window), closes it with the window or the registration, shows a kit view as a toolbar
+strip (`KitView.toolbarStrip`) on the title bar's theme (`ThemeRoute.TITLE_BAR`, the chrome's `TitleBarTheme`) at its
+preferred size, keeps it in the toolbar across passes (moved with `setComponentZOrder`, so that it keeps its focus and
+an open dropdown), and hides it rather than moving it into the overflow menu when the row is too narrow; buttons that
+gave way before a view hid come back when they fit. `ToolbarViewAdmission` (host and testkit) admits an INLINE stack of LABEL text, DROPDOWN,
+SEARCHABLE or PICKER choices, at most one PRIMARY button and menu buttons, at mount and on every update (separators join
+when plan 3b's `Nodes.Separator` is reconciled with this plan).
+`ScopeSpec.hue` and `itemNoun` and `PaletteVerb.role` (STANDARD or SPLIT: at most one, never the first verb) are
+validated by the SDK and the app registry and mirrored as `PaletteScope.hue()`, `itemNoun()` and `PaletteVerb.role()`
+with effective values (a scope's NONE becomes its manifest `icon_hue` through the new `HostedPlugin.iconHue`; a blank
+noun the label; the app registry refuses a NONE hue); nothing draws them until plan 8's Run window. `DialogSpec.swatch` reaches `AuxiliarySurface.swatch`
+and `MacTitleBar.setTitleSwatch` draws it before a window or dialog title. The bundled scopes carry spec 14.6's nouns
+and hues and Remote's split verb is SPLIT. The testkit gains `FakePluginHost.toolbarViews`, `closeToolbarViews`,
+`scopePresentation` and `dialogSwatch`. Zero pixel change: no addition is a node, and the headless gallery's files for
+Slate Cobalt Dark and Light are byte-identical to the base. Deviations from the spec, approved overnight by Claude under the user's authority and recorded in the spec: (plan,
+ruling 1; spec 10.3 and 15) admission runs when a window mounts the view (contained and logged, the refused view
+closed, no exception to the plugin) and on every update (an exception to the plugin), not at registration, since
+`Toolbar.add` sees only the factory; (plan, ruling 6; spec 8.2) on Windows and Linux the default look's dialogs carry
+FlatLaf's Swing title pane (`TitleBarStyle.CUSTOM`), which the plan counts as native, so no swatch shows there. On
+approval, spec 10.3, 15 and 8.2 gain an amendment line and this entry and the plan banner say "approved". Rulings (plan, "Rulings"): (2) a toolbar view's buttons are PRIMARY, at most one; (3) the open event is
+`connectTerminals`, and a failed factory is not asked again for that window; (4) views give way at priority 40; (5)
+`toolbarStrip` keeps the kit's 24 px control height, the default toolbar's button side; (6, a deviation above) the default look draws a
+swatch only in `MacTitleBar`'s title row (overlays draw no title, sheets have no title bar, Windows and Linux title bars
+are native); (7) an item noun is lowercase, stripped, at most 40 characters, without control characters; (8) the app
+mirrors hold effective values and capitalising the noun is plan 8's; (9) `SESSION` and `TRANSFER` follow `TOOLS` in the
+enum; (10) the fake builds views lazily per open window, none for a closed one, and closes them with the window; (11) no KitValues, ViewSpec or
+gallery change; (12) the admission rule exists in the host and the testkit. For plan 3e: Remote's SSH menu entries
+move into `StandardMenu.SESSION` and `TRANSFER` there. For plan 10: Remote's "Session: [hosts] [Connect]" is a
+`ToolbarItem.View`, and its first GUI check is that clicks reach the view's controls inside the macOS unified title bar
+while the bar's blank space still drags the window, and in the Windows/Linux FlatLaf title pane, where the toolbar's
+`COMPONENT_TITLE_BAR_CAPTION` function returns null and FlatLaf's hit test decides. `./gradlew check --continue` after the review fixes: **10,552 tests, 0 failures, 0 errors, 25 skipped** (its
+`:jasper-app:test` rerun once `WindowToolbarTest` installed its own theme instead of relying on another class's).
+GUI checks for the user:
+none new (no bundled plugin adds a toolbar view, a Session or Transfer entry or a swatch yet). Not merged, not pushed.
+
 **Enterprise presentation, plan 3a: SDK 0.18 renames — 2026-10-16** (`claude/enterprise-sdk-0-18-renames`, worktree
 `.claude/worktrees/enterprise-sdk-0-18`, `1021b1c5b..c86589c98`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3a-sdk-0-18-renames.md),

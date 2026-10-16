@@ -28,7 +28,7 @@ import java.util.function.Supplier;
 public final class RemoteScope implements PaletteScope {
     public static final String ID = "dev.jasper.remote.scope";
     public static final PaletteVerb CONNECT = new PaletteVerb("connect", "Connect");
-    public static final PaletteVerb SPLIT = new PaletteVerb("split", "Connect in split");
+    public static final PaletteVerb SPLIT = new PaletteVerb("split", "Connect in split", PaletteVerb.Role.SPLIT);
     public static final PaletteVerb EDIT = new PaletteVerb("edit", "Edit host\u2026");
     static final String CONNECT_ACTION = "dev.jasper.remote.connect";
     static final String ERROR_ROW = "error";
@@ -58,7 +58,8 @@ public final class RemoteScope implements PaletteScope {
 
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(ID, "SSH", "Search saved hosts", List.of(CONNECT, SPLIT, EDIT))
-            .withDescription("Connect to a saved SSH host").withShortcutActionId(CONNECT_ACTION);
+            .withDescription("Connect to a saved SSH host").withShortcutActionId(CONNECT_ACTION)
+            .withHue(dev.jasper.sdk.ui.Nodes.Hue.GREEN).withItemNoun("session");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

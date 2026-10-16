@@ -42,11 +42,25 @@ public interface ContractHarness extends AutoCloseable {
     /** Invokes an action as a window would; true when an enabled action ran. */
     boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull);
 
-    /** The toolbar's plugin section: {@code button:id} or {@code menu:title:id,id}; closed actions omitted. */
+    /** The toolbar's plugin section: {@code button:id}, {@code menu:title:id,id} or {@code view}; closed actions omitted. */
     List<String> toolbar();
 
     /**
-     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code context},
+     * UI thread: builds a window's toolbar views as the window does when it opens, once per window (a second call reports
+     * the same views), and reports each built view as its root's id, in toolbar order; a view whose factory threw or whose
+     * tree the toolbar does not admit is left out.
+     */
+    List<String> openToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: closes a window's toolbar views, as the window does when it closes. */
+    void closeToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: clicks the button with this node id in one of a window's open toolbar views, as the user would. */
+    void clickToolbarViewButton(java.util.UUID windowId, String buttonId);
+
+    /**
+     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
+     * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
      * spaces, sections separated by {@code ===}; items of closed actions omitted.
      */
@@ -89,6 +103,9 @@ public interface ContractHarness extends AutoCloseable {
 
     /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
     List<String> windows();
+
+    /** UI thread: the hue name of the square an open plugin dialog with this title draws before its title, or {@code -} when there is none. */
+    String dialogSwatch(String pluginId, String title);
 
     /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
@@ -193,6 +210,11 @@ public interface ContractHarness extends AutoCloseable {
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */
         List<String> scopes();
+        /**
+         * A registered scope's row presentation as {@code HUE|itemNoun|ROLE,ROLE}: its hue (NONE taken as the plugin's
+         * icon hue, NEUTRAL without one), its item noun (its label when it names none) and each verb's role, in order.
+         */
+        String scopePresentation(String scopeId);
         /** Registered file sources as {@code id|heading}, in registration order. */
         List<String> fileSources();
         /** Searches a scope from a window and optional pane, as {@code rowId|title|enabled}; later row lookups use this answer. */

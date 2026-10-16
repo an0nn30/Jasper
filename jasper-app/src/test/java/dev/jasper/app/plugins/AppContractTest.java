@@ -238,6 +238,7 @@ class AppContractTest extends PluginContractTest {
                                 List<String> live = dropdown.actionIds().stream().filter(id -> contributions.action(id).isPresent()).toList();
                                 if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
                             }
+                            case dev.jasper.app.contributions.ToolbarEntry.View view -> lines.add("view");
                         }
                     }
                     return lines;
@@ -304,6 +305,49 @@ class AppContractTest extends PluginContractTest {
             @Override public void closePanel(String panelId, java.util.UUID windowId) {
                 onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
             }
+            /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
+            final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
+                new java.util.IdentityHashMap<>();
+            /** Windows whose toolbar views closed: like a closed window, they build none again. */
+            final java.util.Set<UUID> closedToolbarWindows = new java.util.HashSet<>();
+            @Override public List<String> openToolbarViews(UUID windowId) {
+                return onEdtValue(() -> {
+                    List<String> roots = new java.util.ArrayList<>();
+                    if (closedToolbarWindows.contains(windowId) || terminalFixture.registry.window(windowId).isEmpty()) return roots;
+                    for (var entry : contributions.toolbar()) {
+                        if (!(entry instanceof dev.jasper.app.contributions.ToolbarEntry.View view)) continue;
+                        var built = toolbarViews.computeIfAbsent(view, key -> new java.util.HashMap<>());
+                        var mounted = built.get(windowId);
+                        if (mounted == null) built.put(windowId, mounted = view.factory().apply(windowId));
+                        else if (mounted.isPresent()) {
+                            // Asks the host again, as a second pass of a window's toolbar could: it keeps the window's view.
+                            var again = view.factory().apply(windowId);
+                            if (again.isPresent()) throw new AssertionError("The host built a second toolbar view for " + windowId);
+                        }
+                        mounted.ifPresent(shown -> roots.add(((dev.jasper.ui.swing.KitView) shown.component()).spec().root().id()));
+                    }
+                    return roots;
+                });
+            }
+            @Override public void closeToolbarViews(UUID windowId) {
+                onEdt(() -> {
+                    closedToolbarWindows.add(windowId);
+                    for (var built : toolbarViews.values()) {
+                        var mounted = built.remove(windowId);
+                        if (mounted != null) mounted.ifPresent(dev.jasper.app.contributions.ToolbarEntry.Mounted::close);
+                    }
+                });
+            }
+            @Override public void clickToolbarViewButton(UUID windowId, String buttonId) {
+                onEdt(() -> {
+                    for (var built : toolbarViews.values()) {
+                        var button = built.getOrDefault(windowId, Optional.empty())
+                            .map(mounted -> WorkspaceContentRouteTest.named(mounted.component(), buttonId, javax.swing.AbstractButton.class)).orElse(null);
+                        if (button != null) { button.doClick(); return; }
+                    }
+                    throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+                });
+            }
             @Override public List<String> rail() {
                 return onEdtValue(() -> contributions.railActions().stream().filter(id -> contributions.action(id).isPresent()).toList());
             }
@@ -311,6 +355,11 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream()
                     .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
                         + "|" + surface.title() + "|" + surface.shown()).toList());
+            }
+            @Override public String dialogSwatch(String pluginId, String title) {
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .filter(surface -> surface.kind() != AuxiliarySurface.Kind.WINDOW && surface.title().equals(title))
+                    .findFirst().map(surface -> surface.swatch().name()).orElse("-"));
             }
             @Override public boolean requestClose(String windowId) {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
@@ -415,6 +464,10 @@ class AppContractTest extends PluginContractTest {
                         @Override public List<String> scopes() {
                             return onEdtValue(() -> contributions.scopes().stream().map(scope -> scope.id() + "|" + scope.label() + "|"
                                 + String.join(",", scope.verbs().stream().map(dev.jasper.app.palette.PaletteVerb::id).toList())).toList());
+                        }
+                        @Override public String scopePresentation(String scopeId) {
+                            return onEdtValue(() -> { var scope = scope(scopeId); return scope.hue().name() + "|" + scope.itemNoun() + "|"
+                                + String.join(",", scope.verbs().stream().map(verb -> verb.role().name()).toList()); });
                         }
                         @Override public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
                             return onEdtValue(() -> {

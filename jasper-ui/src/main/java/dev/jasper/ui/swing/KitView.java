@@ -259,8 +259,8 @@ public final class KitView extends JPanel implements AutoCloseable {
         throw new IllegalArgumentException("Node is not a panel: " + id);
     }
     /**
-     * App-only: moves this view to the other theme slot (a plugin view mounted as workspace content takes the workspace
-     * route, as terminals and editors do), re-applying every control's appearance in place without replacing controls,
+     * App-only: moves this view to another theme route (a plugin view mounted as workspace content takes the workspace
+     * route, as terminals and editors do, and a toolbar view the title bar's), re-applying every control's appearance in place without replacing controls,
      * input or registered content. Other views built from the same caller context keep their route. EDT confined.
      */
     public void route(ThemeRoute route) {
@@ -324,6 +324,19 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Whether this view is presented as a window title action strip. */
     public boolean titleStrip() { return titleStrip; }
     private boolean titleStrip;
+    /**
+     * App-only: this view is a toolbar strip, a contributed view in a window's main toolbar. Its icon-only menu buttons
+     * show their menu indicator on the borderless control surface, as a title strip's do, and its controls keep the
+     * kit's control height, which the toolbar row centres. EDT confined.
+     */
+    public void toolbarStrip(boolean value) {
+        requireOpen();
+        if (toolbarStrip == value) return;
+        toolbarStrip = value; refresh(); repaint();
+    }
+    /** Whether this view is presented as a toolbar strip. */
+    public boolean toolbarStrip() { return toolbarStrip; }
+    private boolean toolbarStrip;
     @Override protected void paintComponent(Graphics graphics) {
         if (!surface) { super.paintComponent(graphics); return; }
         graphics.setColor(context.theme().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));

@@ -46,6 +46,8 @@ public final class CommandsScope implements PaletteScope {
     @Override public String description() { return "Run an application command"; }
     @Override public String placeholder() { return "Type a command"; }
     @Override public List<PaletteVerb> verbs() { return List.of(RUN); }
+    @Override public dev.jasper.ui.model.Nodes.Hue hue() { return dev.jasper.ui.model.Nodes.Hue.BLUE; }
+    @Override public String itemNoun() { return "command"; }
 
     @Override public PaletteResults search(String query, PaletteContext context) {
         if (CommandSearch.normalize(query).isEmpty()) {

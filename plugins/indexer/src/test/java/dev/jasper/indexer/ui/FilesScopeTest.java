@@ -62,6 +62,7 @@ class FilesScopeTest {
     @Test void declaresTheScope() {
         try (var host = host(scope())) {
             assertThat(host.scopes()).containsExactly("dev.jasper.indexer.files|Files|open,copy-path,terminal");
+            assertThat(host.scopePresentation(FilesScope.ID)).as("spec 14.6").isEqualTo("AMBER|file|STANDARD,STANDARD,STANDARD");
             assertThat(host.scopesInAll()).contains(FilesScope.ID);
         }
     }

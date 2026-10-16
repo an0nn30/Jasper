@@ -25,6 +25,18 @@ class CommandsScopeTest {
         return new Command(id, action, List.of());
     }
 
+    /** Spec 14.6: the App Commands scope's rows are blue commands, with no split verb. */
+    @Test void commandRowsAreBlueCommands() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var registry = new CommandRegistry(); var history = new CommandHistory()) {
+                var scope = new CommandsScope(registry, history, true, command -> { }, null);
+                assertThat(scope.hue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.BLUE);
+                assertThat(scope.itemNoun()).isEqualTo("command");
+                assertThat(scope.verbs()).extracting(PaletteVerb::role).containsExactly(PaletteVerb.Role.STANDARD);
+            }
+        });
+    }
+
     @Test void emptyQueryShowsStartersThenRecentsAndSearchRowsCarryShortcuts() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var registry = new CommandRegistry(); var history = new CommandHistory()) {

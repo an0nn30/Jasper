@@ -45,6 +45,15 @@ final class WindowChrome {
     private final Map<JMenu, List<Component>> contributedSections = new LinkedHashMap<>();
     private final List<JMenu> contributedMenus = new ArrayList<>();
     private final ToolbarSeparator pluginSeparator = new ToolbarSeparator();
+    /** When a contributed view gives way on a narrow row: after contributed buttons (30), before dropdowns (80). */
+    private static final int VIEW_PRIORITY = 40;
+    /** This window's built toolbar views by entry; null where the contributor's factory failed. */
+    private final java.util.Map<ToolbarEntry.View, ToolbarEntry.Mounted> views = new java.util.IdentityHashMap<>();
+    /** Whether this window's open event fired, so that it builds toolbar views. */
+    private boolean opened;
+    /** Whether a toolbar pass is running, and whether a change during it asked for another. */
+    private boolean renderingToolbar;
+    private boolean toolbarDirty;
     private WindowContributions contributions;
     private boolean renderingMenus;
     private boolean menusDirty;
@@ -146,6 +155,13 @@ final class WindowChrome {
         renderContributedMenus();
     }
 
+    /** This window's open event fired (its terminals are registered): it builds its toolbar views now. */
+    void windowOpened() {
+        if (opened) return;
+        opened = true;
+        renderContributedToolbar();
+    }
+
     private ReferenceButton contributedButton(Action action, String label, Icon icon) {
         ReferenceButton button = new ReferenceButton(action, null);
         button.setText(owner.toolbarMode() == ToolbarMode.ICONS ? null : label);
@@ -161,12 +177,49 @@ final class WindowChrome {
         return button;
     }
 
-    /** Rebuilds the plugin section after the built-in controls. */
+    /**
+     * Rebuilds the plugin section after the built-in controls. A contributed view is built once, after this window
+     * opened, and closed here when its entry goes or the window lets go of its contributions. Until then it stays in the
+     * toolbar across passes, moved into place without a remove, so that a control inside it keeps its focus and an open
+     * dropdown stays open while other contributions change. A view's factory and its
+     * close are contributor code that may change the contributions (register an action, enable one, add a toolbar
+     * item), which renders the toolbar again from inside this pass: that nested call only marks the toolbar dirty, and
+     * this pass then runs again with the latest model, as {@code renderContributedMenus} does.
+     */
     void renderContributedToolbar() {
-        contributedToolbar.forEach(toolbar::remove);
+        toolbarDirty = true;
+        if (renderingToolbar) return;
+        renderingToolbar = true;
+        try {
+            do {
+                toolbarDirty = false;
+                rebuildContributedToolbar();
+            } while (toolbarDirty);
+        } finally {
+            renderingToolbar = false;
+        }
+    }
+
+    private void rebuildContributedToolbar() {
+        // A built view stays a child of the toolbar: Container.remove would call its removeNotify.
+        var kept = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Component, Boolean>());
+        for (ToolbarEntry.Mounted mounted : views.values()) if (mounted != null) kept.add(mounted.component());
+        for (Component control : contributedToolbar) if (!kept.contains(control)) toolbar.remove(control);
         contributedToolbar.clear();
+        List<ToolbarEntry> entries = contributions == null ? List.of() : contributions.model().toolbar();
+        // Not "live": the Dropdown case below declares its own local of that name.
+        var liveViews = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ToolbarEntry.View, Boolean>());
+        for (ToolbarEntry entry : entries) if (entry instanceof ToolbarEntry.View view) liveViews.add(view);
+        for (var built = views.entrySet().iterator(); built.hasNext(); ) {
+            var next = built.next();
+            if (liveViews.contains(next.getKey())) continue;
+            // Read before the remove: an IdentityHashMap entry is invalid once removed.
+            ToolbarEntry.Mounted gone = next.getValue();
+            built.remove();
+            if (gone != null) { toolbar.remove(gone.component()); gone.close(); }
+        }
         if (contributions != null) {
-            for (ToolbarEntry entry : contributions.model().toolbar()) {
+            for (ToolbarEntry entry : entries) {
                 switch (entry) {
                     case ToolbarEntry.Button placed -> {
                         Action action = contributions.action(placed.actionId());
@@ -194,10 +247,31 @@ final class WindowChrome {
                         });
                         contributedToolbar.add(button);
                     }
+                    case ToolbarEntry.View view -> {
+                        // Built once per window and only after it opened, so never for the warm-up rehearsal's window.
+                        if (!opened) break;
+                        if (!views.containsKey(view)) {
+                            // Reserve the slot before the contributor's factory runs, so that no pass asks it twice.
+                            views.put(view, null);
+                            views.put(view, view.factory().apply(owner.id()).orElse(null));
+                        }
+                        ToolbarEntry.Mounted mounted = views.get(view);
+                        if (mounted == null) break;
+                        // The header is a title bar zone: a kit view paints from the title bar's theme, as the header's own controls do.
+                        if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
+                            kit.toolbarStrip(true); kit.route(dev.jasper.ui.theme.ThemeRoute.TITLE_BAR);
+                        }
+                        WindowToolbar.view(mounted.component(), VIEW_PRIORITY);
+                        contributedToolbar.add(mounted.component());
+                    }
                 }
             }
             int index = toolbar.getComponentIndex(pluginSeparator) + 1;
-            for (Component control : contributedToolbar) toolbar.add(control, index++);
+            // setComponentZOrder moves a kept view without removeNotify; everything else is new to the toolbar.
+            for (Component control : contributedToolbar) {
+                if (control.getParent() == toolbar) toolbar.setComponentZOrder(control, index++);
+                else toolbar.add(control, index++);
+            }
         }
         pluginSeparator.setVisible(!contributedToolbar.isEmpty());
         toolbar.revalidate(); toolbar.repaint();
@@ -250,9 +324,11 @@ final class WindowChrome {
         contributedMenus.clear();
         if (contributions != null) {
             var sections = contributions.model().menus();
-            // Tools holds only plugin entries and, like a plugin's own menu, is built fresh on every pass and added
-            // to the bar only while it has any: a stale one would keep an old look and feel, and one JMenu would be
-            // re-inserted into the macOS screen menu bar.
+            // Session, Transfer and Tools hold only plugin entries and, like a plugin's own menu, are built fresh on
+            // every pass and added to the bar only while they have any: a stale one would keep an old look and feel,
+            // and one JMenu would be re-inserted into the macOS screen menu bar.
+            standardMenus.put(MenuTarget.Slot.SESSION, menu("Session"));
+            standardMenus.put(MenuTarget.Slot.TRANSFER, menu("Transfer"));
             standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
@@ -260,16 +336,18 @@ final class WindowChrome {
                 if (built.isEmpty()) continue;
                 JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
                 List<Component> added = contributedSections.computeIfAbsent(menu, key -> new ArrayList<>());
-                // Tools has no items of its own, so its first section needs no separator.
+                // Session, Transfer and Tools have no items of their own, so a first section there needs no separator.
                 if (menu.getMenuComponentCount() > 0) {
                     var separator = new JPopupMenu.Separator();
                     menu.add(separator); added.add(separator);
                 }
                 for (Component child : built) { menu.add(child); added.add(child); }
             }
-            // The bar orders menus as they are added: Tools after Tab, then plugins' own menus.
-            JMenu tools = standardMenus.get(MenuTarget.Slot.TOOLS);
-            if (tools.getMenuComponentCount() > 0) { menuBar.add(tools); contributedMenus.add(tools); }
+            // The bar orders menus as they are added: Session, Transfer and Tools after Tab, then plugins' own menus.
+            for (MenuTarget.Slot slot : List.of(MenuTarget.Slot.SESSION, MenuTarget.Slot.TRANSFER, MenuTarget.Slot.TOOLS)) {
+                JMenu built = standardMenus.get(slot);
+                if (built.getMenuComponentCount() > 0) { menuBar.add(built); contributedMenus.add(built); }
+            }
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);

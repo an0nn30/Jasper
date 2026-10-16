@@ -149,6 +149,32 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         revalidate(); repaint();
     }
 
+    /**
+     * A square of {@code hue}'s theme colour before a window or dialog title ({@code DialogSpec.swatch}); NONE draws none.
+     * A row that shows no title shows no square either.
+     */
+    public void setTitleSwatch(dev.jasper.ui.model.Nodes.Hue hue) {
+        if (closed) return;
+        SemanticColor role = switch (java.util.Objects.requireNonNull(hue)) {
+            case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
+            case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL; case NONE -> null;
+        };
+        title.setIcon(role == null ? null : new TitleSwatch(role));
+        title.setIconTextGap(dev.jasper.ui.swing.NativeStyles.installed().metric(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP));
+        revalidate(); repaint();
+    }
+
+    /** A solid square of a hue role at the caption icon size, coloured from the theme each time it paints. */
+    private record TitleSwatch(SemanticColor role) implements Icon {
+        private static int side() { return dev.jasper.ui.swing.NativeStyles.installed().metric(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_CAPTION); }
+        @Override public int getIconWidth() { return side(); }
+        @Override public int getIconHeight() { return side(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            graphics.setColor(ThemeZone.color(component, role));
+            graphics.fillRect(x, y, side(), side());
+        }
+    }
+
     /** How this title row looks; a workspace header keeps its own. */
     public void setStyle(Style value) {
         if (closed || header != null || value == Style.INTEGRATED) return;

@@ -51,6 +51,8 @@ class FileServerScopeTest {
         assertThat(scope.spec().id()).isEqualTo(FileServerScope.ID);
         assertThat(scope.spec().verbs()).containsExactly(FileServerScope.TOGGLE, FileServerScope.EDIT);
         assertThat(scope.spec().shortcutActionId()).contains("dev.jasper.fileserver.servers");
+        assertThat(scope.spec().itemNoun()).as("spec 14.5").isEqualTo("file server");
+        assertThat(scope.spec().hue()).isEqualTo(dev.jasper.sdk.ui.Nodes.Hue.NONE);
         List<PaletteRow> rows = scope.search("", query).rows();
         assertThat(rows).extracting(PaletteRow::title).containsExactly("docs", "firmware", "work (HTTP)");
         assertThat(rows.getFirst().detail()).contains("HTTP :8080 · ~" + File.separator + "work");

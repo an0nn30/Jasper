@@ -71,6 +71,7 @@ class EditorPluginTest {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();
             assertThat(host.scopes()).contains(RECENT + "|Recent files|open,remove");
+            assertThat(host.scopePresentation(RECENT)).as("spec 14.6").isEqualTo("AMBER|file|STANDARD,STANDARD");
             assertThat(host.scopesInAll()).contains(RECENT);
             assertThat(host.scopesInRecents()).contains(RECENT);
             assertThat(host.actions()).contains("dev.jasper.editor.recent-files|Recent Files\u2026|true");

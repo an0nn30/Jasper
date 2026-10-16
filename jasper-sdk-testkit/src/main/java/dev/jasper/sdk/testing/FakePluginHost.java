@@ -529,7 +529,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * The toolbar's plugin section.
      *
-     * @return {@code button:id} or {@code menu:title:id,id}; closed actions are omitted
+     * @return {@code button:id}, {@code menu:title:id,id} or {@code view}; closed actions are omitted
      */
     public List<String> toolbar() {
         List<String> lines = new ArrayList<>();
@@ -541,6 +541,7 @@ public final class FakePluginHost implements AutoCloseable {
                         List<String> live = dropdown.actionIds().stream().filter(this::actionExists).toList();
                         if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
                     }
+                    case ToolbarItem.View view -> lines.add("view");
                 }
             }
         }
@@ -548,9 +549,42 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
+     * UI thread: the toolbar views a terminal window shows, in toolbar order. The window builds each registered
+     * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
+     * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
+     * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory.
+     *
+     * @param windowId a terminal window
+     * @return the live views
+     * @since 0.18.0
+     */
+    public List<FakeKitView> toolbarViews(UUID windowId) {
+        if (closedToolbarWindows.contains(windowId) || workspace.window(windowId).isEmpty()) return List.of();
+        List<FakeKitView> views = new ArrayList<>();
+        for (FakePluginContext context : contexts.values()) views.addAll(context.ui.toolbarViews(windowId));
+        return views;
+    }
+
+    /**
+     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
+     * pane closes.
+     *
+     * @param windowId a terminal window
+     * @since 0.18.0
+     */
+    public void closeToolbarViews(UUID windowId) {
+        closedToolbarWindows.add(windowId);
+        for (FakePluginContext context : contexts.values()) context.ui.closeToolbarViews(windowId);
+    }
+
+    /** The windows whose toolbar views closed, which build none again. */
+    private final java.util.Set<UUID> closedToolbarWindows = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
      * One menu target's contributed entries.
      *
-     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code context} or {@code top:<menuId>}
+     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS}, {@code SESSION},
+     *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
      * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
      */
     public List<String> menu(String target) {
@@ -1073,6 +1107,22 @@ public final class FakePluginHost implements AutoCloseable {
             .map(w -> w.presentation).filter(java.util.Objects::nonNull).findFirst();
     }
 
+    /**
+     * The hue of the square an open plugin dialog draws before its title, as its {@code DialogSpec} asked. Call it on the
+     * UI thread.
+     * @param pluginId dialog owner
+     * @param title exact dialog title
+     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for plugin
+     *     windows, {@code Windows.overlay} surfaces and closed or absent dialogs
+     * @since 0.18.0
+     */
+    public java.util.Optional<dev.jasper.sdk.ui.Nodes.Hue> dialogSwatch(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.windows.stream().filter(w -> !w.closed && w.title.equals(title) && w.presentation != null)
+            .map(w -> w.swatch).findFirst();
+    }
+
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
      * @param pluginId content producer @return live mounted views */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
@@ -1469,6 +1519,22 @@ public final class FakePluginHost implements AutoCloseable {
         public List<String> scopes() {
             return scopes.values().stream().map(registered -> registered.spec().id() + "|" + registered.spec().label() + "|"
                 + String.join(",", registered.spec().verbs().stream().map(PaletteVerb::id).toList())).toList();
+        }
+
+        /**
+         * How a registered scope presents its rows where a presentation colours and labels them by scope, as
+         * {@code HUE|itemNoun|ROLE,ROLE}: its hue, NONE read as NEUTRAL (the fake reads no manifest {@code icon_hue});
+         * its item noun, or its label when it names none; and each verb's role, in order.
+         *
+         * @param scopeId a registered scope
+         * @return the presentation
+         * @since 0.18.0
+         */
+        public String scopePresentation(String scopeId) {
+            var spec = scope(scopeId).spec();
+            return (spec.hue() == dev.jasper.sdk.ui.Nodes.Hue.NONE ? dev.jasper.sdk.ui.Nodes.Hue.NEUTRAL : spec.hue()).name() + "|"
+                + (spec.itemNoun().isEmpty() ? spec.label() : spec.itemNoun()) + "|"
+                + String.join(",", spec.verbs().stream().map(verb -> verb.role().name()).toList());
         }
 
         /** The ids of registered scopes the palette's All tab searches, in registration order. */

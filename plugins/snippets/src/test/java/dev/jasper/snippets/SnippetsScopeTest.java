@@ -68,6 +68,7 @@ class SnippetsScopeTest {
         try (var host = started(THREE)) {
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "t"), pane = host.addTerminalPane(tab, pane());
             assertThat(host.scopes()).containsExactly(SCOPE + "|Snippets|paste,paste_run,edit");
+            assertThat(host.scopePresentation(SCOPE)).as("spec 14.6").isEqualTo("PURPLE|snippet|STANDARD,STANDARD,STANDARD");
             assertThat(host.searchScope(SCOPE, "", window, pane)).containsExactly(
                 SnippetService.rowId("Deploy") + "|Deploy|true",
                 SnippetService.rowId("Inspect branch") + "|Inspect branch|true",

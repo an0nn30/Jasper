@@ -40,7 +40,8 @@ public final class FileServerScope implements PaletteScope {
 
     @Override public ScopeSpec spec() {
         return ScopeSpec.of(ID, "File Servers", "Search file servers", List.of(TOGGLE, EDIT))
-            .withDescription("Start or stop a file server").withShortcutActionId(shortcutActionId).withInRecents(false);
+            .withDescription("Start or stop a file server").withShortcutActionId(shortcutActionId).withInRecents(false)
+            .withItemNoun("file server");
     }
 
     @Override public PaletteResults search(String query, PaletteQuery context) {

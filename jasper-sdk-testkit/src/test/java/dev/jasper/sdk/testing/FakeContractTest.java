@@ -40,6 +40,19 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> actions() { return host.actions(); }
             @Override public boolean invoke(String actionId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.invoke(actionId, windowId, paneIdOrNull); }
             @Override public List<String> toolbar() { return host.toolbar(); }
+            @Override public List<String> openToolbarViews(java.util.UUID windowId) {
+                return host.toolbarViews(windowId).stream().map(view -> view.spec().root().id()).toList();
+            }
+            @Override public void closeToolbarViews(java.util.UUID windowId) { host.closeToolbarViews(windowId); }
+            @Override public void clickToolbarViewButton(java.util.UUID windowId, String buttonId) {
+                for (var view : host.toolbarViews(windowId))
+                    for (var child : ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children())
+                        if (child instanceof dev.jasper.sdk.ui.Nodes.Button button && button.id().equals(buttonId)) {
+                            view.emit(new dev.jasper.sdk.ui.UiEvent.Action(button.action()));
+                            return;
+                        }
+                throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+            }
             @Override public List<String> menu(String target) { return host.menu(target); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
@@ -58,12 +71,14 @@ class FakeContractTest extends PluginContractTest {
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
+            @Override public String dialogSwatch(String pluginId, String title) { return host.dialogSwatch(pluginId, title).map(Enum::name).orElse("-"); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public boolean closeCommand(String windowId) { return host.closeCommand(windowId); }
             @Override public boolean requestQuit() { return host.requestQuit(); }
             @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public List<String> scopes() { return host.scopes(); }
+            @Override public String scopePresentation(String scopeId) { return host.scopePresentation(scopeId); }
             @Override public List<String> fileSources() { return host.fileSources(); }
             @Override public List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.searchScope(scopeId, query, windowId, paneIdOrNull); }
             @Override public boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.availableInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }

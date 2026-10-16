@@ -225,16 +225,61 @@ final class HostedUi {
     Toolbar toolbar() {
         return item -> {
             guard("add");
-            ToolbarEntry entry = switch (item) {
-                case ToolbarItem.Button button -> { requireOwn(button.actionId()); yield new ToolbarEntry.Button(button.actionId()); }
+            return switch (item) {
+                case ToolbarItem.Button button -> { requireOwn(button.actionId()); yield placed(new ToolbarEntry.Button(button.actionId())); }
                 case ToolbarItem.Dropdown dropdown -> {
                     dropdown.actionIds().forEach(this::requireOwn);
-                    yield new ToolbarEntry.Dropdown(icon(dropdown.icon()), dropdown.title(), dropdown.actionIds());
+                    yield placed(new ToolbarEntry.Dropdown(icon(dropdown.icon()), dropdown.title(), dropdown.actionIds()));
                 }
+                case ToolbarItem.View view -> toolbarView(view.factory());
             };
-            var registration = model.addToolbar(entry);
-            return tracked(registration::close);
         };
+    }
+
+    private Subscription placed(ToolbarEntry entry) {
+        var registration = model.addToolbar(entry);
+        return tracked(registration::close);
+    }
+
+    /** A toolbar view's mount: the main toolbar of one terminal window. */
+    private record ToolbarMount(java.util.UUID windowId) { }
+
+    /**
+     * A toolbar view: each window builds its own once, when it opens, and closing the registration closes every window's.
+     * A view is admitted ({@link ToolbarViewAdmission}) when it is built and on every update after that.
+     */
+    private Subscription toolbarView(dev.jasper.sdk.ui.ToolbarViewFactory factory) {
+        var built = new java.util.LinkedHashMap<java.util.UUID, HostedKitView>();
+        var registration = model.addToolbar(new ToolbarEntry.View(windowId -> buildToolbarView(factory, windowId, built)));
+        return tracked(() -> {
+            registration.close();
+            for (var view : List.copyOf(built.values())) view.close();
+            built.clear();
+        });
+    }
+
+    /**
+     * One window's view, contained: empty when the factory threw or the toolbar does not admit its tree, and empty for
+     * a window that already holds this registration's view (one built while the factory ran is kept, the newer closed).
+     */
+    private Optional<ToolbarEntry.Mounted> buildToolbarView(dev.jasper.sdk.ui.ToolbarViewFactory factory, java.util.UUID windowId,
+                                                            java.util.Map<java.util.UUID, HostedKitView> built) {
+        if (built.containsKey(windowId)) return Optional.empty();
+        var mounted = new java.util.concurrent.atomic.AtomicReference<HostedKitView>();
+        containment.run(pluginId, "toolbar view", () -> {
+            var view = kit.requireOwned(java.util.Objects.requireNonNull(factory.create(terminals.windowHandle(windowId)), "view"));
+            if (built.containsKey(windowId)) { view.close(); return; }
+            view.mount(new ToolbarMount(windowId));
+            try {
+                ToolbarViewAdmission.require(view.spec());
+                view.hostSpec = spec -> { ToolbarViewAdmission.require(spec); return spec; };
+            } catch (RuntimeException refused) { view.close(); throw refused; }
+            mounted.set(view);
+        });
+        var hosted = mounted.get();
+        if (hosted == null) return Optional.empty();
+        built.put(windowId, hosted);
+        return Optional.of(new ToolbarEntry.Mounted(hosted.component(), () -> { built.remove(windowId, hosted); hosted.close(); }));
     }
 
     Menus menus() {
@@ -740,6 +785,7 @@ final class HostedUi {
                 }
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
+                surface.swatch(dev.jasper.ui.model.Nodes.Hue.valueOf(spec.swatch().name()));
                 if (spec.owner() instanceof OwnedContent content) {
                     var pin = spec.modal() ? content.entry.pin() : null;
                     var registration = content.entry.onClosed(surface::close);
