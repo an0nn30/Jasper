@@ -86,6 +86,13 @@ class ServerEditorTest {
         assertThat(node(editor, ServerEditor.WARNING)).isNull();
     }
 
+    /** Spec 13: plugin form labels are sentence case. */
+    @Test void theReachableRowIsSentenceCase() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        assertThat(((Nodes.FormRow) node(editor, "server.reachable.row")).label()).isEqualTo("Reachable from");
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.REACHABLE)).label()).isEqualTo("Reachable from");
+    }
+
     @Test void protocolChangesPreserveExplicitPortAndHiddenValues() {
         var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP, Protocol.SFTP, Protocol.TFTP));
         assertThat(field(editor, ServerEditor.PORT)).isEqualTo("8080");

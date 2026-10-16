@@ -107,14 +107,14 @@ class TunnelsCompositionTest {
             var tunnel = (Nodes.Card) ((Nodes.Section) form.sections().get(0)).body();
             var ports = (Nodes.Card) ((Nodes.Section) form.sections().get(1)).body();
             assertThat(tunnel.kind()).isEqualTo(Nodes.CardKind.FORM);
-            assertThat(tunnel.children()).extracting(n -> ((Nodes.FormRow) n).label()).containsExactly("Name", "Via Host", "Type", "");
+            assertThat(tunnel.children()).extracting(n -> ((Nodes.FormRow) n).label()).containsExactly("Name", "Via host", "Type", "");
             assertThat(((Nodes.Field) ((Nodes.FormRow) tunnel.children().get(0)).control()).hint()).isEqualTo("e.g. Postgres");
             assertThat(((Nodes.FormRow) tunnel.children().get(3)).control()).isInstanceOfSatisfying(Nodes.Text.class,
                 text -> assertThat(text.role()).as("the type's explanation is supporting text under the segments").isEqualTo(Nodes.TextRole.SUPPORTING));
             assertThat(ports.kind()).isEqualTo(Nodes.CardKind.MIXED);
             assertThat(ports.children()).hasSize(4);
             assertThat(ports.children().get(0)).isInstanceOfSatisfying(Nodes.FormRow.class, row -> {
-                assertThat(row.label()).isEqualTo("Listen On");
+                assertThat(row.label()).isEqualTo("Listen on");
                 assertThat(row.caption()).isEqualTo("this computer");
                 assertThat(((Nodes.Field) row.control()).presentation()).as("a technical address").isEqualTo(Nodes.FieldPresentation.TECHNICAL);
                 assertThat(row.trailing()).get().isInstanceOfSatisfying(Nodes.Field.class, port -> assertThat(port.kind()).isEqualTo(Nodes.FieldKind.PORT));
@@ -141,7 +141,7 @@ class TunnelsCompositionTest {
                 assertThat(face.hue()).isEqualTo(Nodes.Hue.BLUE);
             });
             emit(editor.view(), new UiEvent.Selected(TunnelEditor.TYPE, Set.of(TunnelEditor.DYNAMIC)));
-            assertThat(node(editor.view(), TunnelEditor.FORWARD_ROW, Nodes.FormRow.class).state().visible()).as("a SOCKS proxy has no Forward To").isFalse();
+            assertThat(node(editor.view(), TunnelEditor.FORWARD_ROW, Nodes.FormRow.class).state().visible()).as("a SOCKS proxy has no Forward to").isFalse();
         });
     }
 }

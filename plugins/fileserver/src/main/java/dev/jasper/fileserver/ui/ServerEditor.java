@@ -406,10 +406,10 @@ public final class ServerEditor implements AutoCloseable {
             new Nodes.Field(FOLDER, ControlState.READY, Nodes.FieldKind.PATH, folder, "No folder selected", "Folder", "", Optional.empty(),
                 Nodes.FieldPresentation.STANDARD, "", "", "", true),
             Optional.of(new Nodes.Button(CHOOSE_FOLDER, ControlState.READY, "Choose…", "", Nodes.ButtonKind.SECONDARY, CHOOSE_FOLDER, ""))));
-        server.add(new Nodes.FormRow("server.reachable.row", ControlState.READY, "Reachable From", "",
+        server.add(new Nodes.FormRow("server.reachable.row", ControlState.READY, "Reachable from", "",
             new Nodes.Choice(REACHABLE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
                 java.util.stream.IntStream.range(0, binds.size()).mapToObj(i -> new Option("bind." + i, binds.get(i).label(), Optional.empty())).toList(),
-                "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0), "Reachable From", ""),
+                "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0), "Reachable from", ""),
             Optional.of(new Nodes.Field(PORT, ControlState.READY, Nodes.FieldKind.PORT, port, "", "Port", ""))));
         server.add(text("server.port.hint", portHint, Nodes.TextRole.DESCRIPTION));
         server.add(new Nodes.FormRow("server.passive.row", state(ftp, true), "Passive ports", "",

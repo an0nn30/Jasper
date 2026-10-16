@@ -78,8 +78,9 @@ class TunnelEditorTest {
             type(editor.view(), TunnelEditor.FORWARD_PORT, "5432");
             assertThat(text(editor, TunnelEditor.PREVIEW)).isEqualTo("ssh -L 5432:db.internal:5432 deploy@web.example -p 2222");
             assertThat(route(editor)).containsExactly("This computer", "localhost:5432", "Via", "web", "Target on web", "db.internal:5432");
-            assertThat(row(editor, TunnelEditor.LISTEN_ROW)).satisfies(row -> { assertThat(row.label()).isEqualTo("Listen On"); assertThat(row.caption()).isEqualTo("this computer"); });
-            assertThat(row(editor, TunnelEditor.FORWARD_ROW)).satisfies(row -> { assertThat(row.label()).isEqualTo("Forward To"); assertThat(row.caption()).isEqualTo("as seen from web"); });
+            assertThat(row(editor, TunnelEditor.LISTEN_ROW)).satisfies(row -> { assertThat(row.label()).isEqualTo("Listen on"); assertThat(row.caption()).isEqualTo("this computer"); });
+            assertThat(row(editor, TunnelEditor.FORWARD_ROW)).satisfies(row -> { assertThat(row.label()).isEqualTo("Forward to"); assertThat(row.caption()).isEqualTo("as seen from web"); });
+            assertThat(choice(editor, TunnelEditor.HOST).label()).as("spec 13: sentence case").isEqualTo("Via host");
             assertThat(saveEnabled(editor)).isTrue();
             click(editor.view(), TunnelEditor.SAVE);
             assertThat(saved).singleElement().satisfies(tunnel -> {
