@@ -19,6 +19,8 @@ class PromptVocabularyTest {
     static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*");
     static final Pattern WORDS = Pattern.compile("_|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])");
     static final List<String> TABLES = List.of("compact-roles.tsv", "default-type.tsv");
+    /** Bare {@code hero} that cannot be the slot: a method declared or called with arguments, or a boolean flag. */
+    static final Pattern KIND_USE = Pattern.compile("\\bhero\\s*\\(\\s*[^)\\s]|\\bboolean\\s+hero\\b");
 
     /** True when one of the identifier's words is the slot's word and the identifier is not the slot itself. */
     static boolean saysTheSlotWord(String identifier) {
@@ -64,6 +66,13 @@ class PromptVocabularyTest {
         assertThat(code(source).split("\\s+")).containsExactly("a", "b", "c");
     }
 
+    @Test void theBareWordIsOnlyTheSlotItself() {
+        for (String use : List.of("void hero(boolean value) {}", "icons().hero(name, theme, hue, size)", "boolean hero, panel;", "boolean hero = form.kind() == PROMPT;"))
+            assertThat(KIND_USE.matcher(use).find()).as(use).isTrue();
+        for (String slot : List.of("form.hero()", "n.hero().map(KitValues::toModule)", "Optional<Node> hero,", "var hero = new Nodes.Stack(", "Optional.of(hero)", "if (hero.isPresent())"))
+            assertThat(KIND_USE.matcher(slot).find()).as(slot).isFalse();
+    }
+
     @Test void onlyTheFormSlotKeepsTheOldWord() throws IOException {
         var offenders = new TreeSet<String>();
         var roots = new ArrayList<>(Stream.of("jasper-sdk/src", "jasper-sdk-testkit/src", "jasper-ui/src", "jasper-app/src").map(ROOT::resolve).toList());
@@ -72,9 +81,12 @@ class PromptVocabularyTest {
         }
         for (Path root : roots) try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
-                var identifiers = IDENTIFIER.matcher(code(Files.readString(file)));
+                String code = code(Files.readString(file));
+                var identifiers = IDENTIFIER.matcher(code);
                 while (identifiers.find())
                     if (saysTheSlotWord(identifiers.group())) offenders.add(ROOT.relativize(file) + ": " + identifiers.group());
+                var uses = KIND_USE.matcher(code);
+                while (uses.find()) offenders.add(ROOT.relativize(file) + ": " + uses.group().strip());
             }
         }
         for (String table : TABLES)

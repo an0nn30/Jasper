@@ -135,7 +135,7 @@ public final class IconRegistry implements AutoCloseable {
         }
     }
     /** Prompt glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
-    public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
+    public Icon prompt(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return painted(name,tint(palette,hue),null,logicalSize,logicalSize,false,true,0,false,select(name,null,palette,false),false);
     }
     /** Compact panel artwork uses a lighter optical stroke for canonical built-ins only.
@@ -219,7 +219,7 @@ public final class IconRegistry implements AutoCloseable {
         return painted(name,theme.semantic().color(tint),null,size,size,false,false,0,artworks.get(name)==BUILT_INS.get(name),select(name,theme,theme.semantic(),false),false);
     }
     /** Prompt context retains legacy geometry except explicitly admitted identity meanings. */
-    public Icon hero(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
+    public Icon prompt(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
         return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),false);
     }
     /** The logical extent of {@code size} in {@code metrics}. */
@@ -235,22 +235,22 @@ public final class IconRegistry implements AutoCloseable {
     private Icon painted(String name, Color foreground, Color background, int size, boolean tile) {
         return painted(name, foreground, background, size, tile, false);
     }
-    private synchronized Icon painted(String name, Color foreground, Color background, int size, boolean tile, boolean hero) {
-        return painted(name, foreground, background, size, size, tile, hero);
+    private synchronized Icon painted(String name, Color foreground, Color background, int size, boolean tile, boolean prompt) {
+        return painted(name, foreground, background, size, size, tile, prompt);
     }
-    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero) {
-        return painted(name, foreground, background, width, height, tile, hero, 0);
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean prompt) {
+        return painted(name, foreground, background, width, height, tile, prompt, 0);
     }
-    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize) {
-        return painted(name, foreground, background, width, height, tile, hero, glyphSize, false);
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean prompt, int glyphSize) {
+        return painted(name, foreground, background, width, height, tile, prompt, glyphSize, false);
     }
-    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean hero, int glyphSize, boolean panel) {
-        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,null,false);
+    private synchronized Icon painted(String name, Color foreground, Color background, int width, int height, boolean tile, boolean prompt, int glyphSize, boolean panel) {
+        return painted(name,foreground,background,width,height,tile,prompt,glyphSize,panel,null,false);
     }
-    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground) {
-        return painted(name,foreground,background,width,height,tile,hero,glyphSize,panel,override,selectedForeground,null);
+    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean prompt,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground) {
+        return painted(name,foreground,background,width,height,tile,prompt,glyphSize,panel,override,selectedForeground,null);
     }
-    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean hero,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground,Color outline) {
+    private synchronized Icon painted(String name,Color foreground,Color background,int width,int height,boolean tile,boolean prompt,int glyphSize,boolean panel,DecodedArtwork override,boolean selectedForeground,Color outline) {
         requireOpen(); Objects.requireNonNull(name);
         int size = Math.min(width, height);
         if (size < 1 || Math.max(width, height) > 512) throw new IllegalArgumentException("Invalid logical icon size");
@@ -292,7 +292,7 @@ public final class IconRegistry implements AutoCloseable {
                         return;
                     }
                     float stroke = panel ? FINE_PANEL_BUILT_INS.contains(name) ? 1f : DOT_PANEL_BUILT_INS.contains(name) ? 2f : 7f / 6f
-                        : hero ? 7f / 6f
+                        : prompt ? 7f / 6f
                         : tile && glyphSize > 0 && artwork == BUILT_INS.get(name) ? 7f / 6f : artwork.stroke();
                     g.setColor(foreground); g.setStroke(new BasicStroke(stroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     // The canonical search artwork has a right/down optical bias in the compact slot.

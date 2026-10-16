@@ -99,7 +99,7 @@ final class ControlRegistry {
         Container childParent(Nodes.Node child) { return component; }
         void children(List<Control> controls) {}
         void embeddedLabel(boolean embedded) {}
-        void hero(boolean hero) {}
+        void prompt(boolean prompt) {}
         JComponent focusTarget() { return component; }
         /**
          * Height of this control's first line (a field's face, a list's first row), which a FormRow label and trailing

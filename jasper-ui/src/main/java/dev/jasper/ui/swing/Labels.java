@@ -177,7 +177,7 @@ final class Labels {
                 : receiving==ArtworkPresentation.IDENTITY_HEADER ? context().icons().identityHeader(context().metrics(), icon.name(),context().theme(),icon.hue(),com.formdev.flatlaf.util.UIScale.scale(tileSize),com.formdev.flatlaf.util.UIScale.scale(tileHeight),com.formdev.flatlaf.util.UIScale.scale(tileGlyph))
                 : tileSize > 0 ? context().icons().tile(context().metrics(), icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected || inked ? ink.text : null)
                 : panelDetail ? context().icons().panel(icon.name(), context().theme(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)
-                : icon.size() == Nodes.IconSize.PROMPT && icon.severity().isEmpty() ? context().icons().hero(icon.name(), context().theme(), icon.hue(), size)
+                : icon.size() == Nodes.IconSize.PROMPT && icon.severity().isEmpty() ? context().icons().prompt(icon.name(), context().theme(), icon.hue(), size)
                 : icon.severity().isPresent() ? context().icons().icon(icon.name(), context().theme(), tint(icon.severity().get()), size)
                 : context().icons().icon(icon.name(), context().theme(), icon.hue(), size));
             tileSize=savedSize;tileHeight=savedHeight;tileGlyph=savedGlyph;

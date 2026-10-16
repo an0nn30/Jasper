@@ -66,7 +66,7 @@ final class Buttons {
             button.setIcon(null); button.setDisabledIcon(null); button.putClientProperty("Jasper.button.icon", null);
             super.close();
         }
-        @Override void hero(boolean value) { button.hero=value; }
+        @Override void prompt(boolean value) { button.prompt=value; }
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
@@ -120,7 +120,7 @@ final class Buttons {
             int content=getIcon() instanceof Keycaps caps?caps.heightAt(available):recorderText.height(available);
             return Math.max(getPreferredSize().height,content+insets.top+insets.bottom);
         }
-        boolean hero, panel, fullFooter, orderedAction, panelDetail, circular, hint;
+        boolean prompt, panel, fullFooter, orderedAction, panelDetail, circular, hint;
         /** An ORDERED row's compact up/down/remove command. */
         boolean orderedCommand;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
@@ -228,7 +228,7 @@ final class Buttons {
                 return new Dimension(size.width+recorderIndicator(),Math.max(height,size.height));
             }
             if (embedded) return size;
-            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.PROMPT_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : panelEmpty ? DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel || panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
+            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : prompt ? DesignMetrics.Role.PROMPT_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : panelEmpty ? DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel || panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
             int reservation = panelDetail ? 2*ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0;
             height += reservation;
             size.width += reservation;

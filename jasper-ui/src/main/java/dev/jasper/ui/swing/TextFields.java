@@ -236,11 +236,11 @@ final class TextFields {
             try { input.setText(value); } finally { applying = false; }
         }
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
-        @Override void hero(boolean value) { surface.hero=value; label.setVisible(labelShown()); }
+        @Override void prompt(boolean value) { surface.prompt=value; label.setVisible(labelShown()); }
         /** A search field is labelled by its glyph and hint; its label stays its accessible name only. */
         boolean labelShown() {
             var field = (Nodes.Field)node;
-            return !embedded && !surface.hero && field.kind() != Nodes.FieldKind.SEARCH && (field.presentation() == Nodes.FieldPresentation.STANDARD || field.presentation() == Nodes.FieldPresentation.TECHNICAL || field.presentation() == Nodes.FieldPresentation.PLAIN_PATH);
+            return !embedded && !surface.prompt && field.kind() != Nodes.FieldKind.SEARCH && (field.presentation() == Nodes.FieldPresentation.STANDARD || field.presentation() == Nodes.FieldPresentation.TECHNICAL || field.presentation() == Nodes.FieldPresentation.PLAIN_PATH);
         }
         static int uncommitted(java.awt.event.InputMethodEvent event) {
             var text = event.getText();
@@ -364,7 +364,7 @@ final class TextFields {
         }
     }
     static final class FieldSurface extends JPanel {
-        boolean hero, panelSearch;
+        boolean prompt, panelSearch;
         JComponent trailing;
         DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;
         final KitContext context; final JTextComponent input; final boolean multiline;
@@ -379,7 +379,7 @@ final class TextFields {
         }
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.PROMPT_FIELD_HEIGHT : heightRole, role);
+            int height = ThemePainting.height(context, prompt ? DesignMetrics.Role.PROMPT_FIELD_HEIGHT : heightRole, role);
             int width = port ? Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.PORT_FIELD_WIDTH)) : size.width;
             return new Dimension(width, multiline ? Math.max(size.height, height) : height);
         }

@@ -373,13 +373,13 @@ final class SecretFields {
         @Override
         void embeddedLabel(boolean value) {
             embedded = value;
-            label.setVisible(!value && !surface.hero);
-            lock.setVisible(!value && !surface.hero);
+            label.setVisible(!value && !surface.prompt);
+            lock.setVisible(!value && !surface.prompt);
         }
 
         @Override
-        void hero(boolean value) {
-            surface.hero = value;
+        void prompt(boolean value) {
+            surface.prompt = value;
             label.setVisible(!embedded && !value);
             lock.setVisible(!embedded && !value);
         }
@@ -436,8 +436,8 @@ final class SecretFields {
             label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY));
             label.setEnabled(enabled);
-            label.setVisible(!embedded && !surface.hero);
-            lock.setVisible(!embedded && !surface.hero && !multiline);
+            label.setVisible(!embedded && !surface.prompt);
+            lock.setVisible(!embedded && !surface.prompt && !multiline);
             error.setText(secret.state().error());
             error.setVisible(!secret.state().error().isEmpty());
             error.setEnabled(enabled);

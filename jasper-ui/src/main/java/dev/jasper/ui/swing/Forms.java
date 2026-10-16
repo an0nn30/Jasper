@@ -194,7 +194,7 @@ final class Forms {
             ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET;
             int stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
             component.setBorder(form.kind()==Nodes.FormKind.SHEET ? new EmptyBorder(0,stroke,stroke,stroke) : new EmptyBorder(0,0,0,0));
-            boolean hero = form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT;
+            boolean prompt = form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT;
             boolean compact = form.kind() == Nodes.FormKind.PROMPT_COMPACT;
             boolean window = form.kind() == Nodes.FormKind.WINDOW;
             // A window body shares traversal with native title accessories. Dialog forms
@@ -202,16 +202,16 @@ final class Forms {
             component.setFocusCycleRoot(!window);
             component.setFocusTraversalPolicyProvider(window);
             body.fill = window; footer.window = window; footer.context = context();
-            int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), hero ? DesignMetrics.Role.PROMPT_SIDES : DesignMetrics.Role.FORM_SIDES);
+            int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), prompt ? DesignMetrics.Role.PROMPT_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
-            int focusClearance = hero ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
-            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
+            int focusClearance = prompt ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
+            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, focusClearance, side));
             body.setLayout(window ? new Composition.Vertical(0) {
                 @Override public void layoutContainer(Container parent) {
                     for (var child : parent.getComponents()) if (child.isVisible()) child.setBounds(0, 0, parent.getWidth(), parent.getHeight());
                 }
-            } : hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_SECTION_GAP)) {
+            } : prompt ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_SECTION_GAP)) {
                 @Override int gap(Component previous, Component next) {
                     if (form.hero().isPresent() && previous == view.control(form.hero().get().id()).component)
                         return ThemePainting.metric(context(), compact ? DesignMetrics.Role.PROMPT_COMPACT_INTRO_GAP : DesignMetrics.Role.PROMPT_INTRO_GAP);
@@ -220,13 +220,13 @@ final class Forms {
                 }
             } : new Composition.Vertical(ThemePainting.metric(context(), form.kind() == Nodes.FormKind.SHEET
                     ? DesignMetrics.Role.SHEET_SECTION_GAP : DesignMetrics.Role.SECTION_GAP)));
-            int footerTop = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), compact
+            int footerTop = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : prompt ? ThemePainting.metric(context(), compact
                     ? DesignMetrics.Role.PROMPT_COMPACT_FOOTER_TOP : DesignMetrics.Role.PROMPT_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
-                    window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
+                    window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
             footer.setLayout(new FooterLayout(this));
             actions.setLayout(
-                    hero
+                    prompt
                             ? new GridLayout(
                                     1,
                                     0,

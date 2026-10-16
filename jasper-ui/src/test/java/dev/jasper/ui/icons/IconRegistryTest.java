@@ -69,7 +69,7 @@ class IconRegistryTest {
         try (var registry = new IconRegistry()) {
             registry.register("test:line", "M 2 8 H 14");
             var palette = KitFixtures.dark().semantic();
-            assertThat(strokeAt2x(registry.hero("test:line", palette, Nodes.Hue.BLUE, 24))).isBetween(3.4, 3.6);
+            assertThat(strokeAt2x(registry.prompt("test:line", palette, Nodes.Hue.BLUE, 24))).isBetween(3.4, 3.6);
             assertThat(strokeAt2x(registry.icon("test:line", palette, Nodes.Hue.BLUE, 24))).isBetween(4.4, 4.6);
             assertThat(strokeAt2x(registry.icon("test:line", palette, Nodes.Hue.BLUE, 14))).isBetween(2.5, 2.75);
         }

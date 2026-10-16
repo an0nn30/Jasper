@@ -116,7 +116,7 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);
-        control.hero(false);
+        control.prompt(false);
     }
     private void detachMoves(Nodes.Node root, Map<String, Nodes.Node> nodes, Map<String, ControlRegistry.Control> next) {
         var parents = new LinkedHashMap<JComponent, java.awt.Container>();
@@ -139,9 +139,9 @@ final class ViewReconciler implements AutoCloseable {
         ControlRegistry.children(node).forEach(child -> inherit(child, next, childrenEnabled));
     }
     private void applyPrompt(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
-        boolean hero = node instanceof Nodes.Form form ? (form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT) : inherited;
-        next.get(node.id()).hero(hero);
-        ControlRegistry.children(node).forEach(child -> applyPrompt(child, next, hero));
+        boolean prompt = node instanceof Nodes.Form form ? (form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT) : inherited;
+        next.get(node.id()).prompt(prompt);
+        ControlRegistry.children(node).forEach(child -> applyPrompt(child, next, prompt));
     }
     private void applyFullForm(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
