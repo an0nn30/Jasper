@@ -1,5 +1,40 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 3b: SDK 0.18 controls — 2026-10-16** (`claude/enterprise-sdk-0-18-controls`, worktree
+`.claude/worktrees/enterprise-3b`, `abf90c83a..2a4944861`, then this documentation commit;
+[plan](superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18 gains the first group of spec
+8.2's additions, each in the SDK and the jasper-ui model, projected losslessly by `KitValues`, validated by `ViewSpec`,
+served by the testkit fake, pinned by `KitContractTest` and `PluginContractTest` on both runtimes and drawn by the
+default look: `Nodes.Notice` (the severity's glyph and word before one sentence on the severity's derived ground, the
+text held to 4.5:1 and the border to 1.3:1, at most one SECONDARY or LINK action; a form section or a VERTICAL stack
+child), `Nodes.Properties` with `PropertyRow` (a heading over a card of label and value rows; technical values in the
+data face, kept from their end when shortened; a severity colours a value held to 4.5:1 on the card), `Nodes.Separator`
+(a hairline between two items of an INLINE or ACTIONS stack, hidden while every item on one side is), `ChoiceKind.TABS`
+(the segment track without a visible label), `Field.readOnly` (focusable, selectable and copyable, never edited; it
+replaces the host-only `KitView.setFieldReadOnly`, and the Keymap search sets it while recording),
+`PickerFace.technicalCaption` (`MONO_CAPTION`), `EditorHint.technical()` (generated pages and host rows draw a text
+setting's field TECHNICAL), `IconSize.SWATCH` (a solid square of the hue at caption size) and `Form.footnote` (one muted
+line in the preview's place), and the rule that an EXCLUSIVE choice has 2 to 4 options and a TABS choice two or more.
+That rule refuses File Server's two one-option choices, so a single offered protocol and TFTP's one login are
+read-only fields now (spec 13's TFTP item; 3e keeps the rest of section 13 and must not redo it). Zero pixel change to
+existing fixtures: the headless gallery's 140 earlier files per theme (Slate Cobalt Dark and Light) are byte-identical,
+`manifest.json` and `sheet-9.png` change, and eight new fixtures (`read-only-fields`, `technical-captions`, `tabs`,
+`swatches`, `separators`, `notice-severities`, `properties`, `form-footnote`) add 17 files; `StateFixtures`' controls and
+icon sheets skip TABS and SWATCH. Rulings (plan, "Rulings"): Notice and Separator placement, root views included; list
+rows take neither, nor Properties; the separator's hiding; the Notice words "Information", "Warning" and "Error"; the
+Properties card; a read-only stepper or slider refused, a read-only number deaf to its arrows; TABS needs two options;
+a swatch takes no severity and is painted as authored; a footnote is one line and excludes a preview, above a PROMPT
+form's full-width actions; technical captions in `MONO_CAPTION`; the technical hint applies to text settings; the
+testkit's row projection keeps `Form.submission`; the contract cases split between `KitContractTest` (with a new `type`
+hook) and `PluginContractTest`. Deviations from the plan's text: none beyond the plan's Rulings. Hand-offs: plan 4's classic faces draw
+these nodes the classic way (the classic Notice in its tinted box, Properties as a table, TABS as folder tabs, read-only
+fields on `surface.tableHeader`, the swatch's indicator guard, the footnote in the classic footer); 3c and 3d add their
+nodes to `KitValuesTest`'s list, which `classes` counts with the nodes inside stacks and form sections; 3d's
+`DialogSpec.swatch` can reuse `Labels.Swatch`. `./gradlew check --continue`: **10,561 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: in
+New File Server, choose TFTP and see "No login (TFTP has none)" as a read-only field in the Access card; nothing else
+visible changed in the shipped surfaces. Not merged, not pushed.
+
 **Enterprise presentation, plan 3a: SDK 0.18 renames — 2026-10-16** (`claude/enterprise-sdk-0-18-renames`, worktree
 `.claude/worktrees/enterprise-sdk-0-18`, `1021b1c5b..c86589c98`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3a-sdk-0-18-renames.md),

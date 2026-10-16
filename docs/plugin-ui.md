@@ -183,6 +183,20 @@ confirms (set `pending` while a start or stop is in flight).
 - **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a
   `Stack` with `LayoutRole.SETTINGS_PAGE` of `Section`s over SETTINGS cards (see
   [Declared settings](plugin-authoring.md#declared-settings)).
+- **Notices (SDK 0.18).** `Notice(severity, text, actions)`: one sentence, shown after the severity's glyph and word,
+  with at most one SECONDARY or LINK action; a form section or a child of a VERTICAL stack.
+- **Properties (SDK 0.18).** `Properties(title, rows)` of `PropertyRow(label, value, technical, severity)`: labelled
+  values under an optional heading. Labels carry no colon; `technical` puts a value in the data face and a severity
+  colours it.
+- **Toolbar groups (SDK 0.18).** A `Separator` stands between two items of an INLINE or ACTIONS stack, never first,
+  last or beside another; it is not shown while every item on one side of it is hidden.
+- **Tabs (SDK 0.18).** `ChoiceKind.TABS` switches among two or more views (Overview and Details) and reports
+  `Selected`; compose the chosen content below it. A view whose EXCLUSIVE choice has fewer than two or more than four
+  options is refused.
+- **Facts and data values (SDK 0.18).** A `readOnly` field is focusable, selectable and copyable but never edited (a
+  stepper or slider is never read-only). `PickerFace.technicalCaption` marks a caption as a data value,
+  `IconSize.SWATCH` is a solid square of an icon's hue (never NONE), and `Form.footnote` is one muted line beside the
+  actions, in place of a preview.
 
 ## Icons
 
@@ -207,7 +221,8 @@ rings and hovers on top. Content in the workspace area of a translucent window p
 ## Testing
 
 `jasper-sdk-testkit` implements the same kit contract headlessly: `new FakeKit(pluginId).create(spec, handler)`
-returns a `FakeKitView` whose `spec()` is the current tree and whose `emit(event)` delivers user input. Assert on
+returns a `FakeKitView` whose `spec()` is the current tree and whose `emit(event)` delivers user input; `type(id, text)` types into a field as a person would, and a
+read-only, hidden or disabled field takes nothing. Assert on
 descriptors (which rows exist, which action is primary, which state is enabled), not on pixels; the host's own tests
 cover rendering. `FakePluginHost` runs a whole plugin. Both examples above are compiled and tested in
 `jasper-app/src/test/java/dev/jasper/app/documentation/PluginUiExamplesTest.java`.

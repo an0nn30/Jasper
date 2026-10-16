@@ -1,5 +1,7 @@
 # Enterprise presentation 3b: SDK 0.18 controls Implementation Plan
 
+> **Status:** executed 2026-10-16 (`abf90c83a..2a4944861`); deviations from the text: none beyond the plan's Rulings; `./gradlew check --continue`: 10,561 tests, 0 failures, 0 errors, 25 skipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** SDK 0.18 gains the first group of spec 8.2's additions: `Nodes.Notice`, `Nodes.Properties` with
