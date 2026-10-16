@@ -43,8 +43,8 @@ class StaticDefaultTest {
     static final String PROBE = "dev/jasper/app/architecture/StaticDefaultTest$";
     /** How many calls deep a static initializer's calls are followed through the scanned classes. */
     static final int DEPTH = 4;
-    /** Default catalogs that only their owners may read. */
-    static final Set<String> CATALOGS = Set.of(METRICS + ".DEFAULT", "dev/jasper/ui/metrics/TypeScale.DEFAULT",
+    /** The catalogs that only their owners may read: the defaults and the classic base. */
+    static final Set<String> CATALOGS = Set.of(METRICS + ".DEFAULT", METRICS + ".CLASSIC", "dev/jasper/ui/metrics/TypeScale.DEFAULT",
         "dev/jasper/ui/metrics/FaceSet.PLATFORM");
     /** Calls that read a metric; a static initializer makes none. */
     static final Set<String> METRIC_READS = Set.of(METRICS + ".value", METRICS + ".contentHeight", METRICS + ".contentPadding",
