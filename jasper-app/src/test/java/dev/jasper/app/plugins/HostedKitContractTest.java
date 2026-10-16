@@ -13,5 +13,7 @@ class HostedKitContractTest extends KitContractTest {
  protected void owns(UiKit kit,UiView view){((HostedKit)kit).requireOwned(view);}
  protected void fieldText(UiView view,String id,String text){input(((HostedKitView)view).component(),id+".input").setText(text);}
  protected int[] fieldSelection(UiView view,String id){var field=input(((HostedKitView)view).component(),id+".input");return new int[]{field.getSelectionStart(),field.getSelectionEnd()};}
+ /** As a person types: the text component's key-typed action, which a read-only or disabled field ignores. */
+ protected void type(UiView view,String id,String text){var field=input(((HostedKitView)view).component(),id+".input");field.selectAll();new javax.swing.text.DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new java.awt.event.ActionEvent(field,java.awt.event.ActionEvent.ACTION_PERFORMED,text));}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

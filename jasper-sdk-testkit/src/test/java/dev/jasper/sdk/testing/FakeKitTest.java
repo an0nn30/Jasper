@@ -16,6 +16,18 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThatIllegalArgumentException().isThrownBy(() -> view.setComposing("results",true));
   kit.close();
  });}
+ /** Plan 3b: the fake takes no typing in a read-only field, or in one a hidden container holds, as the host does. */
+ @Test void aReadOnlyOrHiddenFieldTakesNoTypingInTheFake() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("sample");var events=new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();var ready=dev.jasper.sdk.ui.ControlState.READY;
+  var locked=new dev.jasper.sdk.ui.Nodes.Field("locked",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"x","","Locked","",java.util.Optional.empty(),dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",true);
+  var open=new dev.jasper.sdk.ui.Nodes.Field("open",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"","","Open","");
+  var hidden=new dev.jasper.sdk.ui.Nodes.Stack("hidden",new dev.jasper.sdk.ui.ControlState(false,true,false,""),dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(open));
+  var view=kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(locked,hidden))),events::add);
+  view.type("locked","typed");view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("locked","typed"));view.type("open","typed");
+  assertThat(events).isEmpty();
+  assertThatIllegalArgumentException().isThrownBy(() -> view.type("root","typed"));
+  kit.close();
+ });}
  @Test void contextFailedStartAndStopOwnKitAndSemanticRefresh() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   try(var host=new FakePluginHost()) {
    var info=new dev.jasper.sdk.PluginInfo("owner","Owner","1.0.0",java.util.Set.of());var retained=new java.util.ArrayList<FakeKit>();
@@ -40,5 +52,6 @@ class FakeKitContractTest extends KitContractTest {
  protected void owns(dev.jasper.sdk.ui.UiKit kit,dev.jasper.sdk.ui.UiView view){((FakeKit)kit).requireOwned(view);}
  protected void fieldText(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).emit(new dev.jasper.sdk.ui.UiEvent.Edited(id,text));}
  protected int[] fieldSelection(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).fieldSelection(id);}
+ protected void type(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).type(id,text);}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

@@ -16,6 +16,8 @@ public abstract class KitContractTest {
     protected abstract void stop(UiKit kit);
     protected abstract void fieldText(UiView view,String id,String text);
     protected abstract int[] fieldSelection(UiView view,String id);
+    /** Types {@code text} into field {@code id} as a person would, replacing its text; a read-only, hidden or disabled field takes nothing. */
+    protected abstract void type(UiView view,String id,String text);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -35,6 +37,27 @@ public abstract class KitContractTest {
             assertThat(events).containsExactly(new UiEvent.Selected("policy",Set.of("dark")),new UiEvent.Edited("SLIDER","43"));
         }finally{view.close();stop(kit);}
     }); }
+
+    /** Spec 8.2: a read-only field is focusable, selectable and copyable but takes no typing; an editable one reports it. */
+    @Test void aReadOnlyFieldTakesNoTypingAndKeepsItsSelection() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var view = kit.create(readOnlyFields(true), events::add);
+        try {
+            type(view, "locked", "typed"); type(view, "shown", "typed");
+            assertThat(events).isEmpty();
+            view.selectAll("shown");
+            assertThat(fieldSelection(view, "shown")).containsExactly(0, "No folder selected".length());
+            view.update(readOnlyFields(false));
+            assertThat(view.spec()).isEqualTo(readOnlyFields(false));
+            type(view, "locked", "typed");
+            assertThat(events).containsExactly(new UiEvent.Edited("locked", "typed"));
+        } finally { view.close(); stop(kit); }
+    }); }
+    private static ViewSpec readOnlyFields(boolean locked) {
+        return new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Field("locked", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Login", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", locked),
+            new Nodes.Field("shown", ControlState.READY, Nodes.FieldKind.TEXT, "No folder selected", "", "Folder", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", true))));
+    }
 
     @Test void windowPlainPathAndDiscreetInputRetainTheAdditiveContract() throws Exception { edt(()->{
         var path=new Nodes.Field("path",ControlState.READY,Nodes.FieldKind.PATH,"/synthetic/key","Hint","Path","browse",Optional.empty(),Nodes.FieldPresentation.PLAIN_PATH);

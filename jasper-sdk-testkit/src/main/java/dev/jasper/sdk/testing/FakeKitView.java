@@ -87,8 +87,13 @@ public final class FakeKitView implements UiView {
  public void setComposing(String fieldId,boolean value){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
- /** Deliver a typed event through containment. */
- public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ /** Deliver a typed event through containment; an edit of a read-only field, which a person cannot make, is dropped. */
+ public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ /** Simulate a person typing {@code text} into a field, replacing its text: it reports {@link UiEvent.Edited} as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
+ * @param fieldId field node
+ * @param text the text typed */
+ public void type(String fieldId,String text){guard();Objects.requireNonNull(text);if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(field.readOnly()||!live(fieldId))return;emit(new UiEvent.Edited(fieldId,text));}
+ private boolean live(String id){var nodes=index(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
   if(index(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");

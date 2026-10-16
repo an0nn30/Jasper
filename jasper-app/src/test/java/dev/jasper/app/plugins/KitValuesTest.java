@@ -34,6 +34,14 @@ class KitValuesTest {
   assertThat(nodes.stream().map(Object::getClass).distinct()).hasSize(Node.class.getPermittedSubclasses().length);
   for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
  }
+ /** Plan 3b: a read-only field crosses the projection unchanged. */
+ @Test void readOnlyFieldsProjectWithoutLoss(){
+  for(boolean readOnly:List.of(false,true)){
+   var spec=new ViewSpec(new Field("login",READY,FieldKind.TEXT,"No login (TFTP has none)","","Login","",Optional.empty(),FieldPresentation.STANDARD,"","","",readOnly));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   assertThat(((dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root()).readOnly()).isEqualTo(readOnly);
+  }
+ }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
   for(String icon:List.of("lock","")){
    var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);

@@ -24,7 +24,7 @@ final class TextFields {
         final Buttons.ButtonControl browse;
         final JScrollPane scroll;
         final DocumentListener listener;
-        boolean embedded, readOnly;
+        boolean embedded;
         Buttons.ButtonControl trailing;
         boolean applying;
         boolean notifying;
@@ -86,7 +86,7 @@ final class TextFields {
             };
             input.addInputMethodListener(composition); own(() -> input.removeInputMethodListener(composition));
             setValue(node.value());
-            own(() -> { clearTrailing(); readOnly=false; });
+            own(this::clearTrailing);
             refresh();
         }
         private void clearTrailing() {
@@ -203,7 +203,7 @@ final class TextFields {
             input.getInputMap(JComponent.WHEN_FOCUSED).put(key, name);
             input.getActionMap().put(name, new AbstractAction() {
                 @Override public void actionPerformed(java.awt.event.ActionEvent event) {
-                    if (!interactive()) return;
+                    if (!interactive() || ((Nodes.Field)node).readOnly()) return;
                     input.setText(NumberFilter.step(input.getText(), ((Nodes.Field)node).numeric().orElseThrow(), direction));
                 }
             });
@@ -251,7 +251,7 @@ final class TextFields {
         @Override void refresh() {
             var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
             listKeys(!field.listId().isBlank() && field.kind() != Nodes.FieldKind.TEXTAREA && field.kind() != Nodes.FieldKind.NUMBER);
-            input.setEditable(component.isEnabled() && !readOnly); surface.setEnabled(component.isEnabled());
+            input.setEditable(component.isEnabled() && !field.readOnly()); surface.setEnabled(component.isEnabled());
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {
                 scroll.setEnabled(component.isEnabled());

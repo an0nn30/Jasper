@@ -196,10 +196,12 @@ public final class Nodes {
      * passes either key on, to an enclosing stack or form. A nonblank {@code listId} names an ItemList in the same view:
      * Up, Down, Page Up and Page Down in the field move that list's selection (reporting its Selected) while the focus
      * stays in the field, and Enter stays {@code trailingAction}. A TEXTAREA takes neither {@code alternateAction} nor
-     * {@code listId}, and a NUMBER field (whose arrows step it) takes no {@code listId}.
+     * {@code listId}, and a NUMBER field (whose arrows step it) takes no {@code listId}. A {@code readOnly} field (since
+     * 0.18.0) is focusable, selectable and copyable but never edited, so it reports no {@link UiEvent.Edited}; a STEPPER
+     * or SLIDER is never read-only.
      */
     public record Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
-                        String alternateAction, String cancelAction, String listId) implements Node {
+                        String alternateAction, String cancelAction, String listId, boolean readOnly) implements Node {
         public Field {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -217,6 +219,13 @@ public final class Nodes {
             if (kind == FieldKind.TEXTAREA && (!alternateAction.isBlank() || !listId.isBlank()))
                 throw new IllegalArgumentException("A multiline field takes no Shift+Enter action or list");
             if (kind == FieldKind.NUMBER && !listId.isBlank()) throw new IllegalArgumentException("A number field's arrow keys step its value, not a list");
+            if (readOnly && (presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER))
+                throw new IllegalArgumentException("A stepper or slider is never read-only");
+        }
+        /** An editable field. */
+        public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation,
+                     String alternateAction, String cancelAction, String listId) {
+            this(id, state, kind, value, hint, label, trailingAction, numeric, presentation, alternateAction, cancelAction, listId, false);
         }
         /** A field whose Shift+Enter and Escape pass on and that moves no list. */
         public Field(String id, ControlState state, FieldKind kind, String value, String hint, String label, String trailingAction, Optional<Numeric> numeric, FieldPresentation presentation) {

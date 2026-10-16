@@ -20,6 +20,16 @@ class KitValuesTest {
         assertThat(names(IconSize.class)).containsExactly("CAPTION", "CONTROL", "RAIL", "EMPTY", "PROMPT");
         assertThat(names(ButtonKind.class)).contains("GHOST", "DESTRUCTIVE_GHOST");
     }
+    /** Plan 3b: fields are editable unless they say so, and a stepper or slider is never read-only. */
+    @Test void readOnlyFieldsAreValidatedAndDefaultToEditable() {
+        assertThat(new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "").readOnly()).isFalse();
+        assertThat(new Field("find", ControlState.READY, FieldKind.SEARCH, "", "", "Find", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "").readOnly()).isFalse();
+        assertThat(new Field("count", ControlState.READY, FieldKind.NUMBER, "1", "", "Count", "", Optional.of(new Numeric(0, 9, 1, 0)),
+            FieldPresentation.STANDARD, "", "", "", true).readOnly()).isTrue();
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
+                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

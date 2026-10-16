@@ -160,10 +160,6 @@ public final class KitView extends JPanel implements AutoCloseable {
         field.trailing(action.orElse(null));
         if (pointerOnly) unfocusable(this);
     }
-    /** App-only native read-only input, retaining focus, selection, copy, document and undo history. */
-    public void setFieldReadOnly(String fieldId, boolean readOnly) {
-        requireOpen(); var field = textField(fieldId); field.readOnly = readOnly; field.refresh();
-    }
     private TextFields.FieldControl textField(String id) {
         var control = reconciler.mounted(Objects.requireNonNull(id));
         if (!(control instanceof TextFields.FieldControl field)) throw new IllegalArgumentException("Not a mounted ordinary field: " + id);

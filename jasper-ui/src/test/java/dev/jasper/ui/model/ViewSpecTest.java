@@ -14,6 +14,16 @@ class ViewSpecTest {
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> text(" ")).isInstanceOf(IllegalArgumentException.class);
     }
+    /** Plan 3b: fields are editable unless they say so, and a stepper or slider is never read-only. */
+    @Test void readOnlyFieldsAreValidatedAndDefaultToEditable() {
+        assertThat(new Field("name", ControlState.READY, FieldKind.TEXT, "", "", "Name", "").readOnly()).isFalse();
+        assertThat(new Field("find", ControlState.READY, FieldKind.SEARCH, "", "", "Find", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "").readOnly()).isFalse();
+        assertThat(new Field("count", ControlState.READY, FieldKind.NUMBER, "1", "", "Count", "", Optional.of(new Numeric(0, 9, 1, 0)),
+            FieldPresentation.STANDARD, "", "", "", true).readOnly()).isTrue();
+        for (var presentation : List.of(FieldPresentation.STEPPER, FieldPresentation.SLIDER))
+            assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
+                Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
+    }
     @Test void choiceTableListAndTreeValidateReferencesAndUniqueIds() {
         assertThatThrownBy(() -> new ViewSpec(new Choice("pick", ControlState.READY, ChoiceKind.DROPDOWN,
             List.of(new Option("a", "A", Optional.empty())), "missing", "Choice", "choose")))

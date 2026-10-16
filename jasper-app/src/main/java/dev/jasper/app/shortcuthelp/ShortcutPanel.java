@@ -178,7 +178,6 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         if (closed) return;
         top.update(topSpec());
         top.setFieldTrailing(SEARCH, Optional.of(new Nodes.Button("record", ControlState.READY, recording ? "Stop recording" : "Record", "keyboard", Nodes.ButtonKind.GHOST, "record", "Record shortcut", Nodes.ButtonPresentation.EMBEDDED)));
-        top.setFieldReadOnly(SEARCH,recording);
         tools.update(toolsSpec());
         list.update(new ViewSpec(tree.descriptor()));
         list.setTreeRowPresentation(ShortcutTree.ID,tree.presentation());
@@ -188,8 +187,9 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     }
 
     private ViewSpec topSpec() {
+        // While recording, the field shows the query and takes no typing (spec 8.2's Field.readOnly).
         return new ViewSpec(new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query,
-            "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", ""));
+            "Search actions, plugins, or Cmd+Shift+H", "Search keyboard shortcuts", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", recording));
     }
 
     /** Clear appears beside the section tools once there is a query or a recorded key to clear. */
