@@ -93,78 +93,99 @@ public final class KitGallery {
         Path output = Path.of(args.length == 0 ? "jasper-ui/build/gallery" : args[0]);
         String name = System.getProperty("jasper.galleryTheme", "dark");
         GeneratedTheme theme = theme(name);
-        Edt.run(() -> {
-            var priorLaf = UIManager.getLookAndFeel();
-            Object priorFont = UIManager.get("defaultFont");
-            Object priorCaps = UIManager.get("PasswordField.showCapsLock");
-            String family = KitFixtures.platformFamily();
-            var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
-            var focus = new GalleryFocus();
+        Edt.run(() -> installed(theme, dev.jasper.ui.kit.Kit.DEFAULT, (context, focus) -> {
             try {
-                // Install before creating any gallery widget, including transition controllers.
-                FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
-                UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
-                UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));
-                if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");
-                KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
-                var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
-                try (var icons = icons(); var ownedBinding = contextBinding(binding)) {
-                    var context = KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, ownedBinding, ThemeRoute.WORKSPACE, icons, () -> false, action -> "");
-                    float scale = UIScale.getUserScaleFactor();
-                    Path directory = output.resolve(name + "-" + (int)scale + "x");
-                    Files.createDirectories(directory);
-                    var contact = new ArrayList<Rendered>();
-                    for (Fixture fixture : fixtures()) {
-                        UIManager.put("defaultFont", new Font(family, Font.PLAIN, fixture.name().contains("font24") ? 24 : 13));
-                        try (var view = new KitView(context, fixture.spec(), e -> {})) {
-                            registerCustom(view, fixture.spec().root(), context);
-                            int width = UIScale.scale(fixture.width()), height = UIScale.scale(fixture.height());
-                            view.setAvailableHeight(fixture.height() + 1000); // reference content has no artificial screen cap
-                            KitFixtures.render(view, width, height, 1);
-                            if (fixture.name().contains("short-font24")) {
-                                descendants(view).stream().filter(JScrollPane.class::isInstance).map(JScrollPane.class::cast).findFirst().ifPresent(scroll -> scroll.getVerticalScrollBar().setValue(scroll.getVerticalScrollBar().getMaximum()));
-                            }
-                            applyState(view, fixture, focus);
-                            JComponent paintedRoot = view;
-                            BufferedImage rendered = onSurface(KitFixtures.render(view, width, height, 1), context);
-                            if (fixture.name().equals("dropdown-open")) {
-                                var combo=(JComboBox<?>)find(view,"dropdown.input");
-                                var popup=(javax.swing.plaf.basic.BasicComboPopup)combo.getUI().getAccessibleChild(combo,0);
-                                popup.getList().setSelectedIndex(0);paintedRoot=popup;
-                                rendered=paint(popup,UIScale.scale(240),UIScale.scale(100));
-                            }
-                            if (fixture.name().equals("vault-add-menu")) {
-                                var anchor = find(view, "add-menu");
-                                var popup = anchor.getComponentPopupMenu();
-                                popup.setInvoker(anchor);
-                                paintedRoot = popup;
-                                rendered = paint(popup, popup.getPreferredSize().width, popup.getPreferredSize().height);
-                            }
-                            ImageIO.write(rendered, "png", directory.resolve(fixture.name() + ".png").toFile());
-                            Files.writeString(directory.resolve(fixture.name() + ".json"), metadata(fixture, view, context, scale, rendered, paintedRoot));
-                            contact.add(new Rendered(fixture.name(), rendered));
-                        } finally {
-                            if (focus.target != null) {
-                                var lost = new FocusEvent(focus.target, FocusEvent.FOCUS_LOST);
-                                for (var listener : focus.target.getFocusListeners()) listener.focusLost(lost);
-                                focus.target = null;
-                            }
-                        }
-                    }
-                    writeSheets(directory, contact, scale);
-                    Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(name) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":26}");
-                    System.out.println("Rendered " + contact.size() + " fixtures with " + UIManager.getLookAndFeel().getName() + " at " + scale + "x to " + directory);
+                float scale = UIScale.getUserScaleFactor();
+                Path directory = output.resolve(name + "-" + (int)scale + "x");
+                Files.createDirectories(directory);
+                var contact = new ArrayList<Rendered>();
+                for (Fixture fixture : fixtures()) {
+                    var capture = capture(fixture, context, focus);
+                    ImageIO.write(capture.image(), "png", directory.resolve(fixture.name() + ".png").toFile());
+                    Files.writeString(directory.resolve(fixture.name() + ".json"), capture.metadata());
+                    contact.add(new Rendered(fixture.name(), capture.image()));
                 }
+                writeSheets(directory, contact, scale);
+                Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(name) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":26}");
+                System.out.println("Rendered " + contact.size() + " fixtures with " + UIManager.getLookAndFeel().getName() + " at " + scale + "x to " + directory);
             } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
-            finally {
-                KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus);
-                UIManager.put("defaultFont", priorFont);
-                UIManager.put("PasswordField.showCapsLock", priorCaps);
-                try { UIManager.setLookAndFeel(priorLaf); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
-            }
-        });
+        }));
     }
-    static final class GalleryFocus extends DefaultKeyboardFocusManager {
+
+    /** One fixture as the gallery renders it: the image it writes and the metadata beside it. */
+    public record Capture(Fixture fixture, BufferedImage image, String metadata) {}
+
+    /**
+     * Runs {@code action} with {@code theme} and {@code kit} installed as the gallery renders them: real FlatLaf, the
+     * platform family at 13 points, no caps-lock query and the gallery's focus manager, all restored afterwards. EDT.
+     */
+    public static void installed(GeneratedTheme theme, dev.jasper.ui.kit.Kit kit, java.util.function.BiConsumer<KitContext, GalleryFocus> action) {
+        var priorLaf = UIManager.getLookAndFeel();
+        Object priorFont = UIManager.get("defaultFont");
+        Object priorCaps = UIManager.get("PasswordField.showCapsLock");
+        String family = KitFixtures.platformFamily();
+        var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        var focus = new GalleryFocus();
+        try {
+            // Install before creating any gallery widget, including transition controllers.
+            FlatLafInstaller.install(theme, kit);
+            UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
+            UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));
+            if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
+            var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
+            try (var icons = icons(); var ownedBinding = contextBinding(binding)) {
+                action.accept(KitContext.of(kit, ownedBinding, ThemeRoute.WORKSPACE, icons, () -> false, ignored -> ""), focus);
+            }
+        } finally {
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus);
+            UIManager.put("defaultFont", priorFont);
+            UIManager.put("PasswordField.showCapsLock", priorCaps);
+            try { UIManager.setLookAndFeel(priorLaf); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+        }
+    }
+
+    /** {@code fixture} rendered as {@link #main} writes it, in {@code context} with {@code focus} from {@link #installed}. EDT. */
+    public static Capture capture(Fixture fixture, KitContext context, GalleryFocus focus) {
+        String family = KitFixtures.platformFamily();
+        float scale = UIScale.getUserScaleFactor();
+        UIManager.put("defaultFont", new Font(family, Font.PLAIN, fixture.name().contains("font24") ? 24 : 13));
+        try (var view = new KitView(context, fixture.spec(), e -> {})) {
+            registerCustom(view, fixture.spec().root(), context);
+            int width = UIScale.scale(fixture.width()), height = UIScale.scale(fixture.height());
+            view.setAvailableHeight(fixture.height() + 1000); // reference content has no artificial screen cap
+            KitFixtures.render(view, width, height, 1);
+            if (fixture.name().contains("short-font24")) {
+                descendants(view).stream().filter(JScrollPane.class::isInstance).map(JScrollPane.class::cast).findFirst().ifPresent(scroll -> scroll.getVerticalScrollBar().setValue(scroll.getVerticalScrollBar().getMaximum()));
+            }
+            applyState(view, fixture, focus);
+            JComponent paintedRoot = view;
+            BufferedImage rendered = onSurface(KitFixtures.render(view, width, height, 1), context);
+            if (fixture.name().equals("dropdown-open")) {
+                var combo=(JComboBox<?>)find(view,"dropdown.input");
+                var popup=(javax.swing.plaf.basic.BasicComboPopup)combo.getUI().getAccessibleChild(combo,0);
+                popup.getList().setSelectedIndex(0);paintedRoot=popup;
+                rendered=paint(popup,UIScale.scale(240),UIScale.scale(100));
+            }
+            if (fixture.name().equals("vault-add-menu")) {
+                var anchor = find(view, "add-menu");
+                var popup = anchor.getComponentPopupMenu();
+                popup.setInvoker(anchor);
+                paintedRoot = popup;
+                rendered = paint(popup, popup.getPreferredSize().width, popup.getPreferredSize().height);
+            }
+            return new Capture(fixture, rendered, metadata(fixture, view, context, scale, rendered, paintedRoot));
+        } finally {
+            if (focus.target != null) {
+                var lost = new FocusEvent(focus.target, FocusEvent.FOCUS_LOST);
+                for (var listener : focus.target.getFocusListeners()) listener.focusLost(lost);
+                focus.target = null;
+            }
+        }
+    }
+
+    /** The gallery's focus manager: the focus owner is whatever {@link #applyState} focused. */
+    public static final class GalleryFocus extends DefaultKeyboardFocusManager {
         Component target;
         @Override public Component getFocusOwner() { return target; }
         @Override public Component getPermanentFocusOwner() { return target; }
