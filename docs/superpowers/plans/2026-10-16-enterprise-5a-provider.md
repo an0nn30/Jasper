@@ -26,8 +26,8 @@ and AssertJ 3.27.7, Python 3.11+ standard library for the mechanical edit script
 (sections 1, 3, 4, 5.1 to 5.9 without the `[branding]` table, 9.1, 9.2, 15, 16.1.6 to 16.1.8 and row 5 of 19.1). The spec
 row is delivered as two plans: this one (5a, the provider machinery, proven with fixture providers) and
 [5b](2026-10-16-enterprise-5b-enterprise.md) (faces and fonts, the plugin theme tier, the Enterprise plugin, its theme,
-conformance and the shipped-kit renders). Plans 1, 2 and 3a are on `main`; 3b, 3c, 3d, 3e and 4 execute before this plan,
-in that order.
+conformance and the shipped-kit renders). Plans 1, 2 and 3a are on `main`; 3b, 3c, 3d, 3e and 4 (4a, 4b, 4c) execute
+before this plan, in that order.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-5`, branch
 `claude/enterprise-provider`, cut from `main` at `222969926`. Run every command from the worktree root, never in
@@ -51,22 +51,30 @@ grep -c 'Kit CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java        
 ls jasper-ui/src/main/java/dev/jasper/ui/kit/ControlVariants.java jasper-ui/src/main/java/dev/jasper/ui/kit/ColorSlots.java \
    jasper-ui/src/main/java/dev/jasper/ui/metrics/MetricTokens.java                             # 4: all three exist
 grep -c 'TypeScale CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/metrics/TypeScale.java       # 4: 1
-grep -cE 'ROW_HEIGHT\(|FIELD_RADIUS\(' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java   # 4: 2
+grep -cE 'ROW_HEIGHT\(|FIELD_RADIUS\(' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java   # 4a: 2
+grep -c 'enterpriseTokens' jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java   # 4a: at least 1
+ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicButtonFace.java \
+   jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicFolderTabsFace.java                       # 4b: all three exist
+ls jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTableFace.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTagFace.java \
+   jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures.java                # 4c: all three exist
 ```
 
-If any check prints 0 or a file is missing, stop: this plan needs those plans on `main`.
+If any check prints 0 or a file is missing, stop: this plan needs those plans on `main`. Plan 4 is delivered as 4a (the
+classic catalog), 4b (the form faces) and 4c (the data faces), and all three execute before this plan: 5a reads only
+4a's values, but 5b's renders and "Turning Enterprise on gives classic controls" need 4b's and 4c's faces.
 
 **Plan 4's names.** Plan 4 was written at the same time as this plan. This plan uses the names below, which are spec
-5.2, 5.4, 6.1 and 19.1's. Before Task 1, read plan 4's merged code and, where a name differs, change it in this plan's
-code blocks (one search and replace per row) before executing; behaviour does not change. Record any change in this
-plan's status banner.
+5.2, 5.4, 6.1 and 19.1's, read against plans 4a, 4b and 4c as written. Before Task 1, read plan 4's merged code (4a, 4b
+and 4c) and, where a name differs, change it in this plan's code blocks before executing: a renamed member is one search
+and replace per row; a member whose shape differs (a class instead of a record, another factory) means adapting the code
+that uses it to the merged API without changing behaviour. Record any change in this plan's status banner.
 
 | This plan uses | Spec source |
 |---|---|
 | `new Kit(String id, DesignMetrics metrics, TypeScale type, FaceSet faces, ControlVariants controls, ColorSlots colors, UiKeySet uiKeys)`, `Kit.DEFAULT`, `Kit.CLASSIC`, accessors `controls()`, `colors()` | 6.1 |
 | `ControlVariants` a record of 14 components in the order toggle, exclusive, tabs, group, formLabel, empty, table, tree, stepper, orderedList, buttons, tag, route, prompt; each a nested enum `ControlVariants.Toggle` … `ControlVariants.Prompt` whose constants are the 5.2 values upper-cased (`SWITCH`, `CHECKBOX`; `SEGMENTS`, `RADIOS`; `SEGMENTS`, `FOLDER`; `CARD`, `TITLED_BOX`; `PLAIN`, `COLON`; `TILE`, `TEXT`; `PLAIN`, `CLASSIC`; `PLAIN`, `CLASSIC`; `STEPPER`, `SPINNER`; `INLINE`, `SIDE_COLUMN`; `RAISED`, `CLASSIC`; `TINT`, `BOXED`; `TILES`, `EDGED`; `TILE`, `PLAIN`), default value first | 5.2, 6.1 |
 | `ColorSlots(SemanticColor dialogSurface, SemanticColor navigationSurface)` | 5.7, 6.1 |
-| `MetricTokens` a record of 11 `int` components in 5.4's order (controlHeight, rowHeight, controlRadius, fieldRadius, groupRadius, focusRing, toolWindowHeader, groupPadding, dependentIndent, navigationWidth, statusDot); `DesignMetrics.with(MetricTokens)` | 5.4 |
+| `MetricTokens` (plan 4a Task 3): a final class with a private constructor; `MetricTokens.of(DesignMetrics catalog)` (each token's first role as the catalog holds it, so `CONTROL_HEIGHT` reads `FIELD_HEIGHT`), `int value(MetricTokens.Token)`, `MetricTokens with(Token, int)`, which throws `IllegalArgumentException("[metrics].<key>: <value> is outside <min>-<max>")`; the enum `MetricTokens.Token` (`CONTROL_HEIGHT` … `STATUS_DOT` in 5.4's order) with `key()`, `min()`, `max()` and `roles()`; `DesignMetrics.with(MetricTokens)`; the test fixture `KitFixtures.enterpriseTokens()` (spec 5.1's `[metrics]` over the classic base) | 5.4 |
 | `DesignMetrics.Role.ROW_HEIGHT`, `DesignMetrics.Role.FIELD_RADIUS` | 5.4, 5.5 |
 | `TypeScale.CLASSIC` (base 12) | 5.6 |
 | `UiKeySet.CLASSIC` | 6.5 |
@@ -93,8 +101,8 @@ plan's status banner.
 
 1. A hand-edited `plugins.toml` that enables two presentation providers (a BUNDLED one and a `--plugin-dir` DEV one): the
    DEV one wins, the BUNDLED one is SKIPPED with "the <DEV name> look is active", no notice is posted for it, and the
-   Plugins page's "after restart" prediction equals what the launch ran, so no restart banner appears. Task 4:
-   `PresentationSelectionTest.twoEnabledProvidersElectOneByOriginThenIdAndLosersPostNoProblem`; Task 5:
+   Plugins page's "after restart" prediction equals what the launch ran, so no restart banner appears. Task 5:
+   `PresentationSelectionTest.twoEnabledProvidersElectOneByOriginThenIdAndLosersPostNoProblem`; Task 6:
    `PresentationSelectionTest.theCatalogPredictsTheLaunchIncludingAnAttemptSkip`.
 2. A user turns a bundled off-by-default look on, then drops a newer zip of the same plugin into `plugins/` and later
    removes that copy: the opt-in survives every prune path, so the bundled look stays on; a copy installed through the
@@ -102,11 +110,14 @@ plan's status banner.
    `PluginStateStoreOptInTest` (four cases).
 3. Jasper crashes after the look's window was asked for but before it painted (a nonzero `System.exit`): the next start
    skips that look with one Warning and Try Again; a new build or a changed kit gets a fresh try; Try Again clears the
-   record and restarts. Task 12: `PresentationAttemptTest`.
+   record and restarts. Task 4: `AttemptStoreTest.theProcessHandleMarksItsLookAndKeepsAFailureOverALaterPaint` (the
+   handle); Task 12: `PresentationAttemptTest` (`anExitThatIsNotOrderlyBeforeProofKeepsPending`,
+   `tryAgainForgetsTheRecordAndRestarts`, `theFirstWindowsFirstPaintProvesTheLook`, `theRehearsalsPaintProvesTheLook`).
 4. A kit file with a typo, an out-of-range token, a truncated or oversized file, deep nesting or `../` paths: the
    provider is SKIPPED with exactly one message naming the key, the default look applies, nothing escapes the pre-pass,
-   and the plugin-problem notice appears once per digest, not at every start. Task 3: `KitParserTest` (negatives and
-   `fuzzedInputsOnlyEverProduceProblems`); Task 12: `PresentationAttemptTest.anInvalidKitIsAnnouncedOncePerDigest`.
+   and the plugin-problem notice appears once per digest, not at every start. Task 3: `KitParserTest` (negatives,
+   `deepNestingIsOneProblem` and `fuzzedInputsOnlyEverProduceProblems`); Task 12:
+   `PresentationAttemptTest.anInvalidKitIsAnnouncedOncePerDigest`.
 5. A fresh home (no `config.toml`) under a provider whose kit sets defaults: the first snapshot already carries them, a
    saved value wins, Settings' Reset returns to the kit's value, and picking the core default while the kit overrides it
    saves an explicit value. Task 7: `DefaultsPrecedenceTest`.
@@ -232,7 +243,11 @@ this plan's status banner.
     (fact 19). In this plan a kit's `FaceSet` is its base's; plan 5b registers the files and names the faces. A font
     whose name table cannot be read is not a kit problem (it degrades in 5b); five weights cannot exceed 5.9's eight-file
     limit, so that limit has no separate check. Cost if wrong: a kit problem instead of a degraded face.
-13. **Deep nesting.** `KitParser` treats a `StackOverflowError` from tomlj as "kit file: not valid TOML". Cost if wrong: none.
+13. **Deep nesting.** tomlj accepts very deep dotted tables (`[a.a.a…b]` with 20,000 parts parses without error), so no
+    walk of a parsed kit recurses: `KitParser` checks the top-level keys first and walks values with an explicit stack.
+    A `StackOverflowError` anywhere in `KitParser.parse` (tomlj's own parser included) is "kit file: not valid TOML", and
+    `PresentationFacts.read` turns one from any reader into the provider's problem, so nothing escapes the pre-pass. A
+    `--safe-mode` start reads no presentation files at all. Cost if wrong: none.
 14. **Colour literals** are `#rgb`, `#rrggbb`, `#rrggbbaa`, `0xrrggbb` and `rgb(`/`rgba(` anywhere in the file, named by
     key when inside a value and by line otherwise. **`window_title`** is at most 120 characters, not blank, with braces
     only around the three tokens. **`[type.ui]`** needs all three weights and `[type.data]` both. Cost if wrong: a stricter file.
@@ -241,10 +256,12 @@ this plan's status banner.
 16. **Fallback reporting.** When the kit is blamed (4.7), the provider is SKIPPED with "its look could not be installed;
     Jasper uses its standard look" and posts the ordinary NOT_STARTED problem; the attempt record says `failed`. The
     attempt-skip Warning is posted in the Plugins notification group. Cost if wrong: copy.
-17. **The audit's four editors.** `PlatformFontSize`, `Editors.OptionalNumber`, `WorkspaceEditors` and
-    `NotificationGroupsEditor` edit keys outside the allowlist, whose effective default is the core default; they keep
-    their comparisons and `DefaultsPrecedenceTest` pins that no allowlisted key uses them. Cost if wrong: the allowlist
-    cannot grow without editing them.
+17. **The audit's four editors.** `PlatformFontSize`, `Editors.OptionalNumber` and `WorkspaceEditors.Opacity` compare
+    with the effective default, as spec 5.8's table says, through `Editors.effectiveDefault(draft, setting)`, which is
+    `draft.defaultValue(setting)` and the core default only for a page made without a draft (plugin settings pages);
+    `NotificationGroupsEditor` has no setting-default comparison left to change (its one comparison is with a group's
+    declared mode, and removing the table at its default goes through `SchemaPage`, which Task 7 moves to the effective
+    default). `DefaultsPrecedenceTest` still pins that no allowlisted key reaches these editors. Cost if wrong: none.
 18. **The trace line** reads `Startup (cold, AOT cache used, CDS on, look=default): …` and the trace file gains `"look"`.
     Cost if wrong: one string.
 19. **Host facts.** `Projections` take `Host(boolean mac, boolean unifiedTitleSupported)`, computed by `PluginSelection` from
@@ -880,7 +897,8 @@ the public tokens, the type base, the control variants and the colour slots), a 
 **Interfaces:**
 - Consumes: plan 4's `Kit.CLASSIC`, the 7-component `Kit`, `ControlVariants`, `ColorSlots`, `MetricTokens`,
   `DesignMetrics.with(MetricTokens)`, `DesignMetrics.Role.ROW_HEIGHT` and `FIELD_RADIUS`, `TypeScale.CLASSIC`
-  (names in "Plan 4's names"); `CoreSettings.UI_THEME_LIGHT`, `UI_THEME_DARK`, `PALETTE_VISIBLE_ROWS`,
+  (names in "Plan 4's names"), and in the tests 4a's `KitFixtures.enterpriseTokens()`; `CoreSettings.UI_THEME_LIGHT`,
+  `UI_THEME_DARK`, `PALETTE_VISIBLE_ROWS`,
   `WINDOW_TOOLBAR_HEIGHT`; `JasperTheme.builtIn(String)`, `JasperTheme.has(boolean)`.
 - Produces: `public record ChromeSpec(TitleBar, MenuBar, String windowTitle, ToolWindows, EditorTabs, StatusBar,
   PaletteKind, DialogKind, MotionKind)` with `DEFAULT` and `CLASSIC`;
@@ -1023,7 +1041,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.ui.kit.ControlVariants;
 import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.MetricTokens;
+import dev.jasper.ui.testsupport.KitFixtures;
 import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.SemanticColor;
 import java.nio.charset.StandardCharsets;
@@ -1175,7 +1195,7 @@ class KitParserTest {
             ControlVariants.Tabs.FOLDER, ControlVariants.Group.TITLED_BOX, ControlVariants.FormLabel.COLON, ControlVariants.Empty.TEXT,
             ControlVariants.Table.CLASSIC, ControlVariants.Tree.CLASSIC, ControlVariants.Stepper.SPINNER, ControlVariants.OrderedList.SIDE_COLUMN,
             ControlVariants.Buttons.CLASSIC, ControlVariants.Tag.BOXED, ControlVariants.Route.EDGED, ControlVariants.Prompt.PLAIN));
-        assertThat(parsed.kit().metrics()).isEqualTo(Kit.CLASSIC.metrics().with(new MetricTokens(22, 22, 3, 2, 3, 2, 24, 12, 20, 230, 7)));
+        assertThat(parsed.kit().metrics()).isEqualTo(Kit.CLASSIC.metrics().with(KitFixtures.enterpriseTokens()));
         assertThat(parsed.kit().type()).isEqualTo(Kit.CLASSIC.type().withBody(12));
         assertThat(parsed.kit().colors().dialogSurface()).isEqualTo(SemanticColor.SURFACE_APP);
         assertThat(parsed.kit().colors().navigationSurface()).isEqualTo(SemanticColor.SURFACE_CARD);
@@ -1190,6 +1210,18 @@ class KitParserTest {
         assertThat(parsed.faces().data().orElseThrow().medium().family()).isEqualTo(PLEX_MONO);
         assertThat(parsed.faces().files()).extracting(FontFile::path).containsExactly("fonts/ibm-plex-sans-regular.ttf",
             "fonts/ibm-plex-sans-medium.ttf", "fonts/ibm-plex-sans-semibold.ttf", "fonts/ibm-plex-mono-regular.ttf", "fonts/ibm-plex-mono-medium.ttf");
+    }
+
+    /** Plan 4a's MetricTokens.of reads each token's first role, so a token left out keeps its base's value exactly. */
+    @Test void aTokenLeftOutKeepsItsBasesValue() throws Exception {
+        var metrics = parse("kit = 1\nbase = \"classic\"\n[metrics]\nrow_height = 22\n").kit().metrics();
+        assertThat(metrics.value(DesignMetrics.Role.FIELD_HEIGHT)).as("control_height left out").isEqualTo(22);
+        assertThat(metrics.value(DesignMetrics.Role.BUTTON_HEIGHT)).isEqualTo(24);
+        assertThat(metrics).isEqualTo(Kit.CLASSIC.metrics());
+        var tall = parse("kit = 1\nbase = \"default\"\n[metrics]\nrow_height = 26\n").kit().metrics();
+        assertThat(MetricTokens.of(tall).value(MetricTokens.Token.ROW_HEIGHT)).isEqualTo(26);
+        assertThat(MetricTokens.of(tall).value(MetricTokens.Token.CONTROL_HEIGHT))
+            .isEqualTo(MetricTokens.of(Kit.DEFAULT.metrics()).value(MetricTokens.Token.CONTROL_HEIGHT));
     }
 
     @Test void everyChromeAndControlPointTakesBothItsValues() throws Exception {
@@ -1275,6 +1307,14 @@ class KitParserTest {
         assertThatThrownBy(() -> KitParser.parse(FULL.getBytes(StandardCharsets.UTF_8), context(files, Map.of("look", Optional.of(look())))))
             .hasMessage("[type.ui].regular: fonts/ibm-plex-sans-regular.ttf is larger than 2 MiB");
         assertThatThrownBy(() -> KitParser.parse(new byte[] {(byte) 0xC3, 0x28}, context(fonts(), Map.of()))).hasMessage("kit file: not UTF-8 text");
+    }
+
+    /** Rulings 13: tomlj accepts very deep dotted tables; the parser reports one problem and never recurses through them. */
+    @Test void deepNestingIsOneProblem() {
+        String head = "kit = 1\nbase = \"default\"\n";
+        assertThat(problem(head + "[" + "a.".repeat(20_000) + "b]\n")).isEqualTo("[a]: unknown table");
+        assertThat(problem(head + "[chrome." + "a.".repeat(20_000) + "b]\n")).isEqualTo("[chrome].a: unknown key");
+        assertThat(problem(head + "a = " + "[".repeat(30_000))).startsWith("kit file: not valid TOML");
     }
 
     @Test void fuzzedInputsOnlyEverProduceProblems() {
@@ -1575,20 +1615,6 @@ public final class KitParser {
     private static final List<String> CONTROLS = List.of("toggle", "exclusive", "tabs", "group", "form_label", "empty", "table",
         "tree", "stepper", "ordered_list", "buttons", "tag", "route", "prompt");
 
-    /** A public token: its key, its binding range and the role whose base value stands in when the key is left out. */
-    private record Token(String key, int min, int max, DesignMetrics.Role role) { }
-    private static final List<Token> TOKENS = List.of(
-        new Token("control_height", 20, 28, DesignMetrics.Role.BUTTON_HEIGHT),
-        new Token("row_height", 18, 28, DesignMetrics.Role.ROW_HEIGHT),
-        new Token("control_radius", 0, 4, DesignMetrics.Role.CONTROL_RADIUS),
-        new Token("field_radius", 0, 4, DesignMetrics.Role.FIELD_RADIUS),
-        new Token("group_radius", 0, 6, DesignMetrics.Role.CARD_RADIUS),
-        new Token("focus_ring", 1, 3, DesignMetrics.Role.FOCUS_RING),
-        new Token("tool_window_header", 22, 32, DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT),
-        new Token("group_padding", 8, 16, DesignMetrics.Role.CARD_PADDING),
-        new Token("dependent_indent", 12, 28, DesignMetrics.Role.SETTING_DEPENDENT_INDENT),
-        new Token("navigation_width", 180, 300, DesignMetrics.Role.SETTINGS_SIDEBAR_WIDTH),
-        new Token("status_dot", 5, 9, DesignMetrics.Role.STATUS_DOT));
     private static final Map<String, Setting<?>> DEFAULTS = defaultsByKey();
 
     /** A kit file is invalid; the message names the key, as in {@code [metrics].row_height: 40 is outside 18-28}. */
@@ -1692,16 +1718,25 @@ public final class KitParser {
      */
     public static Parsed parse(byte[] bytes, Context context) throws Invalid {
         Objects.requireNonNull(context, "context");
+        try { return read(bytes, context); }
+        catch (StackOverflowError deep) {
+            // Rulings 13: a file too deep for a reader (tomlj's parser included) is not a kit file; nothing escapes the pre-pass.
+            throw new Invalid("kit file: not valid TOML");
+        }
+    }
+
+    private static Parsed read(byte[] bytes, Context context) throws Invalid {
         if (bytes.length > MAX_KIT_BYTES) throw new Invalid("kit file: larger than 64 KiB");
         String text = utf8(bytes);
         TomlParseResult toml;
         try { toml = Toml.parse(text); }
-        catch (RuntimeException | StackOverflowError unreadable) { throw new Invalid("kit file: not valid TOML"); }
+        catch (RuntimeException unreadable) { throw new Invalid("kit file: not valid TOML"); }
         if (toml.hasErrors()) throw new Invalid("kit file: not valid TOML: " + toml.errors().get(0).getMessage());
-        noColours(toml, List.of());
-        noColours(text);
+        // The top-level keys first, so an unknown table is refused before anything walks its contents (Rulings 13).
         for (String key : toml.keySet())
             if (!TOP.contains(key)) throw new Invalid(toml.get(List.of(key)) instanceof TomlTable ? "[" + key + "]: unknown table" : key + ": unknown key");
+        noColours(toml);
+        noColours(text);
         Object format = toml.get(List.of("kit"));
         if (format == null) throw new Invalid("kit: missing; a kit file begins with kit = 1");
         if (!(format instanceof Long number)) throw new Invalid("kit: expected an integer");
@@ -1747,19 +1782,30 @@ public final class KitParser {
         return path.size() == 1 ? last : "[" + String.join(".", path.subList(0, path.size() - 1)) + "]." + last;
     }
 
-    private static void noColours(TomlTable table, List<String> prefix) throws Invalid {
-        for (String key : table.keySet()) {
-            var path = new ArrayList<>(prefix); path.add(key);
-            noColours(table.get(List.of(key)), path);
+    /** One value on the walk: its parent and its key, so the path is built only for a message. */
+    private record Walked(Object value, Walked parent, String key) {
+        List<String> path() {
+            var path = new java.util.ArrayDeque<String>();
+            for (Walked at = this; at != null && at.key() != null; at = at.parent()) path.push(at.key());
+            return List.copyOf(path);
         }
     }
 
-    private static void noColours(Object value, List<String> path) throws Invalid {
-        if (value instanceof TomlTable nested) noColours(nested, path);
-        else if (value instanceof TomlArray array) for (int i = 0; i < array.size(); i++) noColours(array.get(i), path);
-        else if (value instanceof String text) {
-            Matcher match = COLOUR.matcher(text);
-            if (match.find()) throw new Invalid(name(path) + ": \"" + match.group() + "\" looks like a colour; colours come from the theme");
+    /** Every string value, however deeply nested, with an explicit stack (Rulings 13): a colour literal is named by its key. */
+    private static void noColours(TomlTable root) throws Invalid {
+        var pending = new java.util.ArrayDeque<Walked>();
+        pending.push(new Walked(root, null, null));
+        while (!pending.isEmpty()) {
+            Walked item = pending.pop();
+            if (item.value() instanceof TomlTable table) {
+                for (String key : table.keySet()) pending.push(new Walked(table.get(List.of(key)), item, key));
+            } else if (item.value() instanceof TomlArray array) {
+                for (int i = 0; i < array.size(); i++) pending.push(new Walked(array.get(i), item.parent(), item.key()));
+            } else if (item.value() instanceof String text) {
+                Matcher match = COLOUR.matcher(text);
+                if (match.find())
+                    throw new Invalid(name(item.path()) + ": \"" + match.group() + "\" looks like a colour; colours come from the theme");
+            }
         }
     }
 
@@ -1849,19 +1895,20 @@ public final class KitParser {
 
     private static DesignMetrics metrics(TomlTable table, DesignMetrics base) throws Invalid {
         if (table == null) return base;
-        known(table, "metrics", TOKENS.stream().map(Token::key).toList());
-        int[] values = new int[TOKENS.size()];
-        for (int i = 0; i < values.length; i++) {
-            Token token = TOKENS.get(i);
+        known(table, "metrics", Arrays.stream(MetricTokens.Token.values()).map(MetricTokens.Token::key).toList());
+        // The base catalog's own tokens: a key left out keeps the base's value (plan 4a's of reads each token's first role).
+        var tokens = MetricTokens.of(base);
+        for (var token : MetricTokens.Token.values()) {
             Object value = table.get(List.of(token.key()));
-            if (value == null) { values[i] = base.value(token.role()); continue; }
+            if (value == null) continue;
             if (!(value instanceof Long number)) throw new Invalid("[metrics]." + token.key() + ": expected an integer");
-            if (number < token.min() || number > token.max())
+            if (number != number.intValue())
                 throw new Invalid("[metrics]." + token.key() + ": " + number + " is outside " + token.min() + "-" + token.max());
-            values[i] = number.intValue();
+            // MetricTokens owns the ranges and the message, for example "[metrics].row_height: 40 is outside 18-28".
+            try { tokens = tokens.with(token, number.intValue()); }
+            catch (IllegalArgumentException outside) { throw new Invalid(outside.getMessage()); }
         }
-        return base.with(new MetricTokens(values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7],
-            values[8], values[9], values[10]));
+        return base.with(tokens);
     }
 
     private static TypeAndFaces type(TomlTable table, TypeScale base, Context context) throws Invalid {
@@ -1963,15 +2010,30 @@ public final class KitParser {
 ```
 
 `KitParser` reads `Kit.DEFAULT` for the default base, so it joins `StaticDefaultTest`'s readers (the classes that
-choose the start-up kit or fall back to it):
+choose the start-up kit or fall back to it), and it is the one reader of `Kit.CLASSIC`, which plan 4a's rule (no reader
+"until plan 5's kit parser names it") now names; a `Kit.CLASSIC` read is left out of the general "outside the catalog"
+filter like a `Kit.DEFAULT` read:
 
 ```bash
 python3 -I - <<'PY'
 import pathlib
 path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java"); text = path.read_text(encoding="utf-8")
-old = 'static final Set<String> DEFAULT_KIT_READERS = Set.of('
-if text.count(old) != 1: raise SystemExit("StaticDefaultTest: DEFAULT_KIT_READERS moved")
-path.write_text(text.replace(old, old + '"dev/jasper/app/presentation/KitParser", '), encoding="utf-8")
+edits = [
+    ('static final Set<String> DEFAULT_KIT_READERS = Set.of(',
+     'static final Set<String> DEFAULT_KIT_READERS = Set.of("dev/jasper/app/presentation/KitParser", '),
+    ("    /** The classic base; until plan 5's kit parser names it, no production class reads it. */",
+     "    /** The classic base; only the kit parser, which starts a classic kit from it, reads it. */"),
+    ('        assertThat(found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))).as("readers of Kit.CLASSIC").isEmpty();\n',
+     '        Set<String> classicReaders = found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))\n'
+     '            .map(read -> read.substring(0, read.indexOf(\'.\'))).collect(Collectors.toCollection(TreeSet::new));\n'
+     '        assertThat(classicReaders).as("the classes that read Kit.CLASSIC").containsExactly("dev/jasper/app/presentation/KitParser");\n'),
+    ('!read.endsWith(": " + DEFAULT_KIT)))',
+     '!read.endsWith(": " + DEFAULT_KIT)\n                && !read.endsWith(": " + CLASSIC_KIT)))'),
+]
+for old, new in edits:
+    if text.count(old) != 1: raise SystemExit(f"StaticDefaultTest: expected one {old!r} (plan 4a Task 6's text); re-find it")
+    text = text.replace(old, new)
+path.write_text(text, encoding="utf-8")
 PY
 ```
 
@@ -1985,7 +2047,8 @@ jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java,app.pres
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.config.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --tests 'dev.jasper.app.architecture.StaticDefaultTest'`
-Expected: PASS: `FontFileTest` (3), `KitParserTest` (8), `DefaultSourceTest` (2), the config tests, the ledger test and `StaticDefaultTest`.
+Expected: PASS: `FontFileTest` (3), `KitParserTest` (10), `DefaultSourceTest` (2), the config tests, the ledger test and
+`StaticDefaultTest` (KitParser is the one `Kit.CLASSIC` reader and a `Kit.DEFAULT` reader).
 If `KitParserTest.everyChromeAndControlPointTakesBothItsValues` fails on the `toString` check, plan 4's
 `ControlVariants` names its components differently: compare the accessor of each point instead (keep the test's
 meaning: each key takes each of its two values).
@@ -2781,6 +2844,9 @@ public record PresentationFacts(String digest, Optional<String> problem, Optiona
             return new PresentationFacts(hex(digest), Optional.empty(), Optional.of(parsed));
         } catch (KitParser.Invalid invalid) {
             return new PresentationFacts(hex(digest), Optional.of(invalid.getMessage()), Optional.empty());
+        } catch (StackOverflowError deep) {
+            // Rulings 13: a reader that ran out of stack must not stop start-up either.
+            return new PresentationFacts(hex(digest), Optional.of("kit file: not valid TOML"), Optional.empty());
         } catch (RuntimeException defect) {
             // A defect in a reader must never stop start-up: the look is skipped with what went wrong.
             return new PresentationFacts(hex(digest), Optional.of("kit file: could not be read: " + defect), Optional.empty());
@@ -2797,7 +2863,7 @@ public record PresentationFacts(String digest, Optional<String> problem, Optiona
             String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
             return Optional.of(JasperTheme.parse(text.startsWith("﻿") ? text.substring(1) : text, id));
-        } catch (CharacterCodingException | RuntimeException invalid) { return Optional.empty(); }
+        } catch (CharacterCodingException | RuntimeException | StackOverflowError invalid) { return Optional.empty(); }
     }
 
     private static MessageDigest sha256() {
@@ -3382,7 +3448,8 @@ Settings' draft shows and resets to the effective default, and the audited compa
   `ConfigService.java:48-60,107-121,396-399,429-434`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/ConfigurationController.java:61-62`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsDraft.java:20-35,70-74`, `SchemaPage.java:465,511-512`,
-  `AppearanceSelection.java:58-59,155-159`, `SettingsDialog.java:164`
+  `AppearanceSelection.java:58-59,155-159`, `SettingsDialog.java:164`, `PlatformFontSize.java:12-25`,
+  `Editors.java:196-199,500-503` (`OptionalNumber`), `WorkspaceEditors.java:15-34` (`Opacity`)
 - Modify: `config.example.toml:13-15,62-63,134-137`, `docs/configuration.md:190,203,227-228`
 - Test: `jasper-app/src/test/java/dev/jasper/app/config/DefaultsPrecedenceTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/settingsui/AppearanceSelectionTest.java`
@@ -3394,7 +3461,8 @@ Settings' draft shows and resets to the effective default, and the audited compa
   `ConfigService(Path, boolean, ScheduledExecutorService, Consumer<Runnable>, DefaultSource)`, `DefaultSource
   ConfigService.defaults()`; `ConfigService.State` gains a ninth component `DefaultSource defaults` (the 8- and
   4-argument forms keep `DefaultSource.CORE`); `SettingsDraft(SettingValues, DefaultSource)` and
-  `<T> T SettingsDraft.defaultValue(Setting<T>)`. The no-source overloads stay and mean the core look.
+  `<T> T SettingsDraft.defaultValue(Setting<T>)`; package-private `static <T> T Editors.effectiveDefault(SettingsDraft,
+  Setting<T>)`. The no-source overloads stay and mean the core look.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3480,6 +3548,11 @@ class DefaultsPrecedenceTest {
             ".row(UI_THEME_DARK).shownWhen(false)", ".row(UI_THEME_LIGHT).shownWhen(false)");
         assertThat(Files.readString(ui.resolve("Editors.java"))).as("OptionalNumber is made only for Float settings")
             .contains("static final class OptionalNumber implements ValueEditor<Float>");
+        // Spec 5.8's table: these editors compare with the effective default (equal to the core one outside the allowlist).
+        assertThat(Files.readString(ui.resolve("Editors.java"))).contains("unset = effectiveDefault(draft, setting);");
+        assertThat(Files.readString(ui.resolve("PlatformFontSize.java"))).contains("Editors.effectiveDefault(draft,UI_FONT_SIZE)")
+            .doesNotContain("UI_FONT_SIZE.defaultValue()");
+        assertThat(Files.readString(ui.resolve("WorkspaceEditors.java"))).doesNotContain("UI_WORKSPACE_OPACITY.defaultValue()");
     }
 }
 ```
@@ -3715,6 +3788,28 @@ edit(S + "AppearanceSelection.java", [
         return pick.equals(effective) ? Optional.empty() : Optional.of(pick);''', 1)])
 edit(S + "SettingsDialog.java", [
     ('''        draft = new SettingsDraft(state.values());''', '''        draft = new SettingsDraft(state.values(), state.defaults());''', 1)])
+# Spec 5.8's audit: the optional-value editors compare with the effective default as well (Rulings 17).
+edit(S + "Editors.java", [
+    ('''        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit), List.of());
+    }''',
+     '''        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit, context.draft()), List.of());
+    }
+
+    /** {@code setting}'s effective default under {@code draft} (spec 5.8); the core default for a page made without a draft. */
+    static <T> T effectiveDefault(SettingsDraft draft, Setting<T> setting) {
+        return draft == null ? setting.defaultValue() : draft.defaultValue(setting);
+    }''', 1),
+    ('''        OptionalNumber(Setting<Float> setting, String label, double step, String unit) {''',
+     '''        OptionalNumber(Setting<Float> setting, String label, double step, String unit, SettingsDraft draft) {''', 1),
+    ('''            unset = setting.defaultValue();''', '''            unset = effectiveDefault(draft, setting);''', 1)])
+edit(S + "PlatformFontSize.java", [
+    ('''(setting,context)->new PlatformFontSize(),''', '''(setting,context)->new PlatformFontSize(context.draft()),''', 1),
+    ('''    PlatformFontSize(){var kind=''', '''    private final SettingsDraft draft;
+    PlatformFontSize(SettingsDraft draft){this.draft=draft;var kind=''', 1),
+    ('''return inherited?UI_FONT_SIZE.defaultValue():number.value();''', '''return inherited?Editors.effectiveDefault(draft,UI_FONT_SIZE):number.value();''', 1),
+    ('''inherited=value.equals(UI_FONT_SIZE.defaultValue());''', '''inherited=value.equals(Editors.effectiveDefault(draft,UI_FONT_SIZE));''', 1)])
+edit(S + "WorkspaceEditors.java", [
+    ('''UI_WORKSPACE_OPACITY.defaultValue()''', '''Editors.effectiveDefault(draft,UI_WORKSPACE_OPACITY)''', 4)])
 edit("config.example.toml", [
     ('''# Range: 28-64 logical pixels; out-of-range values use the nearest limit.
 toolbar_height = 30''', '''# Range: 28-64 logical pixels; out-of-range values use the nearest limit.
@@ -3761,8 +3856,9 @@ reload, syntax-error state and a fresh home's first snapshot read
 ui.theme.light, ui.theme.dark, palette.visible_rows and
 window.toolbar_height as saved, then the look's default, then the core
 default. Settings' draft shows and resets to the effective default,
-SchemaPage and the Appearance picks compare with it, and picking the core
-default under a look that overrides it saves an explicit value.
+SchemaPage, the Appearance picks and the optional-value editors compare
+with it, and picking the core default under a look that overrides it
+saves an explicit value.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3776,7 +3872,7 @@ EOF
 chrome, whether the base is classic, the declared faces, the kit defaults and every projection of spec 9.1, computed once
 by the 9.1 table. A group of fields takes the file's chrome only once its plan has landed (`Presentation.LANDED`, empty
 here; Rulings 2), so a parsed chrome point has no effect yet; `DesktopFlags` is computed from the file (plan 6 applies it).
-`Presentation.fallback()` is spec 4.7's explicit fallback value.
+`Presentation.fallback(Host)` is spec 4.7's explicit fallback value.
 
 **Files:**
 - Create in `jasper-app/src/main/java/dev/jasper/app/presentation/`: `DesktopFlags.java`, `WorkspaceLook.java`,
@@ -3799,12 +3895,12 @@ here; Rulings 2), so a parsed chrome point has no effect yet; `DesktopFlags` is 
   workspace, ShellLook shell, PaletteLook palette, SettingsChrome settings, Composition composition, DialogMapping
   dialogs, Motion motion, TitleFormat title, DockLayoutKey dockLayout, AppPanels panels)` with `Projections.Host(boolean
   mac, boolean unifiedTitleSupported)`, `static Projections of(ChromeSpec, boolean classicBase, boolean namesUiFace,
-  String providerId, Host, Set<Presentation.Landed>)` and `static Projections fallback(DesktopFlags committed)`;
+  String providerId, Host, Set<Presentation.Landed>)` and `static Projections fallback(DesktopFlags committed, Host host)`;
   `Presentation(Optional<Presentation.Provider> provider, Kit kit, ChromeSpec chrome, boolean classicBase,
   KitParser.Faces faces, DefaultSource defaults, Projections projections)` with `Provider(String id, String name, String
   version, String digest)`, `enum Landed { WINDOW_CHROME, DOCK_CHROME, RUN_WINDOW, SETTINGS }`, `LANDED`,
   `static Presentation standard(Projections.Host)`, `static Presentation of(Provider, KitParser.Parsed, Projections.Host)`,
-  `Presentation fallback()`, `DesktopFlags committedDesktop()`, `String look()`.
+  `Presentation fallback(Projections.Host)`, `DesktopFlags committedDesktop()`, `String look()`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3872,7 +3968,7 @@ class ProjectionsTest {
     }
 
     @Test void theFallbackIsSpecFourSevensValue() {
-        var fallback = Projections.fallback(new DesktopFlags(false, true));
+        var fallback = Projections.fallback(new DesktopFlags(false, true), MAC);
         assertThat(fallback.desktop()).isEqualTo(new DesktopFlags(false, true));
         assertThat(fallback.workspace().header()).isEqualTo(WorkspaceLook.Header.UNIFIED);
         assertThat(fallback.shell()).isEqualTo(new ShellLook(false, true, true));
@@ -3882,6 +3978,11 @@ class ProjectionsTest {
         assertThat(fallback.motion()).isEqualTo(Motion.STANDARD);
         assertThat(fallback.dockLayout().key()).isEmpty();
         assertThat(fallback.panels()).isEqualTo(new AppPanels("Notifications", Slot.RIGHT_TOP));
+        assertThat(Projections.fallback(new DesktopFlags(true, true), LINUX).settings().hiddenKeys())
+            .as("a native title hides the decorations switch on every platform").containsExactly("window.native_decorations");
+        for (var host : new Projections.Host[] {MAC, LINUX})
+            assertThat(Projections.fallback(DesktopFlags.STANDARD, host)).as("a unified title was committed: the default look's values")
+                .isEqualTo(Projections.of(ChromeSpec.DEFAULT, false, false, "", host, Presentation.LANDED));
     }
 
     @Test void everyChromeSpecTheParserAcceptsBuildsEveryProjection() {
@@ -3912,11 +4013,11 @@ class ProjectionsTest {
         assertThat(look.defaults()).isSameAs(parsed.defaults());
         assertThat(look.faces()).isEqualTo(parsed.faces());
         assertThat(look.committedDesktop()).as("nothing is applied before plan 6").isEqualTo(DesktopFlags.STANDARD);
-        var fallback = look.fallback();
+        var fallback = look.fallback(MAC);
         assertThat(fallback.kit()).isSameAs(Kit.DEFAULT);
         assertThat(fallback.provider()).isEmpty();
         assertThat(fallback.defaults()).as("the session keeps the defaults read at start").isSameAs(parsed.defaults());
-        assertThat(fallback.projections()).isEqualTo(Projections.fallback(DesktopFlags.STANDARD));
+        assertThat(fallback.projections()).isEqualTo(Projections.fallback(DesktopFlags.STANDARD, MAC));
         assertThat(fallback.look()).isEqualTo("default");
     }
 }
@@ -4237,14 +4338,21 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             stripes ? new AppPanels("Event Log", Slot.BOTTOM_LEFT) : new AppPanels("Notifications", Slot.RIGHT_TOP));
     }
 
-    /** Spec 4.7's fallback: the native title and in-window menus {@code committed} before AWT, with the default kit's chrome. */
-    public static Projections fallback(DesktopFlags committed) {
+    /**
+     * Spec 4.7's fallback: the default kit's chrome under the title and menus {@code committed} before AWT. A committed native
+     * title keeps the native-title values; a unified one gives the default look's values on {@code host}.
+     */
+    public static Projections fallback(DesktopFlags committed, Host host) {
+        Objects.requireNonNull(committed, "committed"); Objects.requireNonNull(host, "host");
+        boolean nativeTitle = committed.nativeTitle();
+        Set<String> hidden = nativeTitle || host.mac() ? Set.of("window.native_decorations") : Set.of();
         return new Projections(committed,
             new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL,
                 WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD),
-            new ShellLook(false, !committed.screenMenuBar(), true), new PaletteLook(PaletteLook.View.CARD, PaletteLook.Home.TITLE_FIELD),
-            new SettingsChrome(false, false, true, Set.of("window.native_decorations"), "Use platform font size"), Composition.ROWS,
-            new DialogMapping(DialogMapping.Kind.AS_REQUESTED, true), Motion.STANDARD, new TitleFormat("{context}"), new DockLayoutKey(""),
+            new ShellLook(!nativeTitle && host.unifiedTitleSupported(), !committed.screenMenuBar(), nativeTitle),
+            new PaletteLook(PaletteLook.View.CARD, PaletteLook.Home.TITLE_FIELD),
+            new SettingsChrome(!nativeTitle, false, true, hidden, "Use platform font size"), Composition.ROWS,
+            new DialogMapping(DialogMapping.Kind.AS_REQUESTED, nativeTitle), Motion.STANDARD, new TitleFormat("{context}"), new DockLayoutKey(""),
             new AppPanels("Notifications", Slot.RIGHT_TOP));
     }
 }
@@ -4263,7 +4371,7 @@ import java.util.Set;
 
 /**
  * The one presentation a process runs with (spec 3.2 and 4.9), chosen on the bootstrap thread and replaced at most once,
- * by {@link #fallback()}, before plugins start. Consumers receive its kit or a projection, never this value.
+ * by {@link #fallback(Projections.Host)}, before plugins start. Consumers receive its kit or a projection, never this value.
  *
  * @param provider the providing plugin, empty for the default look
  * @param kit the jasper-ui kit every context is made with
@@ -4312,10 +4420,10 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
             Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED));
     }
 
-    /** Spec 4.7: the default kit and chrome under the flags already committed, keeping the defaults read at start. */
-    public Presentation fallback() {
+    /** Spec 4.7: the default kit and chrome under the flags already committed on {@code host}, keeping the defaults read at start. */
+    public Presentation fallback(Projections.Host host) {
         return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, defaults,
-            Projections.fallback(committedDesktop()));
+            Projections.fallback(committedDesktop(), host));
     }
 
     /** The desktop flags the bootstrap applied: the look's once window chrome has landed, else the default look's. */
@@ -4371,7 +4479,7 @@ spec 9.1 projection, computed once by its table; the default look follows
 the same rules. A group of fields takes the file's chrome only once the
 plan that consumes it lands (Presentation.LANDED, empty for now), so every
 chrome value maps to the default projection; DesktopFlags is computed for
-plan 6. Presentation.fallback() is spec 4.7's value.
+plan 6. Presentation.fallback(Host) is spec 4.7's value.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -4413,7 +4521,7 @@ under its kit, and `PluginRuntime.start(selection, …)` consumes it without a s
   `JasperApplication(ConfigService, ShellLauncher, CommandHistory, Path, Runnable, Path, Path, PluginSelection)`,
   `JasperApplication.presentation()`, `JasperApplication.startPlugins(AppDirs)`;
   `ApplicationBootstrap.Preparation` (`Prepared prepare(AppDirs, AppArguments)`, `NONE`), `ApplicationBootstrap.Prepared(AppLog log,
-  PluginSelection selection)`, `ApplicationBootstrap.start(String[], PrintStream, PrintStream, Preparation, Consumer<Startup>)`,
+  PluginSelection bootstrapSelection)`, `ApplicationBootstrap.start(String[], PrintStream, PrintStream, Preparation, Consumer<Startup>)`,
   `Startup(ConfigService service, AppArguments options, AppDirs dirs, AppLog log, PluginSelection selection)`;
   `StartupTrace.look(String)`.
 
@@ -4465,6 +4573,11 @@ class PluginSelectionTest {
         var safe = PluginSelection.of(dirs(), null, "", provider(), true);
         assertThat(safe.presentation().look()).isEqualTo("default");
         assertThat(safe.attempt().records()).isFalse();
+        assertThat(safe.resolution().rejected()).as("without reading its files, the provider is disabled for safe mode")
+            .singleElement().satisfies(status -> {
+                assertThat(status.state()).isEqualTo(PluginStatus.State.DISABLED);
+                assertThat(status.reason()).isEqualTo(PluginStatus.SAFE_MODE_LOOK);
+            });
         assertThat(PluginSelection.none().presentation().look()).isEqualTo("default");
         assertThat(PluginSelection.none().isNone()).isTrue();
         assertThat(PluginSelection.of(dirs(), null, "", null, false).presentation().provider()).isEmpty();
@@ -4673,7 +4786,9 @@ public final class PluginSelection {
             state = Map.of();
         }
         var store = new AttemptStore(options.stateFile().toAbsolutePath().getParent());
-        var presentations = Presentations.read(candidates, store.read(), build);
+        // Safe mode disables every presentation provider (spec 4.5), so it reads none of their files (Rulings 13).
+        var attempts = store.read();
+        var presentations = options.safeMode() ? new Presentations(Map.of(), attempts, build) : Presentations.read(candidates, attempts, build);
         var resolution = PluginResolver.resolve(candidates, state, sdk, options.safeMode(), presentations);
         Presentation presentation = Presentation.standard(host);
         PresentationAttempt attempt = PresentationAttempt.NONE;
@@ -4735,7 +4850,7 @@ public final class PluginSelection {
         var provider = resolution.presentation();
         if (provider.isEmpty()) return this;
         return new PluginSelection(options, build, candidates, problems,
-            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(), attempt, skipped);
+            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped);
     }
 
     List<PluginCandidate> candidates() { return candidates; }
@@ -4940,13 +5055,14 @@ edit(A + "JasperApplication.java", [
     }
 
     /**
-     * As above, under {@code selection}: the bootstrap's plugin selection, whose presentation every surface of this
-     * process receives (spec 4.9) and whose plugins {@link #startPlugins(AppDirs)} starts.
+     * As above, under {@code bootstrapSelection}: the bootstrap's plugin selection, whose presentation every surface of
+     * this process receives (spec 4.9) and whose plugins {@link #startPlugins(AppDirs)} starts.
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
-                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection selection) {
-        this.selection = Objects.requireNonNull(selection, "selection");
-        presentation = selection.presentation();
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.
+        this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
+        presentation = this.selection.presentation();
         dev.jasper.app.platform.BundledFonts.register();''', 1),
     ('''        themes = ThemeController.startup(dark, selection, dev.jasper.ui.kit.Kit.DEFAULT,''',
      '''        themes = ThemeController.startup(dark, picks, presentation.kit(),''', 1),
@@ -5072,6 +5188,7 @@ met here (Rulings 3): no `KitContext` is made from the installed look and feel a
   `HostedContext.java:91`, `HostedKit.java:29-56`, `HostedKitView.java:30`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`startPlugins`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java`
+  (a new case, and plan 1's `appContextsAreMadeOverTheInstalledKit`, whose `PresentationIcons` assertion becomes the new rule)
 
 **Interfaces:**
 - Consumes: `JasperApplication.presentation()` and the 8-argument constructor (Task 9).
@@ -5182,6 +5299,28 @@ runtime's setter check:
 ```
 
 (If `HostedKitTest`'s existing cases build their views from another `ViewSpec`, reuse that one; any single node will do.)
+
+Plan 1's `HostedKitTest.appContextsAreMadeOverTheInstalledKit` asserts that `PresentationIcons` makes its context over
+the installed kit ("the installed kit, not the source's"), which this task reverses: an icon context keeps its source
+context's kit. Its `AppearanceBindings` (three-argument form) and `HostedKit` (seven-argument form) assertions still
+hold, so only the icon assertion and the name change:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java"); text = path.read_text(encoding="utf-8")
+edits = [
+    (' @Test void appContextsAreMadeOverTheInstalledKit() throws Exception {',
+     ' @Test void appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources() throws Exception {'),
+    ('''   assertThat(receiver.context(source).kit()).as("the installed kit, not the source's").isSameAs(tall);''',
+     '''   assertThat(receiver.context(source).kit()).as("the source context's kit, not the installed one").isSameAs(source.kit());'''),
+]
+for old, new in edits:
+    if text.count(old) != 1: raise SystemExit(f"HostedKitTest: expected one {old!r}; re-find it")
+    text = text.replace(old, new)
+path.write_text(text, encoding="utf-8")
+PY
+```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -5333,8 +5472,9 @@ PY
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.platform.*' --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.architecture.StaticDefaultTest'`
-Expected: PASS: `PresentationReachTest` (2), the new `HostedKitTest` case and every existing appearance, platform,
-plugin, workspace and application test. Add `PresentationReachTest.java`'s ledger row (it imports `dev.jasper.ui`) in the
+Expected: PASS: `PresentationReachTest` (2), the new `HostedKitTest` case, the renamed
+`appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources` and every existing appearance, platform, plugin,
+workspace and application test. Add `PresentationReachTest.java`'s ledger row (it imports `dev.jasper.ui`) in the
 Global Constraints' form, and any other row `ThemeMigrationCoverageTest` names.
 
 - [ ] **Step 5: Commit**
@@ -5365,22 +5505,31 @@ EOF
 kit; the selection under `Kit.DEFAULT` (the kit is blamed); Slate Cobalt Dark under the chosen kit (the theme was at
 fault, as today); Slate Cobalt Dark under `Kit.DEFAULT` (blaming the kit), whose failure propagates. With the default kit
 only the first and third exist. When the kit is blamed, the application switches to `selection.blamed()` (the provider
-skipped, so no service of it is published; `Presentation.fallback()`, keeping the kit defaults read at start) before
-plugins start, and records `failed`.
+skipped, so no service of it is published; `Presentation.fallback(Host)`, keeping the kit defaults read at start) before
+plugins start, and records `failed`. The switch assigns the field `this.selection`, never Task 9's constructor
+parameter (`bootstrapSelection`), so `startPlugins(AppDirs)` starts the blamed selection; an application-level case in
+`PresentationReachTest` proves it through a package-private constructor that takes the installers.
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java:49-73`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (constructor)
-- Test: `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (constructor, `pluginRuntime()`)
+- Test: `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java`,
+  `jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java` (one case),
+  `jasper-app/src/test/java/dev/jasper/app/testsupport/LookFixtures.java` (`loadable`)
 
 **Interfaces:**
 - Consumes: `ThemeController(Shown, Kit, Predicate)` (Task 10); `PluginSelection.blamed()`, `attempt()` (Task 9).
 - Produces: `public enum ThemeController.Step { CHOSEN, DEFAULT_KIT, FALLBACK_THEME, FALLBACK_THEME_DEFAULT_KIT }` with
   `blamesKit()`; `public record ThemeController.Started(ThemeController controller, Step step)`;
   `public static Started ThemeController.start(boolean dark, ThemeSelection selection, Kit kit,
-  Consumer<InstallationFailure> fallingBack)` and the package-private seam
-  `start(boolean, ThemeSelection, Kit, Function<Kit, Predicate<GeneratedTheme>> installers, Consumer<InstallationFailure>)`;
-  `startup(dark, selection, kit, fallingBack)` returns `start(…).controller()`.
+  Consumer<InstallationFailure> fallingBack)`, the public seam
+  `start(boolean, ThemeSelection, Kit, Function<Kit, Predicate<GeneratedTheme>> installers, Consumer<InstallationFailure>)`
+  and `public static final Function<Kit, Predicate<GeneratedTheme>> ThemeController.INSTALLERS` (the production
+  installers); `startup(dark, selection, kit, fallingBack)` returns `start(…).controller()`; the package-private
+  nine-argument `JasperApplication(…, PluginSelection bootstrapSelection, Function<Kit, Predicate<GeneratedTheme>>
+  installers)`, which the public eight-argument constructor calls with `INSTALLERS`; package-private
+  `PluginRuntime JasperApplication.pluginRuntime()`; `LookFixtures.loadable(Path root, String id, String descriptor,
+  Map<String, String> resources)` (a provider whose `Main` starts and writes `started` into its data folder).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -5472,10 +5621,71 @@ class ThemeControllerFallbackTest {
 (`start` on the EDT through `invokeAndWait` wraps a propagated failure in an `InvocationTargetException`, whose root
 cause is the installer's `IllegalStateException`.)
 
+Add to `jasper-app/src/test/java/dev/jasper/app/testsupport/LookFixtures.java` (before its final closing brace):
+
+```java
+    /**
+     * As {@link #plugin}, with a {@code Main} class in package {@code id} (the descriptor's entry) whose start writes
+     * {@code started} into the plugin's data folder: a provider that loads, so only its look decides its attempt.
+     */
+    public static Path loadable(Path root, String id, String descriptor, Map<String, String> resources) throws IOException {
+        String main = "package " + id + ";\npublic final class Main implements dev.jasper.sdk.plugin.Plugin {\n"
+            + "    @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {\n"
+            + "        try { java.nio.file.Files.writeString(context.dataDirectory().resolve(\"started\"), \"yes\"); }\n"
+            + "        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }\n    }\n}\n";
+        Path jar = PluginJars.build(root.resolve(id).resolve("jars"), id + ".jar", descriptor, Map.of(id + ".Main", main), List.of());
+        for (var resource : new java.util.TreeMap<>(resources).entrySet()) PluginJars.addResource(jar, resource.getKey(), resource.getValue());
+        return root.resolve(id);
+    }
+```
+
+Append to `PresentationReachTest` (before its final closing brace):
+
+```java
+    /** Spec 4.7 and 16.1.8: a kit that cannot be installed runs the fallback value, and its provider never starts. */
+    @Test void aKitThatCannotBeInstalledRunsTheFallbackValueAndSkipsItsProvider() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = LookFixtures.loadable(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
+            + LookFixtures.provider("look.kit.toml"), Map.of("look.kit.toml", "kit = 1\nbase = \"default\"\n[metrics]\ncontrol_height = 26\n"));
+        var selection = PluginSelection.of(dirs, null, "B", dev, false);
+        var kit = selection.presentation().kit();
+        assertThat(kit).isNotEqualTo(Kit.DEFAULT);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null,
+                    selection, chosen -> theme -> {
+                        if (chosen == kit) throw new IllegalStateException("cannot install under " + chosen.id());
+                        return ThemeController.INSTALLERS.apply(chosen).test(theme);
+                    });
+                assertThat(application[0].presentation()).as("the fallback value").isEqualTo(selection.blamed().presentation());
+                assertThat(application[0].presentation().provider()).isEmpty();
+                assertThat(application[0].themes().kit()).isSameAs(Kit.DEFAULT);
+                assertThat(application[0].themes().appearance().context(ThemeRoute.CHROME).kit()).isSameAs(Kit.DEFAULT);
+                application[0].startPlugins(dirs);
+                assertThat(application[0].pluginRuntime().statusLines()).anySatisfy(line -> assertThat(line)
+                    .contains("dev.example.look", "SKIPPED", "its look could not be installed; Jasper uses its standard look"));
+            });
+            assertThat(dirs.plugins().resolve("dev.example.look/data/started")).as("the provider never started, so it published no service")
+                .doesNotExist();
+            dev.jasper.app.workspace.DesktopTestSupport.until(() -> new dev.jasper.app.presentation.AttemptStore(home).read()
+                .of("dev.example.look").state().equals(java.util.Optional.of(dev.jasper.app.presentation.AttemptStore.State.FAILED)));
+        } finally {
+            edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        }
+    }
+```
+
+Without the field assignment (`this.selection = this.selection.blamed()`), the status line would show the provider
+loaded and `started` would exist: this case is the guard on Task 9's parameter name.
+
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.ThemeControllerFallbackTest'`
-Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `ThemeController.Started`, `Step` and `start`.
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.ThemeControllerFallbackTest' --tests 'dev.jasper.app.application.PresentationReachTest'`
+Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `ThemeController.Started`, `Step`, `start`,
+`INSTALLERS`, the nine-argument `JasperApplication` constructor and `pluginRuntime()`.
 
 - [ ] **Step 3: Write the four steps and use them at start**
 
@@ -5537,10 +5747,17 @@ edit("jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java", 
      */
     public static Started start(boolean dark, ThemeSelection selection, Kit kit, java.util.function.Consumer<InstallationFailure> fallingBack) {
         Objects.requireNonNull(kit);
-        return start(dark, selection, kit, chosen -> theme -> ThemeManager.install(theme, chosen), fallingBack);
+        return start(dark, selection, kit, INSTALLERS, fallingBack);
     }
 
-    static Started start(boolean dark, ThemeSelection selection, Kit kit,
+    /** The production installers: a theme installed into Swing under a kit. Applied on the EDT. */
+    public static final java.util.function.Function<Kit, Predicate<GeneratedTheme>> INSTALLERS = chosen -> theme -> ThemeManager.install(theme, chosen);
+
+    /**
+     * {@link #start(boolean, ThemeSelection, Kit, java.util.function.Consumer)} with {@code installers}, which tests replace
+     * to fail under a chosen kit (spec 4.7's fallback tests).
+     */
+    public static Started start(boolean dark, ThemeSelection selection, Kit kit,
                          java.util.function.Function<Kit, Predicate<GeneratedTheme>> installers,
                          java.util.function.Consumer<InstallationFailure> fallingBack) {
         record Attempt(Shown shown, Kit kit, Step step) { }
@@ -5565,31 +5782,53 @@ edit("jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java", 
 edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java", [
     ('''        themes = ThemeController.startup(dark, picks, presentation.kit(),
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));''',
-     '''        var started = ThemeController.start(dark, picks, presentation.kit(),
+     '''        var started = ThemeController.start(dark, picks, presentation.kit(), installers,
             failure -> LOG.log(System.Logger.Level.WARNING, "Could not start with this theme and look; trying the next: " + failure.getMessage(), failure));
         themes = started.controller();
         // Spec 4.7: the kit was at fault. Every consumer gets the fallback before plugins start, and the provider is skipped.
+        // The field, not the constructor's bootstrapSelection: startPlugins(AppDirs) starts this.selection.
         if (started.step().blamesKit()) {
             LOG.log(System.Logger.Level.WARNING, "The " + presentation.look() + " look could not be installed; Jasper uses its standard look");
-            var attempt = selection.attempt();
-            selection = selection.blamed();
-            presentation = selection.presentation();
+            var attempt = this.selection.attempt();
+            this.selection = this.selection.blamed();
+            presentation = this.selection.presentation();
             Thread.ofVirtual().name("jasper-presentation-attempt").start(attempt::failed);
-        }''', 1)])
+        }''', 1),
+    ('''                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.''',
+     '''                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder, bootstrapSelection,
+            dev.jasper.app.appearance.ThemeController.INSTALLERS);
+    }
+
+    /** As above, with the installers that put a theme in place under a kit: the seam of spec 4.7's fallback tests. */
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection,
+                      java.util.function.Function<dev.jasper.ui.kit.Kit, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme>> installers) {
+        // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.''', 1),
+    ('''    /** The presentation this process runs. EDT. */
+    public dev.jasper.app.presentation.Presentation presentation() { return presentation; }''',
+     '''    /** The presentation this process runs. EDT. */
+    public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
+
+    /** The running plugins; null before {@link #startPlugins(AppDirs)}. Tests. */
+    PluginRuntime pluginRuntime() { return plugins; }''', 1)])
 PY
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.workspace.ThemeControllerTest' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.architecture.StaticDefaultTest'`
-Expected: PASS: `ThemeControllerFallbackTest` (5) and the existing controller tests (`startup` behaves as before for the
-default kit). Add the test's ledger row (it imports `dev.jasper.ui`) in the Global Constraints' form.
+Expected: PASS: `ThemeControllerFallbackTest` (5), `PresentationReachTest` (3) and the existing controller and
+application tests (`startup` behaves as before for the default kit). Add `ThemeControllerFallbackTest`'s ledger row (it
+imports `dev.jasper.ui`) in the Global Constraints' form, and any other row `ThemeMigrationCoverageTest` names.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java \
-  jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java docs/design/theme-engine/migration.csv
+  jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java docs/design/theme-engine/migration.csv \
+  jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java jasper-app/src/test/java/dev/jasper/app/testsupport/LookFixtures.java
 git commit -F - <<'EOF'
 Presentation provider: the fallback at start
 
@@ -5598,8 +5837,8 @@ the default kit, then Slate Cobalt Dark under the chosen kit, then under
 the default kit, and says which step installed; with the default kit only
 today's two steps exist and the last failure still propagates. When the
 kit is blamed, the application switches to the fallback presentation and
-skips the provider before plugins start, and the attempt record says
-failed.
+skips the provider before plugins start, so it never starts, and the
+attempt record says failed.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -5622,9 +5861,12 @@ posts one Warning with Try Again; an invalid kit's plugin-problem notice appears
 - Test: `jasper-app/src/test/java/dev/jasper/app/application/PresentationAttemptTest.java`, `jasper-app/src/test/java/dev/jasper/app/bootstrap/ApplicationBootstrapTest.java`
 
 **Interfaces:**
-- Consumes: `PresentationAttempt` (Task 4), `PluginSelection.attempt()`, `skipped()` (Task 9), `PluginStatus.INVALID` (Task 5).
+- Consumes: `PresentationAttempt` (Task 4), `PluginSelection.attempt()`, `skipped()` (Task 9), `PluginStatus.INVALID` (Task 5),
+  `LookFixtures.loadable` (Task 11), the package-private `JasperApplication.trace(StartupTrace)`, `restartPlanner` and
+  `spawner` seams.
 - Produces: `JasperApplication.presentationAttempt()` (the selection's attempt while its look runs, else
-  `PresentationAttempt.NONE`); `static boolean ApplicationBootstrap.attemptBeforePresenting(AppArguments options, boolean
+  `PresentationAttempt.NONE`); package-private `void JasperApplication.rehearsalPainted()` (the rehearsal stage's
+  post-paint hook); `static boolean ApplicationBootstrap.attemptBeforePresenting(AppArguments options, boolean
   resident, boolean headless)`; `boolean PluginSelection.announceInvalid(String id, PluginCandidate.Origin origin)`
   (package-private).
 
@@ -5640,14 +5882,22 @@ import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.commands.CommandHistory;
+import dev.jasper.app.notifications.NotificationAction;
 import dev.jasper.app.notifications.Severity;
 import dev.jasper.app.platform.AppDirs;
 import dev.jasper.app.plugins.PluginSelection;
 import dev.jasper.app.presentation.AttemptStore;
+import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.testsupport.LookFixtures;
+import dev.jasper.app.workspace.DesktopTestSupport;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
@@ -5665,6 +5915,14 @@ class PresentationAttemptTest {
         return LookFixtures.plugin(home.resolve("dev"), ID, LookFixtures.descriptor(ID, "Example") + LookFixtures.provider("look.kit.toml"),
             Map.of("look.kit.toml", kit));
     }
+
+    /** A provider whose plugin loads and starts, so only the paint decides its attempt. */
+    Path loadable() throws Exception {
+        return LookFixtures.loadable(home.resolve("dev"), ID, LookFixtures.descriptor(ID, "Example") + LookFixtures.provider("look.kit.toml"),
+            Map.of("look.kit.toml", LookFixtures.KIT));
+    }
+
+    Optional<AttemptStore.State> state() { return new AttemptStore(home).read().of(ID).state(); }
 
     JasperApplication started(PluginSelection selection) throws Exception {
         JasperApplication[] application = new JasperApplication[1];
@@ -5728,6 +5986,78 @@ class PresentationAttemptTest {
                     .as("start " + shown).isEqualTo(shown == 2 ? 0 : 1));
             } finally { quit(application, original); }
         }
+    }
+
+    @Test void theFirstWindowsFirstPaintProvesTheLook() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        var selection = PluginSelection.of(dirs(), null, "B", loadable(), false);
+        var trace = StartupTrace.detached();
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            application[0].trace(trace);
+            application[0].startPlugins(dirs());
+            application[0].presentationAttempt().pending();
+        });
+        try {
+            assertThat(state()).contains(AttemptStore.State.PENDING);
+            trace.mark(StartupTrace.Milestone.FIRST_PAINT);
+            DesktopTestSupport.until(() -> state().equals(Optional.of(AttemptStore.State.PROVEN)));
+        } finally { quit(application[0], original); }
+    }
+
+    @Test void theRehearsalsPaintProvesTheLook() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        var selection = PluginSelection.of(dirs(), null, "B", loadable(), false);
+        var application = started(selection);
+        try {
+            edt(() -> {
+                application.presentationAttempt().pending();
+                // What the rehearsal stage runs once Rehearsal.paint returned (a real paint needs a display).
+                application.rehearsalPainted();
+            });
+            DesktopTestSupport.until(() -> state().equals(Optional.of(AttemptStore.State.PROVEN)));
+        } finally { quit(application, original); }
+    }
+
+    @Test void tryAgainForgetsTheRecordAndRestarts() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        Path dev = provider(LookFixtures.KIT);
+        PluginSelection.of(dirs(), null, "B", dev, false).attempt().pending();
+        var selection = PluginSelection.of(dirs(), null, "B", dev, false);
+        List<String> spawned = new CopyOnWriteArrayList<>();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown,
+                null, null, selection);
+            application[0].restartPlanner = mode -> Optional.of(List.of("jasper", mode.name()));
+            application[0].spawner = command -> spawned.add(String.join(" ", command));
+            application[0].startPlugins(dirs());
+        });
+        try {
+            NotificationAction[] tryAgain = new NotificationAction[1];
+            edt(() -> tryAgain[0] = application[0].notificationCenter().history().stream().map(entry -> entry.request())
+                .filter(request -> request.title().equals("Jasper started with its standard look")).findFirst().orElseThrow()
+                .actions().getFirst());
+            edt(() -> tryAgain[0].run().run());
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).as("Try Again restarts Jasper").isTrue();
+            assertThat(spawned).containsExactly("jasper SAME");
+            assertThat(state()).as("the record is forgotten").isEmpty();
+            assertThat(PluginSelection.of(dirs(), null, "B", dev, false).skipped()).as("so the next start tries the look").isEmpty();
+        } finally {
+            edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        }
+    }
+
+    @Test void anExitThatIsNotOrderlyBeforeProofKeepsPending() throws Exception {
+        Path dev = provider(LookFixtures.KIT);
+        var selection = PluginSelection.of(dirs(), null, "B", dev, false);
+        selection.attempt().pending();
+        // A crash or a nonzero System.exit runs the shutdown hook without an orderly quit.
+        selection.attempt().exiting();
+        assertThat(state()).contains(AttemptStore.State.PENDING);
+        assertThat(PluginSelection.of(dirs(), null, "B", dev, false).skipped()).as("the next start skips the look").isPresent();
     }
 
     @Test void anOrderlyQuitBeforeProofClearsPendingAtExit() throws Exception {
@@ -5848,10 +6178,16 @@ edit(A, [
     ('''        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), close);''',
      '''        return new Rehearsal.Stage(() -> {
             Rehearsal.paint(window.nativeWindow());
-            // The rehearsal painted: the look proved itself (spec 4.6), off the EDT.
-            var attempt = presentationAttempt();
-            Thread.ofVirtual().name("jasper-presentation-proven").start(attempt::proven);
+            rehearsalPainted();
         }, close);''', 1),
+    ('''    /** The attempt record of the look this process runs; none for the default look or one that fell back. Any thread. */''',
+     '''    /** The rehearsal painted: the look proved itself (spec 4.6), recorded off the EDT. */
+    void rehearsalPainted() {
+        var attempt = presentationAttempt();
+        Thread.ofVirtual().name("jasper-presentation-proven").start(attempt::proven);
+    }
+
+    /** The attempt record of the look this process runs; none for the default look or one that fell back. Any thread. */''', 1),
     ('''    public void quitNow() {
         quitting = true;''',
      '''    public void quitNow() {
@@ -5888,8 +6224,8 @@ edit(P + "PluginSelection.java", [
      '''            Presentation.standard(host()), PresentationAttempt.NONE, Optional.empty(), Presentations.NONE, null);''', 1),
     ('''        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped);''',
      '''        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store);''', 1),
-    ('''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(), attempt, skipped);''',
-     '''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(), attempt, skipped,
+    ('''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped);''',
+     '''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped,
             presentations, store);''', 1),
     ('''    List<PluginCandidate> candidates() { return candidates; }''',
      '''    /**
@@ -5911,8 +6247,9 @@ PY
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS: `PresentationAttemptTest` (4), the new bootstrap case and every existing application, bootstrap and
-plugin test. Add `PresentationAttemptTest.java`'s ledger row if the coverage test names it.
+Expected: PASS: `PresentationAttemptTest` (8: the first paint and the rehearsal's paint prove the look, Try Again
+clears the record and restarts, a not-orderly exit keeps `pending`, and the four cases above), the new bootstrap case and
+every existing application, bootstrap and plugin test. Add `PresentationAttemptTest.java`'s ledger row if the coverage test names it.
 
 - [ ] **Step 5: Commit**
 

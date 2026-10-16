@@ -35,7 +35,8 @@ found the stated number of times; re-find moved text, never edit around it.
 ```bash
 grep -c 'Presentation provider: documentation and status' <(git log --format=%s)      # 5a: 1
 ls jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java
-grep -c 'static .*enterprise()' jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java   # plan 4's fixture kit: 1
+grep -c 'static .*enterprise()' jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java   # plan 4a's fixture kit: 1
+ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTableFace.java   # 4b, 4c
 ```
 
 If 5a is not on the branch, execute it first. Plan 4's Enterprise fixture kit is used under the name
@@ -595,7 +596,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      '''            Projections.of(ChromeSpec.DEFAULT, false, false, "", host, LANDED), java.util.List.of());''', 1),
     ('''            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED));''',
      '''            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED), parsed.dropped());''', 1),
-    ('''            Projections.fallback(committedDesktop()));''', '''            Projections.fallback(committedDesktop()), java.util.List.of());''', 1)])
+    ('''            Projections.fallback(committedDesktop(), host));''', '''            Projections.fallback(committedDesktop(), host), java.util.List.of());''', 1)])
 A = "jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java"
 edit(A, [
     ('''        dev.jasper.app.platform.BundledFonts.register();
@@ -781,6 +782,24 @@ class PluginThemesTest {
         assertThat(themes.fixed("enterprise")).isTrue();
         assertThat(themes.fixed("slate-cobalt")).isTrue();
         assertThat(themes.fixed("gruvbox")).isFalse();
+    }
+
+    /** ThemeMenu runs prepare on its worker, so the library a folder reads must be one that needs no EDT. */
+    @Test void aFolderRefusesAReservedIdOnTheImportWorker() throws Exception {
+        var library = ThemeLibrary.of(PluginThemes.of(List.of(declared("dev.jasper.enterprise", "Enterprise", 1, false, "enterprise", null))));
+        Path folder = Files.createDirectories(home.resolve("themes"));
+        var themes = new ThemeFolder(folder, () -> {
+            if (java.awt.EventQueue.isDispatchThread()) throw new AssertionError("the folder read its library on the EDT");
+            return library;
+        });
+        Path source = Files.writeString(home.resolve("import.json"), ThemeTestSupport.uiThemeJson("Enterprise"));
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        Thread worker = Thread.ofPlatform().name("theme-import-worker").start(() -> {
+            try { themes.prepare(source); } catch (Throwable thrown) { failure.set(thrown); }
+        });
+        worker.join();
+        assertThat(failure.get()).isInstanceOf(ThemeFolder.ImportFailure.class)
+            .hasMessage("Enterprise is provided by the Enterprise plugin and can't be replaced");
     }
 
     @Test void aDormantPickFallsBackSilentlyAndAnUnknownOneWarns() {
@@ -1156,8 +1175,13 @@ edit(A + "JasperApplication.java", [
             : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());''',
      '''        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.of(selection.themes())
             : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly(), selection.themes());''', 1),
-    ('''SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),''',
-     '''SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, themes::library),''', 1)])
+    ('''            Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),''',
+     '''            // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
+            // fixed plugin tier, never ThemeController.library(), which requires the EDT.
+            var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
+            Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),''', 1)])
 P = "jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java"
 edit(P, [
     ('''    private final Presentations presentations;
@@ -1176,9 +1200,9 @@ edit(P, [
     ('''        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store);''',
      '''        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store,
             themes(candidates, resolution));''', 1),
-    ('''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(), attempt, skipped,
+    ('''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped,
             presentations, store);''',
-     '''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(), attempt, skipped,
+     '''            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped,
             presentations, store, themes);''', 1),
     ('''    List<PluginCandidate> candidates() { return candidates; }''',
      '''    /** The plugin theme tier (spec 7.4): read once here and kept for the whole session, a blamed look's included. */
@@ -1211,7 +1235,7 @@ Add the ledger row of `PluginThemes.java` and of
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.architecture.*'`
-Expected: PASS: `PluginThemesTest` (4), the new Appearance case, `ColourLiteralScanTest` (no in-repo plugin theme yet, so
+Expected: PASS: `PluginThemesTest` (5), the new Appearance case, `ColourLiteralScanTest` (no in-repo plugin theme yet, so
 the loader test reads none) and every existing library, folder, selection, menu and Settings test.
 
 - [ ] **Step 5: Commit**
@@ -1889,7 +1913,10 @@ Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4.
 - Create: `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseHomeTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/presentation/EnterpriseFixtureTest.java`,
-  `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseKitRenderTest.java`
+  `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseKitRenderTest.java`,
+  `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseFirstWindowTest.java`,
+  `jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-enterprise.tsv` (generated in Step 3)
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedRolesTableTest.java` (the Enterprise theme's derived roles)
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:42-59` (`themes()`),
   `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java:25-31`, `jasper-ui/build.gradle.kts:20-27`,
   `jasper-app/build.gradle.kts` (`tasks.test` inputs), `tools/visual/pairs.json`, `tools/visual/README.md`,
@@ -1899,7 +1926,7 @@ Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4.
 - Consumes: Task 1's `LookFonts.register`, `FaceSet.uiFace`; Task 2's `PluginSelection.themes()`, `ThemeLibrary.of(PluginThemes)`,
   `provider`, `dormant`; Task 3's plugin; plan 5a's `PresentationFacts.read(Source)`, `PluginSelection.scan`,
   `PluginStateStore.enabling(id, enabled, optIn)`, `ConfigService(Path, boolean, DefaultSource)`; plan 4's
-  `KitFixtures.enterprise()`, `Kit.CLASSIC`, `MetricTokens`, `TypeScale.withBody` (5a's "Plan 4's names").
+  `KitFixtures.enterprise()`, `KitFixtures.enterpriseTokens()`, `Kit.CLASSIC`, `TypeScale.withBody` (5a's "Plan 4's names").
 - Produces: `public final class dev.jasper.app.testsupport.EnterpriseResources` with `ROOT`, `RESOURCES`,
   `static KitParser.Files files()`, `static PresentationFacts facts()`, `static JasperTheme theme()`; the renders
   `jasper-app/build/enterprise-kit/{light,dark}/<fixture>.png` and `<panel>@2x.png`.
@@ -2099,7 +2126,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.ui.kit.Kit;
-import dev.jasper.ui.metrics.MetricTokens;
 import dev.jasper.ui.testsupport.KitFixtures;
 import org.junit.jupiter.api.Test;
 
@@ -2114,7 +2140,7 @@ class EnterpriseFixtureTest {
         assertThat(shipped.colors()).isEqualTo(fixture.colors());
         assertThat(shipped.uiKeys()).isEqualTo(fixture.uiKeys());
         assertThat(shipped.metrics()).as("spec 5.1's tokens over the classic catalog")
-            .isEqualTo(Kit.CLASSIC.metrics().with(new MetricTokens(22, 22, 3, 2, 3, 2, 24, 12, 20, 230, 7)));
+            .isEqualTo(Kit.CLASSIC.metrics().with(KitFixtures.enterpriseTokens()));
         assertThat(shipped.type()).isEqualTo(Kit.CLASSIC.type().withBody(12));
         assertThat(shipped.faces().uiFace(400)).isEqualTo("IBM Plex Sans");
         assertThat(shipped.faces().uiFace(500)).isEqualTo("IBM Plex Sans Medm");
@@ -2262,6 +2288,120 @@ class EnterpriseHomeTest {
 `ConfigService` with a `config.toml` that does not exist reads the defaults (a fresh home); if its constructor writes the
 file, that is the existing first-run behaviour and the assertions still hold.
 
+Create `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseFirstWindowTest.java` (spec 5.8's "a test starts a
+fresh home under Enterprise and checks that the first window opens with the kit's defaults"; the staged plugin is passed
+as the `--plugin-dir` folder, which needs no opt-in, so the test reaches it through the public pre-pass):
+
+```java
+package dev.jasper.app.application;
+
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static dev.jasper.app.workspace.DesktopTestSupport.launcher;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.app.commands.CommandHistory;
+import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.platform.AppDirs;
+import dev.jasper.app.plugins.PluginSelection;
+import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/** Spec 5.8 and 16.1.8: the first window of a fresh home under Enterprise opens with the kit's defaults. */
+class EnterpriseFirstWindowTest {
+    @TempDir Path home;
+
+    @Test void theFirstWindowOfAFreshHomeUnderEnterpriseUsesTheKitsDefaults() throws Exception {
+        var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path enterprise = Path.of(System.getProperty("jasper.stagedPlugins")).resolve("dev.jasper.enterprise");
+        var selection = PluginSelection.of(dirs, null, "", enterprise, false);
+        assertThat(selection.presentation().look()).isEqualTo("dev.jasper.enterprise");
+        var service = new ConfigService(home.resolve("config.toml"), false, selection.presentation().defaults());
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(service, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown,
+                    null, null, selection);
+                var first = application[0].windowConfiguration();
+                assertThat(first.visibleRows()).isEqualTo(8);
+                assertThat(first.toolbarHeight()).isEqualTo(34);
+                assertThat(first.lightTheme()).isEqualTo("enterprise");
+                assertThat(first.darkTheme()).isEqualTo("enterprise");
+                assertThat(application[0].themes().current().chrome().name()).as("the window's theme is the kit's pick").startsWith("Enterprise");
+                assertThat(application[0].themes().kit()).isSameAs(selection.presentation().kit());
+            });
+        } finally {
+            if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }
+            service.close();
+            edt(() -> dev.jasper.app.appearance.ThemeTestSupport.controller(true));
+        }
+    }
+}
+```
+
+Replace `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedRolesTableTest.java` (spec 7.1 freezes the derived roles of
+the shipped themes, and the Enterprise theme now ships; its rows go to their own table, since the built-in table is
+plan 2's and a theme file outside jasper-ui is read from `jasper.repoRoot` as `KitFixtures.themes()` reads it):
+
+```java
+package dev.jasper.ui.theme;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Spec 7.1: every shipped variant's derived roles, frozen: the built-ins in derived-roles.tsv, the Enterprise plugin's
+ * theme in derived-roles-enterprise.tsv; a recipe or shipped theme change edits them in the same commit.
+ */
+class DerivedRolesTableTest {
+    @Test void theBuiltInVariantsDerivedRolesAreFrozen() throws IOException {
+        assertThat(table(JasperTheme.builtIns())).isEqualTo(expected("derived-roles.tsv"));
+    }
+
+    @Test void theEnterpriseVariantsDerivedRolesAreFrozen() throws IOException {
+        Path root = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
+        var theme = JasperTheme.parse(Files.readString(root.resolve("plugins/enterprise/src/main/resources/themes/enterprise.json")), "enterprise");
+        String actual = table(List.of(theme));
+        // The computed table, for Step 3 to freeze and for any later recipe change to compare against.
+        Path written = Path.of("build/derived-roles/derived-roles-enterprise.tsv");
+        Files.createDirectories(written.getParent());
+        Files.writeString(written, "# The Enterprise theme's derived roles (DerivedPalette), frozen: theme id, variant, role, colour.\n" + actual);
+        assertThat(actual).isEqualTo(expected("derived-roles-enterprise.tsv"));
+    }
+
+    static String table(Iterable<JasperTheme> themes) {
+        var actual = new StringBuilder();
+        for (var theme : themes) for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) {
+            var derived = DerivedPalette.of(theme.generated(dark));
+            for (var role : DerivedColor.values())
+                actual.append(theme.id()).append('\t').append(dark ? "dark" : "light").append('\t').append(role.key()).append('\t')
+                    .append(ColorMath.hex(derived.color(role))).append('\n');
+        }
+        return actual.toString();
+    }
+
+    static String expected(String resource) throws IOException {
+        var expected = new StringBuilder();
+        try (var in = DerivedRolesTableTest.class.getResourceAsStream(resource)) {
+            if (in == null) return "(" + resource + " is missing)\n";
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n"))
+                if (!line.isBlank() && !line.startsWith("#")) expected.append(line).append('\n');
+        }
+        return expected.toString();
+    }
+}
+```
+
 Update the theme set's expected list in `KitFixturesTest` (spec 16.1.2: "Enterprise Light and Dark"):
 
 ```bash
@@ -2283,9 +2423,10 @@ PY
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.testsupport.KitFixturesTest' :jasper-app:test --tests 'dev.jasper.app.plugins.PresentationConformanceTest' --tests 'dev.jasper.app.plugins.EnterpriseHomeTest' --tests 'dev.jasper.app.presentation.EnterpriseFixtureTest' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --continue`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.testsupport.KitFixturesTest' --tests 'dev.jasper.ui.theme.DerivedRolesTableTest' :jasper-app:test --tests 'dev.jasper.app.plugins.PresentationConformanceTest' --tests 'dev.jasper.app.plugins.EnterpriseHomeTest' --tests 'dev.jasper.app.presentation.EnterpriseFixtureTest' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.application.EnterpriseFirstWindowTest' --continue`
 Expected: `KitFixturesTest.theThemeSetIsTheShippedVariantsThenTheConvertedOnes` FAILS (the actual list ends at "Stray
-Dark"). The four new jasper-app classes already pass: they characterise Task 3's plugin. A failure there names a gap
+Dark"), and `DerivedRolesTableTest.theEnterpriseVariantsDerivedRolesAreFrozen` FAILS ("derived-roles-enterprise.tsv is
+missing"; run `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedRolesTableTest'` for it). The five new jasper-app classes already pass: they characterise Task 3's plugin. A failure there names a gap
 between the plugin and spec 4.1, 5.1, 7.6 or 14.1: fix the plugin's files (never the expectations, which are the
 spec's), rerun, and record the fix in the status banner.
 
@@ -2338,6 +2479,22 @@ PY
 
 `expected` is `<repo>/tools/themes/testdata/expected`, so four `getParent()` calls give the repository root.
 
+Freeze the Enterprise theme's derived roles: the failing run above wrote the computed table to
+`jasper-ui/build/derived-roles/derived-roles-enterprise.tsv`. Check it has 46 rows (Light and Dark, 23 roles each) and
+that its values come from spec 7.6's theme (for example Light's `surface.rowHover` is `mix(accent, surface.card, 8%)` of
+its accent and card), then copy it:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+source = pathlib.Path("jasper-ui/build/derived-roles/derived-roles-enterprise.tsv")
+rows = [line for line in source.read_text(encoding="utf-8").splitlines() if line and not line.startswith("#")]
+if len(rows) != 46 or {row.split("\t")[0] for row in rows} != {"enterprise"}: raise SystemExit(f"unexpected table: {len(rows)} rows")
+pathlib.Path("jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-enterprise.tsv").write_text(
+    source.read_text(encoding="utf-8"), encoding="utf-8")
+PY
+```
+
 - [ ] **Step 4: Add the visual pairs**
 
 Append the opt-in crops (Rulings 9; `crop` is `x,y,w,h` in the mock's 2x pixels) to `tools/visual/pairs.json`:
@@ -2347,6 +2504,7 @@ python3 -I - <<'PY'
 import json, pathlib
 path = pathlib.Path("tools/visual/pairs.json")
 pairs = json.loads(path.read_text(encoding="utf-8"))
+before = len(pairs)
 if any(pair["name"].startswith("enterprise-") for pair in pairs): raise SystemExit("pairs.json already has Enterprise pairs")
 mocks = {"light": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
          "dark": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png"}
@@ -2355,13 +2513,15 @@ for variant, mock in mocks.items():
     for panel, crop in crops.items():
         pairs.append({"name": f"enterprise-{variant}-{panel}", "mock": mock, "crop": crop,
                       "render": f"jasper-app/build/enterprise-kit/{variant}/{panel}@2x.png"})
+if len(pairs) != before + 8: raise SystemExit(f"expected {before + 8} pairs, have {len(pairs)}")
 path.write_text(json.dumps(pairs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-print(len(pairs), "pairs")
+print(before, "->", len(pairs), "pairs")
 PY
 git diff --stat tools/visual/pairs.json
 ```
 
-Expected: `42 pairs` (34 before) and only additions in the diff. If `json.dumps` reformats existing entries (the diff
+Expected: `<before> -> <before + 8> pairs` (40 -> 48 when plan 4c's six `classic-*` pairs are the only earlier
+additions to the 34 at `222969926`) and only additions in the diff. If `json.dumps` reformats existing entries (the diff
 shows changed lines that are not additions), restore the file with `git checkout tools/visual/pairs.json` and insert the
 eight objects by hand before the closing `]` in the file's own style. In `tools/visual/README.md`, extend the line that
 names the renders to regenerate:
@@ -2378,9 +2538,9 @@ PY
 
 - [ ] **Step 5: Run the theme-set suites and the new tests**
 
-Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.architecture.*' --continue`
+Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.application.EnterpriseFirstWindowTest' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.architecture.*' --continue`
 Expected: PASS: `PresentationConformanceTest` (5), `EnterpriseFixtureTest` (1), `EnterpriseKitRenderTest` (1),
-`EnterpriseHomeTest` (1), and over the theme set with Enterprise added `KitFixturesTest`, `KitMatrixTest`,
+`EnterpriseHomeTest` (1), `EnterpriseFirstWindowTest` (1), `DerivedRolesTableTest` (2), and over the theme set with Enterprise added `KitFixturesTest`, `KitMatrixTest`,
 `DerivedColorTest`, `DerivedPaletteTest`, `KnownRepairsTest` and `PaintedContrastTest`. A recipe, guard or painted-pair
 failure over Enterprise Light or Dark is a finding about the derived roles or guards, not about the theme (its values are
 spec 7.6's): stop and report it. Then check the images:
@@ -2399,11 +2559,12 @@ plan 10's.
 
 Add the ledger rows of `PresentationConformanceTest.java` (owner `app.plugins`; it imports `java.awt` and
 `dev.jasper.ui` and uses `new ArrayList`), `EnterpriseHomeTest.java` (`app.plugins`; it names `dev.jasper.app.appearance`),
-`EnterpriseFixtureTest.java` (`app.presentation`), `EnterpriseKitRenderTest.java` (`app.application`) and
+`EnterpriseFixtureTest.java` (`app.presentation`), `EnterpriseKitRenderTest.java` and `EnterpriseFirstWindowTest.java`
+(`app.application`, if the coverage test names it) and
 `EnterpriseResources.java` (`app.testsupport`; it imports `dev.jasper.ui`), each
 `<path>,<owner>,<class>,nonvisual-helper,none,none,<its own path>,Test/fixture ownership; New in Enterprise plan 5b Task 4`
 (plan 5a's form: app owners are written `app.<package>`), and run
-`./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.ThemeMigrationCoverageTest'` (PASS) before committing.
+`./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'` (PASS) before committing.
 
 ```bash
 git add jasper-app/src/test jasper-ui/src jasper-ui/build.gradle.kts jasper-app/build.gradle.kts tools/visual docs/design/theme-engine/migration.csv
@@ -2417,8 +2578,9 @@ compares the parsed kit with jasper-ui's Enterprise fixture, and
 EnterpriseKitRenderTest renders the gallery under the real kit and fonts
 in Enterprise Light and Dark into build/enterprise-kit, with 2x panels
 paired with the Workstation and Dark Mode mocks in tools/visual/pairs.json.
-KitFixtures.themes() gains Enterprise Light and Dark, and a fresh home with
-Enterprise turned on starts with its kit's defaults.
+KitFixtures.themes() gains Enterprise Light and Dark, whose derived roles
+are frozen in derived-roles-enterprise.tsv, and a fresh home with Enterprise
+turned on starts, and opens its first window, with its kit's defaults.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2499,9 +2661,9 @@ uses Slate Cobalt without a warning and keeps the name, so turning the plugin on
 files a plugin's descriptor lists.''', 1)])
 edit("docs/configuration.md", [
     ('''`family = "system"` (the default) selects the current platform UI font. You can''',
-     '''`family = "system"` (the default) selects the current platform UI font; under a look that ships its own UI font
-(Enterprise's IBM Plex Sans), leaving both keys unset selects that font at the look's size, and setting either one
-selects the platform font or the named family instead. You can''', 1)])
+     '''`family = "system"` (the default) selects the look's UI font: the platform font under the default look, IBM Plex
+Sans under Enterprise; a named family overrides it. An unset `size` uses the look's size (the platform size, or 12 under
+Enterprise); a set size scales every role. You can''', 1)])
 edit("docs/app-maintenance.md", [
     ('''entry that no longer ships. Read the new version's license''',
      '''entry that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
