@@ -15,7 +15,11 @@ public final class Nodes {
     }
     public enum TextRole { PROMPT_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, SUPPORTING, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
     public enum Hue { BLUE, GREEN, AMBER, PURPLE, NEUTRAL, NONE }
-    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }
+    /**
+     * SWATCH (since 0.18.0) is a solid square of the icon's hue at caption size, such as a protocol's colour beside its
+     * name; its hue is not NONE and it takes no severity, and its name stays a valid icon name.
+     */
+    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT, SWATCH }
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
@@ -90,6 +94,8 @@ public final class Nodes {
             Objects.requireNonNull(size);
             ModelChecks.label(accessibleName, "accessibleName");
             Objects.requireNonNull(severity);
+            if (size == IconSize.SWATCH && (hue == Hue.NONE || severity.isPresent()))
+                throw new IllegalArgumentException("A SWATCH is a square of its hue: the hue is not NONE and it takes no severity");
         }
         public Icon(String id, ControlState state, String name, Hue hue, IconSize size, String accessibleName) {
             this(id, state, name, hue, size, accessibleName, Optional.empty());

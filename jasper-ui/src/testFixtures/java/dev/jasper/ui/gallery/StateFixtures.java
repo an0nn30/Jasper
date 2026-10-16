@@ -17,7 +17,8 @@ public final class StateFixtures {
         var texts = Arrays.stream(TextRole.values()).map(r -> (Node)text("text-" + r, r + " · Jasper", r)).toList();
         result.add(sheet("typography", new Stack("typography", READY, LayoutRole.VERTICAL, texts), 480, 460));
         var icons = new ArrayList<Node>();
-        for (Hue hue : Hue.values()) for (IconSize size : IconSize.values()) icons.add(icon("icon-" + hue + "-" + size, "key", hue, size));
+        // SWATCH has its own fixture (KitGallery's "swatches"), so this sheet keeps its pixels.
+        for (Hue hue : Hue.values()) for (IconSize size : IconSize.values()) if (size != IconSize.SWATCH) icons.add(icon("icon-" + hue + "-" + size, "key", hue, size));
         var iconRows = new ArrayList<Node>();
         for (int i = 0; i < icons.size(); i += 5) iconRows.add(new Stack("icons-" + i, READY, LayoutRole.INLINE, icons.subList(i, i + 5)));
         for (StatusKind kind : StatusKind.values()) iconRows.add(stack("status-" + kind, LayoutRole.INLINE, new StatusDot("dot-" + kind, READY, kind), text("status-title-" + kind, kind.name(), TextRole.BODY)));

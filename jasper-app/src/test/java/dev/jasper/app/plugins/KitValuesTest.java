@@ -57,6 +57,18 @@ class KitValuesTest {
   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
   assertThat(((dev.jasper.ui.model.Nodes.Choice)KitValues.toModule(spec).root()).kind()).isEqualTo(dev.jasper.ui.model.Nodes.ChoiceKind.TABS);
  }
+ /** Plan 3b: swatches of every hue cross the projection unchanged. */
+ @Test void swatchesProjectWithoutLoss(){
+  for(var hue:List.of(Hue.BLUE,Hue.GREEN,Hue.AMBER,Hue.PURPLE,Hue.NEUTRAL)){
+   var spec=new ViewSpec(new Icon("swatch",READY,"file",hue,IconSize.SWATCH,"Swatch"));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  }
+  assertThat(Arrays.stream(IconSize.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.IconSize.values()).map(Enum::name).toArray(String[]::new));
+  // 3a's other renamed enums keep the model's names too (3a's final review: only ChoiceKind and ButtonPresentation were pinned).
+  assertThat(Arrays.stream(FormKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FormKind.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(Arrays.stream(LayoutRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.LayoutRole.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(Arrays.stream(TextRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.TextRole.values()).map(Enum::name).toArray(String[]::new));
+ }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
   for(String icon:List.of("lock","")){
    var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);

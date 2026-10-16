@@ -152,6 +152,19 @@ final class Labels {
             case DANGER -> SemanticColor.STATUS_DANGER;
         };
     }
+    /** A hue's glyph colour, as an icon of that hue is drawn (NONE, which no swatch has, as a plain glyph). */
+    static SemanticColor hue(Nodes.Hue hue) {
+        return switch (hue) {
+            case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
+            case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL; case NONE -> SemanticColor.TEXT_SECONDARY;
+        };
+    }
+    /** An {@code IconSize.SWATCH} icon: a solid square of {@code color}, {@code extent} pixels wide. */
+    record Swatch(Color color, int extent) implements javax.swing.Icon {
+        @Override public int getIconWidth() { return extent; }
+        @Override public int getIconHeight() { return extent; }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) { graphics.setColor(color); graphics.fillRect(x, y, extent, extent); }
+    }
     static final class IconControl extends ControlRegistry.Control {
         int tileSize, tileHeight, tileGlyph, glyphOverride; boolean selected, panelDetail;
         /** On a selected row's fill (set by the row before each refresh): the glyph takes the fill's ink, a tile selected. */
@@ -164,6 +177,14 @@ final class Labels {
         IconControl(KitView view, Nodes.Icon node) { super(view, node, literal()); refresh(); }
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
+            if (icon.size() == Nodes.IconSize.SWATCH) {
+                // A swatch is its hue, whatever the composition: no tile, no artwork, no selection ink (spec 8.2).
+                int extent = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
+                ((LiteralLabel)label).iconOffset = 0;
+                label.setIcon(new Swatch(ThemePainting.color(context(), hue(icon.hue())), extent)); label.setDisabledIcon(label.getIcon());
+                label.getAccessibleContext().setAccessibleName(icon.accessibleName()); label.setToolTipText(icon.accessibleName());
+                return;
+            }
             int size = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), icon.size()));
             ((LiteralLabel)label).iconOffset=panelDetail && tileSize == 0 ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
             var receiving=view.artworkPresentation(node.id());

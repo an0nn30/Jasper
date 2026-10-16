@@ -77,6 +77,13 @@ public final class KitGallery {
         // Plan 3b (SDK 0.18): a TABS choice (Overview and Details).
         result.add(new Fixture("tabs", "", "normal", 360, 60, new ViewSpec(new Nodes.Choice("tabs", ControlState.READY, ChoiceKind.TABS,
             List.of(new Option("overview", "Overview", Optional.empty()), new Option("details", "Details", Optional.empty())), "overview", "Plugin information", "tabs"))));
+        // Plan 3b (SDK 0.18): a swatch of every hue that has one, each beside its name.
+        var swatches = new ArrayList<Nodes.Node>();
+        for (Hue hue : List.of(Hue.BLUE, Hue.GREEN, Hue.AMBER, Hue.PURPLE, Hue.NEUTRAL)) {
+            swatches.add(new Nodes.Icon("swatch-" + hue, ControlState.READY, "file", hue, IconSize.SWATCH, hue.name()));
+            swatches.add(new Nodes.Text("swatch-label-" + hue, ControlState.READY, hue.name(), TextRole.CAPTION));
+        }
+        result.add(new Fixture("swatches", "", "normal", 420, 40, new ViewSpec(new Nodes.Stack("swatches", ControlState.READY, LayoutRole.INLINE, swatches))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

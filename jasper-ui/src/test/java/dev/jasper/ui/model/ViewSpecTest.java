@@ -40,6 +40,15 @@ class ViewSpecTest {
             List.of(new ListItem("row", Optional.empty(), List.of(text("title")), List.of(), List.of(one))), Set.of(), "", List.of())))
             .withMessageContaining("2 to 4 options");
     }
+    /** Plan 3b: a swatch is a square of a hue, so it needs one and takes no severity. */
+    @Test void swatchesNeedAHueAndTakeNoSeverity() {
+        assertThat(new Icon("ftp", ControlState.READY, "file", Hue.AMBER, IconSize.SWATCH, "FTP").size()).isEqualTo(IconSize.SWATCH);
+        assertThatIllegalArgumentException().isThrownBy(() -> new Icon("none", ControlState.READY, "file", Hue.NONE, IconSize.SWATCH, "None"))
+            .withMessageContaining("NONE");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Icon("warn", ControlState.READY, "file", Hue.AMBER, IconSize.SWATCH, "Warn", Optional.of(Severity.WARNING)))
+            .withMessageContaining("severity");
+        assertThat(new Icon("glyph", ControlState.READY, "file", Hue.NONE, IconSize.CAPTION, "File").hue()).isEqualTo(Hue.NONE);
+    }
     @Test void choiceTableListAndTreeValidateReferencesAndUniqueIds() {
         assertThatThrownBy(() -> new ViewSpec(new Choice("pick", ControlState.READY, ChoiceKind.DROPDOWN,
             List.of(new Option("a", "A", Optional.empty())), "missing", "Choice", "choose")))

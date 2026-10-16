@@ -230,6 +230,7 @@ public final class IconRegistry implements AutoCloseable {
             case RAIL -> DesignMetrics.Role.ICON_RAIL;
             case EMPTY -> DesignMetrics.Role.ICON_EMPTY;
             case PROMPT -> DesignMetrics.Role.ICON_PROMPT;
+            case SWATCH -> DesignMetrics.Role.ICON_CAPTION;
         });
     }
     private Icon painted(String name, Color foreground, Color background, int size, boolean tile) {

@@ -17,7 +17,7 @@ class KitValuesTest {
         assertThat(names(FormKind.class)).containsExactly("PROMPT", "PROMPT_COMPACT", "SHEET", "FULL", "SETTINGS", "WINDOW");
         assertThat(names(LayoutRole.class)).startsWith("VERTICAL", "INLINE", "ACTIONS", "PROMPT_HEADER", "DETAIL");
         assertThat(names(TextRole.class)).startsWith("PROMPT_TITLE", "DETAIL_TITLE").contains("MONO", "MONO_SMALL", "MONO_CAPTION");
-        assertThat(names(IconSize.class)).containsExactly("CAPTION", "CONTROL", "RAIL", "EMPTY", "PROMPT");
+        assertThat(names(IconSize.class)).containsExactly("CAPTION", "CONTROL", "RAIL", "EMPTY", "PROMPT", "SWATCH");
         assertThat(names(ButtonKind.class)).contains("GHOST", "DESTRUCTIVE_GHOST");
     }
     /** Plan 3b: fields are editable unless they say so, and a stepper or slider is never read-only. */
@@ -50,6 +50,15 @@ class KitValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new ItemList("list", ControlState.READY, ListKind.SINGLE,
             List.of(new ListItem("row", Optional.empty(), List.of(text("title")), List.of(), List.of(one))), Set.of(), "", List.of())))
             .withMessageContaining("2 to 4 options");
+    }
+    /** Plan 3b: a swatch is a square of a hue, so it needs one and takes no severity. */
+    @Test void swatchesNeedAHueAndTakeNoSeverity() {
+        assertThat(new Icon("ftp", ControlState.READY, "file", Hue.AMBER, IconSize.SWATCH, "FTP").size()).isEqualTo(IconSize.SWATCH);
+        assertThatIllegalArgumentException().isThrownBy(() -> new Icon("none", ControlState.READY, "file", Hue.NONE, IconSize.SWATCH, "None"))
+            .withMessageContaining("NONE");
+        assertThatIllegalArgumentException().isThrownBy(() -> new Icon("warn", ControlState.READY, "file", Hue.AMBER, IconSize.SWATCH, "Warn", Optional.of(Severity.WARNING)))
+            .withMessageContaining("severity");
+        assertThat(new Icon("glyph", ControlState.READY, "file", Hue.NONE, IconSize.CAPTION, "File").hue()).isEqualTo(Hue.NONE);
     }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
