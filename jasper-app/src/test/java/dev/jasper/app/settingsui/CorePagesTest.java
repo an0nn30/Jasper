@@ -222,6 +222,20 @@ class CorePagesTest {
         if (node instanceof Nodes.SettingRow row) walk(row.control(), visit);
     }
 
+    /** Spec 12.2 and 13: every core page's first group is titled, by its own section or by the page's name. */
+    @Test void everyCorePagesFirstGroupIsTitled() {
+        var firsts = new java.util.LinkedHashMap<String, String>();
+        for (var spec : CorePages.specs(APPEARANCE, system)) {
+            var titles = sectionTitles(spec);
+            firsts.put(spec.id(), titles.isEmpty() ? "" : titles.getFirst());
+        }
+        assertThat(firsts).containsEntry("command-palette", "Command Palette").containsEntry("desk-buddy", "Desk Buddy")
+            .containsEntry("system", "General").containsEntry("terminal", "Terminal").containsEntry("terminal.cursor", "Cursor")
+            .containsEntry("terminal.shell", "Shell").containsEntry("appearance", "Theme").containsEntry("window", "Toolbar & Status Bar")
+            .containsEntry("notifications", "System Notifications").containsEntry("terminal.font", "Font");
+        assertThat(firsts.values()).as("no page starts with an untitled card").doesNotContain("");
+    }
+
     @Test void decimalSettingsAreSteppers() {
         var pages = CorePages.pages(APPEARANCE, system, CorePagesTest::keymap, CorePagesTest::plugins).apply(context);
         var font = (SchemaPage) pages.stream().filter(page -> page.id().equals("terminal.font")).findFirst().orElseThrow();

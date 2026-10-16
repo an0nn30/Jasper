@@ -167,7 +167,9 @@ class SchemaPageTest {
             .action("Migrate old settings", () -> "Rewrite old names.", new SchemaPage.Button("Migrate\u2026", () -> runs[0]++, () -> enabled[0], "Nothing to migrate"))
             .build(context);
         page.component();
-        var row = (Nodes.SettingRow) ((Nodes.Card) ((Nodes.Stack) page.viewSpec().root()).children().getFirst()).children().getFirst();
+        var first = (Nodes.Section) ((Nodes.Stack) page.viewSpec().root()).children().getFirst();
+        assertThat(first.title()).as("spec 12.2: the page's name heads its leading rows").isEqualTo("System Settings");
+        var row = (Nodes.SettingRow) ((Nodes.Card) first.body()).children().getFirst();
         assertThat(row.title()).isEqualTo("Migrate old settings");
         assertThat(row.description()).isEqualTo("Rewrite old names.");
         JButton migrate = kit(page, page.actionButtons().getFirst(), JButton.class);
@@ -248,6 +250,23 @@ class SchemaPageTest {
         assertThat(page.rows()).hasSize(1);
         assertThat(KitTestSupport.find(page.component(), "row:window.native_decorations", JComponent.class)).isNull();
         assertThat(page.searchTerms()).doesNotContain(CoreSettings.WINDOW_NATIVE_DECORATIONS.label());
+    }
+
+    /** Spec 12.2 and 13: leading rows that no section heads take the page's title; nothing heads rows that are not built. */
+    @Test void aPagesLeadingUntitledRowsTakeThePagesName() {
+        var leading = SchemaPage.page("window", "Window")
+            .row(CoreSettings.WINDOW_STATUS_BAR)
+            .section("Size")
+            .row(CoreSettings.WINDOW_COLUMNS);
+        assertThat(PageKit.sectionTitles(leading.build(context))).containsExactly("Window", "Size");
+        var sectioned = SchemaPage.page("window", "Window").section("Bars").row(CoreSettings.WINDOW_STATUS_BAR);
+        assertThat(PageKit.sectionTitles(sectioned.build(context))).as("a page that starts with a section keeps it").containsExactly("Bars");
+        var hidden = SchemaPage.page("window", "Window")
+            .row(CoreSettings.WINDOW_NATIVE_DECORATIONS).shownWhen(false)
+            .section("Bars").row(CoreSettings.WINDOW_STATUS_BAR);
+        assertThat(PageKit.sectionTitles(hidden.build(context))).as("no page-name heading over rows that are not built").containsExactly("Bars");
+        var only = SchemaPage.page("window", "Window").row(CoreSettings.WINDOW_STATUS_BAR).row(CoreSettings.WINDOW_COLUMNS);
+        assertThat(PageKit.sectionTitles(only.build(context))).containsExactly("Window");
     }
 
     @Test void aSectionWhoseRowsAreAllHiddenShowsNoHeader() {
