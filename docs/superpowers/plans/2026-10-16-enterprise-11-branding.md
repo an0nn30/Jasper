@@ -28,7 +28,8 @@ folders `09 App Icon` and `10 Boot Splash` (the frames are 1x, 720 × 440; `extr
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-11`, branch
 `claude/enterprise-branding`, cut from `main` at `deafed424`. Run every command from the worktree root, never in
-`~/projects/moray`. Plans 3b to 10 execute before this one (5a, 5b and 6 are required; 7 to 10 touch other packages).
+`~/projects/moray`. Plans 3b to 10b execute before this one (5a, 5b, 6a and 6b are required; 7 to 10b touch other
+packages).
 Line numbers below are from `deafed424` and move after those plans; every edit quotes the exact text it replaces, and
 the edit scripts stop with a message when that text is not found the stated number of times. If a script stops,
 re-find the quoted text (it moves, it does not change), adjust the anchor, and re-run; never edit around a missing
@@ -40,7 +41,7 @@ Bring the branch up to `main` and check that every plan this one builds on is in
 
 ```bash
 git rebase main
-grep -cE '^\*\*Enterprise presentation, plan (5a|5b|6):' docs/STATUS.md                      # 3
+grep -cE '^\*\*Enterprise presentation, plan (5a|5b|6a|6b):' docs/STATUS.md                 # 4
 ls jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java \
    jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java \
    jasper-app/src/main/java/dev/jasper/app/presentation/PresentationFacts.java \
@@ -54,11 +55,11 @@ grep -c '\[branding\]: unknown table' jasper-app/src/test/java/dev/jasper/app/pr
 grep -c 'Branding' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java          # 0: this plan adds it
 grep -c 'record Startup(ConfigService service, AppArguments options, AppDirs dirs, AppLog log' \
    jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java                    # 5a: 1
-grep -cE '^\*\*Enterprise presentation, plan (7|8|9|10):' docs/STATUS.md                      # normally 4
+grep -cE '^\*\*Enterprise presentation, plan (7|8a|8b|9a|9b|10a|10b):' docs/STATUS.md      # normally 7
 ```
 
-If one of the first eight checks fails, stop: this plan needs plans 5a, 5b and 6 on `main`. If plans 7 to 10 are not
-all merged yet, go on (they touch the dock, palette, Settings and plugin packages), and rebase again before Task 8.
+If one of the first eight checks fails, stop: this plan needs plans 5a, 5b, 6a and 6b on `main`. If plans 7 to 10b
+are not all merged yet, go on (they touch the dock, palette, Settings and plugin packages), and rebase again before Task 8.
 Then, for each task, read the code its scripts anchor on (`git log --oneline deafed424..main -- <file>` shows what
 moved) before running them. Record any anchor or name you had to adapt in this plan's status banner (Task 8).
 
@@ -99,7 +100,8 @@ moved) before running them. Record any anchor or name you had to adapt in this p
 
 1. **Start-up fails after the splash was posted** (the first window's composition throws, or `prepareDesktop` fails
    after posting it): the splash closes, so no orphan window outlives the failed start, and a later step does nothing.
-   Task 7: `ApplicationBootstrapTest.theStepsEndWhetherTheStartSucceedsOrFails`; Task 5:
+   Task 7: `ApplicationBootstrapTest.theStepsEndWhetherTheStartSucceedsOrFails` (the composition) and
+   `aFailedStartClosesAPostedSplashOnceAndPostsNothingWithoutOne` (both catches, through `abandon`); Task 5:
    `StartupStepsTest.aFailingSplashEndsTheStepsWithoutStoppingStartUp`.
 2. **A damaged install**: an icon whose PNG header is right but whose data is truncated, or a splash face that does not
    decode: start-up goes on; the icon is left out of the icon list (all of them broken means Jasper's icons), and the
@@ -135,7 +137,11 @@ At `deafed424` unless marked; facts about plans 5a and 5b cite the plan.
    `--background`, `--no-window` and safe-mode flags are `AppArguments.background()`, `noWindow()` and `safeMode()`
    (`AppArguments.java:7-8`); a handed-off launch returns before anything else (`:311`). Plan 5a moves the log and the
    selection into `start` and gives `Startup` the dirs, log and selection (5a Task 9); plan 5a Task 12 marks the attempt
-   `pending` just before `application.newWindow()`.
+   `pending` just before `application.newWindow()`, and adds `attemptBeforePresenting` with its javadoc ("Whether the launch
+   is about to show a window or rehearse one, …") just above `configureDesktopProperties`. Plan 6a Task 2 replaces the
+   one-line javadoc `/** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */`
+   (it becomes `/** The default look's desktop properties. */` above a no-argument overload, and the sentence moves into
+   the multi-line comment of `configureDesktopProperties(DesktopFlags)`), so no edit here anchors on that line.
 4. Tests are headless: the root build sets `java.awt.headless=true` for every test task (`build.gradle.kts:31`); no
    test can create a `JWindow` or `JFrame`.
 5. `JasperApplication.composeWindow` adds, lays out and shows the window on one line
@@ -255,7 +261,7 @@ Decisions where the spec is silent or a literal reading cannot be built. Record 
 9. **The splash opens after the desktop properties and the title-bar style are committed**, at the start of
    `prepareDesktop`'s desktop work, not inside `start` where `PluginSelection` runs: AWT must not start before them
    (spec 4.8). Its files are decoded on the bootstrap thread and its window posted to the EDT ahead of `startDesktop`;
-   each step paints at once (`paintImmediately`) because the event thread is then busy composing. Cost if wrong: the
+   each step paints at once (through the window's own graphics) because the event thread is then busy composing. Cost if wrong: the
    splash appears a few milliseconds later.
 10. **Step timing.** "Starting Java runtime…" is step 1 as the splash opens (the toolkit and the event thread start);
     "Reading configuration…" covers the application's construction, where the configuration, themes and keymap are
@@ -281,9 +287,20 @@ Decisions where the spec is silent or a literal reading cannot be built. Record 
     the render are exact and the mock's within 3, regions compare by mean difference, text by its ink box, and the fill
     by frame 10's rows; frames 02, 03 and 07 caught the fill mid-transition, so their fractions are the measured 96,
     135 and 407 px. The mock's data (version, copyright, steps, fill) are fixtures. Cost if wrong: retuned tolerances.
-16. **The splash window** is a `JWindow`, unfocusable, centred on the default screen device's bounds, with the system's
-    window shadow; a failure to open it is logged and start-up goes on. Cost if wrong: placement.
+16. **The splash window** is a plain `java.awt.Window`, not a `JWindow`: a `JWindow`'s root pane calls `updateUI`,
+    which initializes the platform look and feel (Aqua on macOS, Metal elsewhere) on the EDT before `ThemeController`
+    installs FlatLaf, a second look and feel on every branded cold start's critical path. It paints through `paint` and,
+    for each step, through `getGraphics()` and `Toolkit.sync()`, and it carries the look's icons (`setIconImages`, from
+    `ApplicationIcon.images()` after `useLook`), so an X11 or Windows taskbar entry for it shows the look's icon (spec
+    10.11, "from the splash on"). It is unfocusable, centred on the default screen device's bounds, with the system's
+    window shadow; a failure to open it is logged and start-up goes on. Cost if wrong: placement, or a `JWindow` and
+    its look-and-feel start-up cost back.
 17. **The visual pairs are 1x** (`tools/visual/pairs.json`), because the frames are. Cost if wrong: none.
+18. **The splash's text is compared with the frames on macOS only** (`BootSplashMockTest.everyFramesTextMatchesItsMock`,
+    `@EnabledOnOs(OS.MAC)`), as plan 9a Rulings 17 rules for its mocks: the frames were drawn by Chrome on macOS, and
+    Linux and Windows rasterize IBM Plex differently, so a 1 px ink drift there could be fixed only by a tolerance. The
+    border, rules, gradient, art, icon, bar, fill and track are compared on every OS (`everyFrameMatchesItsMock`).
+    Cost if wrong: a Linux- or Windows-only text drift is seen only in the GUI check.
 
 ## File structure
 
@@ -1657,7 +1674,7 @@ without branding ends the steps at once.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/startup/StartupSteps.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:385,671`, `PluginSelection.java` (`loading`), `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (field, setter, `startPlugins`, `composeWindow`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/startup/package-info.java:2-4`, `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:385,671`, `PluginSelection.java` (`loading`), `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (field, setter, `startPlugins`, `composeWindow`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/startup/StartupStepsTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/PluginStartingStepsTest.java`, `jasper-app/src/test/java/dev/jasper/app/application/StartupStepsApplicationTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (three rows)
 
@@ -2033,6 +2050,24 @@ public final class StartupSteps {
 }
 ```
 
+The package comment says every type is safe from any thread; `StartupSteps` is EDT-only, so qualify it (the smallest
+accurate edit):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+p = pathlib.Path("jasper-app/src/main/java/dev/jasper/app/startup/package-info.java")
+text = p.read_text(encoding="utf-8")
+old = (" * durations, per-window traces, one log line once start-up settles and an optional JSON file for the start-up\n"
+       " * benchmark. Every type is safe from any thread; nothing here blocks the EDT.\n")
+if text.count(old) != 1: raise SystemExit("startup/package-info.java: the thread sentence moved")
+p.write_text(text.replace(old,
+    " * durations, per-window traces, one log line once start-up settles and an optional JSON file for the start-up\n"
+    " * benchmark, and the steps a branded look's splash shows. Every type except StartupSteps (EDT only) is safe from any\n"
+    " * thread; nothing here blocks the EDT.\n"), encoding="utf-8")
+PY
+```
+
 - [ ] **Step 4: Report from the runtime and the application**
 
 ```bash
@@ -2122,7 +2157,8 @@ already depend on `startup`).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add jasper-app/src/main/java/dev/jasper/app/startup/StartupSteps.java jasper-app/src/main/java/dev/jasper/app/plugins \
+git add jasper-app/src/main/java/dev/jasper/app/startup/StartupSteps.java jasper-app/src/main/java/dev/jasper/app/startup/package-info.java \
+  jasper-app/src/main/java/dev/jasper/app/plugins \
   jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java jasper-app/src/test/java/dev/jasper/app/startup/StartupStepsTest.java \
   jasper-app/src/test/java/dev/jasper/app/plugins/PluginStartingStepsTest.java jasper-app/src/test/java/dev/jasper/app/application/StartupStepsApplicationTest.java \
   docs/design/theme-engine/migration.csv
@@ -2161,7 +2197,8 @@ shipped Enterprise branding and compares it with all ten frames.
   Optional<byte[]> textFace, Optional<byte[]> versionFace)`, `static SplashPainter of(Content content, int scale)`
   (throws `IllegalArgumentException` when an icon or the art cannot be drawn), `void paint(Graphics2D g, String step,
   double fraction)`, package-private `fillWidth(double)`, `fit(Font, FontRenderContext, String, float)`,
-  `advance(Font, FontRenderContext, String)`, `GAP`; `public final class Splash` with `Splash(SplashPainter)`,
+  `advance(Font, FontRenderContext, String)`, `GAP`; `public final class Splash` with `Splash(SplashPainter, List<Image> icons)`
+  (a plain `java.awt.Window`, carrying `icons`),
   `void open(StartupSteps.Step first)`, `void show(StartupSteps.Step step)`, `void close()` (EDT), package-private
   `static Point centred(Rectangle screen)`.
 
@@ -2289,7 +2326,8 @@ class SplashPainterTest {
     @Test void theSplashIsCentredOnTheMainScreenAndOneThatCannotOpenStaysClosed() {
         assertThat(Splash.centred(new Rectangle(0, 0, 1440, 900))).isEqualTo(new Point(360, 230));
         assertThat(Splash.centred(new Rectangle(1440, -200, 1920, 1080))).isEqualTo(new Point(2040, 120));
-        var splash = new Splash(SplashPainter.of(content(), 1));
+        assertThatThrownBy(() -> new Splash(SplashPainter.of(content(), 1), null)).isInstanceOf(NullPointerException.class);
+        var splash = new Splash(SplashPainter.of(content(), 1), java.util.List.of(new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)));
         // Headless: the window cannot be made; that is logged and the splash stays closed.
         assertThatCode(() -> {
             splash.open(new StartupSteps.Step(StartupSteps.RUNTIME, 1, 4));
@@ -2318,13 +2356,17 @@ import java.util.Optional;
 import javax.imageio.ImageIO;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 /**
  * Spec 10.11 and 16.1.4: the splash under the shipped Enterprise branding, at 1x, against the ten Boot Splash frames
  * (1x, 720 by 440). The frames are palette-quantised screenshots of the animated mock (the plan's Measured targets), so
  * the render's flat colours are exact and the mock's within 3, regions compare by mean difference, text by its ink box,
- * and the fill by frame 10's rows. The version, the copyright, the steps and their fill are the mock's fixtures. Renders
- * and difference images are written to jasper-app/build/enterprise-splash/ for inspection.
+ * and the fill by frame 10's rows. The version, the copyright, the steps and their fill are the mock's fixtures. The
+ * frames were drawn on macOS and Linux and Windows rasterize IBM Plex differently, so the text is compared on macOS only
+ * (plan Rulings 18); every other probe runs on every OS. Renders and difference images are written to
+ * jasper-app/build/enterprise-splash/ for inspection.
  */
 class BootSplashMockTest {
     static final Path FRAMES_DIRECTORY = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference/10 Boot Splash");
@@ -2449,8 +2491,13 @@ class BootSplashMockTest {
         soft.assertThat(render.bottom()).as(what + " bottom").isBetween(measured.bottom() - bottom, measured.bottom() + bottom);
     }
 
+    static SplashPainter painter() throws Exception {
+        return SplashPainter.of(content(EnterpriseResources.facts().parsed().orElseThrow()), 1);
+    }
+
+    /** The border, rule, gradient, art, icon and bar of every frame: no text, so the same on every OS. */
     @Test void everyFrameMatchesItsMock() throws Exception {
-        var painter = SplashPainter.of(content(EnterpriseResources.facts().parsed().orElseThrow()), 1);
+        var painter = painter();
         Files.createDirectories(OUT);
         BufferedImage settled = mock(FRAMES.getLast().file());
         var soft = new SoftAssertions();
@@ -2479,12 +2526,6 @@ class BootSplashMockTest {
                 soft.assertThat(largest(render, mock, ground)).as(at + "gradient " + ground + " at worst").isLessThanOrEqualTo(6);
             }
             soft.assertThat(mean(render, mock, ICON)).as(at + "icon").isLessThanOrEqualTo(4.0);
-            ink(soft, at + "product name", ink(render, NAME, 140), ink(mock, NAME, 140), NAME_INK, 1, 1, 2, 1);
-            ink(soft, at + "version line", ink(render, VERSION_LINE, 100), ink(mock, VERSION_LINE, 100), VERSION_INK, 1, 1, 2, 1);
-            ink(soft, at + "step", ink(render, STEP, 100), ink(mock, STEP, 100), frame.stepInk(), 1, 1, 2, 1);
-            ink(soft, at + "copyright line", ink(render, COPYRIGHT_LINE, 90), ink(mock, COPYRIGHT_LINE, 90), COPYRIGHT_INK, 2, 1, 1, 1);
-            for (Rectangle text : List.of(NAME, VERSION_LINE, STEP, COPYRIGHT_LINE))
-                soft.assertThat(mean(render, mock, text)).as(at + "text " + text).isLessThanOrEqualTo(8.0);
             soft.assertThat(distance(render.getRGB(360, 432), SplashColors.TRACK_RULE)).as(at + "the bar's rule").isZero();
             soft.assertThat(distance(mock.getRGB(360, 432), SplashColors.TRACK_RULE)).as(at + "the mock's bar rule").isLessThanOrEqualTo(3);
             int mockEnd = fillEnd(mock);
@@ -2496,6 +2537,24 @@ class BootSplashMockTest {
                 soft.assertThat(distance(render.getRGB(track, y), SplashColors.TRACK)).as(at + "track row " + y).isZero();
                 soft.assertThat(distance(mock.getRGB(track, y), SplashColors.TRACK)).as(at + "the mock's track row " + y).isLessThanOrEqualTo(2);
             }
+        }
+        soft.assertAll();
+    }
+
+    /** The product name, version line, step and copyright line of every frame: macOS only (plan Rulings 18). */
+    @Test @EnabledOnOs(OS.MAC) void everyFramesTextMatchesItsMock() throws Exception {
+        var painter = painter();
+        var soft = new SoftAssertions();
+        for (Frame frame : FRAMES) {
+            BufferedImage mock = mock(frame.file());
+            BufferedImage render = render(painter, frame.step(), frame.fraction());
+            String at = "frame " + frame.id() + ": ";
+            ink(soft, at + "product name", ink(render, NAME, 140), ink(mock, NAME, 140), NAME_INK, 1, 1, 2, 1);
+            ink(soft, at + "version line", ink(render, VERSION_LINE, 100), ink(mock, VERSION_LINE, 100), VERSION_INK, 1, 1, 2, 1);
+            ink(soft, at + "step", ink(render, STEP, 100), ink(mock, STEP, 100), frame.stepInk(), 1, 1, 2, 1);
+            ink(soft, at + "copyright line", ink(render, COPYRIGHT_LINE, 90), ink(mock, COPYRIGHT_LINE, 90), COPYRIGHT_INK, 2, 1, 1, 1);
+            for (Rectangle text : List.of(NAME, VERSION_LINE, STEP, COPYRIGHT_LINE))
+                soft.assertThat(mean(render, mock, text)).as(at + "text " + text).isLessThanOrEqualTo(8.0);
         }
         soft.assertAll();
     }
@@ -2793,26 +2852,30 @@ Create `jasper-app/src/main/java/dev/jasper/app/splash/Splash.java`:
 package dev.jasper.app.splash;
 
 import dev.jasper.app.startup.StartupSteps;
+import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
+import java.awt.Image;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
+import java.awt.Window;
+import java.util.List;
 import java.util.Objects;
-import javax.swing.JComponent;
-import javax.swing.JWindow;
 
 /**
- * The boot splash's window (spec 10.11): undecorated, unfocusable and centred on the main screen. It appears and closes
- * at once, with no motion, and paints each step at once, because the event thread is busy starting Jasper and would not
- * get to a queued repaint. A window that cannot be made is logged and the splash stays closed; start-up goes on. EDT.
+ * The boot splash's window (spec 10.11): undecorated, unfocusable and centred on the main screen, carrying the look's
+ * window icons. It appears and closes at once, with no motion, and paints each step at once through the window's own
+ * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. It is a plain AWT
+ * window, not a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot
+ * be made is logged and the splash stays closed; start-up goes on. EDT.
  */
 public final class Splash {
     private static final System.Logger LOG = System.getLogger(Splash.class.getName());
     private final SplashPainter painter;
-    private JWindow window;
-    private JComponent canvas;
+    private final List<Image> icons;
+    private Window window;
     private StartupSteps.Step step;
     private boolean closed;
 
@@ -2820,8 +2883,13 @@ public final class Splash {
      * A splash that draws with {@code painter}; nothing is shown until {@link #open}.
      *
      * @param painter the decoded splash
+     * @param icons the window's icons, the look's (spec 10.11), so a taskbar or window switcher shows them from the
+     *     splash on
      */
-    public Splash(SplashPainter painter) { this.painter = Objects.requireNonNull(painter, "painter"); }
+    public Splash(SplashPainter painter, List<Image> icons) {
+        this.painter = Objects.requireNonNull(painter, "painter");
+        this.icons = List.copyOf(icons);
+    }
 
     /**
      * Shows the splash on its first step. Does nothing once closed or open.
@@ -2832,13 +2900,13 @@ public final class Splash {
         if (closed || window != null) return;
         step = Objects.requireNonNull(first, "first");
         try {
-            canvas = new JComponent() {
-                @Override protected void paintComponent(Graphics g) { painter.paint((Graphics2D) g, step.text(), step.fraction()); }
+            window = new Window((Frame) null) {
+                @Override public void paint(Graphics g) { draw(g); }
+                // The whole window is painted each time, so nothing is cleared first.
+                @Override public void update(Graphics g) { draw(g); }
             };
-            canvas.setOpaque(true);
-            window = new JWindow();
             window.setFocusableWindowState(false);
-            window.setContentPane(canvas);
+            window.setIconImages(icons);
             window.setSize(SplashPainter.WIDTH, SplashPainter.HEIGHT);
             window.setLocation(centred(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice()
                 .getDefaultConfiguration().getBounds()));
@@ -2867,11 +2935,18 @@ public final class Splash {
         window.setVisible(false);
         window.dispose();
         window = null;
-        canvas = null;
+    }
+
+    private void draw(Graphics g) {
+        StartupSteps.Step shown = step;
+        if (shown != null) painter.paint((Graphics2D) g, shown.text(), shown.fraction());
     }
 
     private void paintNow() {
-        canvas.paintImmediately(0, 0, canvas.getWidth(), canvas.getHeight());
+        Graphics g = window.getGraphics();
+        if (g == null) return;
+        try { draw(g); }
+        finally { g.dispose(); }
         Toolkit.getDefaultToolkit().sync();
     }
 
@@ -2920,8 +2995,9 @@ PY
 - [ ] **Step 5: Run the tests and iterate until the render matches**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.splash.*' --tests 'dev.jasper.app.architecture.ColourLiteralScanTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS: `SplashPainterTest` (6) and `BootSplashMockTest.everyFrameMatchesItsMock` (all ten frames, every soft
-assertion), `ColourLiteralScanTest` with `SplashColors` exempt, and the ledger test.
+Expected: PASS: `SplashPainterTest` (6) and `BootSplashMockTest` (2: `everyFrameMatchesItsMock` and, on macOS,
+`everyFramesTextMatchesItsMock`; all ten frames, every soft assertion), `ColourLiteralScanTest` with `SplashColors`
+exempt, and the ledger test. Run this step on the Mac: elsewhere the text test is skipped and proves nothing.
 
 If a `BootSplashMockTest` assertion fails, open `jasper-app/build/enterprise-splash/NN-diff.png` beside `NN.png` and the
 frame, find the cause and change the drawing, never a tolerance:
@@ -2974,7 +3050,7 @@ window is posted ahead of the composition with the Dock or taskbar icon. The ste
 happens; a look that falls back at start gives Jasper's icons back.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java` (`prepareDesktop`, `startDesktop`, `createApplication`, four new static methods), `bootstrap/package-info.java:3`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java` (`prepareDesktop`, `startDesktop`, `createApplication`, five new package-private static methods and the private `screenScale`), `bootstrap/package-info.java:3`
 - Test: `jasper-app/src/test/java/dev/jasper/app/bootstrap/ApplicationBootstrapTest.java`
 
 **Interfaces:**
@@ -2984,7 +3060,7 @@ happens; a look that falls back at start gives Jasper's icons back.
 - Produces: package-private `static StartupSteps ApplicationBootstrap.openSplash(Startup startup, boolean headless)`,
   `static boolean splashWanted(AppArguments options, boolean headless, boolean branded)`,
   `static SplashPainter.Content splashContent(Presentation presentation, BuildInfo build)`,
-  `static void presenting(StartupSteps steps, Runnable start)`.
+  `static void presenting(StartupSteps steps, Runnable start)`, `static void abandon(StartupSteps steps, Executor edt)`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3053,6 +3129,24 @@ Append to `ApplicationBootstrapTest` (before its final closing brace):
             .hasMessage("composition failed");
         assertThat(closed).hasValue(2);
     }
+
+    /** Review Focus 1: a failed start closes a posted splash once, on the EDT; without a splash nothing is posted. */
+    @Test void aFailedStartClosesAPostedSplashOnceAndPostsNothingWithoutOne() {
+        var closed = new java.util.concurrent.atomic.AtomicInteger();
+        var posted = new java.util.ArrayList<Runnable>();
+        var steps = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
+        ApplicationBootstrap.abandon(steps, posted::add);
+        assertThat(closed).as("closed on the EDT, not on the failing thread").hasValue(0);
+        assertThat(posted).hasSize(1);
+        posted.forEach(Runnable::run);
+        assertThat(closed).hasValue(1);
+        ApplicationBootstrap.abandon(steps, posted::add);
+        assertThat(posted).as("an ended splash posts nothing").hasSize(1);
+        ApplicationBootstrap.abandon(dev.jasper.app.startup.StartupSteps.NONE, posted::add);
+        assertThat(posted).as("no splash: nothing is posted, so AWT stays unstarted").hasSize(1);
+        ApplicationBootstrap.abandon(dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet), Runnable::run);
+        assertThat(closed).as("startDesktop's catch, already on the EDT").hasValue(2);
+    }
 ```
 
 (`AppDirs`, `AppArguments`, `assertThat` and `assertThatThrownBy` are already imported by the test; add
@@ -3061,8 +3155,8 @@ Append to `ApplicationBootstrapTest` (before its final closing brace):
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.bootstrap.ApplicationBootstrapTest'`
-Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `splashWanted`, `openSplash`, `splashContent` and
-`presenting`.
+Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `splashWanted`, `openSplash`, `splashContent`,
+`presenting` and `abandon`.
 
 - [ ] **Step 3: Wire the splash and the icon into the bootstrap**
 
@@ -3104,8 +3198,8 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
     ('''            acquired.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);\n''',
      '''            acquired.rollback(failure);
-            // A splash already posted opens first, then closes: start-up failed (spec 10.11).
-            SwingUtilities.invokeLater(opened.get()::done);
+            // A splash already posted opens first, then closes: start-up failed (spec 10.11). Nothing without one.
+            abandon(opened.get(), SwingUtilities::invokeLater);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);\n''', 1),
     # startDesktop: the steps follow the composition and end whatever happens.
     ('''                                     AtomicReference<CommandListener> commands) {
@@ -3126,7 +3220,7 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
             // Also covers failure before composition took ownership (for example initial role resolution).\n''',
      '''                }));
         } catch (RuntimeException | Error failure) {
-            steps.done();
+            abandon(steps, Runnable::run);
             // Also covers failure before composition took ownership (for example initial role resolution).\n''', 1),
     # createApplication: the configuration step, then the look's icons as the application runs them.
     ('''                                                       dev.jasper.app.plugins.PluginSelection selection) {''',
@@ -3140,7 +3234,9 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
             ApplicationIcon.useLook(application.presentation().branding().iconFiles());
             ApplicationIcon.installTaskbarIcon();
             application.startupSteps(steps);\n''', 1),
-    ('''    /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */''',
+    # Before plan 5a Task 12's attemptBeforePresenting javadoc (plan 6a rewrites the configureDesktopProperties one).
+    ('''    /**
+     * Whether the launch is about to show a window or rehearse one, so the look's attempt is marked pending (spec 4.6):''',
      '''    /**
      * Spec 10.11, once the desktop properties and the title-bar style are committed: a branded look's icons become the
      * application's on every launch (so a window a resident opens later carries them too), and on a start that will
@@ -3161,7 +3257,7 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
             LOG.log(System.Logger.Level.WARNING, "The " + branding.product() + " splash cannot be drawn; starting without it", undrawable);
             return StartupSteps.NONE;
         }
-        var splash = new Splash(painter);
+        var splash = new Splash(painter, ApplicationIcon.images());
         var steps = StartupSteps.of(branding.product(), startup.selection().loading().size(), splash::show, splash::close);
         SwingUtilities.invokeLater(() -> {
             ApplicationIcon.installTaskbarIcon();
@@ -3188,6 +3284,16 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
             faces.data().map(data -> data.regular().bytes()));
     }
 
+    /**
+     * Ends the steps of a start that failed (spec 10.11) through {@code edt}, the event thread: a splash already posted
+     * opens first, then closes. Without a splash nothing is posted, so a failure before anything touched AWT does not
+     * start the toolkit. {@code active()} only ever turns false, so a stale read off the EDT at worst posts a second,
+     * harmless {@code done()}.
+     */
+    static void abandon(StartupSteps steps, java.util.concurrent.Executor edt) {
+        if (steps.active()) edt.execute(steps::done);
+    }
+
     /** Runs {@code start}, then ends {@code steps} whatever happened: a splash never outlives the start that opened it. EDT. */
     static void presenting(StartupSteps steps, Runnable start) {
         try { start.run(); }
@@ -3204,7 +3310,8 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
         }
     }
 
-    /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */''', 1)])
+    /**
+     * Whether the launch is about to show a window or rehearse one, so the look's attempt is marked pending (spec 4.6):''', 1)])
 text = pathlib.Path(B).read_text(encoding="utf-8")
 if "import java.awt.GraphicsEnvironment;" not in text:
     text = text.replace("import java.nio.file.Path;\n", "import java.awt.GraphicsEnvironment;\nimport java.nio.file.Path;\n", 1)
@@ -3216,13 +3323,13 @@ PY
 
 Check that the composition reads as intended: `grep -n "presenting(steps\|steps\.\|StartupSteps steps" jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java`
 shows `opened`'s two uses in `prepareDesktop`, `presenting(steps, () -> compose(` closed by `}));`, `steps.workspace();`
-before the first window, `steps.done();` first in `startDesktop`'s catch, and `steps.configuration();` before the
-application is made.
+before the first window, `abandon(steps, Runnable::run);` first in `startDesktop`'s catch, `abandon(opened.get(),
+SwingUtilities::invokeLater);` in `prepareDesktop`'s, and `steps.configuration();` before the application is made.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.platform.*' --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture :jasper-app:javadoc`
-Expected: PASS: the four new `ApplicationBootstrapTest` cases and every existing bootstrap, rollback, application and
+Expected: PASS: the five new `ApplicationBootstrapTest` cases and every existing bootstrap, rollback, application and
 platform test (they run the test entry `start(args, out, error, launch)`, whose selection is `PluginSelection.none()`,
 so nothing is branded); the architecture check with the new `bootstrap → splash` edge and no cycle.
 
@@ -3254,7 +3361,7 @@ EOF
 
 - [ ] **Step 1: Rebase, then edit the documentation**
 
-If plans 7 to 10 were not all on `main` when you started, `git rebase main` now and re-run the Task 6 and 7 tests.
+If plans 7 to 10b were not all on `main` when you started, `git rebase main` now and re-run the Task 6 and 7 tests.
 
 ```bash
 python3 -I - <<'PY'
@@ -3269,7 +3376,9 @@ once("| `residency` |", "| `splash` | The boot splash of a branded look: `Splash
      "and `Splash` is its undecorated window. The bootstrap decodes the files off the EDT, opens the window on it and closes it "
      "through `StartupSteps` when the first window shows or start-up fails. |\n| `residency` |")
 once("| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`);",
-     "| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`) and the steps a branded look's splash shows (`StartupSteps`, EDT);")
+     "| `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`) and the steps a branded look's splash shows (`StartupSteps`);")
+once("bootstrap, application, plugins and benchmark. Safe from any thread;",
+     "bootstrap, application, plugins and benchmark. Safe from any thread except `StartupSteps` (EDT only);")
 row = re.search(r"^\| `presentation` \|.*\|$", text, flags=re.M)
 if not row: raise SystemExit("app-architecture.md: no presentation row (plan 5a Task 13 adds it); re-find it")
 line = row.group(0)
@@ -3304,7 +3413,8 @@ headless gallery with `main`'s:
 
 ```bash
 base=$(mktemp -d)
-git worktree add "$base/main" main
+# main is checked out in ~/projects/moray, so the comparison tree is detached at the commit this branch sits on.
+git worktree add --detach "$base/main" "$(git merge-base HEAD main)"
 for theme in dark light; do
   ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && rm -rf "$base/branch-$theme" && cp -R jasper-ui/build/gallery "$base/branch-$theme"
   (cd "$base/main" && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme) && rm -rf "$base/main-$theme" && cp -R "$base/main/jasper-ui/build/gallery" "$base/main-$theme"
@@ -3366,8 +3476,9 @@ component; (7) icons on every branded launch, About's icon follows, the tray and
 look that falls back gives Jasper's icons back and closes the splash; (9) the splash opens after the desktop
 properties, not at the selection; (10) step timing and count; (11) faces from the kit's files, not registered; (12)
 `BuildInfo.buildLine` and `BuildInfo.COPYRIGHT`; (13) fixed colours in `SplashColors`, exempt from the scan; (14)
-measured window-pixel geometry and baselines; (15) the comparison's tolerances; (16) a `JWindow` centred on the main
-screen; (17) 1x pairs. Deviations from the plan's text: <deviations>. `./gradlew check --continue`: **<counts>**. GUI
+measured window-pixel geometry and baselines; (15) the comparison's tolerances; (16) a plain AWT window with the
+look's icons, centred on the main screen; (17) 1x pairs; (18) the text compared with the frames on macOS only.
+Deviations from the plan's text: <deviations>. `./gradlew check --continue`: **<counts>**. GUI
 checks for the user (spec 16.2): on a cold start with Enterprise on, the splash appears centred, unfocused, with the
 JasperOps art, icon, version line, steps and bar, crisp on a Retina screen, and closes as the first window shows; the
 Dock icon (packaged and development builds) and the window icons on Windows and Linux are the Enterprise icon from the
