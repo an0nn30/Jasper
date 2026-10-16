@@ -1,5 +1,37 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 3a: SDK 0.18 renames — 2026-10-16** (`claude/enterprise-sdk-0-18-renames`, worktree
+`.claude/worktrees/enterprise-sdk-0-18`, `1021b1c5b..c86589c98`, then this documentation commit;
+[plan](superpowers/plans/2026-10-15-enterprise-3a-sdk-0-18-renames.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The SDK is 0.18.0, a breaking boundary,
+and every in-repo manifest, the example external plugin and every guide range declare `sdk = ">=0.18.0, <0.19"`. Spec
+8.1's seven constants are renamed in the SDK and the jasper-ui model alike (`ChoiceKind.EXCLUSIVE`,
+`ButtonPresentation.HELP`, `FormKind.PROMPT` and `PROMPT_COMPACT`, `LayoutRole.PROMPT_HEADER`, `TextRole.PROMPT_TITLE`,
+`IconSize.PROMPT`), and the kit's private names follow (`Typography.Role.PROMPT_TITLE`, the `PROMPT_*` metric roles and
+`ICON_PROMPT`, `MacTitleBar.Style.PROMPT`, `Stacks.PromptLayout`, `ViewReconciler.applyPrompt`), so hero names only
+`Form.hero`; `PromptVocabularyTest` keeps it so. `compact-roles.tsv` and `default-type.tsv` changed their keys only, and
+the headless gallery's PNGs for Slate Cobalt Dark and Light are byte-identical to the base once their names are mapped,
+but for the label lines of the five sheets that print a renamed constant's name. `KitCompatibility` keys every removed
+type and member by the SDK that removed it and refuses a plugin that still reads a renamed constant ("references removed
+SDK member X; rebuild it for SDK 0.18"); a 0.17 manifest is skipped by its range. `Capabilities.PRESENTATION_PROVIDE`
+exists; the SDK Javadoc and `docs/plugin-ui.md` carry spec 8.3's re-documented contracts, and "settings never use
+checkboxes" is gone. Planned deviations (plan, "Planned deviations"): (1) spec row 3 is five plans, 3a to 3e, and THD's
+rebuild is this hand-off; (2) the host refuses a manifest declaring `presentation.provide` until plan 5 adds it to
+`DescriptorParser.CAPABILITIES` with the `presentation` key and the consent text; (3) removed types carry their version
+too, and their message says "type"; (4) 8.3 is one paragraph in `docs/plugin-ui.md`; (5) Remote's `ExistingItemsPanel`
+header id is `existing.header`; (6) jasper-app's test task declares every source tree `PromptVocabularyTest` reads.
+Beyond the plan's text: Task 2's review found bare `hero` still naming the prompt kind, so `5450058d0` renamed the
+per-control prompt flag (`Control.prompt(boolean)`, its fields and `Forms`' local), `IconRegistry.prompt(...)` and
+`FormFixtures.header(...)`, and `PromptVocabularyTest` also flags a bare `hero` called with arguments or used as a
+boolean flag. The gate cannot see a constant named by a string (`valueOf`, a qualified constant label in a pattern
+`switch`); linkage containment still applies. THD Sourcing Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`,
+branch `jasper-sdk-0.17.1` at `3740e4e`) is skipped on 0.18 until it is rebuilt there: `CryptoForm.java:112` and
+`CryptoFormTest.java:61` read `Nodes.ChoiceKind.SEGMENTED` (now `EXCLUSIVE`), and its `plugin.toml`
+(`sdk = ">=0.16.1, <0.18"`) and `PluginPackagingTest.java:49` move to `>=0.18.0, <0.19`, built against the 0.18.0 jars
+`sdkRelease` publishes; rebuild once plans 3b to 3d have settled 0.18's additions (its Mode choice has two options,
+within 3b's rule of two to four for EXCLUSIVE). `./gradlew check --continue`: **10,508 tests, 0 failures, 0 errors, 25
+skipped**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
+
 **Enterprise presentation, plan 2: derived roles — 2026-10-15** (`claude/enterprise-derived-roles`, worktree
 `.claude/worktrees/enterprise-derived-roles`, `b30872f4a..5056f88dc`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-2-derived-roles.md),

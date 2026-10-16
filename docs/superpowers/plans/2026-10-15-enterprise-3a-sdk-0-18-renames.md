@@ -1,5 +1,13 @@
 # Enterprise presentation 3a: SDK 0.18 renames Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-renames` (`1021b1c5b..c86589c98`).** Deviations from
+> this plan's text: Task 2's review found bare `hero` still naming the prompt kind, so a fix commit (`5450058d0`)
+> renamed the per-control prompt flag (`Control.prompt(boolean)`, its fields and `Forms`' local),
+> `IconRegistry.prompt(...)` and `FormFixtures.header(...)`, and `PromptVocabularyTest` also flags a bare `hero` called
+> with arguments or used as a boolean flag (four tests, so the totals are 10,508); the full `./gradlew check` runs were
+> the controller's, after each task's commit, because the environment denied an implementer's run. Otherwise none beyond
+> its "Planned deviations".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The SDK becomes 0.18.0, a clean break: its seven renamed constants (and the kit's private names that follow
