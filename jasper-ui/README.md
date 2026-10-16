@@ -31,8 +31,8 @@ Checks are headless. The bytecode architecture gate rejects other Jasper modules
 Swing dependencies in pure packages, edges a package's package-info does not list and package cycles. It requires only UI classes,
 so it introduces no circular dependency on application checks.
 
-The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, a `Kit` (`Kit.DEFAULT`) of
-logical `DesignMetrics`, a `TypeScale` and a `FaceSet`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
+The kit foundation now provides immutable `Nodes`/`ViewSpec`/`UiEvent` values, a `Kit` (`Kit.DEFAULT`, and the classic base `Kit.CLASSIC`) of
+logical `DesignMetrics`, a `TypeScale`, a `FaceSet`, `ControlVariants` and `ColorSlots`, centrally resolved `Typography`, and monochrome `IconRegistry` artwork.
 `ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
 close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
 publication and restores the old LAF, LAF defaults and developer overrides on failure.

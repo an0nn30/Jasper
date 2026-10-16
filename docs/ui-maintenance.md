@@ -43,7 +43,10 @@ Keep fixed geometry in named metrics read through a kit (`KitContext.metrics()`,
 
 When changing appearance, test contrasting chrome/workspace colors, replay/rollback and disposal.
 A derived role's recipe lives in `DerivedPalette`: changing one, or a built-in theme, updates `DerivedColorTest.INPUTS`
-and `derived-roles.tsv` in the same commit. A painter that repairs a pair declares it in `PaintedContrastTest`.
+and `derived-roles.tsv` in the same commit. A new metric role is appended to `DesignMetrics.Role` with a row in
+`compact-roles.tsv` and `classic-roles.tsv`; a change to the classic catalog, type scale or FlatLaf overlay edits
+`classic-roles.tsv`, `classic-type.tsv` or `ui-color-keys-classic.tsv` in the same commit.
+A painter that repairs a pair declares it in `PaintedContrastTest`.
 When changing layout, test normal and enlarged fonts, narrow/short hosts, real viewport boundaries
 and 1×/2× geometry. Focus rings must remain external to full nominal fill bounds. Field placeholders
 have one paint owner. Validate actual FlatLaf delegates and scrollbars rather than fallback Metal.

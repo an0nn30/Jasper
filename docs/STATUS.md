@@ -1,5 +1,31 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
+`.claude/worktrees/enterprise-4`, `7d8c189c3..485316ed2`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-4a-classic-catalog.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The values of the classic look, with no
+pixel changed. Plan 2's hand-offs: guards measure a translucent slot laid over its surface (a slot that holds keeps its
+alpha), `KitMatrixTest` counts a foreign colour only where it fills a 2 × 2 block, `custom(base)` tints and
+`marked(base)` drops authored overrides, and the structural guard is pinned engaging on Latte's window border.
+`DesignMetrics.Role` gains `ROW_HEIGHT` (the list, table and tree row floor) and `FIELD_RADIUS` (fields and FlatLaf's
+`TextComponent.arc`) at today's values and 32 classic-only roles measured on the mocks; `MetricTokens` holds spec 5.4's
+11 tokens and `DesignMetrics.with(MetricTokens)` moves each token's roles by its change from the base;
+`DesignMetrics.CLASSIC` (`classic-roles.tsv`), `TypeScale.CLASSIC` (`classic-type.tsv`, no label tracking) and
+`UiKeySet.CLASSIC` (`ui-color-keys-classic.tsv`) are frozen; `Kit` gains `ControlVariants` and `ColorSlots`, with
+`Kit.CLASSIC`; the fixtures gain the Enterprise and complement kits. The headless gallery is byte-identical. Rulings
+(plan, "Rulings"): row 4 is three plans (4a values, 4b form faces, 4c data faces, matrix and comparison); the
+translucent guard; the area rule; the fixtures' overrides; plan 2's package-test repairs (`PanelHeaders`' dot,
+the status bar's configuration text, notification counts) carried to the chrome-face plans 6 and 7, which give those
+painters faces (the hand-off stays open); the measured classic-only roles; buttons two taller than
+fields (24 and 22, every mock); tokens by delta, paddings by formula; the classic base tuned as Enterprise; the
+calibrated type roles; `DESCRIPTION` kept at the spec's 11 although the New File Server mock draws 12 (a residual for
+4c); the table and tree selection foregrounds. Deviation: the overlay also sets `Button.default.startBorderColor` and
+`endBorderColor` to `accent.edge`, which FlatLaf reads before `Button.default.borderColor`. Residuals: a focused
+classic button paints flat (4b, 4c); unfocused table and tree selections keep the terminal-selection wildcard (4c's
+comparison). Plan 4b starts with `KitFaces`. `./gradlew check --continue`:
+**10,637 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing
+visible changed). Not merged, not pushed.
+
 **Enterprise presentation, plan 3b: SDK 0.18 controls — 2026-10-16** (`claude/enterprise-sdk-0-18-controls`, worktree
 `.claude/worktrees/enterprise-3b`, `abf90c83a..2a4944861`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md),

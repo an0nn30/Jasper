@@ -1,7 +1,7 @@
 # Enterprise presentation 4a: the classic catalog Implementation Plan
 
-> **Status (2026-10-16): executing on `claude/enterprise-classic-catalog`; Task 7 Step 5 completes this banner.**
-> Deviations so far: Task 5's overlay also sets `Button.default.startBorderColor` and `Button.default.endBorderColor`
+> **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`7d8c189c3..485316ed2`).** Deviations from this
+> plan's text: Task 5's overlay also sets `Button.default.startBorderColor` and `Button.default.endBorderColor`
 > to `accent.edge` (spec 6.5's intent, the default button's border is `accent.edge`: FlatLaf 3.7 reads that border from
 > `startBorderColor` first and ignores `Button.default.borderColor` while it is set); Task 5's text carries it.
 > Residuals handed on: a focused classic button paints flat, because FlatLaf paints the gradient only while the state
