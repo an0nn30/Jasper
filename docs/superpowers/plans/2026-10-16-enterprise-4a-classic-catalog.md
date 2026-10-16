@@ -146,6 +146,15 @@ record them in `docs/STATUS.md` (Task 7) and in the banner when executed.
 15. **The classic overlay also sets `Table.selectionForeground` and `Tree.selectionForeground` to `text.onSelection`** —
     spec 6.5 sets the two backgrounds to `selection.bg`; without the foregrounds the `*.selectionForeground` wildcard
     (`text.primary`) would draw dark text on the selection — cost if wrong: two extra frozen rows.
+16. **Plan 2's last entry condition, moving the three package-test repairs onto the default faces, is carried to the
+    chrome-face plans (6 and 7)** — the three are chrome painters with no face in plan 4: `PanelHeaders`' connected dot
+    (`PanelHostHeaderTest`) belongs to the frame and header strips, the status bar's configuration text
+    (`ConfigurationStatusTest`) to the window and bottom strip, the notification counts (`NotificationCardTest`) to
+    Event Log; plan 4's faces are spec 19.1 row 4's 14 control pairs, so only the two control repairs
+    (`Choices`' selected segment label and `PreviewChoices`' selected caption) move, in 4b, and the `ChromePainter`
+    pairs stay in `PaintedContrastTest.DEFAULT_PAIRS` beside them; the three package tests keep checking their repairs
+    meanwhile, and 4a's STATUS entry hands the condition on — cost if wrong: plans 6 and 7 each move one or two
+    declarations they would have found already moved.
 
 ## Verified facts
 
@@ -164,8 +173,10 @@ Read at `222969926`, with 3a's renames as on its branch head `deafed424`.
    Role.SECTION_LABEL ? .060f : .018f` in the Helvetica Neue medium branch (`Typography.java:84`). `default-type.tsv`
    is `ROLE\tsize\tweight` (38 lines); `TypeScaleTest.defaultTable()` reads it (`TypeScaleTest.java:18-27`).
 4. `Kit` is the record `(String id, DesignMetrics metrics, TypeScale type, FaceSet faces, UiKeySet uiKeys)` with
-   `DEFAULT` (`Kit.java:19-28`); `new Kit(` appears at `Kit.java:21`, `KitTest.java:22-35`,
-   `KitContextTest.java:63`, `KitFixtures.java:27` and `ThemeManagerTest.java:153`.
+   `DEFAULT` (`Kit.java:19-28`); its constructor is called (`grep -rn 'Kit(' | grep -E 'new (dev\.jasper\.ui\.kit\.)?Kit\('`)
+   at `Kit.java:21`, `KitTest.java:22-35`, `KitContextTest.java:63`, `KitFixtures.java:27`, `ThemeManagerTest.java:153`,
+   and fully qualified as `new dev.jasper.ui.kit.Kit(` at `HostedKitTest.java:58` and `WorkspaceMetricsTest.java:78`
+   (both jasper-app tests). Plans 3b to 3e add no caller.
 5. `UiKeySet` is `{ DEFAULT }` (`UiKeySet.java:7-10`); `UiColorKeys.flatLaf(theme, set)` switches on it and fills
    `values(sources, palette, selection)` from a sealed `Source` of `Role`, `TextSelection`, `ErrorTint`
    (`UiColorKeys.java:22-46`); `ui-color-keys.tsv` is `key\tSOURCE` after one `#` comment line (`UiColorKeysTest.java:17-27`).
@@ -199,7 +210,7 @@ targets of spec 7.6 and DESIGN_LANGUAGE §2; they become theme roles, never lite
 |---|---|---|---|
 | Field and combo outer height | New File Server – FTP, Name field and Reachable from combo | 22 | `FIELD_HEIGHT` |
 | Button outer height | Same, Choose…, Cancel; Add Host, Add Key… | 24 | `BUTTON_HEIGHT` (Rulings 8) |
-| Group box edge to dialog edge | Same, Server box | 17 | classic `FORM_SIDES` |
+| Group box edge to the window content edge | Same, Server box (box edge at x = 34 and 1008 at 2×; the window edge, 1 logical, at 0-1 and 1042-1043); Add Host the same | 16 | classic `FORM_SIDES` |
 | Group box border, radius | Same | 1 px `#C4C7CC`, 3 | `border.window`, `CARD_RADIUS` |
 | Border segment before the title | Same, Server | 9 | `GROUP_TITLE_INSET` |
 | Gap around the title text | Same | 4 | `GROUP_TITLE_PADDING` |
@@ -253,8 +264,9 @@ targets of spec 7.6 and DESIGN_LANGUAGE §2; they become theme roles, never lite
 ### Task 1: Plan 2's hand-offs
 
 Guards measure translucent slots as they show (Rulings 2), the literal check counts areas (Rulings 3), the colour
-fixtures tint or drop authored overrides (Rulings 4), and a test pins the structural guard engaging (Rulings 5). Step 1
-captures the gallery base every later task compares against.
+fixtures tint or drop authored overrides (Rulings 4), and a test pins the structural guard engaging (Rulings 5). The
+fifth hand-off, the three package-test repairs, is carried to plans 6 and 7 (Rulings 16). Step 1 captures the gallery
+base every later task compares against.
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/SurfaceContrast.java:88-95`
@@ -575,6 +587,8 @@ MSG
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:368-376`, `jasper-ui/src/main/java/dev/jasper/ui/swing/TextFields.java:278,369`, `jasper-ui/src/main/java/dev/jasper/ui/swing/FlatLafInstaller.java:61-62`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv` (34 rows appended)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java`
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/swing/FlatLafInstallerKitTest.java:21-25` (`other()` sets `FIELD_RADIUS` too; one test added),
+  `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java:103` (`TextComponent.arc` reads `FIELD_RADIUS`)
 
 **Interfaces:**
 - Consumes: nothing from other tasks.
@@ -634,10 +648,55 @@ class NewRolesTest {
 }
 ```
 
+`TextComponent.arc` now follows `FIELD_RADIUS`, so the two tests that read it change with it:
+`FlatLafInstallerKitTest.other()` (which sets only `CONTROL_RADIUS` and expects all three arcs at 4) also sets
+`FIELD_RADIUS`, a new test pins that the field radius moves `TextComponent.arc` alone, and `ThemeManagerTest` reads the
+field radius. Run from the worktree root:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 4a Task 2 step 1: the FlatLaf arc tests follow FIELD_RADIUS for TextComponent.arc."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+edit("jasper-ui/src/test/java/dev/jasper/ui/swing/FlatLafInstallerKitTest.java", [
+    ('''    /** The default kit with other geometry: radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
+    private static Kit other() {
+        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FOCUS_RING, 2)
+            .with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+    }''',
+     '''    /** The default kit with other geometry: control and field radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
+    private static Kit other() {
+        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FIELD_RADIUS, 2)
+            .with(DesignMetrics.Role.FOCUS_RING, 2).with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+    }
+
+    /** Enterprise presentation plan 4: a field's arc follows FIELD_RADIUS, and the control arcs keep CONTROL_RADIUS. */
+    @Test void theTextComponentArcFollowsTheFieldRadiusAlone() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                FlatLafInstaller.install(KitFixtures.dark(), KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.FIELD_RADIUS, 1)));
+                assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2);
+                for (var key : List.of("Button.arc", "Component.arc")) assertThat(UIManager.getInt(key)).as(key).isEqualTo(8);
+            } finally { set(prior); }
+        });
+    }''', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java", [
+    ('''            assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS));''',
+     '''            assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2 * dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_RADIUS));''', 1)])
+PY
+```
+
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.NewRolesTest'`
-Expected: FAIL at compile: "cannot find symbol … variable ROW_HEIGHT" (and `FIELD_RADIUS`).
+Expected: FAIL at compile: "cannot find symbol … variable ROW_HEIGHT" (and `FIELD_RADIUS`, in `NewRolesTest` and
+`FlatLafInstallerKitTest`).
 
 - [ ] **Step 3: Add the roles, read them for rows and fields, and freeze them**
 
@@ -699,8 +758,9 @@ PY
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.FlatLafInstallerKitTest' --tests 'dev.jasper.ui.swing.TextFieldsTest' --tests 'dev.jasper.ui.swing.InteractiveRowsTest' --tests 'dev.jasper.ui.swing.TablesTest' --tests 'dev.jasper.ui.swing.TreesTest' --continue`
-Expected: PASS (`NewRolesTest` 3 tests; `DesignMetricsTest.everyRoleHasItsCompactValue` reads the 34 new rows).
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.FlatLafInstallerKitTest' --tests 'dev.jasper.ui.swing.SlateCobaltInstallTest' --tests 'dev.jasper.ui.swing.TextFieldsTest' --tests 'dev.jasper.ui.swing.InteractiveRowsTest' --tests 'dev.jasper.ui.swing.TablesTest' --tests 'dev.jasper.ui.swing.TreesTest' --continue && ./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.ThemeManagerTest'`
+Expected: PASS (`NewRolesTest` 3 tests; `DesignMetricsTest.everyRoleHasItsCompactValue` reads the 34 new rows;
+`FlatLafInstallerKitTest` 5 tests, `theTextComponentArcFollowsTheFieldRadiusAlone` among them).
 
 - [ ] **Step 5: Prove the gallery unchanged**
 
@@ -729,7 +789,8 @@ Expected: `changed: none`.
 ```bash
 git add jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java \
   jasper-ui/src/main/java/dev/jasper/ui/swing/TextFields.java jasper-ui/src/main/java/dev/jasper/ui/swing/FlatLafInstaller.java \
-  jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java
+  jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java \
+  jasper-ui/src/test/java/dev/jasper/ui/swing/FlatLafInstallerKitTest.java jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java
 git commit -F - <<'MSG'
 Classic catalog: the row floor, the field radius and the classic roles
 
@@ -1059,7 +1120,7 @@ CLASSIC = [("FIELD_HEIGHT", 22), ("BUTTON_HEIGHT", 24), ("PICKER_DEFAULT_HEIGHT"
     ("TOOL_HEADER_ACTIVE_DOT", 7), ("PALETTE_WINDOW_MARGIN", 8), ("WORKSPACE_GUTTER", 0), ("WINDOW_RADIUS", 0),
     ("WORKSPACE_SURFACE_ARC", 0), ("PALETTE_CORNER_ARC", 0), ("DOCK_DROP_ARC", 0), ("RAIL_BUTTON_ARC", 0),
     ("NATIVE_TOOLBAR_HOVER_ARC", 0), ("TITLE_SEARCH_ARC", 0), ("PROMPT_TILE_RADIUS", 0), ("PROMPT_TILE", 30), ("ICON_PROMPT", 16),
-    ("FORM_LABEL_WIDTH", 100), ("COLUMN_GAP", 12), ("SECTION_GAP", 12), ("SHEET_SECTION_GAP", 12), ("FORM_SIDES", 17), ("FORM_TOP", 12),
+    ("FORM_LABEL_WIDTH", 100), ("COLUMN_GAP", 12), ("SECTION_GAP", 12), ("SHEET_SECTION_GAP", 12), ("FORM_SIDES", 16), ("FORM_TOP", 12),
     ("CHIP_HEIGHT", 14), ("PANEL_CHIP_HEIGHT", 14), ("SETTING_HEIGHT", 26), ("SETTING_DESCRIPTION_HEIGHT", 42),
     ("FULL_SETTING_DESCRIPTION_HEIGHT", 42), ("THEME_PREVIEW_WIDTH", 150), ("THEME_PREVIEW_HEIGHT", 78), ("THEME_PREVIEW_GAP", 20),
     ("THEME_PREVIEW_CAPTION_GAP", 8)]
@@ -1615,6 +1676,7 @@ MSG
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java`, `jasper-ui/src/main/java/dev/jasper/ui/kit/package-info.java`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:25-28`
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/kit/KitTest.java` (whole file), `jasper-ui/src/test/java/dev/jasper/ui/swing/KitContextTest.java:63-64`, `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java:153-154`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java:58`, `jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java:78-81` (the fully qualified `new dev.jasper.ui.kit.Kit(` calls)
 - Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java` (no production reader of `Kit.CLASSIC`)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/kit/ControlVariantsTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/testsupport/FixtureKitsTest.java`
 
@@ -1796,8 +1858,8 @@ class FixtureKitsTest {
 }
 ```
 
-Run from the worktree root, to update the three other `new Kit(` call sites and keep `Kit.CLASSIC` free of production
-readers in the static-default scan:
+Run from the worktree root, to update the five other constructor call sites (three `new Kit(` and two fully
+qualified `new dev.jasper.ui.kit.Kit(`) and keep `Kit.CLASSIC` free of production readers in the static-default scan:
 
 ```bash
 python3 -I - <<'PY'
@@ -1819,6 +1881,12 @@ edit("jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java",
             Kit.DEFAULT.faces(), Kit.DEFAULT.uiKeys());''',
      '''        return new Kit("divider", Kit.DEFAULT.metrics().with(DesignMetrics.Role.NATIVE_SPLIT_DIVIDER, 5), Kit.DEFAULT.type(),
             Kit.DEFAULT.faces(), Kit.DEFAULT.controls(), Kit.DEFAULT.colors(), Kit.DEFAULT.uiKeys());''', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java", [
+    ('''base.type(),base.faces(),base.uiKeys());''',
+     '''base.type(),base.faces(),base.controls(),base.colors(),base.uiKeys());''', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java", [
+    ('''                base.type(), base.faces(), base.uiKeys());''',
+     '''                base.type(), base.faces(), base.controls(), base.colors(), base.uiKeys());''', 1)])
 edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java", [
     ('''    /** The default kit with {@code metrics}: a kit that differs from the default in geometry alone. */
     public static Kit kit(DesignMetrics metrics) {
@@ -2098,12 +2166,24 @@ PY
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.kit.*' --tests 'dev.jasper.ui.testsupport.*' --tests 'dev.jasper.ui.swing.KitContextTest' && ./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.StaticDefaultTest' --tests 'dev.jasper.app.appearance.ThemeManagerTest' --continue`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.kit.*' --tests 'dev.jasper.ui.testsupport.*' --tests 'dev.jasper.ui.swing.KitContextTest' && ./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.StaticDefaultTest' --tests 'dev.jasper.app.appearance.ThemeManagerTest' --tests 'dev.jasper.app.plugins.HostedKitTest' --tests 'dev.jasper.app.workspace.WorkspaceMetricsTest' --continue`
 Expected: PASS (`ControlVariantsTest` 3 tests, `KitTest` 4, `FixtureKitsTest` 2; no production class reads `Kit.CLASSIC`).
+Then recount the constructor's callers, so none was missed:
+
+```bash
+grep -rn 'Kit(' --include='*.java' jasper-ui/src jasper-app/src plugins | grep -E 'new (dev\.jasper\.ui\.kit\.)?Kit\(' | cut -d: -f1 | sort | uniq -c
+```
+
+Expected: exactly these seven files, every call on the seven-component constructor (the compile above proves that):
+`Kit.java` 2, `KitTest.java` 1 (the `kit(...)` helper), `KitContextTest.java` 1, `KitFixtures.java` 4 (`kit`,
+`enterprise`, `complement`, `withControls`), `ThemeManagerTest.java` 1, `HostedKitTest.java` 1,
+`WorkspaceMetricsTest.java` 1. An eighth file is a caller this step missed: give it `controls` and `colors` and add it
+to the commit.
 
 - [ ] **Step 5: Run the architecture gate**
 
-Run: `./gradlew :jasper-ui:verifyUiArchitecture :jasper-app:verifyApplicationArchitecture`
+Run: `./gradlew verifyUiArchitecture verifyApplicationArchitecture` (root-project tasks, from `gradle/ui-architecture.gradle.kts` and
+`gradle/application-architecture.gradle.kts`; no project prefix, as `docs/ui-maintenance.md` runs them)
 Expected: BUILD SUCCESSFUL (`kit` depends on `metrics` and `theme` only).
 
 - [ ] **Step 6: Commit**
@@ -2112,7 +2192,8 @@ Expected: BUILD SUCCESSFUL (`kit` depends on `metrics` and `theme` only).
 git add jasper-ui/src/main/java/dev/jasper/ui/kit/ jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java \
   jasper-ui/src/test/java/dev/jasper/ui/kit/ jasper-ui/src/test/java/dev/jasper/ui/testsupport/FixtureKitsTest.java \
   jasper-ui/src/test/java/dev/jasper/ui/swing/KitContextTest.java jasper-app/src/test/java/dev/jasper/app/appearance/ThemeManagerTest.java \
-  jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java
+  jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java \
+  jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java
 git commit -F - <<'MSG'
 Classic catalog: control variants, colour slots and the classic kit
 
@@ -2195,7 +2276,9 @@ alpha), `KitMatrixTest` counts a foreign colour only where it fills a 2 × 2 blo
 `UiKeySet.CLASSIC` (`ui-color-keys-classic.tsv`) are frozen; `Kit` gains `ControlVariants` and `ColorSlots`, with
 `Kit.CLASSIC`; the fixtures gain the Enterprise and complement kits. The headless gallery is byte-identical. Rulings
 (plan, "Rulings"): row 4 is three plans (4a values, 4b form faces, 4c data faces, matrix and comparison); the
-translucent guard; the area rule; the fixtures' overrides; the measured classic-only roles; buttons two taller than
+translucent guard; the area rule; the fixtures' overrides; plan 2's package-test repairs (`PanelHeaders`' dot,
+the status bar's configuration text, notification counts) carried to the chrome-face plans 6 and 7, which give those
+painters faces (the hand-off stays open); the measured classic-only roles; buttons two taller than
 fields (24 and 22, every mock); tokens by delta, paddings by formula; the classic base tuned as Enterprise; the
 calibrated type roles; `DESCRIPTION` kept at the spec's 11 although the New File Server mock draws 12 (a residual for
 4c); the table and tree selection foregrounds. Plan 4b starts with `KitFaces`. `./gradlew check --continue`:

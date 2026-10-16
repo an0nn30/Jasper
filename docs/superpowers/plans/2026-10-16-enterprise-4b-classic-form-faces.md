@@ -7,7 +7,7 @@ implementation: the toggle (switch or checkbox), the buttons with the text-field
 dropdown and picker faces, leading glyphs, read-only fields), the exclusive choice (segments or radios, with swatches and
 preview thumbnails), the tabs (segments or folder tabs), the group (card or titled box) with the label policy (plain or
 colon label column), the stepper (stepper or spinner) and the prompt (tile or plain); the isolation and variant-read
-tests guard them, and the default look stays byte-identical.
+tests guard them, and the default look stays pixel-identical (Rulings 23).
 
 **Architecture:** A face is a package-private interface in `dev.jasper.ui.swing` extending `Face` (which declares the
 `(slot, against, guard)` pairs it paints), with one default and one classic class. `KitFaces.of(kit)` reads the kit's
@@ -50,7 +50,7 @@ of times; re-find the quoted text and re-run, never edit around a missing anchor
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md). `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run.
 - Work only in the worktree above on `claude/enterprise-classic-catalog`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look does not change. Every PNG and JSON file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`); no `tools/visual/` pair changes. Classic renders are new files under `jasper-ui/build/classic-faces/` only (inspection output, not committed). Tasks 1 to 7 each prove it; Task 8 proves it once more.
+- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`), and every JSON file is identical except the `class` field of a section's surface, `javax.swing.JPanel` before and `dev.jasper.ui.swing.Cards$SectionSurface` from Task 5 on (Rulings 23; the digest script reads that one name as the class it replaces, and plan 4c adds `ItemLists$ListPane` for `javax.swing.JScrollPane`); no `tools/visual/` pair changes. Classic renders are new files under `jasper-ui/build/classic-faces/` only (inspection output, not committed). Tasks 1 to 7 each prove it; Task 8 proves it once more.
 - Faces never reference `Kit`, `ControlVariants` or (plan 5's) `ChromeSpec`; only `KitFaces` reads the variants outside the kit package; the reconciler references control classes only (spec 3.3, 6.4, 16.1.7).
 - A default face's implementation is the control's former code, moved into a named method on the control and called unchanged; renderers never branch on a look (spec 3.6), they ask their face.
 - Each face declares every pair it repairs (spec 7.3); a classic face paints each declared pair with `ThemePainting.painted`; default faces declare only the two pairs the default look repairs today (the selected segment label and the selected preview caption), so the default look is unchanged.
@@ -155,6 +155,12 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
 22. **Keycaps, the joined Back/Forward pair and notification cards ("looks that need no point", spec 5.2) are not faces
     here**: their geometry is in 4a's catalog and their paint belongs to the plans that own those surfaces (plans 6, 7 and
     9) — cost if wrong: those three keep the default paint until their plan.
+23. **A section's surface is a named `JPanel` subclass (`Cards.SectionSurface`), so the gallery's JSON names a new class
+    for it** — the gallery records each owned component's class (`KitGallery.metadata`); the classic titled box paints
+    from the section's own `paintComponent`, which a plain `JPanel` has no hook for, and the pixel rule is the spec's
+    "pixel-identical" (spec 3, 7.3): every PNG stays byte-identical, and the JSON differs only in that `class` field of each
+    section, which the digest script reads as `javax.swing.JPanel`, nothing else — cost if wrong: a border
+    or UI-delegate hook instead of the subclass, the same faces.
 
 ## Verified facts
 
@@ -185,7 +191,10 @@ Read at `222969926` with 3a's renames (3a's branch head `deafed424`) and plan 4a
    `HueDot` is a private record (`:216-222`). `SegmentButton.textColor` uses `SurfaceContrast.on` (`:481-485`), and its
    `getPreferredSize` and `paintComponent` are at `:486-497`; `SegmentTrack.paintComponent` at `:464-474`.
    `ChoiceCombo.paintComponent` paints the control face (`:382-384`); the arrow button paints the chevron
-   (`:318-330`); `PickerButton.paintComponent` paints a rich face or itself and a chevron (`:233-243`).
+   (`:318-330`), which plan 3c colours `bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY`
+   (a bare cell dropdown on a selected row takes the row's ink; 3c plan, the `Choices.java` edit of its Task 3), and
+   before which 3c's `paintComponent` returns early for a bare cell; `PickerButton.paintComponent` paints a rich face or
+   itself and a chevron (`:233-243`).
 8. `PreviewChoices.Tile` is a private inner class; its `getPreferredSize` and `paintComponent` are at
    `PreviewChoices.java:63-84`, `miniature` at `:89-104`; the tiles are laid out by `GridLayout` (`:45`).
 9. `PickerMenus.paintFace(JComponent, Graphics, KitContext, PickerFace, boolean, boolean, boolean, boolean)` paints the
@@ -1082,10 +1091,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -1142,14 +1160,16 @@ with a grey read-only face (Rulings 10).
 - Produces: `final ButtonFace KitFaces.buttons`, `final FieldPolicy KitFaces.fields`; `interface ButtonFace extends Face
   { void paintFace(Buttons.KitButton, Graphics2D, boolean hover, boolean focused); Color text(Buttons.KitButton, boolean
   hover); boolean fades(); Typography.Role label(Nodes.ButtonKind, Typography.Role); void paintCombo(Choices.ChoiceCombo,
-  Graphics2D, boolean hover, boolean focused); void paintArrow(JComponent arrow, Graphics2D, KitContext, int beyond,
-  boolean settings); void paintPickerArrow(Choices.PickerButton, Graphics2D); void paintPicker(JComponent, Graphics,
+  Graphics2D, boolean hover, boolean focused); void paintArrow(Choices.ChoiceCombo combo, JComponent arrow, Graphics2D,
+  int beyond, boolean settings); void paintPickerArrow(Choices.PickerButton, Graphics2D); void paintPicker(JComponent, Graphics,
   KitContext, Nodes.PickerFace, boolean empty, boolean focus, boolean hover, boolean expanded); boolean tiles(); Color
   menuDivider(KitContext); }`; `interface FieldPolicy extends Face { boolean glyph(Nodes.FieldKind); void
   paintField(TextFields.FieldSurface, Graphics2D); Color readOnlyText(KitContext); }`; on `Buttons.KitButton`:
   `KitContext context()`, `void paintRaised(Graphics2D, boolean hover, boolean focused)`, the overridable
   `void paintKitFace(Graphics2D, boolean, boolean)` and `boolean fadesDisabled()`; `static void Choices.paintChevron(JComponent,
-  Graphics2D, KitContext, int, boolean)`; `void Choices.PickerButton.paintChevron(Graphics2D)`; `static void
+  Graphics2D, KitContext, int, boolean, SemanticColor)`; `SemanticColor Choices.ChoiceCombo.arrowRole()` (3c's bare
+  cell ink, else `text.secondary`); `static void ClassicButtonFace.down(JComponent, Graphics2D, KitContext, int beyond,
+  Color)`; `void Choices.PickerButton.paintChevron(Graphics2D)`; `static void
   PickerMenus.paintRichFace(…)` (the former eight-argument `paintFace` body) and a package-private `PickerMenus.line`;
   `boolean TextFields.FieldSurface.readOnly` and `void FieldSurface.paintDefault(Graphics2D)`;
   `Nodes.LayoutRole Stacks.StackSurface.role`.
@@ -1313,6 +1333,32 @@ class ClassicButtonsTest {
         });
     }
 
+    /** Plan 3c's selected-row ink survives the faces: a bare cell dropdown's arrow takes the row's supporting ink under both kits. */
+    @Test void aBareCellDropdownsArrowTakesTheSelectedRowsInkUnderBothFaces() {
+        for (var kit : List.of(dev.jasper.ui.kit.Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.dark(), kit);
+            try (var view = new KitView(context, new ViewSpec(TableVocabularyTest.groups(Set.of("errors"))), e -> {})) {
+                view.setSize(640, 300); InteractiveRowsTest.layout(view);
+                var groups = (Tables.TableControl) view.control("groups");
+                var selected = TableVocabularyTest.combo(groups, "errors");
+                assertThat(selected.bare()).as("precondition: a bare cell dropdown").isTrue();
+                assertThat(selected.arrowRole()).as(kit.id()).isEqualTo(groups.ink().supporting);
+                assertThat(TableVocabularyTest.combo(groups, "config").arrowRole()).isEqualTo(SemanticColor.TEXT_SECONDARY);
+                var arrow = Arrays.stream(selected.getComponents()).filter(JButton.class::isInstance).map(JButton.class::cast).findFirst().orElseThrow();
+                int beyond = selected.getWidth() - arrow.getX() - arrow.getWidth();
+                var expected = new BufferedImage(arrow.getWidth(), arrow.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                var g = expected.createGraphics();
+                try {
+                    if (kit == dev.jasper.ui.kit.Kit.DEFAULT) Choices.paintChevron(arrow, g, context, beyond, false, groups.ink().supporting);
+                    else ClassicButtonFace.down(arrow, g, context, beyond, ThemePainting.color(context, groups.ink().supporting));
+                } finally { g.dispose(); }
+                var actual = paint(arrow);
+                assertThat(actual.getRGB(0, 0, actual.getWidth(), actual.getHeight(), null, 0, actual.getWidth())).as(kit.id())
+                    .isEqualTo(expected.getRGB(0, 0, expected.getWidth(), expected.getHeight(), null, 0, expected.getWidth()));
+            } finally { release(context); }
+        });
+    }
+
     @Test void pickerRowsDrawNoTilesUnderTheClassicFace() {
         assertThat(KitFaces.of(dev.jasper.ui.kit.Kit.CLASSIC).buttons.tiles()).isFalse();
         assertThat(KitFaces.of(dev.jasper.ui.kit.Kit.DEFAULT).buttons.tiles()).isTrue();
@@ -1371,8 +1417,11 @@ interface ButtonFace extends Face {
     Typography.Role label(Nodes.ButtonKind kind, Typography.Role role);
     /** Paints a dropdown's closed face behind its value. */
     void paintCombo(Choices.ChoiceCombo combo, Graphics2D g, boolean hover, boolean focused);
-    /** Paints a dropdown's arrow in its arrow button, whose trailing edge lies {@code beyond} inside the combo's. */
-    void paintArrow(JComponent arrow, Graphics2D g, KitContext context, int beyond, boolean settings);
+    /**
+     * Paints {@code combo}'s arrow in {@code arrow}, its arrow button, whose trailing edge lies {@code beyond} inside the
+     * combo's; a bare cell dropdown on a selected row (plan 3c) takes that row's ink.
+     */
+    void paintArrow(Choices.ChoiceCombo combo, JComponent arrow, Graphics2D g, int beyond, boolean settings);
     /** Paints a plain picker button's trailing arrow. */
     void paintPickerArrow(Choices.PickerButton picker, Graphics2D g);
     /** Paints a rich picker or dropdown face. */
@@ -1410,8 +1459,8 @@ final class DefaultButtonFace implements ButtonFace {
         ThemePainting.rounded(g, combo, combo.context, ThemePainting.color(combo.context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL),
             ThemePainting.color(combo.context, SemanticColor.BORDER_CONTROL), focused, false);
     }
-    @Override public void paintArrow(JComponent arrow, Graphics2D g, KitContext context, int beyond, boolean settings) {
-        Choices.paintChevron(arrow, g, context, beyond, settings);
+    @Override public void paintArrow(Choices.ChoiceCombo combo, JComponent arrow, Graphics2D g, int beyond, boolean settings) {
+        Choices.paintChevron(arrow, g, combo.context, beyond, settings, combo.arrowRole());
     }
     @Override public void paintPickerArrow(Choices.PickerButton picker, Graphics2D g) { picker.paintChevron(g); }
     @Override public void paintPicker(JComponent owner, Graphics graphics, KitContext context, Nodes.PickerFace face, boolean empty, boolean focus,
@@ -1534,13 +1583,22 @@ final class ClassicButtonFace implements ButtonFace {
             : ThemePainting.painted(c, hover ? hoverEdge : edge), focused, false);
     }
 
-    @Override public void paintArrow(JComponent owner, Graphics2D g, KitContext c, int beyond, boolean settings) {
-        int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
-        double right = owner.getWidth() + beyond - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET);
-        ClassicGlyphs.down(g, right - glyph / 2.0, (owner.getHeight() - glyph * .8) / 2, glyph, ThemePainting.painted(c, arrow));
+    /** The guarded ▼ in text.secondary; a bare cell dropdown on a selected row takes the row's supporting ink, as by default. */
+    @Override public void paintArrow(Choices.ChoiceCombo combo, JComponent owner, Graphics2D g, int beyond, boolean settings) {
+        var c = combo.context;
+        down(owner, g, c, beyond, combo.bare() && combo.cellInk != null ? ThemePainting.color(c, combo.cellInk.supporting) : ThemePainting.painted(c, arrow));
     }
 
-    @Override public void paintPickerArrow(Choices.PickerButton picker, Graphics2D g) { paintArrow(picker, g, picker.context, 0, false); }
+    /** The drawn ▼ in {@code colour}, centred {@code DROPDOWN_GLYPH_INSET} in from a trailing edge {@code beyond} past {@code owner}'s. */
+    static void down(JComponent owner, Graphics2D g, KitContext c, int beyond, Color colour) {
+        int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
+        double right = owner.getWidth() + beyond - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET);
+        ClassicGlyphs.down(g, right - glyph / 2.0, (owner.getHeight() - glyph * .8) / 2, glyph, colour);
+    }
+
+    @Override public void paintPickerArrow(Choices.PickerButton picker, Graphics2D g) {
+        down(picker, g, picker.context, 0, ThemePainting.painted(picker.context, arrow));
+    }
 
     @Override public void paintPicker(JComponent owner, Graphics graphics, KitContext c, Nodes.PickerFace face, boolean empty, boolean focus,
                                       boolean hover, boolean expanded) {
@@ -1737,7 +1795,7 @@ edit(S + "Choices.java", [
                         // The dropdown chevron shares the picker face's measured glyph and trailing inset; a Settings dropdown
                         // sets it at a fixed distance from its own arrow lane's trailing edge.
                         boolean settings = settingsWidth > 0;
-                        var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
+                        var icon = context.icons().icon("chevron.down", context.theme().semantic(), bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY,
                             ThemePainting.metric(context, settings ? DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON : DesignMetrics.Role.CHOICE_CHEVRON));
                         int beyond = comboBox.getWidth() - getX() - getWidth();
                         int x = settings ? getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth()
@@ -1745,16 +1803,22 @@ edit(S + "Choices.java", [
                         icon.paintIcon(this, graphics, Math.max(0, x), (getHeight()-icon.getIconHeight())/2);
                     }''',
      '''                    @Override protected void paintComponent(Graphics graphics) {
-                        context.faces().buttons.paintArrow(this, (Graphics2D) graphics, context, comboBox.getWidth() - getX() - getWidth(), settingsWidth > 0);
+                        context.faces().buttons.paintArrow(ChoiceCombo.this, this, (Graphics2D) graphics, comboBox.getWidth() - getX() - getWidth(), settingsWidth > 0);
                     }''', 1),
+    # 3c's bare-cell state: the chevron's role, read by both buttons faces.
+    ('''        boolean bare() { return cell && !hover && !(focus != null && focus.visible()) && !isPopupVisible(); }
+''', '''        boolean bare() { return cell && !hover && !(focus != null && focus.visible()) && !isPopupVisible(); }
+        /** The chevron's role: the selected row's supporting ink while this cell dropdown is bare (plan 3c), else text.secondary. */
+        SemanticColor arrowRole() { return bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY; }
+''', 1),
     ('''    /** A dropdown's menu: as wide as its field, wider only when its widest row needs it (spec 3). */''',
      '''    /**
-     * The default look's dropdown chevron in {@code arrow}, whose trailing edge lies {@code beyond} inside the combo's: the
-     * picker face's measured glyph and trailing inset; a Settings dropdown sets it at a fixed distance from its own arrow
-     * lane's trailing edge.
+     * The default look's dropdown chevron in {@code role} in {@code arrow}, whose trailing edge lies {@code beyond} inside
+     * the combo's: the picker face's measured glyph and trailing inset; a Settings dropdown sets it at a fixed distance
+     * from its own arrow lane's trailing edge.
      */
-    static void paintChevron(JComponent arrow, Graphics2D graphics, KitContext context, int beyond, boolean settings) {
-        var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
+    static void paintChevron(JComponent arrow, Graphics2D graphics, KitContext context, int beyond, boolean settings, SemanticColor role) {
+        var icon = context.icons().icon("chevron.down", context.theme().semantic(), role,
             ThemePainting.metric(context, settings ? DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON : DesignMetrics.Role.CHOICE_CHEVRON));
         int x = settings ? arrow.getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth()
             : arrow.getWidth() + beyond - ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET) - icon.getIconWidth();
@@ -1823,15 +1887,18 @@ edit(S + "Stacks.java", [
 PY
 ```
 
-`KitButton.paintFace` now computes `hover` and `focused`, asks `paintKitFace` (the buttons face), sets the label's font and
+The arrow button's anchor is its post-3c text (3c gives the chevron the bare cell's ink); `arrowRole()` keeps that
+colour for the default face, and the classic face uses the same ink while the cell is bare, so 3c's selected-row
+dropdown paints as before. `KitButton.paintFace` now computes `hover` and `focused`, asks `paintKitFace` (the buttons face), sets the label's font and
 colour and calls `paintContent`, which holds the former glyph, label and recorder drawing unchanged; `paintRaised` holds
 the former fill, border, shape and `primaryShadows` lines unchanged.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' --tests 'dev.jasper.ui.gallery.*' --continue`
-Expected: PASS (`ClassicButtonsTest` 7 tests, `PaintSpecTest` with the new rows; `ButtonsTest`, `ChoicesTest`,
-`PickerMenusTest`, `TextFieldsTest`, `ReadOnlyFieldsTest`, `TechnicalCaptionsTest` and the gallery suites unchanged).
+Expected: PASS (`ClassicButtonsTest` 8 tests, `PaintSpecTest` with the new rows; `ButtonsTest`, `ChoicesTest`,
+`PickerMenusTest`, `TextFieldsTest`, `ReadOnlyFieldsTest`, `TechnicalCaptionsTest`, 3c's `TableVocabularyTest` and the
+gallery suites unchanged).
 
 - [ ] **Step 5: Prove the default gallery unchanged**
 
@@ -1929,7 +1996,17 @@ class ClassicChoicesTest {
     }
 
     static int rgb(BufferedImage image, int x, int y) { return image.getRGB(x, y) & 0xFFFFFF; }
-    static int rgb(Color color) { return color.getRGB() & 0xFFFFFF; }
+
+    /**
+     * Whether {@code image}'s pixel at ({@code x}, {@code y}) is {@code color} within 2 a channel. A ring's outermost pixel
+     * on its middle row is about 96% covered and painted on a transparent image, so Java2D stores its colour rounded by
+     * one (for example 0x1F52A6 for 0x1F52A7); a wrong role is far more than 2 away.
+     */
+    static boolean near(BufferedImage image, int x, int y, Color color) {
+        var painted = new Color(image.getRGB(x, y), true);
+        return Math.abs(painted.getRed() - color.getRed()) <= 2 && Math.abs(painted.getGreen() - color.getGreen()) <= 2
+            && Math.abs(painted.getBlue() - color.getBlue()) <= 2;
+    }
 
     @Test void theRadiosAreALeftAlignedRowWithTheirSwatches() {
         Edt.run(() -> {
@@ -1947,10 +2024,14 @@ class ClassicChoicesTest {
                 var pairs = context.faces().exclusive.pairs();
                 var image = paint(ftp);
                 int y = (ftp.getHeight() - ring) / 2;
-                // A ring's outermost pixel is antialiased against nothing: its colour is the ring's, its alpha the coverage.
-                assertThat(rgb(image, 0, y + ring / 2)).as("selected ring").isEqualTo(rgb(ThemePainting.painted(context, pairs.get(1))));
+                // A ring's outermost pixel is antialiased against nothing: its colour is the ring's (within rounding), its alpha
+                // the coverage. The dot's centre pixel is fully covered, so it is exact.
+                assertThat(near(image, 0, y + ring / 2, ThemePainting.painted(context, pairs.get(1))))
+                    .as("selected ring %06X", rgb(image, 0, y + ring / 2)).isTrue();
                 assertThat(new Color(image.getRGB(ring / 2, y + ring / 2), true)).as("dot").isEqualTo(ThemePainting.painted(context, pairs.get(2)));
-                assertThat(rgb(paint(http), 0, y + ring / 2)).as("ring").isEqualTo(rgb(ThemePainting.painted(context, pairs.get(3))));
+                var plain = paint(http);
+                assertThat(near(plain, 0, y + ring / 2, ThemePainting.painted(context, pairs.get(3))))
+                    .as("ring %06X", rgb(plain, 0, y + ring / 2)).isTrue();
                 http.doClick(0);
                 assertThat(events).containsExactly(new UiEvent.Selected("protocol", Set.of("http")));
             } finally { release(context); }
@@ -2000,7 +2081,9 @@ class ClassicChoicesTest {
                 var ftp = find(view, "protocol.option.ftp", Choices.SegmentButton.class);
                 int ring = ThemePainting.metric(context, DesignMetrics.Role.RADIO_RING), y = (ftp.getHeight() - ring) / 2;
                 String where = theme.name() + (theme.dark() ? " Dark" : " Light");
-                assertThat(rgb(paint(ftp), 0, y + ring / 2)).as(where).isEqualTo(rgb(ThemePainting.painted(context, pairs.get(1))));
+                var image = paint(ftp);
+                assertThat(near(image, 0, y + ring / 2, ThemePainting.painted(context, pairs.get(1))))
+                    .as("%s ring %06X", where, rgb(image, 0, y + ring / 2)).isTrue();
                 assertThat(ftp.getForeground()).as(where + " label").isEqualTo(ThemePainting.painted(context, pairs.get(0)));
             } finally { release(context); }
         });
@@ -2018,7 +2101,7 @@ class ClassicChoicesTest {
             try (var view = new KitView(context, new ViewSpec(choice), e -> {})) {
                 KitFixtures.capture(context, view.spec(), 520, 140, "previews");
                 KitFixtures.render(view, 520, 140, 1);
-                var dark = find(view, "theme.option.dark", JButton.class), light = find(view, "theme.option.light", JButton.class);
+                JButton dark = find(view, "theme.option.dark", JButton.class), light = find(view, "theme.option.light", JButton.class);
                 assertThat(dark.getWidth()).isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.THEME_PREVIEW_WIDTH));
                 assertThat(light.getX() - dark.getX() - dark.getWidth()).isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.THEME_PREVIEW_GAP));
                 assertThat(new Color(paint(light).getRGB(0, 10), true)).isEqualTo(ThemePainting.painted(context, context.faces().exclusive.pairs().get(4)));
@@ -2066,7 +2149,10 @@ PY
 
 The last classic choice row is the tabs point's default face, which `Kit.CLASSIC` still uses until Task 4.
 
-Run from the worktree root, to declare the two default pairs through the faces in `PaintedContrastTest`:
+Run from the worktree root, to declare the two default pairs through the faces in `PaintedContrastTest`. After 3b,
+`DEFAULT_PAIRS` continues past the selected preview caption with 3b's Notice pairs, so the first edit replaces only the
+two entries (ending at `PaintedContrastTest::selectedPreview),`) and the method and test go in before the class's
+`palettes()` helper, outside the list:
 
 ```bash
 python3 -I - <<'PY'
@@ -2082,23 +2168,26 @@ edit("jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.jav
     ('''        new Declared("selected segment label", new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
             PaintedContrastTest::selectedSegment),
         new Declared("selected preview caption", new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedPreview));''',
+            PaintedContrastTest::selectedPreview),''',
      '''        new Declared("selected segment label", faces().get(0), PaintedContrastTest::selectedSegment),
-        new Declared("selected preview caption", faces().get(1), PaintedContrastTest::selectedPreview));
-
-    /** The default look's face declarations (plan 4b): the selected segment label, then the selected preview caption. */
+        new Declared("selected preview caption", faces().get(1), PaintedContrastTest::selectedPreview),''', 1),
+    ('''    /** The theme set, then the degenerate palettes. */''',
+     '''    /** The default look's face declarations (plan 4b): the selected segment label, then the selected preview caption. */
     private static List<PaintPair> faces() { return KitFaces.declared(Kit.DEFAULT).stream().distinct().toList(); }
 
     @Test void theDefaultFacesDeclareExactlyTheTwoRepairsTheDefaultLookMakes() {
         assertThat(faces()).containsExactly(new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
             new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT));
-    }''', 1)])
+    }
+
+    /** The theme set, then the degenerate palettes. */''', 1)])
 edit("jasper-ui/src/test/java/dev/jasper/ui/swing/ControlRolesTest.java", [
     ('''var track = new Choices.SegmentTrack(context);''', '''var track = new Choices.SegmentTrack(context, context.faces().exclusive);''', 1)])
 PY
 ```
 
-`PaintedContrastTest` already imports `dev.jasper.ui.swing.*` (so `KitFaces`) and `dev.jasper.ui.kit.Kit`.
+`PaintedContrastTest` already imports `dev.jasper.ui.swing.*` (so `KitFaces`) and `dev.jasper.ui.kit.Kit`. `faces()`
+is a static method, so `DEFAULT_PAIRS`' initializer may call it although it is declared below the list.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -3725,7 +3814,7 @@ class ClassicSpinnersTest {
             var context = KitFixtures.context(KitFixtures.light());
             try (var view = new KitView(context, new ViewSpec(number("height", Nodes.FieldPresentation.STEPPER)), e -> {})) {
                 KitFixtures.render(view, 200, 40, 1);
-                var minus = find(view, "height.minus", JButton.class), plus = find(view, "height.plus", JButton.class);
+                JButton minus = find(view, "height.minus", JButton.class), plus = find(view, "height.plus", JButton.class);
                 assertThat(minus.getX()).as("minus leads, plus trails").isLessThan(plus.getX());
                 assertThat(minus.getText()).isEqualTo("−");
             } finally { release(context); }
@@ -4372,7 +4461,7 @@ MSG
 - [ ] **Step 1: Prove the default gallery unchanged and run the architecture tests**
 
 Run the gallery comparison of Task 1 Step 5, then:
-`./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.*' :jasper-ui:verifyUiArchitecture :jasper-app:verifyApplicationArchitecture --continue`
+`./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.*' verifyUiArchitecture verifyApplicationArchitecture --continue`
 Expected: `changed: none`; BUILD SUCCESSFUL (`StrategyIsolationTest` finds every face of Tasks 1 to 7 and no violation).
 
 - [ ] **Step 2: Edit the documentation**
@@ -4402,8 +4491,9 @@ values from Step 4 and `git log --oneline`:
 [plan](superpowers/plans/2026-10-16-enterprise-4b-classic-form-faces.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). `KitFaces` chooses one face per control
 point from the kit's `ControlVariants`, once per `KitContext`; each control asks its face, and each default face calls
-the control's former code, moved into a named method, so the default look is byte-identical (the headless gallery for
-Slate Cobalt Dark and Light matches plan 4a's base). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
+the control's former code, moved into a named method, so the default look is pixel-identical (the headless gallery for
+Slate Cobalt Dark and Light matches plan 4a's base: every PNG byte-identical, the JSON differing only in a section's
+`class`, now `Cards$SectionSurface`, Rulings 23). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
 checkbox leading its label, never animated), the buttons with the field policy (raised, or the classic gradient with an
 accent primary, flat disabled faces, flat toolbar ghosts, dropdown and picker faces ending with a drawn ▼, picker rows
 without tiles, no SEARCH, PATH or PORT glyphs, grey read-only fields), the exclusive choice (segments, or a wrapping row
@@ -4421,7 +4511,8 @@ edges; pairs against the dialog surface slot; flat disabled buttons; where ghost
 the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labels in `text.strong.secondary`; the
 label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
 padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
-notification cards left to plans 6, 7 and 9. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
+notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
+gallery. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```

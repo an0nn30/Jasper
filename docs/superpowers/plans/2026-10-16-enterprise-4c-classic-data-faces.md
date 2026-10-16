@@ -9,7 +9,7 @@ and one button), the tag (a borderless tint, or an uppercase label in a 1 px box
 cells), and the ordered list (per-row commands, or a side column acting on the selection); then the full kit matrix
 (the Enterprise fixture kit over the theme set, the complement kit and a strength-2 covering array over five palettes,
 `marked()` and `custom()` under the classic look) and an opt-in comparison of classic gallery renders with the Enterprise
-mocks. The default look stays byte-identical.
+mocks. The default look stays pixel-identical (Rulings 25).
 
 **Architecture:** As in plan 4b: a face is a package-private interface in `dev.jasper.ui.swing` extending `Face`, with
 one default and one classic class, built once per `KitContext` by `KitFaces.of(kit)` and read by its control through
@@ -58,7 +58,7 @@ re-find the quoted text and re-run, never edit around a missing anchor.
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md). `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run, at either scale and with either kit.
 - Work only in the worktree above on `claude/enterprise-classic-catalog`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look does not change. Every PNG and JSON file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 with the default kit is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`); the existing `tools/visual/pairs.json` entries do not change. New output appears only under `jasper-ui/build/classic-faces/` (tests' inspection captures), `jasper-ui/build/gallery/enterprise-light-1x/` and `-2x/` (the opt-in Enterprise gallery, Task 5) and the comparison's own output directory; none of it is committed. Tasks 1 to 5 each prove it; Task 6 proves it once more.
+- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 with the default kit is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`), and every JSON file is identical except two `class` fields: a section's surface (`javax.swing.JPanel` before, `dev.jasper.ui.swing.Cards$SectionSurface` from plan 4b) and an item list's scroll pane (`javax.swing.JScrollPane` before, `dev.jasper.ui.swing.ItemLists$ListPane` from Task 3), which the digest script reads as the classes they replace (Rulings 25; plan 4b Rulings 23); the existing `tools/visual/pairs.json` entries do not change. New output appears only under `jasper-ui/build/classic-faces/` (tests' inspection captures), `jasper-ui/build/gallery/enterprise-light-1x/` and `-2x/` (the opt-in Enterprise gallery, Task 5) and the comparison's own output directory; none of it is committed. Tasks 1 to 5 each prove it; Task 6 proves it once more.
 - Faces never reference `Kit`, `ControlVariants` or (plan 5's) `ChromeSpec`; only `KitFaces` reads the variants outside the kit package; the reconciler references control classes only, never a face (spec 3.3, 6.4, 16.1.7; 4b's `StrategyIsolationTest` and `VariantReadTest`).
 - A default face's implementation is the control's former code, moved into a named method and called unchanged, or a hook on the control whose default returns today's value; renderers never branch on a look (spec 3.6), they ask their face.
 - Each face declares every pair it repairs (spec 7.3); a classic face paints each declared pair with `ThemePainting.painted`; the six default faces of this plan declare none.
@@ -66,7 +66,7 @@ re-find the quoted text and re-run, never edit around a missing anchor.
 - No interface without two real implementations (AGENTS.md): every face interface here, and `HeaderFace`, has its default and classic classes.
 - jasper-ui's package graph is unchanged (`dev.jasper.ui.swing` already reads `dev.jasper.ui.kit`); `verifyUiArchitecture` stays green.
 - Javadoc doclint fails the build on errors: jasper-ui runs `-Xdoclint:all,-missing`, jasper-app `-Xdoclint:all`; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->`.
-- Every new candidate source under jasper-app, the SDK, the testkit or plugins gets its `docs/design/theme-engine/migration.csv` row in the same commit (`ThemeMigrationCoverageTest`); this plan creates no file there (it edits jasper-app's existing `PaintedContrastTest` only), so it adds no row.
+- Every new candidate source under jasper-app, the SDK, the testkit or plugins gets its `docs/design/theme-engine/migration.csv` row in the same commit (`ThemeMigrationCoverageTest`); this plan creates one file there, `ClassicHostedKitContractTest` (Task 4, with its row), and edits jasper-app's existing `PaintedContrastTest`.
 - Documentation edits are the smallest that make each document accurate (AGENTS.md); `docs/superpowers/` history and earlier `docs/STATUS.md` entries are not rewritten.
 - Source hygiene (AGENTS.md): no raw control, private-use or unpaired surrogate characters in any source file; `…`, `▶`, `▼`, `→`, `›` and `⌘` are ordinary characters and allowed in strings and comments.
 - The identifier word "hero" stays reserved for `Form.hero` (3a's `PromptVocabularyTest`).
@@ -184,11 +184,21 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
     keeps the comparison opt-in — cost if wrong: floors tuned once in Task 5 Step 7.
 22. **Unlock Vault is not compared yet**: the classic prompt's title belongs to the dialog header strip (plan 6), so the
     body alone would compare badly — cost if wrong: none; plan 6 adds the pair.
-23. **The host's `HostedKitContractTest` runs under the Enterprise kit from plan 5**, when the host can be started with a
-    kit; this plan's `ClassicContractTest` checks spec 16.1.9's events (checkbox, radio, folder tab, side column,
-    read-only field) under both shipped kits in jasper-ui — cost if wrong: none.
+23. **The host's `HostedKitContractTest` runs under both shipped kits now**: `HostedKit.create` already makes each
+    view's context over `FlatLafInstaller.installedKit()` (`HostedKit.java:56`; `HostedKitTest
+    .appContextsAreMadeOverTheInstalledKit` installs a kit of its own), so `ClassicHostedKitContractTest` extends it and
+    installs the Enterprise fixture kit around each case (spec 16.1.9: "run for both kits"); in jasper-ui,
+    `ClassicContractTest` checks spec 16.1.9's events (checkbox, radio, folder tab, side column, read-only field) under
+    both shipped kits — cost if wrong: one more run of the host contract per build (seconds).
 24. **`KitMatrixTest` renders the Enterprise fixtures with the gallery under the Enterprise, complement and covering-array
     kits only**; the default kit's matrix keeps rendering the gallery alone, so its run is unchanged — cost if wrong: none.
+25. **An item list's scroll pane is a named `JScrollPane` subclass (`ItemLists.ListPane`), so the gallery's JSON names a
+    new class for it** — the classic ordered face paints its box from the pane's `paintComponent` and lays its side
+    column out inside it (Rulings 13), which a plain `JScrollPane` has no hook for; the gallery records each owned
+    component's class (`KitGallery.metadata`), and the pixel rule is the spec's "pixel-identical": every PNG stays
+    byte-identical and the JSON differs only in that `class` field of each item list's pane (beside 4b's section surfaces),
+    which the digest script reads as `javax.swing.JScrollPane`, nothing else — cost if wrong: a border or UI-delegate
+    hook instead of the subclass, the same faces.
 
 ## Verified facts
 
@@ -1192,10 +1202,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -2045,10 +2064,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -2823,10 +2851,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -2867,8 +2904,8 @@ mocks); `KitFixtures.enterpriseLight()` is spec 7.6's Light table as a fixture t
 renders the gallery and the Enterprise fixtures under the Enterprise fixture kit over the theme set and Enterprise Light,
 and under the complement kit and the seven covering-array kits over Slate Cobalt Dark and Light, Latte, `marked()` and
 `custom()`; it checks `marked()`'s mapping (Rulings 18), `custom()`'s literals and the array's strength (Rulings 19).
-`PaintedContrastTest` checks every classic pair's guard (Rulings 17); `ClassicContractTest` checks the events
-(Rulings 23).
+`PaintedContrastTest` checks every classic pair's guard (Rulings 17); `ClassicContractTest` checks the events and
+`ClassicHostedKitContractTest` runs the host's contract under the Enterprise kit (Rulings 23).
 
 **Files:**
 - Create: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures.java`
@@ -2876,6 +2913,8 @@ and under the complement kit and the seven covering-array kits over Slate Cobalt
 - Create: `jasper-ui/src/test/resources/dev/jasper/ui/gallery/control-covering-array.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicContractTest.java`
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java`, `GalleryCoverageTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java`
+- Create: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java`
+- Modify: `docs/design/theme-engine/migration.csv` (one row appended)
 
 **Interfaces:**
 - Consumes: Tasks 1 to 3's faces; plan 4a's `KitFixtures.enterprise()`, `complement()`, `withControls(Kit,
@@ -3138,8 +3177,10 @@ import static org.assertj.core.api.Assertions.*;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.testsupport.*;
+import java.awt.event.ActionEvent;
 import java.util.*;
 import javax.swing.AbstractButton;
+import javax.swing.text.DefaultEditorKit;
 import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.Test;
 
@@ -3176,7 +3217,10 @@ class ClassicContractTest {
                 find(view, "toggle", AbstractButton.class).doClick(0);
                 find(view, "protocol.option.b", AbstractButton.class).doClick(0);
                 find(view, "pages.option.b", AbstractButton.class).doClick(0);
-                ((JTextComponent) ((TextFields.FieldControl) view.control("folder")).input).replaceSelection("x");
+                // As a person types (3b's ReadOnlyFieldsTest): the key-typed action, which a read-only field ignores.
+                var folder = (JTextComponent) ((TextFields.FieldControl) view.control("folder")).input;
+                new DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new ActionEvent(folder, ActionEvent.ACTION_PERFORMED, "x"));
+                assertThat(folder.getText()).as(kit.id() + " read-only").isEqualTo("No folder selected");
                 var list = (ItemLists.ListControl) view.control("keys");
                 list.select("b", false);
                 KitFixtures.render(view, 520, 420, 1);
@@ -3191,6 +3235,69 @@ class ClassicContractTest {
         });
     }
 }
+```
+
+Create `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java` (Rulings 23):
+
+```java
+package dev.jasper.app.plugins;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.app.appearance.ThemeTestSupport;
+import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.testsupport.KitFixtures;
+import javax.swing.LookAndFeel;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Spec 16.1.9 (plan 4c Rulings 23): every {@code HostedKitContractTest} case under the Enterprise fixture kit. A hosted
+ * view's context is made over {@code FlatLafInstaller.installedKit()} ({@code HostedKitTest} proves it), so installing
+ * the kit around each case runs the host's controls through the classic faces.
+ */
+class ClassicHostedKitContractTest extends HostedKitContractTest {
+    private final Kit enterprise = KitFixtures.enterprise();
+    private LookAndFeel prior;
+
+    @BeforeEach void installTheEnterpriseKit() throws Exception {
+        edt(() -> { prior = UIManager.getLookAndFeel(); FlatLafInstaller.install(ThemeTestSupport.generated(false), enterprise); });
+    }
+
+    @AfterEach void restoreTheLookAndFeel() throws Exception {
+        edt(() -> {
+            try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+        });
+    }
+
+    /** The premise of every inherited case: the Enterprise kit is the installed one while it runs. */
+    @Test void everyCaseRunsWithTheEnterpriseKitInstalled() throws Exception {
+        edt(() -> assertThat(FlatLafInstaller.installedKit()).isSameAs(enterprise));
+    }
+}
+```
+
+`edt` is `KitContractTest`'s protected helper (`SwingUtilities.invokeAndWait`); `HostedKitContractTest` is
+package-private in the same package, and 3b's and 3c's additions to it (`type`, the TABS, read-only and table cases) are
+inherited. Append its inventory row (`ThemeMigrationCoverageTest`: the file imports `javax.swing`), from the worktree
+root:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv")
+text = path.read_text(encoding="utf-8")
+row = ("jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java,app.plugins,ClassicHostedKitContractTest,"
+       "standard-ui,4,4;10,jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitContractTest.java,"
+       "Test/fixture ownership; New in Enterprise presentation plan 4c; the host contract under the Enterprise fixture kit (spec 16.1.9)")
+if row.split(",")[0] in text: raise SystemExit("migration.csv: ClassicHostedKitContractTest already has a row")
+if len(row.split(",")) != 8: raise SystemExit("migration.csv: a row has eight fields")
+path.write_text(text + ("" if text.endswith("\n") else "\n") + row + "\n", encoding="utf-8")
+PY
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -3482,8 +3589,11 @@ undeclared guard repair or a FlatLaf colour the classic overlay does not map is 
 
 - [ ] **Step 5: Run the app's contrast suite**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS (the new guard test and the default look's pairs unchanged).
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --tests 'dev.jasper.app.plugins.HostedKitContractTest' --tests 'dev.jasper.app.plugins.ClassicHostedKitContractTest'`
+Expected: PASS (the new guard test and the default look's pairs unchanged; `ClassicHostedKitContractTest` runs every
+`HostedKitContractTest` case plus its own under the Enterprise kit, the same count as `HostedKitContractTest` plus one;
+`ThemeMigrationCoverageTest` finds the new row). A case that fails only under the Enterprise kit is a classic face that
+changes behaviour: fix the face, never the contract.
 
 - [ ] **Step 6: Prove the default gallery unchanged**
 
@@ -3492,10 +3602,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -3514,7 +3633,8 @@ git add jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures
   jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java jasper-ui/src/test/resources/dev/jasper/ui/gallery/control-covering-array.tsv \
   jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java \
   jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicContractTest.java \
-  jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java
+  jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java \
+  jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java docs/design/theme-engine/migration.csv
 git commit -F - <<'MSG'
 Classic faces: the Enterprise fixtures and the full kit matrix
 
@@ -3523,7 +3643,8 @@ fixture theme. KitMatrixTest renders the gallery and the fixtures under the Ente
 kit over the theme set, and under the complement kit and a checked-in strength-2
 covering array over five palettes; marked() maps every classic area to a role or a
 blend of two, and custom() finds no literal. PaintedContrastTest checks every classic
-pair's guard; ClassicContractTest checks the events under both kits.
+pair's guard; ClassicContractTest checks the events under both kits, and
+ClassicHostedKitContractTest runs the host's contract under the Enterprise kit.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3847,10 +3968,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -3899,10 +4029,19 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery is byte-identical to plan 4a's base."""
+"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
+item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
+SUBSTITUTED = {b'"class":"dev.jasper.ui.swing.Cards$SectionSurface"': b'"class":"javax.swing.JPanel"',
+               b'"class":"dev.jasper.ui.swing.ItemLists$ListPane"': b'"class":"javax.swing.JScrollPane"'}
+def content(path):
+    data = path.read_bytes()
+    if path.suffix == ".json":
+        for new, old in SUBSTITUTED.items(): data = data.replace(new, old)
+    return data
 def digests(root):
-    return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {p.relative_to(root).as_posix(): hashlib.sha256(content(p)).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for theme in ("dark-1x", "light-1x"):
     base, now = digests(pathlib.Path("jasper-ui/build/plan4-base") / theme), digests(pathlib.Path("jasper-ui/build/gallery") / theme)
@@ -3910,7 +4049,7 @@ for theme in ("dark-1x", "light-1x"):
 print("changed:", bad if bad else "none")
 sys.exit(1 if bad else 0)
 PY
-./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.*' :jasper-ui:verifyUiArchitecture :jasper-app:verifyApplicationArchitecture --continue
+./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.*' verifyUiArchitecture verifyApplicationArchitecture --continue
 ```
 
 Expected: `changed: none`; BUILD SUCCESSFUL (`StrategyIsolationTest` finds the faces of plans 4b and 4c and no
@@ -3945,8 +4084,9 @@ values from Steps 4 and 5, Task 4 Step 4 and Task 5 Step 7, and `git log --oneli
 `.claude/worktrees/enterprise-4`, `[first]..[last]`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-4c-classic-data-faces.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The data half of spec 6.4's face pairs,
-each default face calling the control's former code, so the default look is byte-identical (the headless gallery for
-Slate Cobalt Dark and Light matches plan 4a's base): the table (a header band with column separators and a rule, insets
+each default face calling the control's former code, so the default look is pixel-identical (the headless gallery for
+Slate Cobalt Dark and Light matches plan 4a's base: every PNG byte-identical, the JSON differing only in the `class` of
+4b's section surfaces and 4c's list panes, Rulings 25): the table (a header band with column separators and a rule, insets
 after each separator, zebra rows or, grouped, heading bands with the rows under them indented by the new
 `GROUP_ROW_INDENT`, a 1 px box outside panel bodies, `surface.rowHover`), the tree (the same header, box and hover, drawn
 ▶/▼, `TREE_INDENT` per depth, medium category rows), the empty state (no tile, one button), the tag (upper case in a
@@ -3957,7 +4097,8 @@ the selection, spanning a following entry row). Six Enterprise fixtures rebuild 
 fixtures under the Enterprise kit over the theme set and Enterprise Light, the complement kit and a checked-in
 strength-2 covering array over five palettes, `marked()` mapping every classic area to a role or a blend of two,
 `custom()` finding no literal ([seconds] s for `KitMatrixTest`); `PaintedContrastTest` checks every classic pair's
-guard; `ClassicContractTest` checks spec 16.1.9's events under both kits. Opt-in: `-Pjasper.galleryKit=enterprise` and
+guard; `ClassicContractTest` checks spec 16.1.9's events under both kits and `ClassicHostedKitContractTest` runs the
+host's contract under the Enterprise kit. Opt-in: `-Pjasper.galleryKit=enterprise` and
 `tools/visual/check_pairs.py`, whose six pairs measured [name agreement, …] against floors of 0.30 (dialogs) and 0.40
 (tables and lists); residuals: [each, or none beyond the plan's]. Rulings (plan, "Rulings"): a shared header face; the
 box outside panel bodies; zebra only ungrouped; header titles in `text.strong.secondary` (mock `#4A4F57`); separator
@@ -3965,8 +4106,9 @@ insets; the grouped indent role; the heading count's place; drawn disclosure; ro
 button; boxed tags; edged routes with `ROUTE_HEIGHT` kept; the side column in the list's pane, its target, all four
 buttons (Add Host's two a residual) and the selection shown unfocused; a LINK add action as a standard button; the
 index face; guards checked in jasper-app and sampled in jasper-ui; the marked() rule; the covering array; Enterprise
-Light as a fixture; the opt-in comparison and its floors; Unlock Vault's pair left to plan 6; the host contract under
-Enterprise left to plan 5; the default matrix unchanged. Plan 5 turns the classic look on through the Enterprise kit.
+Light as a fixture; the opt-in comparison and its floors; Unlock Vault's pair left to plan 6; the host contract run
+under the Enterprise kit now (`HostedKit` reads the installed kit); the default matrix unchanged; the list pane's and
+4b's section surface's class names the only JSON change in the default gallery. Plan 5 turns the classic look on through the Enterprise kit.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
