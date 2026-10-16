@@ -64,6 +64,8 @@ final class ControlRegistry {
             case Nodes.Header n -> { n.context().ifPresent(result::add); n.primary().ifPresent(result::add); }
             case Nodes.Stack n -> result.addAll(n.children());
             case Nodes.ItemList n -> n.addAction().ifPresent(result::add);
+            // An empty table's state is mounted only while it has no rows; its cell nodes are mounted by their rows.
+            case Nodes.Table n -> { if (n.rows().isEmpty()) n.empty().ifPresent(result::add); }
             case Nodes.Card n -> result.addAll(n.children());
             case Nodes.Split n -> result.addAll(n.children());
             case Nodes.FormRow n -> { result.add(n.control()); n.trailing().ifPresent(result::add); }

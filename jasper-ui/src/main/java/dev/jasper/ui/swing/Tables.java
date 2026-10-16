@@ -146,6 +146,41 @@ final class Tables {
             return index < 0 || index >= size() || value().rows().get(index).heading().isEmpty();
         }
 
+        @Override
+        String emptyText() {
+            return value().emptyText();
+        }
+
+        /** An empty table's state fills the body below the headers; the reconciler mounts it only while there are no rows. */
+        @Override
+        boolean fillsViewport() {
+            return footer != null && value().rows().isEmpty();
+        }
+
+        @Override
+        Container childParent(Nodes.Node child) {
+            return canvas;
+        }
+
+        /** The table's only child is its empty state, which lies on the canvas where the rows would be. */
+        @Override
+        void children(List<ControlRegistry.Control> controls) {
+            JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
+            if (footer != next && footer != null) canvas.remove(footer);
+            footer = next;
+            if (footer != null && footer.getParent() != canvas) canvas.add(footer);
+            canvas.revalidate();
+            sync();
+        }
+
+        /** An empty table's state takes the canvas's whole height, so it centres in the body. */
+        @Override
+        void layoutAccessories(int width) {
+            if (!fillsViewport()) return;
+            int inset = com.formdev.flatlaf.util.UIScale.scale(gutter);
+            footer.setBounds(inset, 0, Math.max(0, width - 2 * inset), Math.max(footerHeight(), canvas.getHeight()));
+        }
+
         /** A table keeps Enter with no focused row, as the JTable it replaced did (its Enter moved the selection). */
         @Override
         boolean keepsEnterWithoutFocus() {

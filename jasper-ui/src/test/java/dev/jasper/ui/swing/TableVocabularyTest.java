@@ -175,4 +175,86 @@ class TableVocabularyTest {
         assertThat(Tables.countText(new TableRow.Heading("H", OptionalInt.of(4), ""))).isEqualTo("4");
         assertThat(Tables.countText(new TableRow.Heading("H", OptionalInt.empty(), ""))).isEmpty();
     }
+
+    static Table empties(boolean rows) {
+        var state = new Empty("tunnels.empty", READY, new Nodes.Icon("tunnels.empty.icon", READY, "server", Hue.NEUTRAL, IconSize.EMPTY, "Tunnels"), "No Tunnels",
+            "Forward a local port to a remote host.", List.of(new Nodes.Button("tunnels.new", READY, "New Tunnel\u2026", "", ButtonKind.SECONDARY, "new-tunnel", "")));
+        return new Table("tunnels", READY, List.of(new Column("type", "Type", TextRole.BODY, false), new Column("local", "Local", TextRole.MONO_SMALL, false)),
+            rows ? List.of(new TableRow("web", Map.of("type", "Local", "local", "8080"), Optional.empty())) : List.of(),
+            Set.of(), "toggle", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.of(state), "");
+    }
+
+    static ItemList keys(List<ListItem> items) {
+        return new ItemList("keys", READY, ListKind.ORDERED, items, Set.of(), "", List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(),
+            "", "", "", "", "", "No keys");
+    }
+
+    @Test void anEmptyTableKeepsItsHeadersAndCentresItsStateInTheBody() { Edt.run(() -> {
+        var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+        try (var view = new KitView(context, new ViewSpec(empties(false)), events::add)) {
+            view.setSize(420, 360); InteractiveRowsTest.layout(view);
+            var table = (Tables.TableControl) view.control("tunnels");
+            assertThat(table.header.getComponentCount()).as("the headers stay").isEqualTo(2);
+            var state = view.control("tunnels.empty").component;
+            assertThat(state.getParent()).isSameAs(table.canvas);
+            assertThat(table.canvas.getHeight()).as("the body fills the viewport").isEqualTo(table.scroll.getViewport().getHeight());
+            assertThat(state.getY()).isZero();
+            assertThat(state.getHeight()).isEqualTo(table.canvas.getHeight()).isGreaterThanOrEqualTo(state.getPreferredSize().height);
+            ((Buttons.ButtonControl) view.control("tunnels.new")).button.doClick(0);
+            assertThat(events).containsExactly(new UiEvent.Action("new-tunnel"));
+            view.update(new ViewSpec(empties(true))); InteractiveRowsTest.layout(view);
+            assertThat(view.controlOrNull("tunnels.empty")).as("rows replace the state").isNull();
+            assertThat(view.controlOrNull("tunnels.new")).isNull();
+            assertThat(state.getParent()).isNull();
+            assertThat(table.canvas.getHeight()).as("rows keep their own height").isEqualTo(table.rowsHeight());
+            view.update(new ViewSpec(empties(false))); InteractiveRowsTest.layout(view);
+            assertThat(view.controlOrNull("tunnels.empty")).as("and the state returns with no rows").isNotNull();
+        } finally { release(context); }
+    }); }
+
+    @Test void anEmptyTextIsOneMutedLineUntilItemsArrive() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        var files = new Table("files", READY, List.of(new Column("name", "Name", TextRole.BODY, false)), List.of(), Set.of(), "", List.of(),
+            SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.empty(), "Not Connected");
+        var plain = new ItemList("plain", READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of());
+        try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(files, keys(List.of()), plain))), e -> {})) {
+            view.setSize(420, 360); InteractiveRowsTest.layout(view);
+            for (String id : List.of("files", "keys")) {
+                var rows = (InteractiveRows.RowsControl) view.control(id);
+                assertThat(rows.emptyLine.isVisible()).as(id).isTrue();
+                assertThat(rows.emptyLine.getText()).isEqualTo(id.equals("files") ? "Not Connected" : "No keys");
+                assertThat(rows.emptyLine.getForeground()).isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_TERTIARY));
+                assertThat(rows.emptyLine.getHorizontalAlignment()).isEqualTo(SwingConstants.CENTER);
+                assertThat(rows.emptyLine.getHeight()).isEqualTo(rows.rowHeight);
+                assertThat(rows.canvas.getPreferredScrollableViewportSize().height).isEqualTo(rows.rowHeight + rows.footerHeight());
+            }
+            assertThat(((InteractiveRows.RowsControl) view.control("plain")).emptyLine).as("no empty text, no line").isNull();
+            var key = new ListItem("id_ed25519", Optional.empty(), List.of(new Text("key.name", READY, "id_ed25519", TextRole.BODY)), List.of(), List.of());
+            view.update(new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(files, keys(List.of(key)), plain)))); InteractiveRowsTest.layout(view);
+            var list = (InteractiveRows.RowsControl) view.control("keys");
+            assertThat(list.emptyLine.isVisible()).isFalse();
+            assertThat(list.emptyLineHeight()).isZero();
+        } finally { release(context); }
+    }); }
+
+    static ViewSpec filteredKeys(List<ListItem> items) {
+        var filter = new Field("filter", READY, FieldKind.SEARCH, "", "Filter", "Filter", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "keys");
+        return new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(filter, new ItemList("keys", READY, ListKind.COMPACT, items, Set.of(), "",
+            List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(3), "", "", "", "", "", "No matching keys"))));
+    }
+
+    @Test void aFilteredListLaysItsEmptyLineInsideItsReservedRows() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        var key = new ListItem("id_ed25519", Optional.empty(), List.of(new Text("key.name", READY, "id_ed25519", TextRole.BODY)), List.of(), List.of());
+        try (var view = new KitView(context, filteredKeys(List.of(key)), e -> {})) {
+            view.setSize(420, 360); InteractiveRowsTest.layout(view);
+            var list = (ItemLists.ListControl) view.control("keys");
+            int filled = list.canvas.getPreferredScrollableViewportSize().height;
+            assertThat(filled).as("a field names the list, so it keeps three rows").isEqualTo(3 * list.rowHeight);
+            view.update(filteredKeys(List.of())); InteractiveRowsTest.layout(view);
+            assertThat(list.emptyLine.isVisible()).isTrue();
+            assertThat(list.canvas.getPreferredScrollableViewportSize().height).as("emptied, it keeps the same height").isEqualTo(filled);
+            assertThat(list.emptyLine.getY()).as("the line is the first reserved row").isZero();
+        } finally { release(context); }
+    }); }
 }

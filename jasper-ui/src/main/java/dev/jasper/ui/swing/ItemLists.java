@@ -150,6 +150,11 @@ final class ItemLists {
             return value().kind() == Nodes.ListKind.DOUBLE ? 2 : 1;
         }
 
+        @Override
+        String emptyText() {
+            return value().emptyText();
+        }
+
         boolean results() {
             return value().kind() == Nodes.ListKind.RESULTS;
         }
