@@ -39,6 +39,14 @@ class UiValuesTest {
         assertThatNullPointerException().isThrownBy(() -> spec.withContext(null));
     }
 
+    /** SDK 0.18: a toolbar view is a factory the host asks once per window. */
+    @Test void aToolbarViewNeedsAFactory() {
+        ToolbarViewFactory factory = window -> { throw new AssertionError("not called"); };
+        assertThat(ToolbarItem.view(factory)).isEqualTo(new ToolbarItem.View(factory));
+        assertThat(((ToolbarItem.View) ToolbarItem.view(factory)).factory()).isSameAs(factory);
+        assertThatNullPointerException().isThrownBy(() -> new ToolbarItem.View(null));
+    }
+
     @Test void toolbarItemsAndStatusSpecsValidate() {
         assertThat(ToolbarItem.action("dev.x.run")).isEqualTo(new ToolbarItem.Button("dev.x.run"));
         var ids = new ArrayList<>(List.of("dev.x.a", "dev.x.b"));

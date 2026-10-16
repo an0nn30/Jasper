@@ -40,6 +40,19 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> actions() { return host.actions(); }
             @Override public boolean invoke(String actionId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.invoke(actionId, windowId, paneIdOrNull); }
             @Override public List<String> toolbar() { return host.toolbar(); }
+            @Override public List<String> openToolbarViews(java.util.UUID windowId) {
+                return host.toolbarViews(windowId).stream().map(view -> view.spec().root().id()).toList();
+            }
+            @Override public void closeToolbarViews(java.util.UUID windowId) { host.closeToolbarViews(windowId); }
+            @Override public void clickToolbarViewButton(java.util.UUID windowId, String buttonId) {
+                for (var view : host.toolbarViews(windowId))
+                    for (var child : ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children())
+                        if (child instanceof dev.jasper.sdk.ui.Nodes.Button button && button.id().equals(buttonId)) {
+                            view.emit(new dev.jasper.sdk.ui.UiEvent.Action(button.action()));
+                            return;
+                        }
+                throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+            }
             @Override public List<String> menu(String target) { return host.menu(target); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }

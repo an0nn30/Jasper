@@ -854,6 +854,103 @@ public abstract class PluginContractTest {
         }));
     }
 
+    /** A toolbar view tree the toolbar admits: a label, a host choice and a PRIMARY Connect. */
+    private static dev.jasper.sdk.ui.ViewSpec sessionBar(String id) {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        return new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack(id, ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Text(id + ".label", ready, "Session", dev.jasper.sdk.ui.Nodes.TextRole.LABEL),
+            new dev.jasper.sdk.ui.Nodes.Choice(id + ".host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN,
+                List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty())), "mac", "Session", "host"),
+            new dev.jasper.sdk.ui.Nodes.Button(id + ".connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""))));
+    }
+
+    /** SDK 0.18: a toolbar view is built once per open window and closes with its window and its registration. */
+    @Test void aToolbarViewIsBuiltOncePerWindowAndClosesWithItsWindowAndItsRegistration() {
+        List<UUID> asked = Collections.synchronizedList(new ArrayList<>());
+        List<dev.jasper.sdk.ui.UiView> made = Collections.synchronizedList(new ArrayList<>());
+        var registration = new AtomicReference<Subscription>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> registration.set(context.toolbar().add(ToolbarItem.view(window -> {
+            asked.add(window.id());
+            var view = context.kit().create(sessionBar("bar"), event -> { });
+            made.add(view);
+            return view;
+        }))));
+        assertThat(h.toolbar()).containsExactly("view");
+        var first = new AtomicReference<UUID>();
+        var second = new AtomicReference<UUID>();
+        h.ui(() -> { first.set(h.addTerminalWindow()); second.set(h.addTerminalWindow()); });
+        assertThat(asked).as("nothing is built before a window asks").isEmpty();
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(first.get())).containsExactly("bar");
+            assertThat(h.openToolbarViews(first.get())).as("once per window").containsExactly("bar");
+            assertThat(h.openToolbarViews(second.get())).containsExactly("bar");
+        });
+        assertThat(asked).containsExactly(first.get(), second.get());
+        h.ui(() -> {
+            h.closeToolbarViews(first.get());
+            assertThatIllegalStateException().as("the view closes with its window").isThrownBy(() -> made.get(0).spec());
+            assertThat(made.get(1).spec().root().id()).isEqualTo("bar");
+        });
+        h.ui(() -> registration.get().close());
+        assertThat(h.toolbar()).isEmpty();
+        h.ui(() -> assertThatIllegalStateException().as("and with its registration").isThrownBy(() -> made.get(1).spec()));
+    }
+
+    /** SDK 0.18: the toolbar admits an INLINE stack of labels, choices, one PRIMARY button and menu buttons. */
+    @Test void aToolbarViewHoldsOnlyAnInlineStackOfAdmittedControls() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        List<dev.jasper.sdk.ui.UiView> refused = Collections.synchronizedList(new ArrayList<>());
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("plain", ready, "Session",
+                    dev.jasper.sdk.ui.Nodes.TextRole.LABEL)), event -> { });
+                refused.add(view);
+                return view;
+            }));
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("quiet", ready,
+                    dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(new dev.jasper.sdk.ui.Nodes.Button("quiet.edit", ready, "Edit", "",
+                        dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, "edit", "")))), event -> { });
+                refused.add(view);
+                return view;
+            }));
+            context.toolbar().add(ToolbarItem.view(window -> { throw new IllegalStateException("factory failure"); }));
+            context.toolbar().add(ToolbarItem.view(window -> {
+                var view = context.kit().create(sessionBar("bar"), event -> { });
+                admitted.set(view);
+                return view;
+            }));
+        });
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).as("refused trees and a throwing factory show nothing").containsExactly("bar");
+            assertThat(refused).hasSize(2);
+            for (var view : refused) assertThatIllegalStateException().as("a refused view is closed").isThrownBy(view::spec);
+            var twoPrimaries = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+                new dev.jasper.sdk.ui.Nodes.Button("bar.connect", ready, "Connect", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "connect", ""),
+                new dev.jasper.sdk.ui.Nodes.Button("bar.split", ready, "Split", "", dev.jasper.sdk.ui.Nodes.ButtonKind.PRIMARY, "split", ""))));
+            assertThatIllegalArgumentException().isThrownBy(() -> admitted.get().update(twoPrimaries)).withMessageContaining("bar.split");
+            assertThat(admitted.get().spec()).as("a refused update keeps the tree").isEqualTo(sessionBar("bar"));
+        });
+        assertThat(h.active("test.alpha")).as("refusals are contained").isTrue();
+    }
+
+    /** SDK 0.18: a toolbar view's controls report to the plugin that built it. */
+    @Test void aToolbarViewsControlsReportToThePluginThatBuiltIt() {
+        List<dev.jasper.sdk.ui.UiEvent> seen = new CopyOnWriteArrayList<>();
+        h.start(info("test.alpha"), Set.of(), Set.of(), context ->
+            context.toolbar().add(ToolbarItem.view(window -> context.kit().create(sessionBar("bar"), seen::add))));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            h.clickToolbarViewButton(window.get(), "bar.connect");
+        });
+        assertThat(seen).containsExactly(new dev.jasper.sdk.ui.UiEvent.Action("connect"));
+    }
+
     @Test void railButtonsNameThePluginsOwnActions() {
         var open = new AtomicReference<PluginAction>();
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {

@@ -529,7 +529,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * The toolbar's plugin section.
      *
-     * @return {@code button:id} or {@code menu:title:id,id}; closed actions are omitted
+     * @return {@code button:id}, {@code menu:title:id,id} or {@code view}; closed actions are omitted
      */
     public List<String> toolbar() {
         List<String> lines = new ArrayList<>();
@@ -541,10 +541,37 @@ public final class FakePluginHost implements AutoCloseable {
                         List<String> live = dropdown.actionIds().stream().filter(this::actionExists).toList();
                         if (!live.isEmpty()) lines.add("menu:" + dropdown.title() + ":" + String.join(",", live));
                     }
+                    case ToolbarItem.View view -> lines.add("view");
                 }
             }
         }
         return lines;
+    }
+
+    /**
+     * UI thread: the toolbar views a terminal window shows, in toolbar order. The window builds each registered
+     * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
+     * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
+     *
+     * @param windowId a terminal window
+     * @return the live views
+     * @since 0.18.0
+     */
+    public List<FakeKitView> toolbarViews(UUID windowId) {
+        List<FakeKitView> views = new ArrayList<>();
+        for (FakePluginContext context : contexts.values()) views.addAll(context.ui.toolbarViews(windowId));
+        return views;
+    }
+
+    /**
+     * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
+     * pane closes.
+     *
+     * @param windowId a terminal window
+     * @since 0.18.0
+     */
+    public void closeToolbarViews(UUID windowId) {
+        for (FakePluginContext context : contexts.values()) context.ui.closeToolbarViews(windowId);
     }
 
     /**

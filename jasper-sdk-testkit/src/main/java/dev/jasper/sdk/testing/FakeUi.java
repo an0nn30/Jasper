@@ -132,6 +132,10 @@ final class FakeUi {
     final FakePluginContext context;
     final Map<String, Action> actions = new LinkedHashMap<>();
     final List<ToolbarItem> toolbar = new ArrayList<>();
+    /** Each toolbar view's built views, per terminal window; empty where the factory threw or the tree was refused. */
+    final Map<ToolbarItem.View, Map<UUID, Optional<FakeKitView>>> toolbarBuilt = new java.util.IdentityHashMap<>();
+    /** A toolbar view's mount: the toolbar of one terminal window. */
+    record ToolbarMount(UUID windowId) { }
     final List<Menu> sections = new ArrayList<>();
     final List<String> topLevelIds = new ArrayList<>();
     final List<Status> status = new ArrayList<>();
@@ -154,6 +158,8 @@ final class FakeUi {
         quitGuards.clear();
         for (var content : List.copyOf(contents)) content.close();
         for (var item : status) item.closed = true;
+        for (var built : toolbarBuilt.values()) for (var view : built.values()) view.ifPresent(FakeKitView::close);
+        toolbarBuilt.clear();
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
         for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
         panels.clear(); railActions.clear();
@@ -203,10 +209,54 @@ final class FakeUi {
             switch (item) {
                 case ToolbarItem.Button button -> requireOwn(button.actionId());
                 case ToolbarItem.Dropdown dropdown -> { context.kit().validateIcon(dropdown.icon());dropdown.actionIds().forEach(this::requireOwn); }
+                // A view's tree is admitted when a window builds it, and on every update after that.
+                case ToolbarItem.View view -> { }
             }
             toolbar.add(item);
-            return () -> { for (int i = 0; i < toolbar.size(); i++) if (toolbar.get(i) == item) { toolbar.remove(i); break; } };
+            return () -> {
+                for (int i = 0; i < toolbar.size(); i++) if (toolbar.get(i) == item) { toolbar.remove(i); break; }
+                if (item instanceof ToolbarItem.View view) {
+                    var built = toolbarBuilt.remove(view);
+                    if (built != null) for (var each : built.values()) each.ifPresent(FakeKitView::close);
+                }
+            };
         };
+    }
+
+    /** UI thread: the window's toolbar views in toolbar order, each built once for the window, as it builds them when it opens. */
+    List<FakeKitView> toolbarViews(UUID windowId) {
+        List<FakeKitView> views = new ArrayList<>();
+        for (ToolbarItem item : List.copyOf(toolbar)) {
+            if (!(item instanceof ToolbarItem.View view)) continue;
+            var built = toolbarBuilt.computeIfAbsent(view, key -> new LinkedHashMap<>());
+            if (!built.containsKey(windowId)) built.put(windowId, buildToolbarView(view, windowId));
+            built.get(windowId).ifPresent(views::add);
+        }
+        return views;
+    }
+
+    /** Closes the window's toolbar views, as the window does when it closes. */
+    void closeToolbarViews(UUID windowId) {
+        for (var built : toolbarBuilt.values()) {
+            var view = built.remove(windowId);
+            if (view != null) view.ifPresent(FakeKitView::close);
+        }
+    }
+
+    /** One window's view, admitted and mounted; empty, with the failure recorded, when the factory or the admission failed. */
+    private Optional<FakeKitView> buildToolbarView(ToolbarItem.View item, UUID windowId) {
+        try {
+            var view = context.kit().requireOwned(java.util.Objects.requireNonNull(item.factory().create(context.terminals.windowHandle(windowId)), "view"));
+            view.mount(new ToolbarMount(windowId));
+            try {
+                ToolbarViewAdmission.require(view.spec());
+                view.hostSpec = spec -> { ToolbarViewAdmission.require(spec); return spec; };
+            } catch (RuntimeException refused) { view.close(); throw refused; }
+            return Optional.of(view);
+        } catch (RuntimeException | LinkageError failure) {
+            host.recordFailure(pluginId() + " toolbar view: " + failure);
+            return Optional.empty();
+        }
     }
 
     Menus menus() {

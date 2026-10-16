@@ -305,6 +305,39 @@ class AppContractTest extends PluginContractTest {
             @Override public void closePanel(String panelId, java.util.UUID windowId) {
                 onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
             }
+            /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
+            final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
+                new java.util.IdentityHashMap<>();
+            @Override public List<String> openToolbarViews(UUID windowId) {
+                return onEdtValue(() -> {
+                    List<String> roots = new java.util.ArrayList<>();
+                    for (var entry : contributions.toolbar()) {
+                        if (!(entry instanceof dev.jasper.app.contributions.ToolbarEntry.View view)) continue;
+                        var mounted = toolbarViews.computeIfAbsent(view, key -> new java.util.HashMap<>())
+                            .computeIfAbsent(windowId, id -> view.factory().apply(id));
+                        mounted.ifPresent(built -> roots.add(((dev.jasper.ui.swing.KitView) built.component()).spec().root().id()));
+                    }
+                    return roots;
+                });
+            }
+            @Override public void closeToolbarViews(UUID windowId) {
+                onEdt(() -> {
+                    for (var built : toolbarViews.values()) {
+                        var mounted = built.remove(windowId);
+                        if (mounted != null) mounted.ifPresent(dev.jasper.app.contributions.ToolbarEntry.Mounted::close);
+                    }
+                });
+            }
+            @Override public void clickToolbarViewButton(UUID windowId, String buttonId) {
+                onEdt(() -> {
+                    for (var built : toolbarViews.values()) {
+                        var button = built.getOrDefault(windowId, Optional.empty())
+                            .map(mounted -> WorkspaceContentRouteTest.named(mounted.component(), buttonId, javax.swing.AbstractButton.class)).orElse(null);
+                        if (button != null) { button.doClick(); return; }
+                    }
+                    throw new AssertionError("No toolbar view button " + buttonId + " in " + windowId);
+                });
+            }
             @Override public List<String> rail() {
                 return onEdtValue(() -> contributions.railActions().stream().filter(id -> contributions.action(id).isPresent()).toList());
             }

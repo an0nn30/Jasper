@@ -42,8 +42,21 @@ public interface ContractHarness extends AutoCloseable {
     /** Invokes an action as a window would; true when an enabled action ran. */
     boolean invoke(String actionId, UUID windowId, UUID paneIdOrNull);
 
-    /** The toolbar's plugin section: {@code button:id} or {@code menu:title:id,id}; closed actions omitted. */
+    /** The toolbar's plugin section: {@code button:id}, {@code menu:title:id,id} or {@code view}; closed actions omitted. */
     List<String> toolbar();
+
+    /**
+     * UI thread: builds a window's toolbar views as the window does when it opens, once per window (a second call reports
+     * the same views), and reports each built view as its root's id, in toolbar order; a view whose factory threw or whose
+     * tree the toolbar does not admit is left out.
+     */
+    List<String> openToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: closes a window's toolbar views, as the window does when it closes. */
+    void closeToolbarViews(java.util.UUID windowId);
+
+    /** UI thread: clicks the button with this node id in one of a window's open toolbar views, as the user would. */
+    void clickToolbarViewButton(java.util.UUID windowId, String buttonId);
 
     /**
      * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
