@@ -1,6 +1,8 @@
 # Jasper Enterprise presentation
 
 Status: **Approved on 2026-10-15** (the user: "The spec is approved; left-aligned colon labels and keeping Form.hero are fine.").
+Amended late on 2026-10-15 for the second mock set (reference folders 07 to 10) under the user's overnight instruction "make
+decisions on my behalf": 5.1, 5.2, 5.9, 7.6, 8.2, 9.1, 10.8, 10.11, 14.1, 14.3, 14.6, 14.8, 16.2, 18 and 19.1.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -62,8 +64,8 @@ The user's decisions (2026-10-14 and 2026-10-15):
     a removed member are refused at load by the existing `KitCompatibility` gate, and THD Sourcing Crypto rebuilds for
     0.18. `Toggle`, `GHOST`, `MONO*` and `Card` keep their names, which stay accurate.
 14. **Enterprise's own theme is "Enterprise"** (id `enterprise`) with a Light and a Dark variant in this series. Light
-    comes from DESIGN_LANGUAGE §2; it ships a light terminal scheme and a `dark-terminal` scheme. Dark is derived for the
-    user's review. The kit's defaults select `enterprise` for both `ui.theme.light` and `ui.theme.dark`.
+    comes from DESIGN_LANGUAGE §2; it ships a light terminal scheme and a `dark-terminal` scheme. Dark comes from the Dark
+    Mode mock (7.6). The kit's defaults select `enterprise` for both `ui.theme.light` and `ui.theme.dark`.
 15. **Visible changes to the default look**, applied in both looks (section 13): the Session and Transfer standard
     menus replace Remote's "SSH" menu; a new File › Open File… action; "Vault: Locked"/"Vault: Unlocked"; the Snippets
     verb "Insert"; titled leading groups on Settings pages; the FTP warning as a Notice; read-only TFTP login and File
@@ -74,6 +76,12 @@ The user's decisions (2026-10-14 and 2026-10-15):
 17. **Plugin form field labels switch to sentence case in both looks** ("Via host", "Jump host", "Reachable from"),
     per DESIGN_LANGUAGE §3. The plugin compositions (section 14) are approved.
 18. The guarantee, the tests, the ten plans and the amendments (sections 16 and 19) are approved.
+19. **The second mock set** (Credential Vault, Dark Mode, App Icon, Boot Splash) was added on 2026-10-15 with the
+    instruction to make the kit match the mocks and to decide on the user's behalf. Claude's rulings: Enterprise Dark
+    takes the Dark Mode mock (7.6); OVERLAY and ATTACHED_SHEET dialogs are drawn in the window as classic dialogs
+    (10.8), replacing native dialogs; Vault consumes `Workstation` for a classic manager (14.8); the splash and the
+    icon belong to the look's `[branding]` (10.11) as plan 11, the splash without motion and with real start-up steps;
+    the packaged icon, the product name outside the splash and "Remember in Keychain" stay out of scope (section 18).
 
 Jasper is an MVP: settings and APIs are removed or replaced outright, with no migration, aliases or deprecation shims.
 
@@ -491,7 +499,7 @@ tool_windows = "stripes"
 editor_tabs = "classic"
 status_bar = "cells"
 palette = "run_window"
-dialogs = "native"
+dialogs = "classic"
 motion = "none"
 
 [controls]
@@ -541,6 +549,11 @@ medium = "fonts/ibm-plex-mono-medium.ttf"
 dialog_surface = "surface.app"
 navigation_surface = "surface.card"
 
+[branding]
+product = "JasperOps"
+icons = "icons"
+splash_art = "splash/art.svg"
+
 [defaults]
 "ui.theme.light" = "enterprise"
 "ui.theme.dark" = "enterprise"
@@ -550,7 +563,10 @@ navigation_surface = "surface.card"
 
 Top-level keys: `kit` (required, the integer 1), `base` (required, `"default"` or `"classic"`, the host catalog that
 supplies every private role table and a default for every variant point), and the tables `chrome`, `controls`,
-`metrics`, `type`, `colors` and `defaults`, each optional. A key left out takes the base's value. Enterprise lists every
+`metrics`, `type`, `colors`, `branding` and `defaults`, each optional. A key left out takes the base's value.
+`branding` has no base value: a look without it keeps Jasper's icon and shows no splash (10.11). `icons` names a
+directory holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and
+`icon-1024.png`; `splash_art` names a 718 × 250 SVG; `product` is the name the splash shows. Enterprise lists every
 key so the file can be reviewed; `PresentationConformanceTest` pins the list.
 
 ### 5.2 Variant points
@@ -568,7 +584,7 @@ header honours the existing `window.toolbar` setting (10.3).
 | `editor_tabs` | `equal` | `classic` | Content-sized, always-visible tabs with a status dot, ×, "+" and an underline (10.5) |
 | `status_bar` | `segments` | `cells` | Ruled status cells (10.6) |
 | `palette` | `anchored` | `run_window` | The Run window and the leading "▶ Run…" status item (section 11) |
-| `dialogs` | `as_requested` | `native` | OVERLAY and ATTACHED_SHEET dialogs become centred native dialogs (10.8) |
+| `dialogs` | `as_requested` | `classic` | OVERLAY and ATTACHED_SHEET dialogs are drawn in their window as classic dialogs (10.8) |
 | `motion` | `standard` | `none` | No motion, whatever `ui.animations.enabled` says (10.9) |
 
 | `[controls]` key | Default | Enterprise | What the Enterprise value does |
@@ -586,7 +602,7 @@ header honours the existing `window.toolbar` setting (10.3).
 | `buttons` | `raised` | `classic` | A top-to-bottom fill from `button.secondary.bg` to `button.end`, a border that darkens on hover; the primary filled with the accent, an `accent.edge` border and a medium label; no inset line or drop. Dropdown and picker faces follow buttons, without icon tiles and ending with ▼; SEARCH and PATH fields lose their leading glyph (6.4) |
 | `tag` | `tint` | `boxed` | A Chip as a tiny uppercase label in a 1 px `tag.border` box on the pale hue tint |
 | `route` | `tiles` | `edged` | ROUTE steps as bordered cells with a hue left edge, an uppercase caption and → arrows |
-| `prompt` | `tile` | `plain` | PROMPT forms without the 54 px icon tile: a small glyph beside a plain title |
+| `prompt` | `tile` | `plain` | PROMPT forms without the 54 px icon tile and hero title: the title goes to the dialog's header strip (10.8), and a 30 px accent tile with a white glyph sits beside the message |
 
 Looks that need no point come from the catalog alone: square panels, dialogs and popups (their radii), keycaps (face
 `surface.tableHeader`, edge `border.control`, a thicker bottom edge in `border.hover`, data face), the joined
@@ -725,6 +741,8 @@ each and at most 8 files. A kit is rejected for:
 - a `[defaults]` theme id that is neither a built-in id nor a theme file the plugin declares;
 - a path that breaks the path rule, a missing file, or a font file that is not `.ttf` or `.otf`;
 - a `window_title` token other than `{context}`, `{session}` and `{directory}`;
+- a `[branding]` icon that is missing, not a PNG of its stated size or over 512 KiB, a `splash_art` that is not an SVG
+  of at most 256 KiB, or a `product` that is blank or longer than 32 characters;
 - a string that looks like a colour literal anywhere in the file;
 - a file over the size limits.
 
@@ -949,11 +967,28 @@ Overrides: `surface.header` #E1E3E6, `surface.header.active` #D9DFEA, `surface.s
 The `light` scheme follows Slate Cobalt Light's; `dark-terminal` has background #1F2125 and foreground #D5D8DD, with
 the ANSI colours of Slate Cobalt Dark's scheme.
 
-**Dark** is derived for the user's review in plan 5: content (`surface.card`, `surface.input`, `surface.terminal`)
-is #1F2125 and `text.primary` #D5D8DD, the dark terminal of DESIGN_LANGUAGE §2; every other neutral keeps the ΔL* it has
-from the content surface in Light, on the lighter side; the accent keeps its hue, lightened until a checked box meets
-3:1 on the card while white text on it meets 4.5:1; the category hues are lifted to 3:1 on the card. Its `dark` scheme
-is the `dark-terminal` colours. The values are presented to the user before plan 5 merges.
+**Dark** takes the Dark Mode mock (`08 Dark Mode`, sampled at its 2× pixels). A neutral role the table does not name
+keeps the ΔL* it has from `surface.card` in Light, on the lighter side; a hue or status the mock does not show
+(`status.danger`, `hue.purple`, the `*.secondary` text on the accent) keeps its Light hue, lightened until it meets
+4.5:1 on `surface.card`.
+
+| Role | Value | Role | Value |
+|---|---|---|---|
+| `surface.app`, `surface.dialog` | #3C3F44 | `border.window` | #2A2C30 |
+| `surface.titlebar` | #36393E | `border.control`, `border.input`, `button.secondary.border` | #5A5E65 |
+| `surface.panel`, `surface.sidebar` | #35383D | `text.primary` | #DFE1E5 |
+| `surface.card`, `surface.input`, `surface.terminal` | #2E3135 | `text.strong.secondary` | #C4C8CE |
+| `accent`, `selection.bg`, `hue.blue` | #3D74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
+| `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #8E939B |
+| `button.secondary.bg` | #45484D | `status.success`, `hue.green` | #4CB86A |
+| `surface.control.selected` | #50545B | `status.warning` | #E3C27A |
+| `hue.amber` | #D08A4A | | |
+
+Overrides: `surface.header` #36393E, `surface.header.active` #3D4658, `surface.stripe` #383B40,
+`surface.tableHeader` #393C41, `surface.zebra` #313439, `warning.ground` #4A4128, `warning.border` #6B5A30;
+`surface.rowHover` keeps its recipe. Its `dark` scheme has background #2E3135 and foreground #DFE1E5, with the ANSI
+colours of Slate Cobalt Dark's scheme. The mock's tab strip (#3A3D42), unfocused stripe labels and HTTP chip are targets
+for the chrome renders (16.1.4), which plans 6 and 7 compare in both variants.
 
 ### 7.7 Converter
 
@@ -1016,6 +1051,8 @@ additions `hue`, `itemNoun` and `role` are drawn only by the Run window (11.2), 
 | `PickerFace.technicalCaption` | `boolean technicalCaption` | The caption is a data value in the data face | Via host "Mac dustin@192.168.1.119:22" |
 | `EditorHint.technical()` | `record Technical() implements EditorHint` | Host rows and generated pages draw the field with `FieldPresentation.TECHNICAL` | FTP passive ports, host rows |
 | `Nodes.Separator` | `Separator(String id, ControlState state)` | Only in INLINE and ACTIONS stacks, never first, last or beside another | SFTP ← → ⟳ \| Hidden files \| Upload ▾ |
+| `Form.footnote` | `String footnote` | One plain line drawn muted at the leading edge of the form's footer, beside its actions; blank draws none | Unlock Vault "Auto-locks after 15 min idle" |
+| `DialogSpec.swatch` | `Nodes.Hue swatch` | A SWATCH square of the hue before the dialog's title wherever the presentation draws the title (a native title bar draws none); NONE draws none | "■ Add Login", "■ Add SSH Key" |
 | `IconSize.SWATCH` | enum constant | A solid square of the icon's hue at caption size; the hue must not be NONE; the name stays a valid icon name | Run window hue squares; radio swatches |
 | `StandardMenu.SESSION`, `TRANSFER` | enum constants | Built-in menus with no items of their own, shown only while a plugin has entries in them, as TOOLS is | Session and Transfer menus |
 | `ToolbarItem.View` | `record View(ToolbarViewFactory factory)`; `@FunctionalInterface interface ToolbarViewFactory { UiView create(WindowHandle window); }` | Admission and lifetime in 10.3 | "Session: [combo] [Connect]" |
@@ -1074,7 +1111,8 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `fontRowCopy` | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
-| `DialogMapping` | AS_REQUESTED, NATIVE; `windowTitled` | plugins (`HostedUi.dialog`), windows (`AuxiliaryWindows`) |
+| `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | plugins (`HostedUi.dialog`), windows (`AuxiliaryWindows`) |
+| `Branding` | `product`, the icon images, the splash art; `Branding.NONE` for a look without `[branding]` | bootstrap: `Splash`; platform: `ApplicationIcon` (10.11) |
 | `Motion` | STANDARD, NONE | application: the one animations supplier that every `MotionPolicy` reads (10.9) |
 | `TitleFormat` | the template | workspace: `WindowContent.onTitle` |
 | `DockLayoutKey` | empty for the default look, else the provider id | application → `UiState` (a plain string) |
@@ -1105,7 +1143,8 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `SettingsChrome.collapsibleNav`, `inlineReset`; `Composition` | true, false and CLASSIC when `base = "classic"` | false, true, ROWS |
 | `SettingsChrome.hiddenKeys` | `window.native_decorations` when `title_bar = "native"`, and `ui.animations.enabled` when `motion = "none"` | `window.native_decorations` |
 | `SettingsChrome.fontRowCopy` | "Use the default font size" when `[type.ui]` names a face | "Use platform font size" |
-| `DialogMapping` | NATIVE when `dialogs = "native"`; `windowTitled` when `title_bar = "native"` | AS_REQUESTED, `windowTitled` |
+| `DialogMapping` | CLASSIC when `dialogs = "classic"`; `windowTitled` when `title_bar = "native"` | AS_REQUESTED, `windowTitled` |
+| `Branding` | `[branding]` | `Branding.NONE` |
 | `Motion` | NONE when `motion = "none"` | STANDARD |
 | `TitleFormat` | `window_title` | `"{context}"` |
 | `DockLayoutKey` | the provider id | empty |
@@ -1244,10 +1283,22 @@ visible = true
 
 ### 10.8 Dialogs
 
-`DialogMapping.NATIVE` maps OVERLAY and ATTACHED_SHEET dialogs to centred native modal dialogs with the same modality,
-no scrim and no fade. Progress overlays (`OverlaySpec`) stay in the window, square and still, with their label. With
-`windowTitled`, a FULL form does not repeat the title the native bar shows. Form and dialog footers sit on
-`surface.footer` under a `border.window` rule.
+`DialogMapping.CLASSIC` draws OVERLAY and ATTACHED_SHEET dialogs inside their owner window, with the same modality, as
+the 07 Credential Vault mocks show them:
+
+- a card with the catalog's dialog radius on `surface.dialog`, a 1 px `border.hover` frame and the catalog's popup
+  shadow, over a still scrim (black at 21 %: white content reads #C9CACC) covering the window below its title bar;
+- a 26 px header strip on `surface.header.active` above a `border.window` rule, holding the `DialogSpec.swatch` and the
+  title in the semibold UI face; the form below it does not repeat the title;
+- the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
+  its trailing edge;
+- OVERLAY centred in the window's content; ATTACHED_SHEET centred horizontally and joined to the bottom of the title
+  bar, with no top frame edge;
+- no fade (10.9); keys, focus and closing as each presentation has them today.
+
+A dialog whose owner has no window opens as a native dialog. Progress overlays (`OverlaySpec`) stay in the window,
+square and still, with their label. With `windowTitled`, a FULL form does not repeat the title the native bar shows.
+Form and dialog footers sit on `surface.footer` under a `border.window` rule.
 
 ### 10.9 Motion
 
@@ -1261,6 +1312,35 @@ progress draws a still bar with its label, as it does with animations off today.
 
 Compact under a native-titled look hides the toolbar row and keeps the in-window menu bar, the only menu surface once
 `useScreenMenuBar` is false. Zen is unchanged, and the Run window's home does not depend on either.
+
+### 10.11 Splash and application icon
+
+A look with `[branding]` (5.1) brands the start-up and the windows; `Branding.NONE` changes nothing.
+
+**Icon.** The look's icons replace `ApplicationIcon.images()` in every window's icon list, and `icon-1024.png` becomes
+the taskbar and Dock icon as the splash opens, in packaged macOS launches too (today they keep the bundle icon). The
+packaged icons (`packaging/icons`) are unchanged.
+
+**Splash.** A start that will open a window (not a launch handed to a running instance, not `--background`, not safe
+mode) shows `Splash` as soon as `PluginSelection` (4.8) has chosen a branded presentation, until the first window is
+shown or start-up fails. It is an undecorated, unfocusable window centred on the main screen, drawn as the 10 Boot
+Splash frames and the animated mock's markup give it, the same in Light and Dark:
+
+- 720 × 440 with a 1 px #8A8F96 border over a vertical gradient from #17346F to #102552;
+- the art (`splash_art`, rendered with jsvg) across the top 250 px above a 1 px #8A8F96 rule;
+- at (40, 278) the 64 px icon, then 16 px to its right the product name (the UI face, 30 px semibold, #FFFFFF,
+  tracking −0.4 px) above the version line 5 px below (the data face, 12 px, #C7D6F2): the app version and the build's
+  short commit, as About shows them ("1.0.0 · Build a3f9c21");
+- 40 px from the sides and 30 px above the bottom, the step (12 px, #C7D6F2, ellipsised) at the left and About's
+  copyright line (11 px, #9FB3DA) at the right, in place of the mock's "CopyRight Notice Here";
+- a 6 px progress bar along the bottom edge: a #0B1A3C track under a 1 px #2A4580 top rule, and a fill whose vertical
+  gradient runs #5A8BE0, #2F65CA at 60 %, #1F4C9E.
+
+The steps follow start-up as it happens: "Starting Java runtime…", "Reading configuration…", "Loading plugin: <name>"
+for each plugin as it starts, "Restoring workspace…" and "Starting <product> Workstation…". The fill is the step's
+index over the step count, which is known once the plugins are selected. The splash has no motion: it appears and
+closes at once and the fill moves without easing; the animated mock's fades and easing are not adopted (no animations,
+10.9).
 
 ## 11. The Run window
 
@@ -1421,6 +1501,8 @@ stays green otherwise:
 - `src/main/resources/plugin.toml` (4.1);
 - `presentation/enterprise.kit.toml` (5.1) and `presentation/fonts/ibm-plex-sans-regular.ttf`, `-medium.ttf`,
   `-semibold.ttf`, `ibm-plex-mono-regular.ttf` and `-medium.ttf`;
+- `presentation/icons/icon-16.png` to `icon-1024.png` (5.1), copied from the 09 App Icon set (9b, Narrow Square
+  Prompt), and `presentation/splash/art.svg`, the 10 Boot Splash mock's art;
 - `themes/enterprise.json` (7.6);
 - `dev.jasper.enterprise.EnterprisePlugin`, whose `start()` only calls
   `context.services().publish(Workstation.class, new Workstation() { })`;
@@ -1446,12 +1528,13 @@ generic SDK (`ToolbarItem.View`), the menus are standard menus, and anchors and 
 
 ### 14.3 Consuming it
 
-Remote and File Server:
+Remote, File Server and Vault:
 
 - add `{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }` to `requires`;
 - add `compileOnly(project(":jasper-plugin-enterprise"))`;
 - add `dev.jasper.enterprise.api` to their `declaredImports` (`gradle/plugin-architecture.gradle.kts:10`);
-- confine the lookup to `dev.jasper.remote.workstation` and `dev.jasper.fileserver.workstation`, which turn
+- confine the lookup to `dev.jasper.remote.workstation`, `dev.jasper.fileserver.workstation` and
+  `dev.jasper.vault.workstation`, which turn
   `services().find(Workstation.class)`, wrapped in `catch (NoClassDefFoundError absent)`, into a plugin-local
   `Layout.CLASSIC` or `Layout.ROWS`;
 - `verifyPluginArchitecture` gains a check that only those packages reference `dev.jasper.enterprise.api`, and
@@ -1505,8 +1588,8 @@ In both looks: the Notice, the read-only fields, the Transfer menu entries (sect
 
 ### 14.6 Other plugins and the app
 
-- **Vault:** no dependency on Enterprise; "Vault: Locked"/"Vault: Unlocked"; the host maps its OVERLAY and
-  ATTACHED_SHEET dialogs and draws its PROMPT forms through `PromptFace`. `itemNoun "login"`.
+- **Vault:** its classic manager (14.8); "Vault: Locked"/"Vault: Unlocked"; the host maps its OVERLAY and
+  ATTACHED_SHEET dialogs (10.8) and draws its PROMPT forms through `PromptFace`. `itemNoun "login"`.
 - **Snippets:** "Insert"; `itemNoun "snippet"`, hue PURPLE.
 - **Indexer:** the Location column's data face; Files `itemNoun "file"`, hue AMBER.
 - **Editor:** Recent files `itemNoun "file"`, hue AMBER.
@@ -1519,8 +1602,39 @@ In both looks: the Notice, the read-only fields, the Transfer menu entries (sect
 
 Classic compositions keep each default-look gesture reachable: Tunnels' and File Servers' row switches become row
 activation plus the context menu; File Server's details card becomes Properties; Remote's toolbar keeps WSL launch and
-Manage Sessions; the Transfers action works in both. `CompositionParityTest` lists each default-look gesture of Remote
-and File Server and checks its classic path.
+Manage Sessions; the Transfers action works in both; the Vault manager's cards and menus become its toolbar row, table
+and Details pane. `CompositionParityTest` lists each default-look gesture of Remote, File Server and Vault and checks its
+classic path.
+
+### 14.8 Credential Vault
+
+Under CLASSIC the Credential Vault window takes the 07 Credential Vault mocks:
+
+- **Toolbar row.** A MenuButton "+ New" whose items are Login, SSH Key and Secure Note, a separator and Generate SSH
+  Key…, each with its hue swatch (BLUE, GREEN, AMBER and PURPLE); a Separator; Edit…, Delete, Copy
+  Username and Copy Password; a Separator; Lock Vault followed by its shortcut as a muted caption; and the SEARCH field
+  "Search vault" at the trailing edge. An entry the selection does not allow is disabled.
+- **Categories.** A Tree with a count column: All Items, expanded, over Logins, SSH Keys and Secure Notes, each with
+  its swatch and its count.
+- **Items.** A sortable Table: Name (the entry's swatch and name), Username (data face), Type and Modified ("Sep 24,
+  2026"), with the footer "<shown> of <total> items".
+- **Details.** The selected entry's swatch and name, its kind and method muted below ("Login · Password"); a titled
+  group "Fields" with one row per field: its label, its value in the data face (a secret masked) and Copy, with Show
+  before Copy for a secret; Properties for Modified and Used by (the sessions granted the entry); Edit… and Delete….
+  With nothing selected the pane reads "Select an item to view its details."
+- **Status row.** Cells for the store ("● Unlocked · Keychain"), the auto-lock setting ("Auto-lock: 15 min") and the
+  vault file's path in the data face, and the PRIMARY Done at the trailing edge.
+- **Editors.** ATTACHED_SHEET forms titled "Add Login", "Add SSH Key" and "Add Secure Note" ("Edit …" when editing),
+  with the kind's `DialogSpec.swatch`, in titled groups. Add Login: Login (Name with the placeholder "e.g. Production
+  server", Username) and Authentication (Method as Password or Private Key radios, then Password with a Show checkbox,
+  or the key). Add SSH Key: SSH Key (Name, "e.g. Work laptop key"; Private key and Public key with Browse…; Comment,
+  "Optional"). Save stays disabled until the form is valid.
+- **Unlock Vault.** The OVERLAY PROMPT form of 10.8: the lock tile beside "Enter your master password to use saved
+  credentials.", "Master password:", a "Show password" checkbox, `Form.footnote` "Auto-locks after <n> min idle", and
+  Cancel and Unlock, disabled while the field is empty.
+
+The default look's manager is unchanged. The mocks' names, paths, dates and counts are fixtures, and so is "Remember in
+Keychain" (section 18).
 
 ## 15. Errors and diagnostics
 
@@ -1640,8 +1754,9 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 
 Agents never launch the GUI or train the AOT cache. The user checks, per plan: the macOS in-window menu bar and native
 title, and Windows and Linux NATIVE with the caption colour; the Run window's drag, attach to home, saved place, focus
-hand-back and modeless behaviour; stripe drag and drop including the bottom strip; native dialogs; the Enterprise Dark
-values; and Enterprise's cold-start time against the default look.
+hand-back and modeless behaviour; stripe drag and drop including the bottom strip; the classic in-window dialogs;
+Enterprise Dark against the Dark Mode mock; the splash and the Dock or taskbar icon on a cold start; the Credential
+Vault window; and Enterprise's cold-start time against the default look.
 
 ## 17. Documentation
 
@@ -1672,15 +1787,26 @@ query or traits; the items of 8.4; per-look theme variants (`targetUi`) and a th
 the SDK's `SemanticColor`; public tokens beyond the 11 metrics and two colour slots; an Enterprise settings page or a
 look picker (turning the plugin on is the choice); `JASPER_PRESENTATION_SKIP`; AOT training of the classic strategies
 before a measurement; a `PaletteResults` total; a Problems panel; Detach; rebinding any shortcut; the macOS screen menu
-bar under Enterprise.
+bar under Enterprise; remembering the master password in the Keychain (the Unlock Vault mock's "Remember in
+Keychain"); the splash steps "Unlocking credential vault…" and "Indexing hosts…", which no start-up phase performs;
+the product name anywhere but the splash; a new packaged application icon.
 
 ## 19. Delivery
 
 ### 19.1 Plans
 
-Ten plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans` and
-named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 10 in sequence; plan 10 needs 3, 4 and 5.
+Eleven plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
+and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
+`migration.csv` rows. Order: 1 to 11 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+
+Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
+`KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
+`PickerFace.technicalCaption`, `EditorHint.technical()`, Separator, `IconSize.SWATCH`, `Form.footnote` and the
+EXCLUSIVE validation); 3c `sdk-0-18-tables` (`Tree.columns`, `TableRow.cellNodes`, `TableRow.heading`, `Table.empty`,
+`Table.emptyText` and `ItemList.emptyText`); 3d `sdk-0-18-chrome` (SESSION and TRANSFER, `ToolbarItem.View`,
+`ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role` and their app mirrors, `DialogSpec.swatch`, and the bundled scopes'
+nouns, hues and SPLIT roles of 14.6); 3e `default-look` (section 13 with its reference pairs). Each of 3b to 3d renders
+its additions in the default look and adds them to the testkit fake and the contract suites.
 
 | # | Slug | Runnable deliverable |
 |---|---|---|
@@ -1688,12 +1814,13 @@ named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each 
 | 2 | `derived-roles` | `DerivedColor`, `DerivedPalette`, override keys and their parse table, the guards, the converter keys and goldens, `PaintedContrastTest` with the degenerate palettes, jasper-ui `testFixtures` and the default-kit matrix in `check`. Zero pixel change |
 | 3 | `sdk-0-18` | SDK 0.18.0: the renames and `KitCompatibility`, every addition of 8.2 with its default rendering (the Notice card, toolbar views in today's header, SESSION and TRANSFER), the re-documentation, the `presentation.provide` constant and its javadoc, the testkit and contracts; every manifest bumped; the bundled scopes' nouns, hues and SPLIT roles (14.6); the default-look changes of section 13 with their reference pairs; THD's rebuild coordinated |
 | 4 | `classic-catalog` | `DesignMetrics.CLASSIC`, `TypeScale.CLASSIC`, `MetricTokens`, the 14 face pairs and `KitFaces.of`, the classic FlatLaf overlay, the Enterprise fixture kit, the full kit matrix with the complement and covering array, the isolation and variant-read tests |
-| 5 | `provider` | The descriptor keys, the effective rule and opt-in, `PluginSelection` and the single selection, selection in `resolve`, safe mode, the attempt record, the fallback chain, reach, the plugin theme tier with reservation, exemption and dormant ids, `KitParser` and validation, `DefaultSource` and the audit, font registration and notices, `presentation.provide` in `DescriptorParser.CAPABILITIES` with its key rule, `DesktopFlags` computed (plan 6 applies them), the Enterprise plugin with its kit, fonts, theme (Light and Dark for review), `dev.jasper.enterprise.api.Workstation` and its publication in `EnterprisePlugin.start`, its `stagePlugins` entry and its `dev.jasper.enterprise` `migration.csv` row, conformance and the shipped-kit render. Until its plan lands, a chrome value maps to the default projection. Turning Enterprise on gives classic controls, metrics and fonts |
-| 6 | `window-chrome` | `DesktopFlags` applied: native titles and in-window menus; `ClassicMenuBar`, `ClassicHeader` with `window.toolbar` and toolbar views, `TitleFormat`, `RuledCells` and the leading "▶ Run…" item (opening the palette's current view), `ClassicTabs`, `DialogMapping`, NSAppearance and captions, `Motion`, Compact under a native title; the JUnit chrome renders of 16.1.4 |
+| 5 | `provider` | The descriptor keys, the effective rule and opt-in, `PluginSelection` and the single selection, selection in `resolve`, safe mode, the attempt record, the fallback chain, reach, the plugin theme tier with reservation, exemption and dormant ids, `KitParser` and validation, `DefaultSource` and the audit, font registration and notices, `presentation.provide` in `DescriptorParser.CAPABILITIES` with its key rule, `DesktopFlags` computed (plan 6 applies them), the Enterprise plugin with its kit, fonts, theme (Light and Dark, 7.6), `dev.jasper.enterprise.api.Workstation` and its publication in `EnterprisePlugin.start`, its `stagePlugins` entry and its `dev.jasper.enterprise` `migration.csv` row, conformance and the shipped-kit render, compared with the Workstation and Dark Mode mocks. Until its plan lands, a chrome value maps to the default projection. Turning Enterprise on gives classic controls, metrics and fonts |
+| 6 | `window-chrome` | `DesktopFlags` applied: native titles and in-window menus; `ClassicMenuBar`, `ClassicHeader` with `window.toolbar` and toolbar views, `TitleFormat`, `RuledCells` and the leading "▶ Run…" item (opening the palette's current view), `ClassicTabs`, `DialogMapping` and the classic in-window dialogs (10.8), NSAppearance and captions, `Motion`, Compact under a native title; the JUnit chrome renders of 16.1.4 |
 | 7 | `dock-chrome` | Labelled stripes and their numbers, the bottom strip and pills, frames and header strips, horizontal drop geometry, the dock layout per look, Event Log; the chrome renders extended |
 | 8 | `run-window` | `PaletteView` and `PaletteHome` pairs, typed headings and Run copy, the modeless window and focus hand-back, the saved place per home kind, Browse…, the fixed list height; the chrome renders extended |
 | 9 | `settings` | `SettingsChrome`, the collapsible navigation, Reset in the context menu, hidden rows, the Appearance, Keymap, Notifications, Plugins and Shell compositions, ⋯ menus, the font row copy; the chrome renders extended |
-| 10 | `plugin-compositions` | `Workstation` consumption; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; the confinement check; `CompositionParityTest` |
+| 10 | `plugin-compositions` | `Workstation` consumption; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
+| 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
 
 ### 19.2 Amendments
 
