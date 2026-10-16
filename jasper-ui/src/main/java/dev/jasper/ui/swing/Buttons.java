@@ -73,7 +73,7 @@ final class Buttons {
             button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));
             button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
-            button.circular=value.presentation()==Nodes.ButtonPresentation.CIRCULAR;
+            button.circular=value.presentation()==Nodes.ButtonPresentation.HELP;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
             if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
@@ -228,7 +228,7 @@ final class Buttons {
                 return new Dimension(size.width+recorderIndicator(),Math.max(height,size.height));
             }
             if (embedded) return size;
-            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.HERO_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : panelEmpty ? DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel || panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
+            int height = ThemePainting.height(context, panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION : hero ? DesignMetrics.Role.PROMPT_BUTTON_HEIGHT : fullFooter ? DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT : orderedAction ? DesignMetrics.Role.ORDERED_ADD_HEIGHT : panel ? DesignMetrics.Role.PANEL_HEADER_ACTION : panelEmpty ? DesignMetrics.Role.PANEL_EMPTY_ACTION_HEIGHT : DesignMetrics.Role.BUTTON_HEIGHT, panelDetail || panel || panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : Typography.Role.LABEL);
             int reservation = panelDetail ? 2*ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING) : 0;
             height += reservation;
             size.width += reservation;

@@ -159,7 +159,7 @@ class PaintedContrastTest {
 
     private static boolean selectedSegment(GeneratedTheme theme, Color expected) {
         var context = KitFixtures.context(theme);
-        var choice = new Nodes.Choice("choice", ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+        var choice = new Nodes.Choice("choice", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE,
             List.of(new Option("a", "Alpha", Optional.empty()), new Option("b", "Beta", Optional.empty())), "b", "Protocol", "choose");
         try (var view = new KitView(context, new ViewSpec(choice), event -> { })) {
             KitFixtures.render(view, 400, 80, 1);

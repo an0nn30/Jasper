@@ -127,7 +127,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
     private ViewSpec footerSpec() {
         var failed = new ControlState(!message.isEmpty(), true, false, "");
         return new ViewSpec(new Nodes.Stack("footer", ControlState.READY, Nodes.LayoutRole.SETTINGS_FOOTER, List.of(
-            new Nodes.Button(HELP, ControlState.READY, "", "question", Nodes.ButtonKind.GHOST, HELP, "Help", Nodes.ButtonPresentation.CIRCULAR),
+            new Nodes.Button(HELP, ControlState.READY, "", "question", Nodes.ButtonKind.GHOST, HELP, "Help", Nodes.ButtonPresentation.HELP),
             new Nodes.Stack("message-line", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
                 new Nodes.StatusDot("message-status", failed, Nodes.StatusKind.DANGER),
                 new Nodes.Text("message", ControlState.READY, message, Nodes.TextRole.BODY))),

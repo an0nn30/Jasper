@@ -10,7 +10,7 @@ import javax.swing.*;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
-class HeroCompositionTest {
+class PromptCompositionTest {
     static int m(dev.jasper.ui.metrics.DesignMetrics.Role role) { return dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(role); }
 
     @Test void supportingTextPaintsEveryLineBesideANaturalFirstLineAdornment() {

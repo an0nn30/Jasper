@@ -271,7 +271,7 @@ public final class ErrorsView extends JPanel {
         Incident incident = chosen.get();
         boolean plugin = incident.fromPlugin();
         var heading = new Nodes.Stack("detail.heading", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Icon("detail.icon", ControlState.READY, "error", Nodes.Hue.NEUTRAL, Nodes.IconSize.HERO, "Error", Optional.of(Nodes.Severity.DANGER)),
+            new Nodes.Icon("detail.icon", ControlState.READY, "error", Nodes.Hue.NEUTRAL, Nodes.IconSize.PROMPT, "Error", Optional.of(Nodes.Severity.DANGER)),
             new Nodes.Stack("detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
                 text(TITLE, incident.summary(), Nodes.TextRole.DETAIL_TITLE),
                 text(HEADER, sourceName(incident) + " · " + incident.operation(), Nodes.TextRole.DESCRIPTION))),

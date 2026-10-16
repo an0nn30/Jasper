@@ -39,7 +39,7 @@ class UiTypographyTest {
                             int expectedLineHeight = Math.max(Math.round(18*expected/13),description.getFontMetrics(description.getFont()).getHeight());
                             assertThat(description.getPreferredSize().height).as("two description lines sized once").isEqualTo(2*expectedLineHeight);
                             assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(expected);
-                            assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
+                            assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.PROMPT_TITLE).getSize2D()).isCloseTo(expected * 15 / 13, within(.001f));
                             // Defaults leave native forms on the look and feel's own font, which FlatLaf scales from its platform divider
                             // (13 on macOS, 15 on Linux); a configured size is exact everywhere.
                             float nativeSize = config.size() == 0 ? UIManager.getLookAndFeelDefaults().getFont("Label.font").getSize2D() : expected;
@@ -70,11 +70,11 @@ class UiTypographyTest {
             var context = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
             var defaults = dev.jasper.ui.metrics.Typography.of(dev.jasper.ui.metrics.TypeScale.DEFAULT, dev.jasper.ui.metrics.FaceSet.PLATFORM, dev.jasper.ui.metrics.Typography.UserFont.NONE);
             String bodyFace = defaults.font(dev.jasper.ui.metrics.Typography.Role.BODY).getFontName();
-            String headingFace = defaults.font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFontName();
+            String headingFace = defaults.font(dev.jasper.ui.metrics.Typography.Role.PROMPT_TITLE).getFontName();
             var spec = new dev.jasper.ui.model.ViewSpec(new dev.jasper.ui.model.Nodes.Stack("root", dev.jasper.ui.model.ControlState.READY,
                 dev.jasper.ui.model.Nodes.LayoutRole.VERTICAL, java.util.List.of(
                     new dev.jasper.ui.model.Nodes.Text("body", dev.jasper.ui.model.ControlState.READY, "Body", dev.jasper.ui.model.Nodes.TextRole.BODY),
-                    new dev.jasper.ui.model.Nodes.Text("heading", dev.jasper.ui.model.ControlState.READY, "Heading", dev.jasper.ui.model.Nodes.TextRole.HERO_TITLE))));
+                    new dev.jasper.ui.model.Nodes.Text("heading", dev.jasper.ui.model.ControlState.READY, "Heading", dev.jasper.ui.model.Nodes.TextRole.PROMPT_TITLE))));
             try (var view = new dev.jasper.ui.swing.KitView(context, spec, event -> {})) {
                 for (var config : java.util.List.of(new UiFontConfig("system", 13), new UiFontConfig("system", 20), UiFontConfig.defaults())) {
                     themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, config);
@@ -83,10 +83,10 @@ class UiTypographyTest {
                     assertThat(body.getFont().getFontName()).as("system size-only body %s", config).isEqualTo(bodyFace);
                     assertThat(heading.getFont().getFontName()).as("system size-only heading %s", config).isEqualTo(headingFace);
                     assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.BODY).getFontName()).isEqualTo(bodyFace);
-                    assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFontName()).isEqualTo(headingFace);
+                    assertThat(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(dev.jasper.ui.metrics.Typography.Role.PROMPT_TITLE).getFontName()).isEqualTo(headingFace);
                     if (config.size() != 0) {
                         assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getSize2D()).isEqualTo(config.size());
-                        assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getSize2D()).isCloseTo(15 * config.size() / 13f, within(.001f));
+                        assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.PROMPT_TITLE).getSize2D()).isCloseTo(15 * config.size() / 13f, within(.001f));
                     }
                 }
                 // Choosing the platform's own family explicitly keeps that family (Helvetica Neue on macOS).
@@ -94,7 +94,7 @@ class UiTypographyTest {
                 assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.BODY).getFamily()).isEqualTo(new Font(defaults.family(), Font.PLAIN, 20).getFamily());
                 if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(defaults.family()).isEqualTo("Helvetica Neue");
                 themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("Serif", 20));
-                assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.HERO_TITLE).getFamily()).isEqualTo(Font.SERIF);
+                assertThat(context.typography().font(dev.jasper.ui.metrics.Typography.Role.PROMPT_TITLE).getFamily()).isEqualTo(Font.SERIF);
             } finally { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults()); themes.close(); }
         });
     }

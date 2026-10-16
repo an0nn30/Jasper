@@ -81,7 +81,7 @@ public class EditorForm implements AutoCloseable {
     protected final void secret(String id, String label, String revealGroup) { rows.add(new SecretRow(id, label, revealGroup, false)); }
     protected final void note(String id, String label) { rows.add(new SecretRow(id, label, "", true)); }
     protected final void choice(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options), Nodes.ChoiceKind.DROPDOWN)); choices.put(id, selected); }
-    protected final void segmented(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options), Nodes.ChoiceKind.SEGMENTED)); choices.put(id, selected); }
+    protected final void segmented(String id, String label, List<Option> options, String selected) { rows.add(new ChoiceRow(id, label, List.copyOf(options), Nodes.ChoiceKind.EXCLUSIVE)); choices.put(id, selected); }
     protected final void visibleWhen(String id, BooleanSupplier visible) { visibility.put(id, visible); }
     protected final void readyWhen(BooleanSupplier condition) { ready = condition; }
     protected final void identity(String icon, Nodes.Hue hue) { this.icon = icon; this.hue = hue; }
@@ -205,7 +205,7 @@ public class EditorForm implements AutoCloseable {
     private Nodes.Node section(Row row) {
         return switch (row) {
             case DisplayRow display when display.label().isBlank() -> control(display);
-            case ChoiceRow choice when choice.kind() == Nodes.ChoiceKind.SEGMENTED -> control(row);
+            case ChoiceRow choice when choice.kind() == Nodes.ChoiceKind.EXCLUSIVE -> control(row);
             case ToggleRow toggle -> new Nodes.SettingRow("row." + toggle.id(), state(toggle.id()), toggle.label(), "", control(toggle), false);
             default -> new Nodes.FormRow("row." + row.id(), state(row.id()), row.label(), "", control(row), Optional.empty(), false);
         };
@@ -225,8 +225,8 @@ public class EditorForm implements AutoCloseable {
             new Nodes.Button(SAVE, new ControlState(true, !busy && ready.getAsBoolean(), busy, ""), saveLabel, "", Nodes.ButtonKind.PRIMARY, SAVE, ""));
         return new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.SHEET, title, icon.isEmpty() ? Optional.empty() : Optional.of(
             new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-                new Nodes.Icon("identity.icon", ControlState.READY, icon, hue, Nodes.IconSize.HERO, title),
-                new Nodes.Text("identity.title", ControlState.READY, title, Nodes.TextRole.HERO_TITLE)))), sections, Optional.empty(), actions,
+                new Nodes.Icon("identity.icon", ControlState.READY, icon, hue, Nodes.IconSize.PROMPT, title),
+                new Nodes.Text("identity.title", ControlState.READY, title, Nodes.TextRole.PROMPT_TITLE)))), sections, Optional.empty(), actions,
             cancelEnabled ? CANCEL : "");
     }
 

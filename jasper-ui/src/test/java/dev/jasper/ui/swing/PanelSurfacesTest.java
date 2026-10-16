@@ -209,7 +209,7 @@ class PanelSurfacesTest {
                 combo.setSelectedIndex(1);
                 assertThat(events).contains(new UiEvent.Selected("host", Set.of("b")));
             } finally { release(ctx); }
-            assertThatThrownBy(() -> new Nodes.Choice("bad", READY, ChoiceKind.SEGMENTED, options, "a", "Bad", "", "", Optional.empty(), Optional.of(face)))
+            assertThatThrownBy(() -> new Nodes.Choice("bad", READY, ChoiceKind.EXCLUSIVE, options, "a", "Bad", "", "", Optional.empty(), Optional.of(face)))
                 .hasMessageContaining("PICKER or DROPDOWN");
         });
     }

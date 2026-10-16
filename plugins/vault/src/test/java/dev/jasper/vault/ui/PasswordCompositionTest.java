@@ -13,11 +13,11 @@ import static org.assertj.core.api.Assertions.*;
 class PasswordCompositionTest {
     @TempDir Path directory;
 
-    @Test void createUsesHeroAndPolicyReadinessWithoutRetainingSecrets() throws Exception {
+    @Test void createUsesPromptAndPolicyReadinessWithoutRetainingSecrets() throws Exception {
         edt(() -> {
             try (var panel = PasswordPanel.create(new FakeKit("dev.jasper.vault"), true, (p,b) -> java.util.Arrays.fill(p, (char)0), () -> {})) {
                 var view = panel.view();
-                assertThat(((Nodes.Form)view.spec().root()).kind()).isEqualTo(Nodes.FormKind.HERO);
+                assertThat(((Nodes.Form)view.spec().root()).kind()).isEqualTo(Nodes.FormKind.PROMPT);
                 assertThat(((Nodes.Form)view.spec().root()).hero()).isPresent();
                 assertThat(node(view, "strength", Nodes.Strength.class).filled()).isZero();
                 assertThat(node(view, "bind", Nodes.Toggle.class).checked()).isTrue();
@@ -39,7 +39,7 @@ class PasswordCompositionTest {
     @Test void unlockUsesOneSecretAndBecomesReadyWithAnyNonemptyPassword() throws Exception {
         edt(() -> {
             try (var panel = PasswordPanel.unlock(new FakeKit("dev.jasper.vault"), UnlockCaptureSupport.prompt(directory))) {
-                assertThat(((Nodes.Form)panel.view().spec().root()).kind()).isEqualTo(Nodes.FormKind.HERO_COMPACT);
+                assertThat(((Nodes.Form)panel.view().spec().root()).kind()).isEqualTo(Nodes.FormKind.PROMPT_COMPACT);
                 assertThat(all(panel.view()).stream().filter(Nodes.Secret.class::isInstance)).hasSize(1);
                 assertThat(button(panel.view(), "submit").state().enabled()).isFalse();
                 type(panel.view(), "password", "a");

@@ -188,10 +188,10 @@ final class PluginDetails {
         var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),metadata));
         var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.HERO,present?shown.name():"Plugin"),identity,primary));
+            new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.PROMPT,present?shown.name():"Plugin"),identity,primary));
         var ancillary=new Nodes.Stack("ancillary",new ControlState(section.equals(DETAILS),true,false,""),Nodes.LayoutRole.NAVIGATION,List.of(
             new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, ""),more));
-        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE,
             List.of(new Option(OVERVIEW, "Overview", Optional.empty()), new Option(DETAILS, "Details", Optional.empty())), section,
             "Plugin information", "");
         return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, new Nodes.Stack("section-lane",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Card("section-card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(choice)))), ancillary)));

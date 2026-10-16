@@ -838,7 +838,7 @@ class PanelCompositionTest {
             var ctx = KitFixtures.context();
             var detail = new Nodes.Stack("detail", READY, LayoutRole.DETAIL, List.of(
                 new Nodes.Stack("identity", READY, LayoutRole.NAVIGATION, List.of(
-                    new Nodes.Icon("identity-icon", READY, "server", Hue.NEUTRAL, IconSize.HERO, "Host"),
+                    new Nodes.Icon("identity-icon", READY, "server", Hue.NEUTRAL, IconSize.PROMPT, "Host"),
                     new Nodes.Stack("identity-text", READY, LayoutRole.VERTICAL, List.of(
                         new Text("identity-title", READY, "amp", TextRole.BODY_STRONG),
                         new Text("identity-address", READY, "fixture@example.invalid:22", TextRole.MONO))))),

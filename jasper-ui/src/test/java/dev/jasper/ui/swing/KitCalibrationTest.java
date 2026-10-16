@@ -76,7 +76,7 @@ class KitCalibrationTest {
             } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus); context.binding().close(); context.icons().close(); restore(old); UIManager.put("defaultFont", font); }
         });
     }
-    @Test void heroAndCardSegmentsHaveOneVisibleLabelAndSettingsChoicesFitTheirSourceRole() {
+    @Test void promptAndCardSegmentsHaveOneVisibleLabelAndSettingsChoicesFitTheirSourceRole() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             try (var view = new KitView(context, dev.jasper.ui.gallery.FormFixtures.create("unlock-vault"), e -> {})) {

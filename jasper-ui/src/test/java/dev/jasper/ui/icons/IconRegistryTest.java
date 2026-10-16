@@ -65,7 +65,7 @@ class IconRegistryTest {
             assertThat(right-left+1).isEqualTo(28);
         }
     }
-    @Test void heroOpticalStrokeIsExplicitAndControlArtworkKeepsItsRegisteredStroke() {
+    @Test void promptOpticalStrokeIsExplicitAndControlArtworkKeepsItsRegisteredStroke() {
         try (var registry = new IconRegistry()) {
             registry.register("test:line", "M 2 8 H 14");
             var palette = KitFixtures.dark().semantic();

@@ -363,7 +363,7 @@ public final class HostEditor implements AutoCloseable {
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (credentialId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(credentialName.apply(credentialId).orElse("credential missing"), "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         var authentication = section("host.authentication", "Authentication", Nodes.CardKind.MIXED, List.of(
-            new Nodes.Choice(AUTH, state(true, editable), Nodes.ChoiceKind.SEGMENTED, List.of(
+            new Nodes.Choice(AUTH, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
                 new Option(VAULT, vaultPresent ? "Vault Credential" : "Vault credential (needs Credential Vault)", Optional.empty()),
                 new Option(AGENT, "SSH Agent", Optional.empty())), vaultAuth ? VAULT : AGENT, "Authentication", ""),
             row("row." + CREDENTIAL, "Credential", "", new Nodes.Choice(CHOOSE, state(true, keysEnabled), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE, "lock", Optional.empty(), Optional.of(face))),

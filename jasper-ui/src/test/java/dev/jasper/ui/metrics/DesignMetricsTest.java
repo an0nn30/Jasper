@@ -18,7 +18,7 @@ class DesignMetricsTest {
         var m = DesignMetrics.DEFAULT;
         assertThat(m.value(DesignMetrics.Role.FIELD_HEIGHT)).isEqualTo(24);
         assertThat(m.value(DesignMetrics.Role.BUTTON_HEIGHT)).isEqualTo(24);
-        assertThat(m.value(DesignMetrics.Role.HERO_FIELD_HEIGHT)).isEqualTo(28);
+        assertThat(m.value(DesignMetrics.Role.PROMPT_FIELD_HEIGHT)).isEqualTo(28);
         assertThat(m.value(DesignMetrics.Role.MENU_ITEM_HEIGHT)).isEqualTo(22);
         assertThat(m.value(DesignMetrics.Role.FORM_LABEL_WIDTH)).isEqualTo(96);
         assertThat(m.value(DesignMetrics.Role.COLUMN_GAP)).isEqualTo(10);
@@ -74,7 +74,7 @@ class DesignMetricsTest {
         assertThat(m.contentHeight(DesignMetrics.Role.BUTTON_HEIGHT, font, frc)).isGreaterThan(24);
         assertThatThrownBy(() -> m.contentPadding(DesignMetrics.Role.CARD_RADIUS)).isInstanceOf(IllegalArgumentException.class);
         assertThat(normal.font(Typography.Role.LABEL).getSize2D()).isEqualTo(12.5f);
-        assertThat(normal.font(Typography.Role.HERO_TITLE).getSize2D()).isEqualTo(15);
+        assertThat(normal.font(Typography.Role.PROMPT_TITLE).getSize2D()).isEqualTo(15);
         assertThat(large.font(Typography.Role.MONO).getFamily()).isEqualTo("Monospaced");
     }
     @Test void invalidFontSettingsAreRejected() {

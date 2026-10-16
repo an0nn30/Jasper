@@ -138,7 +138,7 @@ The kit paints placeholders once rather than delegating a duplicate FlatLaf hint
 `Choice.icon` is a named cue for PICKER only; empty means no cue. The original seven-argument
 constructor retains its PICKER `key` default, with other kinds empty. The eight-argument form permits
 explicit `lock` or empty artwork; nonempty cues on other kinds are rejected. MenuItem.hue explicitly selects category artwork hue; the original constructor delegates NEUTRAL.
-No domain meaning is inferred from ids/text. Category tiles likewise follow explicit SHEET/DETAIL, HERO/RAIL and
+No domain meaning is inferred from ids/text. Category tiles likewise follow explicit SHEET/DETAIL, PROMPT/RAIL and
 single/double-list roles; ordinary CONTROL folder icons remain plain glyphs.
 
 Settings capabilities (Plan 2 Task 6a): tree items carry an optional trailing count and an emphasized

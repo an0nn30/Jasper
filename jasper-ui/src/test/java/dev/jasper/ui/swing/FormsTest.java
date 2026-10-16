@@ -266,7 +266,7 @@ class FormsTest {
     @Test void sheetIdentityUsesItsTitleGap() {
         Edt.run(()->{
             var context=KitFixtures.context();
-            var heading=new Stack("heading",ControlState.READY,LayoutRole.INLINE,List.of(new Nodes.Icon("icon",ControlState.READY,"user",Hue.BLUE,IconSize.HERO,"Login"),new Text("title",ControlState.READY,"Add Login",TextRole.HERO_TITLE)));
+            var heading=new Stack("heading",ControlState.READY,LayoutRole.INLINE,List.of(new Nodes.Icon("icon",ControlState.READY,"user",Hue.BLUE,IconSize.PROMPT,"Login"),new Text("title",ControlState.READY,"Add Login",TextRole.PROMPT_TITLE)));
             var spec=new Form("form",ControlState.READY,FormKind.SHEET,"Add Login",Optional.of(heading),List.of(),Optional.empty(),List.of(button("save",ButtonKind.PRIMARY)));
             try(var view=new KitView(context,new ViewSpec(spec),e->{})) {
                 view.setSize(view.getPreferredSize());layout(view);
@@ -516,12 +516,12 @@ class FormsTest {
     }
 
     @Test
-    void heroButtonsHaveEqualWidthsAndFormsUseSourceTiers() {
+    void promptButtonsHaveEqualWidthsAndFormsUseSourceTiers() {
         Edt.run(
                 () -> {
                     var ctx = KitFixtures.context();
                     try {
-                        for (var kind : List.of(FormKind.HERO, FormKind.SHEET, FormKind.FULL))
+                        for (var kind : List.of(FormKind.PROMPT, FormKind.SHEET, FormKind.FULL))
                             try (var view =
                                     new KitView(
                                             ctx,
@@ -538,13 +538,13 @@ class FormsTest {
                                         .isEqualTo(
                                                 s(
                                                         switch (kind) {
-                                                            case HERO -> 400;
+                                                            case PROMPT -> 400;
                                                             case SHEET -> 482;
                                                             default -> 540;
                                                         }));
                                 view.setSize(view.getPreferredSize());
                                 layout(view);
-                                if (kind == FormKind.HERO)
+                                if (kind == FormKind.PROMPT)
                                     assertThat(find(view, "save", JButton.class).getWidth())
                                             .isEqualTo(
                                                     find(view, "cancel", JButton.class).getWidth());
@@ -894,7 +894,7 @@ class FormsTest {
     }
 
     @Test
-    void movingOutOfRowRestoresStandaloneLabelAndNestedHeroFieldsGetHeroSizing() {
+    void movingOutOfRowRestoresStandaloneLabelAndNestedPromptFieldsGetPromptSizing() {
         Edt.run(
                 () -> {
                     var ctx = KitFixtures.context();
@@ -903,7 +903,7 @@ class FormsTest {
                                     ctx,
                                     new ViewSpec(
                                             form(
-                                                    FormKind.HERO,
+                                                    FormKind.PROMPT,
                                                     List.of(
                                                             new FormRow(
                                                                     "row",
@@ -920,7 +920,7 @@ class FormsTest {
                         layout(view);
                         var input = editor(view, "input");
                         assertThat(input.getParent().getPreferredSize().height)
-                                .isGreaterThanOrEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_FIELD_HEIGHT));
+                                .isGreaterThanOrEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_FIELD_HEIGHT));
                         view.update(stack(field("input", FieldKind.TEXT, "")));
                         assertThat(find(view, "input.label", JComponent.class).isVisible())
                                 .isTrue();
@@ -932,7 +932,7 @@ class FormsTest {
     }
 
     @Test
-    void heroHeaderCentersItsTileAndTitlesWithSourceGaps() {
+    void promptHeaderCentersItsTileAndTitlesWithSourceGaps() {
         Edt.run(
                 () -> {
                     var ctx = KitFixtures.context();
@@ -940,20 +940,20 @@ class FormsTest {
                             new Stack(
                                     "hero",
                                     ControlState.READY,
-                                    LayoutRole.HERO,
+                                    LayoutRole.PROMPT_HEADER,
                                     List.of(
                                             new Nodes.Icon(
                                                     "hero-icon",
                                                     ControlState.READY,
                                                     "lock",
                                                     Hue.BLUE,
-                                                    IconSize.HERO,
+                                                    IconSize.PROMPT,
                                                     "Vault"),
                                             new Text(
                                                     "hero-title",
                                                     ControlState.READY,
                                                     "Unlock Vault",
-                                                    TextRole.HERO_TITLE),
+                                                    TextRole.PROMPT_TITLE),
                                             new Text(
                                                     "hero-description",
                                                     ControlState.READY,
@@ -1235,7 +1235,7 @@ class FormsTest {
     }
 
     @Test
-    void heroPreviewReservesItsOwnHeightAboveFullWidthActions() {
+    void promptPreviewReservesItsOwnHeightAboveFullWidthActions() {
         Edt.run(
                 () -> {
                     var ctx = KitFixtures.context();
@@ -1244,7 +1244,7 @@ class FormsTest {
                                     new Form(
                                             "form",
                                             ControlState.READY,
-                                            FormKind.HERO,
+                                            FormKind.PROMPT,
                                             "Preview",
                                             Optional.empty(),
                                             List.of(field("name", FieldKind.TEXT, "")),
@@ -1268,7 +1268,7 @@ class FormsTest {
                                 SwingUtilities.convertPoint(preview, 0, preview.getHeight(), view);
                         var actionTop = SwingUtilities.convertPoint(action, 0, 0, view);
                         assertThat(previewBottom.y).isLessThanOrEqualTo(actionTop.y - m(dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_GAP));
-                        assertThat(action.getWidth()).isEqualTo(s(400) - 2*m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
+                        assertThat(action.getWidth()).isEqualTo(s(400) - 2*m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_SIDES));
                         assertThat(view.getPreferredSize()).isEqualTo(view.getSize());
                     } finally {
                         release(ctx);

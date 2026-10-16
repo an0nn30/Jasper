@@ -121,7 +121,7 @@ class KitViewTest {
     @Test void literalLabelsIconsAndTextRolesRenderWithoutHtmlInterpretation() {
         Edt.run(() -> {
             var context = KitFixtures.context();
-            try (var view = new KitView(context, stack(new Text("t", ControlState.READY, "<html><b>literal</b>", TextRole.HERO_TITLE),
+            try (var view = new KitView(context, stack(new Text("t", ControlState.READY, "<html><b>literal</b>", TextRole.PROMPT_TITLE),
                     new Nodes.Icon("i", ControlState.READY, "folder", Hue.BLUE, IconSize.CONTROL, "Folder")), e -> {})) {
                 JLabel label = find(view, "t", JLabel.class);
                 assertThat(label.getClientProperty("html")).isNull(); assertThat(label.getText()).startsWith("<html>");

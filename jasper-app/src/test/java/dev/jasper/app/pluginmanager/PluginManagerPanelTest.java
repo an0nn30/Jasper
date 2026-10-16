@@ -144,7 +144,7 @@ class PluginManagerPanelTest {
             assertThat(image.getRGB(x,y)).as("allocated divider; print="+print+"; bounds="+divider.getBounds()).isNotEqualTo(image.getRGB(x+dx,y+dy));
         }
     }
-    @Test void actualHeroReceivesManifestArtworkAndSearchStaysInListLane() {
+    @Test void actualPromptReceivesManifestArtworkAndSearchStaysInListLane() {
         var art=new PluginRuntime.PluginIcon("art.svg",PluginIconsTest.SVG.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         panel.show(snapshot(TestRows.plugin("a.art","Authored").icon(art).row()));
         panel.setSize(744,600);KitTestSupport.layout(panel);
@@ -256,7 +256,7 @@ class PluginManagerPanelTest {
     @Test void theOverviewAndDetailsChoiceSwapsTheOneTextArea() {
         panel.show(snapshot(TestRows.plugin("a.quiet", "Quiet").description("").row()));
         var choice = (Nodes.Choice) find(panel.detailsPane().header().spec().root(), PluginDetails.SECTION);
-        assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.SEGMENTED);
+        assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.EXCLUSIVE);
         assertThat(choice.options()).extracting(dev.jasper.ui.model.Option::label).containsExactly("Overview", "Details");
         assertThat(choice.selectedId()).isEqualTo(PluginDetails.OVERVIEW);
         assertThat(panel.detailsPane().shownText()).isEqualTo("No description.");

@@ -24,8 +24,8 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         WINDOW,
         /** A dialog's band in the dialog surface, with no rule; its title and the controls centre lower, as a dialog's do. */
         DIALOG,
-        /** A hero dialog: no title, since the content has its heading; the controls over the dialog surface. */
-        HERO,
+        /** A prompt dialog: no title, since the content has its heading; the controls over the dialog surface. */
+        PROMPT,
         /** The content draws the title row itself (the Settings sidebar and header): no strip, only the controls. */
         INTEGRATED
     }
@@ -226,7 +226,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
             case WINDOW -> Math.max(metric(dev.jasper.ui.metrics.DesignMetrics.Role.WINDOW_TITLE_HEIGHT)
                 + metric(dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE), accessoryHeight());
             case DIALOG -> Math.max(metric(dev.jasper.ui.metrics.DesignMetrics.Role.DIALOG_TITLE_HEIGHT), accessoryHeight());
-            case HERO -> metric(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_TITLE_HEIGHT);
+            case PROMPT -> metric(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_TITLE_HEIGHT);
             case INTEGRATED -> 0;
         };
     }
@@ -239,7 +239,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
         return switch (style) {
             case WINDOW -> titleHeight();
             case DIALOG -> Math.max(titleHeight(), 2 * metric(dev.jasper.ui.metrics.DesignMetrics.Role.DIALOG_TITLE_CENTER));
-            case HERO -> 2 * metric(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_CONTROLS_CENTER);
+            case PROMPT -> 2 * metric(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_CONTROLS_CENTER);
             case INTEGRATED -> Math.max(0, integratedHeight.getAsInt());
         };
     }

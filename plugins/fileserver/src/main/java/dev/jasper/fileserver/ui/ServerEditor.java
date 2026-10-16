@@ -392,7 +392,7 @@ public final class ServerEditor implements AutoCloseable {
             ? "Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try " + protocol.suggestedPort(parsedPort()) : "";
         var server = new ArrayList<Nodes.Node>();
         server.add(row("server.name.row", "Name", new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "e.g. Downloads", "Name", "")));
-        server.add(row("server.protocol.row", "Protocol", new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.SEGMENTED,
+        server.add(row("server.protocol.row", "Protocol", new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.EXCLUSIVE,
             protocols.stream().map(value -> new Option(value.name(), value.label(), Optional.of(switch(value) {
                 case HTTP -> Nodes.Hue.BLUE; case FTP -> Nodes.Hue.AMBER; case SFTP -> Nodes.Hue.GREEN; case TFTP -> Nodes.Hue.PURPLE;
             }))).toList(), protocol.name(), "Protocol", "")));
@@ -414,7 +414,7 @@ public final class ServerEditor implements AutoCloseable {
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (accountId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(accountLabel, "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         // The Access card is the login's own card, so its segments need no label: they span the card, as Add Host's do.
-        access.add(new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.SEGMENTED, loginOptions, shownLogin, "Login", ""));
+        access.add(new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.EXCLUSIVE, loginOptions, shownLogin, "Login", ""));
         access.add(new Nodes.FormRow("server.account.row", state(protocol.hasLogin() && shownLogin.equals("vault"), true), "Account", "",
             new Nodes.Choice(CHOOSE_ACCOUNT, state(true, vaultPresent), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE_ACCOUNT, "lock", Optional.empty(),
                 Optional.of(face)), Optional.empty()));

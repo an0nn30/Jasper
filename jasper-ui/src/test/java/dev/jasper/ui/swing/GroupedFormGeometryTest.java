@@ -64,7 +64,7 @@ class GroupedFormGeometryTest {
     @Test void pathHasSemanticFolderCueAndSegmentLabelsFitAtFullFormWidth() {
         Edt.run(()->{
             var context=KitFixtures.context();
-            var choice=new Nodes.Choice("login",ControlState.READY,ChoiceKind.SEGMENTED,List.of(new Option("anon","Anonymous",Optional.empty()),new Option("vault","Vault Account",Optional.empty()),new Option("session","Session Password",Optional.empty())),"anon","Login","");
+            var choice=new Nodes.Choice("login",ControlState.READY,ChoiceKind.EXCLUSIVE,List.of(new Option("anon","Anonymous",Optional.empty()),new Option("vault","Vault Account",Optional.empty()),new Option("session","Session Password",Optional.empty())),"anon","Login","");
             try(var view=new KitView(context,new ViewSpec(new Nodes.Stack("stack",ControlState.READY,LayoutRole.VERTICAL,List.of(choice,field("path",FieldKind.PATH,"")))),e->{})) {
                 KitFixtures.render(view,354,200,2);
                 assertThat(find(view,"path.leading",javax.swing.JLabel.class).getIcon()).isNotNull();
@@ -96,10 +96,10 @@ class GroupedFormGeometryTest {
         Edt.run(()->{
             var context=KitFixtures.context();
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of())),e->{})) {
-                for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.HERO,FormKind.FULL)) {
+                for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.PROMPT,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of())));KitFixtures.render(view,540,300,1);
                     var cancel=find(view,"cancel",javax.swing.JButton.class);
-                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT):kind==FormKind.HERO?m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_BUTTON_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+                    assertThat(cancel.getHeight()).as("%s footer action",kind).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_BUTTON_HEIGHT):kind==FormKind.PROMPT?m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_BUTTON_HEIGHT):m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
                     if(kind==FormKind.FULL)assertThat(((javax.swing.JComponent)cancel.getParent().getParent()).getInsets().top).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_FOOTER_TOP));
                 }
             }finally{release(context);}
@@ -244,14 +244,14 @@ class GroupedFormGeometryTest {
     }
     private static ListItem itemWithId(String id){return new ListItem(id,Optional.empty(),List.of(new Text(id+".name",ControlState.READY,id,TextRole.MONO)),List.of(),List.of());}
 
-    @Test void descriptionDensityFollowsCurrentFormKindWithoutChangingCompactAndHeroRows() {
+    @Test void descriptionDensityFollowsCurrentFormKindWithoutChangingCompactAndPromptRows() {
         Edt.run(()->{
             var context=KitFixtures.context();
             var setting=new SettingRow("setting",ControlState.READY,"Option","Short helper",new Toggle("toggle",ControlState.READY,"Enabled",false,"toggle",false),false);
             try(var view=new KitView(context,new ViewSpec(FormsTest.form(FormKind.FULL,List.of(setting))),e->{})) {
-                // FULL and HERO rows keep their description heights; a SETTINGS row grows to its two lines and padding (44 with the macOS faces).
-                int[] expected={m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1,0,m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SETTING_HEIGHT),m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1};int at=0;
-                for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.HERO,FormKind.FULL)) {
+                // FULL and PROMPT rows keep their description heights; a SETTINGS row grows to its two lines and padding (44 with the macOS faces).
+                int[] expected={m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1,0,m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_SETTING_HEIGHT),m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT)+1};int at=0;
+                for(var kind:List.of(FormKind.FULL,FormKind.SETTINGS,FormKind.PROMPT,FormKind.FULL)) {
                     view.update(new ViewSpec(FormsTest.form(kind,List.of(setting))));KitFixtures.render(view,540,400,1);
                     assertThat(find(view,"setting",javax.swing.JComponent.class).getInsets().left).isEqualTo(kind==FormKind.FULL?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_SIDE_PADDING):m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_SIDE_PADDING));
                     if(kind==FormKind.SETTINGS) {

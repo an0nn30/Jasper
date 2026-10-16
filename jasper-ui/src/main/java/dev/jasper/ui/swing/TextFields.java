@@ -379,7 +379,7 @@ final class TextFields {
         }
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
-            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.HERO_FIELD_HEIGHT : heightRole, role);
+            int height = ThemePainting.height(context, hero ? DesignMetrics.Role.PROMPT_FIELD_HEIGHT : heightRole, role);
             int width = port ? Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.PORT_FIELD_WIDTH)) : size.width;
             return new Dimension(width, multiline ? Math.max(size.height, height) : height);
         }

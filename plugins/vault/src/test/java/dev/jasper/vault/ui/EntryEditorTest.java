@@ -44,7 +44,7 @@ class EntryEditorTest {
             var received = new AtomicReference<Account>();
             var form = EntryEditor.login(kit(), null, value -> { received.set(value); return CompletableFuture.completedFuture(null); }, () -> {});
             var view = form.view();
-            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).kind()).isEqualTo(Nodes.ChoiceKind.SEGMENTED);
+            assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).kind()).isEqualTo(Nodes.ChoiceKind.EXCLUSIVE);
             assertThat(node(view, EntryEditor.AUTH, Nodes.Choice.class).options()).extracting(o -> o.label()).containsExactly("Password", "Private Key");
             assertThat(node(view, EntryEditor.NAME, Nodes.Field.class).hint()).isNotBlank();
             assertThat(node(view, EntryEditor.NAME, Nodes.Field.class).value()).isEmpty();

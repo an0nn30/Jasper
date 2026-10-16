@@ -25,7 +25,7 @@ class KitValuesTest {
    new Empty("empty",READY,new Icon("ico",READY,"add",Hue.NONE,IconSize.EMPTY,"Empty"),"Title","Description",List.of(button("action"))),
    new ItemList("list",READY,ListKind.ORDERED,List.of(new ListItem("a",Optional.of(text("leading")),List.of(text("title")),List.of(text("subtitle")),List.of(new Toggle("inline",READY,"On",true,"change",true)))),Set.of("a"),"activate",menu,SelectionMode.MULTIPLE,Optional.of(button("add"))),
    header(),new Panel("panel",READY,header(),Optional.of(text("query")),text("body"),Optional.of(text("footer"))),
-   new Form("form",READY,FormKind.HERO,"Title",Optional.of(text("hero")),List.of(text("section")),Optional.of(text("preview")),List.of(button("save")),"cancel"),
+   new Form("form",READY,FormKind.PROMPT,"Title",Optional.of(text("hero")),List.of(text("section")),Optional.of(text("preview")),List.of(button("save")),"cancel"),
    new Split("split",READY,SplitKind.SIDEBAR_DETAIL,List.of(text("side"),text("body"))),
    new Table("table",READY,List.of(new Column("column","Title",TextRole.MONO,true)),List.of(new TableRow("row",Map.of("column","42"),Optional.of("add"))),Set.of("row"),"activate",menu,SelectionMode.MULTIPLE),
    new Tree("tree",READY,List.of(new TreeItem("branch","Title",Optional.of("folder"),false,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of())))),Set.of("branch"),Set.of("leaf"),"activate"),

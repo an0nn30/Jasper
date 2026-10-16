@@ -13,13 +13,13 @@ public final class Nodes {
         String id();
         ControlState state();
     }
-    public enum TextRole { HERO_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, SUPPORTING, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
+    public enum TextRole { PROMPT_TITLE, DETAIL_TITLE, WINDOW_TITLE, PANEL_TITLE, BODY, BODY_STRONG, LABEL, DESCRIPTION, SUPPORTING, CAPTION, SECTION_LABEL, COUNT, CHIP, MONO, MONO_SMALL, MONO_CAPTION }
     public enum Hue { BLUE, GREEN, AMBER, PURPLE, NEUTRAL, NONE }
-    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, HERO }
+    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
-    public enum ChoiceKind { DROPDOWN, PICKER, SEGMENTED, SEARCHABLE, PREVIEWS }
+    public enum ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS }
     public enum CardKind { FORM, SETTINGS, MIXED }
     /** NONE keeps rows readable and scrollable but removes row selection, activation and the canvas focus stop.
      * Independently interactive inline controls keep their behavior. NONE requires empty selectedIds. */
@@ -30,7 +30,7 @@ public final class Nodes {
      */
     public enum ListKind { SINGLE, DOUBLE, COMPACT, ORDERED, RESULTS }
     /** WINDOW has exactly one full-bleed content section, no hero, and a shared pinned footer. */
-    public enum FormKind { HERO, HERO_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
+    public enum FormKind { PROMPT, PROMPT_COMPACT, SHEET, FULL, SETTINGS, WINDOW }
     /**
      * SUPPORTING keeps leading adornments natural-sized beside a wrapping final text/body child. ROUTE is a read-only
      * route preview (a tunnel's path): a bordered strip on the input surface whose children are its steps, left to
@@ -38,7 +38,7 @@ public final class Nodes {
      * on a category tile in its hue, its other children (Text) being the step's lines. The steps take equal columns,
      * each later column opening with the arrow, and a step's lines truncate within its column.
      */
-    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, HERO, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION, ROUTE }
+    public enum LayoutRole { VERTICAL, INLINE, ACTIONS, PROMPT_HEADER, DETAIL, FOOTER, NAVIGATION, SUPPORTING, JOINED_ACTIONS, SETTINGS_PAGE, SETTINGS_CONTROLS, SETTINGS_TRAILING, SETTINGS_GROUP_HEADER, SETTINGS_FOOTER, SETTINGS_NAVIGATION, ROUTE }
     /**
      * THREE_COLUMN places a manager window's rail, list and detail columns side by side; SIDEBAR_DETAIL is the same manager
      * without its rail (its last child is the detail column, the others list columns). DOCUMENT stacks them top to bottom for a document
@@ -105,7 +105,7 @@ public final class Nodes {
      * containing item row is selected, hovered or keyboard-active, or while the button itself is hovered/focused.
      * Outside an item row it behaves like EMBEDDED. It never changes action dispatch or selection.
      */
-    public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED, CIRCULAR }
+    public enum ButtonPresentation { STANDARD, EMBEDDED, CONTEXTUAL_EMBEDDED, HELP }
 
     /**
      * A present {@code iconSeverity} tints the button's glyph with that severity's colour (as {@link Icon#severity()}

@@ -137,20 +137,20 @@ public final class KitFixtures {
                 new dev.jasper.ui.model.Nodes.Stack(
                         "unlock-hero",
                         ready,
-                        dev.jasper.ui.model.Nodes.LayoutRole.HERO,
+                        dev.jasper.ui.model.Nodes.LayoutRole.PROMPT_HEADER,
                         java.util.List.of(
                                 new dev.jasper.ui.model.Nodes.Icon(
                                         "unlock-icon",
                                         ready,
                                         "lock",
                                         dev.jasper.ui.model.Nodes.Hue.BLUE,
-                                        dev.jasper.ui.model.Nodes.IconSize.HERO,
+                                        dev.jasper.ui.model.Nodes.IconSize.PROMPT,
                                         "Vault"),
                                 new dev.jasper.ui.model.Nodes.Text(
                                         "unlock-title",
                                         ready,
                                         "Unlock Vault",
-                                        dev.jasper.ui.model.Nodes.TextRole.HERO_TITLE),
+                                        dev.jasper.ui.model.Nodes.TextRole.PROMPT_TITLE),
                                 new dev.jasper.ui.model.Nodes.Text(
                                         "unlock-description",
                                         ready,
@@ -160,7 +160,7 @@ public final class KitFixtures {
                 new dev.jasper.ui.model.Nodes.Form(
                         "unlock",
                         ready,
-                        dev.jasper.ui.model.Nodes.FormKind.HERO,
+                        dev.jasper.ui.model.Nodes.FormKind.PROMPT,
                         "Unlock Vault",
                         java.util.Optional.of(hero),
                         java.util.List.of(

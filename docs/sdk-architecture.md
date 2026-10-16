@@ -592,5 +592,5 @@ reject sliders in both host and testkit. `ChoiceKind.PREVIEWS` keeps stable sele
 authored `Option.Preview` palettes; it never invents theme identity. The compatible three-argument Option
 constructor remains. Optional icon/description/preview fields are copied through KitValues; icon names
 are checked for producer ownership before mount/update, including options in unopened menus.
-`ButtonPresentation.CIRCULAR` requests an engine-owned round outlined face. Fake/real KitContract coverage
+`ButtonPresentation.HELP` marks a button that opens help; the default look draws it as an engine-owned round outlined face. Fake/real KitContract coverage
 checks these additions and keeps SDK0.15's existing boundary; no Swing/native objects cross the SDK.

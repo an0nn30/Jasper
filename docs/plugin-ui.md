@@ -35,10 +35,10 @@ Pick the composition from what the surface is, not from how it should look:
 
 | Surface | Descriptor |
 | --- | --- |
-| Small, focused prompt with an icon tile (unlock, create) | `Form` with `FormKind.HERO` or `HERO_COMPACT` and a hero |
+| Small, focused prompt with an icon tile (unlock, create) | `Form` with `FormKind.PROMPT` or `PROMPT_COMPACT` and a hero |
 | Dialog with grouped fields (add host, new server, new tunnel) | `Form` with `FormKind.FULL`; each group is a `Section` holding a `Card` |
 | Sheet attached to one of your windows | `Form` with `FormKind.SHEET`, shown with `DialogSpec` sheet presentation |
-| Modal prompt inside a window, over its dimmed content (unlock, create) | Any `Form`, often `HERO`/`HERO_COMPACT`, shown with `DialogSpec.Presentation.OVERLAY` (SDK 0.15.4) |
+| Modal prompt inside a window, over its dimmed content (unlock, create) | Any `Form`, often `PROMPT`/`PROMPT_COMPACT`, shown with `DialogSpec.Presentation.OVERLAY` (SDK 0.15.4) |
 | Window body with a pinned footer | `Form` with `FormKind.WINDOW` (one section) |
 | Docked panel | `Panel` with a `Header`, optional search or navigation, a body and an optional footer |
 | Sidebar, list and detail (a manager) | `Split` with `SplitKind.THREE_COLUMN` or `SIDEBAR_DETAIL` |
@@ -50,11 +50,11 @@ Inside cards:
   its control, plus an optional trailing control such as a port field or a Browse button.
 - `CardKind.SETTINGS` holds `SettingRow`s: a title and description with a trailing switch, dropdown or stepper.
   Mark a row `dependent` when it only applies while the row above is on.
-- `CardKind.MIXED` combines a segmented choice, rows and settings in one card (an authentication card).
+- `CardKind.MIXED` combines an exclusive choice, rows and settings in one card (an authentication card).
 
 Controls: `Field` (TEXT, SEARCH, PORT, PATH with Browse, TEXTAREA, NUMBER with steppers or a slider), `Secret`
-(masked input with reveal, confirmation, read-only detail with copy), `Choice` (DROPDOWN, SEGMENTED for two to four
-options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS), `Toggle` (a switch; settings never use checkboxes),
+(masked input with reveal, confirmation, read-only detail with copy), `Choice` (DROPDOWN, EXCLUSIVE for two to four
+visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS), `Toggle` (a switch; settings never use checkboxes),
 `Button` (one PRIMARY per surface, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), `MenuButton`, `Chip`, `StatusDot`,
 `Progress`, `Strength`, `Icon`, `Text` with a semantic `TextRole`, `ItemList`, `Table`, `Tree` and `Breadcrumbs`.
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).

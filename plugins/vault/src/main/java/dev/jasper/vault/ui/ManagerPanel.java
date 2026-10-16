@@ -278,7 +278,7 @@ final class ManagerPanel implements AutoCloseable {
                 List.of(tool(EDIT, "edit", "Edit entry", false), tool(DELETE, "delete", "Delete entry", false), tool(COPY_PUBLIC, "copy", "Copy public key", false))));
         } else {
             content.add(new Nodes.Stack("detail.heading", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-                new Nodes.Icon("detail.icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.HERO, row.type().toString()),
+                new Nodes.Icon("detail.icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.PROMPT, row.type().toString()),
                 new Nodes.Stack("detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(text("detail.name", row.name(), Nodes.TextRole.DETAIL_TITLE), text("detail.type", row.type().toString(), Nodes.TextRole.DESCRIPTION))),
                 tool(DELETE, "delete", "Delete entry", true), new Nodes.Button(EDIT, ControlState.READY, "Edit", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit entry"))));
             entry.apply(row.id()).ifPresent(value -> {

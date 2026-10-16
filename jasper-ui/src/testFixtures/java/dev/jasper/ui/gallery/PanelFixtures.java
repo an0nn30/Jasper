@@ -304,7 +304,7 @@ public final class PanelFixtures {
                                             READY,
                                             LayoutRole.NAVIGATION,
                                             List.of(
-                                                    new Nodes.Icon("session-detail-icon",READY,"server",Hue.NEUTRAL,IconSize.HERO,"SSH host"),
+                                                    new Nodes.Icon("session-detail-icon",READY,"server",Hue.NEUTRAL,IconSize.PROMPT,"SSH host"),
                                                     new Nodes.Stack(
                                                             "session-detail-text",
                                                             READY,

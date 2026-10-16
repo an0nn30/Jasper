@@ -45,7 +45,7 @@ final class ViewReconciler implements AutoCloseable {
         applyArtworkComposition(spec.root(),next,false);
         applyDocumentBars(spec.root(), next);
         for (var node : nodes.values()) next.get(node.id()).update(node);
-        applyHero(spec.root(), next, false);
+        applyPrompt(spec.root(), next, false);
         applyTiles(spec.root(), next, 0);
         applyRoute(spec.root(), next, true);
         for (var control : next.values()) if (control instanceof SecretFields.SecretControl secret) {
@@ -138,10 +138,10 @@ final class ViewReconciler implements AutoCloseable {
         boolean childrenEnabled = enabled && node.state().enabled() && !node.state().busy() && node.state().visible();
         ControlRegistry.children(node).forEach(child -> inherit(child, next, childrenEnabled));
     }
-    private void applyHero(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
-        boolean hero = node instanceof Nodes.Form form ? (form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT) : inherited;
+    private void applyPrompt(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
+        boolean hero = node instanceof Nodes.Form form ? (form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT) : inherited;
         next.get(node.id()).hero(hero);
-        ControlRegistry.children(node).forEach(child -> applyHero(child, next, hero));
+        ControlRegistry.children(node).forEach(child -> applyPrompt(child, next, hero));
     }
     private void applyFullForm(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
         boolean full = node instanceof Nodes.Form form ? form.kind() == Nodes.FormKind.FULL : inherited;
@@ -311,7 +311,7 @@ final class ViewReconciler implements AutoCloseable {
                 ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_SHEET_TILE)
                 : node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL
                 ? view.context().metrics().value(next.get(node.id()) instanceof Stacks.StackControl control && control.panelDetail ? dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TILE : dev.jasper.ui.metrics.DesignMetrics.Role.CATEGORY_DETAIL_TILE) : inherited;
-        if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO && next.get(icon.id()) instanceof Labels.IconControl control)
+        if (size > 0 && node instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.PROMPT && next.get(icon.id()) instanceof Labels.IconControl control)
             control.tile(size, control.panelDetail ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TILE_HEIGHT) : size,
                 control.panelDetail ? view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_GLYPH) : 0, false);
         ControlRegistry.children(node).forEach(child -> applyTiles(child, next, size));
@@ -322,14 +322,14 @@ final class ViewReconciler implements AutoCloseable {
      */
     private void applyFlow(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
         boolean vertical = node instanceof Nodes.Form || node instanceof Nodes.Card || node instanceof Nodes.Section
-                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.HERO || stack.role() == Nodes.LayoutRole.SUPPORTING);
+                || node instanceof Nodes.Stack stack && (stack.role() == Nodes.LayoutRole.VERTICAL || stack.role() == Nodes.LayoutRole.DETAIL || stack.role() == Nodes.LayoutRole.PROMPT_HEADER || stack.role() == Nodes.LayoutRole.SUPPORTING);
         for (var child : ControlRegistry.children(node)) {
             if (vertical && child instanceof Nodes.Text text && switch (text.role()) {
                         case BODY, DESCRIPTION, SUPPORTING, CAPTION -> true;
                         default -> false;
                     } && next.get(child.id()).component instanceof Labels.LiteralLabel label) {
                 label.flow = true;
-                label.wrapped.centered = node instanceof Nodes.Stack parent && parent.role() == Nodes.LayoutRole.HERO;
+                label.wrapped.centered = node instanceof Nodes.Stack parent && parent.role() == Nodes.LayoutRole.PROMPT_HEADER;
                 label.flowColumns = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.TEXT_FLOW_COLUMNS);
             }
             applyFlow(child, next);
@@ -371,7 +371,7 @@ final class ViewReconciler implements AutoCloseable {
         boolean group=node instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() && identityHead(stack.children().getFirst());
         var control=controls.get(node.id());
         if(control instanceof Stacks.StackControl stack){stack.identityHeader=identityHead(node);stack.identityGroup=group;}
-        if(control instanceof Choices.ChoiceControl choice)choice.identitySection=identity && ((Nodes.Choice)node).kind()==Nodes.ChoiceKind.SEGMENTED;
+        if(control instanceof Choices.ChoiceControl choice)choice.identitySection=identity && ((Nodes.Choice)node).kind()==Nodes.ChoiceKind.EXCLUSIVE;
         var children=ControlRegistry.children(node);
         children.forEach(child->applyArtworkComposition(child,controls,identity||group));
         for(int i=0;i<children.size();i++)if(controls.get(children.get(i).id()) instanceof Labels.TextControl text) {

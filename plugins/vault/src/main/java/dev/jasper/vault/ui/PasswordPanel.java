@@ -148,11 +148,11 @@ public final class PasswordPanel implements AutoCloseable {
         });
     }
 
-    /** The standalone hero; domain policy remains in the submit handler. */
+    /** The standalone prompt; domain policy remains in the submit handler. */
     Nodes.Form node() {
-        var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.HERO, List.of(
-            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.HERO, creating ? "Protect credentials" : "Locked vault"),
-            new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.HERO_TITLE),
+        var hero = new Nodes.Stack(form + ".hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon(form + ".icon", ControlState.READY, creating ? "shield" : "lock.keyhole", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, creating ? "Protect credentials" : "Locked vault"),
+            new Nodes.Text(form + ".heading", ControlState.READY, creating ? "Create Vault" : "Unlock Vault", Nodes.TextRole.PROMPT_TITLE),
             new Nodes.Text(intro, ControlState.READY, introText, Nodes.TextRole.DESCRIPTION)));
         var fields = new ArrayList<Nodes.Node>();
         fields.add(secret(password, "Master password"));
@@ -171,7 +171,7 @@ public final class PasswordPanel implements AutoCloseable {
                 new Nodes.Text(form + ".warning.text", ControlState.READY, "Your master password cannot be recovered if forgotten.", Nodes.TextRole.CAPTION))));
         }
         sections.add(statusLine());
-        return new Nodes.Form(form, ControlState.READY, creating ? Nodes.FormKind.HERO : Nodes.FormKind.HERO_COMPACT, primaryTitle, Optional.of(hero), sections, Optional.empty(),
+        return new Nodes.Form(form, ControlState.READY, creating ? Nodes.FormKind.PROMPT : Nodes.FormKind.PROMPT_COMPACT, primaryTitle, Optional.of(hero), sections, Optional.empty(),
             List.of(cancelButton(), submitButton()), cancel);
     }
 

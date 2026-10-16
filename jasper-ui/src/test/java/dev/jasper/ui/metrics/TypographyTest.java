@@ -33,7 +33,7 @@ class TypographyTest {
         // Separate technical roles and established title policy do not follow caption calibration.
         assertThat(sized(26).font(Typography.Role.MONO).getSize2D()).isEqualTo(24);
         assertThat(sized(26).font(Typography.Role.PANEL_DETAIL_MONO).getSize2D()).isEqualTo(23.3f);
-        assertThat(typography.font(Typography.Role.HERO_TITLE).getAttributes().get(java.awt.font.TextAttribute.TRACKING)).isEqualTo(.018f);
+        assertThat(typography.font(Typography.Role.PROMPT_TITLE).getAttributes().get(java.awt.font.TextAttribute.TRACKING)).isEqualTo(.018f);
     }
     private static int inkWidth(java.awt.Font font,String text) {
         var image=new java.awt.image.BufferedImage(1000,100,java.awt.image.BufferedImage.TYPE_INT_ARGB);
@@ -71,16 +71,16 @@ class TypographyTest {
 
     @Test void measuredMediumPolicyPreservesUserFamiliesAndProportionalSizes() {
         var user = named(java.awt.Font.MONOSPACED, 26);
-        assertThat(user.font(Typography.Role.HERO_TITLE).getFamily()).isEqualTo(java.awt.Font.MONOSPACED);
-        assertThat(user.font(Typography.Role.HERO_TITLE).getSize2D()).isEqualTo(30);
-        assertThat(user.font(Typography.Role.HERO_TITLE).getAttributes().get(java.awt.font.TextAttribute.TRACKING)).isNull();
+        assertThat(user.font(Typography.Role.PROMPT_TITLE).getFamily()).isEqualTo(java.awt.Font.MONOSPACED);
+        assertThat(user.font(Typography.Role.PROMPT_TITLE).getSize2D()).isEqualTo(30);
+        assertThat(user.font(Typography.Role.PROMPT_TITLE).getAttributes().get(java.awt.font.TextAttribute.TRACKING)).isNull();
         assertThat(named("Helvetica Neue", 19).font(Typography.Role.BODY).getSize2D()).isEqualTo(19);
         var face = new java.awt.Font("HelveticaNeue-Medium", java.awt.Font.PLAIN, 1);
         if (face.getFamily(java.util.Locale.ROOT).equals("Helvetica Neue")) {
             assertThat(named("Helvetica Neue", 19).font(Typography.Role.BODY).getFamily()).isEqualTo("Helvetica Neue");
             if (platform().family().equals("Helvetica Neue"))
                 assertThat(platform().font(Typography.Role.BODY).getFamily()).isEqualTo("Helvetica Neue");
-            var calibrated = named("Helvetica Neue", 26).font(Typography.Role.HERO_TITLE);
+            var calibrated = named("Helvetica Neue", 26).font(Typography.Role.PROMPT_TITLE);
             assertThat(calibrated.getFontName(java.util.Locale.ROOT)).isEqualTo(face.getFontName(java.util.Locale.ROOT));
             assertThat(calibrated.getSize2D()).isEqualTo(30);
             assertThat(calibrated.getAttributes().get(java.awt.font.TextAttribute.TRACKING)).isEqualTo(.018f);

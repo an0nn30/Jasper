@@ -99,9 +99,9 @@ final class Stacks {
                     settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.ROUTE ? new RouteLayout(this)
                     : routeStep ? new RouteStepLayout(context())
                     : panelFooter != null && stack.role() == Nodes.LayoutRole.VERTICAL ? new PanelFooters.StackLayout(this, panelFooter)
-                    : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.HERO
-                            ? new HeroLayout(this)
-                            : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), hint ? DesignMetrics.Role.PALETTE_HINT_ACTION_GAP : identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.HERO) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
+                    : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.PROMPT_HEADER
+                            ? new PromptLayout(this)
+                            : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), hint ? DesignMetrics.Role.PALETTE_HINT_ACTION_GAP : identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.PROMPT) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return identityGroup ? ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_HEADER_AFTER) : keycapDetail && stack.role() == Nodes.LayoutRole.VERTICAL ? ThemePainting.metric(context(),DesignMetrics.Role.KEYCAP_DETAIL_GAP) : panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
                                 @Override int verticalGap(Component previous, Component child) {
                                     if (panelDetail && stack.role() == Nodes.LayoutRole.VERTICAL && stack.children().stream().allMatch(n -> n instanceof Nodes.Text)) return 0;
@@ -122,7 +122,7 @@ final class Stacks {
 
         @Override
         Container childParent(Nodes.Node child) {
-            return ((Nodes.Stack) node).role() == Nodes.LayoutRole.HERO
+            return ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER
                             && child instanceof Nodes.Icon
                     ? tile
                     : component;
@@ -170,7 +170,7 @@ final class Stacks {
         final DesignMetrics.Role sizeRole;
 
         Tile(KitContext context) {
-            this(context, DesignMetrics.Role.HERO_TILE);
+            this(context, DesignMetrics.Role.PROMPT_TILE);
         }
 
         Tile(KitContext context, DesignMetrics.Role sizeRole) {
@@ -192,7 +192,7 @@ final class Stacks {
             try {
                 ThemePainting.antialias(g);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL));
-                int radius = ThemePainting.metric(context, DesignMetrics.Role.HERO_TILE_RADIUS);
+                int radius = ThemePainting.metric(context, DesignMetrics.Role.PROMPT_TILE_RADIUS);
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
                 g.setColor(ThemePainting.color(context, SemanticColor.BORDER_CONTROL));
                 g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radius * 2, radius * 2);
@@ -202,10 +202,10 @@ final class Stacks {
         }
     }
 
-    static final class HeroLayout implements Composition.WidthLayout {
+    static final class PromptLayout implements Composition.WidthLayout {
         final StackControl owner;
 
-        HeroLayout(StackControl owner) {
+        PromptLayout(StackControl owner) {
             this.owner = owner;
         }
 
@@ -213,7 +213,7 @@ final class Stacks {
             return ThemePainting.metric(
                     owner.context(),
                     previous == owner.tile
-                            ? DesignMetrics.Role.HERO_TILE_GAP
+                            ? DesignMetrics.Role.PROMPT_TILE_GAP
                             : DesignMetrics.Role.DESCRIPTION_GAP);
         }
 

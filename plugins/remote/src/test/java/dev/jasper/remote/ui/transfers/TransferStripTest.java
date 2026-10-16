@@ -172,7 +172,7 @@ class TransferStripTest {
             assertThat(chosen).containsExactly(ConflictDecision.REPLACE, ConflictDecision.SKIP, "cancel");
             assertThat(button(panel.view(), ExistingItemsPanel.SKIP).label()).isEqualTo("Skip existing");
             assertThat(form(panel.view()).submission()).as("Enter copies nothing").isEqualTo(Nodes.FormSubmission.NONE);
-            assertThat(form(panel.view()).kind()).as("the kit's compact question dialog").isEqualTo(Nodes.FormKind.HERO_COMPACT);
+            assertThat(form(panel.view()).kind()).as("the kit's compact question dialog").isEqualTo(Nodes.FormKind.PROMPT_COMPACT);
             assertThat(form(panel.view()).cancelAction()).isEqualTo(ExistingItemsPanel.CANCEL);
             panel.close();
             assertThat(closed(panel.view())).isTrue();

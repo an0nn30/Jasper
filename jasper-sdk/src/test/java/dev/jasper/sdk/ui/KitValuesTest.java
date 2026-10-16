@@ -7,6 +7,19 @@ import static org.assertj.core.api.Assertions.*;
 
 class KitValuesTest {
     private Text text(String id) { return new Text(id, ControlState.READY, "Text", TextRole.BODY); }
+    private static List<String> names(Class<? extends Enum<?>> type) {
+        return Arrays.stream(type.getEnumConstants()).map(constant -> constant.name()).toList();
+    }
+    /** Spec 8.1: the constants SDK 0.18 renames; every other constant keeps its name and place. */
+    @Test void zeroEighteenNamesTheExclusiveHelpAndPromptConstants() {
+        assertThat(names(ChoiceKind.class)).containsExactly("DROPDOWN", "PICKER", "EXCLUSIVE", "SEARCHABLE", "PREVIEWS");
+        assertThat(names(ButtonPresentation.class)).containsExactly("STANDARD", "EMBEDDED", "CONTEXTUAL_EMBEDDED", "HELP");
+        assertThat(names(FormKind.class)).containsExactly("PROMPT", "PROMPT_COMPACT", "SHEET", "FULL", "SETTINGS", "WINDOW");
+        assertThat(names(LayoutRole.class)).startsWith("VERTICAL", "INLINE", "ACTIONS", "PROMPT_HEADER", "DETAIL");
+        assertThat(names(TextRole.class)).startsWith("PROMPT_TITLE", "DETAIL_TITLE").contains("MONO", "MONO_SMALL", "MONO_CAPTION");
+        assertThat(names(IconSize.class)).containsExactly("CAPTION", "CONTROL", "RAIL", "EMPTY", "PROMPT");
+        assertThat(names(ButtonKind.class)).contains("GHOST", "DESTRUCTIVE_GHOST");
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

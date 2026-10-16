@@ -293,7 +293,7 @@ final class ItemLists {
                                                 Typography.Role.LABEL);
                                 case PREVIEWS -> ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+fontHeight(Typography.Role.SETTINGS_PREVIEW)
                                     +2*ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING)+ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
-                                case SEGMENTED ->
+                                case EXCLUSIVE ->
                                         inputHeight(
                                                         DesignMetrics.Role.FORM_SEGMENT_HEIGHT,
                                                         Typography.Role.LABEL)
@@ -413,7 +413,7 @@ final class ItemLists {
                 // A fixed index column keeps every key glyph and name on one vertical line.
                 ((Labels.LiteralLabel) number.component).columnWidth = ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_INDEX_WIDTH);
             }
-            if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.HERO) && icon.hue() != Nodes.Hue.NONE) {
+            if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.PROMPT) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
             } else if (item.leading().orElse(null) instanceof Nodes.Icon icon && row.controls.get(icon.id()) instanceof Labels.IconControl glyph)
                 // A compact panel row draws its leading glyph at the panel-row size; elsewhere the icon's size role holds.

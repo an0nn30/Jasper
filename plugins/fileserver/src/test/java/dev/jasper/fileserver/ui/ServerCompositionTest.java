@@ -21,7 +21,7 @@ class ServerCompositionTest {
                     .extracting(n -> ((Nodes.Section)n).title()).containsExactly("Server", "Access", "Security & Startup");
                 assertThat(form.submission()).isEqualTo(Nodes.FormSubmission.NONE);
                 var protocol = (Nodes.Choice) node(editor, ServerEditor.PROTOCOL);
-                assertThat(protocol.kind()).isEqualTo(Nodes.ChoiceKind.SEGMENTED);
+                assertThat(protocol.kind()).isEqualTo(Nodes.ChoiceKind.EXCLUSIVE);
                 assertThat(protocol.options()).extracting(Option::id).containsExactly("HTTP", "FTP", "SFTP", "TFTP");
                 assertThat(node(editor, "server.account.row").state().visible()).isFalse();
                 assertThat(((Nodes.Button)node(editor, ServerEditor.SAVE)).kind()).isEqualTo(Nodes.ButtonKind.PRIMARY);

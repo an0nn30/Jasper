@@ -57,9 +57,9 @@ class TransferCompositionTest {
             var chosen = new ArrayList<Object>();
             var panel = new ExistingItemsPanel(new FakeKit("dev.jasper.remote"), "2 of 3 items already exist in prod:/srv/app.", chosen::add, () -> chosen.add("cancel"));
             var form = form(panel.view());
-            assertThat(form.kind()).isEqualTo(Nodes.FormKind.HERO_COMPACT);
+            assertThat(form.kind()).isEqualTo(Nodes.FormKind.PROMPT_COMPACT);
             assertThat(form.hero()).get().isInstanceOfSatisfying(Nodes.Stack.class, hero -> {
-                assertThat(hero.role()).isEqualTo(Nodes.LayoutRole.HERO);
+                assertThat(hero.role()).isEqualTo(Nodes.LayoutRole.PROMPT_HEADER);
                 assertThat(hero.children().getFirst()).isInstanceOfSatisfying(Nodes.Icon.class, icon -> assertThat(icon.name()).isEqualTo("warning"));
                 assertThat(((Nodes.Text) hero.children().getLast()).text()).isEqualTo("2 of 3 items already exist in prod:/srv/app.");
             });

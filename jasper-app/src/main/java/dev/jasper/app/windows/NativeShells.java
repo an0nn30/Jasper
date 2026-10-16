@@ -351,8 +351,8 @@ public final class NativeShells {
             for (var child : surface.holder().getComponents()) {
                 if (child instanceof dev.jasper.ui.swing.KitView view
                         && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form
-                        && (form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO || form.kind() == dev.jasper.ui.model.Nodes.FormKind.HERO_COMPACT))
-                    bar.setStyle(MacTitleBar.Style.HERO);
+                        && (form.kind() == dev.jasper.ui.model.Nodes.FormKind.PROMPT || form.kind() == dev.jasper.ui.model.Nodes.FormKind.PROMPT_COMPACT))
+                    bar.setStyle(MacTitleBar.Style.PROMPT);
             }
             surface.integratedTitle().ifPresent(bar::integrate);
         }

@@ -15,7 +15,7 @@ class ChoicesTest {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var previous = UIManager.get("defaultFont");
-            try (var view = new KitView(context, stack(choice(ChoiceKind.SEGMENTED, "b", ControlState.READY)), e -> {})) {
+            try (var view = new KitView(context, stack(choice(ChoiceKind.EXCLUSIVE, "b", ControlState.READY)), e -> {})) {
                 for (int size : new int[] {13, 20}) {
                     UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, size));
                     KitFixtures.render(view, 400, 100, 2);
@@ -36,7 +36,7 @@ class ChoicesTest {
     @Test void selectedSegmentTextRemainsReadableOnLightDarkAndAuthoredControlSurfaces() {
         Edt.run(() -> {
             var context=KitFixtures.context();
-            try(var view=new KitView(context,stack(choice(ChoiceKind.SEGMENTED,"b",ControlState.READY)),e -> {})) {
+            try(var view=new KitView(context,stack(choice(ChoiceKind.EXCLUSIVE,"b",ControlState.READY)),e -> {})) {
                 var custom=KitFixtures.custom();var colors=new EnumMap<dev.jasper.ui.theme.SemanticColor,java.awt.Color>(dev.jasper.ui.theme.SemanticColor.class);
                 for(var role:dev.jasper.ui.theme.SemanticColor.values())colors.put(role,custom.semantic().color(role));
                 colors.put(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY,new java.awt.Color(100,100,100));
@@ -169,7 +169,7 @@ class ChoicesTest {
     @Test void segmentsKeyboardSelectAndPickerOpensItsConfiguredAction() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
-            try (var view = new KitView(context, stack(choice(ChoiceKind.SEGMENTED, "a", ControlState.READY)), events::add)) {
+            try (var view = new KitView(context, stack(choice(ChoiceKind.EXCLUSIVE, "a", ControlState.READY)), events::add)) {
                 var a = find(view, "choice.option.a", JButton.class);
                 assertThat(a.getFont().getAttributes().get(java.awt.font.TextAttribute.WEIGHT)).isEqualTo(java.awt.font.TextAttribute.WEIGHT_MEDIUM);
                 var key = a.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke("RIGHT")); assertThat(key).isNotNull();
@@ -196,7 +196,7 @@ class ChoicesTest {
     @Test void disabledSegmentTrackUsesDisabledOpacityOnce() {
         Edt.run(() -> {
             var context = KitFixtures.context();
-            try (var view = new KitView(context, stack(choice(ChoiceKind.SEGMENTED, "a", new ControlState(true, false, false, ""))), e -> {})) {
+            try (var view = new KitView(context, stack(choice(ChoiceKind.EXCLUSIVE, "a", new ControlState(true, false, false, ""))), e -> {})) {
                 var track = find(view, "choice.input", JComponent.class); track.setSize(200, 32);
                 int alpha=(ButtonsTest.paint(track).getRGB(100, com.formdev.flatlaf.util.UIScale.scale(1))>>>24)&255;
                 assertThat(alpha).isBetween(106,108);
@@ -260,9 +260,9 @@ class ChoicesTest {
     @Test void aSegmentedChoiceStaysOnOneLineWhileItsLabelsFit() {
         Edt.run(() -> {
             var context = KitFixtures.context();
-            var login = new Nodes.Choice("login", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("anon", "Anonymous", Optional.empty()),
+            var login = new Nodes.Choice("login", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE, List.of(new Option("anon", "Anonymous", Optional.empty()),
                 new Option("vault", "Vault Account", Optional.empty()), new Option("session", "Session Password", Optional.empty())), "anon", "Login", "");
-            var protocol = new Nodes.Choice("protocol", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, List.of(new Option("http", "HTTP", Optional.empty()),
+            var protocol = new Nodes.Choice("protocol", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE, List.of(new Option("http", "HTTP", Optional.empty()),
                 new Option("ftp", "FTP", Optional.empty()), new Option("sftp", "SFTP", Optional.empty()), new Option("tftp", "TFTP", Optional.empty())), "http", "Protocol", "");
             for (var choice : List.of(login, protocol)) {
                 try (var view = new KitView(context, new ViewSpec(choice), e -> { })) {
@@ -292,7 +292,7 @@ class ChoicesTest {
     @Test void aSettingsSegmentsLabelKeepsItsPaddingFromTheSegmentsEdge() {
         Edt.run(() -> {
             var context = KitFixtures.context();
-            var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED,
+            var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE,
                 List.of(new Option("icons", "Icons Only", Optional.empty()), new Option("both", "Icons & Labels", Optional.empty()), new Option("hidden", "Hidden", Optional.empty())), "both", "Toolbar", "");
             try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("page", ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(choice))), e -> { })) {
                 view.setSize(600, 200); InteractiveRowsTest.layout(view);

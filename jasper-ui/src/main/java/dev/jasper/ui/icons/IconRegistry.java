@@ -134,7 +134,7 @@ public final class IconRegistry implements AutoCloseable {
             };
         }
     }
-    /** Hero glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
+    /** Prompt glyphs retain a 1.75-logical-pixel optical stroke at the canonical 24px size. */
     public Icon hero(String name, SemanticPalette palette, Nodes.Hue hue, int logicalSize) {
         return painted(name,tint(palette,hue),null,logicalSize,logicalSize,false,true,0,false,select(name,null,palette,false),false);
     }
@@ -218,7 +218,7 @@ public final class IconRegistry implements AutoCloseable {
     public Icon panel(String name,GeneratedTheme theme,SemanticColor tint,int size) {
         return painted(name,theme.semantic().color(tint),null,size,size,false,false,0,artworks.get(name)==BUILT_INS.get(name),select(name,theme,theme.semantic(),false),false);
     }
-    /** Hero context retains legacy geometry except explicitly admitted identity meanings. */
+    /** Prompt context retains legacy geometry except explicitly admitted identity meanings. */
     public Icon hero(String name,GeneratedTheme theme,Nodes.Hue hue,int size) {
         return painted(name,tint(theme.semantic(),hue),null,size,size,false,true,0,false,select(name,theme,theme.semantic(),false),false);
     }
@@ -229,7 +229,7 @@ public final class IconRegistry implements AutoCloseable {
             case CONTROL -> DesignMetrics.Role.ICON_CONTROL;
             case RAIL -> DesignMetrics.Role.ICON_RAIL;
             case EMPTY -> DesignMetrics.Role.ICON_EMPTY;
-            case HERO -> DesignMetrics.Role.ICON_HERO;
+            case PROMPT -> DesignMetrics.Role.ICON_PROMPT;
         });
     }
     private Icon painted(String name, Color foreground, Color background, int size, boolean tile) {
@@ -374,7 +374,7 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("collapse.all", "M 5 2.5 L 8 5.5 L 11 2.5 M 5 13.5 L 8 10.5 L 11 13.5"),
             Map.entry("search", "M 11 7 A 4 4 0 1 1 3 7 A 4 4 0 1 1 11 7 M 10 10 L 14 14"),
             Map.entry("shield", "M 8 1.333 L 12.85 3.667 V 7.5 C 12.85 11 11 13.333 8 14.333 C 5 13.333 3.15 11 3.15 7.5 V 3.667 Z M 6.5 7 H 9.5 Q 10 7 10 7.5 V 10.5 Q 10 11 9.5 11 H 6.5 Q 6 11 6 10.5 V 7.5 Q 6 7 6.5 7 M 7 7 V 6 A 1 1 0 0 1 9 6 V 7"),
-            // Control-sized locks are a plain padlock; the hero padlock carries a solid 2.67-unit keyhole (source 4 logical at 24px).
+            // Control-sized locks are a plain padlock; the prompt padlock carries a solid 2.67-unit keyhole (source 4 logical at 24px).
             Map.entry("lock", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7"),
             Map.entry("lock.keyhole", "M 5 7 V 5 A 3 3 0 0 1 11 5 V 7 M 4.25 7 H 11.75 Q 12.85 7 12.85 8.25 V 12.75 Q 12.85 14 11.75 14 H 4.25 Q 3.15 14 3.15 12.75 V 8.25 Q 3.15 7 4.25 7 M 8.75 10.5 A 0.75 0.75 0 1 1 7.25 10.5 A 0.75 0.75 0 1 1 8.75 10.5"),
             Map.entry("edit", "M 3 10 L 10 3 L 13 6 L 6 13 L 2 14 Z M 9 4 L 12 7"),

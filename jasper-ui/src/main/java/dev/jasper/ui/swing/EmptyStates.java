@@ -131,7 +131,7 @@ final class EmptyStates {
                 ThemePainting.antialias(g);
                 var context = owner.context();
                 g.setColor(ThemePainting.color(context, owner.panel ? SemanticColor.SURFACE_EMPTY_TILE : SemanticColor.SURFACE_CONTROL));
-                int radius = ThemePainting.metric(context, owner.panel ? DesignMetrics.Role.PANEL_EMPTY_TILE_RADIUS : DesignMetrics.Role.HERO_TILE_RADIUS);
+                int radius = ThemePainting.metric(context, owner.panel ? DesignMetrics.Role.PANEL_EMPTY_TILE_RADIUS : DesignMetrics.Role.PROMPT_TILE_RADIUS);
                 if (owner.panel) {
                     g.fill(new java.awt.geom.RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), radius * 2, radius * 2));
                     return;

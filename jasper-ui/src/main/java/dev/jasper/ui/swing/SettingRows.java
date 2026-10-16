@@ -181,7 +181,7 @@ final class SettingRows {
             return Math.max(
                     owner.panelFooter ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT) : ThemePainting.metric(
                             owner.context(),
-                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : owner.grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.HERO_SETTING_HEIGHT : owner.description.isVisible()
+                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : owner.grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.hero && owner.description.isVisible() ? DesignMetrics.Role.PROMPT_SETTING_HEIGHT : owner.description.isVisible()
                                     ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
                                     : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.hero ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) : 0),
                     i.top + i.bottom + Math.max(text, control));

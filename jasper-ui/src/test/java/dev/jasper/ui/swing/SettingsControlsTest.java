@@ -36,7 +36,7 @@ class SettingsControlsTest {
         var context=dev.jasper.ui.testsupport.KitFixtures.context();
         var back=new Nodes.Button("back",ControlState.READY,"","chevron.left",Nodes.ButtonKind.GHOST,"back","Back");
         var next=new Nodes.Button("next",ControlState.READY,"","chevron.right",Nodes.ButtonKind.GHOST,"next","Next");
-        var help=new Nodes.Button("help",ControlState.READY,"","question",Nodes.ButtonKind.GHOST,"help","Help",Nodes.ButtonPresentation.CIRCULAR);
+        var help=new Nodes.Button("help",ControlState.READY,"","question",Nodes.ButtonKind.GHOST,"help","Help",Nodes.ButtonPresentation.HELP);
         var text=new Nodes.Text("status",ControlState.READY,"",Nodes.TextRole.CAPTION);
         var ok=new Nodes.Button("ok",ControlState.READY,"OK","",Nodes.ButtonKind.PRIMARY,"ok","");
         var footer=new Nodes.Stack("footer",ControlState.READY,Nodes.LayoutRole.SETTINGS_FOOTER,List.of(help,text,ok));
@@ -99,7 +99,7 @@ class SettingsControlsTest {
 
     @Test void identityHeaderAddsAnInwardContourWithoutChangingNormalRowsOrAuthoredGlyphs() { Edt.run(()->{
         var context=dev.jasper.ui.testsupport.KitFixtures.context();
-        var icon=new Nodes.Icon("icon",ControlState.READY,"plugin",Nodes.Hue.BLUE,Nodes.IconSize.HERO,"Owner");
+        var icon=new Nodes.Icon("icon",ControlState.READY,"plugin",Nodes.Hue.BLUE,Nodes.IconSize.PROMPT,"Owner");
         try(var view=new KitView(context,new ViewSpec(icon),event->{})) {
             view.setArtworkPresentation("icon",ArtworkPresentation.IDENTITY_HEADER);
             var rendered=find(view,"icon",JLabel.class).getIcon();
@@ -193,7 +193,7 @@ class SettingsControlsTest {
     }); }
     @Test void segmentedChoicesReflowWithoutReplacingButtonsOrLosingKeyboardSelection() { Edt.run(() -> {
         var options = List.of(new Option("both", "Icons & Labels", Optional.empty()), new Option("icons", "Icons Only", Optional.empty()), new Option("none", "Hidden", Optional.empty()));
-        var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, options, "both", "Toolbar", "");
+        var choice = new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE, options, "both", "Toolbar", "");
         var events = new ArrayList<UiEvent>();
         try (var view = new KitView(dev.jasper.ui.testsupport.KitFixtures.context(), new ViewSpec(choice), events::add)) {
             var first = find(view, "toolbar.option.both", JButton.class);
@@ -207,7 +207,7 @@ class SettingsControlsTest {
             var key = first.getInputMap().get(KeyStroke.getKeyStroke("RIGHT"));
             first.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(first, 0, ""));
             assertThat(events).contains(new UiEvent.Selected("toolbar", Set.of("icons")));
-            view.update(new ViewSpec(new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.SEGMENTED, options, "icons", "Toolbar", "")));
+            view.update(new ViewSpec(new Nodes.Choice("toolbar", ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE, options, "icons", "Toolbar", "")));
             assertThat(find(view, "toolbar.option.both", JButton.class)).isSameAs(first);
             assertThat(find(view, "toolbar.option.icons", JButton.class).isSelected()).isTrue();
             float priorScale = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();

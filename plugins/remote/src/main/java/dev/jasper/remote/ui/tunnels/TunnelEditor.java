@@ -268,7 +268,7 @@ public final class TunnelEditor implements AutoCloseable {
             row("row." + NAME, "Name", "", field(NAME, Nodes.FieldKind.TEXT, name, "e.g. Postgres", "Name", true, nameProblem, Nodes.FieldPresentation.STANDARD), Optional.empty()),
             row("row." + HOST, "Via Host", "", new Nodes.Choice(HOST, new ControlState(true, editable, false, hostProblem()), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via Host", "", "",
                 Optional.empty(), face), Optional.empty()),
-            row("row." + TYPE, "Type", "", new Nodes.Choice(TYPE, state(true, editable), Nodes.ChoiceKind.SEGMENTED, List.of(
+            row("row." + TYPE, "Type", "", new Nodes.Choice(TYPE, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
                 new Option(LOCAL, "Local", Optional.empty()), new Option(REMOTE, "Remote", Optional.empty()), new Option(DYNAMIC, "Dynamic (SOCKS)", Optional.empty())),
                 switch (kind) { case LOCAL -> LOCAL; case REMOTE -> REMOTE; case DYNAMIC -> DYNAMIC; }, "Type", ""), Optional.empty()),
             row("row." + EXPLANATION, "", "", new Nodes.Text(EXPLANATION, ControlState.READY, switch (kind) {

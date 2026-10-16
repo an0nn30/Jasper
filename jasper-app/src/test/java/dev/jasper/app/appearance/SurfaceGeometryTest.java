@@ -37,12 +37,12 @@ class SurfaceGeometryTest {
         } finally { SurfaceFixtures.edt(() -> { themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, dev.jasper.app.config.UiFontConfig.defaults()); themes.close(); return null; }); }
     }
 
-    @Test void actualVaultOwnersUseReferenceHeroGeometryWithoutCreatingWindows() throws Exception {
+    @Test void actualVaultOwnersUseReferencePromptGeometryWithoutCreatingWindows() throws Exception {
         int windows=Window.getWindows().length;
         for(String id:java.util.List.of("vault-create","vault-unlock")) try(var open=SurfaceFixtures.open(id,"empty")) {
             assertThat(Window.getWindows()).hasSize(windows);
             assertThat(open.preferred().width).isEqualTo(id.equals("vault-create")?400:380);
-            // The packed hero heights at the compact scale with the macOS faces; on any face the packed view is its body's
+            // The packed prompt heights at the compact scale with the macOS faces; on any face the packed view is its body's
             // rows down to the bottom padding, unscrolled, over its footer.
             if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(open.preferred().height).isEqualTo(id.equals("vault-create")?379:238);
             SurfaceFixtures.edt(() -> {
@@ -64,13 +64,13 @@ class SurfaceGeometryTest {
                 return null;
             });
             assertThat(open.bounds("form.hero.tile").width).isEqualTo(54);
-            assertThat(open.bounds("password").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_FIELD_HEIGHT));
-            assertThat(open.bounds("password").x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
-            assertThat(open.bounds("submit").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_BUTTON_HEIGHT));
+            assertThat(open.bounds("password").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_FIELD_HEIGHT));
+            assertThat(open.bounds("password").x).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_SIDES));
+            assertThat(open.bounds("submit").height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_BUTTON_HEIGHT));
             assertThat(open.bounds("cancel").width).isEqualTo(open.bounds("submit").width);
             assertThat(open.bounds("submit").x-open.bounds("cancel").x-open.bounds("cancel").width).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_GAP));
             var hero=open.bounds("form.hero");
-            assertThat(open.bounds("password").y).isEqualTo(hero.y+hero.height+m(id.equals("vault-create")?dev.jasper.ui.metrics.DesignMetrics.Role.HERO_INTRO_GAP:dev.jasper.ui.metrics.DesignMetrics.Role.HERO_COMPACT_INTRO_GAP));
+            assertThat(open.bounds("password").y).isEqualTo(hero.y+hero.height+m(id.equals("vault-create")?dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_INTRO_GAP:dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_COMPACT_INTRO_GAP));
             if (com.formdev.flatlaf.util.SystemInfo.isMacOS) assertThat(open.bounds("password").y).isEqualTo(id.equals("vault-create")?155:137);
         }
     }
@@ -115,7 +115,7 @@ class SurfaceGeometryTest {
                 var message = open.component("message");
                 assertThat(message.isVisible()).isTrue();
                 assertThat(open.bounds("message").y + message.getHeight()).isLessThanOrEqualTo(open.bounds("cancel").y);
-                assertThat(open.bounds("password").width).isEqualTo(380 - 2 * m(dev.jasper.ui.metrics.DesignMetrics.Role.HERO_SIDES));
+                assertThat(open.bounds("password").width).isEqualTo(380 - 2 * m(dev.jasper.ui.metrics.DesignMetrics.Role.PROMPT_SIDES));
                 return null;
             });
         }

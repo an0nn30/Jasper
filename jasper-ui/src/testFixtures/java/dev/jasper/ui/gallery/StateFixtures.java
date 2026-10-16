@@ -33,7 +33,7 @@ public final class StateFixtures {
         controls.add(new Chip("chip", READY, "HTTP", Hue.BLUE));
         for (FieldPresentation presentation : FieldPresentation.values())
             controls.add(new Field("field-" + presentation, READY, presentation == FieldPresentation.PLAIN_PATH ? FieldKind.PATH : presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER ? FieldKind.NUMBER : FieldKind.TEXT, "42", "", "Presentation " + presentation, "", presentation == FieldPresentation.STEPPER || presentation == FieldPresentation.SLIDER ? Optional.of(new Numeric(0,100,1,0)) : Optional.empty(), presentation));
-        controls.add(new Nodes.Button("circle-help",READY,"","question",ButtonKind.GHOST,"help","Help",ButtonPresentation.CIRCULAR));
+        controls.add(new Nodes.Button("circle-help",READY,"","question",ButtonKind.GHOST,"help","Help",ButtonPresentation.HELP));
         controls.add(new Progress("progress", READY, .65, "Progress"));
         controls.add(new Progress("indeterminate", READY, -1, "Working"));
         controls.add(new Strength("strength", READY, 3, "Strong"));

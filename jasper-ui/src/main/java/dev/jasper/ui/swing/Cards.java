@@ -47,7 +47,7 @@ final class Cards {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
-            controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.SEGMENTED).forEach(c -> Composition.label(c, true));
+            controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
             ((CardSurface) component).settings =
                     controls.stream()
                             .filter(c -> c.node instanceof Nodes.SettingRow)

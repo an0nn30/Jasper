@@ -19,7 +19,7 @@ import java.util.function.Consumer;
  */
 public final class ExistingItemsPanel implements AutoCloseable {
     public static final String FORM = "existing", TEXT = "existing.text", REPLACE = "existing.replace", SKIP = "existing.skip", CANCEL = "existing.cancel";
-    static final String HERO = "existing.hero";
+    static final String HEADER = "existing.header";
     private final String message;
     private final UiView view;
     private boolean closed;
@@ -30,11 +30,11 @@ public final class ExistingItemsPanel implements AutoCloseable {
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SKIP, ControlState.READY, "Skip existing", "", Nodes.ButtonKind.SECONDARY, SKIP, ""),
             new Nodes.Button(REPLACE, ControlState.READY, "Replace", "", Nodes.ButtonKind.PRIMARY, REPLACE, ""));
-        var hero = new Nodes.Stack(HERO, ControlState.READY, Nodes.LayoutRole.HERO, List.of(
-            new Nodes.Icon(HERO + ".icon", ControlState.READY, "warning", Nodes.Hue.AMBER, Nodes.IconSize.HERO, "Items already exist"),
-            new Nodes.Text(HERO + ".title", ControlState.READY, "Replace Existing Items?", Nodes.TextRole.HERO_TITLE),
+        var hero = new Nodes.Stack(HEADER, ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon(HEADER + ".icon", ControlState.READY, "warning", Nodes.Hue.AMBER, Nodes.IconSize.PROMPT, "Items already exist"),
+            new Nodes.Text(HEADER + ".title", ControlState.READY, "Replace Existing Items?", Nodes.TextRole.PROMPT_TITLE),
             new Nodes.Text(TEXT, ControlState.READY, message, Nodes.TextRole.DESCRIPTION)));
-        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.HERO_COMPACT, "Items already exist", Optional.of(hero),
+        var form = new Nodes.Form(FORM, ControlState.READY, Nodes.FormKind.PROMPT_COMPACT, "Items already exist", Optional.of(hero),
             List.of(), Optional.empty(), actions, CANCEL, Nodes.FormSubmission.NONE);
         view = kit.create(new ViewSpec(form), event -> {
             if (closed || !(event instanceof UiEvent.Action action)) return;

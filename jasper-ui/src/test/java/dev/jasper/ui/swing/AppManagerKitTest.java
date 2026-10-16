@@ -43,7 +43,7 @@ class AppManagerKitTest {
         var list = new Panel("list", READY, hidden("list.header"), Optional.empty(),
             new ItemList("rows", READY, ListKind.SINGLE, List.of(row("a"), row("b")), Set.of("a"), "", List.of()), Optional.empty());
         var heading = new Stack("heading", READY, LayoutRole.NAVIGATION, List.of(
-            new Nodes.Icon("tile", READY, "error", Hue.NEUTRAL, IconSize.HERO, "Error"),
+            new Nodes.Icon("tile", READY, "error", Hue.NEUTRAL, IconSize.PROMPT, "Error"),
             new Stack("identity", READY, LayoutRole.VERTICAL, List.of(new Text("name", READY, "A long incident summary that needs room", TextRole.DETAIL_TITLE),
                 new Text("type", READY, "Source · operation", TextRole.DESCRIPTION))),
             new Button("first", READY, "Disable Plugin", "", ButtonKind.SECONDARY, "first", ""),

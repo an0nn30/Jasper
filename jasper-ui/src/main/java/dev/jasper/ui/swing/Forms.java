@@ -190,40 +190,40 @@ final class Forms {
             title.setText(form.title());
             title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty());
             Composition.style(
-                    title, context(), Typography.Role.HERO_TITLE, SemanticColor.TEXT_PRIMARY);
+                    title, context(), Typography.Role.PROMPT_TITLE, SemanticColor.TEXT_PRIMARY);
             ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET;
             int stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
             component.setBorder(form.kind()==Nodes.FormKind.SHEET ? new EmptyBorder(0,stroke,stroke,stroke) : new EmptyBorder(0,0,0,0));
-            boolean hero = form.kind() == Nodes.FormKind.HERO || form.kind() == Nodes.FormKind.HERO_COMPACT;
-            boolean compact = form.kind() == Nodes.FormKind.HERO_COMPACT;
+            boolean hero = form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT;
+            boolean compact = form.kind() == Nodes.FormKind.PROMPT_COMPACT;
             boolean window = form.kind() == Nodes.FormKind.WINDOW;
             // A window body shares traversal with native title accessories. Dialog forms
             // retain their own cycle; a provider preserves our default input within a window.
             component.setFocusCycleRoot(!window);
             component.setFocusTraversalPolicyProvider(window);
             body.fill = window; footer.window = window; footer.context = context();
-            int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), hero ? DesignMetrics.Role.HERO_SIDES : DesignMetrics.Role.FORM_SIDES);
+            int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), hero ? DesignMetrics.Role.PROMPT_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
             int focusClearance = hero ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
-            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
+            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(hero ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, focusClearance, side));
             body.setLayout(window ? new Composition.Vertical(0) {
                 @Override public void layoutContainer(Container parent) {
                     for (var child : parent.getComponents()) if (child.isVisible()) child.setBounds(0, 0, parent.getWidth(), parent.getHeight());
                 }
-            } : hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.HERO_SECTION_GAP)) {
+            } : hero ? new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_SECTION_GAP)) {
                 @Override int gap(Component previous, Component next) {
                     if (form.hero().isPresent() && previous == view.control(form.hero().get().id()).component)
-                        return ThemePainting.metric(context(), compact ? DesignMetrics.Role.HERO_COMPACT_INTRO_GAP : DesignMetrics.Role.HERO_INTRO_GAP);
+                        return ThemePainting.metric(context(), compact ? DesignMetrics.Role.PROMPT_COMPACT_INTRO_GAP : DesignMetrics.Role.PROMPT_INTRO_GAP);
                     return previous instanceof Cards.CardSurface
-                        ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTNOTE_GAP) : super.gap(previous, next);
+                        ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTNOTE_GAP) : super.gap(previous, next);
                 }
             } : new Composition.Vertical(ThemePainting.metric(context(), form.kind() == Nodes.FormKind.SHEET
                     ? DesignMetrics.Role.SHEET_SECTION_GAP : DesignMetrics.Role.SECTION_GAP)));
             int footerTop = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), compact
-                    ? DesignMetrics.Role.HERO_COMPACT_FOOTER_TOP : DesignMetrics.Role.HERO_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
+                    ? DesignMetrics.Role.PROMPT_COMPACT_FOOTER_TOP : DesignMetrics.Role.PROMPT_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
-                    window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), DesignMetrics.Role.HERO_FOOTER_BOTTOM) : pad, side));
+                    window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : hero ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
             footer.setLayout(new FooterLayout(this));
             actions.setLayout(
                     hero
@@ -406,8 +406,8 @@ final class Forms {
                             view.context(),
                             switch (f.kind()) {
                                 case WINDOW -> DesignMetrics.Role.FORM_WIDTH;
-                                case HERO -> DesignMetrics.Role.HERO_WIDTH;
-                                case HERO_COMPACT -> DesignMetrics.Role.HERO_COMPACT_WIDTH;
+                                case PROMPT -> DesignMetrics.Role.PROMPT_WIDTH;
+                                case PROMPT_COMPACT -> DesignMetrics.Role.PROMPT_COMPACT_WIDTH;
                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                 default -> DesignMetrics.Role.FORM_WIDTH;
                             });
@@ -478,7 +478,7 @@ final class Forms {
             Insets i = parent.getInsets();
             int contentWidth = Math.max(0, width - i.left - i.right);
             int actionWidth =
-                    (((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO || ((Nodes.Form) owner.node).kind() == Nodes.FormKind.HERO_COMPACT)
+                    (((Nodes.Form) owner.node).kind() == Nodes.FormKind.PROMPT || ((Nodes.Form) owner.node).kind() == Nodes.FormKind.PROMPT_COMPACT)
                             ? contentWidth
                             : Math.min(contentWidth, owner.actions.getPreferredSize().width);
             int actionHeight = Composition.height(owner.actions, actionWidth);
@@ -529,8 +529,8 @@ final class Forms {
                                     : ThemePainting.metric(
                                             owner.context(),
                                             switch (((Nodes.Form) owner.node).kind()) {
-                                                case HERO -> DesignMetrics.Role.HERO_WIDTH;
-                                                case HERO_COMPACT -> DesignMetrics.Role.HERO_COMPACT_WIDTH;
+                                                case PROMPT -> DesignMetrics.Role.PROMPT_WIDTH;
+                                                case PROMPT_COMPACT -> DesignMetrics.Role.PROMPT_COMPACT_WIDTH;
                                                 case SHEET -> DesignMetrics.Role.SHEET_WIDTH;
                                                 default -> DesignMetrics.Role.FORM_WIDTH;
                                             });

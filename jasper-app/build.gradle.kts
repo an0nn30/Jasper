@@ -196,8 +196,9 @@ tasks.test {
         rootProject.fileTree("plugins/sample/src") { include("**/*.java") }, rootProject.fileTree("packaging") { include("**/*.md") },
         // The example external plugin's descriptor and build script (not its own build output).
         rootProject.fileTree("docs/examples") { include("**/*.toml", "**/*.kts"); exclude("**/build/**", "**/.gradle/**") },
-        // ColourLiteralScanTest reads every production source and resource.
-        rootProject.fileTree("jasper-ui/src/main"), rootProject.fileTree("plugins") { include("*/src/main/**") })
+        // ColourLiteralScanTest reads every production source and resource, PromptVocabularyTest every source.
+        rootProject.fileTree("jasper-ui/src"), rootProject.fileTree("jasper-sdk/src"), rootProject.fileTree("jasper-sdk-testkit/src"),
+        rootProject.fileTree("plugins") { include("*/src/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

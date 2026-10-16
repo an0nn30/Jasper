@@ -37,7 +37,7 @@ import javax.swing.JTextArea;
 /**
  * The About window's content: the application icon, the name, the version line, a Development build chip on anything but
  * a release, the branch and commit as selectable text, the commit date, Jasper's license and copyright, then Licenses… and
- * Copy. One chrome kit view composes it as a compact hero form; Escape closes the window. Copy puts the build's
+ * Copy. One chrome kit view composes it as a compact prompt form; Escape closes the window. Copy puts the build's
  * description on the clipboard and reads "Copied" for two seconds when that worked. EDT only; {@link #close} stops it.
  */
 public final class AboutView extends JPanel {
@@ -161,7 +161,7 @@ public final class AboutView extends JPanel {
         BuildInfo build = hooks.build();
         var hero = new ArrayList<Nodes.Node>(List.of(
             new Nodes.Custom(ICON, ControlState.READY, ICON_SLOT, Nodes.CustomKind.PREVIEW, "Jasper"),
-            text(NAME, "Jasper", Nodes.TextRole.HERO_TITLE)));
+            text(NAME, "Jasper", Nodes.TextRole.PROMPT_TITLE)));
         if (!build.versionLine().isEmpty()) hero.add(text(VERSION, build.versionLine(), Nodes.TextRole.DESCRIPTION));
         var facts = new ArrayList<Nodes.Node>();
         if (!build.release()) facts.add(new Nodes.Chip(BADGE, ControlState.READY, "Development build", Nodes.Hue.AMBER));
@@ -170,9 +170,9 @@ public final class AboutView extends JPanel {
         if (!committed.isEmpty()) facts.add(text(COMMITTED, committed, Nodes.TextRole.CAPTION));
         facts.add(text(LICENSE, "PolyForm Noncommercial 1.0.0", Nodes.TextRole.CAPTION));
         facts.add(text(COPYRIGHT, "Copyright 2026 Dustin McKenna-Watts", Nodes.TextRole.CAPTION));
-        return new ViewSpec(new Nodes.Form("about", ControlState.READY, Nodes.FormKind.HERO_COMPACT, "About Jasper",
-            Optional.of(new Nodes.Stack("about.hero", ControlState.READY, Nodes.LayoutRole.HERO, hero)),
-            List.of(new Nodes.Stack("about.facts", ControlState.READY, Nodes.LayoutRole.HERO, facts)), Optional.empty(),
+        return new ViewSpec(new Nodes.Form("about", ControlState.READY, Nodes.FormKind.PROMPT_COMPACT, "About Jasper",
+            Optional.of(new Nodes.Stack("about.hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, hero)),
+            List.of(new Nodes.Stack("about.facts", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, facts)), Optional.empty(),
             List.of(button(LICENSES, "Licenses…"), button(COPY, copied ? "Copied" : "Copy")), CLOSE, Nodes.FormSubmission.NONE));
     }
 

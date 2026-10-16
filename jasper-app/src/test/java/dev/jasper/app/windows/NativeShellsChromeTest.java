@@ -30,14 +30,14 @@ class NativeShellsChromeTest {
         assertThat(NativeShells.resizable(dialog.apply("file-chooser", false))).as("a dialog with remembered bounds").isTrue();
     }
 
-    @Test void compactHeroPackingUsesContentWidthAndUnifiedUntitledChrome() {
+    @Test void compactPromptPackingUsesContentWidthAndUnifiedUntitledChrome() {
         var controller = ThemeTestSupport.controller(true);
         var resolved = controller.current();
         var binding = new dev.jasper.ui.theme.ThemeBinding(resolved.pair(), failure -> { throw new AssertionError(failure); });
         var icons = new dev.jasper.ui.icons.IconRegistry();
         var context = dev.jasper.ui.swing.KitContext.of(dev.jasper.ui.kit.Kit.DEFAULT, binding, dev.jasper.ui.theme.ThemeRoute.CHROME, icons, () -> false, action -> "");
         var form = new dev.jasper.ui.model.Nodes.Form("hero", dev.jasper.ui.model.ControlState.READY,
-            dev.jasper.ui.model.Nodes.FormKind.HERO_COMPACT, "Unlock Vault", java.util.Optional.empty(), java.util.List.of(), java.util.Optional.empty(), java.util.List.of());
+            dev.jasper.ui.model.Nodes.FormKind.PROMPT_COMPACT, "Unlock Vault", java.util.Optional.empty(), java.util.List.of(), java.util.Optional.empty(), java.util.List.of());
         try (var view = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(form), e -> {})) {
             var surface = new AuxiliarySurface("", "Unlock Vault", AuxiliarySurface.Kind.DIALOG, true,
                 new Dimension(400, 300), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });

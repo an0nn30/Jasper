@@ -103,7 +103,7 @@ public final class Editors {
 
     /** A compact exclusive segmented choice. */
     public static <E> Factory<E> segments(Map<String,String> names) {
-        return new Factory<>((setting,context) -> new Pick<>(setting.label(),(SettingKind.Choice<E>)setting.kind(),names,Nodes.ChoiceKind.SEGMENTED),List.copyOf(names.values()));
+        return new Factory<>((setting,context) -> new Pick<>(setting.label(),(SettingKind.Choice<E>)setting.kind(),names,Nodes.ChoiceKind.EXCLUSIVE),List.copyOf(names.values()));
     }
 
     /** A − value + stepper within the kind's range with up to two decimals; its buttons, Up and Down step by {@code step}. */

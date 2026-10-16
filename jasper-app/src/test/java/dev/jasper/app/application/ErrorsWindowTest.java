@@ -96,7 +96,7 @@ class ErrorsWindowTest {
         var errors = new ErrorsWindow(contributions, windows, incidents, new ErrorsView.Hooks(id -> id, id -> "",
             new IncidentReport.Environment("1", "os", "java"), text -> { }, id -> { }, () -> { }), ZoneOffset.UTC,
             () -> {
-                if (fail[0]) { fail[0] = false; throw new NoClassDefFoundError("dev/jasper/ui/swing/Stacks$HeroLayout"); }
+                if (fail[0]) { fail[0] = false; throw new NoClassDefFoundError("dev/jasper/ui/swing/Stacks$PromptLayout"); }
                 return dev.jasper.app.testsupport.KitTestSupport.context();
             });
         Incident incident = incidents.record("jasper", "a", "t", Capture.of(new IllegalStateException("boom")));

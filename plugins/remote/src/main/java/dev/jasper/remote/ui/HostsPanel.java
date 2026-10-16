@@ -409,7 +409,7 @@ public final class HostsPanel implements AutoCloseable {
             new Nodes.Text(CARD_INFO, state(!isHost), info, Nodes.TextRole.DESCRIPTION),
             new Nodes.Text(CARD_JUMP, state(false), jump, Nodes.TextRole.DESCRIPTION)));
         var identity = new Nodes.Stack("card.identity", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Icon(CARD_TILE, ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.HERO, isHost ? "SSH host" : "WSL distribution"), details));
+            new Nodes.Icon(CARD_TILE, ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.PROMPT, isHost ? "SSH host" : "WSL distribution"), details));
         var status = new ArrayList<Nodes.Node>();
         if (isHost && connected) status.add(new Nodes.StatusDot(CARD_CONNECTED, ControlState.READY, Nodes.StatusKind.SUCCESS));
         else if (isHost && credential.equals("Vault locked")) status.add(new Nodes.Icon(CARD_LOCKED, ControlState.READY, "lock", Nodes.Hue.NONE, Nodes.IconSize.CONTROL, "Vault locked"));
