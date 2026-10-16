@@ -76,6 +76,37 @@ final class Trees {
     }
     record Visible(TreeItem item, int depth) {}
 
+    /**
+     * A column tree's header: the item column's title from the rows' content inset, then each later title right-aligned
+     * over its trailing column, packed against the count column at the rows' trailing inset, as the rows pack them.
+     */
+    static final class ColumnHeaderLayout implements java.awt.LayoutManager {
+        final TreeControl owner;
+        ColumnHeaderLayout(TreeControl owner) { this.owner = owner; }
+        @Override public void addLayoutComponent(String name, java.awt.Component component) {}
+        @Override public void removeLayoutComponent(java.awt.Component component) {}
+        @Override public java.awt.Dimension preferredLayoutSize(java.awt.Container parent) {
+            int height = 0;
+            for (var child : parent.getComponents()) height = Math.max(height, child.getPreferredSize().height);
+            var insets = parent.getInsets();
+            return new java.awt.Dimension(insets.left + insets.right, height + insets.top + insets.bottom);
+        }
+        @Override public java.awt.Dimension minimumLayoutSize(java.awt.Container parent) { return preferredLayoutSize(parent); }
+        @Override public void layoutContainer(java.awt.Container parent) {
+            var insets = parent.getInsets();
+            var children = parent.getComponents();
+            int gap = ThemePainting.metric(owner.context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+            int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+            int end = parent.getWidth() - insets.right - (owner.countWidth > 0 ? owner.countWidth + gap : 0);
+            for (int i = children.length - 1; i >= 1; i--) {
+                int width = i - 1 < owner.trailingWidths.length ? owner.trailingWidths[i - 1] : children[i].getPreferredSize().width;
+                children[i].setBounds(end - width, insets.top, width, height);
+                end -= width + gap;
+            }
+            if (children.length > 0) children[0].setBounds(insets.left, insets.top, Math.max(0, end - insets.left), height);
+        }
+    }
+
     static final class TreeControl extends InteractiveRows.RowsControl {
         boolean settingsNavigation;
         final List<Visible> visible = new ArrayList<>();
@@ -83,6 +114,10 @@ final class Trees {
         final Map<String, TreeItem> items = new HashMap<>();
         /** Each trailing column's width, measured over every item so the columns line up from row to row. */
         int[] trailingWidths = new int[0];
+        /** A column tree's header (Tree.columns): the item column's title and one title over each trailing column. */
+        final javax.swing.JPanel header = new javax.swing.JPanel();
+        /** A column tree's count column: as wide as its widest count, so every row's values line up; zero without counts. */
+        int countWidth;
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node, new TreePane(view.context()));
@@ -265,7 +300,8 @@ final class Trees {
             if(detail!=null && indexOf(detail.itemId)<0)detach(detail);
             presentation=presentation.entrySet().stream().filter(e->itemIds.contains(e.getKey())).collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue));
             var metrics = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.CAPTION));
-            int columns = items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0);
+            int columns = value().columns().isEmpty() ? items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0)
+                : value().columns().size() - 1;
             trailingWidths = new int[columns];
             // Detail columns are at least TREE_DETAIL_COLUMN wide and the last (the value) at least TREE_VALUE_COLUMN.
             for (int i = 0; i < columns; i++)
@@ -275,6 +311,51 @@ final class Trees {
             for (var item : items.values())
                 for (int i = 0; i < item.trailing().size(); i++)
                     trailingWidths[i] = Math.max(trailingWidths[i], metrics.stringWidth(item.trailing().get(i)));
+            columnHeader();
+        }
+
+        /** A plain tree row's side inset, as InteractiveRows.Row.doLayout gives it. */
+        int rowPad() {
+            return ThemePainting.metric(context(), column >= 0 ? dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE : dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+        }
+
+        /** How many trailing values a row shows: its own, or in a column tree one per column after the title. */
+        int trailingColumns(TreeItem item) {
+            return value().columns().isEmpty() ? item.trailing().size() : value().columns().size() - 1;
+        }
+
+        /** A column tree's header, or none; widens each trailing column to its title and measures the count column. */
+        private void columnHeader() {
+            var columns = value().columns();
+            countWidth = 0;
+            header.removeAll();
+            if (columns.isEmpty()) {
+                if (scroll.getColumnHeader() != null && scroll.getColumnHeader().getView() == header) scroll.setColumnHeader(null);
+                return;
+            }
+            for (int i = 0; i < columns.size(); i++) {
+                var label = Tables.headerLabel(this, "@tree/", columns.get(i));
+                // The item column's title reads from the rows' start; the others sit over their right-aligned values.
+                if (i > 0) {
+                    label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+                    trailingWidths[i - 1] = Math.max(trailingWidths[i - 1], label.getPreferredSize().width);
+                }
+                header.add(label);
+            }
+            var counts = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.COUNT));
+            for (var item : items.values())
+                if (item.count().isPresent()) countWidth = Math.max(countWidth, counts.stringWidth(Integer.toString(item.count().getAsInt())));
+            header.setOpaque(false);
+            header.setLayout(new ColumnHeaderLayout(this));
+            int pad = ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP),
+                    side = rowPad() + com.formdev.flatlaf.util.UIScale.scale(gutter);
+            header.setBorder(javax.swing.BorderFactory.createEmptyBorder(pad, side, pad, side));
+            if (scroll.getColumnHeader() == null || scroll.getColumnHeader().getView() != header) {
+                scroll.setColumnHeaderView(header);
+                scroll.getColumnHeader().setOpaque(false);
+            }
+            header.revalidate();
+            header.repaint();
         }
 
         @Override
@@ -360,9 +441,9 @@ final class Trees {
             // A read-only contextual key reads quieter than the rows the user can change.
             if(!row.inked && presented!=null && presented.locked() && !item.emphasized())
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
-            for (int i = 0; presented==null && i < item.trailing().size(); i++)
+            for (int i = 0; presented==null && i < trailingColumns(item); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
-                        ControlState.READY, item.trailing().get(i), Nodes.TextRole.CAPTION));
+                        ControlState.READY, i < item.trailing().size() ? item.trailing().get(i) : "", Nodes.TextRole.CAPTION));
             if(presented!=null) {
                 if(presented.locked())trailing.add(new Nodes.Icon("@tree/"+node.id()+"/"+item.id()+"/lock",ControlState.READY,"lock",Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,"Read-only contextual key"));
                 trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/context",ControlState.READY,presented.context(),Nodes.TextRole.CAPTION));
@@ -372,6 +453,9 @@ final class Trees {
             if(!presentation.isEmpty() && !item.leaf() && item.emphasized())trailing.add(new Nodes.StatusDot(modifiedId,ControlState.READY,Nodes.StatusKind.IDLE));
             item.count().ifPresent(count -> trailing.add(new Nodes.Text(
                     "@tree/" + node.id() + "/" + item.id() + "/count", ControlState.READY, Integer.toString(count), Nodes.TextRole.COUNT)));
+            // A column tree reserves the count column on every row, so the values before it line up.
+            if (presented == null && countWidth > 0 && item.count().isEmpty())
+                trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/count", ControlState.READY, "", Nodes.TextRole.COUNT));
             row.slot(row.trailing, trailing);
             if(presented!=null)row.trailing.setLayout(null);
             if(row.controls.get(modifiedId) instanceof Indicators.DotControl dot){dot.modified=true;dot.refresh();}
@@ -384,12 +468,20 @@ final class Trees {
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/keys").component;
                 label.getAccessibleContext().setAccessibleName(presented.keycaps().get().accessibleName());label.setText("");label.setIcon(new Keycaps(context(),presented.keycaps().get()));label.setDisabledIcon(label.getIcon());
             }
-            for (int i = 0; presented==null && i < item.trailing().size(); i++) {
+            for (int i = 0; presented==null && i < trailingColumns(item); i++) {
                 var label = (javax.swing.JLabel) row.controls.get(trailing.get(i).id()).component;
                 label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
                 label.setPreferredSize(null);
                 int width = i < trailingWidths.length ? trailingWidths[i] : label.getPreferredSize().width;
                 label.setPreferredSize(new java.awt.Dimension(width + label.getInsets().left + label.getInsets().right, label.getPreferredSize().height));
+            }
+            if (presented == null && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/count") instanceof Labels.TextControl countText
+                    && countText.component instanceof javax.swing.JLabel count) {
+                count.setPreferredSize(null);
+                if (countWidth > 0) {
+                    count.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
+                    count.setPreferredSize(new java.awt.Dimension(countWidth + count.getInsets().left + count.getInsets().right, count.getPreferredSize().height));
+                }
             }
             // The row, its slots and its passive texts (title, trailing columns, count) show the item's literal tooltip.
             row.tooltip(item.tooltip());

@@ -257,4 +257,47 @@ class TableVocabularyTest {
             assertThat(list.emptyLine.getY()).as("the line is the first reserved row").isZero();
         } finally { release(context); }
     }); }
+
+    static final List<Column> SESSION_COLUMNS = List.of(new Column("name", "Name", TextRole.BODY, false),
+        new Column("host", "Host", TextRole.MONO_SMALL, false, 1, Optional.of(true)), new Column("port", "Port number", TextRole.MONO_SMALL, true));
+
+    static Tree sessions(List<Column> columns) {
+        var mac = new TreeItem("mac", "Mac", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.of(StatusKind.SUCCESS),
+            List.of("192.168.1.119", "22"), Optional.empty());
+        var mine = new TreeItem("mine", "minecraft-local", Optional.empty(), true, List.of(), OptionalInt.of(12), false, "", Optional.of(StatusKind.IDLE),
+            List.of("192.168.1.124"), Optional.empty());
+        return new Tree("sessions", READY, List.of(new TreeItem("lan", "Local Network", Optional.empty(), false, List.of(mac, mine))),
+            Set.of("lan"), Set.of(), "connect", columns);
+    }
+
+    static int left(java.awt.Component c, java.awt.Component root) { return SwingUtilities.convertPoint(c, 0, 0, root).x; }
+    static int right(java.awt.Component c, java.awt.Component root) { return SwingUtilities.convertPoint(c, c.getWidth(), 0, root).x; }
+
+    @Test void aColumnTreeShowsItsHeaderOverTheValuesAndReportsSorts() { Edt.run(() -> {
+        var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+        try (var view = new KitView(context, new ViewSpec(sessions(SESSION_COLUMNS)), events::add)) {
+            view.setSize(480, 320); InteractiveRowsTest.layout(view);
+            var tree = (Trees.TreeControl) view.control("sessions");
+            assertThat(tree.scroll.getColumnHeader().getView()).isSameAs(tree.header);
+            var name = find(view, "@tree/sessions/header/name", JLabel.class);
+            var host = find(view, "@tree/sessions/header/host", JLabel.class);
+            var port = find(view, "@tree/sessions/header/port", JLabel.class);
+            assertThat(host.getIcon()).as("the sort indicator").isNotNull();
+            assertThat(left(name, view)).as("the item column's title starts where the rows' content does").isEqualTo(left(tree.mounted.get("lan").leading, view));
+            for (String item : List.of("lan", "mac", "mine")) {
+                var row = tree.mounted.get(item);
+                assertThat(row.trailing.getComponentCount()).as(item + ": a value per column, then the count column").isEqualTo(3);
+                assertThat(right(row.trailing.getComponent(0), view)).as(item + " under Host").isEqualTo(right(host, view));
+                assertThat(right(row.trailing.getComponent(1), view)).as(item + " under Port").isEqualTo(right(port, view));
+            }
+            assertThat(((JLabel) tree.mounted.get("mine").trailing.getComponent(1)).getText()).as("a missing value is blank").isEmpty();
+            assertThat(tree.mounted.get("mac").trailing.getComponent(1).getWidth()).as("a column is as wide as its title")
+                .isGreaterThanOrEqualTo(ThemePainting.measureText(port.getFont(), "Port number"));
+            for (var listener : host.getMouseListeners()) listener.mouseClicked(BrowserKitTest.click(host, 0));
+            assertThat(events).containsExactly(new UiEvent.Sorted("sessions", "host"));
+            view.update(new ViewSpec(sessions(List.of()))); InteractiveRowsTest.layout(view);
+            assertThat(tree.scroll.getColumnHeader()).as("no columns, no header").isNull();
+            assertThat(tree.mounted.get("mine").trailing.getComponentCount()).as("its own value and its count").isEqualTo(2);
+        } finally { release(context); }
+    }); }
 }
