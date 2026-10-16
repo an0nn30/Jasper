@@ -57,7 +57,8 @@ class IndexerSettingsPanelTest {
                 assertThat(view.spec().root()).isInstanceOfSatisfying(Nodes.Stack.class, page -> assertThat(page.role()).isEqualTo(Nodes.LayoutRole.SETTINGS_PAGE));
                 host.highlightSettingsPanel(IndexerTesting.INFO.id(), "excluded folders");
                 assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isTrue();
-                view.emit(new UiEvent.Edited("settings:excludes", ".git\nnew-hidden"));
+                view.emit(new UiEvent.Edited("settings:excludes:new", "new-hidden"));
+                view.emit(new UiEvent.Action("settings:excludes:add"));
                 projects.indexing(APP, false);
                 assertThat(node(view, "settings:excludes:row", Nodes.SettingRow.class).highlighted()).isTrue();
                 host.highlightSettingsPanel(IndexerTesting.INFO.id(), "");

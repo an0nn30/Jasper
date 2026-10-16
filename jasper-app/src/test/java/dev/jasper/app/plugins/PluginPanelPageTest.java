@@ -681,6 +681,58 @@ class PluginPanelPageTest {
         return ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
     }
 
+    /** Spec 13: a plugin's stringList host row is the generated page's ordered-list editor, and edits the same way. */
+    @Test void aStringListHostRowIsTheGeneratedPagesOrderedList() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var rows = new AtomicReference<SettingsPanelHost>();
+        var words = new AtomicReference<Setting<List<String>>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                words.set(plugin.settings().declare(SettingSpec.of("words", SettingKind.stringList(word -> !word.contains("/")), List.of("a", "b"))
+                    .label("Words")));
+                plugin.settings().page((SettingsPanel) panelHost -> {
+                    rows.set(panelHost);
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                        dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(panelHost.row(words.get())))), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            var control = hostControl(view.get(), 0);
+            var generated = dev.jasper.app.settingsui.Editors.textList().build().apply(appList("words", "Words"), context);
+            generated.show(List.of("a", "b"));
+            assertThat(KitValues.toModule(control)).as("the generated page's ordered list")
+                .isEqualTo(generated.node("settings:words", KitValues.toModule(control.state())));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Reordered("settings:words", "item-1", 0));
+            assertThat(rows.get().pending(words.get())).containsExactly("b", "a");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Removed("settings:words", "item-9"));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Reordered("settings:words", "item-0", 7));
+            assertThat(rows.get().pending(words.get())).as("a row that is gone moves nothing").containsExactly("b", "a");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", "x/y"));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:words:add"));
+            assertThat(rows.get().pending(words.get())).as("a rejected value is not staged").containsExactly("b", "a");
+            assertThat(page.valid()).isFalse();
+            var editor = (dev.jasper.sdk.ui.Nodes.Stack) hostControl(view.get(), 0);
+            var entry = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) editor.children().get(1)).children().getFirst();
+            assertThat(entry.value()).as("the entry keeps the text to correct").isEqualTo("x/y");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", "c"));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:words:add"));
+            assertThat(rows.get().pending(words.get())).containsExactly("b", "a", "c");
+            assertThat(page.valid()).isTrue();
+            assertThat(page.modified()).isTrue();
+        });
+        onEdt(page::dispose);
+    }
+
+    /** An application string-list setting labelled as a declared one, to build the generated page's editor beside it. */
+    private static dev.jasper.app.settings.Setting<List<String>> appList(String key, String label) {
+        return dev.jasper.app.settings.Setting.of(key, dev.jasper.app.settings.SettingKind.stringList(value -> true), List.<String>of())
+            .label(label).build();
+    }
+
     /** An application text setting labelled as a declared one, to build the generated page's editor beside it. */
     private static dev.jasper.app.settings.Setting<String> appText(String key, String label) {
         return dev.jasper.app.settings.Setting.of(key, dev.jasper.app.settings.SettingKind.string(value -> true, "Not an allowed value."), "")

@@ -38,7 +38,11 @@ class FakeKitMountingTest {
                 view.get().emit(new UiEvent.Edited("settings:text",""));
                 assertThatThrownBy(() -> host.applySettingsPanel("test.kinds")).isInstanceOf(IllegalStateException.class);
                 view.get().emit(new UiEvent.Edited("settings:text","after"));
-                view.get().emit(new UiEvent.Edited("settings:list","one\ntwo"));
+                view.get().emit(new UiEvent.Removed("settings:list","item-0"));
+                view.get().emit(new UiEvent.Edited("settings:list:new","one"));
+                view.get().emit(new UiEvent.Action("settings:list:add"));
+                view.get().emit(new UiEvent.Edited("settings:list:new","two"));
+                view.get().emit(new UiEvent.Action("settings:list:add"));
                 host.applySettingsPanel("test.kinds");
                 assertThat(host.savedSettings("test.kinds")).containsEntry("bool",true).containsEntry("choice","on")
                     .containsEntry("number",2.5).containsEntry("text","after").containsEntry("list",List.of("one","two"));
@@ -46,6 +50,58 @@ class FakeKitMountingTest {
             }
         });
     }
+    /** Spec 13: a stringList host row is the generated pages' ordered-list editor, here as in the host. */
+    @Test void aStringListRowIsTheOrderedListEditor() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try(var host=new FakePluginHost()) {
+                var view=new AtomicReference<FakeKitView>();var rows=new AtomicReference<SettingsPanelHost>();var words=new AtomicReference<Setting<List<String>>>();
+                host.start(new PluginInfo("test.list","List","1.0.0",Set.of()),Set.of(),Set.of(),context -> {
+                    words.set(context.settings().declare(SettingSpec.of("words",SettingKind.stringList(word -> !word.contains("/")),List.of("a","b")).label("Words")));
+                    context.settings().page((SettingsPanel) h -> {
+                        rows.set(h);
+                        var made=(FakeKitView)context.kit().create(new ViewSpec(new Nodes.Card("card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(h.row(words.get())))),
+                            event -> {throw new AssertionError("Owned setting event leaked");});
+                        view.set(made);return made;
+                    });
+                });
+                host.settingsPanel("test.list");
+                var editor=editor(view.get());
+                assertThat(editor.id()).isEqualTo("settings:words:editor");
+                assertThat(editor.children().getFirst()).isInstanceOfSatisfying(Nodes.ItemList.class, list -> {
+                    assertThat(list.id()).isEqualTo("settings:words");
+                    assertThat(list.kind()).isEqualTo(Nodes.ListKind.ORDERED);
+                    assertThat(list.items()).extracting(ListItem::id).containsExactly("item-0","item-1");
+                });
+                assertThat(entry(view.get()).id()).isEqualTo("settings:words:new");
+                view.get().emit(new UiEvent.Reordered("settings:words","item-1",0));
+                assertThat(rows.get().pending(words.get())).containsExactly("b","a");
+                view.get().emit(new UiEvent.Removed("settings:words","item-9"));
+                view.get().emit(new UiEvent.Reordered("settings:words","item-0",7));
+                assertThat(rows.get().pending(words.get())).as("a row that is gone moves nothing").containsExactly("b","a");
+                view.get().emit(new UiEvent.Edited("settings:words:new","x/y"));
+                view.get().emit(new UiEvent.Action("settings:words:add"));
+                assertThat(rows.get().pending(words.get())).as("a rejected value is not staged").containsExactly("b","a");
+                assertThat(entry(view.get()).value()).as("the entry keeps the text to correct").isEqualTo("x/y");
+                assertThat(((Nodes.ItemList)editor(view.get()).children().getFirst()).state().error()).isNotBlank();
+                assertThatThrownBy(() -> host.applySettingsPanel("test.list")).isInstanceOf(IllegalStateException.class);
+                view.get().emit(new UiEvent.Edited("settings:words:new","c"));
+                view.get().emit(new UiEvent.Action("settings:words:add"));
+                assertThat(rows.get().pending(words.get())).containsExactly("b","a","c");
+                assertThat(entry(view.get()).value()).isEmpty();
+                assertThat(((Nodes.ItemList)editor(view.get()).children().getFirst()).state().error()).isEmpty();
+                host.applySettingsPanel("test.list");
+                assertThat(host.savedSettings("test.list")).containsEntry("words",List.of("b","a","c"));
+                assertThat(view.get().owner.failures()).isEmpty();
+            }
+        });
+    }
+    /** The ordered-list editor in the trailing slot of the card's only host row. */
+    private static Nodes.Stack editor(FakeKitView view) {
+        var row=(Nodes.SettingRow)((Nodes.Card)view.spec().root()).children().getFirst();
+        return (Nodes.Stack)((Nodes.Stack)row.control()).children().getFirst();
+    }
+    /** The ordered-list editor's entry field. */
+    private static Nodes.Field entry(FakeKitView view) { return (Nodes.Field)((Nodes.Stack)editor(view).children().get(1)).children().getFirst(); }
     @Test void rowsKeepTheSearchHighlightThePluginAskedForThroughHostProjection() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()) {
