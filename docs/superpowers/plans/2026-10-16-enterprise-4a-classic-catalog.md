@@ -1,5 +1,15 @@
 # Enterprise presentation 4a: the classic catalog Implementation Plan
 
+> **Status (2026-10-16): executing on `claude/enterprise-classic-catalog`; Task 7 Step 5 completes this banner.**
+> Deviations so far: Task 5's overlay also sets `Button.default.startBorderColor` and `Button.default.endBorderColor`
+> to `accent.edge` (spec 6.5's intent, the default button's border is `accent.edge`: FlatLaf 3.7 reads that border from
+> `startBorderColor` first and ignores `Button.default.borderColor` while it is set); Task 5's text carries it.
+> Residuals handed on: a focused classic button paints flat, because FlatLaf paints the gradient only while the state
+> colour is `Button.startBackground` itself and the inherited `Button.focusedBackground` is a separate colour (without
+> it FlatLaf falls back to its own focus background), for 4b and 4c; an unfocused classic table or tree takes the
+> terminal-selection wildcard for `selectionInactiveBackground` and `selectionInactiveForeground` (spec 6.5 lists
+> neither), for 4c's mock comparison.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains the values of the classic look, with no painted pixel changed: plan 2's hand-offs, the new
@@ -1487,6 +1497,8 @@ Button.startBackground	BUTTON_SECONDARY_BG
 Button.endBackground	button.end
 Button.hoverBorderColor	border.hover
 Button.default.borderColor	accent.edge
+Button.default.startBorderColor	accent.edge
+Button.default.endBorderColor	accent.edge
 MenuBar.selectionBackground	ACCENT
 MenuBar.selectionForeground	TEXT_ONACCENT
 ToolBar.separatorColor	border.divider
@@ -1502,7 +1514,8 @@ rows = [("TableHeader.background", "surface.tableHeader"), ("TableHeader.foregro
     ("Table.alternateRowColor", "surface.zebra"), ("Table.gridColor", "border.divider"), ("Table.selectionBackground", "SELECTION_BG"),
     ("Table.selectionForeground", "TEXT_ONSELECTION"), ("Tree.selectionBackground", "SELECTION_BG"), ("Tree.selectionForeground", "TEXT_ONSELECTION"),
     ("Button.startBackground", "BUTTON_SECONDARY_BG"), ("Button.endBackground", "button.end"), ("Button.hoverBorderColor", "border.hover"),
-    ("Button.default.borderColor", "accent.edge"), ("MenuBar.selectionBackground", "ACCENT"), ("MenuBar.selectionForeground", "TEXT_ONACCENT"),
+    ("Button.default.borderColor", "accent.edge"), ("Button.default.startBorderColor", "accent.edge"),
+    ("Button.default.endBorderColor", "accent.edge"), ("MenuBar.selectionBackground", "ACCENT"), ("MenuBar.selectionForeground", "TEXT_ONACCENT"),
     ("ToolBar.separatorColor", "border.divider")]
 head = "# The classic overlay on ui-color-keys.tsv (spec 6.5, plan 4 Rulings 15): FlatLaf key, then a SemanticColor or a derived role key.\n"
 pathlib.Path("jasper-ui/src/test/resources/dev/jasper/ui/theme/ui-color-keys-classic.tsv").write_text(
@@ -1592,9 +1605,14 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiKeySet.java", [
     /** The default keys with the classic look's overlay (headers, zebra rows, gradient buttons), frozen by ui-color-keys-classic.tsv. */
     CLASSIC''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java", [
-    (''' * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role; text selection in text''',
+    (''' * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role; text selection in text
+ * components takes the variant's terminal selection and a search field's no-match background the
+ * {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the
+ * suffix.''',
      ''' * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role (or, in the classic
- * set, a derived one); text selection in text''', 1),
+ * set, a derived one); text selection in text components takes the variant's terminal selection and a search field's
+ * no-match background the {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys
+ * before it that end in the suffix.''', 1),
     ('''    private sealed interface Source permits Role, TextSelection, ErrorTint {}
     private record Role(SemanticColor role) implements Source {}''',
      '''    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint {}
@@ -1647,6 +1665,9 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java", [
         keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
         keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));
         keys.put("Button.default.borderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        // FlatLaf reads the default border from startBorderColor first and ignores borderColor while it is set.
+        keys.put("Button.default.startBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        keys.put("Button.default.endBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
         role(keys, "MenuBar.selectionBackground", ACCENT);
         role(keys, "MenuBar.selectionForeground", TEXT_ONACCENT);
         keys.put("ToolBar.separatorColor", new Derived(DerivedColor.BORDER_DIVIDER));
@@ -2297,7 +2318,10 @@ the status bar's configuration text, notification counts) carried to the chrome-
 painters faces (the hand-off stays open); the measured classic-only roles; buttons two taller than
 fields (24 and 22, every mock); tokens by delta, paddings by formula; the classic base tuned as Enterprise; the
 calibrated type roles; `DESCRIPTION` kept at the spec's 11 although the New File Server mock draws 12 (a residual for
-4c); the table and tree selection foregrounds. Plan 4b starts with `KitFaces`. `./gradlew check --continue`:
+4c); the table and tree selection foregrounds. Deviation: the overlay also sets `Button.default.startBorderColor` and
+`endBorderColor` to `accent.edge`, which FlatLaf reads before `Button.default.borderColor`. Residuals: a focused
+classic button paints flat (4b, 4c); unfocused table and tree selections keep the terminal-selection wildcard (4c's
+comparison). Plan 4b starts with `KitFaces`. `./gradlew check --continue`:
 **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for the user: none new (nothing
 visible changed). Not merged, not pushed.
 ```
@@ -2325,7 +2349,7 @@ Write the four numbers into the STATUS entry.
 
 - [ ] **Step 5: Set this plan's status banner**
 
-Insert below this plan's title:
+Replace the banner below this plan's title, keeping its deviations and residuals:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this

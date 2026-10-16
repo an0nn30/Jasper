@@ -13,6 +13,8 @@ Button.startBackground	BUTTON_SECONDARY_BG
 Button.endBackground	button.end
 Button.hoverBorderColor	border.hover
 Button.default.borderColor	accent.edge
+Button.default.startBorderColor	accent.edge
+Button.default.endBorderColor	accent.edge
 MenuBar.selectionBackground	ACCENT
 MenuBar.selectionForeground	TEXT_ONACCENT
 ToolBar.separatorColor	border.divider

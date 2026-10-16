@@ -10,10 +10,9 @@ import java.util.Objects;
 
 /**
  * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role (or, in the classic
- * set, a derived one); text selection in text
- * components takes the variant's terminal selection and a search field's no-match background the
- * {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the
- * suffix.
+ * set, a derived one); text selection in text components takes the variant's terminal selection and a search field's
+ * no-match background the {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys
+ * before it that end in the suffix.
  */
 public final class UiColorKeys {
     private UiColorKeys() {}
@@ -214,6 +213,9 @@ public final class UiColorKeys {
         keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
         keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));
         keys.put("Button.default.borderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        // FlatLaf reads the default border from startBorderColor first and ignores borderColor while it is set.
+        keys.put("Button.default.startBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        keys.put("Button.default.endBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
         role(keys, "MenuBar.selectionBackground", ACCENT);
         role(keys, "MenuBar.selectionForeground", TEXT_ONACCENT);
         keys.put("ToolBar.separatorColor", new Derived(DerivedColor.BORDER_DIVIDER));
