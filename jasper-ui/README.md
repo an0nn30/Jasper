@@ -36,7 +36,7 @@ logical `DesignMetrics`, a `TypeScale` and a `FaceSet`, centrally resolved `Typo
 `ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
 close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
 publication and restores the old LAF, LAF defaults and developer overrides on failure.
-`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values. All 26 node renderers and four working panel controllers are implemented. The headless gallery
+`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values. Every node renderer and four working panel controllers are implemented. The headless gallery
 now exercises the eight initial mock compositions, panel transitions and state variants; final
 whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
 

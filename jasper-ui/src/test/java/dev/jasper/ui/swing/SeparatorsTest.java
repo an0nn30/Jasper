@@ -46,6 +46,49 @@ class SeparatorsTest {
         });
     }
 
+    static Nodes.Button labelled(String id, String label) { return new Nodes.Button(id, READY, label, "", ButtonKind.GHOST, id, ""); }
+
+    @Test void aWrappingActionsBarNeverStartsOrEndsARowWithARuleAndCentresTheRulesItShows() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            int hairline = UIScale.scale(context.metrics().value(DesignMetrics.Role.HAIRLINE));
+            release(context);
+            var broken = new ViewSpec(new Stack("bar", READY, LayoutRole.ACTIONS, List.of(labelled("download", "Download selected files"),
+                new Separator("rule", READY), labelled("upload", "Upload"))));
+            context = KitFixtures.context();
+            try (var view = new KitView(context, broken, e -> {})) {
+                KitFixtures.render(view, 220, 120, 1);
+                var download = find(view, "download", JComponent.class);
+                var upload = find(view, "upload", JComponent.class);
+                var rule = find(view, "rule", JComponent.class);
+                assertThat(upload.getY()).as("the bar wraps").isGreaterThan(download.getY());
+                assertThat(upload.getX()).as("the second row starts with its item").isEqualTo(download.getX());
+                assertThat(rule.getWidth() * rule.getHeight()).as("the rule at the break is not shown").isZero();
+            } finally { release(context); }
+            var kept = new ViewSpec(new Stack("bar", READY, LayoutRole.ACTIONS, List.of(labelled("open", "Open"), new Separator("rule", READY),
+                labelled("rename", "Rename"), labelled("download", "Download selected files"))));
+            context = KitFixtures.context();
+            try (var view = new KitView(context, kept, e -> {})) {
+                KitFixtures.render(view, 220, 120, 1);
+                var open = find(view, "open", JComponent.class);
+                var rename = find(view, "rename", JComponent.class);
+                var download = find(view, "download", JComponent.class);
+                var rule = find(view, "rule", JComponent.class);
+                assertThat(download.getY()).as("the bar wraps").isGreaterThan(open.getY());
+                assertThat(rule.getWidth()).isEqualTo(hairline);
+                assertThat(rule.getX()).isGreaterThanOrEqualTo(open.getX() + open.getWidth()).isLessThan(rename.getX());
+                assertThat(rule.getY() + rule.getHeight() / 2).as("the rule is centred in its row").isCloseTo(open.getY() + open.getHeight() / 2, within(1));
+            } finally { release(context); }
+            var squeezed = new ViewSpec(new Stack("toolbar", READY, LayoutRole.INLINE, List.of(labelled("download", "Download selected files"),
+                new Separator("rule", READY), labelled("upload", "Upload selected files"))));
+            context = KitFixtures.context();
+            try (var view = new KitView(context, squeezed, e -> {})) {
+                KitFixtures.render(view, 200, 60, 1);
+                assertThat(find(view, "rule", JComponent.class).getWidth()).as("a squeezed row keeps its rule").isEqualTo(hairline);
+            } finally { release(context); }
+        });
+    }
+
     @Test void aSeparatorWithNoShownItemOnOneSideIsHidden() {
         Edt.run(() -> {
             var context = KitFixtures.context();

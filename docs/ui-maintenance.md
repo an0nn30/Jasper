@@ -11,11 +11,11 @@ Use Java 25 JetBrains Runtime and the wrapper. All commands here stay headless:
 ./gradlew :jasper-ui:verifyUiDistribution
 ```
 
-The gallery is a test-runtime entry point. It writes individual PNG/JSON captures, six full-resolution
-contact sheets and a manifest under `jasper-ui/build/gallery/<theme>-<scale>x`. `galleryScale` accepts
+The gallery is a test-runtime entry point. It writes individual PNG/JSON captures, full-resolution
+contact sheets of eight and a manifest under `jasper-ui/build/gallery/<theme>-<scale>x`. `galleryScale` accepts
 1/2; `galleryTheme` accepts dark/light (Slate Cobalt's variants). JSON records bounds, actual enabled/focus
 state, typed descriptor busy/error/visibility state, route, central font and scale. It excludes values
-and secrets. Coverage tests require all 26 nodes, enum variants, nine originals and real panel
+and secrets. Coverage tests require every node, enum variants, nine originals and real panel
 transitions. Test and gallery classes stay out of the production jar.
 The gallery and the kit fixtures (`KitFixtures`, `Edt` and the `dev.jasper.ui.gallery` builders) are jasper-ui's
 `testFixtures` source set, which jasper-app's tests use through `testFixtures(project(":jasper-ui"))`. Inside

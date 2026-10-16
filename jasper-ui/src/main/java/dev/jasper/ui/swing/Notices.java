@@ -42,6 +42,11 @@ final class Notices {
         return new PaintPair(SemanticColor.TEXT_PRIMARY, ground(severity), SurfaceContrast.Guard.TEXT);
     }
 
+    /** A LINK action's text on the notice's ground, held to the text floor. */
+    static PaintPair link(Nodes.Severity severity, boolean hover) {
+        return new PaintPair(hover ? SemanticColor.TEXT_LINK_HOVER : SemanticColor.TEXT_LINK, ground(severity), SurfaceContrast.Guard.TEXT);
+    }
+
     /** The notice's border on its ground, held to the structural floor (a theme may author the two alike). */
     static PaintPair edge(Nodes.Severity severity) {
         return new PaintPair(border(severity), ground(severity), SurfaceContrast.Guard.STRUCTURAL);
@@ -87,7 +92,14 @@ final class Notices {
         @Override void children(List<ControlRegistry.Control> controls) {
             actions = List.copyOf(controls);
             var wanted = new ArrayList<JComponent>(List.of(glyph, text));
-            for (var control : controls) wanted.add(control.component);
+            for (var control : controls) {
+                if (control instanceof Buttons.ButtonControl button) {
+                    button.button.noticeGround = ((Nodes.Notice) node).severity();
+                    button.button.setForeground(button.button.textColor(false));
+                    button.button.repaint();
+                }
+                wanted.add(control.component);
+            }
             Stacks.mount(component, wanted);
         }
     }

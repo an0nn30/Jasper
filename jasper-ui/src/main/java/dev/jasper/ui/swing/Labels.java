@@ -152,13 +152,6 @@ final class Labels {
             case DANGER -> SemanticColor.STATUS_DANGER;
         };
     }
-    /** A hue's glyph colour, as an icon of that hue is drawn (NONE, which no swatch has, as a plain glyph). */
-    static SemanticColor hue(Nodes.Hue hue) {
-        return switch (hue) {
-            case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
-            case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL; case NONE -> SemanticColor.TEXT_SECONDARY;
-        };
-    }
     /** An {@code IconSize.SWATCH} icon: a solid square of {@code color}, {@code extent} pixels wide. */
     record Swatch(Color color, int extent) implements javax.swing.Icon {
         @Override public int getIconWidth() { return extent; }
@@ -181,7 +174,7 @@ final class Labels {
                 // A swatch is its hue, whatever the composition: no tile, no artwork, no selection ink (spec 8.2).
                 int extent = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
                 ((LiteralLabel)label).iconOffset = 0;
-                label.setIcon(new Swatch(ThemePainting.color(context(), hue(icon.hue())), extent)); label.setDisabledIcon(label.getIcon());
+                label.setIcon(new Swatch(Choices.hue(context(), icon.hue()), extent)); label.setDisabledIcon(label.getIcon());
                 label.getAccessibleContext().setAccessibleName(icon.accessibleName()); label.setToolTipText(icon.accessibleName());
                 return;
             }

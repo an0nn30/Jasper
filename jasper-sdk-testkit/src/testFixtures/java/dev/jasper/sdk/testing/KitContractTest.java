@@ -18,6 +18,8 @@ public abstract class KitContractTest {
     protected abstract int[] fieldSelection(UiView view,String id);
     /** Types {@code text} into field {@code id} as a person would, replacing its text; a read-only, hidden or disabled field takes nothing. */
     protected abstract void type(UiView view,String id,String text);
+    /** Clicks what a person sees as {@code id}: a button whose action is its id, or a choice's option {@code choice.option.value}. */
+    protected abstract void click(UiView view,String id);
     protected static void edt(Runnable body) throws Exception { SwingUtilities.invokeAndWait(body); }
     protected static ViewSpec spec(String title) { return new ViewSpec(new Nodes.Stack("root", ControlState.READY,
         Nodes.LayoutRole.VERTICAL, List.of(new Nodes.Text("title", ControlState.READY,title,Nodes.TextRole.BODY),
@@ -50,8 +52,8 @@ public abstract class KitContractTest {
             var next = zeroEighteen("Plain FTP sends passwords unencrypted");
             view.update(next);
             assertThat(view.spec()).isEqualTo(next);
-            emit(view, new UiEvent.Action("notice-details"));
-            emit(view, new UiEvent.Selected("tabs", Set.of("details")));
+            click(view, "notice-details");
+            click(view, "tabs.option.details");
             assertThat(events).containsExactly(new UiEvent.Action("notice-details"), new UiEvent.Selected("tabs", Set.of("details")));
         } finally { view.close(); stop(kit); }
     }); }

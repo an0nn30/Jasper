@@ -152,7 +152,7 @@ public final class KitGallery {
                     contact.add(new Rendered(fixture.name(), capture.image()));
                 }
                 writeSheets(directory, contact, scale);
-                Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(name) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":26}");
+                Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(name) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":" + Nodes.Node.class.getPermittedSubclasses().length + "}");
                 System.out.println("Rendered " + contact.size() + " fixtures with " + UIManager.getLookAndFeel().getName() + " at " + scale + "x to " + directory);
             } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
         }));

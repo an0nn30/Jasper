@@ -26,12 +26,22 @@ rows take neither, nor Properties; the separator's hiding; the Notice words "Inf
 Properties card; a read-only stepper or slider refused, a read-only number deaf to its arrows; TABS needs two options;
 a swatch takes no severity and is painted as authored; a footnote is one line and excludes a preview, above a PROMPT
 form's full-width actions; technical captions in `MONO_CAPTION`; the technical hint applies to text settings; the
-testkit's row projection keeps `Form.submission`; the contract cases split between `KitContractTest` (with a new `type`
-hook) and `PluginContractTest`. Deviations from the plan's text: none beyond the plan's Rulings. Hand-offs: plan 4's classic faces draw
+testkit's row projection keeps `Form.submission`; the contract cases split between `KitContractTest` (with new `type` and
+`click` hooks) and `PluginContractTest`. Deviations from the plan's text: the final review's fixes. A Notice's LINK
+action is held to the text floor on the severity's ground (three more `PaintedContrastTest` pairs); a separator's rule
+never starts or ends a wrapped ACTIONS row, is centred in its row and keeps its width in a squeezed one; a read-only
+field's document refuses every edit route, the transfer handler's paste action included; the swatch takes its colour
+from `Choices.hue` (no `Labels.hue`); the plugin contract case is
+`aPluginsKitAdmitsZeroEighteenControlsAndTheSdkRefusesMisplacedOnes`, since the SDK refuses those views before a kit
+sees them. The footnote (CAPTION in `text.tertiary`), the Properties labels (`text.secondary` on `surface.card`) and
+values without a severity reuse the default look's unguarded caption, label and body pairs by design (Rulings 6 and
+10), so `PaintedContrastTest` does not declare them. Hand-offs: plan 4's classic faces draw
 these nodes the classic way (the classic Notice in its tinted box, Properties as a table, TABS as folder tabs, read-only
 fields on `surface.tableHeader`, the swatch's indicator guard, the footnote in the classic footer); 3c and 3d add their
-nodes to `KitValuesTest`'s list, which `classes` counts with the nodes inside stacks and form sections; 3d's
-`DialogSpec.swatch` can reuse `Labels.Swatch`. `./gradlew check --continue`: **10,561 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: in
+nodes to `KitValuesTest`'s list, which `classes` counts with the nodes inside stacks and form sections; 3d draws
+`DialogSpec.swatch` with its own `TitleSwatch` in `MacTitleBar`; both paint the `HUE_*` role at `ICON_CAPTION`, so
+reconcile them when the second of 3b and 3d merges. `./gradlew check --continue`: **10,561 tests, 0 failures, 0 errors, 25 skipped** before the final review's fixes
+(three tests added, one removed; jasper-ui, the testkit and jasper-app pass after them). GUI checks for the user: in
 New File Server, choose TFTP and see "No login (TFTP has none)" as a read-only field in the Access card; nothing else
 visible changed in the shipped surfaces. Not merged, not pushed.
 

@@ -73,6 +73,12 @@ class PaintedContrastTest {
             (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.WARNING)),
         new Declared("error notice border", new PaintPair(DerivedColor.DANGER_BORDER, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.STRUCTURAL),
             (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.DANGER)),
+        new Declared("information notice link", new PaintPair(TEXT_LINK, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeLink(theme, expected, Nodes.Severity.INFO)),
+        new Declared("warning notice link", new PaintPair(TEXT_LINK, DerivedColor.WARNING_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeLink(theme, expected, Nodes.Severity.WARNING)),
+        new Declared("error notice link", new PaintPair(TEXT_LINK, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> noticeLink(theme, expected, Nodes.Severity.DANGER)),
         // Plan 3b: a property value coloured by its severity, held readable on the Properties card.
         new Declared("information property value", new PaintPair(ACCENT, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
             (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.INFO)),
@@ -218,10 +224,20 @@ class PaintedContrastTest {
         });
     }
 
+    /** A notice of {@code severity} with a LINK action: the link's resting colour. */
+    private static boolean noticeLink(GeneratedTheme theme, Color expected, Nodes.Severity severity) {
+        var details = new Nodes.Button("details", ControlState.READY, "Details", "", Nodes.ButtonKind.LINK, "details", "");
+        return withNotice(theme, severity, List.of(details), view -> KitTestSupport.require(view, "details", JButton.class).getForeground().equals(expected));
+    }
+
     private static boolean withNotice(GeneratedTheme theme, Nodes.Severity severity, java.util.function.Predicate<KitView> check) {
+        return withNotice(theme, severity, List.of(), check);
+    }
+
+    private static boolean withNotice(GeneratedTheme theme, Nodes.Severity severity, List<Nodes.Button> actions, java.util.function.Predicate<KitView> check) {
         var context = KitFixtures.context(theme);
         var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, Nodes.LayoutRole.VERTICAL,
-            List.of(new Nodes.Notice("notice", ControlState.READY, severity, "Plain FTP sends the password unencrypted"))));
+            List.of(new Nodes.Notice("notice", ControlState.READY, severity, "Plain FTP sends the password unencrypted", actions))));
         try (var view = new KitView(context, spec, event -> { })) {
             KitFixtures.render(view, 400, 80, 1);
             return check.test(view);

@@ -6,8 +6,12 @@ import static org.assertj.core.api.Assertions.*;
 import dev.jasper.ui.model.*;
 import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.testsupport.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.util.*;
+import java.util.List;
 import javax.swing.*;
 import javax.swing.text.DefaultEditorKit;
 import org.junit.jupiter.api.Test;
@@ -42,6 +46,43 @@ class ReadOnlyFieldsTest {
                 assertThat(input.isEditable()).isTrue();
                 new DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new ActionEvent(input, ActionEvent.ACTION_PERFORMED, "x"));
                 assertThat(events).isNotEmpty().last().isEqualTo(new UiEvent.Edited("login", "x"));
+            } finally { release(context); }
+        });
+    }
+
+    @Test void aReadOnlyFieldCopiesItsTextAndNoPasteRouteEditsIt() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+            String fact = "No login (TFTP has none)";
+            var spec = new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(
+                readOnlyField("login", FieldKind.TEXT, fact, true), readOnlyField("source", FieldKind.TEXT, "PASTED", false),
+                readOnlyField("target", FieldKind.TEXT, "", false))));
+            try (var view = new KitView(context, spec, events::add)) {
+                var input = find(view, "login.input", JTextField.class);
+                input.selectAll();
+                var clipboard = new Clipboard("read-only-copy");
+                input.getTransferHandler().exportToClipboard(input, clipboard, TransferHandler.COPY);
+                try { assertThat(clipboard.getContents(null).getTransferData(DataFlavor.stringFlavor)).isEqualTo(fact); }
+                catch (Exception failure) { throw new AssertionError(failure); }
+                // Headless, the copy and paste actions share Swing's sandbox clipboard, never the desktop's.
+                var source = find(view, "source.input", JTextField.class);
+                source.selectAll(); source.copy();
+                var paste = TransferHandler.getPasteAction();
+                var target = find(view, "target.input", JTextField.class);
+                paste.actionPerformed(new ActionEvent(target, ActionEvent.ACTION_PERFORMED, "paste"));
+                assertThat(target.getText()).as("an editable field takes the paste").isEqualTo("PASTED");
+                events.clear();
+                int bound = 0;
+                for (var stroke : input.getInputMap(JComponent.WHEN_FOCUSED).allKeys()) {
+                    Object action = input.getInputMap(JComponent.WHEN_FOCUSED).get(stroke);
+                    if (stroke.getKeyEventType() != KeyEvent.KEY_PRESSED || !(DefaultEditorKit.pasteAction.equals(action) || "paste".equals(action))) continue;
+                    bound++;
+                    SwingUtilities.processKeyBindings(new KeyEvent(input, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), stroke.getModifiers(), stroke.getKeyCode(), KeyEvent.CHAR_UNDEFINED));
+                }
+                assertThat(bound).as("the look and feel binds a paste key").isPositive();
+                paste.actionPerformed(new ActionEvent(input, ActionEvent.ACTION_PERFORMED, "paste"));
+                assertThat(input.getText()).isEqualTo(fact);
+                assertThat(events).isEmpty();
             } finally { release(context); }
         });
     }

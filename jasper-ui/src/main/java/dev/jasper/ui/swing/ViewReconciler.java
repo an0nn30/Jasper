@@ -100,6 +100,7 @@ final class ViewReconciler implements AutoCloseable {
             button.button.windowFooter = false;
             button.button.orderedAction = false;
             button.button.panelEmpty = false;
+            button.button.noticeGround = null;
         }
         if (control instanceof Menus.MenuControl menu) {
             menu.main.panel = false;

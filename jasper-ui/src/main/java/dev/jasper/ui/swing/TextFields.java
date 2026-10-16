@@ -53,6 +53,7 @@ final class TextFields {
                 ((AbstractDocument)input.getDocument()).setDocumentFilter(new NumberFilter(() -> ((Nodes.Field)this.node).numeric().orElseThrow()));
                 bindStep("UP", 1); bindStep("DOWN", -1); bindStep("KP_UP", 1); bindStep("KP_DOWN", -1);
             }
+            if (input.getDocument() instanceof AbstractDocument document) document.setDocumentFilter(new ReadOnlyGuard(document.getDocumentFilter()));
             surface = new FieldSurface(context(), input, node.kind() == Nodes.FieldKind.TEXTAREA);
             surface.port = node.kind() == Nodes.FieldKind.PORT;
             var focus = new ThemePainting.Focus(input, surface, view); surface.focus = focus; own(focus);
@@ -228,6 +229,27 @@ final class TextFields {
                         });
                     } else setValue(field.value());
                 }
+            }
+        }
+        /**
+         * While the field is read-only only its descriptor's value reaches the document: a route that skips the
+         * editability check (the transfer handler's paste action) edits nothing. Otherwise {@code delegate} decides.
+         */
+        final class ReadOnlyGuard extends DocumentFilter {
+            final DocumentFilter delegate;
+            ReadOnlyGuard(DocumentFilter delegate) { this.delegate = delegate; }
+            private boolean refused() { return ((Nodes.Field) node).readOnly() && !applying; }
+            @Override public void insertString(FilterBypass bypass, int offset, String text, AttributeSet attributes) throws BadLocationException {
+                if (refused()) return;
+                if (delegate != null) delegate.insertString(bypass, offset, text, attributes); else super.insertString(bypass, offset, text, attributes);
+            }
+            @Override public void replace(FilterBypass bypass, int offset, int length, String text, AttributeSet attributes) throws BadLocationException {
+                if (refused()) return;
+                if (delegate != null) delegate.replace(bypass, offset, length, text, attributes); else super.replace(bypass, offset, length, text, attributes);
+            }
+            @Override public void remove(FilterBypass bypass, int offset, int length) throws BadLocationException {
+                if (refused()) return;
+                if (delegate != null) delegate.remove(bypass, offset, length); else super.remove(bypass, offset, length);
             }
         }
         private void setValue(String value) {

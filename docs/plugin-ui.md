@@ -54,7 +54,7 @@ Inside cards:
 
 Controls: `Field` (TEXT, SEARCH, PORT, PATH with Browse, TEXTAREA, NUMBER with steppers or a slider), `Secret`
 (masked input with reveal, confirmation, read-only detail with copy), `Choice` (DROPDOWN, EXCLUSIVE for two to four
-visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS), `Toggle` (a boolean, drawn as a switch or a checkbox),
+visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS, TABS to switch views), `Toggle` (a boolean, drawn as a switch or a checkbox),
 `Button` (one PRIMARY per surface, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), `MenuButton`, `Chip`, `StatusDot`,
 `Progress`, `Strength`, `Icon`, `Text` with a semantic `TextRole`, `ItemList`, `Table`, `Tree` and `Breadcrumbs`.
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).
@@ -221,7 +221,7 @@ rings and hovers on top. Content in the workspace area of a translucent window p
 ## Testing
 
 `jasper-sdk-testkit` implements the same kit contract headlessly: `new FakeKit(pluginId).create(spec, handler)`
-returns a `FakeKitView` whose `spec()` is the current tree and whose `emit(event)` delivers user input; `type(id, text)` types into a field as a person would, and a
+returns a `FakeKitView` whose `spec()` is the current tree and whose `emit(event)` delivers user input (an edit of a read-only field is dropped); `type(id, text)` types into a field as a person would, and a
 read-only, hidden or disabled field takes nothing. Assert on
 descriptors (which rows exist, which action is primary, which state is enabled), not on pixels; the host's own tests
 cover rendering. `FakePluginHost` runs a whole plugin. Both examples above are compiled and tested in

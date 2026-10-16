@@ -13,7 +13,12 @@ class HostedKitContractTest extends KitContractTest {
  protected void owns(UiKit kit,UiView view){((HostedKit)kit).requireOwned(view);}
  protected void fieldText(UiView view,String id,String text){input(((HostedKitView)view).component(),id+".input").setText(text);}
  protected int[] fieldSelection(UiView view,String id){var field=input(((HostedKitView)view).component(),id+".input");return new int[]{field.getSelectionStart(),field.getSelectionEnd()};}
- /** As a person types: the text component's key-typed action, which a read-only or disabled field ignores. */
- protected void type(UiView view,String id,String text){var field=input(((HostedKitView)view).component(),id+".input");field.selectAll();new javax.swing.text.DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new java.awt.event.ActionEvent(field,java.awt.event.ActionEvent.ACTION_PERFORMED,text));}
+ /** As a person types: the text component's key-typed action, which a read-only or disabled field ignores; a hidden field (or one under a hidden container) is not there to type into. */
+ protected void type(UiView view,String id,String text){var root=((HostedKitView)view).component();var field=input(root,id+".input");if(!shown(field,root))return;field.selectAll();new javax.swing.text.DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new java.awt.event.ActionEvent(field,java.awt.event.ActionEvent.ACTION_PERFORMED,text));}
+ /** As a person clicks: the kit's shown button named {@code id}. */
+ protected void click(UiView view,String id){var root=((HostedKitView)view).component();var button=named(root,id);if(!(button instanceof AbstractButton b)||!shown(b,root))throw new AssertionError("No shown button "+id);b.doClick(0);}
+ static Component named(Component c,String name){if(name.equals(c.getName()))return c;if(c instanceof Container p)for(var child:p.getComponents()){var result=named(child,name);if(result!=null)return result;}return null;}
+ /** Whether {@code c} and every container above it, up to {@code root}, is visible. */
+ static boolean shown(Component c,Component root){for(var at=c;at!=null;at=at.getParent()){if(!at.isVisible())return false;if(at==root)return true;}return false;}
  protected void stop(UiKit kit){((HostedKit)kit).close();}
 }

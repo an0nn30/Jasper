@@ -135,8 +135,11 @@ public abstract class PluginContractTest {
         return context.get();
     }
 
-    /** Spec 16.1.9: a plugin's kit admits SDK 0.18's controls and refuses a misplaced Notice or Separator, a NONE swatch and a miscounted choice. */
-    @Test void aPluginsKitAdmitsZeroEighteenControlsAndRefusesMisplacedOnes() {
+    /**
+     * Spec 16.1.9: a plugin's kit admits SDK 0.18's controls; the SDK refuses a misplaced Notice or Separator, a NONE
+     * swatch and a miscounted choice when the view is built, before any kit sees it.
+     */
+    @Test void aPluginsKitAdmitsZeroEighteenControlsAndTheSdkRefusesMisplacedOnes() {
         var context = started("test.controls", Set.of());
         h.ui(() -> {
             var spec = dev.jasper.sdk.testing.KitContractTest.zeroEighteen("Plain FTP sends the password unencrypted");
@@ -156,8 +159,7 @@ public abstract class PluginContractTest {
                 () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, one, "one", "Pick", "")),
                 () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, five, "o0", "Pick", "")),
                 () -> new ViewSpec(new Nodes.Choice("tabs", ready, Nodes.ChoiceKind.TABS, one, "one", "Tabs", "")));
-            for (var bad : refused)
-                assertThatIllegalArgumentException().isThrownBy(() -> context.kit().create(bad.get(), event -> { }));
+            for (var bad : refused) assertThatIllegalArgumentException().isThrownBy(bad::get);
         });
     }
 

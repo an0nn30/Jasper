@@ -10,8 +10,6 @@ import dev.jasper.ui.model.Nodes.*;
 import dev.jasper.ui.testsupport.*;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.image.BufferedImage;
-import java.util.*;
-import java.util.List;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
@@ -37,11 +35,6 @@ class SwatchesTest {
                 assertThat(label.getAccessibleContext().getAccessibleName()).isEqualTo("FTP");
             } finally { release(context); }
         });
-    }
-
-    @Test void eachHueHasItsGlyphColour() {
-        assertThat(List.of(Hue.BLUE, Hue.GREEN, Hue.AMBER, Hue.PURPLE, Hue.NEUTRAL).stream().map(Labels::hue).toList())
-            .containsExactly(SemanticColor.HUE_BLUE, SemanticColor.HUE_GREEN, SemanticColor.HUE_AMBER, SemanticColor.HUE_PURPLE, SemanticColor.HUE_NEUTRAL);
     }
 
     @Test void aSwatchKeepsItsSquareWhenTheIconChangesSize() {

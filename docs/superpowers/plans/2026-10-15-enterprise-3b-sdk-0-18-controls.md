@@ -1,6 +1,6 @@
 # Enterprise presentation 3b: SDK 0.18 controls Implementation Plan
 
-> **Status:** executed 2026-10-16 (`abf90c83a..2a4944861`); deviations from the text: none beyond the plan's Rulings; `./gradlew check --continue`: 10,561 tests, 0 failures, 0 errors, 25 skipped.
+> **Status:** executed 2026-10-16 (`abf90c83a..2a4944861`); deviations from the text: none beyond the plan's Rulings, then the final review's fixes ("Plan 3b: final review fixes"): a Notice's LINK action guarded on its ground and declared in `PaintedContrastTest`; a separator's rule kept off wrapped rows' edges, centred, and whole in a squeezed row; a read-only field's document guard; `Labels.hue` removed for `Choices.hue` (with `SwatchesTest.eachHueHasItsGlyphColour`); `PluginContractTest`'s case renamed `aPluginsKitAdmitsZeroEighteenControlsAndTheSdkRefusesMisplacedOnes`; a `click` hook in `KitContractTest`. The footnote, Properties labels and severity-less values reuse the default look's unguarded caption, label and body pairs by design (Rulings 6 and 10). `./gradlew check --continue` before those fixes: 10,561 tests, 0 failures, 0 errors, 25 skipped.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

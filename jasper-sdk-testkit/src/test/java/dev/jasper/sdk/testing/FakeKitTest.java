@@ -53,5 +53,7 @@ class FakeKitContractTest extends KitContractTest {
  protected void fieldText(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).emit(new dev.jasper.sdk.ui.UiEvent.Edited(id,text));}
  protected int[] fieldSelection(dev.jasper.sdk.ui.UiView view,String id){return ((FakeKitView)view).fieldSelection(id);}
  protected void type(dev.jasper.sdk.ui.UiView view,String id,String text){((FakeKitView)view).type(id,text);}
+ /** The fake has no components: a click is the event the host's button or option reports. */
+ protected void click(dev.jasper.sdk.ui.UiView view,String id){int option=id.indexOf(".option.");emit(view,option<0?new dev.jasper.sdk.ui.UiEvent.Action(id):new dev.jasper.sdk.ui.UiEvent.Selected(id.substring(0,option),java.util.Set.of(id.substring(option+".option.".length()))));}
  protected void stop(dev.jasper.sdk.ui.UiKit kit){((FakeKit)kit).close();}
 }

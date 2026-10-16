@@ -42,6 +42,37 @@ class NoticesTest {
         });
     }
 
+    @Test void aNoticesLinkIsHeldToTheTextFloorOnItsSeveritysGround() {
+        Edt.run(() -> {
+            for (var theme : KitFixtures.themes()) {
+                var context = KitFixtures.context(theme); var events = new ArrayList<UiEvent>();
+                var notices = new ArrayList<Node>();
+                for (var severity : Severity.values())
+                    notices.add(new Notice("notice-" + severity, READY, severity, FTP,
+                        List.of(new Nodes.Button("details-" + severity, READY, "Details", "", ButtonKind.LINK, "details-" + severity, ""))));
+                try (var view = new KitView(context, new ViewSpec(new Stack("notices", READY, LayoutRole.VERTICAL, notices)), events::add)) {
+                    KitFixtures.render(view, 420, 240, 1);
+                    for (var severity : Severity.values()) {
+                        String where = theme.name() + (theme.dark() ? " Dark " : " Light ") + severity;
+                        var link = (Buttons.KitButton) find(view, "details-" + severity, JButton.class);
+                        var ground = Notices.ground(severity).color(theme);
+                        assertThat(link.getForeground()).as(where).isEqualTo(SurfaceContrast.painted(theme, Notices.link(severity, false)));
+                        assertThat(link.textColor(true)).as(where).isEqualTo(SurfaceContrast.painted(theme, Notices.link(severity, true)));
+                        for (boolean hover : List.of(false, true))
+                            assertThat(dev.jasper.ui.theme.ColorMath.contrast(link.textColor(hover), ground)).as(where + " hover=" + hover).isGreaterThanOrEqualTo(4.5);
+                    }
+                    find(view, "details-WARNING", JButton.class).doClick(0);
+                    assertThat(events).containsExactly(new UiEvent.Action("details-WARNING"));
+                    // Outside a notice the same link keeps its authored colour.
+                    var plain = new Nodes.Button("details-INFO", READY, "Details", "", ButtonKind.LINK, "details-INFO", "");
+                    view.update(new ViewSpec(new Stack("notices", READY, LayoutRole.VERTICAL, List.of(plain))));
+                    assertThat(find(view, "details-INFO", JButton.class).getForeground())
+                        .isEqualTo(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_LINK));
+                } finally { release(context); }
+            }
+        });
+    }
+
     @Test void aLongNoticeWrapsBesideItsGlyphAndKeepsItsActionAtTheTrailingEdge() {
         Edt.run(() -> {
             var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();

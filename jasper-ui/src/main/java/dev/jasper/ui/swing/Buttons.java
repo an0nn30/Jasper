@@ -199,8 +199,15 @@ final class Buttons {
                 case LINK -> hover ? SemanticColor.TEXT_LINK_HOVER : SemanticColor.TEXT_LINK;
             };
         }
+        /** A Notice's action (set by the notice after each update): the severity whose ground it sits on, or null. */
+        Nodes.Severity noticeGround;
         /** Final paint color; specialized shared controls may apply a surface-specific readability floor. */
-        Color textColor(boolean hover) { return ThemePainting.color(context, textRole(hover)); }
+        Color textColor(boolean hover) {
+            // A Notice's link sits on the severity's ground: its link colour is held to the text floor there.
+            if (noticeGround != null && kind == Nodes.ButtonKind.LINK && !onSelection)
+                return SurfaceContrast.painted(context.theme(), Notices.link(noticeGround, hover));
+            return ThemePainting.color(context, textRole(hover));
+        }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
             if (onSelection) return ink.text;
