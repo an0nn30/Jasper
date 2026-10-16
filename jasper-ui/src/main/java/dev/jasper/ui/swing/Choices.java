@@ -27,7 +27,9 @@ final class Choices {
         boolean embedded, settings, identitySection;
         /** A FULL-form setting row's trailing dropdown uses the compact setting-control height. */
         boolean fullSetting;
-        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(!value); }
+        @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
+        /** A TABS choice is labelled by its tabs; its label stays the accessible name. */
+        boolean labelShown() { return !embedded && ((Nodes.Choice)node).kind() != Nodes.ChoiceKind.TABS; }
         @Override int firstLineHeight() { return input.getHeight() > 0 ? input.getY() + input.getHeight() : input.getPreferredSize().height; }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
@@ -159,7 +161,7 @@ final class Choices {
                         button.setBorder(new EmptyBorder(0, pad, 0, pad));
                     }
                 }
-                label.setVisible(!embedded);label.setText(choice.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(input.isEnabled());
+                label.setVisible(labelShown());label.setText(choice.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(input.isEnabled());
                 error.setText(choice.state().error()); error.setVisible(!choice.state().error().isEmpty()); error.setEnabled(input.isEnabled());
                 error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
                 ((BorderLayout)component.getLayout()).setVgap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));

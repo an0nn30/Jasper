@@ -51,6 +51,12 @@ class KitValuesTest {
    assertThat(((dev.jasper.ui.model.Nodes.Choice)KitValues.toModule(spec).root()).face().orElseThrow().technicalCaption()).isEqualTo(technical);
   }
  }
+ /** Plan 3b: a TABS choice crosses the projection unchanged. */
+ @Test void tabsProjectWithoutLoss(){
+  var spec=new ViewSpec(new Choice("tabs",READY,ChoiceKind.TABS,List.of(new Option("overview","Overview",Optional.empty()),new Option("details","Details",Optional.empty())),"overview","Plugin information",""));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  assertThat(((dev.jasper.ui.model.Nodes.Choice)KitValues.toModule(spec).root()).kind()).isEqualTo(dev.jasper.ui.model.Nodes.ChoiceKind.TABS);
+ }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
   for(String icon:List.of("lock","")){
    var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);

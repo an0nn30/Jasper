@@ -19,7 +19,7 @@ public final class Nodes {
     public enum ButtonKind { PRIMARY, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK }
     public enum StatusKind { SUCCESS, WARNING, DANGER, IDLE }
     public enum FieldKind { TEXT, SEARCH, PORT, PATH, TEXTAREA, NUMBER }
-    public enum ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS }
+    public enum ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS, TABS }
     public enum CardKind { FORM, SETTINGS, MIXED }
     /** NONE keeps rows readable and scrollable but removes row selection, activation and the canvas focus stop.
      * Independently interactive inline controls keep their behavior. NONE requires empty selectedIds. */

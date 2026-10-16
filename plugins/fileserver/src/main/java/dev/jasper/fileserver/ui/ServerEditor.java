@@ -371,6 +371,10 @@ public final class ServerEditor implements AutoCloseable {
     private static Nodes.Text text(String id, String value, Nodes.TextRole role) {
         return new Nodes.Text(id, state(!value.isBlank(), true), value, role);
     }
+    /** A value shown as a fact rather than as a one-option choice (spec 8.2: an EXCLUSIVE choice has 2 to 4 options). */
+    private static Nodes.Field fact(String id, String value, String label, Nodes.FieldPresentation presentation) {
+        return new Nodes.Field(id, ControlState.READY, Nodes.FieldKind.TEXT, value, "", label, "", Optional.empty(), presentation, "", "", "", true);
+    }
 
     private Nodes.Form form() {
         boolean ftp = protocol == Protocol.FTP, sftp = protocol == Protocol.SFTP;
@@ -392,7 +396,8 @@ public final class ServerEditor implements AutoCloseable {
             ? "Ports below 1024 need root or CAP_NET_BIND_SERVICE on Linux — try " + protocol.suggestedPort(parsedPort()) : "";
         var server = new ArrayList<Nodes.Node>();
         server.add(row("server.name.row", "Name", new Nodes.Field(NAME, ControlState.READY, Nodes.FieldKind.TEXT, name, "e.g. Downloads", "Name", "")));
-        server.add(row("server.protocol.row", "Protocol", new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.EXCLUSIVE,
+        server.add(row("server.protocol.row", "Protocol", protocols.size() == 1 ? fact(PROTOCOL, protocol.label(), "Protocol", Nodes.FieldPresentation.STANDARD)
+            : new Nodes.Choice(PROTOCOL, state(true, !existing && protocols.size() > 1), Nodes.ChoiceKind.EXCLUSIVE,
             protocols.stream().map(value -> new Option(value.name(), value.label(), Optional.of(switch(value) {
                 case HTTP -> Nodes.Hue.BLUE; case FTP -> Nodes.Hue.AMBER; case SFTP -> Nodes.Hue.GREEN; case TFTP -> Nodes.Hue.PURPLE;
             }))).toList(), protocol.name(), "Protocol", "")));
@@ -414,7 +419,9 @@ public final class ServerEditor implements AutoCloseable {
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (accountId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(accountLabel, "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         // The Access card is the login's own card, so its segments need no label: they span the card, as Add Host's do.
-        access.add(new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.EXCLUSIVE, loginOptions, shownLogin, "Login", ""));
+        // A single login (TFTP has none) is a fact: a read-only field in the choice's place, unlabelled as the choice was.
+        access.add(loginOptions.size() == 1 ? fact(LOGIN, loginOptions.getFirst().label(), "Login", Nodes.FieldPresentation.EMBEDDED)
+            : new Nodes.Choice(LOGIN, state(true, protocol.hasLogin()), Nodes.ChoiceKind.EXCLUSIVE, loginOptions, shownLogin, "Login", ""));
         access.add(new Nodes.FormRow("server.account.row", state(protocol.hasLogin() && shownLogin.equals("vault"), true), "Account", "",
             new Nodes.Choice(CHOOSE_ACCOUNT, state(true, vaultPresent), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE_ACCOUNT, "lock", Optional.empty(),
                 Optional.of(face)), Optional.empty()));

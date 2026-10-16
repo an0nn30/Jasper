@@ -74,6 +74,9 @@ public final class KitGallery {
                 "mac", "Via host", "via", "", Optional.empty(), Optional.of(new PickerFace("Mac", "dustin@192.168.1.119:22", "server", Hue.BLUE, PickerDensity.DEFAULT, true))),
             new Nodes.Choice("technical-key", ControlState.READY, ChoiceKind.PICKER, List.of(), "", "Credential", "pick", "lock", Optional.empty(),
                 Optional.of(new PickerFace("root", "SHA256:4f2a9c", "key", Hue.GREEN, PickerDensity.COMPACT, true))))))));
+        // Plan 3b (SDK 0.18): a TABS choice (Overview and Details).
+        result.add(new Fixture("tabs", "", "normal", 360, 60, new ViewSpec(new Nodes.Choice("tabs", ControlState.READY, ChoiceKind.TABS,
+            List.of(new Option("overview", "Overview", Optional.empty()), new Option("details", "Details", Optional.empty())), "overview", "Plugin information", "tabs"))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

@@ -83,6 +83,8 @@ class StagedFileServerFormTest {
                         if(!protocol.equals("TFTP"))click(form,"server.login.option."+login);
                         captureServer(protocol.toLowerCase()+"-"+login,kitView(form),540,730);
                         // The Login choice is one line of segments at the editor's width, for every protocol.
+                        // TFTP's one login is a read-only field (spec 8.2: an EXCLUSIVE choice has 2 to 4 options).
+                        if(protocol.equals("TFTP")){assertThat(node(form,"server.login")).isInstanceOfSatisfying(Nodes.Field.class,f->assertThat(f.readOnly()).isTrue());continue;}
                         var segments=((Nodes.Choice)node(form,"server.login")).options().stream().map(option->require(form,"server.login.option."+option.id())).toList();
                         for(var segment:segments)assertThat(segment.getY()).as(protocol+" "+((JButton)segment).getText()+" on one line").isEqualTo(segments.getFirst().getY());
                     }

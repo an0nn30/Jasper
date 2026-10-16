@@ -12,7 +12,7 @@ class KitValuesTest {
     }
     /** Spec 8.1: the constants SDK 0.18 renames; every other constant keeps its name and place. */
     @Test void zeroEighteenNamesTheExclusiveHelpAndPromptConstants() {
-        assertThat(names(ChoiceKind.class)).containsExactly("DROPDOWN", "PICKER", "EXCLUSIVE", "SEARCHABLE", "PREVIEWS");
+        assertThat(names(ChoiceKind.class)).containsExactly("DROPDOWN", "PICKER", "EXCLUSIVE", "SEARCHABLE", "PREVIEWS", "TABS");
         assertThat(names(ButtonPresentation.class)).containsExactly("STANDARD", "EMBEDDED", "CONTEXTUAL_EMBEDDED", "HELP");
         assertThat(names(FormKind.class)).containsExactly("PROMPT", "PROMPT_COMPACT", "SHEET", "FULL", "SETTINGS", "WINDOW");
         assertThat(names(LayoutRole.class)).startsWith("VERTICAL", "INLINE", "ACTIONS", "PROMPT_HEADER", "DETAIL");
@@ -34,6 +34,22 @@ class KitValuesTest {
     @Test void pickerFacesDefaultToAPlainCaption() {
         assertThat(new PickerFace("Mac", "dustin@host:22", "server", Hue.BLUE, PickerDensity.DEFAULT).technicalCaption()).isFalse();
         assertThat(new PickerFace("Mac", "dustin@host:22", "server", Hue.BLUE, PickerDensity.DEFAULT, true).technicalCaption()).isTrue();
+    }
+    /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
+    @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {
+        for (int count = 0; count <= 6; count++) {
+            var options = java.util.stream.IntStream.range(0, count).mapToObj(i -> new Option("o" + i, "Option " + i, Optional.empty())).toList();
+            var exclusive = new Choice("pick", ControlState.READY, ChoiceKind.EXCLUSIVE, options, "", "Pick", "");
+            var tabs = new Choice("tabs", ControlState.READY, ChoiceKind.TABS, options, "", "Tabs", "");
+            if (count >= 2 && count <= 4) assertThatCode(() -> new ViewSpec(exclusive)).as("%d options", count).doesNotThrowAnyException();
+            else assertThatIllegalArgumentException().as("%d options", count).isThrownBy(() -> new ViewSpec(exclusive)).withMessageContaining("2 to 4 options");
+            if (count >= 2) assertThatCode(() -> new ViewSpec(tabs)).as("%d tabs", count).doesNotThrowAnyException();
+            else assertThatIllegalArgumentException().as("%d tabs", count).isThrownBy(() -> new ViewSpec(tabs)).withMessageContaining("two or more options");
+        }
+        var one = new Choice("one", ControlState.READY, ChoiceKind.EXCLUSIVE, List.of(new Option("a", "A", Optional.empty())), "a", "One", "");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new ItemList("list", ControlState.READY, ListKind.SINGLE,
+            List.of(new ListItem("row", Optional.empty(), List.of(text("title")), List.of(), List.of(one))), Set.of(), "", List.of())))
+            .withMessageContaining("2 to 4 options");
     }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,

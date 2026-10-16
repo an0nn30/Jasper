@@ -32,6 +32,14 @@ class ServerCompositionTest {
                 emit(editor, new UiEvent.Selected(ServerEditor.PROTOCOL, Set.of("TFTP")));
                 assertThat(node(editor,"server.account.row").state().visible()).isFalse();
                 assertThat(((Nodes.Text)node(editor,"server.preview")).text()).isEqualTo("tftp://127.0.0.1:6969");
+                // Spec 8.2: TFTP's one login is a fact, not a choice: a read-only field in the choice's place.
+                assertThat(node(editor, ServerEditor.LOGIN)).isInstanceOfSatisfying(Nodes.Field.class, login -> {
+                    assertThat(login.readOnly()).isTrue();
+                    assertThat(login.value()).isEqualTo("No login (TFTP has none)");
+                    assertThat(login.presentation()).isEqualTo(Nodes.FieldPresentation.EMBEDDED);
+                });
+                emit(editor, new UiEvent.Selected(ServerEditor.PROTOCOL, Set.of("HTTP")));
+                assertThat(node(editor, ServerEditor.LOGIN)).isInstanceOf(Nodes.Choice.class);
             }
         });
     }
@@ -66,6 +74,11 @@ class ServerCompositionTest {
             int[] requests={0};var kit=new FakeKit("dev.jasper.fileserver");
             try(var editor=new ServerEditor(kit,List.of(),Optional.empty(),false,Set.of(Protocol.HTTP),List.of(),false,id->Optional.empty(),
                 ()->CompletableFuture.completedFuture(Optional.empty()),()->{requests[0]++;return Optional.empty();},ServerEditor.KeySources.NONE,false,d->{},()->{})) {
+                // One offered protocol is a fact, not a choice (spec 8.2: an EXCLUSIVE choice has 2 to 4 options).
+                assertThat(node(editor, ServerEditor.PROTOCOL)).isInstanceOfSatisfying(Nodes.Field.class, protocol -> {
+                    assertThat(protocol.readOnly()).isTrue();
+                    assertThat(protocol.value()).isEqualTo("HTTP");
+                });
                 String longPath=root.resolve("very-long-synthetic-folder/another-segment/still-editable").toString();
                 emit(editor,new UiEvent.Edited(ServerEditor.FOLDER,longPath));assertThat(requests[0]).isZero();
                 emit(editor,new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));assertThat(requests[0]).isEqualTo(1);

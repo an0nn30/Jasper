@@ -26,7 +26,8 @@ public final class StateFixtures {
         for (ButtonKind kind : ButtonKind.values()) controls.add(button("button-" + kind, kind.name(), kind));
         for (FieldKind kind : FieldKind.values()) controls.add(field("field-" + kind, "", kind.name(), kind));
         controls.add(new Secret("secret", READY, "Password", "Password", ""));
-        for (ChoiceKind kind : ChoiceKind.values()) controls.add(choice("choice-" + kind, kind, "Selected", "Selected", "Other"));
+        // TABS has its own fixture (KitGallery's "tabs"), so this sheet keeps its pixels.
+        for (ChoiceKind kind : ChoiceKind.values()) if (kind != ChoiceKind.TABS) controls.add(choice("choice-" + kind, kind, "Selected", "Selected", "Other"));
         controls.add(new Choice("choice-free-entry", READY, ChoiceKind.SEARCHABLE, List.of(new Option("menlo", "Menlo", Optional.empty()), new Option("sf-mono", "SF Mono", Optional.empty())),
             "", "Font family", "", "", Optional.of(new ChoiceSearch(0, "No installed font matches", Optional.of("Iosevka")))));
         controls.add(new Toggle("switch", READY, "Switch", true, "switch", false));

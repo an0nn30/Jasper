@@ -293,7 +293,7 @@ final class ItemLists {
                                                 Typography.Role.LABEL);
                                 case PREVIEWS -> ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+fontHeight(Typography.Role.SETTINGS_PREVIEW)
                                     +2*ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING)+ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
-                                case EXCLUSIVE ->
+                                case EXCLUSIVE, TABS ->
                                         inputHeight(
                                                         DesignMetrics.Role.FORM_SEGMENT_HEIGHT,
                                                         Typography.Role.LABEL)

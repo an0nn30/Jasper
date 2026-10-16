@@ -24,6 +24,22 @@ class ViewSpecTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /** Plan 3b (spec 8.2): EXCLUSIVE shows two to four options and TABS two or more, wherever the choice sits. */
+    @Test void exclusiveChoicesShowTwoToFourOptionsAndTabsTwoOrMore() {
+        for (int count = 0; count <= 6; count++) {
+            var options = java.util.stream.IntStream.range(0, count).mapToObj(i -> new Option("o" + i, "Option " + i, Optional.empty())).toList();
+            var exclusive = new Choice("pick", ControlState.READY, ChoiceKind.EXCLUSIVE, options, "", "Pick", "");
+            var tabs = new Choice("tabs", ControlState.READY, ChoiceKind.TABS, options, "", "Tabs", "");
+            if (count >= 2 && count <= 4) assertThatCode(() -> new ViewSpec(exclusive)).as("%d options", count).doesNotThrowAnyException();
+            else assertThatIllegalArgumentException().as("%d options", count).isThrownBy(() -> new ViewSpec(exclusive)).withMessageContaining("2 to 4 options");
+            if (count >= 2) assertThatCode(() -> new ViewSpec(tabs)).as("%d tabs", count).doesNotThrowAnyException();
+            else assertThatIllegalArgumentException().as("%d tabs", count).isThrownBy(() -> new ViewSpec(tabs)).withMessageContaining("two or more options");
+        }
+        var one = new Choice("one", ControlState.READY, ChoiceKind.EXCLUSIVE, List.of(new Option("a", "A", Optional.empty())), "a", "One", "");
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new ItemList("list", ControlState.READY, ListKind.SINGLE,
+            List.of(new ListItem("row", Optional.empty(), List.of(text("title")), List.of(), List.of(one))), Set.of(), "", List.of())))
+            .withMessageContaining("2 to 4 options");
+    }
     @Test void choiceTableListAndTreeValidateReferencesAndUniqueIds() {
         assertThatThrownBy(() -> new ViewSpec(new Choice("pick", ControlState.READY, ChoiceKind.DROPDOWN,
             List.of(new Option("a", "A", Optional.empty())), "missing", "Choice", "choose")))

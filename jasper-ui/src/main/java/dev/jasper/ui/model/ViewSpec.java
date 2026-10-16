@@ -50,6 +50,11 @@ public record ViewSpec(Node root) {
             case PickerMenu ignored -> {}
             case Choice n -> {
                 if (!n.selectedId().isEmpty()) references(Set.of(n.selectedId()), new HashSet<>(n.options().stream().map(Option::id).toList()));
+                // Spec 8.2: EXCLUSIVE shows two to four options, all of them visible; TABS switches among two or more.
+                if (n.kind() == ChoiceKind.EXCLUSIVE && (n.options().size() < 2 || n.options().size() > 4))
+                    throw new IllegalArgumentException("An EXCLUSIVE choice has 2 to 4 options, not " + n.options().size());
+                if (n.kind() == ChoiceKind.TABS && n.options().size() < 2)
+                    throw new IllegalArgumentException("A TABS choice has two or more options, not " + n.options().size());
             }
             case Table n -> {
                 var columns = new HashSet<>(n.columns().stream().map(Column::id).toList());
