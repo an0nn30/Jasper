@@ -1,5 +1,46 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 3e: the default-look changes — 2026-10-16** (`claude/enterprise-default-look`, worktree
+`.claude/worktrees/enterprise-3e`, `46b9bca82..7de3ee4ec`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-3e-default-look.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec section 13, in both looks. Remote's
+SSH menu is gone: Connect to SSH Host…, Toggle SSH hosts and Split with Same Host, New Host… and Import from
+~/.ssh/config…, and the tunnels group sit in the Session menu, Open SFTP here and Transfers in the Transfer menu,
+where File Server adds the new Share Folder… (what the empty File Servers panel's button runs) and New File Server….
+File › Open File… (`open_file`, no default binding; also a palette command) asks the plugins' file chooser over the
+window for one local file, starting in the pane's folder, and opens it as a Cmd-click does. Vault's status item reads
+"Vault: Locked" or "Vault: Unlocked" ("Vault" with no vault); the Snippets scope's first verb reads "Insert" (id
+`paste`). A Settings page's leading rows that no section heads take the page's name (Command Palette, Desk Buddy,
+Terminal, Cursor, Shell and every generated plugin page, such as Credential Vault), and System Settings opens with
+"General". New File Server's warnings are one WARNING Notice and its folder a read-only field that only the separate
+Choose… sets. A plugin's `stringList` host row is the generated pages' ordered-list editor, node for node, in the host
+and the testkit's fake. Project Index's Location column uses `MONO_SMALL`. Plugin form labels are sentence case (Via
+host, Jump host, Reachable from, Listen on, Forward to). The palette's empty query shows three recent rows. The
+banners of the Snippets, Palette plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault
+specifications carry spec 19.2's lines. Pixels: no jasper-ui file changed, so the headless gallery is byte-identical;
+measured against renders taken before Task 1, the reference pairs whose renders changed, all as section 13 asks, are
+`settings-keymap` 0.294 → 0.293, `host-add` 0.191 → 0.190, `fileserver-add` 0.228 → 0.228, `workspace-rails` 0.818 → 0.807, `workspace-integrated` 0.586 → 0.583, `workspace-palette` 0.375 → 0.349, `tunnel-new` 0.340 → 0.341 (edge agreement before → after), each with a `note` in `tools/visual/pairs.json`; `vault-manager` and
+`vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder);
+every other pair's render is pixel-identical. Rulings (plan, "Rulings"): the reference pairs keep their mocks and gain
+notes; Session and Transfer keep the SSH menu's order; Share Folder… runs what New File Server… runs; Open File…
+opens nothing before plugins start; "Vault" with no vault; the verb id stays `paste`;
+one `SchemaPage` rule titles leading groups, plugin-built pages excepted; one Notice joins the warnings; the folder is
+set only through the chooser, in tests too; sentence case covers exactly the five labels, and jasper-ui fixtures keep
+their Title Case copies; the host list is `Editors.textList()`'s node; Location takes `MONO_SMALL`; `SUGGESTED_ROWS`
+stays 10; the banner lines follow each status paragraph. Rulings 4, approved on 2026-10-16 under the user's overnight
+authority: File › Open File… shows Jasper's own file chooser, which every other file pick in the app uses, as IntelliJ
+does by default; spec 11.7 and 13 now say so, with a header amendment line. Deviations from the plan's text:
+Task 9: the plan's Rulings 14 linked the Enterprise design relative to the plans folder, which `AppDocumentationTest` refuses; that link now points into `../specs/`. Task 9: `fileserver-add` changed only in its "Reachable from" label (the read-only folder draws as before and that state has no warning), and its note says so. Task 9: `settings-keymap` (the Keymap lists Open File… and Share Folder…), `workspace-rails` and `workspace-integrated` (the Vault status item reads Vault: Locked) changed by design and carry notes too. Task 9: `vault-manager` and `vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder, shown by two renders of one tree), so they carry no note and Step 5 skips them. Hand-offs:
+plan 9's classic Settings compositions draw the new leading headings as titled group boxes; plan 10's classic File
+Servers table reuses Share Folder… for its empty state; plan 8's Browse… runs `ActionId.OPEN_FILE`.
+`./gradlew check --continue`: **10,621 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the menu bar reads File, Edit, View, Pane, Tab,
+Session, Transfer, Tools, … with no SSH menu, and every former SSH entry works from Session or Transfer; File › Open
+File… opens a chosen file in the default editor and Cancel opens nothing; the Vault status item reads Vault: Locked
+and Vault: Unlocked as you lock and unlock; New File Server with FTP shows the Warning notice, and Choose… sets the
+read-only folder; Settings › Command Palette, Terminal and System Settings show their first headings; Settings › Tools
+› Project Index edits its lists as ordered lists; the palette's empty query shows three recent rows. Not merged, not
+pushed.
+
 **Enterprise presentation, plan 3b: SDK 0.18 controls — 2026-10-16** (`claude/enterprise-sdk-0-18-controls`, worktree
 `.claude/worktrees/enterprise-3b`, `abf90c83a..2a4944861`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md),

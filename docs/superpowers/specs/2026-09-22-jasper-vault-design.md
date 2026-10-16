@@ -8,6 +8,8 @@ Managed SSH storage and config import are amended by the approved
 and failure walkthroughs of `2026-09-21-jasper-plugin-sdk-design.md` for the Vault side; the
 SSH/SFTP/Tunnel Manager gets its own spec and consumes the API defined here.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): the status item reads Vault: Locked or Vault: Unlocked; everything else in this document stands.
+
 **Scope:** One bundled plugin, `dev.jasper.vault`, that keeps SSH credentials (accounts with a
 password, a key, or both; standalone SSH keys; secure notes) in one encrypted file, bound to this
 device, unlocked with a master password, locked again after inactivity; a consumer API other

@@ -621,9 +621,10 @@ the kind rejects falls back to the default and is reported against the file with
 reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
-heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
+heading wherever `section` changes (the page's name heads rows before the first one), the description under each control, and an editor chosen by kind or by
 `editor(EditorHint...)`. An `integer` setting is a stepper and a `number` a decimal field; `unit("min")` (a short unit,
-empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). To build the page yourself, call `context.settings().page(panel)` during `start` with a
+empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). A `stringList` is an ordered list with an entry
+below it that adds a value, on generated pages and in `host.row` rows alike. To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel

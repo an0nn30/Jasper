@@ -1,5 +1,7 @@
 # Enterprise presentation 3e: the default-look changes Implementation Plan
 
+> **Status:** executed 2026-10-16 (`46b9bca82..7de3ee4ec`). Rulings 4 approved on 2026-10-16 under the user's overnight authority: File › Open File… shows Jasper's own file chooser, and spec 11.7 and 13 are amended to say so. Deviations from the text: Task 9: the plan's Rulings 14 linked the Enterprise design relative to the plans folder, which `AppDocumentationTest` refuses; that link now points into `../specs/`. Task 9: `fileserver-add` changed only in its "Reachable from" label (the read-only folder draws as before and that state has no warning), and its note says so. Task 9: `settings-keymap` (the Keymap lists Open File… and Share Folder…), `workspace-rails` and `workspace-integrated` (the Vault status item reads Vault: Locked) changed by design and carry notes too. Task 9: `vault-manager` and `vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder, shown by two renders of one tree), so they carry no note and Step 5 skips them. `./gradlew check --continue`: 10,621 tests, 0 failures, 0 errors, 25 skipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Spec section 13's visible changes, made once and applied in both looks: Remote's SSH menu becomes entries in
@@ -206,7 +208,7 @@ STATUS entry and the status banner record it as a deviation awaiting that ruling
 13. **`RECENT_ROWS` becomes 3 and `SUGGESTED_ROWS` stays 10**, the empty query's total, so Most used shows one row
     fewer — spec 11.3 changes the recent count only — cost: one constant.
 14. **Banner placement**: each 19.2 line is a new paragraph right after the specification's status paragraph, worded
-    exactly "Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md):
+    exactly "Amended on 2026-10-15 by the [Enterprise presentation design](../specs/2026-10-15-jasper-enterprise-presentation-design.md):
     <what>; everything else in this document stands." — cost: none.
 
 ## Verified facts

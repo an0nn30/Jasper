@@ -39,8 +39,9 @@ button. It stays centered on resize and blocks underlying input; Escape and outs
 dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
 **Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
 remain native dialogs above it. A second connection request in that window focuses the current attempt.
-The **SSH** menu carries the connection commands plus **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
-panel's **+** without opening the panel; unbound by default) and **Import from ~/.ssh/config...**.
+The **Session** menu carries the connection commands, the tunnel commands and **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
+panel's **+** without opening the panel; unbound by default) and **Import from ~/.ssh/config...**; the **Transfer**
+menu carries **Open SFTP here** and **Transfers**.
 
 A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:
 a **Vault credential** (a login with a password, a key or both, or a standalone key with the host's
@@ -168,7 +169,7 @@ menus, palette and subsequent connection overlay follow the new family/size.
 
 ## SFTP browsing and transfers
 
-Remote 0.4 includes SFTP in the same plugin as SSH. Choose **SSH > SFTP**, **View > SFTP**,
+Remote 0.4 includes SFTP in the same plugin as SSH. Choose **Transfer > Open SFTP here**, **View > SFTP**,
 **Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
 Connecting a shell does not automatically open the browser. There is one remote browser in
 each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
@@ -231,7 +232,7 @@ button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** 
 A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until
 dismissed with ×. The strip hides when nothing is queued. Before copying onto items that already
 exist, Remote asks once: **Replace** (files replaced, folders merged), **Skip existing** or
-**Cancel**. **SSH > Transfers** shows the sidebar. The status bar displays aggregate progress,
+**Cancel**. **Transfer > Transfers** shows the sidebar. The status bar displays aggregate progress,
 confirmed-data speed and bytes remaining; scanning has an unknown total. Click it to show the
 sidebar. Its cancel control cancels the sole active job, or shows the sidebar when several jobs
 are active.
@@ -285,7 +286,7 @@ verified build commands are in [SFTP verification](remote-7c-verification.md).
 
 ## Tunnels
 
-Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **SSH > Toggle Tunnels**
+Remote 0.10 adds SSH tunnels. Open the **Tunnels** panel from its rail button or **Session > Toggle Tunnels**
 (the palette's **Show Tunnels** command opens it too). A tunnel goes through a saved host: its credential, host-key
 trust and jump host apply. It has its own life: starting one never opens a terminal, closing terminals never stops it,
 and it shares the host's SSH connection with any terminals that are open.
@@ -296,15 +297,15 @@ and it shares the host's SSH connection with any terminals that are open.
   connect needs the server's `GatewayPorts` to permit it.
 - **Dynamic** (`-D`): a SOCKS5 proxy on this computer (no authentication, CONNECT only); names resolve on the server.
 
-Click **+** (or **SSH > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
+Click **+** (or **Session > New Tunnel...**) to add one: a name, the host to go through, the type, where to listen (port 0
 means any free port) and where to forward to. Start and stop a tunnel with the button at the end of its row, Enter or
-Space. The palette's Tunnels scope (`tunnels >`, or **SSH > Start or Stop a Tunnel...**) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
+Space. The palette's Tunnels scope (`tunnels >`, or **Session > Start or Stop a Tunnel...**) lists the same tunnels: Enter starts or stops, Cmd/Ctrl+Enter opens a
 running local tunnel in the browser, Shift+Enter edits a saved tunnel. Double-clicking a saved tunnel edits it. A
 running row shows its open connections, the bytes moved each way and its uptime; right-click for Start or Stop, Open
 in Browser, Copy Address, Edit, Duplicate and Delete. The status bar counts running tunnels and failures. A tunnel
 whose host was deleted stays in the list, marked "Host missing"; edit it to choose another host.
 
-**Forward a Port...** (a terminal's context menu, the SSH menu or the palette) forwards a remote port to the same port
+**Forward a Port...** (a terminal's context menu, the Session menu or the palette) forwards a remote port to the same port
 on this computer's loopback (the next free one if it is taken) through the SSH pane's host, or through a host you choose
 when the command does not start from an SSH pane. **More** reveals a *Forward to host* field for a target other than the
 server itself, named as the server sees it. It starts a quick forward, listed under *Quick forwards* until you stop it

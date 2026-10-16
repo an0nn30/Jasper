@@ -8,6 +8,8 @@ is the binding reference.
 
 - **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in a terminal window's File menu or the
   palette, and **Open…** inside the Editor window.
+- **Open File…** in a terminal window's File menu or the palette (no default shortcut) opens the file you choose in
+  the [default editor](#default-editor), as a Cmd-click does.
 - **New Editor File**, or **New File** (Cmd/Ctrl+N) inside the Editor window, for an untitled tab.
 - Drop files from the desktop onto the Editor window. Folders are ignored.
 - `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the

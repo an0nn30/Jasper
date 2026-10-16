@@ -5,6 +5,7 @@ Amended late on 2026-10-15 for the second mock set (reference folders 07 to 10) 
 decisions on my behalf": 5.1, 5.2, 5.9, 7.6, 8.2, 9.1, 10.8, 10.11, 14.1, 14.3, 14.6, 14.8, 16.2, 18 and 19.1.
 Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority: 8.2 (`DialogSpec.swatch`), 10.3 and 15
 (toolbar view admission).
+Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -1428,7 +1429,7 @@ reveal or other motion, and the shadow uses the catalog's popup values.
 
 ### 11.7 Browse… and File › Open File…
 
-Browse… runs the new File › Open File… action (section 13): the native file chooser, then the routing Cmd-click uses
+Browse… runs the new File › Open File… action (section 13): Jasper's file chooser, then the routing Cmd-click uses
 (`JasperApplication.openFileAt`, `:534-539`). The Run window stays open (11.6).
 
 ## 12. Settings
@@ -1485,7 +1486,7 @@ stays green otherwise:
   toggle, Split with Same Host, New Host…, Import from ~/.ssh/config…, and the tunnels group) and the Transfer menu
   (Open SFTP here, Transfers); File Server adds a new Share Folder… action (what the empty state's button runs today,
   `FileServersPanel.java:138`) and New File Server… to Transfer. A new app action, File › Open File… ("Open a file with
-  the default editor"), with no default binding (the Editor plugin's Open in Editor… keeps cmd+o), opens the native
+  the default editor"), with no default binding (the Editor plugin's Open in Editor… keeps cmd+o), opens Jasper's file
   chooser and routes the file as Cmd-click does.
 - **Copy.** Vault's status item reads "Vault: Locked" or "Vault: Unlocked"; the Snippets scope's first verb reads
   "Insert" (its other verbs keep their labels); the untitled leading groups of 12.2.
