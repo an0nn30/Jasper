@@ -29,6 +29,12 @@ class SettingSpecTest {
         assertThat(EditorHint.font(true)).isEqualTo(new EditorHint.Font(true));
     }
 
+    /** Plan 3b: the technical hint is a value, like the others. */
+    @Test void theTechnicalHintIsAValue() {
+        assertThat(EditorHint.technical()).isEqualTo(new EditorHint.Technical());
+        assertThat(SettingSpec.of("ports", SettingKind.text(), "").editor(EditorHint.technical()).editor()).contains(EditorHint.technical());
+    }
+
     @Test void badDeclarationsAreRejected() {
         for (String key : new String[]{"", ".a", "a.", "a..b", "has space", "a.b c"})
             assertThatIllegalArgumentException().as(key).isThrownBy(() -> SettingSpec.of(key, SettingKind.bool(), false));

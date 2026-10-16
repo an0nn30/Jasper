@@ -606,6 +606,38 @@ class PluginPanelPageTest {
         onEdt(page::dispose);
     }
 
+    /** Spec 8.2: a technical hint's host row is the generated page's text field in the data face. */
+    @Test void aTechnicalHintsHostRowIsTheGeneratedPagesTechnicalField() throws Exception {
+        var view = new AtomicReference<HostedKitView>();
+        var ports = new AtomicReference<Setting<String>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
+            getClass().getClassLoader(), () -> plugin -> {
+                ports.set(plugin.settings().declare(SettingSpec.of("ports", SettingKind.text(), "50000-50100").label("Passive ports")
+                    .editor(dev.jasper.sdk.settings.EditorHint.technical())));
+                plugin.settings().page((SettingsPanel) panelHost -> {
+                    var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                        dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(panelHost.row(ports.get())))), event -> { });
+                    view.set(made);
+                    return made;
+                });
+            })));
+        var context = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
+            () -> changes[0]++, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
+        var page = onEdtValue(() -> (PluginPanelPage) host.settingsPages(context).getFirst());
+        onEdt(() -> {
+            page.component();
+            var field = hostControl(view.get(), 0);
+            var generated = dev.jasper.app.settingsui.Editors.technical().build().apply(appText("ports", "Passive ports"), context);
+            generated.show("50000-50100");
+            assertThat(KitValues.toModule(field)).as("the generated page's technical field")
+                .isEqualTo(generated.node("settings:ports", KitValues.toModule(field.state())));
+            assertThat(((dev.jasper.sdk.ui.Nodes.Field) field).presentation()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldPresentation.TECHNICAL);
+            assertThat(PluginSettingsPage.Hint.of(SettingSpec.of("ports", SettingKind.text(), "").editor(dev.jasper.sdk.settings.EditorHint.technical())))
+                .isEqualTo(PluginSettingsPage.Hint.TECHNICAL);
+        });
+        onEdt(page::dispose);
+    }
+
     /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
     private static dev.jasper.sdk.ui.Nodes.Node hostControl(HostedKitView view, int index) {
         var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);

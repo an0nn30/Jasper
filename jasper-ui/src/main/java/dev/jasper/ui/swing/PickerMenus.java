@@ -34,7 +34,7 @@ final class PickerMenus {
             var arrow=c.icons().icon(expanded?"chevron.up":"chevron.down",c.theme().semantic(),SemanticColor.TEXT_SECONDARY,metric(c,compact?DesignMetrics.Role.PICKER_COMPACT_FACE_CHEVRON:DesignMetrics.Role.PICKER_DEFAULT_FACE_CHEVRON));
             int right=button.getWidth()-pad-arrow.getIconWidth()-metric(c,DesignMetrics.Role.FOCUS_RING);
             arrow.paintIcon(button,g,right,(button.getHeight()-arrow.getIconHeight())/2);
-            line(g,c,empty?"Choose…":face.primary(),empty?"":face.caption(),x,0,Math.max(0,right-gap-x),button.getHeight(),false,empty,face.density()==Nodes.PickerDensity.COMPACT,false);
+            line(g,c,empty?"Choose…":face.primary(),empty?"":face.caption(),x,0,Math.max(0,right-gap-x),button.getHeight(),false,empty,face.density()==Nodes.PickerDensity.COMPACT,false,face.technicalCaption());
         }finally{g.dispose();}
     }
     private static void tile(Graphics2D g,JComponent owner,KitContext c,String name,Nodes.Hue hue,int x,int y,int size,boolean active){
@@ -48,11 +48,15 @@ final class PickerMenus {
         c.icons().icon(name,c.theme().semantic(),role,glyph).paintIcon(owner,g,x+(size-glyph)/2,y+(size-glyph)/2);
     }
     private static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}
-    private static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link){
+    /** A caption's type: a data value (a technical caption) in the data face, otherwise the density's caption. */
+    static Typography.Role captionRole(boolean compact,boolean technical){
+        return technical?Typography.Role.MONO_CAPTION:compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION;
+    }
+    private static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link,boolean technical){
         g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));var fm=g.getFontMetrics();int baseline=y+(height-fm.getHeight())/2+fm.getAscent();
         g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
         String primary=clipped(fm,label,width);g.drawString(primary,x,baseline);int used=fm.stringWidth(primary)+metric(c,DesignMetrics.Role.PICKER_GAP);
-        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION_SECONDARY:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
+        if(!caption.isEmpty()&&used<width){g.setFont(ThemePainting.font(c,captionRole(compact,technical)));g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION_SECONDARY:SemanticColor.TEXT_TERTIARY));g.drawString(clipped(g.getFontMetrics(),caption,width-used),x+used,baseline);}
     }
     static final class MenuControl extends ControlRegistry.Control {
         final JTextField search;
@@ -143,7 +147,7 @@ final class PickerMenus {
             if(active){g.setColor(ThemePainting.color(c,SemanticColor.SELECTION_BG));g.fillRect(0,top,getWidth(),rowHeight);}
             if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
-            int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer);
+            int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer,false);
             if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
         }finally{g.dispose();}}
     }

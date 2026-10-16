@@ -30,6 +30,11 @@ class KitValuesTest {
             assertThatIllegalArgumentException().isThrownBy(() -> new Field("n", ControlState.READY, FieldKind.NUMBER, "1", "", "N", "",
                 Optional.of(new Numeric(0, 9, 1, 0)), presentation, "", "", "", true)).withMessageContaining("never read-only");
     }
+    /** Plan 3b: a rich face's caption is plain text unless it says it is a data value. */
+    @Test void pickerFacesDefaultToAPlainCaption() {
+        assertThat(new PickerFace("Mac", "dustin@host:22", "server", Hue.BLUE, PickerDensity.DEFAULT).technicalCaption()).isFalse();
+        assertThat(new PickerFace("Mac", "dustin@host:22", "server", Hue.BLUE, PickerDensity.DEFAULT, true).technicalCaption()).isTrue();
+    }
     @Test void duplicateNodeIdsAndBlankLabelsAreRejected() {
         assertThatThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL,
             List.of(text("same"), text("same"))))).isInstanceOf(IllegalArgumentException.class);

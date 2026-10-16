@@ -48,7 +48,8 @@ final class KitSettingRows {
             // both show the declared unit after the value.
             // As the generated pages: a path ends with Browse.
             control=new Nodes.Field(id,state,kind,edits.getOrDefault(id,text),numeric.isPresent()?spec.unit():"",spec.label(),kind==Nodes.FieldKind.PATH?id+BROWSE:"",numeric,
-                spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldPresentation.STEPPER:Nodes.FieldPresentation.STANDARD);
+                spec.kind() instanceof SettingKind.IntegerRange?Nodes.FieldPresentation.STEPPER
+                    :kind==Nodes.FieldKind.TEXT&&PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.TECHNICAL?Nodes.FieldPresentation.TECHNICAL:Nodes.FieldPresentation.STANDARD);
         }
         boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,resettable,control),false);

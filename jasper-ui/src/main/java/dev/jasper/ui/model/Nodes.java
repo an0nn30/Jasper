@@ -294,10 +294,13 @@ public final class Nodes {
     /**
      * Grant-free display metadata. Empty primary means the placeholder face. A PICKER's face is its whole control; a
      * DROPDOWN may carry one too (a rich closed face, such as a saved host's tile, name and endpoint) while its popup
-     * still lists the options and reports Selected; its owner keeps the face describing the selected option.
+     * still lists the options and reports Selected; its owner keeps the face describing the selected option. A
+     * {@code technicalCaption} (since 0.18.0) is a data value, such as a saved host's endpoint, drawn in the data face.
      */
-    public record PickerFace(String primary, String caption, String icon, Hue hue, PickerDensity density) {
+    public record PickerFace(String primary, String caption, String icon, Hue hue, PickerDensity density, boolean technicalCaption) {
         public PickerFace { Objects.requireNonNull(primary);Objects.requireNonNull(caption);Objects.requireNonNull(icon);Objects.requireNonNull(hue);Objects.requireNonNull(density); }
+        /** A face whose caption is plain text. */
+        public PickerFace(String primary, String caption, String icon, Hue hue, PickerDensity density) { this(primary, caption, icon, hue, density, false); }
     }
     /** One selectable popup row; its id is also the Action emitted on explicit acceptance. */
     public enum PickerItemKind { VALUE, UTILITY }

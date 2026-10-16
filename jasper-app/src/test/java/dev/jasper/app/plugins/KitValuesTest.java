@@ -42,6 +42,15 @@ class KitValuesTest {
    assertThat(((dev.jasper.ui.model.Nodes.Field)KitValues.toModule(spec).root()).readOnly()).isEqualTo(readOnly);
   }
  }
+ /** Plan 3b: a technical caption crosses the projection unchanged. */
+ @Test void technicalPickerCaptionsProjectWithoutLoss(){
+  for(boolean technical:List.of(false,true)){
+   var face=new PickerFace("Mac","dustin@192.168.1.119:22","server",Hue.BLUE,PickerDensity.DEFAULT,technical);
+   var spec=new ViewSpec(new Choice("via",READY,ChoiceKind.DROPDOWN,List.of(new Option("mac","Mac",Optional.empty())),"mac","Via host","","",Optional.empty(),Optional.of(face)));
+   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+   assertThat(((dev.jasper.ui.model.Nodes.Choice)KitValues.toModule(spec).root()).face().orElseThrow().technicalCaption()).isEqualTo(technical);
+  }
+ }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
   for(String icon:List.of("lock","")){
    var choice=new Choice("picker",READY,ChoiceKind.PICKER,List.of(),"","Credential","choose",icon);

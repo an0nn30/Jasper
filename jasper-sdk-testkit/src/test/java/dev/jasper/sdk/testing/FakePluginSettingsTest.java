@@ -163,6 +163,26 @@ class FakePluginSettingsTest {
         assertThat(host.failures()).isEmpty();
     }); }
 
+    /** As the host: a technical hint's row is a text field in the data face. */
+    @Test void aTechnicalHintsRowIsATextFieldInTheDataFace() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+        var ports = new AtomicReference<Setting<String>>();
+        host.start(INFO, Set.of(), Set.of(), context -> {
+            ports.set(context.settings().declare(SettingSpec.of("ports", SettingKind.text(), "50000-50100").label("Passive ports").editor(EditorHint.technical())));
+            context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
+                dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(rows.row(ports.get())))), e -> {}));
+        });
+        host.settingsPanel("test.fake").orElseThrow();
+        var view = host.settingsPanelView("test.fake").orElseThrow();
+        assertThat(control(view, 0)).isInstanceOfSatisfying(dev.jasper.sdk.ui.Nodes.Field.class, field -> {
+            assertThat(field.kind()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldKind.TEXT);
+            assertThat(field.presentation()).isEqualTo(dev.jasper.sdk.ui.Nodes.FieldPresentation.TECHNICAL);
+            assertThat(field.value()).isEqualTo("50000-50100");
+        });
+        view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("settings:ports", "50000-50010"));
+        assertThat(host.pendingSettings("test.fake")).containsEntry("ports", "50000-50010");
+        assertThat(host.failures()).isEmpty();
+    }); }
+
     /** The control in the trailing slot of the {@code index}th host row of a page that stacks them. */
     private static dev.jasper.sdk.ui.Nodes.Node control(FakeKitView view, int index) {
         var row = (dev.jasper.sdk.ui.Nodes.SettingRow) ((dev.jasper.sdk.ui.Nodes.Stack) view.spec().root()).children().get(index);

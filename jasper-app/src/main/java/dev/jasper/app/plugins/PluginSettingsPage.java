@@ -79,6 +79,7 @@ final class PluginSettingsPage implements SettingsPage {
         Hint hint = Hint.of(spec);
         if (hint.font()) return Editors.font(hint == Hint.MONOSPACED_FONT);
         if (hint == Hint.FILE) return Editors.path(Hint.FILE_CHOOSER_TITLE);
+        if (hint == Hint.TECHNICAL && spec.kind() instanceof dev.jasper.sdk.settings.SettingKind.Text) return Editors.technical();
         return switch (spec.kind()) {
             case dev.jasper.sdk.settings.SettingKind.OneOf<?> oneOf -> Editors.choice(names(oneOf));
             // A bounded integer is the Settings stepper, as on the core pages, with its declared unit.
@@ -106,6 +107,8 @@ final class PluginSettingsPage implements SettingsPage {
         MONOSPACED_FONT,
         /** A path with Browse, which asks for an existing file. */
         FILE,
+        /** A text setting's field in the data face. */
+        TECHNICAL,
         /** No hint either page honours: the kind decides. */
         NONE;
 
@@ -116,6 +119,7 @@ final class PluginSettingsPage implements SettingsPage {
             return switch (spec.editor().orElse(null)) {
                 case EditorHint.Font font -> font.monospaced() ? MONOSPACED_FONT : FONT;
                 case EditorHint.File _ -> FILE;
+                case EditorHint.Technical _ -> TECHNICAL;
                 case null, default -> NONE;
             };
         }

@@ -126,6 +126,11 @@ public final class Editors {
         return new Factory<>((setting, context) -> new Line(setting.label()), List.of());
     }
 
+    /** A text field for a data value (a host, a port range, a path or a command), in the data face. */
+    public static Factory<String> technical() {
+        return new Factory<>((setting, context) -> new Line(setting.label(), Nodes.FieldPresentation.TECHNICAL), List.of());
+    }
+
     /** A font family: free text, with the installed families as suggestions that filter as you type. */
     public static Factory<String> font(boolean monospaced) {
         return new Factory<>((setting, context) -> new FontField(setting.label(), () -> Fonts.families(monospaced)), List.of());
@@ -311,9 +316,13 @@ public final class Editors {
 
     static final class Line implements ValueEditor<String> {
         private final String label;
+        private final Nodes.FieldPresentation presentation;
         String text = "";
-        Line(String label) { this.label = label; }
-        @Override public Nodes.Node node(String id, ControlState state) { return new Nodes.Field(id, state, Nodes.FieldKind.TEXT, text, "", label, ""); }
+        Line(String label) { this(label, Nodes.FieldPresentation.STANDARD); }
+        Line(String label, Nodes.FieldPresentation presentation) { this.label = label; this.presentation = presentation; }
+        @Override public Nodes.Node node(String id, ControlState state) {
+            return new Nodes.Field(id, state, Nodes.FieldKind.TEXT, text, "", label, "", Optional.empty(), presentation);
+        }
         @Override public String value() { return text; }
         @Override public void show(String value) { text = value; }
         @Override public boolean event(String id, UiEvent event) {

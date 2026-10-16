@@ -41,7 +41,8 @@ final class KitSettingRows {
             // As the host: a path ends with Browse.
             input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(),
                 kind == Nodes.FieldKind.PATH ? id + ":browse" : "", numeric,
-                spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldPresentation.STEPPER : Nodes.FieldPresentation.STANDARD);
+                spec.kind() instanceof SettingKind.IntegerRange ? Nodes.FieldPresentation.STEPPER
+                    : kind == Nodes.FieldKind.TEXT && spec.editor().orElse(null) instanceof EditorHint.Technical ? Nodes.FieldPresentation.TECHNICAL : Nodes.FieldPresentation.STANDARD);
         }
         // As the host: the settings control slot, then the icon-only Reset, shown while the value differs from the default.
         // As the host: Reset also shows while an unparsed edit or its error is pending; decimals compare at float precision.

@@ -68,6 +68,12 @@ public final class KitGallery {
         result.add(new Fixture("read-only-fields", "", "normal", 400, 110, new ViewSpec(new Nodes.Stack("read-only", ControlState.READY, LayoutRole.VERTICAL, List.of(
             new Nodes.Field("read-only-login", ControlState.READY, FieldKind.TEXT, "No login (TFTP has none)", "", "Login", "", Optional.empty(), FieldPresentation.STANDARD, "", "", "", true),
             new Nodes.Field("read-only-folder", ControlState.READY, FieldKind.TEXT, "/Users/me/Downloads", "No folder selected", "Folder", "", Optional.empty(), FieldPresentation.TECHNICAL, "", "", "", true))))));
+        // Plan 3b (SDK 0.18): rich faces whose captions are data values, at both densities.
+        result.add(new Fixture("technical-captions", "", "normal", 260, 110, new ViewSpec(new Nodes.Stack("technical-captions", ControlState.READY, LayoutRole.VERTICAL, List.of(
+            new Nodes.Choice("technical-via", ControlState.READY, ChoiceKind.DROPDOWN, List.of(new Option("mac", "Mac", Optional.empty()), new Option("box", "build-box", Optional.empty())),
+                "mac", "Via host", "via", "", Optional.empty(), Optional.of(new PickerFace("Mac", "dustin@192.168.1.119:22", "server", Hue.BLUE, PickerDensity.DEFAULT, true))),
+            new Nodes.Choice("technical-key", ControlState.READY, ChoiceKind.PICKER, List.of(), "", "Credential", "pick", "lock", Optional.empty(),
+                Optional.of(new PickerFace("root", "SHA256:4f2a9c", "key", Hue.GREEN, PickerDensity.COMPACT, true))))))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {
