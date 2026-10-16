@@ -28,6 +28,7 @@ final class KitContent implements AutoCloseable {
             case Nodes.Header n -> { n.context().ifPresent(result::add); n.primary().ifPresent(result::add); }
             case Nodes.Stack n -> result.addAll(n.children());
             case Nodes.ItemList n -> { n.addAction().ifPresent(result::add); for(var item:n.items()) { item.leading().ifPresent(result::add);result.addAll(item.title());result.addAll(item.subtitle());result.addAll(item.trailing()); } }
+            case Nodes.Table n -> { for(var row:n.rows()) result.addAll(row.cellNodes().values()); n.empty().ifPresent(result::add); }
             case Nodes.Card n -> result.addAll(n.children());
             case Nodes.Split n -> result.addAll(n.children());
             case Nodes.FormRow n -> { result.add(n.control()); n.trailing().ifPresent(result::add); }

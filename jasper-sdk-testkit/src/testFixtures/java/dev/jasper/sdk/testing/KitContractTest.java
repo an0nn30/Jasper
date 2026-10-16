@@ -229,6 +229,11 @@ public abstract class KitContractTest {
         cases.put("table-row",name -> descriptorTable(Optional.of(name),Optional.empty(),List.of()));
         cases.put("table-row-menu",name -> descriptorTable(Optional.empty(),Optional.of(List.of(descriptorMenu(name))),List.of()));
         cases.put("table-menu",name -> descriptorTable(Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));
+        // SDK 0.18 (plan 3c): a cell node and an empty table's state are descriptor positions too.
+        cases.put("table-cell-node",name -> new Nodes.Table("table",ControlState.READY,List.of(new Column("col","Column",Nodes.TextRole.BODY,false)),
+            List.of(new TableRow("row",Map.of(),Optional.empty(),false,Optional.empty(),"",Map.of("col",descriptorIcon(name)),Optional.empty())),Set.of(),"",List.of()));
+        cases.put("table-empty",name -> new Nodes.Table("table",ControlState.READY,List.of(new Column("col","Column",Nodes.TextRole.BODY,false)),List.of(),Set.of(),"",List.of(),
+            Nodes.SelectionMode.SINGLE,Nodes.ScrollPolicy.STANDARD,Optional.of(new Nodes.Empty("empty",ControlState.READY,descriptorIcon(name),"Nothing","",List.of())),""));
         cases.put("tree-hidden-child",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("branch","Branch",Optional.empty(),false,List.of(new TreeItem("leaf","Leaf",Optional.of(name),true,List.of())))),Set.of(),Set.of(),""));
         cases.put("tree-row-menu",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of(),OptionalInt.empty(),false,"",Optional.empty(),List.of(),Optional.of(List.of(descriptorMenu(name))))),Set.of(),Set.of(),""));
         cases.put("breadcrumb-menu",name -> new Nodes.Breadcrumbs("crumbs",ControlState.READY,List.of(new Crumb("crumb","Crumb",List.of(descriptorMenu(name)))),"Path",false,"","edit","submit","cancel"));
