@@ -34,7 +34,8 @@ same branch, and its Global Constraints, Verified facts and Mock measurements ap
 ```bash
 git log --oneline -1 --grep 'Settings chrome: documentation and status'      # prints 9a's last commit
 grep -c 'record Frame(boolean integratedTitle, boolean collapsibleNavigation)' jasper-ui/src/main/java/dev/jasper/ui/swing/SettingsShell.java  # 1
-ls jasper-app/src/test/java/dev/jasper/app/settingsui/EnterpriseSettings.java jasper-app/src/test/java/dev/jasper/app/testsupport/MockMatch.java
+ls jasper-app/src/test/java/dev/jasper/app/settingsui/EnterpriseSettings.java jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsMockMatch.java \
+   jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsFrameRenders.java
 ls build/plan9-base/compare.py
 ```
 
@@ -182,8 +183,10 @@ Read at `deafed424`; facts about plans 3b to 9a cite the plan.
     (`Editors.java:446-490`); `Editors.Items` builds an ORDERED `ItemList` and an entry (`:385-410`).
 12. `SettingsDialog.confirm` asks a SHEET form over the dialog with `windows.dialog(title, true, surface)` and a kit view
     (`SettingsDialog.java:128-149`).
-13. Plan 9a: `PageContext(… kit, chrome, composition)`, `SchemaPage.resetMenu`, `EnterpriseSettings.open/render`,
-    `SettingsChromeMockTest.PAGES`, `MockMatch`.
+13. Plan 9a: `PageContext(… kit, chrome, composition)`, `SchemaPage.resetMenu`, `EnterpriseSettings.open/render` (on 6a's
+    `EnterpriseLook`, restoring the default look on close), `SettingsChromeMockTest.PAGES`, the package-private
+    `SettingsMockMatch` (`mock`, `crop`, `deltaE`, `compare`, `inspect`) and the test bridge
+    `SettingsFrameRenders.check`, which 6a's `ChromeRenderTest.everyLookBuildsItsSettingsFrame` calls for every look.
 
 ### Mock measurements
 
@@ -201,7 +204,7 @@ canvas); colours are Enterprise Light's.
 | Status line | 07 | "131 shortcuts · Contextual keys are read-only" #5C6370, no glyph | Rulings 9 |
 | Band | 07b | from the row's bottom, 60 tall incl. 1 px edges #C9D7F2, #EEF2FA; the field from canvas 34 (its halo from 32) to 644.5, 22 tall, 7 below the band's top; Cancel 62 and Set 48, 24 tall, 6 apart, ending 8 before the box; the hint at the field's left in #5C6370 | `KEYCAP_DETAIL_TOP` 7, `KEYCAP_DETAIL_LEADING` 32, `KEYCAP_CONTENT_TRAILING` 8, `KEYCAP_DETAIL_AFTER` 0, Rulings 10 |
 | Recorder | 07b | #FFFFFF in #2F65CA with a 1 px #C9D7F2 halo; dot 7 #D03A3A at 9.5; prompt #838992 at 27.5 | Rulings 10 |
-| Plugins list | 08 | box 292 wide at the body's left 16, from 18 below the header rule to 16 above the footer; search inside at 6; group bands 22 on #F0F1F3 with #DDE0E4 rules; rows 36; checkbox at 8, name at 28.5; selection across the box | Rulings 12 |
+| Plugins list | 08 | box 292 wide at the body's left 16 (its border #B4B8BF), from 18 below the header rule (53) to 16 above the footer; inside, a search strip #F7F7F8 from the box's inner top (54) to 90 with the search at 6 (60 to 83), then a 1 px #DDE0E4 rule at 90 meeting the first heading's; group bands 22 on #F0F1F3 with #DDE0E4 rules; rows 36 on #FFFFFF; checkbox at 8, name at 28.5; selection across the box | Rulings 12; the strip `surface.sidebar` and its rule `border.row` (9a's strip roles) |
 | Plugin details | 08 | 12 right of the box; title 15/600; meta line; Disable ending at the body's right 16; folder tabs 26 tall below | 4b's folder tabs |
 | Shell | 11 | "Environment variables" row with Add Variable… (100 × 24) at the box's padding; arguments box "Empty" | Rulings 13, 15 |
 
@@ -236,7 +239,7 @@ pages whose controls plans 4b and 9a already draw: Appearance and Window. Under 
 - Modify: `docs/design/theme-engine/migration.csv` (two rows)
 
 **Interfaces:**
-- Consumes: plan 9a's `PageContext.composition()`, `EnterpriseSettings`, `SettingsChromeMockTest.Page` and `PAGES`, `MockMatch`.
+- Consumes: plan 9a's `PageContext.composition()`, `EnterpriseSettings`, `SettingsChromeMockTest.Page` and `PAGES`, `SettingsMockMatch`.
 - Produces: `ThemeMenu(ThemeImports, Supplier<InstalledThemes>, PageContext, Target, Runnable, String icon)`;
   package-private `static String Editors.menuIcon(PageContext)` ("more" under CLASSIC, "settings" otherwise);
   `SchemePick(String, Supplier<InstalledThemes>, Optional<ThemeImports>, PageContext, String icon)`;
@@ -318,7 +321,6 @@ package dev.jasper.app.settingsui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.app.testsupport.MockMatch;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -369,16 +371,16 @@ class SettingsPagesMockTest {
             var mock = SettingsChromeMockTest.content(page);
             for (var probe : PROBES.getOrDefault(id, List.of())) {
                 int x = 2 * probe.x(), y = 2 * probe.y();
-                double distance = MockMatch.deltaE(render[0].getRGB(x, y), mock.getRGB(x, y));
+                double distance = SettingsMockMatch.deltaE(render[0].getRGB(x, y), mock.getRGB(x, y));
                 if (distance > SettingsChromeMockTest.PROBE) failures.add(String.format("%s %s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", id,
                     probe.name(), probe.x(), probe.y(), render[0].getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance));
             }
-            var ours = MockMatch.crop(render[0], body(page)); var theirs = MockMatch.crop(mock, body(page));
-            var result = MockMatch.compare(ours, theirs, 2, SettingsChromeMockTest.TOLERANCE);
+            var ours = SettingsMockMatch.crop(render[0], body(page)); var theirs = SettingsMockMatch.crop(mock, body(page));
+            var result = SettingsMockMatch.compare(ours, theirs, 2, SettingsChromeMockTest.TOLERANCE);
             double floor = FLOORS.getOrDefault(id, FLOOR);
             shares.append(String.format("%s %.3f (%d, %d) floor %.2f%n", id, result.matching(), result.dx(), result.dy(), floor));
             if (result.matching() < floor) {
-                MockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), number + "-body", ours, theirs, SettingsChromeMockTest.TOLERANCE);
+                SettingsMockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), number + "-body", ours, theirs, SettingsChromeMockTest.TOLERANCE);
                 if (SettingsChromeMockTest.MAC) failures.add(String.format("%s body: %.3f below %.2f", id, result.matching(), floor));
             }
         }
@@ -395,8 +397,8 @@ class SettingsPagesMockTest {
 ```
 
 The probe points are inside drawn parts of the two mocks (a preview frame, a radio dot, a dropdown edge and arrow, a
-radio, a spinner's box and arrows); `SettingsChromeMockTest.Probe`, `content`, `PROBE`, `TOLERANCE` and `MAC` are plan
-9a's package members.
+radio, a spinner's box and arrows); `SettingsChromeMockTest.Probe`, `content`, `PROBE`, `TOLERANCE` and `MAC` and
+`SettingsMockMatch` are plan 9a's package members.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -1311,11 +1313,35 @@ PY
 
 - [ ] **Step 5: Compare the page with its mock and calibrate**
 
-The fixture's Keymap needs the mock's sections; give `EnterpriseSettings` the application's own actions: in
-`EnterpriseSettings.open`, after `runtime[0].start(Map.of(), dark);`, register the actions the mock lists through the
-same `contributions` object (`contributions.addAction(id, name, null, keywords, Optional.empty(), invocation -> { })`
-for Copy and Paste under Clipboard, and one action per section the mock shows, with ids from `KeyBindings`' defaults so
-they carry their default shortcuts). Then append to `SettingsPagesMockTest`:
+The fixture's Keymap needs the mock's sections. `ShortcutCatalog.rows` already lists the core sections from `ActionId`
+and its contextual rows (Appearance, Application, Clipboard with Copy and Paste, Command Palette, Panes, Search, Tabs,
+Terminal), and the staged bundled plugins register theirs (Credential Vault, Editor, File Server, Project Index, Remote,
+Shell History, Snippets), named through `runtime[0]::pluginNames` (plan 9a's fixture). What is missing are the actions
+the application itself registers at start, which give the mock's `config`, `commandline` and `notifications` sections
+and part of Application. In `EnterpriseSettings.open`, after `runtime[0].start(Map.of(), dark);`, register exactly
+these, with the titles `JasperApplication`, `AboutWindows`, `ErrorsWindow`, `MemoryIndicator` and `NotificationsFeature`
+give them:
+
+```java
+                // The application's own actions, as it registers them at start (the mock's config, commandline and
+                // notifications sections); the core sections come from ActionId, the plugins' from the staged plugins.
+                for (String[] action : new String[][] {{"plugins.manage", "Manage Plugins…"}, {"app.shortcuts", "Keyboard Shortcuts…"},
+                        {"app.about", "About Jasper"}, {"app.memory", "Change Memory Settings…"}, {"app.vmoptions", "Edit Custom VM Options…"},
+                        {"app.memory.gc", "Run Garbage Collection"}, {"config.migrate", "Migrate Config"},
+                        {"commandline.install", "Install 'jasper' Command in PATH"}, {"commandline.uninstall", "Uninstall 'jasper' Command from PATH"},
+                        {"notifications.errors", "Notifications: Show Errors"}, {"notifications.history", "Notifications: Show History"},
+                        {"notifications.dismiss", "Notifications: Dismiss Cards"}})
+                    contributions.addAction(action[0], action[1], null, List.of(), Optional.empty(), invocation -> { });
+```
+
+(the first six group under Application by `ShortcutCatalog.pluginGroup`; `config` 1, `commandline` 2 and
+`notifications` 3 match the mock's counts). The mock's status line reads "131 shortcuts" over nineteen sections; the
+fixture's count is what these sources give, and two differences are fixtures, recorded as residuals under Rulings 16
+with the measured count in the banner: the fixture's THD Sourcing Crypto plugin registers no action, so its section
+("1 shortcuts" in the mock) is absent, and Application's and the plugins' counts are today's code's, not the mock's
+(Application 14, Credential Vault 12, Editor 4, File Server 16, Project Index 5, Remote 24, Shell History 1, Snippets
+2). The probes below sit in the search row, the header band and its separators, which do not depend on the count. Then
+append to `SettingsPagesMockTest`:
 
 ```java
     @Test void keymapMatchesItsMock() throws Exception {
@@ -1758,12 +1784,12 @@ Append to `SettingsPagesMockTest`:
                     new SettingsChromeMockTest.Probe("band bottom edge", 600, 254), new SettingsChromeMockTest.Probe("recorder field", 500, 213),
                     new SettingsChromeMockTest.Probe("armed dot", 252, 213), new SettingsChromeMockTest.Probe("Set disabled", 970, 213),
                     new SettingsChromeMockTest.Probe("edited row selected", 600, 183))) {
-                double distance = MockMatch.deltaE(render[0].getRGB(2 * probe.x(), 2 * probe.y()), mock.getRGB(2 * probe.x(), 2 * probe.y()));
+                double distance = SettingsMockMatch.deltaE(render[0].getRGB(2 * probe.x(), 2 * probe.y()), mock.getRGB(2 * probe.x(), 2 * probe.y()));
                 if (distance > SettingsChromeMockTest.PROBE) failures.add(probe.name() + " ΔE " + distance);
             }
-            var result = MockMatch.compare(MockMatch.crop(render[0], body(recording)), MockMatch.crop(mock, body(recording)), 2, SettingsChromeMockTest.TOLERANCE);
+            var result = SettingsMockMatch.compare(SettingsMockMatch.crop(render[0], body(recording)), SettingsMockMatch.crop(mock, body(recording)), 2, SettingsChromeMockTest.TOLERANCE);
             if (result.matching() < FLOORS.getOrDefault("keymap-recording", FLOOR)) {
-                MockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), "07b-body", MockMatch.crop(render[0], body(recording)), MockMatch.crop(mock, body(recording)), SettingsChromeMockTest.TOLERANCE);
+                SettingsMockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), "07b-body", SettingsMockMatch.crop(render[0], body(recording)), SettingsMockMatch.crop(mock, body(recording)), SettingsChromeMockTest.TOLERANCE);
                 if (SettingsChromeMockTest.MAC) failures.add("07b body " + result.matching());
             }
             assertThat(failures).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
@@ -1878,7 +1904,7 @@ import org.junit.jupiter.api.Test;
 /** Spec 12.2 (CLASSIC): the Plugins page's checkbox rows, folder tabs and ⋯ menus; every action stays reachable. */
 class PluginsCompositionTest {
     @Test void aClassicRowLeadsWithItsCheckboxAndHasNoIcon() {
-        var row = TestRows.enabled("dev.example.tidy", "Tidy Tabs");
+        var row = TestRows.plugin("dev.example.tidy", "Tidy Tabs").row();
         var item = PluginCard.item(row, false, "plugin", PluginShape.CLASSIC);
         assertThat(item.leading()).containsInstanceOf(Nodes.Toggle.class);
         assertThat(item.trailing()).isEmpty();
@@ -1889,7 +1915,9 @@ class PluginsCompositionTest {
     }
 
     @Test void everyRowsStateAndActionStayReachable() {
-        for (var row : List.of(TestRows.needsReview("dev.example.review"), TestRows.failed("dev.example.failed"), TestRows.pendingRemoval("dev.example.gone"))) {
+        for (var row : List.of(TestRows.plugin("dev.example.review", "Review").needsReview("network").row(),
+                TestRows.plugin("dev.example.failed", "Failed").state("FAILED", "boom").row(),
+                TestRows.plugin("dev.example.gone", "Gone").removing().row())) {
             var item = PluginCard.item(row, false, "plugin", PluginShape.CLASSIC);
             var toggle = (Nodes.Toggle) item.leading().orElseThrow();
             assertThat(toggle.checked()).as(row.id()).isEqualTo(PluginCard.checked(row));
@@ -1903,7 +1931,7 @@ class PluginsCompositionTest {
             for (var shape : List.of(PluginShape.ROWS, PluginShape.CLASSIC)) {
                 var details = new PluginDetails(dev.jasper.app.testsupport.KitTestSupport.context(), event -> { }, shape);
                 try {
-                    details.show(TestRows.enabled("dev.example.tidy", "Tidy Tabs"), false);
+                    details.show(TestRows.plugin("dev.example.tidy", "Tidy Tabs").row(), false);
                     var root = details.header().spec().root();
                     var section = (Nodes.Choice) dev.jasper.app.settingsui.ResetMenuTestAccess.find(root, PluginDetails.SECTION);
                     assertThat(section.kind()).as(shape.toString()).isEqualTo(Nodes.ChoiceKind.TABS);
@@ -1919,9 +1947,10 @@ class PluginsCompositionTest {
 }
 ```
 
-`TestRows` is the package's existing row fixture (`jasper-app/src/test/java/dev/jasper/app/pluginmanager/TestRows.java`);
-use its factories for an enabled row, one that needs review, a failed one and one pending removal, adding any of the four
-it lacks in its own style.
+`TestRows` is the package's existing row builder (`jasper-app/src/test/java/dev/jasper/app/pluginmanager/TestRows.java`):
+`plugin(id, name)` is an active, enabled, user-installed plugin, and its setters `needsReview(String...)`,
+`state("FAILED", why)` and `removing()` give the other three states; `row()` builds the `PluginRuntime.Row`. No factory
+is added.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -2116,14 +2145,21 @@ edit(P + "PluginManagerPanel.java", [
             listLane.setOpaque(true);
             listLane.setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
             listLane.setBorder(BorderFactory.createLineBorder(palette.color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL)));
-            bar.setBorder(BorderFactory.createEmptyBorder(inset, inset, inset, inset));
+            // The search row is a strip on surface.sidebar ruled in border.row above the rows, as 9a's Settings search strip.
+            bar.setOpaque(true);
+            bar.setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+            bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, dev.jasper.ui.theme.DerivedColor.BORDER_ROW.color(kit.theme())),
+                BorderFactory.createEmptyBorder(inset, inset, inset, inset)));
             list.view().setBorder(BorderFactory.createEmptyBorder());
         }''', 1)])
 PY
 ```
 
 The classic lane keeps the panel's own geometry roles (`PLUGIN_*`); the box's margins and the details' 12 px gap are
-calibrated in Step 5 by classic values of those roles, if the comparison asks. Add the test's ledger row:
+calibrated in Step 5 by classic values of those roles, if the comparison asks. The search row (`bar`, the panel's own
+search-and-⋯ row) is opaque on `surface.sidebar` with a one-pixel `border.row` rule at its foot over the card-surface
+rows (the mock's strip); its colours are read where the lane's are, from the kit's theme. Add the test's ledger row:
 
 ```bash
 python3 -I - <<'PY'
@@ -2158,7 +2194,8 @@ and its probes:
         PROBES.put("plugins", List.of(new SettingsChromeMockTest.Probe("list box", 247, 300), new SettingsChromeMockTest.Probe("list surface", 400, 400),
             new SettingsChromeMockTest.Probe("heading band", 450, 99), new SettingsChromeMockTest.Probe("selected row", 450, 120),
             new SettingsChromeMockTest.Probe("checkbox on the selection", 257, 127), new SettingsChromeMockTest.Probe("active tab", 600, 113),
-            new SettingsChromeMockTest.Probe("inactive tab", 650, 113)));
+            new SettingsChromeMockTest.Probe("inactive tab", 650, 113), new SettingsChromeMockTest.Probe("search strip", 400, 56),
+            new SettingsChromeMockTest.Probe("search strip rule", 400, 90)));
 ```
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' :jasper-app:test --tests 'dev.jasper.app.pluginmanager.*' --tests 'dev.jasper.app.settingsui.SettingsPagesMockTest' --tests 'dev.jasper.app.architecture.CompositionReadTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
@@ -2263,6 +2300,11 @@ class EnvironmentTableTest {
         assertThat(row.title()).isEqualTo(CoreSettings.TERMINAL_ENV.label());
         assertThat(row.description()).isEqualTo("Applies to new panes");
         assertThat(((Nodes.Button) row.control()).label()).isEqualTo("Add Variable…");
+        assertThat(row.contextActions()).as("Reset to Default in the row's menu (spec 12.1)").extracting(MenuItem::action)
+            .containsExactly(ID + ":reset");
+        assertThat(row.contextActions().getFirst().enabled()).as("at its default").isFalse();
+        var highlighted = (Nodes.SettingRow) ((Nodes.Stack) editor.node(ID, ControlState.READY, true)).children().getFirst();
+        assertThat(highlighted.highlighted()).as("the search highlight reaches the row").isTrue();
     }
 
     @Test void addingAnEmptyValueAndAValueWithEqualsShowsThemAsWritten() {
@@ -2276,6 +2318,8 @@ class EnvironmentTableTest {
         assertThat(table.columns()).extracting(dev.jasper.ui.model.Column::title).containsExactly("Name", "Value");
         assertThat(table.rows()).extracting(row -> row.cells().get("value")).containsExactly("", "a=b=c");
         assertThat(table.rows().getFirst().contextActions().orElseThrow()).extracting(MenuItem::label).containsExactly("Edit…", "Remove");
+        var row = (Nodes.SettingRow) ((Nodes.Stack) editor.node(ID, ControlState.READY)).children().getFirst();
+        assertThat(row.contextActions().getFirst().enabled()).as("modified: Reset to Default is enabled").isTrue();
     }
 
     @Test void aRenameReplacesTheOtherEntryAndCancelChangesNothing() {
@@ -2401,8 +2445,8 @@ edit(S + "SettingsDialog.java", [
         var sheet = windows.dialog(request.title(), true, surface);
         var fields = new java.util.ArrayList<Nodes.Node>();
         for (var field : request.fields())
-            fields.add(new Nodes.FormRow("sheet-row-" + field.id(), ControlState.READY, field.label(),
-                new Nodes.Field("sheet-" + field.id(), ControlState.READY, Nodes.FieldKind.TEXT, field.value(), "", field.label(), "")));
+            fields.add(new Nodes.FormRow("sheet-row-" + field.id(), ControlState.READY, field.label(), "",
+                new Nodes.Field("sheet-" + field.id(), ControlState.READY, Nodes.FieldKind.TEXT, field.value(), "", field.label(), ""), Optional.empty()));
         var sheetView = new KitView(kit, new ViewSpec(new Nodes.Form("value-sheet", ControlState.READY, Nodes.FormKind.SHEET, request.heading(),
             Optional.empty(), List.of(new Nodes.Card("sheet-card", ControlState.READY, Nodes.CardKind.FORM, fields)), Optional.empty(),
             List.of(new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
@@ -2427,9 +2471,9 @@ edit(S + "SettingsDialog.java", [
 PY
 ```
 
-The sheet is `confirm`'s pattern (fact 12) with a FORM card of `FormRow`s; `Nodes.FormRow(id, state, label, control)` and
-`Nodes.CardKind.FORM` are the model's form vocabulary (read `Forms`' callers for their exact forms and adapt if a
-constructor differs). The canonical `PageContext` now has ten components; plan 9a's tests use the nine-argument form,
+The sheet is `confirm`'s pattern (fact 12) with a FORM card of `FormRow`s: `Nodes.FormRow(id, state, label, caption,
+control, trailing)` (the six-component form; the seven-component one adds `highlighted`) with no caption and no trailing
+node, and `Nodes.CardKind.FORM`. The canonical `PageContext` now has ten components; plan 9a's tests use the nine-argument form,
 which keeps `Sheets.NONE`.
 
 - [ ] **Step 4: Compose the environment table and the empty lines**
@@ -2457,7 +2501,7 @@ edit(S + "Editors.java", [
     ('''        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.of(() -> Fonts.families(monospaced))), List.of());''',
      '''        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.of(() -> Fonts.families(monospaced)), classic(context)), List.of());''', 1),
     ('''        return new Factory<>((setting, context) -> new Table(), List.of());''',
-     '''        return new Factory<>((setting, context) -> new Table(setting, context, classic(context)), List.of("Add Variable", "variable"));''', 1),
+     '''        return new Factory<>((setting, context) -> new Table(setting, context, classic(context)), List.of());''', 1),
     ('''        String pending = "";
         Items(String label, Optional<Supplier<List<String>>> suggestions) { this.label = label; this.suggestions = suggestions; }''',
      '''        String pending = "";
@@ -2494,14 +2538,21 @@ edit(S + "Editors.java", [
         @Override public boolean fullSpan() { return classic; }
         @Override public boolean cardRows() { return classic; }
 
-        @Override public Nodes.Node node(String id, ControlState state) {
-            if (classic) return classicNode(id, state);''', 1),
-    ('''        void addRow(String name, String value) { rows.add(new String[]{name, value}); }''', '''        private Nodes.Node classicNode(String id, ControlState state) {
+        @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+
+        @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
+            if (classic) return classicNode(id, state, highlighted);''', 1),
+    ('''        void addRow(String name, String value) { rows.add(new String[]{name, value}); }''', '''        /**
+         * The classic composition's own row (a full-span editor builds it): the search highlight, and Reset to Default in
+         * its menu while the variables differ from the setting's effective default (spec 12.1 and 14.7).
+         */
+        private Nodes.Node classicNode(String id, ControlState state, boolean highlighted) {
             String applies = switch (setting.applies()) {
                 case LIVE -> ""; case NEW_PANES -> "Applies to new panes"; case NEW_WINDOWS -> "Applies to new windows"; case RESTART -> "Takes effect after restart";
             };
             var add = new Nodes.Button(id + ":add", plain(state), "Add Variable…", "", Nodes.ButtonKind.SECONDARY, id + ":add", "");
-            var row = new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false);
+            var row = new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false, highlighted, "",
+                SchemaPage.resetMenu(context, id + ":reset", !value().equals(Editors.effectiveDefault(context.draft(), setting))));
             if (rows.isEmpty()) return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL, List.of(row));
             var columns = List.of(new dev.jasper.ui.model.Column("name", "Name", Nodes.TextRole.MONO, false),
                 new dev.jasper.ui.model.Column("value", "Value", Nodes.TextRole.MONO, false, 2, Optional.empty()));
@@ -2545,6 +2596,9 @@ edit(S + "Editors.java", [
 PY
 ```
 
+The default composition's `Table` keeps `List.of()` as its search terms and its own `node(id, state)` path, so the
+default look's search and rows are unchanged; the classic node's Reset to Default reports `terminal.env:reset`, which
+`SchemaPage.event` already resets (9a fact 10), and `SchemaPage.resetMenu` is empty under an inline Reset.
 `Nodes.ItemList`'s sixteen-component form is plan 3c's (`…, cancelAction, emptyText`); if 3c's canonical orders the
 string actions otherwise, keep the four blanks and put "Empty" in `emptyText`. A table row's activation (double-click or
 Enter) reports the table's `activateAction` with the row's id the way the table reports it; route it to the same edit as
@@ -2584,7 +2638,7 @@ and its probes:
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.architecture.CompositionReadTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS: `EnvironmentTableTest` (3), `SettingsPagesMockTest` (6), `EditorsTest` and `SettingsDialogTest` unchanged
-(the ROWS composition keeps its field rows). Fix a comparison failure as in Task 1 Step 4.
+(the ROWS composition keeps its field rows and its search terms). Fix a comparison failure as in Task 1 Step 4.
 
 - [ ] **Step 6: Prove the default look unchanged and commit**
 
@@ -2618,11 +2672,11 @@ Colors, Cursor and the seven Tools pages) are compared with their mocks; the Ent
 checked for structure. No new composition: a failure here is a Settings role or a face value.
 
 **Files:**
-- Modify: `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsPagesMockTest.java`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsPagesMockTest.java`, `SettingsFrameRenders.java` (plan 9a's bridge)
 - Modify (calibration only): `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (classic Settings values) and `classic-roles.tsv`
 
 **Interfaces:**
-- Consumes: Tasks 1 to 6; plan 9a's fixture.
+- Consumes: Tasks 1 to 6; plan 9a's fixture and `SettingsFrameRenders.check`.
 - Produces: tests only.
 
 - [ ] **Step 1: Write the comparisons**
@@ -2674,15 +2728,46 @@ and the probes, inside the static block (each at a drawn part of its mock: a box
         PROBES.put(dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.sample"), List.of(new SettingsChromeMockTest.Probe("first checkbox", 257, 112)));
 ```
 
+Extend plan 9a's `SettingsFrameRenders.check`, which 6a's `ChromeRenderTest.everyLookBuildsItsSettingsFrame` runs for
+every look it renders, with the compositions (spec 16.1.4 over spec 12.2): after its Reset assertion, before `return
+image;`, the Shell page's environment variables show the composition the look names:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 9b Task 7 step 1: the chrome renders check the look's page composition."""
+import pathlib
+path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsFrameRenders.java"); text = path.read_text(encoding="utf-8")
+anchor = '''                .as(name + ": a Reset button exactly when Reset is inline").isEqualTo(chrome.inlineReset());
+            return image;'''
+if text.count(anchor) != 1: raise SystemExit("SettingsFrameRenders: plan 9a's Reset check moved")
+text = text.replace(anchor, '''                .as(name + ": a Reset button exactly when Reset is inline").isEqualTo(chrome.inlineReset());
+            // Plan 9b (spec 12.2): the composition the look names, on the Shell page's environment variables.
+            boolean classic = projections.composition() == dev.jasper.app.presentation.Composition.CLASSIC;
+            dialog.select("terminal.shell");
+            var add = KitTestSupport.require(view, "terminal.env:add", AbstractButton.class);
+            assertThat(add.getText()).as(name + ": the environment's add action").isEqualTo(classic ? "Add Variable…" : "Add variable");
+            assertThat(KitTestSupport.find(view, "terminal.env:name-0", JComponent.class)).as(name + ": no field rows").isNull();
+            return image;''', 1)
+path.write_text(text, encoding="utf-8")
+PY
+```
+
+The bridge's state has no `terminal.env`, so neither composition builds a variable row: the classic one shows its
+"Environment variables" row with Add Variable…, the default its "Add variable" button (`Editors.Table`, 9b fact 11).
+
 - [ ] **Step 2: Run, calibrate and record**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.SettingsPagesMockTest' --continue`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.SettingsPagesMockTest' --tests 'dev.jasper.app.workspace.ChromeRenderTest' --continue`
 
-Expected: PASS: `SettingsPagesMockTest` (8). For each failure open its difference image and fix by cause as in Task 1
-Step 4: a geometry difference shared by several pages (box edges, row heights, section gaps, trailing controls) is a
-classic Settings role (`SETTINGS_*`, `SETTING_*`, `FULL_SETTING_*`, both tables) or plan 4b's face value, corrected once
-and re-checked against every page; a page-only difference in a plugin page's own composition is plan 10's, recorded as a
-residual with its page's floor; fixture text is a residual. Record every lowered floor and its cause in the banner.
+Expected: PASS: `SettingsPagesMockTest` (8) and `ChromeRenderTest.everyLookBuildsItsSettingsFrame` with the composition
+check. For each failure open its difference image and fix by cause as in Task 1 Step 4: a geometry difference shared by
+several pages (box edges, row heights, section gaps, trailing controls) is a classic Settings role (`SETTINGS_*`,
+`SETTING_*`, `FULL_SETTING_*`, both tables) or plan 4b's face value, corrected once and re-checked against every page.
+The seven Tools pages are the plugins' own compositions, which no plan of this series composes for Enterprise (plans
+10a and 10b compose the plugins' tool windows, not their Settings pages): what 9a and 9b own there is the frame and the
+`SETTINGS_*` page geometry, so a page-only difference inside a plugin's own composition is recorded as a residual with
+its page's floor, never fixed in the plugin here; fixture text is a residual. Record every lowered floor and its cause
+in the banner, and the hand-off in STATUS (Task 8).
 
 - [ ] **Step 3: Prove the default look and commit**
 
@@ -2748,7 +2833,7 @@ with Add Variable…, and Edit… and Remove in a variable's context menu." Keep
 - [ ] **Step 2: Run the whole build and count**
 
 Run: `./gradlew check --continue`
-Expected: BUILD SUCCESSFUL. Count the results with plan 9a Task 7 Step 2's script.
+Expected: BUILD SUCCESSFUL. Count the results with plan 9a Task 8 Step 2's script.
 
 - [ ] **Step 3: Prove the default look once more**
 
@@ -2779,11 +2864,14 @@ headings), with the plugin's ⋯ beside Disable and Overview | Details as TABS i
 are a Name / Value table with Add Variable… and a sheet (`PageContext.sheets()`), Edit… and Remove in the row menu, and
 the ordered lists read "Empty". `SettingsPagesMockTest` compares all eighteen pages and 07b with their mocks (probes on
 every OS, the body's share on macOS: [shares and lowered floors with causes]) and checks the composed pages under
-Enterprise Dark. Default look: byte-identical but [the plugins* files, or "none"] (Rulings 2). Rulings (plan, "Rulings"):
+Enterprise Dark; plan 9a's `SettingsFrameRenders` also checks the page composition under every look of 6a's chrome
+renders. Default look: byte-identical but [the plugins* files, or "none"] (Rulings 2). Rulings (plan, "Rulings"):
 [the sixteen, one line each]. Deviations from the plan's text: [list or "none"]. `./gradlew check --continue`: **[n]
 tests, 0 failures, 0 errors, [n] skipped**. GUI checks for the user: under Enterprise, the Keymap's recording band and
 Find by Shortcut, the Plugins page's checkboxes and ⋯, Add Variable… and its sheet, and a right-click on a Notifications
-row. Not merged, not pushed.
+row. Hand-off to plans 10a, 10b and any later plan that changes a face, a `SETTINGS_*` role or a bundled plugin's
+Settings page: re-run `SettingsPagesMockTest`, and re-baseline the seven Tools pages' probes and floors it records
+(`PROBES`, `FLOORS`) when the change moves them, with the cause in that plan's banner. Not merged, not pushed.
 ```
 
 Update this plan's banner: "Executed on 2026-10-16: [first]..[last]; floors [list]; deviations [list or none]."
