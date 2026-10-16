@@ -28,15 +28,21 @@ public final class KitFixtures {
     }
 
     /** A third appearance: Slate Cobalt Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
-    public static GeneratedTheme custom() {
+    public static GeneratedTheme custom() { return custom(dark()); }
+
+    /** {@code base} with every role and every authored derived override 20% plum (alpha kept). */
+    public static GeneratedTheme custom(GeneratedTheme base) {
         var plum = new java.awt.Color(0x7a3fa0);
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) {
-            var base = dark().semantic().color(role);
-            var mixed = ColorMath.mix(base, plum, .8);
-            values.put(role, new java.awt.Color(mixed.getRed(), mixed.getGreen(), mixed.getBlue(), base.getAlpha()));
+            var own = base.semantic().color(role);
+            var mixed = ColorMath.mix(own, plum, .8);
+            values.put(role, new java.awt.Color(mixed.getRed(), mixed.getGreen(), mixed.getBlue(), own.getAlpha()));
         }
-        return withSemantic(dark(), new SemanticPalette(values));
+        var overrides = new java.util.EnumMap<DerivedColor, java.awt.Color>(DerivedColor.class);
+        base.derivedOverrides().forEach((role, colour) -> overrides.put(role, ColorMath.mix(colour, plum, .8)));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(values), base.terminal(), base.editor(),
+            base.syntax(), base.glass(), overrides);
     }
 
     /**
@@ -208,11 +214,14 @@ public final class KitFixtures {
     }
 
     /** The dark fixture with every semantic role in its own colour, so a painted pixel names the role it came from. */
-    public static GeneratedTheme marked() {
-        var base = dark();
+    public static GeneratedTheme marked() { return marked(dark()); }
+
+    /** {@code base} with every semantic role in its marker colour and no authored overrides, so every derived role follows the markers. */
+    public static GeneratedTheme marked(GeneratedTheme base) {
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) values.put(role, marker(role));
-        return withSemantic(base, new SemanticPalette(values));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(values), base.terminal(), base.editor(),
+            base.syntax(), base.glass(), java.util.Map.of());
     }
 
     /** {@code role}'s marker colour in {@link #marked()}: opaque, its red channel unique to the role. */

@@ -38,7 +38,7 @@ class KitMatrixTest {
         var foreign = foreign(KitFixtures.custom());
         var found = new ArrayList<String>();
         for (var capture : captures(KitFixtures.custom(), Kit.DEFAULT)) {
-            var painted = colours(capture.image());
+            var painted = areas(capture.image());
             painted.retainAll(foreign);
             for (int rgb : painted) found.add(capture.fixture().name() + " #" + Integer.toHexString(rgb & 0xFFFFFF));
         }
@@ -48,10 +48,20 @@ class KitMatrixTest {
     @Test void aLiteralOfAnotherThemesColourIsFound() {
         var literal = KitFixtures.dark().semantic().color(SemanticColor.ACCENT);
         var image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB);
-        image.setRGB(2, 2, literal.getRGB());
-        var painted = colours(image);
+        for (int y = 1; y <= 2; y++) for (int x = 1; x <= 2; x++) image.setRGB(x, y, literal.getRGB());
+        var painted = areas(image);
         painted.retainAll(foreign(KitFixtures.custom()));
         assertThat(painted).containsExactly(literal.getRGB());
+    }
+
+    /** Plan 4 (Rulings 3): an antialiased edge pixel that happens to equal another theme's colour is not a literal. */
+    @Test void aSingleAntialiasedPixelOfAnotherThemesColourIsNotALiteral() {
+        var literal = KitFixtures.dark().semantic().color(SemanticColor.ACCENT);
+        var image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(2, 2, literal.getRGB());
+        var painted = areas(image);
+        painted.retainAll(foreign(KitFixtures.custom()));
+        assertThat(painted).isEmpty();
     }
 
     /** The theme set's opaque role colours that {@code custom} does not have, black and white aside: a literal paints one. */
@@ -65,6 +75,17 @@ class KitMatrixTest {
         foreign.remove(0xFF000000);
         foreign.remove(0xFFFFFFFF);
         return foreign;
+    }
+
+    /** The opaque colours that fill at least one 2 × 2 block of {@code image}: painted areas, not antialiased edges. */
+    static Set<Integer> areas(BufferedImage image) {
+        var colours = new HashSet<Integer>();
+        for (int y = 0; y + 1 < image.getHeight(); y++) for (int x = 0; x + 1 < image.getWidth(); x++) {
+            int argb = image.getRGB(x, y);
+            if ((argb >>> 24) == 0xFF && image.getRGB(x + 1, y) == argb && image.getRGB(x, y + 1) == argb
+                    && image.getRGB(x + 1, y + 1) == argb) colours.add(argb);
+        }
+        return colours;
     }
 
     /** The opaque colours in {@code image}. */
