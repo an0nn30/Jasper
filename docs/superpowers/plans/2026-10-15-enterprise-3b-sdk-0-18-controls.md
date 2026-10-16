@@ -10,7 +10,8 @@ model, projected losslessly by `KitValues`, validated by `ViewSpec`, served by t
 contract suites and drawn by the default look, with every existing gallery pixel unchanged.
 
 **Architecture:** Each addition is one task that changes the SDK record or enum and its jasper-ui mirror together
-(the two `Nodes.java` and `ViewSpec.java` files are identical but for the package, so one edit script edits both),
+(after 3a the two `Nodes.java` and `ViewSpec.java` files differ only in the package and SDK-only Javadoc, and every
+edit anchors on text present in both, or for TABS on the SDK's 3a Javadoc, so one edit script edits both),
 adds the `KitValues` mapping, the default-look renderer in `dev.jasper.ui.swing` (new package-private
 `Separators`, `Notices` and `PropertyLists` classes, the rest small changes to existing controls), the testkit fake's
 part and a new headless gallery fixture appended after the existing 66, so every existing fixture keeps its pixels.
@@ -50,10 +51,10 @@ not found the stated number of times; line numbers in **Files** are from `222969
 - Work only in the worktree above on `claude/enterprise-sdk-0-18-controls`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Scope is spec 8.2's rows for Notice, Properties (with PropertyRow), `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, Separator, `IconSize.SWATCH`, `Form.footnote` and "An EXCLUSIVE choice has 2 to 4 options". Tree columns, cell nodes, heading rows and empty tables are 3c's; SESSION/TRANSFER, toolbar views, scope hues, nouns, verb roles and `DialogSpec.swatch` are 3d's; the plugin adoptions of spec 13 are 3e's. The one exception is Task 3's File Server change, which the new EXCLUSIVE rule forces (Rulings 1).
 - SDK 0.18.0 stays the version (`JasperSdk.VERSION`, every manifest's `sdk = ">=0.18.0, <0.19"`): every change is additive. Each record keeps its former canonical constructor as a convenience with the new component at its empty value (spec 8.2, "Existing record constructors stay as conveniences"); no member is removed, so `KitCompatibility` is unchanged.
-- The jasper-ui model mirror stays textually identical to the SDK but for the package: `KitValues` maps enums by name and `KitValuesTest` compares `toString()` of both trees, so component order and names match exactly.
+- The jasper-ui model mirror keeps the SDK's code but for the package (SDK-only Javadoc aside): `KitValues` maps enums by name and `KitValuesTest` compares `toString()` of both trees, so component order and names match exactly.
 - Pixel rule: every file the headless gallery wrote before this plan is byte-identical after it, except `manifest.json` (its `fixtureCount` grows from 66 to 74) and the last contact sheet `sheet-9.png` (it held two fixtures and now holds eight). The eight new fixtures are appended after `picker-menu`, in task order: `read-only-fields`, `technical-captions`, `tabs`, `swatches`, `separators`, `notice-severities`, `properties`, `form-footnote` (16 files, plus the new `sheet-10.png`). `StateFixtures`' enumerating sheets (`controls`, `icons-status`) skip `ChoiceKind.TABS` and `IconSize.SWATCH` to keep their pixels. Task 10 proves this.
 - No new `DesignMetrics` role and no type-scale change: new renderers use existing roles (`NOTICE_*`, `ICON_*`, `CARD_PADDING`, `HAIRLINE`, `ROW_GAP`, `COLUMN_GAP`, `SECTION_LABEL_GAP`, `CONTROL_RADIUS`), so `compact-roles.tsv` and `default-type.tsv` are unchanged.
-- Colours come from the theme only: semantic roles or spec 7.1's derived roles (`DerivedColor`), and every pair a new renderer paints on a known surface is held by a `SurfaceContrast.Guard` and declared in `PaintedContrastTest`.
+- Colours come from the theme only: semantic roles or spec 7.1's derived roles (`DerivedColor`), and every pair a new renderer paints on a known surface is held by a `SurfaceContrast.Guard` and declared in `PaintedContrastTest`. A glyph tinted on a surface through `IconRegistry.icon(name, surface, foreground, size)` (the Notice's) is held to 3:1 by the registry's `surfaceTint`, the module rule for surface-tinted artwork, and is not declared.
 - Javadoc doclint fails the build on errors: the SDK and jasper-app run `-Xdoclint:all`, jasper-ui `-Xdoclint:all,-missing`; every `{@link}` must resolve and no comment may contain a raw `<`, `>`, `&` or `->`. New public SDK members say "since 0.18.0".
 - `ThemeMigrationCoverageTest` needs a `docs/design/theme-engine/migration.csv` row for every new candidate source under jasper-app, the SDK, the testkit or plugins. This plan creates new files only under `jasper-ui/src` (outside the ledger's roots) and edits existing files elsewhere, so it adds no row; an executor who creates a new file under those roots adds its row in the same commit.
 - Documentation edits are the smallest that make each document accurate (AGENTS.md); `docs/superpowers/` history and earlier `docs/STATUS.md` entries are not rewritten.
@@ -99,7 +100,8 @@ Decisions where the spec is silent. Record them in `docs/STATUS.md` (Task 10).
    ground (`info.ground`, `warning.ground`, `danger.ground`), its border (`*.border`) guarded to 1.3:1 against the
    ground (plan 2's hand-off: each Catppuccin flavour's `warning.border` equals its `warning.ground`), the line "Word ·
    text" in `text.primary` guarded to 4.5:1 on the ground and wrapping, the glyph tinted with the severity colour
-   through `IconRegistry.surfaceTint` (3:1), and the action at the trailing edge.
+   through `IconRegistry.surfaceTint` (3:1), and the action at the trailing edge. `PaintedContrastTest` declares the
+   text and border pairs; the glyph is held by the registry's surface tint and is not declared.
 6. **Properties' default look** is a section-label heading (omitted when blank) over a card on `surface.card` with a
    label column as wide as the widest label; values are one line, BODY or MONO (technical, shortened at the start),
    with the whole value as the tooltip; a severity colours the value through the text guard against `surface.card`. A
@@ -130,9 +132,13 @@ Decisions where the spec is silent. Record them in `docs/STATUS.md` (Task 10).
 
 Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines materially.
 
-1. `Nodes.Node` permits 28 types (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12`); the jasper-ui model
-   `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`, `ViewSpec.java` and `ListItem.java` are byte-identical to
-   the SDK's but for the package (`diff` with the package normalised prints nothing).
+1. `Nodes.Node` permits 28 types (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12`); at `222969926` the
+   jasper-ui model `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`, `ViewSpec.java` and `ListItem.java` are
+   byte-identical to the SDK's but for the package. After 3a (its Task 4) the SDK's `Nodes.java` also carries SDK-only
+   Javadoc on `TextRole`, `ButtonKind`, `ChoiceKind`, `ListKind`, `FormKind`, `ScrollPolicy`, `ButtonPresentation`,
+   `FieldPresentation`, `PickerDensity`, `Toggle`, `FormRow`, `Section` and `Empty`, so a `diff` with the package
+   normalised shows those comments only; every edit here anchors on text present in both files (or, for TABS, on the
+   SDK's 3a `ChoiceKind` Javadoc).
 2. `IconSize` is `{ CAPTION, CONTROL, RAIL, EMPTY, HERO }` (`Nodes.java:18`, `PROMPT` after 3a); `ChoiceKind` is
    `{ DROPDOWN, PICKER, SEGMENTED, SEARCHABLE, PREVIEWS }` (`:22`, `EXCLUSIVE` after 3a, which also adds a one-line
    Javadoc above it in the SDK only); `Severity` is `{ INFO, WARNING, DANGER }` (`:82`).
@@ -919,7 +925,7 @@ read as read-only fields (Rulings 1). `StateFixtures`' controls sheet skips TABS
 - Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:371-373,395-398,417`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/StateFixtures.java:29`, `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java` (fixture `tabs`)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/TabsTest.java`
-- Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/KitValuesTest.java` (a new test, and 3a's `zeroEighteenNamesTheExclusiveHelpAndPromptConstants`), `jasper-ui/src/test/java/dev/jasper/ui/model/ViewSpecTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java`, `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerCompositionTest.java`
+- Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/KitValuesTest.java` (a new test, and 3a's `zeroEighteenNamesTheExclusiveHelpAndPromptConstants`), `jasper-ui/src/test/java/dev/jasper/ui/model/ViewSpecTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java:86` (TFTP's login is a read-only field), `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerCompositionTest.java`
 
 **Interfaces:**
 - Consumes: Task 1's 13-argument `Nodes.Field` constructor and `readOnly()`.
@@ -1049,6 +1055,12 @@ edit(COMPOSITION, [
                 });
                 String longPath=root.resolve("very-long-synthetic-folder/another-segment/still-editable").toString();
 ''', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/plugins/StagedFileServerFormTest.java", [
+    ('''                        var segments=((Nodes.Choice)node(form,"server.login")).options().stream().map(option->require(form,"server.login.option."+option.id())).toList();
+''', '''                        // TFTP's one login is a read-only field (spec 8.2: an EXCLUSIVE choice has 2 to 4 options).
+                        if(protocol.equals("TFTP")){assertThat(node(form,"server.login")).isInstanceOfSatisfying(Nodes.Field.class,f->assertThat(f.readOnly()).isTrue());continue;}
+                        var segments=((Nodes.Choice)node(form,"server.login")).options().stream().map(option->require(form,"server.login.option."+option.id())).toList();
+''', 1)])
 edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java", [
     ("        return List.copyOf(result);\n    }\n    private static Fixture panelState(",
      r'''        // Plan 3b (SDK 0.18): a TABS choice (Overview and Details).
@@ -1069,7 +1081,8 @@ PY
 
 Run: `./gradlew :jasper-sdk:test --tests dev.jasper.sdk.ui.KitValuesTest :jasper-plugin-fileserver:test --tests dev.jasper.fileserver.ui.ServerCompositionTest --continue`
 Expected: FAIL. The SDK test compile reports "cannot find symbol … TABS"; `ServerCompositionTest` fails both changed
-tests (the login is still a `Choice`; the HTTP-only protocol is still a `Choice`).
+tests (the login is still a `Choice`; the HTTP-only protocol is still a `Choice`). `StagedFileServerFormTest`'s TFTP
+branch would fail the same way (Step 4 runs it).
 
 - [ ] **Step 3: Add TABS, the counts, the presentation and File Server's facts**
 
@@ -1143,8 +1156,9 @@ stays accurate for the choice it still describes.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-sdk:test --tests dev.jasper.sdk.ui.KitValuesTest :jasper-ui:test --tests dev.jasper.ui.model.ViewSpecTest --tests dev.jasper.ui.swing.TabsTest --tests dev.jasper.ui.swing.ChoicesTest --tests dev.jasper.ui.swing.InteractiveRowsTest --tests dev.jasper.ui.gallery.GalleryCoverageTest :jasper-app:test --tests dev.jasper.app.plugins.KitValuesTest --tests 'dev.jasper.app.pluginmanager.*' --tests 'dev.jasper.app.settingsui.*' :jasper-plugin-fileserver:test :jasper-plugin-remote:test :jasper-plugin-vault:test --continue`
-Expected: BUILD SUCCESSFUL. `InteractiveRowsTest.inlineChoiceKindsKeepUsableInputHeightWithoutStandaloneLabels` covers
+Run: `./gradlew :jasper-sdk:test --tests dev.jasper.sdk.ui.KitValuesTest :jasper-ui:test --tests dev.jasper.ui.model.ViewSpecTest --tests dev.jasper.ui.swing.TabsTest --tests dev.jasper.ui.swing.ChoicesTest --tests dev.jasper.ui.swing.InteractiveRowsTest --tests dev.jasper.ui.gallery.GalleryCoverageTest :jasper-app:test --tests dev.jasper.app.plugins.KitValuesTest --tests 'dev.jasper.app.plugins.Staged*' --tests 'dev.jasper.app.appearance.Surface*' --tests 'dev.jasper.app.pluginmanager.*' --tests 'dev.jasper.app.settingsui.*' :jasper-plugin-fileserver:test :jasper-plugin-remote:test :jasper-plugin-vault:test --continue`
+Expected: BUILD SUCCESSFUL. `StagedFileServerFormTest` walks every protocol's login through the real host, TFTP's as
+the read-only field. `InteractiveRowsTest.inlineChoiceKindsKeepUsableInputHeightWithoutStandaloneLabels` covers
 TABS in list rows through `ItemLists.inlineHeight`. If another test fails with "An EXCLUSIVE choice has 2 to 4
 options", that test builds a one-option or five-option choice: give it two to four options (or, for a fact, a
 read-only field as above) and record the file in the plan's status banner.
@@ -2785,7 +2799,7 @@ edit("jasper-ui/src/test/java/dev/jasper/ui/model/ViewSpecTest.java", [
 edit("jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java", [
     (" @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){\n", r''' /** Plan 3b: a footnote crosses the projection unchanged. */
  @Test void footnotesProjectWithoutLoss(){
-  var spec=new ViewSpec(new Form("unlock",READY,FormKind.PROMPT_COMPACT,"Unlock Vault",Optional.empty(),List.of(text("password")),Optional.empty(),List.of(button("unlock")),
+  var spec=new ViewSpec(new Form("unlock-form",READY,FormKind.PROMPT_COMPACT,"Unlock Vault",Optional.empty(),List.of(text("password")),Optional.empty(),List.of(button("unlock")),
    "cancel",FormSubmission.NONE,"Auto-locks after 15 min idle"));
   assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
   assertThat(((dev.jasper.ui.model.Nodes.Form)KitValues.toModule(spec).root()).footnote()).isEqualTo("Auto-locks after 15 min idle");
@@ -3148,13 +3162,13 @@ EOF
 
 ### Task 10: The guides, the gallery proof, STATUS and the whole build
 
-The plugin UI guide gains the new building blocks and the fake's `type`, the authoring guide the technical hint
-(spec 17: smallest edits). The headless gallery proves the pixel rule against the branch's base, `./gradlew check
+The plugin UI guide gains the new building blocks and the fake's `type`, the authoring guide the technical hint and
+the SDK README's 0.18.0 sentence the additions (spec 17: smallest edits). The headless gallery proves the pixel rule against the branch's base, `./gradlew check
 --continue` runs everything, and `docs/STATUS.md` gains this plan's entry above 3a's, with the counts from the result
 XML; the plan's status banner records the execution.
 
 **Files:**
-- Modify: `docs/plugin-ui.md:165-177,199-205`, `docs/plugin-authoring.md:611`
+- Modify: `docs/plugin-ui.md:165-177,199-205`, `docs/plugin-authoring.md:611`, `jasper-sdk/README.md:45` (3a's 0.18.0 sentence)
 - Modify: `docs/STATUS.md:2` (a new entry at the top), `docs/superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md:1` (the status banner)
 
 **Interfaces:**
@@ -3197,6 +3211,10 @@ edit("docs/plugin-ui.md", [
 edit("docs/plugin-authoring.md", [
     ("and so do `EditorHint.font` (the font family picker) and `EditorHint.file` (a path with Browse…).",
      "and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face).", 1)])
+edit("jasper-sdk/README.md", [
+    ("and it adds the `presentation.provide` capability;",
+     "and it adds the `presentation.provide` capability, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, "
+     "`Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH` and `Form.footnote`;", 1)])
 PY
 ```
 
@@ -3351,13 +3369,14 @@ entry and names the right range.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add docs/plugin-ui.md docs/plugin-authoring.md docs/STATUS.md docs/superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md
+git add docs/plugin-ui.md docs/plugin-authoring.md jasper-sdk/README.md docs/STATUS.md docs/superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md
 git commit -F - <<'EOF'
 SDK 0.18 controls: documentation and status
 
 The plugin UI guide names Notice, Properties, Separator, TABS, read-only
 fields, technical captions, swatches, footnotes and the fake's type; the
-authoring guide the technical hint. STATUS records plan 3b, its rulings,
+authoring guide the technical hint; the SDK README's 0.18.0 sentence the
+additions. STATUS records plan 3b, its rulings,
 the gallery proof and the whole build's counts.
 
 🤖 Generated with Claude Code at The Home Depot
