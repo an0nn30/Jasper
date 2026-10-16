@@ -29,52 +29,65 @@ Keymap.png` (Action/Scope/Shortcut) and `03 Add Host/Add Host - Default.png` ("N
 plugins and app pages is plans 3e, 9 and 10, not this plan.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-3c`, branch
-`claude/enterprise-sdk-0-18-tables`. The branch holds only this plan's commit on `222969926`; plans 3a and 3b merge to
-`main` first. Before Task 1, run `git rebase main` (it replays this one commit) and check the base: `grep -c
-'EXCLUSIVE' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java` prints a number above 0 and `grep VERSION
-jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java` shows `0.18.0`. Run every command from the worktree root,
-never in `~/projects/moray` itself. Line numbers below are from `222969926`; every edit quotes the text it replaces,
-and the edit scripts stop with a message when their text is not found exactly the stated number of times (3a and 3b
-edit some of the same files, so re-find an anchor by its text, never by its number).
+`claude/enterprise-sdk-0-18-tables`. The branch already sits on `main` at `149cd8fb9` (plans 3a, 3b and 3d merged)
+and holds only this plan's commits; do not rebase or merge. Before Task 1, check the base: `git merge-base
+--is-ancestor 149cd8fb9 HEAD` succeeds, `grep -c 'EXCLUSIVE' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java`
+prints a number above 0 and `grep VERSION jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java` shows `0.18.0`. Run
+every command from the worktree root, never in `~/projects/moray` itself. Line numbers below are from `149cd8fb9`
+(re-verified 2026-10-16); every edit quotes the text it replaces, and the edit scripts stop with a message when their
+text is not found exactly the stated number of times (re-find an anchor by its text, never by its number). Plan 3e runs
+in parallel in another worktree and shares `migration.csv`, `docs/STATUS.md`, the testkit fake, `docs/plugin-ui.md`
+and `docs/plugin-authoring.md`; whichever of the two merges second reconciles them, so do not anticipate 3e here.
 
 ## Verified facts
 
-At `222969926` (the mirrors are byte-identical once the package names are mapped; checked with `diff`):
+At `149cd8fb9` (re-verified 2026-10-16; the mirrors are byte-identical once the package names are mapped, checked
+with `diff`):
 
-1. `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java` and `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`
-   are identical but for the package; so are `TableRow.java`, `TreeItem.java`, `Column.java`, `ListItem.java`,
-   `ModelChecks.java`, `ViewSpec.java` and `UiEvent.java`. After 3a, `Nodes.java` differs too: 3a Task 4 adds Javadoc
-   to the SDK copy only (`TextRole`, `ButtonKind`, `ChoiceKind`, `ListKind`, `FormKind`, `ScrollPolicy`, `Toggle`,
-   `Empty` and others); `TableRow.java` and `ViewSpec.java` stay identical.
+1. `TableRow.java`, `TreeItem.java`, `Column.java`, `ListItem.java`, `ModelChecks.java`, `ViewSpec.java` and
+   `UiEvent.java` are identical in `jasper-sdk/src/main/java/dev/jasper/sdk/ui/` and
+   `jasper-ui/src/main/java/dev/jasper/ui/model/` but for the package. `Nodes.java` differs by 42 lines, every one a
+   Javadoc line (3a Task 4 added or reworded the SDK copy's for `TextRole`, `ButtonKind`, `ChoiceKind`, `ListKind`,
+   `FormKind`, `ScrollPolicy`, `Toggle`, `Empty` and others), none inside the ItemList, Table or Tree text this plan
+   edits.
 2. `Nodes.Table` is `(id, state, columns, rows, selectedIds, activateAction, contextActions, selectionMode, scroll)`
-   with 8- and 7-argument conveniences (`Nodes.java:591-613`); `Nodes.Tree` is `(id, state, roots, expandedIds,
-   selectedIds, activateAction)` with no convenience (`:615-623`); `Nodes.ItemList` has 15 components ending in
-   `cancelAction` and conveniences of 12, 10, 9 and 7 arguments (`:460-524`); `Nodes.Empty` is `(id, state, icon,
-   title, description, actions)` (`:450-458`).
+   with 8- and 7-argument conveniences (SDK `Nodes.java:638-660`, model `:622-644`); `Nodes.Tree` is `(id, state,
+   roots, expandedIds, selectedIds, activateAction)` with no convenience (SDK `:662-670`, model `:646-654`);
+   `Nodes.ItemList` has 15 components ending in `cancelAction` and conveniences of 12, 10, 9 and 7 arguments (SDK
+   `:494-558`, model `:478-542`); `Nodes.Empty` is `(id, state, icon, title, description, actions)` (SDK `:483-492`,
+   model `:467-476`). 3b's and 3d's records (`Separator`, `Notice`, `Properties`, `Field.readOnly`, ...) leave these
+   five records as they were.
 3. `TableRow` is `(id, cells, icon, muted, contextActions, tooltip)` with 5- and 3-argument conveniences
    (`TableRow.java:14-27`); `TreeItem.trailing` is a `List<String>` drawn as right-aligned columns
    (`TreeItem.java:9-16`); `Column` is `(id, title, role, numeric, weight, sorted)` (`Column.java:11`).
-4. `ViewSpec.validate` checks table cell keys against column ids (`ViewSpec.java:54-58`), walks tree items with
-   `tree(item, ids, branches, depth)` (`:21-26`, `:59-63`), and collects children per node type (`:33-65`).
-   `ListItem.inline` is the row whitelist (`ListItem.java:42-51`).
+4. `ViewSpec.validate` checks table cell keys against column ids (`ViewSpec.java:79-83`), walks tree items with
+   `tree(item, ids, branches, depth)` (`:40-45`, `:84-88`), and collects children per node type (`:52-90`). 3b added
+   `place(parent, child)` (`:28-33`, run on every collected child at `:91`): a Notice only in a form's sections or a
+   VERTICAL stack, a Separator only in an INLINE or ACTIONS stack. A table's cell nodes and empty state become its
+   collected children here, so `place` sees them under the Table; `TableRow` already refuses both kinds as cell nodes,
+   and an Empty's actions are placed under the Empty as before. `ListItem.inline` is the row whitelist
+   (`ListItem.java:42-51`).
 5. `KitValues` projects by constructing the model records field by field: Table at `KitValues.java:32`, Tree at `:33`,
-   ItemList at `:27`, `toModule(TableRow)` at `:43`. `KitValuesTest` (jasper-app) checks losslessness by comparing
-   `toString()` of the SDK and the projected spec (`KitValuesTest.java:35`, `:85`). `Map.copyOf` of an immutable map
-   returns that map, which is why `cells` prints alike after projection.
-6. The descriptor walks: `FakeKitView.children` (`jasper-sdk-testkit/.../FakeKitView.java:101-118`) and
-   `KitContent.children` (`jasper-app/.../plugins/KitContent.java:24-41`) feed both `KitIconNames` copies
-   (`:48` in each), the fake's node index and anchors. Neither visits table rows.
+   ItemList at `:27`, `toModule(TableRow)` at `:46`. `KitValuesTest` (jasper-app) checks losslessness by comparing
+   `toString()` of the SDK and the projected spec (`KitValuesTest.java:42`, `:83` and others). `Map.copyOf` of an
+   immutable map returns that map, which is why `cells` prints alike after projection.
+6. The descriptor walks: `FakeKitView.children` (`jasper-sdk-testkit/.../FakeKitView.java:106-124`, its ItemList case
+   at `:112`) and `KitContent.children` (`jasper-app/.../plugins/KitContent.java:24-42`, ItemList at `:30`) feed both
+   `KitIconNames` copies (`:48` in each), the fake's node index and anchors. Neither visits table rows.
 7. `KitContractTest` (testkit `testFixtures`) runs against the host (`HostedKitContractTest`) and the fake
    (`FakeKitContractTest`, a top-level class declared in `FakeKitTest.java`, so a filter must be `FakeKit*`, not
-   `FakeKitTest*`); `PluginContractTest` runs on the host (`AppContractTest`) and the fake (`FakeContractTest`); its `descriptorIconCases` map (`KitContractTest.java:148-173`) is the parity table for icon
-   validation; `browser(...)` and `browserDescriptorsMountUpdateAndReportSortsCrumbsAndMenus` (`:227-247`) are the
-   pattern for a descriptor-family contract.
-8. Rendering: `ControlRegistry.validate` treats Table and Tree as leaves (`ControlRegistry.java:20`; 3b Task 5 appends
-   `Nodes.Separator _` to that line and 3b Task 7 `Nodes.Properties _`, so this plan replaces only its stable prefix
-   `case Nodes.Table _, Nodes.Tree _,`);
-   `ControlRegistry.children` gives an ItemList its `addAction` (`:62`) and nothing for Table; the reconciler mounts
-   exactly `ControlRegistry.children` (`ViewReconciler.java:338-340`) and hands them to `Control.children`
-   (`:52`). Row content is mounted per row by `InteractiveRows.Row.control` (`InteractiveRows.java:915-985`), which inks
+   `FakeKitTest*`); `PluginContractTest` runs on the host (`AppContractTest`) and the fake (`FakeContractTest`); no
+   other class extends either. Its `descriptorIconCases` map (a `LinkedHashMap`, `KitContractTest.java:218-244`,
+   `table-menu` at `:231`) is the parity table for icon validation, read by
+   `everyDescriptorIconPositionValidatesOwnershipBeforeCreateOrUpdateMutation` (`:167`), whose messages read
+   `<case> create <name>`; `browser(...)` and `browserDescriptorsMountUpdateAndReportSortsCrumbsAndMenus`
+   (`:297-306` on) are the pattern for a descriptor-family contract.
+8. Rendering: `ControlRegistry.validate` treats Table and Tree as leaves; its line (`ControlRegistry.java:20`) reads
+   `case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}` after 3b, so
+   this plan replaces only its prefix `case Nodes.Table _, Nodes.Tree _,`;
+   `ControlRegistry.children` gives an ItemList its `addAction` (`:65`) and nothing for Table; the reconciler mounts
+   exactly `ControlRegistry.children` (`collect`, `ViewReconciler.java:339-341`) and hands them to `Control.children`
+   (`:56`). Row content is mounted per row by `InteractiveRows.Row.control` (`InteractiveRows.java:915-985`), which inks
    Text, Icon, Button, Toggle and Chip controls on a selected row and calls `embeddedLabel(true)`.
 9. `Tables.TableControl.populate` builds one synthetic `Text` per column, casts every title child to `JLabel`, and sets
    alignment, the row glyph and muted ink (`Tables.java:187-231`); the header labels are built in `data()`
@@ -82,48 +95,55 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 10. Headings: `RowsControl.dataRow` (`InteractiveRows.java:221`) drives `selectable`, `step`, `typeAhead`, `range`,
     `activate`, `context` and `paintFill`; a non-data row lays out with `Row.headingLayout` (`:1176-1186`), which
     zeroes the trailing slot, and paints a hairline above itself when it is not first (`:1218-1228`).
-    `ItemLists.ListControl` overrides `dataRow` for `ListItem.heading` (`ItemLists.java:157-160`).
+    `ItemLists.ListControl` overrides `dataRow` for `ListItem.heading` (`ItemLists.java:157-160`). `Tables.java`,
+    `InteractiveRows.java` and `Trees.java` are unchanged since `222969926`, so facts 9, 10 and 13 keep their lines
+    (fact 11's footer line was misquoted as `:443-444` and is corrected).
 11. Row geometry: `Canvas.getPreferredSize` is `rowsHeight() + footerHeight()` and its viewport size
-    `viewportRowsHeight() + footerHeight()` (`InteractiveRows.java:769-776`); it never tracks the viewport height
-    (`:794-796`); `sync` places `footer` at `rowsHeight()` (`:443-444`) and then calls `layoutAccessories(width)`.
-    `RowsControl.inline` and `revealInline` let `KitView.focus` and `reveal` reach row-mounted nodes
-    (`ViewReconciler.java:399-407`, `KitView.java:220-238`); `ItemLists` implements them with a `nodeRows` index
-    (`ItemLists.java:351-375`).
-12. `Choices.ChoiceControl` builds a DROPDOWN as a `ChoiceCombo` in a `BorderLayout` panel (`Choices.java:34-75`); the
-    closed value is rendered by `optionLabel` (`:76-84`), but `BasicComboBoxUI.paintCurrentValue` then sets the
-    renderer's foreground to the combo's own; `ChoiceCombo` paints the
-    control face in `paintComponent` (`:382-384`), the chevron in its arrow button (`:318-330`) and sizes itself with
-    `naturalWidth()` (`:352-374`). 3b Task 3 rewrites `embeddedLabel` (`:30`) to `label.setVisible(labelShown())` and
-    adds `labelShown()` under it, so this plan inserts `inCell` before `firstLineHeight` (`:31`), which 3b leaves alone.
-    The closed value's text starts `getInsets().left` plus `FIELD_HORIZONTAL_PADDING` (the renderer's `EmptyBorder`,
-    `:202-203`) inside the combo.
+    `viewportRowsHeight() + footerHeight()` (`InteractiveRows.java:768-776`); it never tracks the viewport height
+    (`:793-796`); `sync` places `footer` at `rowsHeight()` (`:457-458`) and then calls `layoutAccessories(width)`
+    (`:459`). `RowsControl.inline` and `revealInline` let `KitView.focus` and `reveal` reach row-mounted nodes
+    (`ViewReconciler.java:395-405`, `KitView.java:216`, `:228-233`); `ItemLists` implements them with a `nodeRows`
+    index (`ItemLists.java:351-375`).
+12. `Choices.ChoiceControl` builds a DROPDOWN as a `ChoiceCombo` in a `BorderLayout` panel (`Choices.java:36-77`, the
+    `SegmentColumn` line at `:74`); the closed value is rendered by `optionLabel` (`:78-86`), but
+    `BasicComboBoxUI.paintCurrentValue` then sets the renderer's foreground to the combo's own; `ChoiceCombo` (`:282`,
+    `hover` at `:286`) paints the control face in `paintComponent` (`:384-386`), the chevron in its arrow button
+    (`:319-332`, the `chevron.down` call at `:325`) and sizes itself with `getPreferredSize` and `naturalWidth()`
+    (`:353-375`). 3b rewrote `embeddedLabel` (`:30`) to `label.setVisible(labelShown())` and added `labelShown()`
+    (`:32`), so this plan inserts `inCell` before `firstLineHeight` (`:33`). The closed value's text starts
+    `getInsets().left` plus `FIELD_HORIZONTAL_PADDING` (the renderer's `EmptyBorder`, `:204-205`) inside the combo.
 13. `Trees.TreeControl.data` measures `trailingWidths` over every item in CAPTION type, at least `TREE_DETAIL_COLUMN`
     and, for the last, `TREE_VALUE_COLUMN` (`Trees.java:265-275`); `populate` adds one CAPTION text per trailing value,
     right-aligned at that width, then the COUNT text (`:356-391`); a plain tree row's side inset is `ICON_GAP`, or
     `COLUMN_LIST_SIDE` in a manager column (`InteractiveRows.java:1096`). `Trees.validateDetail` walks table rows for
     icons (`Trees.java:35-41`).
-14. Gallery: `KitGallery.fixtures()` ends with the `picker-menu` fixture before `return List.copyOf(result);`
-    (`KitGallery.java:66-67`); contact sheets group eight fixtures per `sheet-N.png` in list order (`:165-180`); the
-    metadata JSON walks record components that are Nodes, ListItems, Optionals and Iterables only (`:261-273`), so map
-    values and table rows' new components add nothing to existing fixtures' JSON. `GalleryCoverageTest.collect` does not
-    walk map values (`GalleryCoverageTest.java:139-148`). The headless gallery wrote 142 files per theme at
-    `995ff899f` (STATUS, plan 2).
+14. Gallery: `KitGallery.fixtures()` ends with 3b's `form-footnote` fixture (`KitGallery.java:108`) before
+    `return List.copyOf(result);` and `panelState(` (`:113-115`); contact sheets group eight fixtures per `sheet-N.png`
+    in list order (`writeSheets`, `:330-345`); the metadata JSON walks record components that are Nodes, ListItems,
+    Optionals and Iterables only (`appendStates`, `:307-320`), so map values and table rows' new components add nothing
+    to existing fixtures' JSON. Neither `GalleryCoverageTest.collect` (`GalleryCoverageTest.java:162-171`) nor 3b's
+    `records` walker (`:151-160`, used by `zeroEighteenFieldsHaveARealFixture`) walks map values. At `149cd8fb9` the
+    gallery holds 74 fixtures and writes 159 files per theme (sheets 1 to 10, the tenth holding two), so the new
+    fixture is the 75th and joins `sheet-10.png`.
 15. Gates: `ThemeMigrationCoverageTest` scans jasper-app, the SDK, the testkit and plugins only
-    (`ThemeMigrationCoverageTest.java:62-77`); this plan creates no file there (its new files are under jasper-ui), so
+    (`ThemeMigrationCoverageTest.java:64-67`); this plan creates no file there (its new files are under jasper-ui), so
     it adds no `migration.csv` row. The SDK's javadoc runs `-Xdoclint:all` with `isFailOnError`
     (`jasper-sdk/build.gradle.kts:4-11`), jasper-ui's `-Xdoclint:all,-missing` (`jasper-ui/build.gradle.kts:51-52`).
+    `docs/plugin-ui.md` is read by jasper-app's `AppDocumentationTest` and `PluginUiExamplesTest`
+    (`UiDocumentationTest` reads jasper-ui's own documents, not this guide).
 
-16. Dry run (2026-10-16, while writing this plan, without Gradle): every edit script and file of Tasks 1 to 7 applied
-    cleanly, in order, to a copy of `222969926`; the SDK, jasper-ui (main, `testFixtures`, tests), the testkit and
-    `KitValues` compiled with the JBR's `javac`; the new and neighbouring tests passed under a JUnit launcher (SDK
-    `KitValuesTest` 22, jasper-app `KitValuesTest` 11, the fake's kit contract 32, 231 jasper-ui tests across
-    `TableVocabularyTest`, the table, tree, list, choice, ink, empty-state, panel, settings and gallery suites, and
-    `KitKeyBindingAuditTest`; `KitMatrixTest` 3); and `KitGallery.main` for Slate Cobalt Dark and Light wrote 142 base
-    files of which 140 were byte-identical, `manifest.json` and `sheet-9.png` changing and `tables-0-18.png`/`.json`
-    added. 3a's and 3b's edits come in between, so the executor's runs are the evidence; the host contract
-    (`HostedKitContractTest`) was not run. A review the same day replayed the scripts on 3a's branch with 3b's applied:
-    the Choices and ControlRegistry anchors stopped on 3b's text and now quote text 3b leaves alone (facts 8 and 12);
-    with them, every script applied and its tests passed there.
+16. Dry run (2026-10-16, refreshed against `149cd8fb9`, without Gradle): every edit script and file of Tasks 1 to 7,
+    as this plan now reads, applied cleanly, in order, to a `git archive` of the branch; the SDK, jasper-ui (main,
+    `testFixtures`, tests), the terminal, Buddy, jasper-app main, the testkit (main, `testFixtures`, tests) and the
+    named jasper-app tests compiled with the JBR's `javac`; under a headless JUnit launcher the whole SDK suite (90),
+    the whole testkit suite (194, the fake's kit and plugin contracts among them), the whole jasper-ui suite (668; one
+    failure, `GalleryCoverageTest.shippedJarExcludesGalleryAndTestSupport`, which needs the Gradle-built
+    `build/libs/jasper-ui.jar` and does not run outside Gradle), jasper-app's `KitValuesTest`, `HostedKitContractTest`,
+    `AppContractTest` and `KitMountingTest` (160) and `AppDocumentationTest` and `PluginUiExamplesTest` (6) passed. With
+    Task 6's `FakeKitView` edit held back, the fake's run of the new kit contract test failed on "focus into the state
+    while rows show", as Task 6 Step 2 expects. `KitGallery.main` for Slate Cobalt Dark and Light, at the base and with
+    the plan applied, and Task 6's comparison script: per theme 159 base files, 157 byte-identical, `manifest.json` and
+    `sheet-10.png` changed, `tables-0-18.png` and `.json` added. The executor's Gradle runs remain the evidence.
 
 ## Global Constraints
 
@@ -132,7 +152,7 @@ At `222969926` (the mirrors are byte-identical once the package names are mapped
 - Work only in the worktree above on `claude/enterprise-sdk-0-18-tables`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Scope is exactly spec 8.2's rows `Tree.columns`, `TableRow.cellNodes`, `TableRow.heading` (with `Heading` and `countNoun`), `Table.empty`, `Table.emptyText` and `ItemList.emptyText`. No plugin or app page adopts them (plans 3e, 9 and 10); no other 8.2 row is touched (3b and 3d own them).
 - Existing record constructors stay as conveniences with the new components at their empty values (`Map.of()`, `Optional.empty()`, `List.of()`, `""`); new components go last; no existing component is renamed or reordered.
-- The SDK and the jasper-ui model differ only by their package names and the Javadoc 3a adds to the SDK copy of `Nodes.java` (fact 1): every edit to `Nodes.java`, `TableRow.java` or `ViewSpec.java` is applied to both copies by the same script, and Task 1 Step 3 checks that the copies' difference is unchanged by this plan.
+- The SDK and the jasper-ui model differ only by their package names and the Javadoc lines of `Nodes.java` that 3a changed in the SDK copy only (fact 1): every edit to `Nodes.java`, `TableRow.java` or `ViewSpec.java` is applied to both copies by the same script, and Task 1 Step 3 checks that the copies' difference is unchanged by this plan.
 - Pixel rule: every existing gallery fixture renders byte-identically for Slate Cobalt Dark and Light. The headless gallery may change only in: the new `tables-0-18.png` and `tables-0-18.json`; `manifest.json` (`fixtureCount` + 1); and the last contact sheet `sheet-N.png`, which gains the new fixture's cell (or a new `sheet-N.png` when the previous last sheet held eight). Task 6 proves it.
 - Javadoc doclint fails the build on errors: every `{@link}` resolves and no comment holds a raw `<`, `>` (outside HTML tags), `&` or `->`.
 - `docs/design/theme-engine/migration.csv`: every new or renamed candidate source under jasper-app, the SDK, the testkit or plugins gets its row in the same commit (`ThemeMigrationCoverageTest`); this plan creates none, and Task 7's full build confirms it.
@@ -207,9 +227,9 @@ the exclusive empty states; `ViewSpec` checks cell-node columns, walks cell node
 caps each tree item's values at the columns after the title.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java` (ItemList `:460-524`, Table `:591-613`, Tree `:615-623`) and the same lines of `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`
-- Replace: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java`, `jasper-ui/src/main/java/dev/jasper/ui/model/TableRow.java` (whole files)
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:21-26,54-63` and the same lines of `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java`
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java` (ItemList `:494-558`, Table `:638-660`, Tree `:662-670`) and `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java` (the same text 16 lines earlier: `:478-542`, `:622-644`, `:646-654`)
+- Replace: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java`, `jasper-ui/src/main/java/dev/jasper/ui/model/TableRow.java` (whole files; unchanged since `222969926`)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:40-45,79-88` and the same lines of `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java`
 - Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/KitValuesTest.java` (five tests appended), `jasper-ui/src/test/java/dev/jasper/ui/model/ViewSpecTest.java` (one test appended)
 
 **Interfaces:**
@@ -390,8 +410,8 @@ Expected: FAIL. Both `compileTestJava` tasks stop with "cannot find symbol" (`ce
 
 - [ ] **Step 3: Add the components and their checks to both copies**
 
-First record how the copies differ at the rebased base (3a's SDK-only Javadoc in `Nodes.java`, fact 1), from the
-worktree root:
+First record how the copies differ at the base (the Javadoc lines of `Nodes.java` 3a changed in the SDK copy, fact 1), from the worktree
+root:
 
 ```bash
 python3 -I - <<'PY'
@@ -410,7 +430,8 @@ out.write_text(json.dumps(result), encoding="utf-8")
 PY
 ```
 
-Expected: `TableRow 0 differing lines`, `ViewSpec 0 differing lines`, and a positive count for `Nodes` (3a's Javadoc).
+Expected: `Nodes 42 differing lines` (Javadoc lines only, at `149cd8fb9`), `TableRow 0 differing lines` and
+`ViewSpec 0 differing lines`.
 The snapshot lives under the SDK's `build/` directory, which git ignores.
 
 Then run from the worktree root:
@@ -686,7 +707,7 @@ for name in ["Nodes", "TableRow", "ViewSpec"]:
 PY
 ```
 
-Expected: `Nodes unchanged (N differing lines, the base's)` with the same N the snapshot printed, `TableRow unchanged
+Expected: `Nodes unchanged (42 differing lines, the base's)`, the same count the snapshot printed, `TableRow unchanged
 (identical)` and `ViewSpec unchanged (identical)`. Any `CHANGED` means an edit reached one copy only: fix the script
 and rerun it on a clean checkout of the two files.
 
@@ -723,9 +744,9 @@ host's descriptor walks visit a table's cell nodes and its empty state, so their
 validated alike. The shared icon contract gains the two new positions.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:27,32,33,43`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitContent.java:30`, `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java:107`
-- Test: `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java` (one test appended), `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java:161` (two icon cases)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:27,32,33,46`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitContent.java:30`, `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java:112`
+- Test: `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java` (one test appended), `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java:231` (two icon cases after `table-menu`)
 
 **Interfaces:**
 - Consumes: Task 1's records and accessors.
@@ -794,7 +815,7 @@ PY
 ```
 
 The jasper-app `KitValuesTest` imports `dev.jasper.sdk.ui.*`, `java.util.*` and `static dev.jasper.sdk.ui.Nodes.*`
-and defines `READY`, `text(id)` and `button(id)` (`KitValuesTest.java:1-11`).
+and defines `READY`, `text(id)` and `button(id)` (`KitValuesTest.java:1-10`).
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -876,7 +897,7 @@ and empty states. A plain table, list and dropdown paint exactly as before.
 
 **Files:**
 - Replace: `jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` (whole file)
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java:31,72,280-285,322-323,352-385` (anchored on text; 3b rewrites `:30`)
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java:33,74,282,286-287,324-325,357,374-375,384-385` (anchored on text; 3b's `embeddedLabel` and `labelShown()` are `:30-32`)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:1175-1186` (`headingLayout`)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java:20`, `jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java:35-41`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java`
@@ -892,9 +913,10 @@ and empty states. A plain table, list and dropdown paint exactly as before.
 
 - [ ] **Step 1: Write the failing tests**
 
-Before replacing `Tables.java`, check that nothing changed it since `222969926` (3a and 3b do not touch it):
-`git diff --stat 222969926 -- jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` prints nothing. If it prints a
-change, carry that change into the replacement in Step 3.
+Before replacing `Tables.java`, check that nothing changed it since `222969926`, the version the replacement was
+written from (3a, 3b and 3d did not touch it; re-verified at `149cd8fb9`): `git diff --stat 222969926 --
+jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` prints nothing. If it prints a change, carry that change into
+the replacement in Step 3.
 
 Create `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java`:
 
@@ -1490,7 +1512,7 @@ def edit(name, edits):
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java", [
-    # 3b rewrites embeddedLabel and adds labelShown() under it; firstLineHeight follows them in either tree.
+    # 3b rewrote embeddedLabel and added labelShown() under it; firstLineHeight follows them.
     ('''        @Override int firstLineHeight()''', '''        /**
          * A DROPDOWN in a table cell (its row sets this on every populate): bare until hovered, focused or open, as wide
          * as its value and chevron, and while bare on a selected row its value and chevron take {@code ink}; null off one.
@@ -1595,7 +1617,7 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java", [
             trailing.doLayout();
         }''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java", [
-    # 3b appends Separator and Properties to this leaf line; only its stable prefix is replaced.
+    # 3b appended Separator and Properties to this leaf line, after Breadcrumbs; only its prefix is replaced.
     ('''            case Nodes.Table _, Nodes.Tree _,''', '''            case Nodes.Table n -> { for (var row : n.rows()) row.cellNodes().values().forEach(ControlRegistry::validate); n.empty().ifPresent(ControlRegistry::validate); }
             case Nodes.Tree _,''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java", [
@@ -1653,8 +1675,8 @@ in the body; rows replace the state, and the state returns when the rows go. A c
 before.
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:384,401-404,443-444,769-776,793-796`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ItemLists.java:148-151` (after `lines()`), `jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` (Task 3's `TableControl`), `jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java:62`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:384,401-403,456-458,769-776,793-796`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ItemLists.java:148-151` (after `lines()`), `jasper-ui/src/main/java/dev/jasper/ui/swing/Tables.java` (Task 3's `TableControl`), `jasper-ui/src/main/java/dev/jasper/ui/swing/ControlRegistry.java:65`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/TableVocabularyTest.java` (three tests appended)
 
 **Interfaces:**
@@ -2207,10 +2229,10 @@ in-cell DROPDOWN included) and walks map values, and the headless gallery proves
 
 **Files:**
 - Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java` (one descriptor builder and one test appended)
-- Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java:37,134` (imports it lacks and one case, before `semanticPresentationIconsValidateOwnershipAtEveryBoundary`)
+- Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java:37,166` (imports it lacks and one case, before `semanticPresentationIconsValidateOwnershipAtEveryBoundary`)
 - Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java:62,73,78` (focus and reveal refuse a table's dormant empty state)
 - Create: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/TableFixtures.java`
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:66-67`, `jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java:143` (and one test appended)
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:113-115`, `jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java:154,166` (3b's `records` and `collect` walk map values; one test appended)
 
 **Interfaces:**
 - Consumes: everything from Tasks 1 to 5.
@@ -2301,37 +2323,29 @@ def before_last_brace(name, block):
     if not text.endswith("}"): raise SystemExit(f"{name}: expected the class's closing brace at the end")
     path.write_text(text[:-1].rstrip() + "\n" + block + "}\n", encoding="utf-8")
 coverage = "jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java"
-edit(coverage, [('''        if (value instanceof Iterable<?> items) { items.forEach(v -> collect(v, values)); return; }
+# Both walkers reach cell nodes too: 3b's records (zeroEighteenFieldsHaveARealFixture and the test below) and collect.
+edit(coverage, [('''        if (value instanceof Iterable<?> items) { items.forEach(v -> records(v, out)); return; }
+''', '''        if (value instanceof Iterable<?> items) { items.forEach(v -> records(v, out)); return; }
+        if (value instanceof Map<?, ?> map) { map.values().forEach(v -> records(v, out)); return; }
+''', 1), ('''        if (value instanceof Iterable<?> items) { items.forEach(v -> collect(v, values)); return; }
 ''', '''        if (value instanceof Iterable<?> items) { items.forEach(v -> collect(v, values)); return; }
         if (value instanceof Map<?, ?> map) { map.values().forEach(v -> collect(v, values)); return; }
 ''', 1)])
 before_last_brace(coverage, '''
     /** Spec 16.1.3 and plan 3c: SDK 0.18's table vocabulary has a real fixture, the in-cell DROPDOWN among it. */
     @Test void everyTableAdditionOfSdkZeroEighteenHasARealFixture() {
-        var nodes = new ArrayList<Nodes.Node>();
-        KitGallery.fixtures().forEach(f -> nodes(f.spec().root(), nodes));
-        assertThat(nodes).as("a tree with columns").anyMatch(n -> n instanceof Nodes.Tree tree && tree.columns().size() > 1);
-        assertThat(nodes).as("a heading row with a counted noun").anyMatch(n -> n instanceof Nodes.Table table
+        var records = new ArrayList<Record>();
+        KitGallery.fixtures().forEach(f -> records(f.spec().root(), records));
+        assertThat(records).as("a tree with columns").anyMatch(r -> r instanceof Nodes.Tree tree && tree.columns().size() > 1);
+        assertThat(records).as("a heading row with a counted noun").anyMatch(r -> r instanceof Nodes.Table table
             && table.rows().stream().anyMatch(row -> row.heading().filter(h -> h.count().isPresent() && !h.countNoun().isBlank()).isPresent()));
-        assertThat(nodes).as("an in-cell DROPDOWN").anyMatch(n -> n instanceof Nodes.Table table && table.rows().stream()
+        assertThat(records).as("an in-cell DROPDOWN").anyMatch(r -> r instanceof Nodes.Table table && table.rows().stream()
             .anyMatch(row -> row.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN)));
-        assertThat(nodes).as("an inline cell stack").anyMatch(n -> n instanceof Nodes.Table table && table.rows().stream()
+        assertThat(records).as("an inline cell stack").anyMatch(r -> r instanceof Nodes.Table table && table.rows().stream()
             .anyMatch(row -> row.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.INLINE)));
-        assertThat(nodes).as("an empty table's state").anyMatch(n -> n instanceof Nodes.Table table && table.rows().isEmpty() && table.empty().isPresent());
-        assertThat(nodes).as("an empty table's line").anyMatch(n -> n instanceof Nodes.Table table && table.rows().isEmpty() && !table.emptyText().isBlank());
-        assertThat(nodes).as("an empty list's line").anyMatch(n -> n instanceof Nodes.ItemList list && list.items().isEmpty() && !list.emptyText().isBlank());
-    }
-
-    /** Every node in a descriptor value: records, optionals, lists and map values, walked like {@link #collect}. */
-    static void nodes(Object value, List<Nodes.Node> into) {
-        if (value == null || value instanceof Enum<?>) return;
-        if (value instanceof Optional<?> o) { o.ifPresent(v -> nodes(v, into)); return; }
-        if (value instanceof Iterable<?> items) { items.forEach(v -> nodes(v, into)); return; }
-        if (value instanceof Map<?, ?> map) { map.values().forEach(v -> nodes(v, into)); return; }
-        if (value instanceof Nodes.Node n) into.add(n);
-        if (value instanceof Record record) try {
-            for (RecordComponent c : record.getClass().getRecordComponents()) nodes(c.getAccessor().invoke(record), into);
-        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        assertThat(records).as("an empty table's state").anyMatch(r -> r instanceof Nodes.Table table && table.rows().isEmpty() && table.empty().isPresent());
+        assertThat(records).as("an empty table's line").anyMatch(r -> r instanceof Nodes.Table table && table.rows().isEmpty() && !table.emptyText().isBlank());
+        assertThat(records).as("an empty list's line").anyMatch(r -> r instanceof Nodes.ItemList list && list.items().isEmpty() && !list.emptyText().isBlank());
     }
 ''')
 before_last_brace("jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java", '''    /** SDK 0.18 (plan 3c): a column tree, a grouped table with a cell dropdown and an inline cell, an empty table's state and two empty lines. */
@@ -2374,7 +2388,7 @@ before_last_brace("jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testi
     }); }
 ''')
 CONTRACT = "jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java"
-# 3b adds some of these imports first; add only the ones still missing.
+# 3b added ControlState, Nodes and ViewSpec already; add only the ones still missing (Column, TableRow, TreeItem).
 contract = pathlib.Path(CONTRACT).read_text(encoding="utf-8")
 missing = "".join(f"import dev.jasper.sdk.ui.{name};\n" for name in ["Column", "ControlState", "Nodes", "TableRow", "TreeItem", "ViewSpec"]
     if f"import dev.jasper.sdk.ui.{name};\n" not in contract)
@@ -2419,7 +2433,8 @@ edit(CONTRACT, [
 PY
 ```
 
-`GalleryCoverageTest` imports `java.util.*` and `java.lang.reflect.RecordComponent` (`GalleryCoverageTest.java:3-9`).
+`GalleryCoverageTest` imports `java.util.*` (`GalleryCoverageTest.java:7`), so `Map` and `ArrayList` resolve; the new test
+reuses 3b's `records` walker rather than adding a third one.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -2541,9 +2556,9 @@ The kit contract mounts, updates and drives tree columns, cell nodes,
 heading rows and the empty states on the host and the fake alike, and
 the fake refuses focus into an empty state its table's rows replaced;
 the plugin contract admits the view and refuses misplaced cells,
-headings and empty states; the gallery's last fixture shows every addition, coverage checks each one
-(the in-cell DROPDOWN included), and every earlier fixture renders
-byte-identically.
+headings and empty states; the gallery's last fixture shows every
+addition, coverage checks each one (the in-cell DROPDOWN included), and
+every earlier fixture renders byte-identically.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2557,7 +2572,7 @@ EOF
 the plan, its rulings and hand-offs; the whole build runs and its counts are recorded; the plan gets its banner.
 
 **Files:**
-- Modify: `docs/plugin-ui.md` (one bullet after "Empty states", `:173-174` at `222969926`)
+- Modify: `docs/plugin-ui.md` (one bullet after "Empty states", `:181-182` at `149cd8fb9`)
 - Modify: `docs/STATUS.md:2` (a new entry above the newest one)
 - Modify: `docs/superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md:1` (the status banner)
 
@@ -2594,8 +2609,8 @@ PY
 
 Run: `./gradlew check --continue`
 Expected: BUILD SUCCESSFUL (javadoc doclint, `verifyUiArchitecture`, `verifyApplicationArchitecture`,
-`verifySdkArchitecture`, `ThemeMigrationCoverageTest` with no new row needed, `UiDocumentationTest` reading the edited
-guide). Then print the totals:
+`verifySdkArchitecture`, `ThemeMigrationCoverageTest` with no new row needed, jasper-app's `AppDocumentationTest` and
+`PluginUiExamplesTest` reading the edited guide). Then print the totals:
 
 ```bash
 python3 -I - <<'PY'
@@ -2609,11 +2624,14 @@ print(f"{totals[0]:,} tests, {totals[1]} failures, {totals[2]} errors, {totals[3
 PY
 ```
 
-Expected: 0 failures and 0 errors, and 21 tests more than the base's count (the base is `main` after 3b; its count is
-in 3b's STATUS entry): five SDK `KitValuesTest`, one model `ViewSpecTest`, one jasper-app `KitValuesTest`, nine
+Expected: 0 failures and 0 errors, and 21 tests more than the base's count, so **10,629 tests** with **25 skipped**
+(the base is `149cd8fb9`, whose count, 10,608 tests and 25 skipped, is the merged-branch line of 3b's STATUS entry):
+five SDK `KitValuesTest`, one model `ViewSpecTest`, one jasper-app `KitValuesTest`, nine
 `TableVocabularyTest`, one `GalleryCoverageTest`, the new kit contract test twice (`HostedKitContractTest` and
 `FakeKitContractTest`) and the new plugin contract test twice (`AppContractTest` and `FakeContractTest`); skipped as
-the base. Then run the AGENTS.md source-hygiene script over every Java source; it must print nothing.
+the base. If another plan's builds share the machine and a timing-sensitive test fails once, rerun that test alone
+before treating it as a failure. Then run the AGENTS.md source-hygiene script over every Java source; it must print
+nothing.
 
 - [ ] **Step 3: Record the plan in STATUS and in this plan**
 
@@ -2679,3 +2697,99 @@ the whole build's counts.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-16)
+
+Refreshed for execution against `149cd8fb9` (plans 3a, 3b and 3d merged into `main`, the branch's base). Every anchor,
+quoted text, path, signature and line number above was re-checked against that code; line numbers in the prose and
+the **Files** lists now point at it, the scripts' anchors are unchanged except Task 6's coverage edit (ruling R4), and
+the whole plan was replayed as fact 16 describes. This refresh is not a deviation from the plan: Task 7's banner and
+STATUS entry name only step text the executor itself has to change.
+
+### Pre-flight scan
+
+| Scope | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| Tasks 1 and 2 | Task 1's records (`TableRow` 8-argument, `TableRow.Heading`, `Table` 11-argument, `Tree` 7-argument, `ItemList` 16-argument) and accessors, used by `KitValues`, both descriptor walks and the two icon cases | Agree; compiled and passed together | R2 |
+| Tasks 1 and 3 | Model `TableRow.cellNodes()`, `heading()`, `Heading`; `TableVocabularyTest`'s constructors | Agree | R2 |
+| Tasks 1 and 4 | `Table.empty()`, `Table.emptyText()`, `ItemList.emptyText()` | Agree with rulings 5 and 6 | R2 |
+| Tasks 1 and 5 | `Tree.columns()`: `ViewSpec` caps values at `columns.size() - 1`, `Trees.trailingColumns` pads to the same number | Agree | R2 |
+| Tasks 1 and 6 | The contract's and fixture's constructors; `PluginContractTest`'s refusals rest on Task 1's record and `ViewSpec` checks | Agree | R3 |
+| Tasks 2 and 6 | `FakeKitView.java`: Task 2 edits `children` (`:112`), Task 6 `update`, `focus` and `reveal` (`:62`, `:73`, `:78`); Task 6's `dormant` finds the state through `index`, which needs Task 2's Table case. `KitContractTest.java`: Task 2 inside `descriptorIconCases` (`:231`), Task 6 appended at the end | Distinct anchors; order 2 before 6 is the plan's | R9 |
+| Tasks 3 and 4 | `Tables.java` (Task 3 replaces it; Task 4 inserts before the `keepsEnterWithoutFocus` Javadoc, which Task 3's file holds once); `InteractiveRows.java` (Task 3 `headingLayout` `:1175-1186`; Task 4 `:384`, `:401-403`, `:456-458`, `:769-796`); `ControlRegistry.java` (Task 3 `:20`; Task 4 `:65`); `TableVocabularyTest` (Task 4 appends) | Distinct anchors; Task 4 consumes Task 3's `TableControl` as written | R8, R13 |
+| Tasks 3 and 5 | `Trees.java` (Task 3 `validateDetail` `:35-41`; Task 5 from `:75`); `Tables.headerLabel(ControlRegistry.Control, String, Column)` produced by 3, called by 5 with `this, "@tree/", column` | Distinct anchors; signatures match | R2 |
+| Tasks 3, 4 and 5 with 6 | The gallery fixture draws every addition; the pixel rule rests on Tasks 3 to 5 leaving plain tables, lists, dropdowns and trees untouched | Agree; replayed gallery 157 of 159 files byte-identical per theme | R5 |
+| Tasks 4 and 6 | `ControlRegistry.children(Table)` mounts the state only without rows; the shared contract expects both runtimes to refuse focus and reveal into it while rows show, and Task 6 teaches the fake | Agree; host passes, fake fails until Task 6 Step 3 (replayed) | R9 |
+| Tasks 3, 4 and 5 (counts) | `TableVocabularyTest` grows 5, then 8, then 9; each Step 4 names that count | Agree | none |
+| Tasks 1 to 6 with 7 | Task 7 counts 5 + 1 + 1 + 9 + 1 + 2 + 2 = 21 new tests; its guide bullet describes Task 1's API | Agree | R6 |
+| Plan and 3e (parallel) | `docs/plugin-ui.md` and `docs/STATUS.md` (Task 7), `FakeKitView.java` (Tasks 2 and 6); `migration.csv` and `docs/plugin-authoring.md` untouched here | Reconciled when the second merges | R9 |
+| Task 1 alone | Files, Interfaces, the five SDK tests and one model test, the mirror snapshot (42 lines) and the commit's paths | Self-consistent | R2 |
+| Task 2 alone | Step 2's "table-cell-node create missing" follows from `descriptorIconCases` being a `LinkedHashMap` with the cell case first; Step 4's host claim holds because the renderer ignores cell nodes until Task 3 | Self-consistent | none |
+| Task 3 alone | Interfaces (`inCell`, `cell`, `cellInk`, `bare()`, `cellWidth()`, `textLead()`, `getForeground()`, `CellLayout`, `cellLead`, `headerLabel`, `countText`, `cellText`) match the script and the replacement file | Self-consistent | R10, R12, R13 |
+| Task 4 alone | Interfaces (`emptyLine`, `emptyText()`, `fillsViewport()`, `emptyLineHeight()`, `emptyLine()`) match; Files line numbers corrected | Self-consistent after R8 | R8 |
+| Task 5 alone | Interfaces (`header`, `countWidth`, `columnHeader()`, `rowPad()`, `trailingColumns`, `ColumnHeaderLayout`) match | Self-consistent | none |
+| Task 6 alone | `KitContractTest.tables` is public static and reused by `PluginContractTest`; Step 2's two expected failures replayed; the coverage test's walker | Self-consistent after R4; commit message rewrapped to 72 columns | R4, R15 |
+| Task 7 alone | The documentation tests that read the guide; the base count; STATUS insertion after line 2; the banner | Self-consistent after R6 and R7 | R6, R7, R16 |
+
+### Rulings
+
+- **R1.** Ruling: no rebase; the Workspace step that ran `git rebase main` is now an ancestry check of `149cd8fb9` —
+  why: the branch already sits on the merged base, and execution must not rebase or merge — cost if wrong: a base
+  missing a plan makes an edit script stop with its "expected N of" message, so nothing applies silently.
+- **R2.** Ruling: line numbers re-anchored to `149cd8fb9`; the scripts keep matching by quoted text, which held for every
+  edit — why: 3b and 3d moved `Nodes.java`, `ViewSpec.java`, `KitValues.java`, `FakeKitView.java`, `KitContractTest`,
+  `PluginContractTest`, `Choices.java`, `ControlRegistry.java`, `KitGallery.java` and `GalleryCoverageTest` — cost if
+  wrong: a stale number in prose only; a script stops on text, never on a number.
+- **R3.** Ruling: 3b's `ViewSpec.place` needs no change: a table's cell nodes and empty state become its collected
+  children and are placed under the Table, where neither the Notice nor the Separator rule fires, because `TableRow`
+  admits neither as a cell node; an INLINE cell stack keeps refusing a Separator although `place` would admit one in an
+  INLINE stack — why: spec 8.2's cell list is Text, StatusDot, Icon, Chip, an INLINE Stack of those, or a DROPDOWN
+  — cost if wrong: a plugin wanting a separator inside a cell is refused; admitting it later is additive.
+- **R4.** Ruling: Task 6's coverage test reuses 3b's `records` walker, extended with map values like `collect`, instead
+  of adding a third walker (`nodes`) — why: 3b's walker already collects every record (nodes included) for the same
+  kind of "has a real fixture" test; walking more records cannot break 3b's `anyMatch` assertions (replayed: both
+  pass) — cost if wrong: none for coverage; a nodes-only walk is a filter away.
+- **R5.** Ruling: the pixel rule stands as written; at the base the gallery has 74 fixtures and 159 files per theme, so
+  the new fixture changes `manifest.json` and `sheet-10.png` and adds no sheet; the comparison script's
+  `git merge-base HEAD main` stays `149cd8fb9` while the branch is not rebased, even if 3e lands on `main` — why:
+  replayed with `KitGallery.main` for both themes — cost if wrong: if `main` were merged into the branch first, the
+  base gallery would move with it, and the script would still compare the branch with its own base.
+- **R6.** Ruling: Task 7 expects 10,629 tests and 25 skipped (the base's 10,608 and 25, 3b's merged-branch line in
+  STATUS, plus 21) — why: `149cd8fb9` is the base and recorded that count — cost if wrong: a mismatch sends the
+  executor to the XML reports to find which suite gained or lost tests, which is the check's purpose.
+- **R7.** Ruling: Task 7 names `AppDocumentationTest` and `PluginUiExamplesTest` (jasper-app) as the readers of
+  `docs/plugin-ui.md`, not `UiDocumentationTest` — why: `UiDocumentationTest` reads jasper-ui's README, architecture,
+  maintenance and calibration documents only; the replay ran both readers against the edited guide — cost if wrong:
+  prose only.
+- **R8.** Ruling: fact 11 and Task 4's Files quoted the footer placement as `:443-444`; it is `:457-458` (with
+  `layoutAccessories` at `:459`), and was at `222969926` too — why: `InteractiveRows.java` is unchanged since then and
+  the line was misquoted — cost if wrong: none; Task 4's script anchors on the text.
+- **R9.** Ruling: plan 3e is not anticipated; Task 7 inserts its STATUS entry at the top and its guide bullet after
+  "Empty states" as written, and the `FakeKitView` edits of Tasks 2 and 6 stay as written; whichever of 3c and 3e merges
+  second reconciles `migration.csv`, `docs/STATUS.md`, the testkit fake, `docs/plugin-ui.md` and
+  `docs/plugin-authoring.md` — why: the two plans run in parallel worktrees by design — cost if wrong: a textual merge
+  conflict in those files at the second merge, resolved by keeping both sides.
+- **R10.** Ruling: the whole-file replacements of `TableRow.java` (both copies) and `Tables.java` are safe at the new
+  base: neither changed since `222969926`, and Task 3 Step 1's `git diff --stat` guard stays — why: verified with
+  `git diff --stat 222969926 HEAD` — cost if wrong: a later edit to either file would be lost; the guard catches it.
+- **R11.** Ruling: 3b's TABS, EXCLUSIVE 2-4 rule and `IconSize.SWATCH` and 3d's toolbar views, palette fields and
+  `DialogSpec.swatch` need nothing here: a cell admits only a DROPDOWN `Choice` (TABS, EXCLUSIVE and PICKER are
+  refused alike), toolbar views cannot hold tables, and the plan adds no enum constant, so
+  `everyNodeAndEnumVariantHasARealFixture` asks for nothing new — why: read against the merged code and replayed —
+  cost if wrong: a missed interaction surfaces in `./gradlew check`, which Task 7 runs.
+- **R12.** Ruling: `Choices.inCell` goes before `firstLineHeight` (`:33`), after 3b's `labelShown()` (`:32`); a cell
+  dropdown's label is hidden by the row's `embeddedLabel(true)` and `labelShown()` stays false there, so the bare face
+  and 3b's TABS label rule do not meet — why: replayed, `ChoicesTest` and `TableVocabularyTest` pass — cost if wrong: a
+  visible label inside a cell, caught by Task 3's tests and the gallery.
+- **R13.** Ruling: replacing the prefix `case Nodes.Table _, Nodes.Tree _,` leaves
+  `case Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}` after the new Table case — why:
+  3b's Separator and Properties stay leaves — cost if wrong: a compile error, caught at Task 3 Step 4.
+- **R14.** Ruling: on a machine shared with another plan's Gradle builds, a timing-sensitive test that fails once is
+  rerun alone before it counts as a failure (added to Task 7 Step 2) — why: the orchestrator's machine note — cost if
+  wrong: a flaky failure is retried once; a failure that repeats still fails the task.
+- **R15.** Ruling: Task 6's import edit adds only `Column`, `TableRow` and `TreeItem` to `PluginContractTest`; 3b
+  already imports `ControlState`, `Nodes`, `Option` and `ViewSpec` (`:38-41`), and the script computes the missing ones
+  — why: replayed — cost if wrong: a duplicate-import compile error, caught at Task 6 Step 2.
+- **R16.** Ruling: the STATUS entry and banner templates keep "2026-10-15"; Task 7 already tells the executor to use the
+  execution date, which will be 2026-10-16 or later — why: the template follows the plan's date — cost if wrong: a
+  wrong date in STATUS, a one-word fix.
