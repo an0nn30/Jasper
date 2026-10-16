@@ -1,5 +1,8 @@
 # Enterprise presentation 3c: SDK 0.18 tables Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-tables` (`d858e8f57..7ea713687`).** Deviations from this
+> plan's text: none beyond its "Planned deviations and rulings".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** SDK 0.18 gains spec 8.2's table vocabulary: `Tree.columns`, `TableRow.cellNodes` (with the borderless in-cell

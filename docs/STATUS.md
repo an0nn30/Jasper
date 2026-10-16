@@ -1,5 +1,34 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree
+`.claude/worktrees/enterprise-3c`, `d858e8f57..7ea713687`, then this documentation commit;
+[plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18 gains spec 8.2's table
+vocabulary, mirrored in the jasper-ui model, projected losslessly by `KitValues`, walked by both runtimes' descriptor
+walks, and carried by the shared kit and plugin contracts: `Tree.columns` (a header over the trailing values, header clicks report
+`Sorted`), `TableRow.cellNodes` (Text, StatusDot, Icon, Chip, an INLINE stack of those, or a DROPDOWN `Choice`; one
+content per column), `TableRow.heading` with `Heading` and `countNoun` ("6 groups"), `Table.empty` (one action at
+most) or `Table.emptyText`, and `ItemList.emptyText`. Every former constructor stays with the new components empty.
+The default look draws a cell node in its weighted column, the cell DROPDOWN bare (value then chevron, the face only
+on hover, focus or while open, the selection ink while bare), a heading row as a strong title with its muted count
+that keys, clicks and type-ahead never land on, the empty line, an empty table's state centred below its kept
+headers, and a column tree's header over right-aligned values with a reserved count column. Zero pixel change: the
+headless gallery's files for Slate Cobalt Dark and Light are byte-identical to the base but for `manifest.json`, the
+last contact sheet and the new `tables-0-18` fixture. Planned deviations and rulings (plan, "Planned deviations and
+rulings"): (1) the admission and refusal case is in `PluginContractTest`, the per-view behaviour in
+`KitContractTest`; (2) `cellNodes` iterates in
+column-id order; (3) a `countNoun` needs a count and is lowercase with no surrounding spaces, and a heading row has
+nothing but its heading; (4) a heading row is BODY_STRONG with a CAPTION count and no indent below it; (5) a table's
+`empty` is mounted only while it has no rows, and both runtimes refuse focus and reveal into it while rows show; (6)
+the empty line shows only with no items, one row tall (inside a filter-driven list's reserved rows), above an
+ItemList's add action; (7) tree columns right-align the values, pad missing ones and reserve the count column, and
+keycap-presented trees are plan 9's; (8) a muted row dims plain cells and Text cell nodes; (9) the cell dropdown is as
+wide as its selected plain value and its value starts under the column's title; (10) no README edit. Hand-offs: plan 4's classic faces draw the same descriptors
+(grid lines, the indent under headings, the mocks' header strip); plans 9 and 10 adopt them (Notifications, Keymap,
+Sessions, Tunnels, File Servers, SFTP, Add Host's keys); 3e owns the default-look changes of section 13.
+`./gradlew check --continue`: **10,629 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (no plugin or page uses the vocabulary
+yet). Not merged, not pushed.
+
 **Enterprise presentation, plan 3b: SDK 0.18 controls — 2026-10-16** (`claude/enterprise-sdk-0-18-controls`, worktree
 `.claude/worktrees/enterprise-3b`, `abf90c83a..2a4944861`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md),
