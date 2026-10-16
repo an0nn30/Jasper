@@ -194,6 +194,11 @@ public interface ContractHarness extends AutoCloseable {
 
         /** Contributed scopes as {@code id|label|verbIds}, in registration order. */
         List<String> scopes();
+        /**
+         * A registered scope's row presentation as {@code HUE|itemNoun|ROLE,ROLE}: its hue (NONE taken as the plugin's
+         * icon hue, NEUTRAL without one), its item noun (its label when it names none) and each verb's role, in order.
+         */
+        String scopePresentation(String scopeId);
         /** Registered file sources as {@code id|heading}, in registration order. */
         List<String> fileSources();
         /** Searches a scope from a window and optional pane, as {@code rowId|title|enabled}; later row lookups use this answer. */

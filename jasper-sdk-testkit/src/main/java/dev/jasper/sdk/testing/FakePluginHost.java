@@ -1472,6 +1472,22 @@ public final class FakePluginHost implements AutoCloseable {
                 + String.join(",", registered.spec().verbs().stream().map(PaletteVerb::id).toList())).toList();
         }
 
+        /**
+         * How a registered scope presents its rows where a presentation colours and labels them by scope, as
+         * {@code HUE|itemNoun|ROLE,ROLE}: its hue, NONE read as NEUTRAL (the fake reads no manifest {@code icon_hue});
+         * its item noun, or its label when it names none; and each verb's role, in order.
+         *
+         * @param scopeId a registered scope
+         * @return the presentation
+         * @since 0.18.0
+         */
+        public String scopePresentation(String scopeId) {
+            var spec = scope(scopeId).spec();
+            return (spec.hue() == dev.jasper.sdk.ui.Nodes.Hue.NONE ? dev.jasper.sdk.ui.Nodes.Hue.NEUTRAL : spec.hue()).name() + "|"
+                + (spec.itemNoun().isEmpty() ? spec.label() : spec.itemNoun()) + "|"
+                + String.join(",", spec.verbs().stream().map(verb -> verb.role().name()).toList());
+        }
+
         /** The ids of registered scopes the palette's All tab searches, in registration order. */
         public List<String> scopesInAll() {
             return scopes.values().stream().filter(registered -> registered.spec().inAll()).map(registered -> registered.spec().id()).toList();

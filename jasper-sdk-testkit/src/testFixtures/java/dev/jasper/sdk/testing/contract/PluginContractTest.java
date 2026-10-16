@@ -1435,6 +1435,29 @@ public abstract class PluginContractTest {
             assertThat(h.active("test.bare")).as("a contained registration failure does not fail the plugin").isTrue();
         }
 
+        /** SDK 0.18: a scope's hue, item noun and verb roles reach the host as the presentation will read them. */
+        @Test void aScopeCarriesItsHueItemNounAndSplitVerbToTheHost() {
+            var split = new PaletteVerb("split", "Open in a split pane", PaletteVerb.Role.SPLIT);
+            h.start(info("test.a", Capabilities.PALETTE_CONTRIBUTE), Set.of(), Set.of(), context -> {
+                context.palette().register(presented(ScopeSpec.of("test.a.hosts", "Hosts", "Search hosts", List.of(PASTE, split))
+                    .withHue(dev.jasper.sdk.ui.Nodes.Hue.GREEN).withItemNoun("session")));
+                context.palette().register(presented(ScopeSpec.of("test.a.plain", "Plain", "Search", List.of(PASTE))));
+            });
+            assertThat(h.scopes()).containsExactly("test.a.hosts|Hosts|paste,split", "test.a.plain|Plain|paste");
+            assertThat(h.scopePresentation("test.a.hosts")).isEqualTo("GREEN|session|STANDARD,SPLIT");
+            assertThat(h.scopePresentation("test.a.plain")).as("NONE takes the plugin's icon hue, NEUTRAL without one; no noun is the label")
+                .isEqualTo("NEUTRAL|Plain|STANDARD");
+        }
+
+        private static PaletteScope presented(ScopeSpec spec) {
+            return new PaletteScope() {
+                @Override public ScopeSpec spec() { return spec; }
+                @Override public PaletteResults search(String query, PaletteQuery context) { return PaletteResults.none(); }
+                @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery context) { }
+                @Override public Subscription onChanged(Runnable listener) { return () -> { }; }
+            };
+        }
+
         @Test void aScopeGetsItsOwnRowsAndHandlesBackAndAStepCanReopenAnotherScope() {
             UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "t");
             UUID pane = h.addTerminalPane(tab, "zsh", Path.of("/src"));

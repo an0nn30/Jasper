@@ -35,6 +35,43 @@ class PaletteValuesTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new PaletteVerb("paste", ""));
     }
 
+    /** SDK 0.18 (spec 8.2): a hue and an item noun for presentations that colour and label rows by scope. */
+    @Test void aScopeCarriesAHueAndAnItemNounAndAtMostOneSplitVariantAfterItsFirstVerb() {
+        var none = dev.jasper.sdk.ui.Nodes.Hue.NONE;
+        var green = dev.jasper.sdk.ui.Nodes.Hue.GREEN;
+        var split = new PaletteVerb("split", "Connect in split", PaletteVerb.Role.SPLIT);
+        ScopeSpec spec = ScopeSpec.of("dev.x.hosts", "Hosts", "Search hosts", List.of(PASTE, split));
+        assertThat(spec.hue()).isEqualTo(none);
+        assertThat(spec.itemNoun()).isEmpty();
+        var named = spec.withHue(green).withItemNoun("session").withDescription("Saved hosts").withInAll(false).withIcon(null)
+            .withMonospaceRows(true).withShortcutActionId("dev.x.open").withInRecents(false);
+        assertThat(named.hue()).as("derivations keep the hue").isEqualTo(green);
+        assertThat(named.itemNoun()).as("and the noun").isEqualTo("session");
+        assertThat(spec.withItemNoun("file server").itemNoun()).isEqualTo("file server");
+        assertThat(spec.withItemNoun("  ").itemNoun()).as("blank means the label").isEmpty();
+        assertThat(spec.withItemNoun(null).itemNoun()).isEmpty();
+        assertThat(new ScopeSpec("dev.x.old", "Old", "", "Search", List.of(PASTE), false, Optional.empty(), Optional.empty(), true, true).hue())
+            .as("the 0.9.2 constructor still works").isEqualTo(none);
+        assertThat(new ScopeSpec("dev.x.old", "Old", "", "Search", List.of(PASTE), false, Optional.empty(), Optional.empty(), true).itemNoun())
+            .as("and the 0.9.1 one").isEmpty();
+        assertThatIllegalArgumentException().as("lowercase").isThrownBy(() -> spec.withItemNoun("Session"));
+        assertThatIllegalArgumentException().as("no surrounding space").isThrownBy(() -> spec.withItemNoun(" session"));
+        assertThatIllegalArgumentException().as("no control characters").isThrownBy(() -> spec.withItemNoun("ses\tsion"));
+        assertThatIllegalArgumentException().as("short").isThrownBy(() -> spec.withItemNoun("s".repeat(41)));
+        assertThatNullPointerException().isThrownBy(() -> spec.withHue(null));
+        assertThatIllegalArgumentException().as("never the first verb")
+            .isThrownBy(() -> ScopeSpec.of("dev.x.hosts", "Hosts", "Search", List.of(split, PASTE)));
+        assertThatIllegalArgumentException().as("at most one").isThrownBy(() -> ScopeSpec.of("dev.x.hosts", "Hosts", "Search",
+            List.of(PASTE, split, new PaletteVerb("split_down", "Split down", PaletteVerb.Role.SPLIT))));
+    }
+
+    @Test void aVerbIsStandardUnlessMarkedSplit() {
+        assertThat(PASTE.role()).isEqualTo(PaletteVerb.Role.STANDARD);
+        assertThat(new PaletteVerb("split", "Split", PaletteVerb.Role.SPLIT).role()).isEqualTo(PaletteVerb.Role.SPLIT);
+        assertThat(new PaletteVerb("paste", "Paste")).isEqualTo(new PaletteVerb("paste", "Paste", PaletteVerb.Role.STANDARD));
+        assertThatNullPointerException().isThrownBy(() -> new PaletteVerb("split", "Split", null));
+    }
+
     @Test void rowsResultsAndStepsValidateLikeTheApplicationsOwn() {
         PaletteRow row = PaletteRow.of("r1", "Row").withDetail(" ").withTag("3 fields").withToken(42);
         assertThat(row.detail()).isEmpty();

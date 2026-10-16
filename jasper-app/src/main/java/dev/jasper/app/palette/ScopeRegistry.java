@@ -22,6 +22,9 @@ public final class ScopeRegistry implements AutoCloseable {
         if (PaletteScope.ALL_ID.equals(id)) throw new IllegalArgumentException("Reserved scope ID: " + id);
         if (scopes.containsKey(id)) throw new IllegalArgumentException("Duplicate scope: " + id);
         if (scope.verbs().isEmpty()) throw new IllegalArgumentException("Scope needs at least one verb: " + id);
+        if (scope.verbs().getFirst().role() == PaletteVerb.Role.SPLIT
+                || scope.verbs().stream().filter(verb -> verb.role() == PaletteVerb.Role.SPLIT).count() > 1)
+            throw new IllegalArgumentException("A scope's split verb follows its first verb, and it has at most one: " + id);
         scopes.put(id, scope);
         notifyListeners();
         return new Subscription(() -> {

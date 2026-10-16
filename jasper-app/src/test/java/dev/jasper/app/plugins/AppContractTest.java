@@ -416,6 +416,10 @@ class AppContractTest extends PluginContractTest {
                             return onEdtValue(() -> contributions.scopes().stream().map(scope -> scope.id() + "|" + scope.label() + "|"
                                 + String.join(",", scope.verbs().stream().map(dev.jasper.app.palette.PaletteVerb::id).toList())).toList());
                         }
+                        @Override public String scopePresentation(String scopeId) {
+                            return onEdtValue(() -> { var scope = scope(scopeId); return scope.hue().name() + "|" + scope.itemNoun() + "|"
+                                + String.join(",", scope.verbs().stream().map(verb -> verb.role().name()).toList()); });
+                        }
                         @Override public List<String> searchScope(String scopeId, String query, UUID windowId, UUID paneIdOrNull) {
                             return onEdtValue(() -> {
                                 var results = scope(scopeId).search(query, context(windowId, paneIdOrNull));

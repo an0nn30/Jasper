@@ -683,7 +683,7 @@ public final class PluginRuntime {
             for (var requirement : candidate.descriptor().requires())
                 (requirement.optional() ? optional : hard).add(requirement.id());
             PluginHost.Outcome outcome = created.start(new HostedPlugin(candidate.descriptor().info(), hard, optional,
-                candidate.descriptor().exports(), unit.loader(), unit::instantiate));
+                candidate.descriptor().exports(), unit.loader(), unit::instantiate, candidate.descriptor().iconHue()));
             statuses.add(PluginStatus.of(candidate, outcome.state(), outcome.reason()));
             if (outcome.state() == PluginStatus.State.SKIPPED)
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),

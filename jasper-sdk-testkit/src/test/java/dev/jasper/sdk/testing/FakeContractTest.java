@@ -64,6 +64,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public java.util.UUID addTerminalWindow() { return host.addTerminalWindow(); }
             @Override public java.util.UUID addTerminalTab(java.util.UUID windowId, String title) { return host.addTerminalTab(windowId, title); }
             @Override public List<String> scopes() { return host.scopes(); }
+            @Override public String scopePresentation(String scopeId) { return host.scopePresentation(scopeId); }
             @Override public List<String> fileSources() { return host.fileSources(); }
             @Override public List<String> searchScope(String scopeId, String query, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.searchScope(scopeId, query, windowId, paneIdOrNull); }
             @Override public boolean availableInScope(String scopeId, String rowId, String verbId, java.util.UUID windowId, java.util.UUID paneIdOrNull) { return host.availableInScope(scopeId, rowId, verbId, windowId, paneIdOrNull); }

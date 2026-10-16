@@ -10,12 +10,14 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class PaletteScopeModelTest {
-    static PaletteScope scope(String id) {
+    static PaletteScope scope(String id) { return scope(id, List.of(new PaletteVerb("run", "Run"))); }
+
+    static PaletteScope scope(String id, List<PaletteVerb> verbs) {
         return new PaletteScope() {
             @Override public String id() { return id; }
             @Override public String label() { return id; }
             @Override public String placeholder() { return "Search " + id; }
-            @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("run", "Run")); }
+            @Override public List<PaletteVerb> verbs() { return verbs; }
             @Override public PaletteResults search(String query, PaletteContext context) { return PaletteResults.none(); }
             @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) {}
             @Override public Subscription onChanged(Runnable listener) {
@@ -65,6 +67,24 @@ class PaletteScopeModelTest {
                 assertThat(registry.contains(first)).isFalse();
                 assertThat(registry.scopes()).extracting(PaletteScope::id).containsExactly("test.two");
                 assertThat(changes).hasSize(3);
+            }
+        });
+    }
+
+    /** Plan 3d: the registry keeps a split verb after the first and alone; an app scope is NEUTRAL and named by its label. */
+    @Test void theRegistryRefusesASplitVerbFirstOrTwiceAndScopesDefaultToNeutralAndTheirLabel() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var registry = new ScopeRegistry()) {
+                var plain = scope("a.plain");
+                assertThat(plain.hue()).isEqualTo(dev.jasper.ui.model.Nodes.Hue.NEUTRAL);
+                assertThat(plain.itemNoun()).isEqualTo("a.plain");
+                var run = new PaletteVerb("run", "Run");
+                var split = new PaletteVerb("split", "Split", PaletteVerb.Role.SPLIT);
+                assertThat(run.role()).isEqualTo(PaletteVerb.Role.STANDARD);
+                assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope("a.first", List.of(split, run))));
+                assertThatIllegalArgumentException().isThrownBy(() -> registry.register(scope("a.twice",
+                    List.of(run, split, new PaletteVerb("down", "Split down", PaletteVerb.Role.SPLIT)))));
+                registry.register(scope("a.ok", List.of(run, split))).close();
             }
         });
     }
