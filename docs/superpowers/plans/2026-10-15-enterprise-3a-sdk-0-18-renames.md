@@ -5,8 +5,7 @@
 > renamed the per-control prompt flag (`Control.prompt(boolean)`, its fields and `Forms`' local),
 > `IconRegistry.prompt(...)` and `FormFixtures.header(...)`, and `PromptVocabularyTest` also flags a bare `hero` called
 > with arguments or used as a boolean flag (four tests, so the totals are 10,508); the full `./gradlew check` runs were
-> the controller's, after each task's commit, because the environment denied an implementer's run. Otherwise none beyond
-> its "Planned deviations".
+> the controller's because the environment denied an implementer's run. Otherwise none beyond its "Planned deviations".
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
