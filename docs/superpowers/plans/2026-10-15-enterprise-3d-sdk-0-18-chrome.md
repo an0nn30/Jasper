@@ -1,7 +1,7 @@
 # Enterprise presentation 3d: SDK 0.18 chrome Implementation Plan
 
 > **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-chrome` (`d6210499e..9f7a43ae8`), then the documentation
-> commit and the final review's fixes.** Deviations from the spec, awaiting the user's approval: ruling 1 (toolbar view
+> commit and the final review's fixes.** Deviations from the spec, approved overnight by Claude under the user's authority and recorded in the spec: ruling 1 (toolbar view
 > admission at mount and on update, not at registration; spec 10.3 and 15) and ruling 6 (no dialog swatch in the
 > Windows and Linux FlatLaf title pane; spec 8.2). Deviations from this plan's text: none beyond its "Rulings", its
 > "Execution notes (2026-10-16)" and the review fixes' toolbar-view title bar route (`ThemeRoute.TITLE_BAR`).
@@ -196,7 +196,7 @@ the node", and section 15's row "A toolbar view's root breaks admission": "`Ille
 naming the node"). It needs the user's approval, or a spec amendment line, before this plan merges; the status banner
 and the STATUS entry record it as a deviation awaiting that approval.
 
-1. **Deviation (spec 10.3, 15; awaiting the user's approval): admission runs when the view is mounted, and on every
+1. **Deviation (spec 10.3, 15; approved 2026-10-16, spec amended): admission runs when the view is mounted, and on every
    update, not at registration.** `Toolbar.add` receives only a factory, so the tree exists only once a window asks for
    it: the host checks it when it mounts the factory's view (the refusal is contained like a throwing factory, logged
    against the plugin, the refused view closed and that window shows no view, so the plugin never receives the
@@ -213,7 +213,7 @@ and the STATUS entry record it as a deviation awaiting that approval.
 5. **`KitView.toolbarStrip` in the default look** presents icon-only menus as a title strip does, and keeps the kit's
    control height, which equals the default toolbar's button side (24 px); the toolbar centres the view at its
    preferred height. A classic toolbar density, if one is needed, is plan 4's or 6's.
-6. **Deviation (spec 8.2; awaiting the user's approval): the default look draws a swatch only in `MacTitleBar`'s window
+6. **Deviation (spec 8.2; approved 2026-10-16, spec amended): the default look draws a swatch only in `MacTitleBar`'s window
    or dialog title**, the one dialog title it draws
    itself; overlays draw no title, attached sheets have no title bar, and Windows and Linux dialogs carry the system's
    or FlatLaf's title bar, which count as native title bars ("a native title bar draws none").

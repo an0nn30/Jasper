@@ -22,7 +22,7 @@ noun the label; the app registry refuses a NONE hue); nothing draws them until p
 and `MacTitleBar.setTitleSwatch` draws it before a window or dialog title. The bundled scopes carry spec 14.6's nouns
 and hues and Remote's split verb is SPLIT. The testkit gains `FakePluginHost.toolbarViews`, `closeToolbarViews`,
 `scopePresentation` and `dialogSwatch`. Zero pixel change: no addition is a node, and the headless gallery's files for
-Slate Cobalt Dark and Light are byte-identical to the base. Deviations from the spec, awaiting the user's approval: (plan,
+Slate Cobalt Dark and Light are byte-identical to the base. Deviations from the spec, approved overnight by Claude under the user's authority and recorded in the spec: (plan,
 ruling 1; spec 10.3 and 15) admission runs when a window mounts the view (contained and logged, the refused view
 closed, no exception to the plugin) and on every update (an exception to the plugin), not at registration, since
 `Toolbar.add` sees only the factory; (plan, ruling 6; spec 8.2) on Windows and Linux the default look's dialogs carry
