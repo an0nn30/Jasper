@@ -161,6 +161,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * opens. EDT.
      */
     public java.util.function.BiConsumer<Path, Integer> onOpenFile = (file, line) -> { };
+    /**
+     * File › Open File…'s chooser: given the active pane's folder, the file the person chose, or empty when they cancelled.
+     * The application shows its file chooser over this window; by default nothing is chosen. EDT.
+     */
+    public java.util.function.Function<java.util.Optional<Path>, java.util.Optional<Path>> fileChooser = folder -> java.util.Optional.empty();
 
     /** Replays existing producers before returning; the listener receives later events until closed. */
     public Subscription activity(Consumer<WorkspaceActivity.Event> listener) {
@@ -667,6 +672,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void openWindowSettings() { if (openSettingsAt != null) openSettingsAt.accept("window"); }
     void reloadConfiguration() { reloadConfiguration.run(); }
     void requestNewWindow() { newWindow.accept(directory()); }
+    /** File › Open File…: {@link #fileChooser} from the active pane's folder, then the route a Cmd-click takes, at no line. */
+    void openFile() { fileChooser.apply(java.util.Optional.ofNullable(directory())).ifPresent(file -> onOpenFile.accept(file, 0)); }
     void requestQuit() { quit.run(); }
 
     CommandRegistry commands() { return commands; }
@@ -1432,7 +1439,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onThemeChanged = theme -> {};
         onTabHeightChanged = () -> {};
         onTitle = title -> {}; onError = (title, details) -> {}; onInfo = (title, details) -> {}; onLaunchFailure = (details, cause) -> {}; onMinimumSizeChanged = () -> {};
-        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {};
+        onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
         activityListeners.clear();
         anyWindowActive = () -> false;
     }

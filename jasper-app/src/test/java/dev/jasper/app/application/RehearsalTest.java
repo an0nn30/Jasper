@@ -515,12 +515,16 @@ class RehearsalTest {
 
     @Test void aSilencedWindowOpensNoFile() throws Exception {
         var opened = new CopyOnWriteArrayList<String>();
+        var chosen = new CopyOnWriteArrayList<Boolean>();
         edt(() -> {
             var content = DesktopTestSupport.content(launcher(new ArrayDeque<>()));
             content.onOpenFile = (file, line) -> opened.add(file + ":" + line);
+            content.fileChooser = folder -> java.util.Optional.of(java.nio.file.Path.of("chosen.txt"));
             Rehearsal.silence(content);
             content.onOpenFile.accept(java.nio.file.Path.of("notes.txt"), 3);
+            chosen.add(content.fileChooser.apply(java.util.Optional.empty()).isPresent());
         });
         assertThat(opened).isEmpty();
+        assertThat(chosen).as("the rehearsal's window shows no chooser").containsExactly(false);
     }
 }

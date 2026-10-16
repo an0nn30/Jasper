@@ -48,6 +48,7 @@ final class WindowCommands implements AutoCloseable {
             if (id == ActionId.SPLIT_RIGHT || id == ActionId.SPLIT_DOWN) continue;
             var keywords = new ArrayList<String>(); keywords.add(id.id().replace('_', ' '));
             keywords.addAll(switch (id) {
+                case OPEN_FILE -> List.of("open", "editor", "browse");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
                 case ZOOM_PANE -> List.of("maximize", "restore");

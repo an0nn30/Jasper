@@ -17,7 +17,7 @@ class KeyBindingsTest {
     @Test
     void actionCatalogCoversEveryPhaseOneActionAndUsesStableIds() {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
-            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.NEW_WINDOW,
+            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE,
             ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.CLOSE_PANE, ActionId.ZOOM_PANE,
             ActionId.TOGGLE_ZEN_MODE,
             ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
