@@ -40,6 +40,8 @@ import org.junit.jupiter.api.Test;
 class StaticDefaultTest {
     static final String METRICS = "dev/jasper/ui/metrics/DesignMetrics", ROLE = "Ldev/jasper/ui/metrics/DesignMetrics$Role;";
     static final String ANIMATION = "dev/jasper/app/config/AnimationSettings", DEFAULT_KIT = "dev/jasper/ui/kit/Kit.DEFAULT";
+    /** The classic base; until plan 5's kit parser names it, no production class reads it. */
+    static final String CLASSIC_KIT = "dev/jasper/ui/kit/Kit.CLASSIC";
     static final String PROBE = "dev/jasper/app/architecture/StaticDefaultTest$";
     /** How many calls deep a static initializer's calls are followed through the scanned classes. */
     static final int DEPTH = 4;
@@ -100,7 +102,7 @@ class StaticDefaultTest {
                     for (var element : code) {
                         if (element instanceof FieldInstruction field && field.opcode() == Opcode.GETSTATIC) {
                             String read = field.owner().asInternalName() + "." + field.name().stringValue();
-                            if (CATALOGS.contains(read) || read.equals(DEFAULT_KIT)) found.add(type + "." + name + ": " + read);
+                            if (CATALOGS.contains(read) || read.equals(DEFAULT_KIT) || read.equals(CLASSIC_KIT)) found.add(type + "." + name + ": " + read);
                         }
                         if (initializer && element instanceof InvokeInstruction call) {
                             String callee = call.owner().asInternalName() + "." + call.name().stringValue();
@@ -167,6 +169,7 @@ class StaticDefaultTest {
         var found = reads(Classes.of(files));
         assertThat(found.stream().filter(read -> read.equals(ANIMATION + ".<clinit>: " + METRICS + ".DEFAULT")))
             .as("the one allowed read, so the scan is live").hasSize(3);
+        assertThat(found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))).as("readers of Kit.CLASSIC").isEmpty();
         assertThat(found.stream().filter(read -> !read.startsWith(ANIMATION + ".<clinit>: ") && !read.endsWith(": " + DEFAULT_KIT)))
             .as("default-catalog reads and static metric finals outside the catalog").isEmpty();
         // A typed local: assertThat(stream.collect(toCollection(TreeSet::new))) is ambiguous among AssertJ's overloads.

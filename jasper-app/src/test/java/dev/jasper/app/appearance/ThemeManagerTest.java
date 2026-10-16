@@ -151,7 +151,7 @@ class ThemeManagerTest {
     /** The default kit with the split divider at 5. */
     private static Kit divider() {
         return new Kit("divider", Kit.DEFAULT.metrics().with(DesignMetrics.Role.NATIVE_SPLIT_DIVIDER, 5), Kit.DEFAULT.type(),
-            Kit.DEFAULT.faces(), Kit.DEFAULT.uiKeys());
+            Kit.DEFAULT.faces(), Kit.DEFAULT.controls(), Kit.DEFAULT.colors(), Kit.DEFAULT.uiKeys());
     }
 
     private static String hex(Color color) {
