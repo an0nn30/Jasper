@@ -91,6 +91,23 @@ class ViewSpecTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(notice), List.of(), List.of()))
             .withMessageContaining("Unsupported inline row node: Notice");
     }
+    /** Plan 3b (spec 8.2): properties hold one or more labelled values, their labels without a closing colon. */
+    @Test void propertiesNeedRowsAndLabelsWithoutAColon() {
+        var host = new PropertyRow("Host", "192.168.1.124", true);
+        assertThat(host.severity()).isEmpty();
+        assertThat(new Nodes.Properties("properties", ControlState.READY, "", List.of(host)).title()).isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> new Nodes.Properties("properties", ControlState.READY, "Properties", List.of()))
+            .withMessageContaining("at least one row");
+        assertThatIllegalArgumentException().isThrownBy(() -> new PropertyRow(" ", "x", false));
+        assertThatIllegalArgumentException().isThrownBy(() -> new PropertyRow("Host:", "x", false)).withMessageContaining("colon");
+        assertThat(new PropertyRow("Time (UTC:local)", "12:30", false).label()).isEqualTo("Time (UTC:local)");
+        assertThatNullPointerException().isThrownBy(() -> new PropertyRow("Host", null, false));
+        var properties = new Nodes.Properties("properties", ControlState.READY, "Properties — minecraft-local", List.of(host,
+            new PropertyRow("Credentials", "Vault locked", false, Optional.of(Severity.WARNING))));
+        assertThatCode(() -> new ViewSpec(new Nodes.Stack("detail", ControlState.READY, LayoutRole.VERTICAL, List.of(properties)))).doesNotThrowAnyException();
+        assertThatIllegalArgumentException().isThrownBy(() -> new ListItem("row", Optional.empty(), List.of(properties), List.of(), List.of()))
+            .withMessageContaining("Unsupported inline row node: Properties");
+    }
     @Test void choiceTableListAndTreeValidateReferencesAndUniqueIds() {
         assertThatThrownBy(() -> new ViewSpec(new Choice("pick", ControlState.READY, ChoiceKind.DROPDOWN,
             List.of(new Option("a", "A", Optional.empty())), "missing", "Choice", "choose")))

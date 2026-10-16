@@ -34,6 +34,7 @@ final class KitValues {
  case dev.jasper.sdk.ui.Nodes.Breadcrumbs n -> new dev.jasper.ui.model.Nodes.Breadcrumbs(n.id(), toModule(n.state()), n.crumbs().stream().map(KitValues::toModule).toList(), n.label(), n.editing(), n.value(), n.editAction(), n.submitAction(), n.cancelAction());
  case dev.jasper.sdk.ui.Nodes.Custom n -> new dev.jasper.ui.model.Nodes.Custom(n.id(), toModule(n.state()), n.contentId(), dev.jasper.ui.model.Nodes.CustomKind.valueOf(n.kind().name()), n.accessibleName());
  case dev.jasper.sdk.ui.Nodes.Separator n -> new dev.jasper.ui.model.Nodes.Separator(n.id(), toModule(n.state()));
+ case dev.jasper.sdk.ui.Nodes.Properties n -> new dev.jasper.ui.model.Nodes.Properties(n.id(), toModule(n.state()), n.title(), n.rows().stream().map(KitValues::toModule).toList());
  case dev.jasper.sdk.ui.Nodes.Notice n -> new dev.jasper.ui.model.Nodes.Notice(n.id(), toModule(n.state()), dev.jasper.ui.model.Nodes.Severity.valueOf(n.severity().name()), n.text(), n.actions().stream().map(KitValues::toModule).toList());
  }; }
  static dev.jasper.ui.model.ControlState toModule(dev.jasper.sdk.ui.ControlState n) { return new dev.jasper.ui.model.ControlState(n.visible(), n.enabled(), n.busy(), n.error()); }
@@ -45,6 +46,7 @@ final class KitValues {
  static dev.jasper.ui.model.TableRow toModule(dev.jasper.sdk.ui.TableRow n) { return new dev.jasper.ui.model.TableRow(n.id(), n.cells(), n.icon(), n.muted(), n.contextActions().map(items -> items.stream().map(KitValues::toModule).toList()), n.tooltip()); }
  static dev.jasper.ui.model.TreeItem toModule(dev.jasper.sdk.ui.TreeItem n) { return new dev.jasper.ui.model.TreeItem(n.id(), n.title(), n.icon(), n.leaf(), n.children().stream().map(KitValues::toModule).toList(), n.count(), n.emphasized(), n.tooltip(), n.status().map(KitValues::toModule), n.trailing(), n.contextActions().map(items -> items.stream().map(KitValues::toModule).toList())); }
  static dev.jasper.ui.model.Crumb toModule(dev.jasper.sdk.ui.Crumb n) { return new dev.jasper.ui.model.Crumb(n.id(), n.label(), n.contextActions().stream().map(KitValues::toModule).toList()); }
+ static dev.jasper.ui.model.Nodes.PropertyRow toModule(dev.jasper.sdk.ui.Nodes.PropertyRow n) { return new dev.jasper.ui.model.Nodes.PropertyRow(n.label(), n.value(), n.technical(), n.severity().map(s -> dev.jasper.ui.model.Nodes.Severity.valueOf(s.name()))); }
  static dev.jasper.ui.model.Nodes.Numeric toModule(dev.jasper.sdk.ui.Nodes.Numeric n) { return new dev.jasper.ui.model.Nodes.Numeric(n.min(), n.max(), n.step(), n.decimals()); }
  static dev.jasper.ui.model.Nodes.PickerFace toModule(dev.jasper.sdk.ui.Nodes.PickerFace n){return new dev.jasper.ui.model.Nodes.PickerFace(n.primary(),n.caption(),n.icon(),dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()),dev.jasper.ui.model.Nodes.PickerDensity.valueOf(n.density().name()),n.technicalCaption());}
  static dev.jasper.ui.model.Nodes.PickerItem toModule(dev.jasper.sdk.ui.Nodes.PickerItem n){return new dev.jasper.ui.model.Nodes.PickerItem(n.id(),n.label(),n.caption(),n.icon(),dev.jasper.ui.model.Nodes.Hue.valueOf(n.hue().name()),dev.jasper.ui.model.Nodes.PickerItemKind.valueOf(n.kind().name()));}

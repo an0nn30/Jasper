@@ -9,7 +9,7 @@ import java.util.Objects;
 /** Immutable, semantic view vocabulary; no pixel dimensions, delegates or secret values. */
 public final class Nodes {
     private Nodes() {}
-    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice {
+    public sealed interface Node permits Text, Icon, Button, MenuButton, StatusDot, Field, Secret, Choice, PickerMenu, Toggle, Chip, Progress, Strength, Stack, FormRow, SettingRow, Card, Section, Empty, ItemList, Header, Panel, Form, Split, Table, Tree, Breadcrumbs, Custom, Separator, Notice, Properties {
         String id();
         ControlState state();
     }
@@ -688,6 +688,37 @@ public final class Nodes {
         }
         /** A notice without an action. */
         public Notice(String id, ControlState state, Severity severity, String text) { this(id, state, severity, text, List.of()); }
+    }
+
+    /**
+     * One labelled value of {@link Properties}. {@code label} is not blank and does not end with a colon (the
+     * presentation punctuates it); {@code technical} draws the value in the data face; a present {@code severity}
+     * colours the value, held readable on its surface.
+     *
+     * @since 0.18.0
+     */
+    public record PropertyRow(String label, String value, boolean technical, Optional<Severity> severity) {
+        public PropertyRow {
+            ModelChecks.label(label, "label");
+            if (label.strip().endsWith(":")) throw new IllegalArgumentException("A property label carries no colon; the presentation punctuates it");
+            Objects.requireNonNull(value); Objects.requireNonNull(severity);
+        }
+        /** A value without a severity. */
+        public PropertyRow(String label, String value, boolean technical) { this(label, value, technical, Optional.empty()); }
+    }
+
+    /**
+     * A read-only list of labelled values, such as a selected host's properties. A blank {@code title} shows no heading.
+     *
+     * @since 0.18.0
+     */
+    public record Properties(String id, ControlState state, String title, List<PropertyRow> rows) implements Node {
+        public Properties {
+            ModelChecks.id(id); Objects.requireNonNull(state);
+            Objects.requireNonNull(title);
+            rows = List.copyOf(rows);
+            if (rows.isEmpty()) throw new IllegalArgumentException("Properties need at least one row");
+        }
     }
 
     public record Custom(String id, ControlState state, String contentId, CustomKind kind, String accessibleName) implements Node {

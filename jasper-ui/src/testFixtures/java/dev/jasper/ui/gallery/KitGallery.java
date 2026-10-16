@@ -100,6 +100,10 @@ public final class KitGallery {
             switch (severity) { case INFO -> "Changes apply when the server restarts"; case WARNING -> "Plain FTP sends the password unencrypted"; case DANGER -> "The folder no longer exists"; },
             severity == Nodes.Severity.DANGER ? List.of(new Nodes.Button("notice-choose", ControlState.READY, "Choose…", "", ButtonKind.SECONDARY, "choose", "")) : List.of()));
         result.add(new Fixture("notice-severities", "", "normal", 420, 170, new ViewSpec(new Nodes.Stack("notice-severities", ControlState.READY, LayoutRole.VERTICAL, notices))));
+        // Plan 3b (SDK 0.18): a selected host's properties, three data values and one with a severity.
+        result.add(new Fixture("properties", "", "normal", 320, 170, new ViewSpec(new Nodes.Properties("properties", ControlState.READY, "Properties — minecraft-local", List.of(
+            new Nodes.PropertyRow("Host", "192.168.1.124", true), new Nodes.PropertyRow("User", "dustin", true), new Nodes.PropertyRow("Port", "22", true),
+            new Nodes.PropertyRow("Credentials", "Vault locked", false, Optional.of(Nodes.Severity.WARNING)))))));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

@@ -27,7 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * (the connected dot in {@code PanelHeaders}, the status bar's configuration text and notification counts) keep
  * {@code PanelHostHeaderTest}, {@code ConfigurationStatusTest} and {@code NotificationCardTest}. The off switch, which
  * no guard repairs, is painted as authored. The default look declares no other pair for the controls it had (spec 7.3),
- * so they stay pixel-identical; SDK 0.18's Notice declares its own.
+ * so they stay pixel-identical; SDK 0.18's Notice and Properties declare their own.
  */
 @ExtendWith(EdtTestExtension.class)
 class PaintedContrastTest {
@@ -72,7 +72,14 @@ class PaintedContrastTest {
         new Declared("warning notice border", new PaintPair(DerivedColor.WARNING_BORDER, DerivedColor.WARNING_GROUND, SurfaceContrast.Guard.STRUCTURAL),
             (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.WARNING)),
         new Declared("error notice border", new PaintPair(DerivedColor.DANGER_BORDER, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.STRUCTURAL),
-            (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.DANGER)));
+            (theme, expected) -> noticeBorder(theme, expected, Nodes.Severity.DANGER)),
+        // Plan 3b: a property value coloured by its severity, held readable on the Properties card.
+        new Declared("information property value", new PaintPair(ACCENT, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.INFO)),
+        new Declared("warning property value", new PaintPair(STATUS_WARNING, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.WARNING)),
+        new Declared("error property value", new PaintPair(STATUS_DANGER, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
+            (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.DANGER)));
 
     /** The theme set, then the degenerate palettes. */
     private static List<GeneratedTheme> palettes() {
@@ -218,6 +225,17 @@ class PaintedContrastTest {
         try (var view = new KitView(context, spec, event -> { })) {
             KitFixtures.render(view, 400, 80, 1);
             return check.test(view);
+        } finally { context.icons().close(); context.binding().close(); }
+    }
+
+    /** A Properties row whose value has {@code severity}: the value label's colour. */
+    private static boolean propertyValue(GeneratedTheme theme, Color expected, Nodes.Severity severity) {
+        var context = KitFixtures.context(theme);
+        var spec = new ViewSpec(new Nodes.Properties("properties", ControlState.READY, "",
+            List.of(new Nodes.PropertyRow("Credentials", "Vault locked", false, Optional.of(severity)))));
+        try (var view = new KitView(context, spec, event -> { })) {
+            KitFixtures.render(view, 320, 80, 1);
+            return KitTestSupport.require(view, "properties.value.0", JLabel.class).getForeground().equals(expected);
         } finally { context.icons().close(); context.binding().close(); }
     }
 

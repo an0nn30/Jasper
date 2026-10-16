@@ -17,7 +17,7 @@ final class ControlRegistry {
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
-            case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _ -> {}
+            case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}
             case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _, Nodes.Notice _ -> children(node).forEach(ControlRegistry::validate);
         }
     }
@@ -52,6 +52,7 @@ final class ControlRegistry {
             case Nodes.Tree tree -> new Trees.TreeControl(view,tree);
             case Nodes.Breadcrumbs crumbs -> new BreadcrumbControls.BreadcrumbsControl(view, crumbs);
             case Nodes.Notice notice -> new Notices.NoticeControl(view, notice);
+            case Nodes.Properties properties -> new PropertyLists.PropertiesControl(view, properties);
             case Nodes.Separator separator -> new Separators.SeparatorControl(view, separator);
         };
     }
