@@ -40,7 +40,11 @@ these nodes the classic way (the classic Notice in its tinted box, Properties as
 fields on `surface.tableHeader`, the swatch's indicator guard, the footnote in the classic footer); 3c and 3d add their
 nodes to `KitValuesTest`'s list, which `classes` counts with the nodes inside stacks and form sections; 3d draws
 `DialogSpec.swatch` with its own `TitleSwatch` in `MacTitleBar`; both paint the `HUE_*` role at `ICON_CAPTION`, so
-reconcile them when the second of 3b and 3d merges. `./gradlew check --continue`: **10,563 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: in
+reconcile them when the second of 3b and 3d merges. `./gradlew check --continue`: **10,563 tests, 0 failures, 0 errors, 25 skipped**.
+Main (plan 3d) was then merged in (`e35ed11cd`), and `b935cb081` restored separators in toolbar views (3d's ruling R1) and
+gave 3d's refused EXCLUSIVE case the two options 3b's rule needs, leaving the `TitleSwatch` reconciliation as an optional
+follow-up; `./gradlew check --continue` on the merged branch: **10,608 tests, 0 failures, 0 errors, 25 skipped**. GUI
+checks for the user: in
 New File Server, choose TFTP and see "No login (TFTP has none)" as a read-only field in the Access card; nothing else
 visible changed in the shipped surfaces. Not merged, not pushed.
 
