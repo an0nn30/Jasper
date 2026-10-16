@@ -24,27 +24,27 @@ base's own relations.
 (sections 1, 3, 5.2 to 5.7, 6.1, 6.2, 6.5, 7.1 to 7.3, 16.1 and 19.1 row 4). The reference mocks are
 [`docs/design/enterprise/reference/`](../../design/enterprise/reference/) (2× PNGs; the mock wins on layout,
 DESIGN_LANGUAGE.md on intent). Plans 1 and 2 are merged on `main`; plan 2's `docs/STATUS.md` entry lists this plan's entry
-conditions, which Task 1 does first. Plans 3a to 3e merge to `main` before this plan executes; plans 4b, 4c and 5 follow
-it in that order.
+conditions, which Task 1 does first. Plans 3a, 3b and 3d are merged on `main` (`149cd8fb9`); plans 3c (tables) and 3e
+(default look) run in parallel in their own worktrees and are not on this branch, and 4a uses none of their APIs. Plans
+4b, 4c and 5 follow it in that order (4b and 4c on this branch).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-4`, branch
-`claude/enterprise-classic-catalog`. The branch was cut from `main` at `222969926` and holds only the three plan files.
-Before Task 1, bring it up to `main` and check the base:
+`claude/enterprise-classic-catalog`. The branch already contains `main` at `149cd8fb9` (3a, 3b and 3d merged) and adds
+the three plan files; do not rebase or merge. Before Task 1, check the base:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 149cd8fb9 HEAD && echo base-ok                                       # prints base-ok
 grep -c 'PROMPT_TILE_RADIUS' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java   # 3a: at least 1
 grep -c 'record Separator(' jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java             # 3b: 1
-grep -c 'cellNodes' jasper-ui/src/main/java/dev/jasper/ui/model/TableRow.java                   # 3c: at least 1
 grep -c 'SESSION' jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java                 # 3d: at least 1
 ```
 
 Each `grep -c` must print at least 1; if one prints 0, stop. Run every command from the worktree root, never in
-`~/projects/moray`. Every quoted anchor below is in its post-3a form (`PROMPT_*`, `EXCLUSIVE`, `HELP`, `prompt(boolean)`)
-and was read at `222969926` with 3a's renames applied (3a's branch head `deafed424`). Plans 3b to 3e edit some of the same
-files; the edit scripts replace text, not line numbers, and stop with a message when their text is not found the stated
-number of times. If a script stops, re-find the quoted text (it moves, it does not change) and re-run; never edit around
-a missing anchor. Line numbers in **Files** are from `222969926` and approximate.
+`~/projects/moray`. Every quoted anchor below was re-read at `149cd8fb9` on 2026-10-16 (Execution notes). Plans 3c and 3e
+edit some of the same files in other worktrees (3c: `InteractiveRows.java`); the edit scripts replace text, not line
+numbers, and stop with a message when their text is not found the stated number of times. If a script stops, re-find the
+quoted text (it moves, it does not change) and re-run; never edit around a missing anchor. Line numbers in **Files** are
+from `149cd8fb9`.
 
 ## Global Constraints
 
@@ -158,48 +158,54 @@ record them in `docs/STATUS.md` (Task 7) and in the banner when executed.
 
 ## Verified facts
 
-Read at `222969926`, with 3a's renames as on its branch head `deafed424`.
+Read at `222969926` with 3a's renames, and re-read at `149cd8fb9` (3a, 3b and 3d merged) on 2026-10-16; the line numbers
+are `149cd8fb9`'s.
 
 1. `DesignMetrics` is a final class over `int[] values` with `DEFAULT`, `with(Role, int)` and a private constructor; its
    enum ends `HISTORY_TITLE_GAP(5), HISTORY_CONTENT_GAP(2);` (`DesignMetrics.java:125`); `contentPadding` maps
    `PANEL_EMPTY_ACTION_HEIGHT, BUTTON_HEIGHT, PROMPT_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT,` and
    `PANEL_ACTION, INLINE_ACTION -> Role.BUTTON_VERTICAL_PADDING;` (`:159-160`); `contentHeight` is
-   `max(value(height), line + value(padding))` (`:143-146`), so a padding role is both sides' total.
+   `max(value(height), line + value(padding))` (`:165-168`), so a padding role is both sides' total.
 2. `compact-roles.tsv` is `ROLE\tvalue` per line in enum order, ending with a newline (560 lines); `DesignMetricsTest
-   .everyRoleHasItsCompactValue` reads it (`DesignMetricsTest.java:31-43`).
+   .everyRoleHasItsCompactValue` reads it (`DesignMetricsTest.java:32-44`).
 3. `TypeScale` is a final class over `float[] sizes, int[] weights, float base, float body` with `DEFAULT` and
    `withBody` (`TypeScale.java:11-37`); `Typography.Role` holds `declaredSize` and `declaredWeight` package-private
-   (`Typography.java:27-30`); `Typography.font` applies `TextAttribute.TRACKING, platformDefault && role ==
+   (`Typography.java:28-31`); `Typography.font` applies `TextAttribute.TRACKING, platformDefault && role ==
    Role.SECTION_LABEL ? .060f : .018f` in the Helvetica Neue medium branch (`Typography.java:84`). `default-type.tsv`
-   is `ROLE\tsize\tweight` (38 lines); `TypeScaleTest.defaultTable()` reads it (`TypeScaleTest.java:18-27`).
+   is `ROLE\tsize\tweight` (38 lines); `TypeScaleTest.defaultTable()` reads it (`TypeScaleTest.java:19-28`).
 4. `Kit` is the record `(String id, DesignMetrics metrics, TypeScale type, FaceSet faces, UiKeySet uiKeys)` with
    `DEFAULT` (`Kit.java:19-28`); its constructor is called (`grep -rn 'Kit(' | grep -E 'new (dev\.jasper\.ui\.kit\.)?Kit\('`)
    at `Kit.java:21`, `KitTest.java:22-35`, `KitContextTest.java:63`, `KitFixtures.java:27`, `ThemeManagerTest.java:153`,
    and fully qualified as `new dev.jasper.ui.kit.Kit(` at `HostedKitTest.java:58` and `WorkspaceMetricsTest.java:78`
-   (both jasper-app tests). Plans 3b to 3e add no caller.
+   (both jasper-app tests). 3b and 3d added no caller, and the 3c and 3e plans add none.
 5. `UiKeySet` is `{ DEFAULT }` (`UiKeySet.java:7-10`); `UiColorKeys.flatLaf(theme, set)` switches on it and fills
    `values(sources, palette, selection)` from a sealed `Source` of `Role`, `TextSelection`, `ErrorTint`
-   (`UiColorKeys.java:22-46`); `ui-color-keys.tsv` is `key\tSOURCE` after one `#` comment line (`UiColorKeysTest.java:17-27`).
-6. `FlatLafInstaller.install` puts `fixed.put("TextComponent.arc", control);` from `CONTROL_RADIUS` (`:61-62`).
+   (`UiColorKeys.java:20-46`); `ui-color-keys.tsv` is `key\tSOURCE` after one `#` comment line (`UiColorKeysTest.java:16-27`).
+6. `FlatLafInstaller.install` puts `fixed.put("TextComponent.arc", control);` from `CONTROL_RADIUS` (`:60-62`).
 7. The list, table and tree row floor is `ThemePainting.height(context(), DesignMetrics.Role.BUTTON_HEIGHT,
    Typography.Role.LABEL)` in `InteractiveRows.RowsControl.refresh` (`InteractiveRows.java:368-376`).
 8. `TextFields.FieldControl.refresh` sets `surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS :
-   DesignMetrics.Role.CONTROL_RADIUS;` (`TextFields.java:278`), and `FieldSurface` declares
-   `DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;` (`:369`);
-   secret fields paint through the same surface.
+   DesignMetrics.Role.CONTROL_RADIUS;` (`TextFields.java:300`), and `FieldSurface` declares
+   `DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;` (`:391`);
+   secret fields and the breadcrumb path field paint through the same surface with its default radius role, and the
+   picker's search surface sets `PICKER_SEARCH_RADIUS` itself (`PickerMenus.java:86`).
 9. `SurfaceContrast.painted(theme, pair)` is `pair.guard().apply(pair.slot().color(theme), pair.against().color(theme),
-   text.primary)` (`SurfaceContrast.java:92-95`); `Guard.apply` returns the colour when `holds` (`:73-79`).
+   text.primary)` (`SurfaceContrast.java:92-95`); `Guard.apply` returns the colour when `holds` (`:71-77`). Its
+   production callers are `Notices.java:76,118`, `Buttons.java:208` (a notice's link) and `PropertyLists.java:60`.
 10. The shipped themes' and converter fixtures' only translucent roles are `surface.scrim`, `border.subtle`,
     `text.onAccent.secondary` and `text.onSelection.secondary` (read from the JSON files); none is a slot or surface of
-    a declared default pair (`PaintedContrastTest.java:46-62`).
+    a declared default pair (`PaintedContrastTest.java:46-88`: 20 pairs since 3b, the Notice text, border and link
+    pairs on the derived grounds and the Properties values on `surface.card` among them; derived roles are opaque).
 11. `KitFixtures.custom()` keeps `base.derivedOverrides()` through `withSemantic` and `marked()` likewise
-    (`KitFixtures.java:31-41`, `:146-151`, `:166-170`); Catppuccin Latte authors overrides (plan 2 STATUS).
+    (`KitFixtures.java:30-40`, `:210-216`, `withSemantic` at `:110-113`); Catppuccin Latte authors overrides (plan 2
+    STATUS); Slate Cobalt authors none, so `custom()` and `marked()` are unchanged for their existing callers.
 12. `KitMatrixTest.underCustomNoFixturePaintsAColourOnlyAnotherThemeHas` retains every opaque pixel colour
-    (`KitMatrixTest.java:38-47`, `colours` at `:72-80`).
+    (`KitMatrixTest.java:37-46`, `colours` at `:70-78`).
 13. `StaticDefaultTest.CATALOGS` names `DesignMetrics.DEFAULT`, `TypeScale.DEFAULT` and `FaceSet.PLATFORM`, readable only
-    from `dev.jasper.ui.metrics` and `dev.jasper.ui.kit` (`StaticDefaultTest.java:45-46`, `owner` at `:59`).
-14. The gallery (`:jasper-ui:gallery`, `-Pjasper.galleryTheme=dark|light`) writes 142 files per theme before 3b; after
-    3b and 3c it writes the 3b and 3c fixtures too (their plans' pixel rules); this plan compares against its own base.
+    from `dev.jasper.ui.metrics` and `dev.jasper.ui.kit` (`StaticDefaultTest.java:47-48`, `owner` at `:59`).
+14. The gallery (`:jasper-ui:gallery`, `-Pjasper.galleryTheme=dark|light`) wrote 142 files per theme before 3b and
+    159 at `149cd8fb9` (3b's eight fixtures add 17; 3d adds none); 3c's fixture arrives only when 3c merges. This plan
+    compares against its own base.
 
 ### Mock measurements
 
@@ -270,8 +276,8 @@ base every later task compares against.
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/SurfaceContrast.java:88-95`
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:29-41,145-151`
-- Modify: `jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java:38-80`
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:30-40,210-216`
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java:41,48-55,70`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/theme/GuardSurfacesTest.java`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java` (one test appended)
 
@@ -453,8 +459,9 @@ PY
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.GuardSurfacesTest' --tests 'dev.jasper.ui.testsupport.KitFixturesTest' --tests 'dev.jasper.ui.gallery.KitMatrixTest' --continue`
 Expected: FAIL. `:jasper-ui:compileTestJava` stops with "cannot find symbol … method custom(GeneratedTheme)" in
-`KitFixturesTest` (and `marked(GeneratedTheme)`); once that compiles, `aTranslucentSlotIsMeasuredAsItShowsOverItsSurface`
-fails with "Expecting actual … not to be equal to" (the RGB-only guard returns the slot unchanged).
+`KitFixturesTest` (and `marked(GeneratedTheme)`), so no test runs; were it to compile,
+`aTranslucentSlotIsMeasuredAsItShowsOverItsSurface` would fail at "[a repair is opaque] expected: 255 but was: 48" (the
+RGB-only guard returns the translucent slot unchanged).
 
 - [ ] **Step 4: Measure translucent slots and add the fixture overloads**
 
@@ -554,7 +561,8 @@ Expected: PASS (`GuardSurfacesTest` 4 tests, `KitFixturesTest` 4, `KitMatrixTest
 - [ ] **Step 6: Run the default look's contrast suite**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS (the declared default pairs are opaque, so nothing they paint moved).
+Expected: PASS (the 20 declared default pairs, 3b's Notice and Properties pairs among them, are opaque, so nothing
+they paint moved).
 
 - [ ] **Step 7: Commit**
 
@@ -584,7 +592,8 @@ MSG
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java:125,159-160`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:368-376`, `jasper-ui/src/main/java/dev/jasper/ui/swing/TextFields.java:278,369`, `jasper-ui/src/main/java/dev/jasper/ui/swing/FlatLafInstaller.java:61-62`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/InteractiveRows.java:372` (one line of the `:368-376` call; 3c
+  edits the same file from `:382` on, so keep this edit to that line), `jasper-ui/src/main/java/dev/jasper/ui/swing/TextFields.java:300,391`, `jasper-ui/src/main/java/dev/jasper/ui/swing/FlatLafInstaller.java:62`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv` (34 rows appended)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java`
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/swing/FlatLafInstallerKitTest.java:21-25` (`other()` sets `FIELD_RADIUS` too; one test added),
@@ -818,7 +827,7 @@ and recomputes `FIELD_VERTICAL_PADDING` and `BUTTON_VERTICAL_PADDING` from spec 
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (after `with(Role, int)`; the `DEFAULT` field)
 - Create: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/classic-roles.tsv` (generated in Step 3)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/metrics/MetricTokensTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/ClassicCatalogTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:45-46` (the classic catalog is owner-only too)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:46-48` (the classic catalog is owner-only too)
 
 **Interfaces:**
 - Consumes: Task 2's roles.
@@ -991,6 +1000,8 @@ def edit(name, edits):
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 edit("jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java", [
+    ('''    /** Default catalogs that only their owners may read. */''',
+     '''    /** The catalogs that only their owners may read: the defaults and the classic base. */''', 1),
     ('''    static final Set<String> CATALOGS = Set.of(METRICS + ".DEFAULT", "dev/jasper/ui/metrics/TypeScale.DEFAULT",
         "dev/jasper/ui/metrics/FaceSet.PLATFORM");''',
      '''    static final Set<String> CATALOGS = Set.of(METRICS + ".DEFAULT", METRICS + ".CLASSIC", "dev/jasper/ui/metrics/TypeScale.DEFAULT",
@@ -1208,10 +1219,10 @@ The classic type scale is spec 5.6's 12-based table, with the calibrated roles o
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/TypeScale.java`, `jasper-ui/src/main/java/dev/jasper/ui/metrics/Typography.java:84`
 - Create: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/classic-type.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/ClassicTypeTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:45-46`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:47-48`
 
 **Interfaces:**
-- Consumes: nothing from other tasks.
+- Consumes: Task 3's text in `StaticDefaultTest.CATALOGS` (its edit script's anchor); no other task's code.
 - Produces: `public static final TypeScale TypeScale.CLASSIC` (base 12, body 12); `public boolean TypeScale.labelTracking()`
   (true for `DEFAULT`, false for `CLASSIC`, kept by `withBody`).
 
@@ -1581,6 +1592,9 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiKeySet.java", [
     /** The default keys with the classic look's overlay (headers, zebra rows, gradient buttons), frozen by ui-color-keys-classic.tsv. */
     CLASSIC''', 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java", [
+    (''' * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role; text selection in text''',
+     ''' * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role (or, in the classic
+ * set, a derived one); text selection in text''', 1),
     ('''    private sealed interface Source permits Role, TextSelection, ErrorTint {}
     private record Role(SemanticColor role) implements Source {}''',
      '''    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint {}
@@ -2210,7 +2224,7 @@ MSG
 ### Task 7: Documentation, STATUS and the whole build
 
 **Files:**
-- Modify: `docs/ui-architecture.md`, `docs/ui-maintenance.md`, `jasper-ui/README.md` (the smallest accurate edits)
+- Modify: `docs/ui-architecture.md:11-12`, `docs/ui-maintenance.md:46`, `jasper-ui/README.md:34-35` (the smallest accurate edits)
 - Modify: `docs/STATUS.md` (a new entry at the top)
 - Modify: this plan's status banner
 
@@ -2244,16 +2258,18 @@ Expected: `changed: none`.
 
 Read each document first and keep its voice. Make these edits (find the paragraph by its text; do not add sections):
 
-- `docs/ui-architecture.md`: where it describes `dev.jasper.ui.kit` and the instance metrics (plan 1's paragraph), add
-  one sentence: "A `Kit` also names its control variants (`ControlVariants`, the 14 control points) and colour slots
-  (`ColorSlots`); `Kit.CLASSIC` is the classic base, with `DesignMetrics.CLASSIC`, `TypeScale.CLASSIC` and the
-  `UiKeySet.CLASSIC` FlatLaf overlay. `MetricTokens` are the 11 public tokens a kit file tunes; `DesignMetrics.with(MetricTokens)`
-  moves each token's roles by its change from the base."
-- `docs/ui-maintenance.md`: where it names `compact-roles.tsv` and `default-type.tsv` as frozen tables, add
-  `classic-roles.tsv`, `classic-type.tsv` and `ui-color-keys-classic.tsv` to the same sentence, with "the classic
-  catalog's"; where it describes adding a metric role, add: "A new role is appended to `DesignMetrics.Role` and gets a
-  row in both `compact-roles.tsv` and `classic-roles.tsv`."
-- `jasper-ui/README.md`: where it lists the `kit` package, name `ControlVariants`, `ColorSlots` and `Kit.CLASSIC`.
+- `docs/ui-architecture.md`, the package table (`:11-12`): the `metrics` row's ownership cell becomes "Logical geometry
+  catalogs (`DesignMetrics`, `DEFAULT` and `CLASSIC`) and the 11 public `MetricTokens` a kit file tunes, type scales and
+  faces, central typography/motion roles"; the `kit` row's becomes "The look: `Kit` names a metric catalog, type scale,
+  faces, control variants (`ControlVariants`), colour slots (`ColorSlots`) and FlatLaf key set; `Kit.DEFAULT` is the
+  default look and `Kit.CLASSIC` the classic base".
+- `docs/ui-maintenance.md`: it names no frozen metric or type table; after the sentence ending "and `derived-roles.tsv`
+  in the same commit." (`:45-46`) add: "A new metric role is appended to `DesignMetrics.Role` with a row in
+  `compact-roles.tsv` and `classic-roles.tsv`; a change to the classic catalog, type scale or FlatLaf overlay edits
+  `classic-roles.tsv`, `classic-type.tsv` or `ui-color-keys-classic.tsv` in the same commit."
+- `jasper-ui/README.md` (`:34-35`): "a `Kit` (`Kit.DEFAULT`) of logical `DesignMetrics`, a `TypeScale` and a `FaceSet`"
+  becomes "a `Kit` (`Kit.DEFAULT`, and the classic base `Kit.CLASSIC`) of logical `DesignMetrics`, a `TypeScale`, a
+  `FaceSet`, `ControlVariants` and `ColorSlots`".
 
 - [ ] **Step 3: Write the STATUS entry**
 
@@ -2328,3 +2344,88 @@ Classic catalog: documentation and status
 Co-Authored-By: Claude <noreply@anthropic.com>
 MSG
 ```
+
+## Execution notes (2026-10-16)
+
+Pre-flight for `superpowers:subagent-driven-development`, run on `claude/enterprise-classic-catalog` at `5cd8c8c16`
+(`main` `149cd8fb9` with 3a, 3b and 3d merged, plus the three plan-4 files). Every anchor, quoted text, path, signature
+and line number above was re-read against that code, and the text above now carries the current ones. Evidence without
+Gradle: every edit script and file of Tasks 1 to 6 was replayed in order on a `git archive` copy of `HEAD` (each found
+its text the stated number of times); the patched jasper-ui (main, `testFixtures`, tests) compiled with the JBR's
+`javac -Xlint:all`, `javadoc -Xdoclint:all -Xdoclint:-missing` reported nothing on its main sources, the patched
+`StaticDefaultTest` compiled against it, and the AGENTS.md hygiene scan found no bad character; a JUnit launcher passed
+119 jasper-ui tests (`NewRolesTest`, `MetricTokensTest`, `ClassicCatalogTest`, `ClassicTypeTest`, `DesignMetricsTest`,
+`TypeScaleTest`, `TypographyTest`, `ControlVariantsTest`, `KitTest`, `GuardSurfacesTest`, `ClassicUiKeysTest`,
+`UiColorKeysTest`, `KitFixturesTest`, `FixtureKitsTest`, `FlatLafInstallerKitTest`, `SlateCobaltInstallTest`,
+`KitContextTest`, `TextFieldsTest`, `InteractiveRowsTest`, `TablesTest`, `TreesTest`, `KitMatrixTest`,
+`KnownRepairsTest`, `DerivedColorTest`); and `KitGallery.main` for Slate Cobalt Dark and Light wrote 159 files per theme,
+byte-identical between the unpatched and patched copies. Not run here: the jasper-app tests (`ThemeManagerTest`,
+`HostedKitTest`, `WorkspaceMetricsTest`, `StaticDefaultTest`, `PaintedContrastTest`), the architecture gates and
+`./gradlew check`; the executor's runs are the evidence for those.
+
+### Shared files and interfaces
+
+| Pair | What they share | Agree? | Ruling |
+|---|---|---|---|
+| Task 1 and Task 6 | `KitFixtures.java`: Task 1 rewrites `custom()` (`:30-40`) and `marked()` (`:210-216`); Task 6 replaces `kit(DesignMetrics)` (`:25-28`) and adds four methods after it | Yes: distinct anchors, either order applies | E3 |
+| Task 1 and Tasks 2, 7 | The gallery base `jasper-ui/build/plan4-base` (Task 1 Step 1), compared in Task 2 Step 5 and Task 7 Step 1 | Yes | E9 |
+| Task 2 and Task 3 | `DesignMetrics.java` (Task 2: enum tail `:125`, `contentPadding` `:160`; Task 3: the `DEFAULT` field `:21-22`, `declared()` `:132`, the `contentPadding` comment `:148`); `compact-roles.tsv`, which Task 3 reads to write `classic-roles.tsv`; `NewRolesTest.ADDED`, which `ClassicCatalogTest` reads | Yes, if Task 2 runs first (Task 3's Consumes says so) | E3 |
+| Task 2 and Task 6 | `ThemeManagerTest.java` (Task 2 `:103`, Task 6 `:153-154`) | Yes | E3 |
+| Task 3 and Task 4 | `StaticDefaultTest.CATALOGS`: Task 4's anchor is the text Task 3's script writes | No: Task 4 said it consumes nothing | E2 |
+| Tasks 3, 4 and Task 6 | `StaticDefaultTest` (Task 6 edits `:42`, `:103`, `:170`, which Tasks 3 and 4 leave alone); `MetricTokens` and `DesignMetrics.CLASSIC` read by `KitFixtures.enterpriseTokens()` and `enterprise()` | Yes | E3 |
+| Task 4 and Task 6 | `TypeScale.CLASSIC`, `withBody` keeping `labelTracking` (`KitTest.kitsCompareByValue` needs `DEFAULT.withBody(13)` equal to `DEFAULT`) | Yes | none |
+| Task 5 and Task 6 | `UiKeySet.CLASSIC` in `Kit.CLASSIC` and `enterprise()` | Yes | none |
+| Task 1 and Task 5 | `dev.jasper.ui.theme` tests: Task 5 Step 4 runs `dev.jasper.ui.theme.*`, Task 1's `GuardSurfacesTest` included | Yes | none |
+| Task 2 and plan 3c (parallel) | `InteractiveRows.java`: 4a changes line 372 only; 3c's nearest anchor is `measureRows();` at `:382` | Yes: a three-way `git merge-file` of 4a's change with 3c's insertion there has no conflict | E1 |
+| This plan and plans 3c, 3e (parallel) | `docs/STATUS.md`, `KitFixtures.java`, `compact-roles.tsv`, `migration.csv` | Yes: neither plan adds a metric role or edits `KitFixtures`; 4a adds no `migration.csv` row | E10 |
+| This plan and plans 4b, 4c | 4b and 4c consume `Kit.controls()`, `Kit.colors()`, `ControlVariants.of`/`keys()`, `ColorSlots`, `KitFixtures.enterprise()`/`complement()`/`withControls`, `KitMatrixTest.areas` and the new roles | Yes: each is produced here under that name | none |
+
+### Each task against itself
+
+| Task | Finding | Ruling |
+|---|---|---|
+| 1 | Step 3's expected message was the third assertion's; the first to fail is the alpha check, and the compile failure means no test runs. Step 6's "the declared default pairs" are now 20 (3b's Notice and Properties pairs), all opaque | E4, E5 |
+| 1 | `SurfaceContrast.flat` repeats `DerivedPalette`'s private `flat` (`:127-129`) | E6 |
+| 2 | Anchors and counts hold (34 rows, 32 classic-only roles, `FlatLafInstallerKitTest` 4 then 5 tests). `FieldSurface`'s default radius role also serves `SecretFields` and `BreadcrumbControls` | E7 |
+| 3 | Anchors hold; `MetricTokensTest` 6 and `ClassicCatalogTest` 2 pass on the replay. The `CATALOGS` field comment said "Default catalogs" | E8 |
+| 4 | Consumes line (see the pair table); `ClassicTypeTest` 3 passes | E2 |
+| 5 | Anchors hold; the `UiColorKeys` class comment said every key is "from a semantic role" | E8 |
+| 6 | Anchors hold; the seven constructor-calling files are as listed; `ControlVariantsTest` 3, `KitTest` 4, `FixtureKitsTest` 2 pass on the replay | none |
+| 7 | `docs/ui-maintenance.md` names no frozen metric or type table and has no "adding a metric role" paragraph; `docs/ui-architecture.md` describes the kit in its package table, not a plan-1 paragraph | E9 |
+| Workspace | `git rebase main` is not allowed and not needed (the branch contains `149cd8fb9`); the 3c `cellNodes` check would print 0 | E1 |
+
+### Rulings
+
+- **E1. No rebase; check the base by ancestry; drop the 3c check; keep the `InteractiveRows` edit to its one line** —
+  the branch already contains `main` `149cd8fb9`, rebasing is forbidden in this run, and 3c runs in parallel; 4a uses no
+  3c or 3e API (none of `TableRow.cellNodes`, 3c's empty lines or 3e's copy), and 4a's change at `:372` merges cleanly
+  with 3c's insertion at `:382` — cost if wrong: one manual hunk when 3c and 4a meet, or a compile error naming the 3c
+  symbol.
+- **E2. Task 4 runs after Task 3 and names Task 3's `StaticDefaultTest` text as consumed** — its script's anchor is the
+  `CATALOGS` text Task 3 writes; order 1 to 7 already holds it — cost if wrong: Task 4's script stops on the missing
+  anchor before writing anything.
+- **E3. Tasks run in order 1 to 7, one commit each, as written** — every shared file's anchors are disjoint or ordered,
+  and the replay applied them in that order — cost if wrong: a script stops on a missing anchor.
+- **E4. Task 1 Step 3 expects only the compile failure; the translucent test's would-be message is the alpha check's**
+  — the test checks `getAlpha()` before inequality — cost if wrong: an executor misreads a correct red step.
+- **E5. Rulings 2 still leaves the default look unchanged after 3b** — 3b's twelve new declared pairs (Notice text, border
+  and link on `info`/`warning`/`danger.ground`, Properties values on `surface.card`) and their production callers
+  (`Notices`, `Buttons`, `PropertyLists`) paint opaque slots on opaque roles in every theme of the set (derived roles are
+  opaque; the only translucent roles are `surface.scrim`, `border.subtle`, `text.onAccent.secondary` and
+  `text.onSelection.secondary`); the replayed gallery is byte-identical — cost if wrong: Task 2 Step 5 reports the
+  changed files.
+- **E6. `SurfaceContrast.flat` is added beside `DerivedPalette`'s private `flat`, which stays** — 4a's edits stay in
+  the files it names, and the two differ (`SurfaceContrast`'s makes a translucent `under` opaque first) — cost if wrong:
+  two three-line helpers to fold together later.
+- **E7. `FIELD_RADIUS` moves every `FieldSurface` that keeps its default radius role (text, secret and breadcrumb
+  fields), and not the picker's search surface** — they are fields, as spec 5.4's `field_radius` names; under
+  `Kit.DEFAULT` the value is today's — cost if wrong: 4b sets the breadcrumb surface's role to `CONTROL_RADIUS`.
+- **E8. Two comments made inaccurate by the new values are corrected in the same scripts** — Task 3 renames the
+  `StaticDefaultTest.CATALOGS` comment ("the defaults and the classic base") and Task 5 says the classic set also
+  fills keys from derived roles (AGENTS.md: documentation stays accurate, smallest edit) — cost if wrong: none.
+- **E9. Task 7's documentation edits target the text that exists** — the two `docs/ui-architecture.md` table cells,
+  one sentence after `docs/ui-maintenance.md`'s derived-role sentence, and the `Kit` sentence of `jasper-ui/README.md`;
+  the gallery base is 159 files per theme here — cost if wrong: wording only.
+- **E10. Shared files are reconciled at merge, not here** — `docs/STATUS.md` gets 4a's entry at the top as Task 7 says;
+  `compact-roles.tsv` gains 34 rows that 3c and 3e do not touch; `migration.csv` gains no row (no new candidate source
+  under jasper-app, the SDK, the testkit or plugins) — cost if wrong: a textual conflict in STATUS at merge.
