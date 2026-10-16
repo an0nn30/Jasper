@@ -5,6 +5,7 @@ plugins {
 dependencies {
     testImplementation(testFixtures(project(":jasper-buddy")))
     implementation(project(":jasper-ui"))
+    testImplementation(testFixtures(project(":jasper-ui")))
     implementation(project(":jasper-terminal"))
     implementation(project(":jasper-buddy"))
     implementation(project(":jasper-sdk"))
