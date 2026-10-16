@@ -22,9 +22,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Spec 16.1.2 for the default look: each pair it repairs today is declared with its guard and painted as the guard makes
- * it, over the theme set and the eight degenerate palettes; the off switch, which no guard repairs, is painted as
- * authored. The default look declares no other pair (spec 7.3), so it stays pixel-identical.
+ * Spec 16.1.2 for the default look: each pair it repairs that public API reaches is declared with its guard and painted
+ * as the guard makes it, over the theme set and the eight degenerate palettes; the three repairs it does not reach
+ * (the connected dot in {@code PanelHeaders}, the status bar's configuration text and notification counts) keep
+ * {@code PanelHostHeaderTest}, {@code ConfigurationStatusTest} and {@code NotificationCardTest}. The off switch, which
+ * no guard repairs, is painted as authored. The default look declares no other pair (spec 7.3), so it stays
+ * pixel-identical.
  */
 @ExtendWith(EdtTestExtension.class)
 class PaintedContrastTest {

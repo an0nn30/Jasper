@@ -98,6 +98,7 @@ tasks.test {
     systemProperty("jasper.uiJar", project(":jasper-ui").layout.buildDirectory.file("libs/jasper-ui.jar").get().asFile.absolutePath)
     val configExample = rootProject.layout.projectDirectory.file("config.example.toml")
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.file("tools/themes/testdata/expected")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.file("docs/design/theme-engine/migration.csv")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.fileTree("docs/design/theme-engine/before-f16ae32f")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.layout.projectDirectory.file("docs/configuration.md")).withPathSensitivity(PathSensitivity.RELATIVE)

@@ -30,7 +30,15 @@ Java loader accepts override keys in any order, the converter writes and checks 
 counts only keys the theme or its plugin's parents set, and lays translucent values over `surface.app` or
 `surface.card`; (7) `KitGallery.main` splits into `installed` and `capture`. For plan 7's review: Slate Cobalt Dark's
 active header (#232B3C) comes out darker than its inactive header (#2D3036), as `apart` moves toward black, and each
-Catppuccin flavour authors one colour for both headers. `./gradlew check --continue`: **10,500 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the
+Catppuccin flavour authors one colour for both headers. That active header is also only about 2.4 L* from `surface.app`
+(#23262C), because `SurfaceContrast.apart` moves toward black whenever the reference is at least the distance in L*;
+settle the direction rule before plan 5 derives Enterprise Dark and before plan 7. After regeneration each Catppuccin
+flavour's `warning.border` equals its `warning.ground` (1.00:1), so the Notice and pill border needs a guard when plan
+3's Notice card or plan 4's faces paint it. Plan 4 starts by deciding how guards treat translucent slots (they measure
+RGB only, as `SurfaceContrast.on` does), making `KitMatrixTest`'s literal check count an area rather than single
+anti-aliased pixels, tinting or dropping authored overrides in the `custom()` and `marked()` colour fixtures, adding a
+test where the STRUCTURAL boundary guard engages, and moving the three package-test repairs of (1) onto the
+default faces. `./gradlew check --continue`: **10,500 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the
 user: none new (nothing visible changed). Not merged, not pushed.
 
 **Enterprise presentation, plan 1: the kit seam — 2026-10-15** (`claude/enterprise-presentation`, worktree

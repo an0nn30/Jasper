@@ -84,7 +84,7 @@ Record each of these in `docs/STATUS.md` (Task 8) and in this plan's status bann
    `Kit.DEFAULT` over the theme set and checks that under `custom()` no pixel has a colour only another theme has (the
    literal check). The marked-pixel mapping is stated for classic pixels and arrives with the classic faces, as do the
    complement kit, the covering array and the classic frozen tables (plan 4); `GalleryCoverageTest` is
-   kit-independent and stays as it is; `derived-roles.tsv` is frozen by `DerivedPaletteTest`.
+   kit-independent and stays as it is; `derived-roles.tsv` is frozen by `DerivedRolesTableTest`.
 4. **Recipe details spec 7.1 leaves open.** A translucent input is laid over the surface its recipe mixes it with
    first; `border.window′` and `border.control′` are guarded on `surface.card` toward `text.primary`; "closer to
    `surface.card` than `surface.tableHeader`" falls back to halfway between the table header and the card when the
