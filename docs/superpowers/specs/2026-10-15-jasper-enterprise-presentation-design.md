@@ -1,7 +1,7 @@
 # Jasper Enterprise presentation
 
 Status: **Approved on 2026-10-15** (the user: "The spec is approved; left-aligned colon labels and keeping Form.hero are fine.").
-Amended on 2026-10-16 for the second mock set (reference folders 07 to 10) under the user's overnight instruction "make
+Amended late on 2026-10-15 for the second mock set (reference folders 07 to 10) under the user's overnight instruction "make
 decisions on my behalf": 5.1, 5.2, 5.9, 7.6, 8.2, 9.1, 10.8, 10.11, 14.1, 14.3, 14.6, 14.8, 16.2, 18 and 19.1.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
