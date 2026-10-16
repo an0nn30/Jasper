@@ -17,7 +17,8 @@ final class ControlRegistry {
             case Nodes.Chip ignored -> {} case Nodes.StatusDot ignored -> {} case Nodes.Progress ignored -> {} case Nodes.Strength ignored -> {}
             case Nodes.MenuButton ignored -> {}
             case Nodes.ItemList n -> { for(var item:n.items()) { item.leading().ifPresent(ControlRegistry::validate); item.title().forEach(ControlRegistry::validate); item.subtitle().forEach(ControlRegistry::validate); item.trailing().forEach(ControlRegistry::validate); } n.addAction().ifPresent(ControlRegistry::validate); }
-            case Nodes.Table _, Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}
+            case Nodes.Table n -> { for (var row : n.rows()) row.cellNodes().values().forEach(ControlRegistry::validate); n.empty().ifPresent(ControlRegistry::validate); }
+            case Nodes.Tree _, Nodes.Breadcrumbs _, Nodes.Separator _, Nodes.Properties _ -> {}
             case Nodes.Panel _, Nodes.Header _, Nodes.Stack _, Nodes.FormRow _, Nodes.SettingRow _, Nodes.Card _, Nodes.Section _, Nodes.Empty _, Nodes.Form _, Nodes.Split _, Nodes.Notice _ -> children(node).forEach(ControlRegistry::validate);
         }
     }

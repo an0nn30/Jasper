@@ -30,6 +30,16 @@ final class Choices {
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
         /** A TABS choice is labelled by its tabs; its label stays the accessible name. */
         boolean labelShown() { return !embedded && ((Nodes.Choice)node).kind() != Nodes.ChoiceKind.TABS; }
+        /**
+         * A DROPDOWN in a table cell (its row sets this on every populate): bare until hovered, focused or open, as wide
+         * as its value and chevron, and while bare on a selected row its value and chevron take {@code ink}; null off one.
+         */
+        void inCell(InteractiveRows.Ink ink) {
+            if (!(input instanceof ChoiceCombo combo) || combo.cell && combo.cellInk == ink) return;
+            combo.cell = true;
+            combo.cellInk = ink;
+            component.revalidate(); component.repaint();
+        }
         @Override int firstLineHeight() { return input.getHeight() > 0 ? input.getY() + input.getHeight() : input.getPreferredSize().height; }
         boolean applying;
         ChoiceControl(KitView view, Nodes.Choice node) {
@@ -72,6 +82,7 @@ final class Choices {
             if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo, combo, view); own(combo.focus); }
             var container = (JPanel)component;
             if (input instanceof SegmentTrack) container.setLayout(new SegmentColumn());
+            else if (node.kind() == Nodes.ChoiceKind.DROPDOWN) { container.setLayout(new CellLayout((ChoiceCombo) input)); container.putClientProperty(CellLayout.class, input); }
             container.setOpaque(false); container.add(label, BorderLayout.NORTH); container.add(input, BorderLayout.CENTER); container.add(error, BorderLayout.SOUTH);
             label.setLabelFor(input); refresh();
         }
@@ -279,11 +290,37 @@ final class Choices {
         }
     }
 
+    /**
+     * How far a table cell reaches back into the column gap so a cell dropdown's value starts under its column's title:
+     * the dropdown's text inset while it is in a cell, else 0 (every other cell, and every header title).
+     */
+    static int cellLead(Component cell) {
+        return cell instanceof JComponent panel && panel.getClientProperty(CellLayout.class) instanceof ChoiceCombo combo && combo.cell ? combo.textLead() : 0;
+    }
+    /** A choice's label, input and error, where a cell dropdown keeps its own width, centred on the line it is given. */
+    static final class CellLayout extends BorderLayout {
+        final ChoiceCombo combo;
+        CellLayout(ChoiceCombo combo) { this.combo = combo; }
+        @Override public void layoutContainer(Container parent) {
+            super.layoutContainer(parent);
+            if (!combo.cell) return;
+            var size = combo.getPreferredSize();
+            int height = Math.min(combo.getHeight(), size.height);
+            combo.setBounds(combo.getX(), combo.getY() + (combo.getHeight() - height) / 2, Math.min(combo.getWidth(), size.width), height);
+        }
+    }
     static class ChoiceCombo extends JComboBox<Option> {
         final KitContext context; ThemePainting.Focus focus; KitComboPopup popup; int settingsWidth; boolean compactHeight;
         /** A DROPDOWN's rich closed face (its owner keeps it describing the selected option); null paints the value. */
         Nodes.PickerFace face;
         boolean hover;
+        /** In a table cell (set by {@link ChoiceControl#inCell}); the ink of its selected row while it is bare, else null. */
+        boolean cell;
+        InteractiveRows.Ink cellInk;
+        /** A cell dropdown shows only its value and chevron until it is hovered, focused or open. */
+        boolean bare() { return cell && !hover && !(focus != null && focus.visible()) && !isPopupVisible(); }
+        /** The closed value is painted in the combo's foreground (BasicComboBoxUI), so a bare value on a selected row takes the row's ink here. */
+        @Override public Color getForeground() { return bare() && cellInk != null ? ThemePainting.color(context, cellInk.text) : super.getForeground(); }
         /** A rich value's trailing chevron lane; a Settings dropdown's lane also holds the gap before its chevron. */
         int arrowWidth() { return ThemePainting.metric(context, settingsWidth > 0 ? DesignMetrics.Role.SETTINGS_CHOICE_ARROW : DesignMetrics.Role.CHOICE_ARROW_WIDTH); }
         ChoiceCombo(KitContext context) {
@@ -322,7 +359,7 @@ final class Choices {
                         // The dropdown chevron shares the picker face's measured glyph and trailing inset; a Settings dropdown
                         // sets it at a fixed distance from its own arrow lane's trailing edge.
                         boolean settings = settingsWidth > 0;
-                        var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
+                        var icon = context.icons().icon("chevron.down", context.theme().semantic(), bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY,
                             ThemePainting.metric(context, settings ? DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON : DesignMetrics.Role.CHOICE_CHEVRON));
                         int beyond = comboBox.getWidth() - getX() - getWidth();
                         int x = settings ? getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth()
@@ -354,7 +391,7 @@ final class Choices {
             var size = super.getPreferredSize();
             int height = face != null ? ThemePainting.height(context, DesignMetrics.Role.PICKER_DEFAULT_HEIGHT, Typography.Role.BODY)
                 : ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);
-            return new Dimension(settingsWidth>0?settingsWidth:Math.max(size.width, naturalWidth()), compactHeight && face == null ? height : Math.max(size.height, height));
+            return new Dimension(settingsWidth>0?settingsWidth:cell && naturalWidth() > 0 ? cellWidth() : Math.max(size.width, naturalWidth()), compactHeight && face == null ? height : Math.max(size.height, height));
         }
         /**
          * The width a dropdown at its natural size needs to show its longest plain option whole: the value's padding on
@@ -373,6 +410,18 @@ final class Choices {
             return insets.left + insets.right + text + 2 * ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
                 + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
         }
+        /** A cell dropdown's width: its selected value (or the placeholder), then the chevron, so the chevron follows the value. */
+        int cellWidth() {
+            var metrics = getFontMetrics(ThemePainting.font(context, Typography.Role.BODY));
+            String value = getSelectedItem() instanceof Option selected ? selected.label() : "Choose…";
+            var insets = getInsets();
+            return insets.left + insets.right + metrics.stringWidth(value) + 2 * ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
+                + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
+        }
+        /** Where the closed value's text starts inside the combo: its border inset, then the renderer's padding. */
+        int textLead() {
+            return getInsets().left + ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+        }
         @Override public void paint(Graphics graphics) {
             if (face != null) {
                 // The rich face is the whole closed control: tile, primary, caption and chevron; the popup lists the options.
@@ -382,6 +431,7 @@ final class Choices {
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
         @Override protected void paintComponent(Graphics graphics) {
+            if (bare()) { super.paintComponent(graphics); return; }
             var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL), ThemePainting.color(context, SemanticColor.BORDER_CONTROL), focus != null && focus.visible(), false); super.paintComponent(g); } finally { g.dispose(); }
         }
     }

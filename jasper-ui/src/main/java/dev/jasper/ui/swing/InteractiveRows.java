@@ -1172,17 +1172,21 @@ final class InteractiveRows {
             trailing.doLayout();
         }
 
-        /** A heading shows only its title, inset like the rows below it. */
+        /** A heading shows its title, inset like the rows below it, and a table heading's count at the row's end. */
         void headingLayout() {
             int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
-            trailing.setBounds(0, 0, 0, 0);
             // An identity list's heading sits low in its band, close to the rows it introduces.
             int line = owner.identityRows() ? Math.min(getHeight(), title.getPreferredSize().height) : getHeight();
             int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
-            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad), line);
+            // Only a table heading has trailing content (its count); a list heading has a title only.
+            int tw = trailing.getComponentCount() == 0 ? 0 : Math.min(trailing.getPreferredSize().width, Math.max(0, getWidth() - 2 * pad));
+            if (tw == 0) trailing.setBounds(0, 0, 0, 0);
+            else trailing.setBounds(getWidth() - pad - tw, top, tw, line);
+            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad - (tw > 0 ? tw + pad : 0)), line);
             title.doLayout();
+            trailing.doLayout();
         }
 
         /**

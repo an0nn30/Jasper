@@ -37,7 +37,9 @@ final class Trees {
                 for(var row:table.rows()) {
                     row.icon().ifPresent(name->requireIcon(name,icons));
                     row.contextActions().ifPresent(menu->validateMenus(menu,icons));
+                    row.cellNodes().values().forEach(child->validateDetail(child,icons));
                 }
+                table.empty().ifPresent(child->validateDetail(child,icons));
             }
             case Nodes.Tree tree -> tree.roots().forEach(item->validateTreeItem(item,icons));
             case Nodes.Breadcrumbs crumbs -> crumbs.crumbs().forEach(crumb->validateMenus(crumb.contextActions(),icons));
