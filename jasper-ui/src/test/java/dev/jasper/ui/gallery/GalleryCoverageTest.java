@@ -20,6 +20,18 @@ class GalleryCoverageTest {
                 assertThat(values).as("Missing variant: %s.%s", type.getSimpleName(), value).contains(type.getSimpleName() + "." + value);
     }
 
+    /** Plan 3b: SDK 0.18's new fields have real fixtures too, not only its new nodes and constants. */
+    @Test void zeroEighteenFieldsHaveARealFixture() {
+        var records = new ArrayList<Record>();
+        KitGallery.fixtures().forEach(f -> records(f.spec().root(), records));
+        assertThat(records).as("a read-only field").anyMatch(r -> r instanceof Nodes.Field field && field.readOnly());
+        assertThat(records).as("a technical caption").anyMatch(r -> r instanceof Nodes.PickerFace face && face.technicalCaption());
+        assertThat(records).as("a footnote").anyMatch(r -> r instanceof Nodes.Form form && !form.footnote().isBlank());
+        assertThat(records).as("a technical property").anyMatch(r -> r instanceof Nodes.PropertyRow row && row.technical());
+        assertThat(records).as("a property with a severity").anyMatch(r -> r instanceof Nodes.PropertyRow row && row.severity().isPresent());
+        assertThat(records).as("a notice with an action").anyMatch(r -> r instanceof Nodes.Notice notice && !notice.actions().isEmpty());
+    }
+
     @Test void allNineOriginalReferencesAndFourPanelsAreRepresented() {
         assertThat(KitGallery.fixtures().stream().map(KitGallery.Fixture::reference).filter(s -> !s.isEmpty()).distinct())
             .containsExactlyInAnyOrder("add-host.png", "unlock-vault.png", "new-file-server.png", "create-vault.png", "credential-vault.png", "vault-add-menu.png", "add-login-sheet.png", "add-ssh-key-sheet.png", "plugin-panels.png");
@@ -134,6 +146,17 @@ class GalleryCoverageTest {
                 assertThat(KitGallery.metadata(fixture, view, context, 1, image, popup)).contains("\"bounds\":[0,0,200,140]", "\"id\":null", "Menus$Popup");
             } finally { context.icons().close(); base.icons().close(); base.binding().close(); }
         });
+    }
+
+    /** Every record reachable from {@code value}: nodes and their parts (faces, rows, items). */
+    static void records(Object value, List<Record> out) {
+        if (value instanceof Optional<?> o) { o.ifPresent(v -> records(v, out)); return; }
+        if (value instanceof Iterable<?> items) { items.forEach(v -> records(v, out)); return; }
+        if (value instanceof Record record && !(value instanceof dev.jasper.ui.model.ControlState)) {
+            out.add(record);
+            try { for (RecordComponent c : record.getClass().getRecordComponents()) records(c.getAccessor().invoke(record), out); }
+            catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        }
     }
 
     static void collect(Object value, Set<String> values) {

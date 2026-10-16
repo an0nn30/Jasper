@@ -38,6 +38,51 @@ public abstract class KitContractTest {
         }finally{view.close();stop(kit);}
     }); }
 
+    /** Spec 16.1.9: SDK 0.18's controls mount, update and read back as given, and the events a person can cause reach the owner. */
+    @Test void zeroEighteenControlsMountUpdateAndReportTheirEvents() throws Exception { edt(() -> {
+        var kit = kit("owner"); var events = new ArrayList<UiEvent>();
+        var spec = zeroEighteen("Plain FTP sends the password unencrypted");
+        var view = kit.create(spec, events::add);
+        try {
+            view.update(spec);
+            assertThat(view.spec()).isEqualTo(spec);
+            assertThat(events).isEmpty();
+            var next = zeroEighteen("Plain FTP sends passwords unencrypted");
+            view.update(next);
+            assertThat(view.spec()).isEqualTo(next);
+            emit(view, new UiEvent.Action("notice-details"));
+            emit(view, new UiEvent.Selected("tabs", Set.of("details")));
+            assertThat(events).containsExactly(new UiEvent.Action("notice-details"), new UiEvent.Selected("tabs", Set.of("details")));
+        } finally { view.close(); stop(kit); }
+    }); }
+
+    /**
+     * One view of every SDK 0.18 control of plan 3b: a TABS choice, a toolbar row with a separator, a swatch, a technical
+     * caption, a read-only field and properties in the body, a notice as a section, and a footnote.
+     */
+    public static ViewSpec zeroEighteen(String warning) {
+        var ready = ControlState.READY;
+        var tabs = new Nodes.Choice("tabs", ready, Nodes.ChoiceKind.TABS, List.of(new Option("overview", "Overview", Optional.empty()),
+            new Option("details", "Details", Optional.empty())), "overview", "Plugin information", "");
+        var toolbar = new Nodes.Stack("toolbar", ready, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("back", ready, "", "back", Nodes.ButtonKind.GHOST, "back", "Back"), new Nodes.Separator("toolbar-separator", ready),
+            new Nodes.Button("hidden", ready, "Hidden files", "", Nodes.ButtonKind.GHOST, "hidden", "")));
+        var swatch = new Nodes.Icon("swatch", ready, "file", Nodes.Hue.AMBER, Nodes.IconSize.SWATCH, "FTP");
+        var via = new Nodes.Choice("via", ready, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("mac", "Mac", Optional.empty()),
+            new Option("box", "build-box", Optional.empty())), "mac", "Via host", "", "", Optional.empty(),
+            Optional.of(new Nodes.PickerFace("Mac", "dustin@192.168.1.119:22", "server", Nodes.Hue.BLUE, Nodes.PickerDensity.DEFAULT, true)));
+        var folder = new Nodes.Field("folder", ready, Nodes.FieldKind.TEXT, "No folder selected", "", "Folder", "", Optional.empty(),
+            Nodes.FieldPresentation.STANDARD, "", "", "", true);
+        var properties = new Nodes.Properties("properties", ready, "Properties — minecraft-local", List.of(
+            new Nodes.PropertyRow("Host", "192.168.1.124", true), new Nodes.PropertyRow("Credentials", "Vault locked", false, Optional.of(Nodes.Severity.WARNING))));
+        var notice = new Nodes.Notice("notice", ready, Nodes.Severity.WARNING, warning,
+            List.of(new Nodes.Button("notice-details", ready, "Details", "", Nodes.ButtonKind.LINK, "notice-details", "")));
+        return new ViewSpec(new Nodes.Form("form", ready, Nodes.FormKind.FULL, "New File Server", Optional.empty(),
+            List.of(new Nodes.Stack("body", ready, Nodes.LayoutRole.VERTICAL, List.of(tabs, toolbar, swatch, via, folder, properties)), notice),
+            Optional.empty(), List.of(new Nodes.Button("cancel", ready, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", "")),
+            "cancel", Nodes.FormSubmission.PRIMARY, "Auto-locks after 15 min idle"));
+    }
+
     /** Spec 8.2: a read-only field is focusable, selectable and copyable but takes no typing; an editable one reports it. */
     @Test void aReadOnlyFieldTakesNoTypingAndKeepsItsSelection() throws Exception { edt(() -> {
         var kit = kit("owner"); var events = new ArrayList<UiEvent>();

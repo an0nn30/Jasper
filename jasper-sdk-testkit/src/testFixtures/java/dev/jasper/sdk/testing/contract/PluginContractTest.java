@@ -35,6 +35,10 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.WindowSpec;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -129,6 +133,32 @@ public abstract class PluginContractTest {
         h.start(info(id), requires, Set.of(), context::set);
         assertThat(h.active(id)).as("%s started", id).isTrue();
         return context.get();
+    }
+
+    /** Spec 16.1.9: a plugin's kit admits SDK 0.18's controls and refuses a misplaced Notice or Separator, a NONE swatch and a miscounted choice. */
+    @Test void aPluginsKitAdmitsZeroEighteenControlsAndRefusesMisplacedOnes() {
+        var context = started("test.controls", Set.of());
+        h.ui(() -> {
+            var spec = dev.jasper.sdk.testing.KitContractTest.zeroEighteen("Plain FTP sends the password unencrypted");
+            var view = context.kit().create(spec, event -> { });
+            assertThat(view.spec()).isEqualTo(spec);
+            view.close();
+            var ready = ControlState.READY;
+            var text = new Nodes.Text("a", ready, "A", Nodes.TextRole.BODY);
+            var separator = new Nodes.Separator("separator", ready);
+            var one = List.of(new Option("one", "One", Optional.empty()));
+            var five = java.util.stream.IntStream.range(0, 5).mapToObj(i -> new Option("o" + i, "Option " + i, Optional.empty())).toList();
+            List<java.util.function.Supplier<ViewSpec>> refused = List.of(
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(separator, text))),
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.VERTICAL, List.of(text, separator, new Nodes.Text("b", ready, "B", Nodes.TextRole.BODY)))),
+                () -> new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(new Nodes.Notice("notice", ready, Nodes.Severity.INFO, "Saved")))),
+                () -> new ViewSpec(new Nodes.Icon("swatch", ready, "file", Nodes.Hue.NONE, Nodes.IconSize.SWATCH, "None")),
+                () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, one, "one", "Pick", "")),
+                () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, five, "o0", "Pick", "")),
+                () -> new ViewSpec(new Nodes.Choice("tabs", ready, Nodes.ChoiceKind.TABS, one, "one", "Tabs", "")));
+            for (var bad : refused)
+                assertThatIllegalArgumentException().isThrownBy(() -> context.kit().create(bad.get(), event -> { }));
+        });
     }
 
     @Test void semanticPresentationIconsValidateOwnershipAtEveryBoundary() {
