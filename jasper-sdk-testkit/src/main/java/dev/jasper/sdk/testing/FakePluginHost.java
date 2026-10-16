@@ -1074,6 +1074,22 @@ public final class FakePluginHost implements AutoCloseable {
             .map(w -> w.presentation).filter(java.util.Objects::nonNull).findFirst();
     }
 
+    /**
+     * The hue of the square an open plugin dialog draws before its title, as its {@code DialogSpec} asked. Call it on the
+     * UI thread.
+     * @param pluginId dialog owner
+     * @param title exact dialog title
+     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for plugin
+     *     windows, {@code Windows.overlay} surfaces and closed or absent dialogs
+     * @since 0.18.0
+     */
+    public java.util.Optional<dev.jasper.sdk.ui.Nodes.Hue> dialogSwatch(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.windows.stream().filter(w -> !w.closed && w.title.equals(title) && w.presentation != null)
+            .map(w -> w.swatch).findFirst();
+    }
+
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
      * @param pluginId content producer @return live mounted views */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}

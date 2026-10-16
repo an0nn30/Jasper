@@ -274,6 +274,8 @@ final class FakeUi {
         boolean attachedSheet;
         /** The presentation a dialog asked for; plain windows and overlays have none. */
         DialogSpec.Presentation presentation;
+        /** The hue of the square a dialog asked for before its title; NONE for none. */
+        dev.jasper.sdk.ui.Nodes.Hue swatch = dev.jasper.sdk.ui.Nodes.Hue.NONE;
         java.util.function.BooleanSupplier ownerLive = () -> true;
         @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
             context.requireOpen(); java.util.Objects.requireNonNull(actions, "actions");
@@ -564,6 +566,7 @@ final class FakeUi {
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
                 dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
                 dialog.presentation = spec.presentation();
+                dialog.swatch = spec.swatch();
                 dialog.ownerLive = () -> owner instanceof dev.jasper.sdk.ui.UiAnchor anchor ? anchor.isOpen() : liveChooserOwner(owner);
                 if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var registration=value.onClosed(dialog::close);dialog.onClosed(registration::close);}
                 if (owner instanceof FakeContent content) {

@@ -91,6 +91,9 @@ public interface ContractHarness extends AutoCloseable {
     /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
     List<String> windows();
 
+    /** UI thread: the hue name of the square an open plugin dialog with this title draws before its title, or {@code -} when there is none. */
+    String dialogSwatch(String pluginId, String title);
+
     /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
 

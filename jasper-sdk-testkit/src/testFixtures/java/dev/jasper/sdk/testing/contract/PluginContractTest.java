@@ -903,6 +903,21 @@ public abstract class PluginContractTest {
         assertThat(h.windows()).isEmpty();
     }
 
+    /** SDK 0.18: a dialog's swatch reaches the host with the dialog; NONE asks for no square. */
+    @Test void aDialogCarriesItsSwatchToTheHost() {
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
+            PluginWindow manager = context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true));
+            PluginWindow other = context.windows().create(new WindowSpec("test.alpha.other", "Other", new Dimension(640, 480), true));
+            context.windows().dialog(new DialogSpec("Add Login", manager, true, DialogSpec.Presentation.CENTERED, dev.jasper.sdk.ui.Nodes.Hue.BLUE));
+            context.windows().dialog(new DialogSpec("Details", other, true));
+        });
+        h.ui(() -> {
+            assertThat(h.dialogSwatch("test.alpha", "Add Login")).isEqualTo("BLUE");
+            assertThat(h.dialogSwatch("test.alpha", "Details")).isEqualTo("NONE");
+            assertThat(h.dialogSwatch("test.alpha", "Absent")).isEqualTo("-");
+        });
+    }
+
     @Test void theCloseCommandAsksTheContentNewestFirstBeforeTheGuards() {
         var handled = new java.util.concurrent.atomic.AtomicBoolean(true);
         var allow = new java.util.concurrent.atomic.AtomicBoolean(false);

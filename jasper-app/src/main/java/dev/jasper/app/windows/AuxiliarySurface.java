@@ -80,6 +80,10 @@ public final class AuxiliarySurface {
         if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
         attachedSheet = value;
     }
+    private dev.jasper.ui.model.Nodes.Hue swatch = dev.jasper.ui.model.Nodes.Hue.NONE;
+    /** The hue of the square drawn before this surface's title wherever Jasper draws it; NONE draws none. Set before the first show. */
+    public void swatch(dev.jasper.ui.model.Nodes.Hue value) { swatch = Objects.requireNonNull(value); }
+    public dev.jasper.ui.model.Nodes.Hue swatch() { return swatch; }
     private java.util.function.IntSupplier integratedTitle;
     /**
      * The content draws the window's title row itself, {@code height} pixels tall (Settings: its sidebar and header):

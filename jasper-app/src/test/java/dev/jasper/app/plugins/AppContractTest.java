@@ -312,6 +312,11 @@ class AppContractTest extends PluginContractTest {
                     .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
                         + "|" + surface.title() + "|" + surface.shown()).toList());
             }
+            @Override public String dialogSwatch(String pluginId, String title) {
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .filter(surface -> surface.kind() != AuxiliarySurface.Kind.WINDOW && surface.title().equals(title))
+                    .findFirst().map(surface -> surface.swatch().name()).orElse("-"));
+            }
             @Override public boolean requestClose(String windowId) {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
                     .map(dev.jasper.app.windows.AuxiliarySurface::requestClose).orElse(false));

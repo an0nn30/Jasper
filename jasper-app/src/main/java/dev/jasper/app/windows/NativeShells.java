@@ -348,6 +348,7 @@ public final class NativeShells {
                 bar.setAccessory(surface.titleActions()); surface.onTitleActionsChanged(bar::accessoryChanged);
             }
             bar.setTitle(surface.title());
+            bar.setTitleSwatch(surface.swatch());
             for (var child : surface.holder().getComponents()) {
                 if (child instanceof dev.jasper.ui.swing.KitView view
                         && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form

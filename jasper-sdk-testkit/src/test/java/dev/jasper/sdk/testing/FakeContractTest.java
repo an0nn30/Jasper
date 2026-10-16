@@ -58,6 +58,7 @@ class FakeContractTest extends PluginContractTest {
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }
+            @Override public String dialogSwatch(String pluginId, String title) { return host.dialogSwatch(pluginId, title).map(Enum::name).orElse("-"); }
             @Override public boolean requestClose(String windowId) { return host.requestClose(windowId); }
             @Override public boolean closeCommand(String windowId) { return host.closeCommand(windowId); }
             @Override public boolean requestQuit() { return host.requestQuit(); }

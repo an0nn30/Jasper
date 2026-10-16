@@ -740,6 +740,7 @@ final class HostedUi {
                 }
                 else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
+                surface.swatch(dev.jasper.ui.model.Nodes.Hue.valueOf(spec.swatch().name()));
                 if (spec.owner() instanceof OwnedContent content) {
                     var pin = spec.modal() ? content.entry.pin() : null;
                     var registration = content.entry.onClosed(surface::close);

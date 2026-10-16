@@ -52,6 +52,33 @@ class NativeShellsChromeTest {
         } finally { binding.close(); icons.close(); controller.close(); }
     }
 
+    /** Plan 3d: DialogSpec.swatch is a square of its hue before a dialog's title in Jasper's title row; NONE draws none. */
+    @Test void aDialogSwatchSitsBeforeItsTitleInItsHuesColour() {
+        var controller = ThemeTestSupport.controller(true);
+        try {
+            for (var hue : java.util.List.of(dev.jasper.ui.model.Nodes.Hue.BLUE, dev.jasper.ui.model.Nodes.Hue.NONE)) {
+                var surface = new AuxiliarySurface("", "Add Login", AuxiliarySurface.Kind.DIALOG, true, new Dimension(400, 300), null, null,
+                    ignored -> { throw new AssertionError("No native shell in tests"); });
+                assertThat(surface.swatch()).as("none until asked for").isEqualTo(dev.jasper.ui.model.Nodes.Hue.NONE);
+                surface.swatch(hue);
+                try (var bar = NativeShells.installTitleBar(new JRootPane(), surface, true)) {
+                    var title = (JLabel) bar.getComponent(0);
+                    assertThat(title.isVisible()).as("a dialog's title row shows its title").isTrue();
+                    if (hue == dev.jasper.ui.model.Nodes.Hue.NONE) { assertThat(title.getIcon()).isNull(); continue; }
+                    var icon = title.getIcon();
+                    int side = com.formdev.flatlaf.util.UIScale.scale(12);
+                    assertThat(icon.getIconWidth()).as("the caption icon size").isEqualTo(side);
+                    assertThat(icon.getIconHeight()).isEqualTo(side);
+                    var image = new java.awt.image.BufferedImage(side, side, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics();
+                    try { icon.paintIcon(title, graphics, 0, 0); } finally { graphics.dispose(); }
+                    assertThat(new java.awt.Color(image.getRGB(side / 2, side / 2), true))
+                        .isEqualTo(controller.current().chrome().semantic().color(dev.jasper.ui.theme.SemanticColor.HUE_BLUE));
+                }
+            }
+        } finally { controller.close(); }
+    }
+
     @Test void actualChromeMountsTitleActionsOutsideBodyWithCenteredNativeTitleAndFallback() {
         for (boolean supported : java.util.List.of(true, false)) {
             var surface = new AuxiliarySurface("test", "Manager", AuxiliarySurface.Kind.WINDOW, false,

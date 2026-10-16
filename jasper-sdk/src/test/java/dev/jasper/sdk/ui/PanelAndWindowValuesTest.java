@@ -56,6 +56,15 @@ class PanelAndWindowValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Trust host?", null, true));
         assertThatIllegalArgumentException().isThrownBy(() -> new DialogSpec(" ", owner, true));
     }
+    /** SDK 0.18: a dialog's swatch is NONE unless asked for, and never null. */
+    @Test void aDialogsSwatchDefaultsToNoneAndIsRequired() {
+        WindowOwner owner = new WindowOwner() { };
+        assertThat(new DialogSpec("Add Login", owner, true).swatch()).isEqualTo(Nodes.Hue.NONE);
+        assertThat(new DialogSpec("Add Login", owner, true, DialogSpec.Presentation.OVERLAY).swatch()).isEqualTo(Nodes.Hue.NONE);
+        assertThat(new DialogSpec("Add Login", owner, true, DialogSpec.Presentation.OVERLAY, Nodes.Hue.BLUE).swatch()).isEqualTo(Nodes.Hue.BLUE);
+        assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Add Login", owner, true, DialogSpec.Presentation.CENTERED, null));
+    }
+
     @Test void oldNativeConstructorsPreserveCenteredAndOuterDefaults() throws Exception {
         WindowOwner owner = new WindowOwner() { };
         assertThat(new DialogSpec("Old", owner, true).presentation().toString()).isEqualTo("CENTERED");
