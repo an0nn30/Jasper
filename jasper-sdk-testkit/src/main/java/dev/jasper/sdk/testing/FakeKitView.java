@@ -59,7 +59,7 @@ public final class FakeKitView implements UiView {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
   }
-  sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
+  sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&(!nodes.containsKey(focused)||dormant(focused)))focused=null;}finally{updating=false;}
  }
  private static List<String> path(Nodes.Node root,String id){if(root.id().equals(id))return List.of(root.id());for(var child:children(root)){var nested=path(child,id);if(!nested.isEmpty()){var result=new ArrayList<String>();result.add(root.id());result.addAll(nested);return result;}}return List.of();}
  private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
@@ -70,12 +70,14 @@ public final class FakeKitView implements UiView {
  @Override public void replaceSecret(String id,char[] value){requireSecret(id);Objects.requireNonNull(value);char[] next=value.clone();clearSecret(id);secrets.put(id,next);}
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
- @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ /** Whether a node lies in a table's empty state while that table has rows: the host leaves the state unmounted then, though its ids and icons are still checked. */
+ private boolean dormant(String id){for(var node:index(spec.root()).values())if(node instanceof Nodes.Table table&&!table.rows().isEmpty()&&table.empty().isPresent()&&index(table.empty().get()).containsKey(id))return true;return false;}
  @Override public void selectAll(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
  /** The fake's logical field selection, independently recorded from focus. */
  public int[] fieldSelection(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
  private String revealed;
- @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
+ @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
  /** The node last scrolled into view; reveal never moves logical focus.
  * @return node id */
  public Optional<String> revealed(){guard();return Optional.ofNullable(revealed);}

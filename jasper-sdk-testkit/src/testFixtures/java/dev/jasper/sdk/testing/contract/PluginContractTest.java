@@ -35,6 +35,9 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
 import dev.jasper.sdk.ui.WindowSpec;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.TreeItem;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.Option;
@@ -160,6 +163,40 @@ public abstract class PluginContractTest {
                 () -> new ViewSpec(new Nodes.Choice("pick", ready, Nodes.ChoiceKind.EXCLUSIVE, five, "o0", "Pick", "")),
                 () -> new ViewSpec(new Nodes.Choice("tabs", ready, Nodes.ChoiceKind.TABS, one, "one", "Tabs", "")));
             for (var bad : refused) assertThatIllegalArgumentException().isThrownBy(bad::get);
+        });
+    }
+
+    /** Spec 16.1.9 (plan 3c): a plugin's kit admits SDK 0.18's table vocabulary and refuses misplaced cell nodes, selected headings, doubled empty states and extra tree values. */
+    @Test void aPluginsKitAdmitsZeroEighteenTablesAndRefusesMisplacedOnes() {
+        var context = started("test.tables", Set.of());
+        h.ui(() -> {
+            for (boolean rows : new boolean[] {false, true}) {
+                var spec = dev.jasper.sdk.testing.KitContractTest.tables("card", rows);
+                var view = context.kit().create(spec, event -> { });
+                assertThat(view.spec()).isEqualTo(spec);
+                view.close();
+            }
+            var ready = ControlState.READY;
+            var columns = List.of(new Column("c", "C", Nodes.TextRole.BODY, false), new Column("d", "D", Nodes.TextRole.BODY, false));
+            var go = new Nodes.Button("go", ready, "Go", "", Nodes.ButtonKind.SECONDARY, "go", "");
+            var more = new Nodes.Button("more", ready, "More", "", Nodes.ButtonKind.SECONDARY, "more", "");
+            var text = new Nodes.Text("t", ready, "T", Nodes.TextRole.BODY);
+            var heading = TableRow.heading("h", "Group", java.util.OptionalInt.of(1), "group");
+            var icon = new Nodes.Icon("e.icon", ready, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Servers");
+            var three = new TreeItem("x", "X", Optional.empty(), true, List.of(), java.util.OptionalInt.empty(), false, "", Optional.empty(), List.of("1", "2", "3"), Optional.empty());
+            List<java.util.function.Supplier<ViewSpec>> refused = List.of(
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", go), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", text), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(heading), Set.of("h"), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of())), "Nothing here")),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
+                    Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of(go, more))), "")),
+                () -> new ViewSpec(new Nodes.Tree("tree", ready, List.of(three), Set.of(), Set.of(), "", columns)));
+            for (var bad : refused)
+                assertThatIllegalArgumentException().isThrownBy(() -> context.kit().create(bad.get(), event -> { }));
         });
     }
 
