@@ -48,6 +48,7 @@ grep -c 'TRANSFER' jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java 
 grep -c 'record View(' jasper-app/src/main/java/dev/jasper/app/contributions/ToolbarEntry.java          # 3d: 1
 grep -c 'OPEN_FILE' jasper-app/src/main/java/dev/jasper/app/commands/ActionId.java                      # 3e: at least 1
 grep -c 'DOCK_RULE_HIT(6)' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java              # 4a: 1
+grep -c 'GROUP_ROW_INDENT(14);' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java          # 4c: 1 (the enum's last role)
 grep -c 'Kit CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java                                # 4a: 1
 ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicPromptFace.java   # 4b
 ls jasper-app/src/test/java/dev/jasper/app/architecture/VariantReadTest.java                          # 4b
@@ -75,6 +76,7 @@ search and replace; a different shape means adapting the call without changing b
 | `ThemeController.startup(boolean dark, ThemeSelection selection, Kit kit, Consumer<InstallationFailure> fallingBack)`; `ThemeController.kit()` | 5a Tasks 10, 11 |
 | `EnterpriseResources.ROOT`, `RESOURCES`, `facts()` (`PresentationFacts.parsed()` an `Optional<KitParser.Parsed>`), `theme()` (a `JasperTheme`) | 5b Task 4 |
 | `KitFixtures.complement()` (the complement fixture kit) | 4a Task 6 |
+| `DesignMetrics.Role.GROUP_ROW_INDENT(14)` as the enum's last role, `NewRolesTest.ADDED` and `theAddedRolesCloseTheEnumInOrder` | 4c Task 1, 4a Task 2 |
 | `VariantReadTest` (the class-file scan of the app and ui jars) and `StrategyIsolationTest.Scanned` | 4b Task 0 (its "isolation and variant-read tests") |
 | `ToolbarEntry.View`, `WindowChrome.windowOpened()`, `MenuTarget.Slot.SESSION`, `TRANSFER` | 3d Tasks 1 and 4 |
 | `ActionId.OPEN_FILE` in File after New Window | 3e Task 2 |
@@ -167,7 +169,10 @@ At `deafed424` unless marked; facts about plans 3b to 5b cite the plan.
     `MockUiPreview` mounts a window on a bare `JRootPane` through `installTitleBar` and prints it at 2× (`MockUiPreview.java:79-118`).
 12. Plan 4a appends its roles after `HISTORY_CONTENT_GAP(2)`, ending the enum with `DOCK_RULE(1), DOCK_RULE_HIT(6);`, and
     appends their rows to `compact-roles.tsv`; `classic-roles.tsv` lists every role of `DesignMetrics.CLASSIC`
-    (4a Tasks 2 and 3).
+    (4a Tasks 2 and 3). Plan 4c Task 1 then appends `GROUP_ROW_INDENT(14);` after `DOCK_RULE_HIT(6),`, a
+    `GROUP_ROW_INDENT\t14` row to both tables and the name to `NewRolesTest.ADDED`, so after 4c the enum and both tables
+    end with `GROUP_ROW_INDENT`. 4a's `NewRolesTest.theAddedRolesCloseTheEnumInOrder` asserts that `ADDED` is the enum's
+    tail, and `ClassicCatalogTest.theSpecsNamedValuesHold` reads `ADDED` (4a Task 2 step 1, Task 3).
 
 ### Mock measurements
 
@@ -216,8 +221,12 @@ this plan's status banner.
 7. **About Jasper is in Help whenever the screen menu bar is off on macOS** and stays in the application menu too
    (macOS shows that menu even without a screen menu bar) — cost if wrong: one duplicate entry.
 8. **Windows and Linux captions follow the operating system.** JBR exposes no dark-caption hint for a title bar the
-   system draws (fact 5), so spec 10.1's documentation branch applies: `docs/app-architecture.md` records it — cost if
-   wrong: none; a later JBR call is one line in `ShellChrome`.
+   system draws (fact 5), so spec 10.1's documentation branch applies: `docs/app-architecture.md` records it. On macOS
+   every native-titled frame and dialog follows the theme: terminal frames (`WindowContent.mount`); auxiliary frames and
+   dialogs, the file chooser and its replace and new-folder sheets (`NativeShells.sheet`, which takes the appearance when
+   it opens, as it lives for one question) through `ShellChrome.followTheme`; and a window's configuration diagnostics
+   option pane through the window's own flag (the default look keeps `JOptionPane.showMessageDialog`) — cost if wrong:
+   none; a later JBR call is one line in `ShellChrome`.
 9. **The Dark divider.** Recorded as a residual here and fixed by plan 6b's override key (6b Rulings 3) — cost if wrong:
    the Dark menu row's rule is darker than the mock until 6b.
 10. **`{session}` and `{directory}`.** A provider pane's session is its saved identity (`PaneSnapshot.shell()`), a remote
@@ -419,6 +428,7 @@ The bootstrap applies the committed `DesktopFlags` before AWT (spec 9.1, 10.1): 
 - Modify: `jasper-app/src/main/java/dev/jasper/app/platform/TitleBarStyle.java:20-23`
 - Create: `jasper-app/src/test/java/dev/jasper/app/bootstrap/DesktopFlagsTest.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/platform/TitleBarStyleTest.java` (one test)
+- Modify: `docs/design/theme-engine/migration.csv` (one row: `DesktopFlagsTest` names `apple.awt.application.appearance`, which `CANDIDATE`'s `[Aa]ppearance` matches)
 
 **Interfaces:**
 - Consumes: Task 1's `Presentation.committedDesktop()`; 5a's `Startup.selection()`.
@@ -555,9 +565,22 @@ edit("jasper-app/src/main/java/dev/jasper/app/platform/TitleBarStyle.java", [
 PY
 ```
 
+Add the ledger row:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+test = "jasper-app/src/test/java/dev/jasper/app/bootstrap/DesktopFlagsTest.java"
+rows = [(test, "app.bootstrap", "DesktopFlagsTest", test, "Test/fixture ownership; New in Enterprise presentation Plan 6a Task 2; the desktop flags reach the AWT properties")]
+ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
+text += "" if text.endswith("\n") else "\n"
+ledger.write_text(text + "".join(f"{p},{m},{c},nonvisual-helper,none,none,{e},{d}\n" for p, m, c, e, d in rows), encoding="utf-8")
+PY
+```
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.platform.TitleBarStyleTest' :jasper-app:verifyApplicationArchitecture`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.platform.TitleBarStyleTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture`
 Expected: PASS (`DesktopFlagsTest` 2, `TitleBarStyleTest` 4, every existing `ApplicationBootstrapTest` case; `bootstrap →
 presentation` is an allowed edge since 5a).
 
@@ -565,7 +588,8 @@ presentation` is an allowed edge since 5a).
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java jasper-app/src/main/java/dev/jasper/app/platform/TitleBarStyle.java \
-  jasper-app/src/test/java/dev/jasper/app/bootstrap/DesktopFlagsTest.java jasper-app/src/test/java/dev/jasper/app/platform/TitleBarStyleTest.java
+  jasper-app/src/test/java/dev/jasper/app/bootstrap/DesktopFlagsTest.java jasper-app/src/test/java/dev/jasper/app/platform/TitleBarStyleTest.java \
+  docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Window chrome: the desktop flags
 
@@ -583,16 +607,21 @@ EOF
 ### Task 3: The classic chrome metrics
 
 The classic menu row, toolbar, tabs, status cells and dialogs of plans 6a and 6b are drawn from catalog roles measured on
-the mocks. They are appended after plan 4a's roles with the same value in `DEFAULT` and `CLASSIC` (Rulings 5; 4a's
-Rulings 6): only classic chrome reads them, so the default look cannot move.
+the mocks. They are appended after plan 4's roles (the last is 4c's `GROUP_ROW_INDENT`) with the same value in `DEFAULT`
+and `CLASSIC` (Rulings 5; 4a's Rulings 6): only classic chrome reads them, so the default look cannot move. 4a's
+`NewRolesTest.theAddedRolesCloseTheEnumInOrder` asserts that plan 4's roles end the enum, which these roles would break;
+it becomes `theAddedRolesFollowEachOtherInOrder` (plan 4's roles stay one run in their order, wherever later roles go),
+and `ChromeRolesTest` checks this plan's run the same way, so a later plan appending roles changes neither test (plan
+7 Task 4's script sees that `NewRolesTest` no longer checks the tail and writes its own `DockRolesTest`).
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (enum tail)
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv` (rows appended)
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java` (the tail assertion becomes a run assertion)
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/metrics/ChromeRolesTest.java`
 
 **Interfaces:**
-- Consumes: plan 4a's catalog (`DesignMetrics.DEFAULT`, `CLASSIC`, `value(Role)`).
+- Consumes: plan 4a's catalog (`DesignMetrics.DEFAULT`, `CLASSIC`, `value(Role)`) and `NewRolesTest`; 4c's `GROUP_ROW_INDENT`.
 - Produces: `DesignMetrics.Role` constants, in this order: `MENU_BAR_SIDE(4)`, `MENU_BAR_ITEM_PADDING(10)`,
   `MENU_BAR_HEIGHT(24)`, `CHROME_BUTTON_PADDING(8)`, `CHROME_BUTTON_GAP(8)`, `CHROME_SEPARATOR_GAP(10)`,
   `CHROME_SEPARATOR_INSET(8)`, `CHROME_GLYPH(7)`, `CHROME_GLYPH_GAP(6)`, `CHROME_CARET(5)`, `CHROME_CARET_GAP(7)`,
@@ -634,7 +663,7 @@ class ChromeRolesTest {
     @Test void theChromeRolesFollowPlanFoursRolesWithTheirMeasuredValuesInBothCatalogs() {
         var names = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
         int first = names.indexOf("MENU_BAR_SIDE");
-        assertThat(first).as("appended after plan 4a's roles").isEqualTo(names.indexOf("DOCK_RULE_HIT") + 1);
+        assertThat(first).as("appended after plan 4's roles, the last of which is 4c's").isEqualTo(names.indexOf("GROUP_ROW_INDENT") + 1);
         assertThat(names.subList(first, first + ROLES.size())).containsExactlyElementsOf(ROLES.keySet());
         ROLES.forEach((name, value) -> {
             var role = DesignMetrics.Role.valueOf(name);
@@ -648,7 +677,32 @@ class ChromeRolesTest {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.ChromeRolesTest'`
-Expected: FAIL: the first assertion reports that `-1` (no `MENU_BAR_SIDE` role yet) is not the index after `DOCK_RULE_HIT`.
+Expected: FAIL: the first assertion reports that `-1` (no `MENU_BAR_SIDE` role yet) is not the index after `GROUP_ROW_INDENT`.
+
+Then make 4a's tail assertion a run assertion, so it holds once this plan's roles follow plan 4's:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 6a Task 3 step 2: plan 4's roles stay one run in order; they no longer end the enum."""
+import pathlib
+path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java"); text = path.read_text(encoding="utf-8")
+old = '''    @Test void theAddedRolesCloseTheEnumInOrder() {
+        var roles = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
+        assertThat(roles.subList(roles.size() - ADDED.size(), roles.size())).containsExactlyElementsOf(ADDED);
+    }'''
+new = '''    /** Plan 4's roles are one run in order; plan 6's chrome roles follow them (ChromeRolesTest). */
+    @Test void theAddedRolesFollowEachOtherInOrder() {
+        var roles = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
+        int first = roles.indexOf(ADDED.getFirst());
+        assertThat(first).as("plan 4's first role").isPositive();
+        assertThat(roles.subList(first, first + ADDED.size())).containsExactlyElementsOf(ADDED);
+    }'''
+if text.count(old) != 1: raise SystemExit("NewRolesTest: theAddedRolesCloseTheEnumInOrder not found once")
+path.write_text(text.replace(old, new), encoding="utf-8")
+PY
+```
+
+This edit passes on its own (plan 4's roles are still the tail); `ChromeRolesTest` is the failing test.
 
 - [ ] **Step 3: Add the roles and their rows**
 
@@ -665,17 +719,17 @@ ADDED = [("MENU_BAR_SIDE", 4), ("MENU_BAR_ITEM_PADDING", 10), ("MENU_BAR_HEIGHT"
     ("DIALOG_RADIUS", 4), ("DIALOG_HEADER_HEIGHT", 26), ("DIALOG_HEADER_INSET", 10), ("DIALOG_SWATCH", 8),
     ("DIALOG_SWATCH_GAP", 7), ("DIALOG_FOOTER_VERTICAL", 8)]
 path = pathlib.Path("jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java"); text = path.read_text(encoding="utf-8")
-old = "DOCK_RULE(1), DOCK_RULE_HIT(6);"
-if text.count(old) != 1: raise SystemExit("DesignMetrics: the enum no longer ends with DOCK_RULE_HIT(6);")
+old = "GROUP_ROW_INDENT(14);"
+if text.count(old) != 1: raise SystemExit("DesignMetrics: the enum no longer ends with plan 4c's GROUP_ROW_INDENT(14);")
 lines = [", ".join(f"{n}({v})" for n, v in ADDED[i:i + 6]) for i in range(0, len(ADDED), 6)]
-new = ("DOCK_RULE(1), DOCK_RULE_HIT(6),\n"
+new = ("GROUP_ROW_INDENT(14),\n"
        "        // Enterprise presentation plan 6: the classic chrome's menu row, toolbar, tabs, status cells and dialogs,\n"
        "        // measured on the Enterprise mocks and read only by classic chrome.\n"
        "        " + ",\n        ".join(lines) + ";")
 path.write_text(text.replace(old, new), encoding="utf-8")
 for table in ("compact-roles.tsv", "classic-roles.tsv"):
     path = pathlib.Path("jasper-ui/src/test/resources/dev/jasper/ui/metrics/" + table); text = path.read_text(encoding="utf-8")
-    if not text.endswith("DOCK_RULE_HIT\t6\n"): raise SystemExit(f"{table}: expected DOCK_RULE_HIT last")
+    if not text.endswith("GROUP_ROW_INDENT\t14\n"): raise SystemExit(f"{table}: expected plan 4c's GROUP_ROW_INDENT last")
     path.write_text(text + "".join(f"{n}\t{v}\n" for n, v in ADDED), encoding="utf-8")
 PY
 ```
@@ -683,21 +737,22 @@ PY
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.metrics.*' :jasper-ui:javadoc`
-Expected: PASS (`ChromeRolesTest`, `DesignMetricsTest.everyRoleHasItsCompactValue`, 4a's `ClassicCatalogTest` frozen
-table, `MetricTokensTest`).
+Expected: PASS (`ChromeRolesTest`, `NewRolesTest` with `theAddedRolesFollowEachOtherInOrder`,
+`DesignMetricsTest.everyRoleHasItsCompactValue`, 4a's `ClassicCatalogTest` frozen table, `MetricTokensTest`).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java jasper-ui/src/test/resources/dev/jasper/ui/metrics \
-  jasper-ui/src/test/java/dev/jasper/ui/metrics/ChromeRolesTest.java
+  jasper-ui/src/test/java/dev/jasper/ui/metrics/ChromeRolesTest.java jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java
 git commit -F - <<'EOF'
 Window chrome: the classic chrome metrics
 
 Thirty catalog roles for the classic menu row, toolbar, tabs, status
 cells and dialogs, measured on the Enterprise mocks and the same in both
-catalogs, appended after plan 4a's roles and frozen in both tables. Only
-classic chrome reads them.
+catalogs, appended after plan 4's roles and frozen in both tables. Only
+classic chrome reads them. NewRolesTest checks plan 4's roles as one run
+in order rather than as the enum's tail.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -1429,8 +1484,8 @@ the rehearsal's included, the look.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowLook.java`, `jasper-app/src/main/java/dev/jasper/app/windows/ShellChrome.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalWindow.java:47-70`, `WindowContent.java:297-334` (`installTitleBar`, new `mount`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java:73-78,141-171,207-277,419-423`, `windows/package-info.java` (the `presentation` edge, if 5a did not add it)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/TerminalWindow.java:47-70`, `WindowContent.java:139-140,297-334` (the diagnostics dialog, `installTitleBar`, new `mount`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java:73-78,141-171,207-277,419-423,472-476` (the chooser's `sheet`), `windows/package-info.java` (the `presentation` edge, if 5a did not add it)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`composeWindow`, `rehearsalWindow`, the shells, Help), `application/AboutWindows.java:70-80`
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/WindowShellTest.java`, `jasper-app/src/test/java/dev/jasper/app/windows/ShellChromeTest.java`, `jasper-app/src/test/java/dev/jasper/app/application/AboutWindowsTest.java` (one test)
 - Modify: `docs/design/theme-engine/migration.csv` (rows below)
@@ -1444,6 +1499,8 @@ the rehearsal's included, the look.
   WindowContent.installTitleBar(JRootPane, WindowContent, boolean supported, boolean followTheme, Consumer<String>)`;
   `public final class ShellChrome` with `static ShellChrome of(ShellLook)`, `static ShellChrome standard()`, package
   `static ShellChrome of(ShellLook, boolean macOs)`, `boolean unifiedTitle()`, `void followTheme(JRootPane, MacTitleBar, boolean dark)`;
+  package-private `boolean WindowContent.followsThemeAppearance()` (the window's configuration diagnostics dialog follows
+  the theme with it); `NativeShells.sheet` becomes an instance method so the chooser's sheets follow the theme;
   `NativeShells(ThemeController, UiState, Function<UUID, Window>, Runnable, Runnable, ShellChrome)`;
   `static boolean AboutWindows.aboutInApplicationMenu(boolean macOs, boolean screenMenuBar)`.
 
@@ -1496,8 +1553,10 @@ class WindowShellTest {
             var root = new JRootPane();
             try (var bar = WindowContent.mount(root, owner, new WindowLook(WorkspaceChrome.STANDARD, true, false), value -> { })) {
                 assertThat(bar).isNotNull();
-                assertThat(root.getJMenuBar()).as("the unified bar holds the menus").isNull();
-                assertThat(root.getClientProperty("apple.awt.windowAppearance")).isNull();
+                assertThat(root.getJMenuBar()).as("MacTitleBar.setMenuBar keeps the menus on the root, the screen menu bar's source")
+                    .isSameAs(owner.menuBar());
+                assertThat(root.getClientProperty("apple.awt.windowAppearance")).as("the unified bar's own setLight, as today")
+                    .isEqualTo(dev.jasper.ui.theme.TitleBarTheme.of(owner.theme().chrome()).dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
             }
         });
     }
@@ -1510,10 +1569,12 @@ class WindowShellTest {
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameDarkAqua");
             owner.onThemeChanged.accept(ThemeTestSupport.resolved(false));
             assertThat(root.getClientProperty("apple.awt.windowAppearance")).isEqualTo("NSAppearanceNameAqua");
+            assertThat(owner.followsThemeAppearance()).as("the window's diagnostics dialog follows with it").isTrue();
             var linux = window(false, WindowChromeMenusTest.classic());
             var other = new JRootPane();
             WindowContent.mount(other, linux, new WindowLook(WindowChromeMenusTest.classic(), false, true), value -> { });
             assertThat(other.getClientProperty("apple.awt.windowAppearance")).as("only macOS has NSAppearance").isNull();
+            assertThat(linux.followsThemeAppearance()).isFalse();
         });
     }
 
@@ -1731,8 +1792,9 @@ edit(W + "WindowContent.java", [
         MacTitleBar bar;''',
      '''    /**
      * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
-     * unified macOS bar hosting the header and the menus, or the system's title bar with the menus as a row in the window
-     * (on macOS the screen menu bar shows that row's menus while the look keeps it on). TerminalWindow and the chrome
+     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
+     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
+     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
      * renders share this path. Returns the unified bar, or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
@@ -1756,7 +1818,28 @@ edit(W + "WindowContent.java", [
                                       Consumer<String> nativeTitle) {
         MacTitleBar bar;''', 1),
     ('''        if (content.viewMode == ViewMode.COMPACT && content.macOs) {''',
-     '''        if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {''', 1)])
+     '''        // The window's own dialogs (the configuration diagnostics) follow with it under a native-titled look.
+        content.followsThemeAppearance = bar == null && followTheme && content.macOs;
+        if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {''', 1),
+    ('''    Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
+        this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);''',
+     '''    /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
+    private boolean followsThemeAppearance;
+    Consumer<JComponent> showConfigDiagnostics = control -> {
+        if (!followsThemeAppearance) {
+            JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+            return;
+        }
+        // As showMessageDialog does, with the frame's appearance on the option pane's dialog.
+        var dialog = new JOptionPane(control, JOptionPane.PLAIN_MESSAGE).createDialog(this, "Configuration");
+        dialog.getRootPane().putClientProperty("apple.awt.windowAppearance",
+            theme().chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        dialog.setVisible(true);
+        dialog.dispose();
+    };''', 1),
+    ('''    ResolvedTheme theme() { return themes.current(); }''',
+     '''    ResolvedTheme theme() { return themes.current(); }
+    boolean followsThemeAppearance() { return followsThemeAppearance; }''', 1)])
 N = "jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java"
 edit(N, [
     ('''    private final Map<AuxiliarySurface, Window> natives = new HashMap<>();''',
@@ -1818,7 +1901,16 @@ edit(N, [
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
             if (bar != null) bar.setLight(!resolved.chrome().dark());
             shell.followTheme(dialog.getRootPane(), bar, resolved.chrome().dark());
-        });''', 1)])
+        });''', 1),
+    # The chooser's replace and new-folder sheets are native-titled dialogs too (spec 10.1); each lives for one
+    # question, so it takes the appearance when it opens.
+    ('''    private static ChooserPrompts.Modal sheet(Window owner, String title) {
+        var window = new JDialog(owner, title, Dialog.ModalityType.DOCUMENT_MODAL);
+        window.setIconImages(ApplicationIcon.images());''',
+     '''    private ChooserPrompts.Modal sheet(Window owner, String title) {
+        var window = new JDialog(owner, title, Dialog.ModalityType.DOCUMENT_MODAL);
+        shell.followTheme(window.getRootPane(), null, themes.current().chrome().dark());
+        window.setIconImages(ApplicationIcon.images());''', 1)])
 A = "jasper-app/src/main/java/dev/jasper/app/application/"
 edit(A + "JasperApplication.java", [
     ('''                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);''',
@@ -1898,8 +1990,9 @@ A terminal window takes the look's title bar through WindowLook: the
 unified macOS bar only where the look asks for it, otherwise the system
 title bar with the menus as a row in the window; a native-titled macOS
 frame follows the theme's appearance, and Compact keeps the menu row.
-ShellChrome gives auxiliary windows, dialogs and the file chooser the same
-values. About Jasper joins Help when the screen menu bar is off. Every
+ShellChrome gives auxiliary windows, dialogs, the file chooser and its
+sheets the same values, and a window's diagnostics dialog follows it.
+About Jasper joins Help when the screen menu bar is off. Every
 window, the rehearsal's included, gets the look.
 
 🤖 Generated with Claude Code at The Home Depot
@@ -1921,6 +2014,7 @@ The saved setting is untouched.
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/ConfigurationController.java:105-110,273`, `JasperApplication.java` (the controller)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java` (`lookAnimates`), `WindowTabs.java:81`, `WindowCommandPalette.java:138`
 - Test: `jasper-app/src/test/java/dev/jasper/app/application/LookMotionTest.java`, `jasper-app/src/test/java/dev/jasper/app/application/MotionReachTest.java`
+- Modify: `docs/design/theme-engine/migration.csv` (one row: `MotionReachTest` imports `dev.jasper.ui.theme` and `SystemAppearance`)
 
 **Interfaces:**
 - Consumes: 5a's `Motion`, `Projections.motion()`.
@@ -2098,9 +2192,19 @@ edit(W + "WindowCommandPalette.java", [
 PY
 ```
 
-`LookMotion` names no Swing or UI type, so it needs no ledger row; the two tests neither (if
-`ThemeMigrationCoverageTest` names `MotionReachTest`, which imports `dev.jasper.ui.theme`, add its row in the Global
-Constraints' form).
+`LookMotion` and `LookMotionTest` name no Swing, UI or appearance type, so they need no ledger row; `MotionReachTest`
+imports `dev.jasper.ui.theme` and `SystemAppearance`, so it gets its row:
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+test = "jasper-app/src/test/java/dev/jasper/app/application/MotionReachTest.java"
+rows = [(test, "app.application", "MotionReachTest", test, "Test/fixture ownership; New in Enterprise presentation Plan 6a Task 6; the one motion supplier reaches the kit contexts")]
+ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
+text += "" if text.endswith("\n") else "\n"
+ledger.write_text(text + "".join(f"{p},{m},{c},nonvisual-helper,none,none,{e},{d}\n" for p, m, c, e, d in rows), encoding="utf-8")
+PY
+```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -2140,6 +2244,7 @@ title still starts as "Jasper".
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowTitle.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java:311-320` (the `onTitle` wiring)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/WindowTitleTest.java`
+- Modify: `docs/design/theme-engine/migration.csv` (one row: `WindowTitle`'s `new ArrayList` matches `CANDIDATE`'s `new …List`)
 
 **Interfaces:**
 - Consumes: Task 4's `WorkspaceChrome.title()`; 5a's `TitleFormat`.
@@ -2313,9 +2418,22 @@ path.write_text(text.replace(old, new), encoding="utf-8")
 PY
 ```
 
+Add the ledger row (`WindowTitleTest` names no candidate type):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+rows = [("jasper-app/src/main/java/dev/jasper/app/workspace/WindowTitle.java", "app.workspace", "WindowTitle",
+         "jasper-app/src/test/java/dev/jasper/app/workspace/WindowTitleTest.java", "New in Enterprise presentation Plan 6a Task 7; the frame title from the look's template")]
+ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
+text += "" if text.endswith("\n") else "\n"
+ledger.write_text(text + "".join(f"{p},{m},{c},nonvisual-helper,none,none,{e},{d}\n" for p, m, c, e, d in rows), encoding="utf-8")
+PY
+```
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*'`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
 Expected: PASS: `WindowTitleTest` 4; every existing title and header test (under `{context}` the frame title is the
 label as before).
 
@@ -2323,7 +2441,7 @@ label as before).
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/workspace/WindowTitle.java jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java \
-  jasper-app/src/test/java/dev/jasper/app/workspace/WindowTitleTest.java
+  jasper-app/src/test/java/dev/jasper/app/workspace/WindowTitleTest.java docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Window chrome: the window title
 
@@ -3093,7 +3211,7 @@ Rulings (plan, "Rulings"): (1) row 6 is plans 6a and 6b; (2) the window-chrome g
 (3) Help is `MenuTarget.HELP`, last in the classic bar; (4) the classic Window menu takes the tool-window toggles from
 View; (5) the menu-row roles are the same in both catalogs and the item margins come from the face's line height;
 (6) an open classic title is the accent, a hovered closed one `surface.control.hover`; (7) About is in Help whenever the
-screen menu bar is off; (8) Windows and Linux captions follow the operating system; (9) Enterprise Dark's menu-row rule is
+screen menu bar is off; (8) Windows and Linux captions follow the operating system, and on macOS every native-titled frame and dialog follows the theme (the chooser's sheets and the diagnostics dialog included); (9) Enterprise Dark's menu-row rule is
 darker than the mock until plan 6b's `border.divider` override; (10) the title tokens and separators; (11) the one motion
 supplier is the theme controller's flag; (12) mock comparison by profile. Deviations from the plan's text: <deviations>.
 Plan-6b entry conditions: the `WINDOW_CONTENT` group, `border.divider` overridable, the header, tabs, status cells and
