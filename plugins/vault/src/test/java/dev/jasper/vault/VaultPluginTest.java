@@ -251,13 +251,14 @@ class VaultPluginTest {
             plugin.clock = 0;
             plugin.timer().touch();
             plugin.tick();
-            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|Vault unlocked · locks in 15 min|dev.jasper.vault.lock");
+            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault: Unlocked|Vault unlocked · locks in 15 min|dev.jasper.vault.lock");
             plugin.clock = Duration.ofMinutes(14).toMillis() + 1;
             plugin.tick();
             assertThat(host.status().getFirst()).contains("locks in 1 min");
             plugin.lockManager().lock();
-            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault|Vault locked|dev.jasper.vault.open");
+            assertThat(host.status()).containsExactly("dev.jasper.vault.status|RIGHT|Vault: Locked|Vault locked|dev.jasper.vault.open");
             assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ZERO)).isEqualTo("Vault unlocked");
+            assertThat(VaultPlugin.statusText(LockState.NO_VAULT)).as("spec 13; no vault is neither locked nor unlocked").isEqualTo("Vault");
             assertThat(VaultPlugin.tooltip(LockState.UNLOCKED, Duration.ofSeconds(30))).isEqualTo("Vault unlocked · locks in 1 min");
         }
     }); }
