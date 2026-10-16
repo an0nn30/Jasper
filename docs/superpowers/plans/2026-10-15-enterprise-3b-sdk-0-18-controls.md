@@ -11,7 +11,7 @@ contract suites and drawn by the default look, with every existing gallery pixel
 
 **Architecture:** Each addition is one task that changes the SDK record or enum and its jasper-ui mirror together
 (after 3a the two `Nodes.java` and `ViewSpec.java` files differ only in the package and SDK-only Javadoc, and every
-edit anchors on text present in both, or for TABS on the SDK's 3a Javadoc, so one edit script edits both),
+edit anchors on text present in both, or for TABS and SWATCH on the SDK's 3a Javadoc, so one edit script edits both),
 adds the `KitValues` mapping, the default-look renderer in `dev.jasper.ui.swing` (new package-private
 `Separators`, `Notices` and `PropertyLists` classes, the rest small changes to existing controls), the testkit fake's
 part and a new headless gallery fixture appended after the existing 66, so every existing fixture keeps its pixels.
@@ -26,23 +26,25 @@ AssertJ 3.27.7, Python 3.11+ standard library for the mechanical edit scripts (a
 (sections 1, 3, 8, 16 and 19; 19.1 defines this plan: "3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`,
 `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, Separator, `IconSize.SWATCH`,
 `Form.footnote` and the EXCLUSIVE validation)"; also 6.4, 7.1, 7.3 and 13 for what the default look draws and what
-3e changes). Plans 1 and 2 are merged on `main`; plan 3a (SDK 0.18 renames,
-[plan](2026-10-15-enterprise-3a-sdk-0-18-renames.md)) is merged before this plan executes. Plans 3c and 3d follow it.
+3e changes). Plans 1, 2 and 3a (SDK 0.18 renames,
+[plan](2026-10-15-enterprise-3a-sdk-0-18-renames.md)) are merged on `main` (3a as `deafed424`). Plan 3d executes in
+parallel in another worktree and 3c follows; the files both touch are reconciled when the second of them merges.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-3b`, branch
-`claude/enterprise-sdk-0-18-controls`. The branch was cut from `main` at `222969926` (before 3a) and holds only this
-plan's commit. Before Task 1, confirm 3a is on `main` and rebase:
+`claude/enterprise-sdk-0-18-controls`. The branch stands on `main` at `deafed424` (3a merged) and holds only this
+plan's commits (`5c0a2f374`, `41a3d9c38` and the anchor refresh); do not rebase or merge it. Before Task 1, confirm:
 
 ```bash
-git log --oneline main | grep -c 'SDK 0.18: EXCLUSIVE, HELP and the prompt names'   # expect 1
-git rebase main
+git merge-base --is-ancestor deafed424 HEAD && echo ok   # expect ok
+git log --oneline deafed424..HEAD | grep -vc '^[0-9a-f]* Plan'   # expect 0: only the plan's own commits
 grep -c 'ChoiceKind { DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS }' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java  # expect 1
 ```
 
 Run every command from the worktree root, never in `~/projects/moray`. Every quoted anchor below is in its post-3a
 form (`EXCLUSIVE`, `HELP`, `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE`, `IconSize.PROMPT`,
 `JasperSdk.VERSION` 0.18.0). The edit scripts replace text, not line numbers, and stop with a message when their text is
-not found the stated number of times; line numbers in **Files** are from `222969926` and are approximate after 3a.
+not found the stated number of times; line numbers in **Files** and **Verified facts** were re-read at `deafed424` on
+2026-10-16 (see "Execution notes").
 
 ## Global Constraints
 
@@ -130,21 +132,24 @@ Decisions where the spec is silent. Record them in `docs/STATUS.md` (Task 10).
 
 ## Verified facts
 
-Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines materially.
+Re-read at `deafed424` (post-3a) on 2026-10-16. A bare `Nodes.java:N` is the jasper-ui model's line; the SDK's, lower
+by 3a's Javadoc, follows as "SDK `:N`".
 
 1. `Nodes.Node` permits 28 types (`jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12`); at `222969926` the
    jasper-ui model `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java`, `ViewSpec.java` and `ListItem.java` are
    byte-identical to the SDK's but for the package. After 3a (its Task 4) the SDK's `Nodes.java` also carries SDK-only
-   Javadoc on `TextRole`, `ButtonKind`, `ChoiceKind`, `ListKind`, `FormKind`, `ScrollPolicy`, `ButtonPresentation`,
-   `FieldPresentation`, `PickerDensity`, `Toggle`, `FormRow`, `Section` and `Empty`, so a `diff` with the package
-   normalised shows those comments only; every edit here anchors on text present in both files (or, for TABS, on the
-   SDK's 3a `ChoiceKind` Javadoc).
-2. `IconSize` is `{ CAPTION, CONTROL, RAIL, EMPTY, HERO }` (`Nodes.java:18`, `PROMPT` after 3a); `ChoiceKind` is
-   `{ DROPDOWN, PICKER, SEGMENTED, SEARCHABLE, PREVIEWS }` (`:22`, `EXCLUSIVE` after 3a, which also adds a one-line
-   Javadoc above it in the SDK only); `Severity` is `{ INFO, WARNING, DANGER }` (`:82`).
-3. `Field` has 12 components and three conveniences (`Nodes.java:201-231`); `PickerFace` has 5 (`:290-292`); `Form` has
-   10 with two conveniences (`:555-580`); `Icon` checks only non-null hue and size (`:85-97`); `Choice` validates face,
-   icon and search but not option counts (`:309-338`).
+   Javadoc on `TextRole`, `IconSize`, `ButtonKind`, `ChoiceKind`, `ListKind`, `FormKind`, `ScrollPolicy`,
+   `ButtonPresentation`, `FieldPresentation`, `PickerDensity`, `Toggle`, `FormRow`, `Section` and `Empty`, so a `diff`
+   with the package normalised shows those comments only (`ViewSpec.java` and `ListItem.java` are identical but for the
+   package); every edit here anchors on text present in both files (or, for TABS and SWATCH, on the SDK's 3a
+   `ChoiceKind` and `IconSize` Javadoc).
+2. `IconSize` is `{ CAPTION, CONTROL, RAIL, EMPTY, PROMPT }` (`Nodes.java:18`, SDK `:20` under 3a's one-line Javadoc);
+   `ChoiceKind` is `{ DROPDOWN, PICKER, EXCLUSIVE, SEARCHABLE, PREVIEWS }` (`:22`, SDK `:26` under 3a's one-line
+   Javadoc); `Severity` is `{ INFO, WARNING, DANGER }` (`:82`, SDK `:90`).
+3. `Field` has 12 components and three conveniences (`Nodes.java:201-231`, SDK `:211-241`); `PickerFace` has 5
+   (`:290-292`, SDK `:300-302`); `Form` has 10 with two conveniences (`:555-580`, SDK `:568-593`); `Icon` checks only
+   non-null hue and size (`:85-97`, SDK `:93-105`); `Choice` validates face, icon and search but not option counts
+   (`:309-338`, SDK `:319-348`).
 4. `ViewSpec.validate` is one exhaustive switch whose last case lists the leaves (`ViewSpec.java:27-67`, `:64`);
    `ListItem.inline` admits Text, Icon, Chip, StatusDot, Progress, Strength, Button, MenuButton, Toggle, Choice and INLINE
    stacks of them and refuses anything else (`ListItem.java:42-51`).
@@ -161,7 +166,7 @@ Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines
    (`Choices.java:68`); its label shows unless embedded (`:30`, `:162`); `Cards` hides an EXCLUSIVE choice's label in a
    card (`Cards.java:50`); `ItemLists.inlineHeight` switches exhaustively on `ChoiceKind` (`ItemLists.java:282-305`).
 9. `PickerMenus.paintFace` draws a rich face's caption through `line(...)` in CAPTION or PICKER_CAPTION
-   (`PickerMenus.java:22-38`, `:48-53`); popup rows call `line` too (`:146`).
+   (`PickerMenus.java:22-38`, `line` at `:51-56`); popup rows call `line` too (`:146`).
 10. `Labels.IconControl.refresh` picks a glyph, tile or prompt rendering (`Labels.java:165-187`); `IconRegistry.size`
     switches exhaustively on `IconSize` (`IconRegistry.java:226-234`); hue tints are `HUE_*`, NONE `TEXT_SECONDARY`
     (`:306-312`); `icon(name, Color surface, Color foreground, size)` holds a glyph to 3:1 on a surface (`:155-170`).
@@ -178,10 +183,10 @@ Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines
     `DANGER_BORDER` (`DerivedColor.java:10-33`); `ColorRole.color(theme)` resolves either kind (`ColorRole.java:14-19`);
     `SurfaceContrast.painted(theme, PaintPair)` applies a pair's guard (`SurfaceContrast.java:92-95`); `Guard.TEXT`
     and `Guard.STRUCTURAL` exist (`:48-54`).
-15. The gallery's fixtures are listed in `KitGallery.fixtures()` (`KitGallery.java:37-64`); `main` writes a PNG and a
-    JSON per fixture, contact sheets of eight (`:285-298`) and `manifest.json` with `fixtureCount` (`:109`): 66
+15. The gallery's fixtures are listed in `KitGallery.fixtures()` (`KitGallery.java:37-68`); `main` writes a PNG and a
+    JSON per fixture, contact sheets of eight (`:284-298`) and `manifest.json` with `fixtureCount` (`:109`): 66
     fixtures and 142 files per theme today (plan 2's STATUS entry). A fixture's JSON lists mounted kit-owned components
-    only (`:244-252`). `StateFixtures` enumerates every `IconSize` (`StateFixtures.java:20`) and every `ChoiceKind`
+    only (`:246-256`). `StateFixtures` enumerates every `IconSize` (`StateFixtures.java:20`) and every `ChoiceKind`
     (`:29`).
 16. `GalleryCoverageTest.everyNodeAndEnumVariantHasARealFixture` requires every node type and every `Nodes` enum
     constant in a fixture (`GalleryCoverageTest.java:13-21`); `KitMatrixTest` renders every fixture over the theme set
@@ -192,7 +197,7 @@ Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines
     the listed classes against `Node`'s permitted subclasses (`jasper-app/.../plugins/KitValuesTest.java:12-36`).
 19. `KitContractTest` (testkit `testFixtures`) is abstract over `kit`, `emit`, `secret`, `owns`, `stop`, `fieldText` and
     `fieldSelection` (`KitContractTest.java:12-18`), implemented by `HostedKitContractTest` (app) and
-    `FakeKitContractTest` (`FakeKitTest.java:37-45`); `PluginContractTest` runs on both through `ContractHarness.ui`
+    `FakeKitContractTest` (`FakeKitTest.java:36-44`); `PluginContractTest` runs on both through `ContractHarness.ui`
     (`PluginContractTest.java:120-131`).
 20. `FakeKitView.emit` records an `Edited` of a field as its text and delivers it (`FakeKitView.java:91`).
 21. `EditorHint` has `Font`, `Directory` and `File` (`EditorHint.java:4-39`); `PluginSettingsPage.Hint` maps them for
@@ -203,8 +208,8 @@ Read at `222969926` (pre-3a); 3a renames constants but moves none of these lines
     testkit's drops it (`jasper-sdk-testkit/.../KitSettingRows.java:97`).
 23. `ServerEditor` builds TFTP's login as a one-option choice ("No login (TFTP has none)", `ServerEditor.java:377-386,417`)
     and the protocol choice from the offered protocols, which can be one (`:123-127,395-398`).
-24. `docs/plugin-ui.md` lists the controls (`:53-58`) and other building blocks (`:165-177`) and describes the testkit
-    (`:199-205`); `docs/plugin-authoring.md:608-612` lists the editor hints.
+24. `docs/plugin-ui.md` lists the controls (`:55-60`) and other building blocks (`:173-185`) and describes the testkit
+    (`:207-212`); `docs/plugin-authoring.md:608-612` lists the editor hints.
 
 ## File structure
 
@@ -237,14 +242,14 @@ state moves into its descriptor. The fake drops an `Edited` addressed to a read-
 fixture shows two read-only fields.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:193-231`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:193-231` (Field)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:203-241`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:193-231` (Field)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:13`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/TextFields.java:27,89,206,254`, `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:163-166` (removed)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/shortcuthelp/ShortcutPanel.java:181,190-193`
 - Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/FakeKitView.java:90-92`
-- Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java:18,36` (hook and case)
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitContractTest.java:16`, `jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeKitTest.java:21,44`
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:63` (fixture `read-only-fields`)
+- Modify: `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/KitContractTest.java:18,39` (hook and case)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitContractTest.java:16`, `jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeKitTest.java:19,43`
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:67` (fixture `read-only-fields`)
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/swing/FieldTrailingTest.java:12-14,38-54`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ReadOnlyFieldsTest.java`
 - Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/KitValuesTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/model/ViewSpecTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java`
@@ -419,7 +424,7 @@ edit("jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeKitTest.java",
   var locked=new dev.jasper.sdk.ui.Nodes.Field("locked",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"x","","Locked","",java.util.Optional.empty(),dev.jasper.sdk.ui.Nodes.FieldPresentation.STANDARD,"","","",true);
   var open=new dev.jasper.sdk.ui.Nodes.Field("open",ready,dev.jasper.sdk.ui.Nodes.FieldKind.TEXT,"","","Open","");
   var hidden=new dev.jasper.sdk.ui.Nodes.Stack("hidden",new dev.jasper.sdk.ui.ControlState(false,true,false,""),dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(open));
-  var view=(FakeKitView)kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(locked,hidden))),events::add);
+  var view=kit.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("root",ready,dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL,java.util.List.of(locked,hidden))),events::add);
   view.type("locked","typed");view.emit(new dev.jasper.sdk.ui.UiEvent.Edited("locked","typed"));view.type("open","typed");
   assertThat(events).isEmpty();
   assertThatIllegalArgumentException().isThrownBy(() -> view.type("root","typed"));
@@ -574,9 +579,9 @@ and `EditorHint.technical()` make generated pages use the new `Editors.technical
 testkit's) use `FieldPresentation.TECHNICAL`. One gallery fixture shows technical captions at both densities.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:285-292`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:285-292` (PickerFace)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:295-302`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:285-292` (PickerFace)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:47`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/PickerMenus.java:37,48-53,146`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/PickerMenus.java:37,51-56,146`
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/settings/EditorHint.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginSettingsPage.java:77-88,102-127`, `jasper-app/src/main/java/dev/jasper/app/settingsui/Editors.java:125-127,312-316`, `jasper-app/src/main/java/dev/jasper/app/plugins/KitSettingRows.java:50-51`
 - Modify: `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/KitSettingRows.java:42-44`
@@ -919,7 +924,7 @@ label. The count rule refuses File Server's two one-option choices, so a single 
 read as read-only fields (Rulings 1). `StateFixtures`' controls sheet skips TABS, which gets its own fixture.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:22` (and 3a's one-line Javadoc above it), `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:22`
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:26` (and 3a's one-line Javadoc above it, `:25`), `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:22`
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:51-53`, `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java:51-53`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Choices.java:30,162`, `jasper-ui/src/main/java/dev/jasper/ui/swing/ItemLists.java:296`
 - Modify: `plugins/fileserver/src/main/java/dev/jasper/fileserver/ui/ServerEditor.java:371-373,395-398,417`
@@ -1188,10 +1193,11 @@ EOF
 radio's swatch. The hue must not be NONE and a swatch takes no severity; the name stays a valid icon name (it is still
 validated and is what a presentation without swatches would draw). `IconRegistry.size` gives it `ICON_CAPTION`, and
 `Labels.IconControl` paints the square in the hue's glyph colour (Rulings 9). `StateFixtures`' icon sheet skips SWATCH,
-which gets its own fixture.
+which gets its own fixture. The app's `KitValuesTest` also pins the full name lists of `IconSize`, `FormKind`,
+`LayoutRole` and `TextRole` against the model's, which 3a's final review found unpinned there.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:18,85-97`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:18,85-97`
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:19-20,92-105` (with 3a's one-line Javadoc at `:19`), `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:18,85-97`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/icons/IconRegistry.java:226-234`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Labels.java:148-154,165-167`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/StateFixtures.java:20`, `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java` (fixture `swatches`)
@@ -1308,6 +1314,10 @@ edit("jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java", [
    assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
   }
   assertThat(Arrays.stream(IconSize.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.IconSize.values()).map(Enum::name).toArray(String[]::new));
+  // 3a's other renamed enums keep the model's names too (3a's final review: only ChoiceKind and ButtonPresentation were pinned).
+  assertThat(Arrays.stream(FormKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FormKind.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(Arrays.stream(LayoutRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.LayoutRole.values()).map(Enum::name).toArray(String[]::new));
+  assertThat(Arrays.stream(TextRole.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.TextRole.values()).map(Enum::name).toArray(String[]::new));
  }
  @Test void explicitPickerCuesSurviveHostProjectionAndRejectOtherKinds(){
 ''', 1)])
@@ -1351,12 +1361,18 @@ def edit(name, edits):
         if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
-for nodes in ["jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java", "jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java"]:
+SDK_NODES, MODEL_NODES = "jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java", "jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java"
+SWATCH_DOC = ("     * SWATCH (since 0.18.0) is a solid square of the icon's hue at caption size, such as a protocol's colour beside its\n"
+              "     * name; its hue is not NONE and it takes no severity, and its name stays a valid icon name.\n")
+# The SDK's IconSize carries 3a's one-line Javadoc: SWATCH joins it, so no doc comment is left dangling.
+edit(SDK_NODES, [("    /** PROMPT is the large icon: a prompt's header, a detail heading or a sheet's title. */\n"
+                  "    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }\n",
+    "    /**\n     * PROMPT is the large icon: a prompt's header, a detail heading or a sheet's title.\n" + SWATCH_DOC + "     */\n"
+    "    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT, SWATCH }\n", 1)])
+edit(MODEL_NODES, [("    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }\n",
+    "    /**\n" + SWATCH_DOC + "     */\n    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT, SWATCH }\n", 1)])
+for nodes in [SDK_NODES, MODEL_NODES]:
     edit(nodes, [
-        ("    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT }\n",
-         "    /**\n     * SWATCH (since 0.18.0) is a solid square of the icon's hue at caption size, such as a protocol's colour beside its\n"
-         "     * name; its hue is not NONE and it takes no severity, and its name stays a valid icon name.\n     */\n"
-         "    public enum IconSize { CAPTION, CONTROL, RAIL, EMPTY, PROMPT, SWATCH }\n", 1),
         (r'''            Objects.requireNonNull(severity);
         }
         public Icon(String id, ControlState state, String name, Hue hue, IconSize size, String accessibleName) {
@@ -1435,7 +1451,7 @@ anywhere else, or as a view's root, and list rows keep refusing it (Rulings 2 an
 root.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,643`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the record)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,656`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the record)
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:3-7,15,21,35,64,66`, `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java` (same)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:35`
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/Separators.java`
@@ -1771,7 +1787,7 @@ VERTICAL stack child only (Rulings 2). Its action is a node of the view, so ever
 look (Rulings 5) is the new `Notices` control; its two painted pairs per severity join `PaintedContrastTest`.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,643`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the record)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,656`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the record)
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:41`, `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java:41` (the case and `place`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java` (after the Separator case)
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/Notices.java`
@@ -2253,7 +2269,7 @@ rows; a label is not blank and does not end with a colon (the presentation punct
 the new `PropertyLists` control; its three severity pairs join `PaintedContrastTest`.
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,643`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the records)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:12,656`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:12,643` (permits and the records)
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/ViewSpec.java:64`, `jasper-ui/src/main/java/dev/jasper/ui/model/ViewSpec.java:64`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java` (after the Notice case, and before the Numeric mapping)
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/PropertyLists.java`
@@ -2667,9 +2683,9 @@ footnote); a footnote is one line and excludes a preview (Rulings 10). The defau
 projections now keep it, and the testkit's also keeps the submission it used to drop (Rulings 13).
 
 **Files:**
-- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:554-580`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:554-580` (Form)
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java:567-593`, `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:554-580` (Form)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitValues.java:30`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Forms.java:32,54,187,296-309`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Forms.java:32,55,190,296-309`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/KitSettingRows.java:139`, `jasper-sdk-testkit/src/main/java/dev/jasper/sdk/testing/KitSettingRows.java:97`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java` (fixture `form-footnote`)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/FootnotesTest.java`
@@ -3168,7 +3184,7 @@ the SDK README's 0.18.0 sentence the additions (spec 17: smallest edits). The he
 XML; the plan's status banner records the execution.
 
 **Files:**
-- Modify: `docs/plugin-ui.md:165-177,199-205`, `docs/plugin-authoring.md:611`, `jasper-sdk/README.md:45` (3a's 0.18.0 sentence)
+- Modify: `docs/plugin-ui.md:173-185,207-212`, `docs/plugin-authoring.md:611`, `jasper-sdk/README.md:45` (3a's 0.18.0 sentence)
 - Modify: `docs/STATUS.md:2` (a new entry at the top), `docs/superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md:1` (the status banner)
 
 **Interfaces:**
@@ -3310,8 +3326,10 @@ def git(*args): return subprocess.run(["git", *args], capture_output=True, text=
 counts = os.environ["COUNTS"].strip()
 if not counts or counts.startswith("<"): raise SystemExit("set COUNTS to the line the count script printed")
 base = git("merge-base", "HEAD", "main")
-commits = git("log", "--reverse", "--format=%h", f"{base}..HEAD").split()
-first, last = commits[1], commits[-1]          # commits[0] is this plan's own commit
+# The plan's own commits ("Plan: …", "Plan 3b: …") are not the execution's.
+commits = [line.split(" ", 1)[0] for line in git("log", "--reverse", "--format=%h %s", f"{base}..HEAD").splitlines()
+           if not line.split(" ", 1)[1].startswith("Plan")]
+first, last = commits[0], commits[-1]
 date = datetime.date.today().isoformat()
 deviations = " ".join(DEVIATIONS) if DEVIATIONS else "none beyond the plan's Rulings"
 entry = f"""**Enterprise presentation, plan 3b: SDK 0.18 controls — {date}** (`claude/enterprise-sdk-0-18-controls`, worktree
@@ -3386,3 +3404,135 @@ EOF
 ```
 
 Then stop: do not push or merge. The user reviews the branch and the GUI check above.
+
+## Execution notes (2026-10-16)
+
+The anchors, quoted text, paths, signatures and line numbers above were re-verified against the worktree at
+`41a3d9c38` (on `main`'s `deafed424`, 3a merged), and the text was updated where the code had moved. How: every
+Python edit script of Tasks 1 to 10 (and each "Create" file) was applied in task order to an exported copy of the
+tree, with every anchor found its stated number of times. The result then compiled with JBR 25's `javac -Xlint:all`
+(no Gradle) in every source set it touches (SDK, jasper-ui with its test fixtures, app, testkit with its contracts,
+File Server); its only new lint warnings, both fixed below, were a dangling SDK doc comment and a redundant cast. The
+SDK, jasper-ui and app javadoc ran with the build's doclint flags (the testkit's with the defaults) and reported no
+errors. The JUnit launcher,
+run outside Gradle, passed every new and named test. Its failures (jasper-ui's shipped-jar check, the app's staged
+plugin tests, File Server's network tests) need Gradle-built jars or open sockets and fail the same way on the
+unchanged base. The headless gallery's bytes and the Gradle architecture tasks were not run; Task 10 still proves
+them.
+
+Corrections made in this refresh: the Workspace step (the branch already stands on `deafed424`, so there is no
+rebase); SDK `Nodes.java` line numbers, which sit 2 to 13 lines below the model's after 3a's Javadoc (both are now
+given); `PickerMenus.line`, `KitGallery`, `FakeKitTest`, `KitContractTest`, `Forms` and `docs/plugin-ui.md` line
+numbers; Verified fact 1's list of SDK-only Javadoc (`IconSize` has one too); Task 4's SDK `IconSize` edit; Task 4's
+enum-name pins; Task 1's redundant cast; Task 10's commit range.
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface. "Disjoint" means each task's anchors are different text, and the
+in-order simulation found each later anchor its stated number of times after the earlier task had run. Every task
+from 1 to 8 edits both `Nodes.java` files, appends a fixture before `KitGallery`'s `return List.copyOf(result);`
+(so fixtures land in task order, as the pixel rule needs), and inserts tests before one fixed anchor in the SDK
+`KitValuesTest`, the model `ViewSpecTest` and the app `KitValuesTest`. Those shared files are not repeated in each row
+below unless something more is shared.
+
+| Pair | Shared beyond the common files | Finding | Ruling |
+|---|---|---|---|
+| 1 × 2 | `KitValues` (Field line, PickerFace line) | disjoint | A |
+| 1 × 3 | interface: the 13-argument `Field` that `ServerEditor.fact` builds | 3 consumes 1's signature exactly | A |
+| 1 × 4 | none | disjoint | A |
+| 1 × 5 | `KitValues` | disjoint | A |
+| 1 × 6 | `FakeKitView` (1: `emit`/`type` before `registerContent`; 6: the `children` Empty case) | disjoint | A |
+| 1 × 7 | `KitValues` | disjoint | A |
+| 1 × 8 | `KitValues` (Field line, Form line) | disjoint | A |
+| 1 × 9 | `KitContractTest`: 9 inserts its case before 1's read-only case Javadoc; interface: `type` hook, read-only `Field` | 1's Javadoc line occurs once, so 9's anchor holds | A |
+| 1 × 10 | interface: the guide documents `FakeKitView.type` and `readOnly` | names match 1's code | A |
+| 2 × 3 | none | disjoint | A |
+| 2 × 4 | none | disjoint | A |
+| 2 × 5 | `KitValues` | disjoint | A |
+| 2 × 6 | `KitValues` | disjoint | A |
+| 2 × 7 | `KitValues` | disjoint | A |
+| 2 × 8 | `KitValues`; both `KitSettingRows` (2: the field presentation, 8: the Form rebuild); `PluginPanelPageTest`, `FakePluginSettingsTest` (both insert before the `hostControl`/`control` helper Javadoc, which 2 re-emits once) | disjoint; 8's anchor still occurs once after 2 | A |
+| 2 × 9 | interface: the 6-argument `PickerFace` in `zeroEighteen` | matches | A |
+| 2 × 10 | interface: `EditorHint.technical()`, `technicalCaption` in the guides | matches | A |
+| 3 × 4 | `StateFixtures` (3: the controls line, 4: the icons line) | disjoint | A |
+| 3 × 5 | `ViewSpec` (3: the `Choice` case, 5: imports, `place`, the Stack case, the leaf case, the child loop) | disjoint | A |
+| 3 × 6 | `ViewSpec` (6: `place` and the `Empty` case) | disjoint | A |
+| 3 × 7 | `ViewSpec` (7: the leaf case) | disjoint | A |
+| 3 × 8 | none | disjoint | A |
+| 3 × 9 | interface: TABS, the 2-to-4 rule (9's refused cases) | messages match ("2 to 4 options", "two or more options") | A |
+| 3 × 10 | interface: the guide's TABS and EXCLUSIVE sentences | matches | A |
+| 4 × 5 | none | disjoint | A |
+| 4 × 6 | none (6's glyph uses `Labels.tint`, untouched by 4) | disjoint | A |
+| 4 × 7 | none (7's `valuePair` uses `Labels.tint`) | disjoint | A |
+| 4 × 8 | none | disjoint | A |
+| 4 × 9 | interface: `IconSize.SWATCH`, the NONE refusal | matches | A |
+| 4 × 10 | interface: the guide's SWATCH sentence | matches | A |
+| 5 × 6 | permits chain (`Custom, Separator {` then `…, Notice {`); `ViewSpec.place` (6 rewrites 5's Javadoc and adds its rule); `KitValues` (6 anchors on 5's Separator case); `ControlRegistry` (both add a `create` case after Breadcrumbs, so Notice lands before Separator); app `KitValuesTest`'s list, which 5's `classes` counts | chained anchors each occur once; the order of switch cases does not matter | A, D |
+| 5 × 7 | permits chain; the `ViewSpec` leaf case (`Custom _, Separator _` then `…, Properties _`); `ControlRegistry` validate leaf line; `KitValues`; the counted list | chained anchors each occur once | A |
+| 5 × 8 | `KitValues` | disjoint | A |
+| 5 × 9 | interface: `Separator`, placement messages | matches | A |
+| 5 × 10 | interface: the guide's toolbar-groups sentence | matches | A |
+| 6 × 7 | permits chain; `KitValues` (7 inserts before 6's Notice case); `ControlRegistry` (7 anchors on 6's create case); `PaintedContrastTest` (7 anchors on 6's last `Declared` line and 6's class Javadoc line; both insert helpers before `paint(`) | chained anchors each occur once | A |
+| 6 × 8 | `KitValues` | disjoint | A |
+| 6 × 9 | interface: `Notice` with one LINK action; the notice-with-action fixture (DANGER, "Choose…") that 9's coverage asks for | matches | A |
+| 6 × 10 | interface: the guide's Notice sentence | matches | A |
+| 7 × 8 | `KitValues` (7 adds a `PropertyRow` mapping before the `Numeric` one; 8 edits the Form line) | disjoint | A |
+| 7 × 9 | interface: `Properties`, `PropertyRow` (technical and graded rows in the fixture) | matches | A |
+| 7 × 10 | interface: the guide's Properties sentence | matches | A |
+| 8 × 9 | interface: the 11-argument `Form` with `FormSubmission.PRIMARY` and a footnote; the `form-footnote` fixture | matches | A |
+| 8 × 10 | interface: the guide's footnote sentence | matches | A |
+| 9 × 10 | none (10 runs `check`, which runs 9's cases) | none | A |
+
+Each task against itself:
+
+| Task | Finding | Ruling |
+|---|---|---|
+| 1 | Files cited `KitContractTest.java:18,36`, `FakeKitTest.java:21,44` and `KitGallery.java:63` (now `:18,39`, `:19,43`, `:67`); the fake test's `(FakeKitView)` cast is redundant (`FakeKit.create` returns `FakeKitView`), a new `-Xlint:cast` warning | C |
+| 2 | SDK `PickerFace` lines and `PickerMenus.line` lines had moved; text otherwise agrees (Interfaces, steps, commit) | B |
+| 3 | SDK `ChoiceKind` line had moved. Other one- or five-option EXCLUSIVE choices in main code: none (Plugin Details 2, toolbar setting 3, Remote and the fixtures 2 to 4), so Step 4's fallback should not fire | B, E |
+| 4 | Its SDK edit put a new Javadoc under 3a's one-line `IconSize` Javadoc, leaving that one dangling (`-Xlint:dangling-doc-comments`, and the PROMPT sentence lost from the SDK's javadoc); the enum-name pins carried from 3a's review were missing | F, G |
+| 5 | SDK `Custom` line had moved (`:656`) | B |
+| 6 | SDK `Custom` line had moved | B |
+| 7 | SDK `Custom` line had moved | B |
+| 8 | SDK `Form` and `Forms.java` lines had moved | B |
+| 9 | agrees with itself; its cases pass on the host and the fake in the simulation | A |
+| 10 | Step 4 took `commits[1]` as the first task commit, but the branch now holds three plan commits before Task 1; the guide line numbers had moved | H, B |
+
+### Rulings
+
+- **A. Shared files stay shared as written.** What: the edits that several tasks make to `Nodes.java`, `ViewSpec`,
+  `KitValues`, `ControlRegistry`, `KitGallery`, `PaintedContrastTest` and the tests run in task order, unchanged. Why:
+  each anchor occurs exactly once at its turn in the in-order simulation, and the end state compiles and passes.
+  Cost if wrong: an edit script stops with "expected 1 of …" and names the anchor; nothing is half-applied in that
+  file, because each script writes a file only after all its edits match.
+- **B. Line numbers are refreshed; text anchors rule.** What: **Files** and **Verified facts** now give the model's line
+  and the SDK's separately. Why: 3a's SDK-only Javadoc moved the SDK lines by 2 to 13. Cost if wrong: a reader opens
+  the wrong line; the scripts do not use line numbers.
+- **C. Task 1's fake test drops the redundant cast.** What: `var view=kit.create(…)`. Why: `FakeKit.create` already
+  returns `FakeKitView`, and the cast added a `-Xlint:cast` warning. Cost if wrong: none (one warning).
+- **D. Notice's `create` case sits before Separator's in `ControlRegistry`.** What: accept the order the anchors
+  produce. Why: pattern-switch cases over distinct record types do not depend on order. Cost if wrong: none.
+- **E. The EXCLUSIVE count rule needs no other code change.** What: Task 3 changes only File Server's two one-option
+  choices. Why: every other EXCLUSIVE producer in main code has two to four options. Cost if wrong: Step 4's
+  fallback (give the choice two to four options and record it in the banner) still applies.
+- **F. In the SDK, SWATCH joins 3a's `IconSize` Javadoc instead of adding a second one.** What: the SDK gets one
+  block (the PROMPT sentence, then the SWATCH sentence); the model, which has no Javadoc there, gets the SWATCH
+  sentence alone. Why: two doc comments in a row leave the first dangling (a new lint warning) and drop the PROMPT
+  sentence from the SDK javadoc. The model may differ in comments only (Global Constraints). Cost if wrong: one
+  warning and a missing sentence of public SDK documentation.
+- **G. Task 4 pins the 3a enums' names in the app's `KitValuesTest`.** What: `IconSize` (already in the text),
+  `FormKind`, `LayoutRole` and `TextRole` each compared by name with the model, one line each, in
+  `swatchesProjectWithoutLoss`. Why: 3a's final review found only `ChoiceKind` and `ButtonPresentation` pinned there,
+  and each extra pin is one line. They pass at once (no red step), as the mirrors agree today. Cost if wrong: none;
+  a later mismatch fails loudly.
+- **H. Task 10's STATUS range skips the plan's own commits by subject.** What: commits whose subject starts with
+  "Plan" are left out, and the range runs from the first `SDK 0.18` commit to the last. Why: the branch holds three
+  plan commits (`5c0a2f374`, `41a3d9c38`, this refresh), so `commits[1]` would name a plan commit. Cost if wrong: the
+  STATUS entry and banner name the wrong range, which the step's "read the new entry once" check catches.
+- **I. Plan 3d is not anticipated.** What: no task changes for 3d's StandardMenu, ScopeSpec, PaletteVerb,
+  `DialogSpec.swatch`, `ToolbarItem.View` or the header. Why: 3d runs in parallel; whichever plan merges second
+  reconciles the shared files (`docs/STATUS.md`, `FakeKitView`, `KitContractTest`, `PluginContractTest`,
+  `docs/plugin-ui.md`, and the SDK and model `Nodes.java` and `KitValues`; this plan adds no `migration.csv` row).
+  Cost if wrong: textual merge conflicts in those files at the second merge.
+- **J. A timing-sensitive test that fails once is re-run alone first.** What: before treating such a failure as real,
+  re-run that test by itself. Why: another plan's Gradle builds share the machine. Cost if wrong: one extra run.
