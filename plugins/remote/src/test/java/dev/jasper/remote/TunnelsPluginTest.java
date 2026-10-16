@@ -84,7 +84,7 @@ class TunnelsPluginTest {
             assertThat(host.panels()).contains(TunnelsUi.PANEL + "|Tunnels|LEFT|" + TunnelsUi.TOGGLE);
             assertThat(host.scopes()).contains(TunnelsScope.ID + "|Tunnels|toggle,browse,edit");
             assertThat(host.scopePresentation(TunnelsScope.ID)).as("spec 14.6").isEqualTo("NEUTRAL|tunnel|STANDARD,STANDARD,STANDARD");
-            assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + TunnelsUi.TOGGLE, "item:" + TunnelsUi.PICK, "item:" + TunnelsUi.NEW,
+            assertThat(host.menu("SESSION")).containsSubsequence("item:" + TunnelsUi.TOGGLE, "item:" + TunnelsUi.PICK, "item:" + TunnelsUi.NEW,
                 "item:" + TunnelsUi.FORWARD, "item:" + TunnelsUi.STOP_ALL);
             assertThat(host.menu("context")).contains("item:" + TunnelsUi.FORWARD);
             assertThat(host.status()).as("hidden while nothing runs").isEmpty();

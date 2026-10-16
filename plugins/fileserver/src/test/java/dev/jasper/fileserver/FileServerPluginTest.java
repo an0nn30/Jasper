@@ -216,6 +216,20 @@ class FileServerPluginTest {
         }
     }
 
+    /** Spec 13: Share Folder… and New File Server… sit in the Transfer menu, and Share Folder… opens New File Server. */
+    @Test void theTransferMenuSharesAFolderAndAddsAFileServer() {
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            assertThat(host.menu("TRANSFER")).containsExactly("item:" + FileServerPlugin.SHARE_FOLDER, "item:" + FileServerPlugin.NEW);
+            assertThat(host.actions()).contains(FileServerPlugin.SHARE_FOLDER + "|Share Folder…|true");
+            UUID window = host.addTerminalWindow();
+            UiTestAccess.edt(() -> assertThat(host.invoke(FileServerPlugin.SHARE_FOLDER, window, null)).isTrue());
+            assertThat(host.windows()).containsExactly("dialog|New File Server|true");
+        }
+    }
+
     @Test void keyFilesSkipsLargeFilesAndFolders() throws Exception {
         Path keys = Files.createDirectories(home.resolve(".ssh"));
         Path good = Files.writeString(keys.resolve("id_ed25519.pub"), "ssh-ed25519 AAAA alice");

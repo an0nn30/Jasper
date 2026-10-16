@@ -77,7 +77,7 @@ class RemoteShortcutConfigTest {
                 .as("View > Tool Windows toggles the panel; Remote adds no View item of its own")
                 .allSatisfy(menu -> assertThat(menu.entries()).doesNotContain(new MenuEntry.Item(HOSTS)));
             assertThat(contributions.menus()).anySatisfy(menu -> {
-                assertThat(menu.target().key()).isEqualTo("dev.jasper.remote.menu");
+                assertThat(menu.target()).as("spec 13: the Session menu").isEqualTo(MenuTarget.standard(MenuTarget.Slot.SESSION));
                 assertThat(menu.entries()).contains(new MenuEntry.Item(HOSTS), new MenuEntry.Item(CONNECT));
             });
         });

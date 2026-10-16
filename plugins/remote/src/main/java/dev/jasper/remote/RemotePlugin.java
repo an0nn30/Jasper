@@ -64,12 +64,12 @@ import javax.swing.Timer;
 
 /**
  * Wires the plugin: the hosts store and its poll, trust, the agent, the connection registry, the session
- * provider, the Sessions panel (saved hosts and WSL distributions), the scope, the actions, the SSH menu, the status item and the dialogs.
+ * provider, the Sessions panel (saved hosts and WSL distributions), the scope, the actions, its Session and Transfer menu entries, the status item and the dialogs.
  */
 public class RemotePlugin implements Plugin {
     public static final String CONNECT = "dev.jasper.remote.connect", HOSTS = "dev.jasper.remote.hosts", SPLIT = "dev.jasper.remote.split";
     public static final String NEW_HOST = "dev.jasper.remote.hosts.new";
-    public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", MENU = "dev.jasper.remote.menu", PANEL = "dev.jasper.remote.panel";
+    public static final String IMPORT = "dev.jasper.remote.import", STATUS = "dev.jasper.remote.status", PANEL = "dev.jasper.remote.panel";
 
     private final Executor ui;
     private final Function<PluginContext,Executor> transferExecutor;
@@ -213,10 +213,12 @@ public class RemotePlugin implements Plugin {
         context.actions().register(ActionSpec.of(NEW_HOST, "New Host...").withIcon("add").withKeywords(List.of("ssh", "host", "session", "add")),
             invoked -> editHost(invoked.window(), Optional.empty()));
         context.actions().register(ActionSpec.of(IMPORT, "Import from ~/.ssh/config...").withKeywords(List.of("ssh", "import", "config")), invoked -> importConfig(invoked.window()));
-        PluginMenu menu = context.menus().create(MENU, "SSH");
-        menu.add(CONNECT); menu.add(HOSTS); menu.add(SPLIT); menu.addSeparator(); menu.add(NEW_HOST); menu.add(IMPORT);
-        menu.addSeparator();menu.add(SFTP);menu.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
-        tunnelsUi.addToMenu(menu);
+        // Spec 13: Remote's entries live in the Session and Transfer standard menus, which show only while they have entries.
+        PluginMenu session = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.SESSION);
+        session.add(CONNECT); session.add(HOSTS); session.add(SPLIT); session.addSeparator(); session.add(NEW_HOST); session.add(IMPORT);
+        tunnelsUi.addToMenu(session);
+        PluginMenu transfer = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.TRANSFER);
+        transfer.add(SFTP); transfer.add(dev.jasper.remote.ui.transfers.TransferUi.SHOW);
         // View > Tool Windows lists HOSTS, SFTP_TOGGLE and the Tunnels toggle: the panels name them as their toggles.
 
         distros = wslProfiles();
