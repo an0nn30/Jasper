@@ -53,7 +53,7 @@ class HostedKitTest {
   }
  });}
  /** Enterprise presentation plan 1: the app's three context sites take the kit installed when they make a context. */
- @Test void appContextsAreMadeOverTheInstalledKit() throws Exception {SwingUtilities.invokeAndWait(() -> {
+ @Test void appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var base=dev.jasper.ui.kit.Kit.DEFAULT;
   var tall=new dev.jasper.ui.kit.Kit("tall-buttons",base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,40),base.type(),base.faces(),base.controls(),base.colors(),base.uiKeys());
   var pair=ThemeTestSupport.pair(true);
@@ -67,7 +67,7 @@ class HostedKitTest {
    dev.jasper.ui.swing.FlatLafInstaller.install(pair.chrome(),tall);
    assertThat(source.kit()).as("read when the context was made").isSameAs(base);
    assertThat(bindings.context(dev.jasper.ui.theme.ThemeRoute.CHROME).kit()).isSameAs(tall);
-   assertThat(receiver.context(source).kit()).as("the installed kit, not the source's").isSameAs(tall);
+   assertThat(receiver.context(source).kit()).as("the source context's kit, not the installed one").isSameAs(source.kit());
    var tallView=kit.create(spec,e -> {});
    assertThat(tallView.component().getPreferredSize().height).as("a hosted view measures with the kit installed when it was made")
     .isGreaterThan(view.component().getPreferredSize().height);
@@ -239,4 +239,17 @@ class HostedKitTest {
   } finally {view.close();kit.close();ui.closeAll();}
   assertThat(themeSubscriptions.get()).isZero();assertThat(workspaceSubscriptions.get()).isZero();assertThat(updates).isEmpty();assertThat(glass).isEmpty();
  });}
+  @org.junit.jupiter.api.Test void aPluginsViewsAreMadeWithThePresentationsKit() throws Exception {
+    var kit = new dev.jasper.ui.kit.Kit("reach", dev.jasper.ui.kit.Kit.DEFAULT.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT, 26),
+        dev.jasper.ui.kit.Kit.DEFAULT.type(), dev.jasper.ui.kit.Kit.DEFAULT.faces(), dev.jasper.ui.kit.Kit.DEFAULT.controls(),
+        dev.jasper.ui.kit.Kit.DEFAULT.colors(), dev.jasper.ui.kit.Kit.DEFAULT.uiKeys());
+    javax.swing.SwingUtilities.invokeAndWait(() -> {
+      var hosted = new HostedKit("owner", () -> true, () -> dev.jasper.app.appearance.ThemeTestSupport.pair(false), null,
+          new Containment(java.awt.EventQueue::isDispatchThread), () -> false, action -> "", () -> kit);
+      var view = hosted.create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("t", dev.jasper.sdk.ui.ControlState.READY, "x",
+          dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+      org.assertj.core.api.Assertions.assertThat(view.context().kit()).isSameAs(kit);
+      view.close(); hosted.close();
+    });
+  }
 }

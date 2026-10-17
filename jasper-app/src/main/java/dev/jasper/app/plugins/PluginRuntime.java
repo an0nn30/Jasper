@@ -386,6 +386,12 @@ public final class PluginRuntime {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         clipboard = Objects.requireNonNull(value);
     }
+    private dev.jasper.ui.kit.Kit kit;
+    /** Supplies the presentation's kit, which plugins' views are made with, before plugin startup (spec 4.9). */
+    public void presentation(dev.jasper.ui.kit.Kit kit) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        this.kit = Objects.requireNonNull(kit);
+    }
     /** Supplies the live application motion policy before plugin startup. */
     public void animations(java.util.function.BooleanSupplier enabled) {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
@@ -661,6 +667,7 @@ public final class PluginRuntime {
             reports.report(), DRAIN_GRACE, contributions, () -> this.dark, windows, terminals, notifications, editor, settingsFiles, reports.clear(), profiles,
             dev.jasper.app.platform.Browser::open, appearance, appearanceSubscriber, failure -> failureSink.accept(failure), glass));
         created.animations = animations;
+        if (kit != null) { var chosen = kit; created.kit = () -> chosen; }
         created.shortcuts = shortcuts;
         created.clipboard = clipboard;
         created.commandClient = commandClient;

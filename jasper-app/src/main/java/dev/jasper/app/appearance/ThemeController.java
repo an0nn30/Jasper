@@ -38,6 +38,8 @@ public final class ThemeController implements AutoCloseable {
 
     private final Set<BiConsumer<ResolvedTheme, Boolean>> listeners = new LinkedHashSet<>();
     private final Predicate<GeneratedTheme> installer;
+    /** The kit every install of this controller uses and every context it hands out carries. */
+    private final Kit kit;
     private Shown shown;
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
@@ -56,7 +58,13 @@ public final class ThemeController implements AutoCloseable {
     public static ThemeController startup(boolean dark, ThemeSelection selection, Kit kit,
                                           java.util.function.Consumer<InstallationFailure> fallingBack) {
         Objects.requireNonNull(kit);
-        return startup(dark, selection, theme -> ThemeManager.install(theme, kit), fallingBack);
+        try { return new ThemeController(new Shown(dark, selection), kit, theme -> ThemeManager.install(theme, kit)); }
+        catch (InstallationFailure failure) {
+            fallingBack.accept(failure);
+            var cobalt = JasperTheme.bundled();
+            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), kit,
+                theme -> ThemeManager.install(theme, kit));
+        }
     }
     static ThemeController startup(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
@@ -64,30 +72,31 @@ public final class ThemeController implements AutoCloseable {
     }
     static ThemeController startup(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer,
                                    java.util.function.Consumer<InstallationFailure> fallingBack) {
-        try { return new ThemeController(new Shown(dark, selection), installer); }
+        try { return new ThemeController(new Shown(dark, selection), Kit.DEFAULT, installer); }
         catch (InstallationFailure failure) {
             fallingBack.accept(failure);
             var cobalt = JasperTheme.bundled();
-            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), installer);
+            return new ThemeController(new Shown(true, new ThemeSelection(selection.library(), cobalt, cobalt, selection.scheme())), Kit.DEFAULT, installer);
         }
     }
 
     /** Slate Cobalt in {@code dark} with {@code scheme}, under the default kit. */
     public ThemeController(boolean dark, TerminalSchemeChoice scheme) { this(dark, scheme, ThemeController::installDefault); }
     ThemeController(boolean dark, TerminalSchemeChoice scheme, Predicate<GeneratedTheme> installer) {
-        this(new Shown(dark, ThemeSelection.slateCobalt(Objects.requireNonNull(scheme))), installer);
+        this(new Shown(dark, ThemeSelection.slateCobalt(Objects.requireNonNull(scheme))), Kit.DEFAULT, installer);
     }
     /** {@code selection} in {@code dark}, under the default kit. */
     public ThemeController(boolean dark, ThemeSelection selection) {
-        this(new Shown(dark, Objects.requireNonNull(selection)), ThemeController::installDefault);
+        this(new Shown(dark, Objects.requireNonNull(selection)), Kit.DEFAULT, ThemeController::installDefault);
     }
     ThemeController(boolean dark, ThemeSelection selection, Predicate<GeneratedTheme> installer) {
-        this(new Shown(dark, Objects.requireNonNull(selection)), installer);
+        this(new Shown(dark, Objects.requireNonNull(selection)), Kit.DEFAULT, installer);
     }
     /** The installer of the controllers made without a kit. */
     private static boolean installDefault(GeneratedTheme theme) { return ThemeManager.install(theme, Kit.DEFAULT); }
-    private ThemeController(Shown shown, Predicate<GeneratedTheme> installer) {
+    private ThemeController(Shown shown, Kit kit, Predicate<GeneratedTheme> installer) {
         requireEdt();
+        this.kit = Objects.requireNonNull(kit);
         this.installer = Objects.requireNonNull(installer);
         this.shown = shown;
         // Swing otherwise tries the component's plugin loader for third-party LAF delegates.
@@ -97,13 +106,15 @@ public final class ThemeController implements AutoCloseable {
         UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = ResolvedTheme.of(shown.dark(), shown.selection());
-        appearance = new AppearanceBindings(current.pair(), ThemeController::reportFailure, () -> animationsEnabled);
+        appearance = new AppearanceBindings(current.pair(), kit, ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
         platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
 
     public ResolvedTheme current() { requireEdt(); return current; }
+    /** The kit this controller installs under and its contexts carry. */
+    public Kit kit() { return kit; }
     /** The terminal scheme chosen. */
     public TerminalSchemeChoice schemeChoice() { requireEdt(); return shown.selection().scheme(); }
     /** The themes picked and the library they come from. */

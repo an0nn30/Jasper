@@ -27,7 +27,10 @@ final class HostedKitView implements UiView {
  Runnable updated = () -> { };
 
  private final AtomicBoolean closed=new AtomicBoolean();
- HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;sourceSpec=spec;}
+ private final KitContext context;
+ /** The context the view was made with. */
+ KitContext context(){return context;}
+ HostedKitView(HostedKit owner,KitContext context,ViewSpec spec,Consumer<UiEvent> events){this.owner=owner;this.context=context;this.events=Objects.requireNonNull(events);view=new KitView(context,KitValues.toModule(spec),e -> dispatch(KitValues.toSdk(e)));this.spec=spec;sourceSpec=spec;}
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
