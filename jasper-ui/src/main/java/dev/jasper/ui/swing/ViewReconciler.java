@@ -97,12 +97,15 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof Choices.ChoiceControl choice && choice.node instanceof Nodes.Choice node && node.kind() == Nodes.ChoiceKind.EXCLUSIVE)
             choice.component.setBorder(null);
         if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
+        // A list keeps an adopted entry row only if its VERTICAL parent adopts it again (ItemLists.ListControl.children).
+        if (control instanceof ItemLists.ListControl list) list.spanned = false;
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;
             button.button.panelRow = false;
             button.button.fullFooter = false;
             button.button.windowFooter = false;
             button.button.orderedAction = false;
+            button.button.sideColumn = false;
             button.button.panelEmpty = false;
             button.button.noticeGround = null;
         }
@@ -303,10 +306,12 @@ final class ViewReconciler implements AutoCloseable {
         if (node instanceof Nodes.Stack route && route.role() == Nodes.LayoutRole.ROUTE) {
             int tile = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_TILE),
                 glyph = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_GLYPH);
+            // The classic strip edges its cells in the steps' hues instead of tiling their icons.
+            boolean tiled = !(next.get(route.id()) instanceof Stacks.StackControl strip) || strip.routeTiles();
             for (var step : route.children()) {
                 if (!tiles && next.get(step.id()) instanceof Stacks.StackControl control) control.routeStep = true;
                 Nodes.Node lead = step instanceof Nodes.Stack stack && !stack.children().isEmpty() ? stack.children().getFirst() : step;
-                if (tiles && lead instanceof Nodes.Icon && next.get(lead.id()) instanceof Labels.IconControl icon) icon.tile(tile, tile, glyph, false);
+                if (tiles && tiled && lead instanceof Nodes.Icon && next.get(lead.id()) instanceof Labels.IconControl icon) icon.tile(tile, tile, glyph, false);
             }
         }
         for (var child : ControlRegistry.children(node)) applyRoute(child, next, tiles);

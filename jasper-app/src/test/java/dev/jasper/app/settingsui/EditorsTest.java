@@ -145,6 +145,68 @@ class EditorsTest {
         assertThat(shell.value()).isEqualTo(Path.of("/bin/zsh").toString());
     }
 
+    /**
+     * Plan 4c final review: under the Enterprise kit the ordered list's side column acts on the selection, so a row moved
+     * twice with Move Up stays selected as it goes, though the rows are keyed by position.
+     */
+    @Test void theClassicSideColumnMovesTheSelectedItemTwoPlaces() {
+        dev.jasper.ui.testsupport.Edt.run(() -> {
+            var kitContext = dev.jasper.ui.testsupport.KitFixtures.context(dev.jasper.ui.testsupport.KitFixtures.light(),
+                dev.jasper.ui.testsupport.KitFixtures.enterprise());
+            var args = (Editors.Items) build(Editors.textList(), CoreSettings.TERMINAL_SHELL_ARGS, context);
+            String id = "terminal.shell.args";
+            args.show(List.of("alpha", "beta", "gamma"));
+            var view = new AtomicReference<dev.jasper.ui.swing.KitView>();
+            try (var mounted = new dev.jasper.ui.swing.KitView(kitContext, new dev.jasper.ui.model.ViewSpec(args.node(id, ControlState.READY)), event -> {
+                if (args.event(id, event)) view.get().update(new dev.jasper.ui.model.ViewSpec(args.node(id, ControlState.READY)));
+            })) {
+                view.set(mounted);
+                dev.jasper.ui.testsupport.KitFixtures.render(mounted, 420, 300, 1);
+                var rows = rows(mounted);
+                assertThat(rows).hasSize(3);
+                click(rows.get(2));
+                for (var expected : List.of(List.of("alpha", "gamma", "beta"), List.of("gamma", "alpha", "beta"))) {
+                    ((javax.swing.AbstractButton) named(mounted, "@ordered/" + id + "/side/up")).doClick(0);
+                    dev.jasper.ui.testsupport.KitFixtures.render(mounted, 420, 300, 1);
+                    assertThat(args.value()).isEqualTo(expected);
+                }
+                var list = (Nodes.ItemList) control(args.node(id, ControlState.READY), id);
+                assertThat(list.selectedIds()).as("the moved row stays selected").containsExactly("item-0");
+            } finally { kitContext.icons().close(); kitContext.binding().close(); }
+        });
+    }
+
+    /** The mounted rows of {@code view}'s lists, top to bottom. */
+    private static List<java.awt.Component> rows(java.awt.Container view) {
+        var found = new ArrayList<java.awt.Component>();
+        collect(view, found);
+        found.sort(java.util.Comparator.comparingInt(row -> javax.swing.SwingUtilities.convertPoint(row, 0, 0, view).y));
+        return found;
+    }
+
+    private static void collect(java.awt.Container parent, List<java.awt.Component> found) {
+        for (var child : parent.getComponents()) {
+            if (child.getClass().getName().equals("dev.jasper.ui.swing.InteractiveRows$Row") && child.isVisible() && child.getHeight() > 0) found.add(child);
+            if (child instanceof java.awt.Container nested) collect(nested, found);
+        }
+    }
+
+    private static java.awt.Component named(java.awt.Container parent, String name) {
+        for (var child : parent.getComponents()) {
+            if (name.equals(child.getName())) return child;
+            if (child instanceof java.awt.Container nested) { var found = named(nested, name); if (found != null) return found; }
+        }
+        return null;
+    }
+
+    /** A left click as a person makes it: press, release, click. */
+    private static void click(java.awt.Component row) {
+        long now = System.currentTimeMillis();
+        int x = row.getWidth() / 2, y = row.getHeight() / 2;
+        for (int type : new int[] {java.awt.event.MouseEvent.MOUSE_PRESSED, java.awt.event.MouseEvent.MOUSE_RELEASED, java.awt.event.MouseEvent.MOUSE_CLICKED})
+            row.dispatchEvent(new java.awt.event.MouseEvent(row, type, now, java.awt.event.InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+    }
+
     @Test void theOptionalSizeUsesThePlatformUntilTurnedOff() {
         var editor = (Editors.OptionalNumber) build(Editors.optionalNumber("Use platform size", 0.5, "pt"), CoreSettings.UI_FONT_SIZE, context);
         assertThat(editor.removesAtDefault()).isTrue();

@@ -67,8 +67,46 @@ final class Tables {
         return heading.countNoun().isBlank() ? Integer.toString(count) : count + " " + heading.countNoun() + (count == 1 ? "" : "s");
     }
 
+    /** A table's or a column tree's header: the titles over whatever its face paints behind them (nothing by default). */
+    static final class HeaderBand extends JPanel {
+        final ControlRegistry.Control owner;
+
+        HeaderBand(ControlRegistry.Control owner) { this.owner = owner; }
+
+        HeaderFace face() { return owner instanceof Trees.TreeControl ? owner.context().faces().tree : owner.context().faces().table; }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            super.paintComponent(graphics);
+            var g = (Graphics2D) graphics.create();
+            try { face().paintHeader(this, g, owner.context()); } finally { g.dispose(); }
+        }
+    }
+
+    /** A cell's padding after its column's start (the classic look, plan 4c Rulings 5 and 6), over its control's own border. */
+    static final class CellInset extends javax.swing.border.CompoundBorder {
+        final int inset;
+
+        CellInset(javax.swing.border.Border own, int inset) {
+            super(own, BorderFactory.createEmptyBorder(0, inset, 0, 0));
+            this.inset = inset;
+        }
+    }
+
+    /** Pads {@code cell} by {@code inset} on the left over its own border, or gives it back its own border for 0. */
+    static void inset(JComponent cell, int inset) {
+        var border = cell.getBorder();
+        var own = border instanceof CellInset padded ? padded.getOutsideBorder() : border;
+        if (inset <= 0) {
+            if (border instanceof CellInset) cell.setBorder(own);
+            return;
+        }
+        if (!(border instanceof CellInset current && current.inset == inset)) cell.setBorder(new CellInset(own, inset));
+    }
+
     static final class TableControl extends InteractiveRows.RowsControl {
-        final JPanel header = new JPanel();
+        final JPanel header = new HeaderBand(this);
+        /** Which rows are data rows below a heading row (plan 4c), measured with the data. */
+        private boolean[] underHeading = new boolean[0];
         /** The row of every cell node and its descendants, so focus and reveal reach row-mounted nodes. */
         final Map<String, Integer> nodeRows = new HashMap<>();
         private List<Column> measuredColumns=List.of();
@@ -112,6 +150,8 @@ final class Tables {
             // The titles sit on whatever is behind the table, as a heading does: an opaque header viewport painted its
             // own strip over a rounded pane's top.
             scroll.getColumnHeader().setOpaque(false);
+            var box = context().faces().table.box(this);
+            if (box != null) scroll.setBorder(box);
             refresh();
         }
 
@@ -190,6 +230,31 @@ final class Tables {
             if (!fillsViewport()) return;
             int inset = com.formdev.flatlaf.util.UIScale.scale(gutter);
             footer.setBounds(inset, 0, Math.max(0, width - 2 * inset), Math.max(footerHeight(), canvas.getHeight()));
+        }
+
+        /** Whether any row is a heading row. */
+        boolean grouped() {
+            return value().rows().stream().anyMatch(row -> row.heading().isPresent());
+        }
+
+        /** Whether row {@code index} is a data row below a heading row. */
+        boolean underHeading(int index) {
+            return index >= 0 && index < underHeading.length && underHeading[index];
+        }
+
+        @Override
+        void paintBands(Graphics2D g, int width) {
+            context().faces().table.paintBands(this, g, width);
+        }
+
+        @Override
+        Color hoverFill() {
+            return context().faces().table.hover(context());
+        }
+
+        @Override
+        boolean headingRule() {
+            return context().faces().table.headingRule();
         }
 
         /** A table keeps Enter with no focused row, as the JTable it replaced did (its Enter moved the selection). */
@@ -273,6 +338,12 @@ final class Tables {
 
         @Override
         void data() {
+            underHeading = new boolean[size()];
+            boolean seen = false;
+            for (int i = 0; i < size(); i++) {
+                if (value().rows().get(i).heading().isPresent()) seen = true;
+                else underHeading[i] = seen;
+            }
             nodeRows.clear();
             for (int i = 0; i < size(); i++) for (var cell : value().rows().get(i).cellNodes().values()) index(cell, i);
             if (focusControl != null && !nodeRows.containsKey(focusControl)) focusControl = null;
@@ -282,11 +353,18 @@ final class Tables {
             scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP), 0, 0, 0) : null);
             header.removeAll();
             header.setLayout(weights());
-            for (var column : value().columns()) header.add(headerLabel(this, "@table/", column));
+            var titles = value().columns();
+            for (int i = 0; i < titles.size(); i++) {
+                var title = headerLabel(this, "@table/", titles.get(i));
+                context().faces().table.styleTitle(title, context(), i);
+                header.add(title);
+            }
             // The header's titles start where the cells' text does: the row inset (a manager column's, else the icon gap).
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
                     side = (column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad) + com.formdev.flatlaf.util.UIScale.scale(gutter);
-            header.setBorder(BorderFactory.createEmptyBorder(pad, side, pad, side));
+            var insets = context().faces().table.headerInsets(context(), side,
+                    header.getComponentCount() == 0 ? 0 : header.getComponent(0).getPreferredSize().height);
+            header.setBorder(BorderFactory.createEmptyBorder(insets.top, insets.left, insets.bottom, insets.right));
             header.revalidate();
             header.repaint();
         }
@@ -324,6 +402,9 @@ final class Tables {
                 var control = row.controls.get(nodes.get(i).id());
                 // A cell dropdown is bare; on a selected row its bare value takes the fill's ink.
                 if (control instanceof Choices.ChoiceControl choice) choice.inCell(row.inked ? ink() : null);
+                // The classic look pads a cell after its column's separator and indents a grouped row's first cell.
+                inset(cell, i == 0 ? underHeading(index) ? context().faces().table.groupIndent(context()) : 0
+                        : context().faces().table.cellInset(context()));
                 if (control instanceof Labels.TextControl && cell instanceof JLabel label) {
                     label.setHorizontalAlignment(
                             value().columns().get(i).numeric()
@@ -365,6 +446,8 @@ final class Tables {
             String count = countText(heading);
             row.slot(row.trailing, count.isEmpty() ? List.of()
                     : List.of(new Nodes.Text(prefix + "/count", ControlState.READY, count, Nodes.TextRole.CAPTION)));
+            if (row.controls.get(prefix + "/count") != null && row.controls.get(prefix + "/count").component instanceof JLabel label)
+                context().faces().table.styleCount(label, context());
             var title = new Nodes.Text(prefix + "/heading", ControlState.READY, heading.title(), Nodes.TextRole.BODY_STRONG);
             row.slot(row.title, List.of(title));
             row.tooltip("");

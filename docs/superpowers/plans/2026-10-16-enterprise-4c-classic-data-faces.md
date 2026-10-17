@@ -1,5 +1,15 @@
 # Enterprise presentation 4c: the classic data faces Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`dedf877dc..9d11af9b3`).** Deviations from this
+> plan's text: no pair floor was lowered at execution (every pair measured its pre-flight value), but the final review
+> found the gallery drew the Enterprise kit at a 13-point body, so its fixes re-derived every floor at 12 points and
+> added a seventh pair (`classic-file-servers`); the final review's other fixes are listed in `docs/STATUS.md`; spec 6.5's classic overlay list
+> gains `Button.focusedBackground`, `hoverBackground` and `pressedBackground` (Execution notes E9); Task 3's reviews
+> added Execution notes E18 (the ordered index's row-aware styling and third pair, the side layout's minimum) and E19
+> (an update moves nothing the classic ordered face placed; a list gives up an entry row no VERTICAL parent adopts
+> again), so `ClassicOrderedTest` has 9 tests; Tasks 6 and 7 were executed in one session, one commit each; Task 7's
+> `docs/ui-maintenance.md` sentence joins its `PaintedContrastTest` clause with a semicolon.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains the data half of spec 6.4's face pairs, each with its default and classic implementation: the
@@ -46,8 +56,10 @@ grep -c 'TableRow heading(' jasper-ui/src/main/java/dev/jasper/ui/model/TableRow
 ls jasper-ui/build/plan4-base/dark-1x | head -1                                                 # the gallery base exists
 ```
 
-If the base directory is gone, re-create it from 4a's first commit's parent with plan 4a Task 1 Step 1 (plans 4a and 4b
-changed no default pixel, so the current branch head renders the same base). Run every command from the worktree root.
+The base is plan 4b's re-recording at `91153a4ce` (4b's Execution notes X1); plans 3e and 5a, merged since as
+`c2f166022`, changed no jasper-ui file, and a render of this plan's final state matched it in the pre-flight (Execution
+notes E2). If the base directory is gone, re-create it by rendering the branch head before Task 1's first edit (plan 4b
+changed no default pixel). Run every command from the worktree root.
 Every quoted anchor is post-3c and post-4b text: the Tables, Trees, InteractiveRows and ItemLists anchors are quoted
 as plan 3c's Tasks 3 to 5 leave them, the `KitFaces`, `Stacks`, `Buttons` and `ClassicButtonFace` anchors as plan 4b's
 Tasks 1 to 7 leave them. The edit scripts stop with a message when their text is not found the stated number of times;
@@ -58,7 +70,8 @@ re-find the quoted text and re-run, never edit around a missing anchor.
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md). `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run, at either scale and with either kit.
 - Work only in the worktree above on `claude/enterprise-classic-catalog`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 with the default kit is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`), and every JSON file is identical except two `class` fields: a section's surface (`javax.swing.JPanel` before, `dev.jasper.ui.swing.Cards$SectionSurface` from plan 4b) and an item list's scroll pane (`javax.swing.JScrollPane` before, `dev.jasper.ui.swing.ItemLists$ListPane` from Task 3), which the digest script reads as the classes they replace (Rulings 25; plan 4b Rulings 23); the existing `tools/visual/pairs.json` entries do not change. New output appears only under `jasper-ui/build/classic-faces/` (tests' inspection captures), `jasper-ui/build/gallery/enterprise-light-1x/` and `-2x/` (the opt-in Enterprise gallery, Task 5) and the comparison's own output directory; none of it is committed. Tasks 1 to 5 each prove it; Task 6 proves it once more.
+- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 with the default kit is byte-identical to the plan-4 base (`jasper-ui/build/plan4-base/`, re-recorded by plan 4b at `91153a4ce`), and every JSON file is identical except two `class` fields: a section's surface (`javax.swing.JPanel` before, `dev.jasper.ui.swing.Cards$SectionSurface` from plan 4b) and an item list's scroll pane (`javax.swing.JScrollPane` before, `dev.jasper.ui.swing.ItemLists$ListPane` from Task 3), which the digest script reads as the classes they replace (Rulings 25; plan 4b Rulings 23); the existing `tools/visual/pairs.json` entries do not change. New output appears only under `jasper-ui/build/classic-faces/` (tests' inspection captures), `jasper-ui/build/gallery/enterprise-light-1x/` and `-2x/` (the opt-in Enterprise gallery, Task 5) and the comparison's own output directory; none of it is committed. The default gallery at scale 2 renders its text at
+  scale 2 from Task 5 (Execution notes E5); scale 2 is outside this rule. Tasks 1 to 6 each prove it; Task 7 proves it once more.
 - Faces never reference `Kit`, `ControlVariants` or (plan 5's) `ChromeSpec`; only `KitFaces` reads the variants outside the kit package; the reconciler references control classes only, never a face (spec 3.3, 6.4, 16.1.7; 4b's `StrategyIsolationTest` and `VariantReadTest`).
 - A default face's implementation is the control's former code, moved into a named method and called unchanged, or a hook on the control whose default returns today's value; renderers never branch on a look (spec 3.6), they ask their face.
 - Each face declares every pair it repairs (spec 7.3); a classic face paints each declared pair with `ThemePainting.painted`; the six default faces of this plan declare none.
@@ -94,15 +107,17 @@ re-find the quoted text and re-run, never edit around a missing anchor.
 ## Rulings
 
 Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "what — why — cost if wrong". Record them in
-`docs/STATUS.md` (Task 6) and in the banner when executed.
+`docs/STATUS.md` (Task 7) and in the banner when executed. The pre-flight's rulings E1 to E17 ("Execution notes",
+below) are taken on the same terms and are binding too; the task text already carries them.
 
 1. **The table and tree points share one interface for what they have in common, `HeaderFace`** (the header's titles,
    insets and band, the box, the hover), and the classic faces share the painter `ClassicHeaders` — the mocks draw the
    Keymap tree's header exactly like the Notifications table's; each point still has its own face, so the complement kit
    can mix them — cost if wrong: none.
-2. **The classic table and tree draw a 1 px `border.control` box, guarded against the dialog surface slot, unless they
-   lie in a panel body (`Panels.Body`)** — the Settings and dialog tables are boxed in every mock, the Workstation's panel
-   tables are not (their panel draws the rules) — cost if wrong: one box too many or too few in an unusual host.
+2. **The classic table and tree draw a 1 px `border.control` box, guarded against the dialog surface slot, with
+   `surface.card` inside it, unless they lie in a panel body (`Panels.Body`)** — the Settings and dialog tables are boxed
+   on white in every mock, the Workstation's panel tables are not (their panel draws the rules) — cost if wrong: one box
+   too many or too few in an unusual host (the card fill: Execution notes E4).
 3. **Zebra rows stripe an ungrouped table's odd rows (`surface.zebra`); a grouped table (any heading row) stripes none and
    bands its heading rows in `surface.tableHeader` with no hairline above them; trees are not striped; ordered lists are**
    — spec 5.2 says "zebra rows"; the Notifications mock bands groups instead, the Workstation SFTP table and Project
@@ -179,14 +194,17 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
 21. **The mock comparison is opt-in: `-Pjasper.galleryKit=enterprise` renders the gallery and the Enterprise fixtures
     with the Enterprise fixture kit over Enterprise Light (Light only; Enterprise Dark is plan 5's) into
     `jasper-ui/build/gallery/enterprise-light-<scale>x/`, and `tools/visual/check_pairs.py` passes a pair when its edge
-    agreement reaches the pair's `min_agreement` (0.30 for whole dialogs, 0.40 for tables and lists, as fonts differ
-    until plan 5 registers Plex; a dry run of the six fixtures with the default catalog and faces measured 0.21 to 0.47) and each listed colour fills a 2 × 2 block within ΔE76 6 in both images** — spec 16.1.4
-    keeps the comparison opt-in — cost if wrong: floors tuned once in Task 5 Step 7.
+    agreement reaches the pair's `min_agreement` (the agreement the pre-flight measured on this plan's final state,
+    rounded down to 0.05, less 0.05 for font hinting: 0.50, 0.50 and 0.40 for the three dialogs, 0.75, 0.40 and 0.45 for
+    the Notifications, Project Index and Keymap crops; fonts differ until plan 5 registers Plex; Execution notes E10) and
+    each listed colour fills a 2 × 2 block within ΔE76 6 in both images** — spec 16.1.4 keeps the comparison opt-in —
+    cost if wrong: floors tuned once in Task 5 Step 7.
 22. **Unlock Vault is not compared yet**: the classic prompt's title belongs to the dialog header strip (plan 6), so the
     body alone would compare badly — cost if wrong: none; plan 6 adds the pair.
 23. **The host's `HostedKitContractTest` runs under both shipped kits now**: `HostedKit.create` already makes each
-    view's context over `FlatLafInstaller.installedKit()` (`HostedKit.java:56`; `HostedKitTest
-    .appContextsAreMadeOverTheInstalledKit` installs a kit of its own), so `ClassicHostedKitContractTest` extends it and
+    view's context over `FlatLafInstaller.installedKit()` (plan 5a: the constructors the tests use pass the supplier
+    `FlatLafInstaller::installedKit`, `HostedKit.java:32`, and `create` reads it, `:59`; `HostedKitTest
+    .appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources` installs a kit of its own), so `ClassicHostedKitContractTest` extends it and
     installs the Enterprise fixture kit around each case (spec 16.1.9: "run for both kits"); in jasper-ui,
     `ClassicContractTest` checks spec 16.1.9's events (checkbox, radio, folder tab, side column, read-only field) under
     both shipped kits — cost if wrong: one more run of the host contract per build (seconds).
@@ -202,99 +220,107 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
 
 ## Verified facts
 
-Read at `222969926` with 3a's renames (3a's branch head `deafed424`), plan 3c's text (branch
-`claude/enterprise-sdk-0-18-tables`, `1b0e88eb1`) and plans 4a and 4b. Line numbers are from `deafed424`.
+Re-read on 2026-10-16 at `70987ccc4` (this branch: `main` `265497430`, with plans 3a to 3e, 4a, 4b and 5a merged, plus
+one STATUS punctuation commit). Line numbers are from `70987ccc4`; the edit scripts match by text, so lines only guide
+reading. The first pass of these facts was written at `222969926` against plan 3c's and 4b's texts; every one below
+holds in the merged code.
 
-1. Plan 3c Task 3 Step 3 replaces `Tables.java` whole: `TableControl` holds `final JPanel header = new JPanel();` (set as
-   the scroll's column header view, non-opaque, in the constructor, which ends `scroll.getColumnHeader().setOpaque(false);`
-   then `refresh();`), `data()` starts `nodeRows.clear();`, adds `headerLabel(this, "@table/", column)` per column, and
-   pads the header with `BorderFactory.createEmptyBorder(pad, side, pad, side)` (`pad` = `ICON_GAP`); `populate` casts
-   each title child to `JComponent cell`, calls `choice.inCell(row.inked ? ink() : null)` on a dropdown cell, and
-   `heading(row, data, heading)` mounts the count as `prefix + "/count"` (CAPTION) in the trailing slot. 3c Task 4 adds
-   `emptyText`, `fillsViewport`, `childParent`, `children` and `layoutAccessories` before the comment "A table keeps Enter
-   with no focused row, as the JTable it replaced did (its Enter moved the selection)."
+1. `Tables.java` is plan 3c's: `TableControl` holds `final JPanel header = new JPanel();` (`:71`), set as the scroll's
+   column header view, non-opaque, in the constructor, which ends `scroll.getColumnHeader().setOpaque(false);` then
+   `refresh();` (`:114-116`); `data()` starts `nodeRows.clear();` (`:276`), adds `headerLabel(this, "@table/", column)`
+   per column (`:285`), and pads the header with `BorderFactory.createEmptyBorder(pad, side, pad, side)` (`:289`, `pad`
+   = `ICON_GAP`); `populate` casts each title child to `JComponent cell` and calls `choice.inCell(row.inked ? ink() :
+   null)` on a dropdown cell (`:326`), and `heading(row, data, heading)` (`:363-372`) mounts the count as `prefix +
+   "/count"` (CAPTION) in the trailing slot and the title as BODY_STRONG. 3c's `emptyText`, `fillsViewport` and
+   `childParent` follow the comment "A table keeps Enter with no focused row, as the JTable it replaced did (its Enter
+   moved the selection)." (`:195`); `fillsViewport` is true only for an empty table's state (`:207`), so a canvas is as
+   tall as its rows.
 2. `InteractiveRows.RowsControl.selectionShown` shows an ORDERED list's selection only while its canvas has focus
-   (`InteractiveRows.java:33-38`); `identityRows()` is at `:335`; `sync()` ends by calling `layoutAccessories(width)`
-   (`:450`); `Canvas.paintComponent` paints the keycap detail card, then the ORDERED box and dividers (`:755-764`), then
-   every mounted row's fill (`:766`); `Canvas.getPreferredSize` follows at `:768` (3c adds the empty line's height);
-   `Row.paintFill` uses `ColorMath.opacity(HOVER_OVERLAY, .05)` for hover and keyboard focus (`:818-829`);
-   `Row.paintComponent` paints a hairline above a non-data row after the first (`:1218-1228`).
-3. `Trees.TreeControl` (`Trees.java:77-415`): the constructor sets `((TreePane)scroll).owner=this;` (`:86`);
-   `uniformRows()` at `:125`; `populate` indents `entry.depth() * UIScale.scale(16)` (`:304`), builds a GHOST expand
-   button with presentation `presentation.isEmpty() ? STANDARD : EMBEDDED` (`:306-317`), slots the leading nodes
-   (`:328`), titles a branch BODY unless emphasized (`:337`) and binds the expand button to `UiEvent.Expanded`
-   (`:396-413`). Plan 3c Task 5 adds `final javax.swing.JPanel header = new javax.swing.JPanel();`, `columnHeader()`
-   (titles from `Tables.headerLabel(this, "@tree/", columns.get(i))`, border
-   `javax.swing.BorderFactory.createEmptyBorder(pad, side, pad, side)`), `ColumnHeaderLayout`, `rowPad()` and
-   `trailingColumns`.
-4. `ItemLists.ListControl` (`ItemLists.java:18-524`): the constructor begins `super(view, node);` (`:26-27`); ItemLists
+   (`InteractiveRows.java:33-38`); the pane is non-opaque with an empty border (`:80-83`); `identityRows()` is at
+   `:335`; `sync()` ends by calling `layoutAccessories(width)` (`:496`); `Canvas.paintComponent` paints the keycap detail
+   card, then the ORDERED box and dividers (`:792-802`), then every mounted row's fill (`:803`); `Canvas.getPreferredSize`
+   follows at `:805`; `Row.paintFill` uses `ColorMath.opacity(HOVER_OVERLAY, .05)` for hover and keyboard focus
+   (`:856-866`); `Row.paintComponent` paints a hairline above a non-data row after the first (`:1236-1246`).
+3. `Trees.TreeControl` (`Trees.java:110-517`): `final javax.swing.JPanel header = new javax.swing.JPanel();` (`:118`);
+   the constructor sets `((TreePane)scroll).owner=this;` (`:124`); `uniformRows()` at `:167`; `columnHeader()` (`:337`,
+   titles from `Tables.headerLabel(this, "@tree/", columns.get(i))`, border
+   `javax.swing.BorderFactory.createEmptyBorder(pad, side, pad, side)`); `populate` indents `entry.depth() *
+   com.formdev.flatlaf.util.UIScale.scale(16)` (`:398`), builds a GHOST expand button `@tree/<tree>/<item>/expand` with
+   presentation `presentation.isEmpty() ? STANDARD : EMBEDDED` (`:402-411`), slots the leading nodes (`:426`), titles a
+   branch BODY unless emphasized (`:429-437`, `@tree/<tree>/<item>/title`) and binds the expand button to
+   `UiEvent.Expanded` (`:499-510`). `TreePane` paints the keycap presentation's card only (`:64-76`).
+4. `ItemLists.ListControl` (`ItemLists.java:19-524`): the constructor begins `super(view, node);` (`:26-27`); ItemLists
    imports `java.awt.Container` only from AWT (`:9`); `children` mounts the add action as the canvas footer, an ORDERED
-   one with `orderedAction` (`:381-390`); `populate` adds the ORDERED index (CAPTION) and the up, down and remove
+   one with `orderedAction` (`:382-391`); `populate` adds the ORDERED index (CAPTION) and the up, down and remove
    commands (`:399-411`), sets the index's `columnWidth` (`:412-415`) and binds the commands (`:452-464`);
    `internalId` at `:484`; no `layoutAccessories` override.
-5. `Stacks.StackSurface` paints a route through the private `paintRoute(Graphics)` (`Stacks.java:26`, `:31-41`); plan 4b
-   Task 2 adds its `Nodes.LayoutRole role` field before the constructor. `StackControl.refresh` picks
-   `new RouteLayout(this)` for ROUTE (`:99`); `children` ends with the `barTexts` collection (`:148-151`), and plan 4b
-   Task 7 adds the prompt face's call at its start. `RouteLayout` (`:322-355`) lays equal columns with the arrow at each
-   later column's start; `RouteStepLayout` (`:358-395`) leads with a visible icon-only `JLabel`.
-6. `ViewReconciler.resetComposition` resets the button flags, `orderedAction` among them (`ViewReconciler.java:96-103`);
-   `applyRoute(node, next, tiles)` marks route steps before the update and tiles each step's leading Icon after it
-   (`:297-308`, called at `:39` and `:50`).
+5. `Stacks.StackSurface` (`Stacks.java:20-45`) holds plan 4b's `Nodes.LayoutRole role` (`:23`) and `int[] arrows`
+   (`:26`) and paints a route through the private `paintRoute(Graphics)` (`:29`, `:34-44`). `StackControl.refresh` picks
+   `new RouteLayout(this)` for ROUTE and `new RouteStepLayout(context())` for a route step (`:103-104`); `children`
+   starts with the prompt face's call (`:138`) and ends with the `barTexts` collection (`:158-160`). `RouteLayout`
+   (`:329-365`) lays equal columns with the arrow at each later column's start; `RouteStepLayout` (`:368-404`) leads with
+   a visible icon-only `JLabel`.
+6. `ViewReconciler.resetComposition` (`ViewReconciler.java:88-`) resets the button flags, `orderedAction` among them
+   (`:105`); `applyRoute(node, next, tiles)` marks route steps before the update and tiles each step's leading Icon after
+   it (`:302-313`, called at `:39` and `:50`).
 7. `EmptyStates.EmptyControl` sizes the tile with `tileSize()` (`EmptyStates.java:45`), spaces it with `gap(index)`
-   (`:50-57`), styles title and description in `refresh` (`:60-80`) and mounts tile, title, description and actions in
-   `children` (`:87-99`).
+   (`:50-57`), styles title and description in `refresh` (`:60-80`, the layout set at `:74`) and mounts tile, title,
+   description and actions in `children` (`:88-99`).
 8. `Indicators.ChipControl.refresh` sets the chip's text, face, colour, fill and padding, then its accessible name
-   (`Indicators.java:22-29`); `ChipLabel.paintComponent` paints the tile at the tile share (`:38-46`).
+   (`Indicators.java:23-29`); `ChipLabel` (`:31`) holds `Color fill` (`:35`) and its `paintComponent` paints the tile at
+   the tile share (`:39-47`).
 9. `Buttons.ButtonControl(KitView, Nodes.Button, Consumer<UiEvent>)` routes its click to the consumer
-   (`Buttons.java:49-62`); `KitButton` declares `orderedCommand` (`:124-125`) and sizes it first in `getPreferredSize`
-   (`:212`). Plan 4b's `ClassicButtonFace.paintFace` and `text` treat `b.kind == Nodes.ButtonKind.LINK` as the default
-   look (4b Task 2).
-10. `Choices.hue(KitContext, Hue)` and `hueSurface` map NONE to the neutral roles (`Choices.java:206-217`).
+   (`Buttons.java:49-62`); its `refresh` sets the icon and `Jasper.button.icon` (`:79-87`) and ends `button.revalidate();
+   button.repaint();` (`:100`); `KitButton` declares `orderedCommand` (`:124-125`) and sizes it first in
+   `getPreferredSize` (`:228`). Plan 4b's `ClassicButtonFace` treats `b.kind == Nodes.ButtonKind.LINK` as the default
+   look in `paintFace` (`:59`), `text` (`:89`, with `b.onSelection`) and, since 4b's Task 2 review, `fades(KitButton)`
+   (`:106`, the same condition as `text`'s; 4b Execution notes X12).
+10. `Choices.hue(KitContext, Hue)` and `hueSurface` map NONE to the neutral roles (`Choices.java:232-243`).
 11. `UiEvent` has `Selected(id, Set)`, `Toggled`, `Expanded`, `Removed(id, itemId)` and `Reordered(id, itemId,
-    destination)` (`UiEvent.java:13-37`); a choice emits `Selected(id, Set.of(optionId))` (`Choices.java:180`).
-12. `KitGallery.fixtures()` (`KitGallery.java:37-67`), `main` (`:92-113`, writing `<theme>-<scale>x/` and a manifest),
-    `installed(theme, kit, action)` (`:122-147`) and `capture(fixture, context, focus)` (`:149`); the `gallery` task reads
-    `jasper.galleryScale` and `jasper.galleryTheme` (`jasper-ui/build.gradle.kts:28-46`).
-13. `KitFixtures.themes()`, `degenerate()`, `marked()`, `custom()`, `context(theme, kit)` (`KitFixtures.java:46-233`);
-    plan 4a adds `custom(base)`, `marked(base)`, `enterprise()`, `complement()` and `withControls(base, controls)`;
-    plan 4b adds `capture(context, spec, width, height, name)`.
-14. `KitMatrixTest.captures(theme, kit)` renders `KitGallery.fixtures()` (`KitMatrixTest.java:19-25`); plan 4a adds
-    `areas(BufferedImage)` (2 × 2 blocks). `PaintedContrastTest.palettes()` returns a mutable list of the theme set and
-    the degenerate palettes (`PaintedContrastTest.java:65-69`).
-15. `tools/visual/compare_mock.py` prints `best_offset_render_px dx=… dy=… edge_agreement=…` as its second line
-    (`compare_mock.py:139-141`); `compare_all.py` reads `name`, `mock`, `crop`, `render` and `render_crop` and ignores
-    other keys (`compare_all.py:22-36`); `pairs.json` holds 34 entries.
+    destination)` (`UiEvent.java:17-25`); a choice emits `Selected(id, Set.of(optionId))` (`Choices.java:186`).
+12. `KitGallery.fixtures()` (`KitGallery.java:37`), `main` (`:140-167`, writing `<theme>-<scale>x/` and a manifest,
+    printing "Rendered N fixtures with <theme name> at <scale>x to <directory>"), `installed(theme, kit, action)`
+    (`:170-195`, which sets the developer `defaultFont` to the platform family at 13) and `capture(fixture, context,
+    focus)` (`:197`, which sets it again at 13, or 24 for a `font24` fixture, whatever the UI scale); the `gallery` task
+    reads `jasper.galleryScale` and `jasper.galleryTheme` (`jasper-ui/build.gradle.kts:28-46`).
+13. `KitFixtures`: `enterprise()` (`:43`), `complement()` (`:50`), `withControls(base, controls)` (`:57`), `custom()` and
+    `custom(base)` (`:62-65`), `themes()` (`:83`), `degenerate()` (`:104`), plan 4b's `capture(context, spec, width,
+    height, name)` (`:236`), `marked()` and `marked(base)` (`:262-265`), `context(theme, kit)` (`:278`); the class
+    comment line "The platform UI family the default kit draws in when the user names none (resolved once per
+    process)." is at `:19`.
+14. `KitMatrixTest.captures(theme, kit)` renders `KitGallery.fixtures()` (`KitMatrixTest.java:19-25`); plan 4a's
+    `areas(BufferedImage)` (2 × 2 blocks) is at `:81` and `colours` at `:92`. `PaintedContrastTest.palettes()` returns a
+    mutable list of the theme set and the degenerate palettes (`PaintedContrastTest.java:97-101`).
+15. `tools/visual/compare_mock.py` prints `best_offset_render_px dx=… dy=… edge_agreement=…` as its second line;
+    `compare_all.py` reads `name`, `mock`, `crop`, `render`, `render_crop` and (plan 3e) `note`, and ignores other keys;
+    `pairs.json` holds 34 entries, and `json.dumps(indent=2)` reproduces it byte for byte.
 16. The dialog mocks (1044 px wide at 2×) draw a 2 px window edge, the title bar in rows 2 to 57 and its rule in rows 58
-    and 59; the content runs from x 2 to 1041 and y 60 to the height less 2 (measured with Pillow, Task 5's crops).
+    and 59; the content runs from x 2 to 1041 and y 60 to the height less 2 (960, 1104 and 1272 tall).
 17. Plan 4b's final `face-pairs.tsv` lists the classic faces in `KitFaces.all()` order, and its last
     `ClassicLabelPolicy`, `ClassicStepperFace` and `ClassicFieldPolicy` rows are
     `classic	ClassicLabelPolicy	text.secondary	surface.app	CONTRAST:4.5`,
     `classic	ClassicStepperFace	text.placeholder	surface.input	CONTRAST:4.5` and
-    `classic	ClassicFieldPolicy	text.secondary	surface.tableHeader	CONTRAST:4.5`.
-
+    `classic	ClassicFieldPolicy	text.secondary	surface.tableHeader	CONTRAST:4.5`; the classic button face's
+    `label` pair is `pairs().get(1)` and its arrow pair `pairs().get(5)`.
 18. `KitButton.paintContent` paints the glyph its `Jasper.button.icon` client property names in the current role, and
-    `getIcon()` only when that property is null (`Buttons.java:363-375`; `ButtonControl.refresh` sets both, `:79-90`), so
+    `getIcon()` only when that property is null (`Buttons.java:369-400`; `ButtonControl.refresh` sets both, `:79-87`), so
     a face that replaces a button's icon clears the property too.
-19. `KitGallery.capture` composites each render on the context's surface (`onSurface`, `KitGallery.java:163`), so the
-    gallery's images are opaque; it renders at the gallery's UI scale (`flatlaf.uiScale`).
+19. `KitGallery.capture` composites each render on the context's surface (`onSurface`, `KitGallery.java:211`, `:323`), so
+    the gallery's images are opaque; it renders at the gallery's UI scale (`flatlaf.uiScale`).
 20. `KitView`'s constructor subscribes to its theme binding right after the first reconcile, and the subscription
-    notifies at once (`KitView.java:55-56`, `ThemeBinding.java:19-25`), so every mounted control refreshes once more
-    after `children` ran; `ViewReconciler.refresh` does not call `children` (`ViewReconciler.java:416`). A face's
-    styling therefore lives where a refresh re-applies it: a layout, a flag the refresh reads, a row population, or
-    4b's `Labels.TextControl.styled`.
-21. Every colour Task 5 lists for a `classic-*` pair fills a 2 × 2 block within ΔE76 6 in its mock crop (checked
-    2026-10-16 with `check_pairs.py`'s own colour test on the six crops).
-22. Dry run (2026-10-16, while writing this plan, without Gradle): on a copy of `deafed424` with plan 3c's Tables, Trees,
-    InteractiveRows, ItemLists and model edits applied, plan 4b's Task 7 `TextControl.styled` edits applied and stubs
-    for the rest of 4a and 4b (the new roles, `Face`, `ClassicGlyphs`, `ThemePainting.role` and `painted`, a `KitFaces`
-    holding this plan's faces), every edit script of Tasks 1 to 5 applied without a stop; jasper-ui's main sources,
-    test fixtures and the new swing and gallery tests compiled with the JBR's `javac` (only 3b's `ChoiceKind.TABS` and
-    `Field.readOnly` missing); under the JUnit launcher the classic halves of `ClassicTablesTest`,
-    `ClassicIndicatorsTest` and `ClassicOrderedTest` passed with classic stub faces and their default halves with
-    default ones, `ClassicContractTest` emitted the expected events but the read-only field's (3b), the six Enterprise
-    fixtures rendered at 1× and 2×, `EnterpriseGalleryTest` passed against the appended `pairs.json`, and
-    `check_pairs.py` ran end to end (agreement 0.21 to 0.47 with the default catalog and 4b's faces absent). The
-    executor's runs on the real branch are the evidence.
+    notifies at once (`KitView.java:56`, `ThemeBinding.java:19-25`), so every mounted control refreshes once more after
+    `children` ran; `ViewReconciler.refresh` does not call `children` (`ViewReconciler.java:418`). A face's styling
+    therefore lives where a refresh re-applies it: a layout, a flag the refresh reads, a row population, or 4b's
+    `Labels.TextControl.styled`.
+21. Every colour Task 5 lists for a `classic-*` pair fills a 2 × 2 block within ΔE76 6 in its mock crop and in the render
+    of this plan's final state (the pre-flight's `check_pairs.py` run, Execution notes E10).
+22. Pre-flight replay (2026-10-16, Execution notes E2): on a `git archive` copy of `70987ccc4`, every `Create` block and
+    edit script of Tasks 1 to 6 applied in order without a stop; jasper-ui's main sources, test fixtures and tests
+    compiled with the JBR's `javac -Xlint:all -Xlint:-serial`; the whole jasper-ui suite passed under a JUnit launcher
+    (801 tests, 0 failures); the default gallery for Slate Cobalt Dark and Light at 1x matched the base (`changed:
+    none`); `ClassicHostedKitContractTest`, `HostedKitContractTest` and the patched `PaintedContrastTest` passed against
+    the worktree's last-built jasper-app classes (73 tests); the Enterprise gallery rendered 81 fixtures at 1x and 2x and
+    `check_pairs.py` passed all six pairs. The executor's Gradle runs are the evidence.
 
 ## Mock measurements
 
@@ -310,7 +336,7 @@ Measured with Pillow (`python3 -I`) at the mocks' 2× pixels, halved; colours ar
 | Grouped row indent | Notifications "Jasper" under "Jasper" | 14 | `GROUP_ROW_INDENT` (Rulings 6) |
 | Heading count | Same, "6 groups" | `#5C6370`, under the last column's start | Rulings 7 (residual) |
 | Zebra | Workstation SFTP; Project Index markers | odd rows `#F7F8FA` | Rulings 3 |
-| Table box | Notifications, Keymap, Project Index | 1 px `#B4B8BF` | `border.control` (Rulings 2) |
+| Table box | Notifications, Keymap, Project Index | 1 px `#B4B8BF` around `#FFFFFF` rows | `border.control` around `surface.card` (Rulings 2) |
 | Tree triangles | Keymap "Appearance", "Clipboard" | ▶ and ▼ 6 × 5 `#5C6370`, 9.5 from the box; text 15.5 after the glyph | Rulings 8 |
 | Tree child indent | Keymap "Copy" | text 26 right of the branch glyph | `TREE_INDENT` 24 (2 px residual) |
 | Tree trailing values | Keymap "3 shortcuts" | `#7A808A` | residual (3c's CAPTION colour) |
@@ -328,12 +354,14 @@ Measured with Pillow (`python3 -I`) at the mocks' 2× pixels, halved; colours ar
   (Task 2); `OrderedFace`, `DefaultOrderedFace`, `ClassicOrderedFace` (Task 3).
 - Changed controls: `KitFaces`, `Tables`, `Trees`, `InteractiveRows`, `Buttons`, `DesignMetrics` (Task 1); `KitFaces`,
   `EmptyStates`, `Indicators`, `Stacks`, `ViewReconciler` (Task 2); `KitFaces`, `ItemLists`, `InteractiveRows`, `Stacks`,
-  `Buttons`, `ClassicButtonFace`, `ViewReconciler` (Task 3).
+  `Buttons`, `ClassicButtonFace`, `ViewReconciler` (Task 3); `KitView` (Task 4, a SLIDER is no text field under either
+  kit); `theme/UiColorKeys` (Task 6, the classic overlay's button state colours).
 - Test fixtures (`jasper-ui/src/testFixtures/java/dev/jasper/ui/`): `gallery/EnterpriseFixtures` and
   `KitGallery.enterpriseCatalog()`, `testsupport/KitFixtures.enterpriseLight()` (Task 4); `KitGallery.main`'s
-  Enterprise mode (Task 5).
+  Enterprise mode and the gallery font at the gallery's scale (Task 5).
 - Tests: `jasper-ui/src/test/java/dev/jasper/ui/swing/` `ClassicTablesTest` (Task 1), `ClassicIndicatorsTest` (Task 2),
-  `ClassicOrderedTest` (Task 3), `ClassicContractTest` (Task 4); `gallery/KitMatrixTest` and
+  `ClassicOrderedTest` (Task 3), `ClassicContractTest` and `ClassicPickersTest` (Task 4), `ClassicNativeButtonsTest`
+  (Task 6); `theme/ClassicUiKeysTest` and `theme/ui-color-keys-classic.tsv` (Task 6); `gallery/KitMatrixTest` and
   `control-covering-array.tsv`, `GalleryCoverageTest`, `testsupport/KitFixturesTest` (Task 4); `gallery/EnterpriseGalleryTest`
   (Task 5); `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest` (Task 4); frozen tables
   `metrics/compact-roles.tsv`, `metrics/classic-roles.tsv` (Task 1) and `swing/face-pairs.tsv` (Tasks 1 to 3).
@@ -353,7 +381,7 @@ and draws ▶/▼ triangles, a `TREE_INDENT` per depth and BODY_STRONG category 
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/HeaderFace.java`, `ClassicHeaders.java`, `TableFace.java`, `DefaultTableFace.java`, `ClassicTableFace.java`, `TreeFace.java`, `DefaultTreeFace.java`, `ClassicTreeFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Tables.java` (3c's file), `Trees.java:62-415`, `InteractiveRows.java:335,755-766,818-829,1218-1228`, `Buttons.java:124-125,212`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Tables.java` (3c's file), `Trees.java:110-517`, `InteractiveRows.java:335,792-803,856-866,1236-1246`, `Buttons.java:124-125,228`
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (one role), `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java` (`ADDED`), `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv` and `classic-roles.tsv` (one row each)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicTablesTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (six rows inserted)
@@ -476,6 +504,8 @@ class ClassicTablesTest {
                 assertThat(table.scroll.getBorder()).isInstanceOf(ClassicHeaders.Box.class);
                 assertThat(table.scroll.getInsets()).isEqualTo(new Insets(line, line, line, line));
                 assertThat(at(paint(table.scroll), 0, table.scroll.getHeight() / 2)).isEqualTo(ThemePainting.painted(context, context.faces().table.pairs().get(1)));
+                assertThat(at(paint(table.scroll), table.scroll.getWidth() / 2, table.scroll.getHeight() - 3)).as("the rows' card inside the box")
+                    .isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
                 assertThat(table.hoverFill()).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_ROW_HOVER));
                 assertThat(((Tables.CellInset) odd.cells.get(1).getBorder()).inset).as("a cell after a separator").isEqualTo(ClassicHeaders.inset(context));
                 assertThat(odd.cells.get(0).getBorder() instanceof Tables.CellInset).as("an ungrouped first cell").isFalse();
@@ -520,6 +550,7 @@ class ClassicTablesTest {
                 var table = (Tables.TableControl) view.control("table");
                 assertThat(paint(table.header).getRGB(table.header.getWidth() / 2, 2) >>> 24).isZero();
                 assertThat(table.scroll.getInsets()).isEqualTo(new Insets(0, 0, 0, 0));
+                assertThat(paint(table.scroll).getRGB(table.scroll.getWidth() / 2, table.scroll.getHeight() - 3) >>> 24).as("no card").isZero();
                 for (var cell : table.mounted.get("a").cells) assertThat(cell.getBorder() instanceof Tables.CellInset).isFalse();
                 assertThat(table.hoverFill()).isEqualTo(ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .05));
             } finally { release(context); }
@@ -545,6 +576,8 @@ class ClassicTablesTest {
                 assertThat(find(view, "@tree/tree/mac/title", JLabel.class).getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.BODY));
                 assertThat(at(paint(tree.header), tree.header.getWidth() / 2, 2)).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER));
                 assertThat(tree.hoverFill()).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_ROW_HOVER));
+                assertThat(at(paint(tree.scroll), tree.scroll.getWidth() / 2, tree.scroll.getHeight() - 3)).as("the rows' card inside the box")
+                    .isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
                 expand.doClick(0);
                 assertThat(events).containsExactly(new UiEvent.Expanded("tree", "net", false));
             } finally { release(context); }
@@ -589,7 +622,7 @@ class ClassicTablesTest {
 
 `find(root, id, type)` and `release(context)` are `KitViewTest`'s helpers (4b's tests use them the same way);
 `view.control(id)` is package-private. The table's synthetic cell and count ids are `@table/<table>/<row>/…` (3c Task 3)
-and the tree's `@tree/<tree>/<item>/…` (`Trees.java:307`, `:330`).
+and the tree's `@tree/<tree>/<item>/…` (`Trees.java:403`, `:429`).
 
 Insert the table and tree rows into `face-pairs.tsv` after the last `ClassicLabelPolicy` row (`KitFaces.all()` puts the
 two points after the label policy):
@@ -814,7 +847,11 @@ final class ClassicHeaders {
         }
     }
 
-    /** The 1 px box around a table or tree that is not in a panel body (Rulings 2), its edge through {@code edge}'s guard. */
+    /**
+     * The 1 px box around a table or tree that is not in a panel body (Rulings 2), its edge through {@code edge}'s guard,
+     * around the rows' {@code surface.card} (the mocks' white list). A border paints before the pane's children, so the
+     * fill lies under the header band and the rows.
+     */
     static final class Box implements Border {
         final KitContext context;
         final PaintPair edge;
@@ -834,6 +871,8 @@ final class ClassicHeaders {
         @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
             if (!drawn(c)) return;
             int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            g.setColor(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
+            g.fillRect(x + line, y + line, Math.max(0, width - 2 * line), Math.max(0, height - 2 * line));
             g.setColor(ThemePainting.painted(context, edge));
             g.fillRect(x, y, width, line);
             g.fillRect(x, y + height - line, width, line);
@@ -1183,7 +1222,8 @@ PY
 The default faces return today's values: `Tables.inset(cell, 0)` leaves a border that is not a `CellInset` alone, the
 header keeps `createEmptyBorder(pad, side, pad, side)`, the table and tree keep `RowsControl`'s empty scroll border, the
 hover stays `opacity(HOVER_OVERLAY, .05)`, the heading rule stays, the indent stays `depth × scale(16)`, the expand
-button keeps its STANDARD presentation and chevron, and a branch keeps its declared title role. `HeaderBand` paints
+button keeps its STANDARD presentation and chevron, and a branch keeps its declared title role. The classic box fills
+`surface.card` under the rows (Execution notes E4); the default pane keeps its empty border and paints nothing. `HeaderBand` paints
 nothing more than the non-opaque `JPanel` it replaces. `GROUP_ROW_INDENT` is 14 in both catalogs and only the classic
 table face reads it, as 4a's Rulings 6 asks of classic-only roles (`ClassicCatalogTest.theSpecsNamedValuesHold` checks
 it with `NewRolesTest.ADDED`).
@@ -1260,7 +1300,7 @@ equal cells, each led by its step's hue edge, with upper-case captions and drawn
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/EmptyFace.java`, `DefaultEmptyFace.java`, `ClassicEmptyFace.java`, `TagFace.java`, `DefaultTagFace.java`, `ClassicTagFace.java`, `RouteFace.java`, `DefaultRouteFace.java`, `ClassicRouteFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `EmptyStates.java:45-99`, `Indicators.java:15-47`, `Stacks.java:20-42,99,148-152`, `ViewReconciler.java:297-308`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `EmptyStates.java:45-99`, `Indicators.java:15-47`, `Stacks.java:20-45,103-104,158-160`, `ViewReconciler.java:302-313`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicIndicatorsTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (20 rows inserted)
 
@@ -1460,7 +1500,7 @@ class ClassicIndicatorsTest {
 }
 ```
 
-`Labels.IconControl.tileSize` is the tile width `tile(...)` stores (`Labels.java:163`).
+`Labels.IconControl.tileSize` is the tile width `tile(...)` stores (`Labels.java:165`, `:177`).
 
 Insert the rows into `face-pairs.tsv`: the empty state's after the last `ClassicLabelPolicy` row (before the table's),
 the tag's and the route's after the last `ClassicFieldPolicy` row (before the prompt's), in `KitFaces.all()` order:
@@ -2119,7 +2159,7 @@ a following entry row in a VERTICAL parent is adopted so the column spans it (Ru
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/OrderedFace.java`, `DefaultOrderedFace.java`, `ClassicOrderedFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `ItemLists.java:18-524`, `InteractiveRows.java:33-38,755-768`, `Stacks.java` (Task 2's children lines), `Buttons.java:124-125`, `ClassicButtonFace.java` (4b Task 2), `ViewReconciler.java:101`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `ItemLists.java:19-524`, `InteractiveRows.java:33-38,792-806`, `Stacks.java` (Task 2's children lines), `Buttons.java:100,124-125`, `ClassicButtonFace.java:59,89,106` (4b Task 2), `ViewReconciler.java:105`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicOrderedTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (two rows inserted)
 
@@ -2279,6 +2319,24 @@ class ClassicOrderedTest {
                 assertThat(list.footer).isNull();
                 button.doClick(0);
                 assertThat(events).containsExactly(new UiEvent.Action("key-add"));
+            } finally { release(context); }
+        });
+    }
+
+    /** Rulings 15 with plan 4b's Rulings 6: a disabled LINK add action is a flat disabled standard button, faded once (E1). */
+    @Test void aDisabledLinkAddActionIsFlatAndFadedOnce() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var add = new Nodes.Button("key-add", new ControlState(true, false, false, ""), "Add Key…", "add", Nodes.ButtonKind.LINK, "key-add", "");
+            try (var view = new KitView(context, new ViewSpec(markers(List.of(), Optional.of(add))), e -> {})) {
+                KitFixtures.render(view, 420, 120, 1);
+                var button = find(view, "key-add", Buttons.KitButton.class);
+                assertThat(button.sideColumn).isTrue();
+                assertThat(button.fadesDisabled()).as("the face draws its own disabled state").isFalse();
+                var image = paint(button);
+                assertThat(at(image, 3, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER));
+                assertThat(at(image, 0, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER));
+                assertThat(button.getForeground().getAlpha()).isEqualTo(Math.round(.42f * 255));
             } finally { release(context); }
         });
     }
@@ -2818,7 +2876,10 @@ edit(S + "ClassicButtonFace.java", [
      '''        if (b.embedded || b.recorder() || b.circular || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }''', 1),
     ('''        if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK) return ThemePainting.color(c, b.textRole(hover));''',
      '''        if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
-        if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);''', 1)])
+        if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);''', 1),
+    # Execution notes E1: fades repeats text's condition (plan 4b X12), so a disabled side-column LINK is faded once.
+    ('''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;''',
+     '''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;''', 1)])
 edit(S + "ViewReconciler.java", [
     ('''            button.button.orderedAction = false;
 ''', '''            button.button.orderedAction = false;
@@ -2837,11 +2898,14 @@ classic side-column buttons are real `ButtonControl`s whose clicks go to `SideCo
 (`restyle`); `ButtonControl.refresh` drops a side-column button's glyph, so the add action stays glyphless through the
 extra refresh `KitView` runs after its first pass (fact 20); the reconciler resets
 `sideColumn` on the add action as it resets `orderedAction`, and the list's `children` sets it again on every pass.
+`ClassicButtonFace.fades` repeats `text`'s condition (plan 4b Execution notes X12), so it takes the same
+`&& !b.sideColumn` (Execution notes E1): a disabled side-column LINK draws 4b's flat disabled face (an opaque
+`surface.tableHeader` fill inside `border.divider`, the label at 0.42) and is not faded again as one layer.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' --tests 'dev.jasper.ui.gallery.*' --continue`
-Expected: PASS (`ClassicOrderedTest` 6 tests; `PaintSpecTest` with the two new rows; `ItemListShortcutsTest`,
+Expected: PASS (`ClassicOrderedTest` 7 tests; `PaintSpecTest` with the two new rows; `ItemListShortcutsTest`,
 `InteractiveRowsTest`, `FormsTest`, `ButtonsTest`, `ClassicButtonsTest` and the gallery suites green).
 
 - [ ] **Step 6: Prove the default gallery unchanged**
@@ -2910,7 +2974,8 @@ and under the complement kit and the seven covering-array kits over Slate Cobalt
 **Files:**
 - Create: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures.java`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java` (`enterpriseCatalog()`), `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java` (`enterpriseLight()`)
-- Create: `jasper-ui/src/test/resources/dev/jasper/ui/gallery/control-covering-array.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicContractTest.java`
+- Create: `jasper-ui/src/test/resources/dev/jasper/ui/gallery/control-covering-array.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicContractTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicPickersTest.java` (Execution notes E8)
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:218-243` (`selectAll` and `composing`; Execution notes E7)
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java`, `GalleryCoverageTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java`
 - Create: `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java`
@@ -2919,7 +2984,7 @@ and under the complement kit and the seven covering-array kits over Slate Cobalt
 **Interfaces:**
 - Consumes: Tasks 1 to 3's faces; plan 4a's `KitFixtures.enterprise()`, `complement()`, `withControls(Kit,
   ControlVariants)`, `ControlVariants.of(boolean...)` and `keys()`, `KitMatrixTest.areas`; plan 4b's
-  `KitFaces.declared(Kit)`; plan 3c's `nodes(Object, List)` helper in `GalleryCoverageTest`.
+  `KitFaces.declared(Kit)`; plan 3b's `records(Object, List<Record>)` helper in `GalleryCoverageTest` (`GalleryCoverageTest.java:152`; it collects every record reachable from a node, parts included).
 - Produces: `public static List<KitGallery.Fixture> EnterpriseFixtures.create()` (fixtures `classic-new-tunnel` 520 × 449,
   `classic-add-host` 520 × 521, `classic-new-file-server-ftp` 520 × 605, `classic-notifications-groups` 751 × 529,
   `classic-project-markers` 751 × 92, `classic-keymap-tree` 777 × 489, each referencing its mock's path under
@@ -3112,8 +3177,8 @@ coverage = "jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.ja
 before_last_brace(coverage, '''
     /** Plan 4c: the Enterprise fixtures hold the classic surfaces, and none shares a name with a gallery fixture. */
     @Test void theEnterpriseFixturesHoldTheClassicSurfaces() {
-        var nodes = new ArrayList<Nodes.Node>();
-        EnterpriseFixtures.create().forEach(f -> nodes(f.spec().root(), nodes));
+        var nodes = new ArrayList<Record>();
+        EnterpriseFixtures.create().forEach(f -> records(f.spec().root(), nodes));
         assertThat(nodes).as("a route").anyMatch(n -> n instanceof Nodes.Stack s && s.role() == Nodes.LayoutRole.ROUTE);
         assertThat(nodes).as("an ordered list followed by its entry row").anyMatch(n -> n instanceof Nodes.Stack s && s.role() == Nodes.LayoutRole.VERTICAL
             && s.children().size() > 1 && s.children().get(0) instanceof Nodes.ItemList l && l.kind() == Nodes.ListKind.ORDERED
@@ -3181,7 +3246,6 @@ import java.awt.event.ActionEvent;
 import java.util.*;
 import javax.swing.AbstractButton;
 import javax.swing.text.DefaultEditorKit;
-import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -3218,7 +3282,7 @@ class ClassicContractTest {
                 find(view, "protocol.option.b", AbstractButton.class).doClick(0);
                 find(view, "pages.option.b", AbstractButton.class).doClick(0);
                 // As a person types (3b's ReadOnlyFieldsTest): the key-typed action, which a read-only field ignores.
-                var folder = (JTextComponent) ((TextFields.FieldControl) view.control("folder")).input;
+                var folder = ((TextFields.FieldControl) view.control("folder")).input;
                 new DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new ActionEvent(folder, ActionEvent.ACTION_PERFORMED, "x"));
                 assertThat(folder.getText()).as(kit.id() + " read-only").isEqualTo("No folder selected");
                 var list = (ItemLists.ListControl) view.control("keys");
@@ -3233,6 +3297,142 @@ class ClassicContractTest {
                 assertThat(side).as(kit.id() + " side column").isEqualTo(kit != Kit.DEFAULT);
             } finally { release(context); }
         });
+    }
+
+    /** Spec 16.1.9: a SLIDER is no text field under either kit, though the classic stepper face builds it as a spinner. */
+    @Test void aSliderIsNoTextFieldUnderEitherKit() {
+        for (var kit : List.of(Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), kit);
+            var slider = new Nodes.Field("level", READY, Nodes.FieldKind.NUMBER, "42", "%", "Level", "", Optional.of(new Nodes.Numeric(0, 100, 1, 0)),
+                Nodes.FieldPresentation.SLIDER);
+            try (var view = new KitView(context, new ViewSpec(slider), e -> {})) {
+                assertThatIllegalArgumentException().as(kit.id()).isThrownBy(() -> view.selectAll("level"));
+                assertThatIllegalArgumentException().as(kit.id()).isThrownBy(() -> view.composing("level"));
+            } finally { release(context); }
+        });
+    }
+}
+```
+
+Create `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicPickersTest.java` (Execution notes E8: plan 4b's classic picker
+faces had no render test; this one passes as soon as it compiles, as it covers code 4b wrote):
+
+```java
+package dev.jasper.ui.swing;
+
+import static dev.jasper.ui.swing.KitViewTest.*;
+import static org.assertj.core.api.Assertions.*;
+
+import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.*;
+import dev.jasper.ui.testsupport.*;
+import dev.jasper.ui.theme.*;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.util.*;
+import javax.swing.*;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Plan 4b's classic picker faces as painted (plan 4c Execution notes E8): a plain picker, a rich picker and a rich dropdown are
+ * the classic gradient ending with the drawn ▼ and lead with their text, no tile; picker menu rows draw no tiles.
+ */
+@SuppressWarnings("try")
+class ClassicPickersTest {
+    static final Nodes.PickerFace VIA = new Nodes.PickerFace("Mac", "dustin@192.168.1.119:22", "server", Nodes.Hue.BLUE, Nodes.PickerDensity.DEFAULT, true);
+
+    static BufferedImage paint(JComponent component) {
+        var image = new BufferedImage(component.getWidth(), component.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics(); try { component.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    static Color at(BufferedImage image, int x, int y) { return new Color(image.getRGB(x, y), true); }
+
+    static int distance(Color a, Color b) {
+        return Math.abs(a.getRed() - b.getRed()) + Math.abs(a.getGreen() - b.getGreen()) + Math.abs(a.getBlue() - b.getBlue());
+    }
+
+    /** The first column, from {@code from}, holding a pixel within 60 of {@code ink} between rows {@code top} and {@code bottom}. */
+    static int firstInk(BufferedImage image, Color ink, int from, int top, int bottom) {
+        for (int x = from; x < image.getWidth(); x++) for (int y = top; y < bottom; y++)
+            if (at(image, x, y).getAlpha() > 0 && distance(at(image, x, y), ink) < 60) return x;
+        return image.getWidth();
+    }
+
+    /** Whether the drawn ▼ in its guarded colour lies in the last 24 px. */
+    static boolean arrow(BufferedImage image, Color colour) {
+        for (int y = 0; y < image.getHeight(); y++) for (int x = Math.max(0, image.getWidth() - 24); x < image.getWidth(); x++)
+            if (at(image, x, y).equals(colour)) return true;
+        return false;
+    }
+
+    static ViewSpec pickers() {
+        return new ViewSpec(new Nodes.Stack("pickers", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Choice("credential", ControlState.READY, Nodes.ChoiceKind.PICKER, List.of(), "", "Credential", "credential", ""),
+            new Nodes.Choice("via", ControlState.READY, Nodes.ChoiceKind.PICKER, List.of(), "", "Via host", "via", "", Optional.empty(), Optional.of(VIA)),
+            new Nodes.Choice("jump", ControlState.READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("mac", "Mac", Optional.empty()),
+                new Option("box", "build-box", Optional.empty())), "mac", "Jump host", "jump", "", Optional.empty(), Optional.of(VIA)))));
+    }
+
+    @Test void classicPickersAndRichDropdownsAreGradientsLedByTheirTextAndEndedByTheirArrow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var pairs = context.faces().buttons.pairs();
+            try (var view = new KitView(context, pickers(), e -> {})) {
+                KitFixtures.capture(context, view.spec(), 320, 140, "pickers");
+                KitFixtures.render(view, 320, 140, 1);
+                int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+                for (var id : List.of("credential.input", "via.input", "jump.input")) {
+                    var face = find(view, id, JComponent.class);
+                    var image = paint(face);
+                    int h = face.getHeight();
+                    assertThat(distance(at(image, face.getWidth() / 2, 2), ThemePainting.color(context, SemanticColor.BUTTON_SECONDARY_BG))).as(id + " top").isLessThan(12);
+                    assertThat(distance(at(image, face.getWidth() / 2, h - 3), ThemePainting.role(context, DerivedColor.BUTTON_END))).as(id + " foot").isLessThan(12);
+                    assertThat(arrow(image, ThemePainting.painted(context, pairs.get(5)))).as(id + " ▼").isTrue();
+                    if (!id.equals("credential.input")) {
+                        int ink = firstInk(image, ThemePainting.color(context, SemanticColor.TEXT_PRIMARY), 2, 3, h - 3);
+                        assertThat(ink).as(id + " leads with its text, no tile").isBetween(pad - 1, pad + 4);
+                    }
+                }
+            } finally { release(context); }
+        });
+    }
+
+    @Test void theDefaultRichFaceKeepsItsTile() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light());
+            try (var view = new KitView(context, pickers(), e -> {})) {
+                KitFixtures.render(view, 320, 140, 1);
+                var face = find(view, "via.input", JComponent.class);
+                var image = paint(face);
+                int pad = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+                int ink = firstInk(image, ThemePainting.color(context, SemanticColor.TEXT_PRIMARY), 2, 3, face.getHeight() - 3);
+                assertThat(ink).as("the text follows the tile").isGreaterThan(pad + ThemePainting.metric(context, DesignMetrics.Role.PICKER_DEFAULT_FACE_TILE));
+            } finally { release(context); }
+        });
+    }
+
+    /** Plan 4b Rulings 9: picker menu rows draw no tiles under the classic face, so their labels start a tile earlier. */
+    @Test void pickerMenuRowsDrawNoTilesUnderTheClassicFace() {
+        var items = List.of(new Nodes.PickerItem("login", "Login", "Password", "user", Nodes.Hue.BLUE), new Nodes.PickerItem("key", "Deploy key", "SSH key", "key", Nodes.Hue.GREEN));
+        var menu = new Nodes.PickerMenu("menu", ControlState.READY, "", "Search", items, "", "", "No matches", "New Credential…", "create", "cancel");
+        var starts = new LinkedHashMap<String, Integer>();
+        for (var kit : List.of(Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), kit);
+            try (var view = new KitView(context, new ViewSpec(menu), e -> {})) {
+                if (kit != Kit.DEFAULT) KitFixtures.capture(context, view.spec(), 260, 140, "picker-menu");
+                KitFixtures.render(view, 260, 140, 1);
+                var rows = find(view, "menu.rows", JList.class);
+                var image = paint(rows);
+                var cell = rows.getCellBounds(0, 0);
+                starts.put(kit.id(), firstInk(image, ThemePainting.color(context, SemanticColor.TEXT_PRIMARY), 0, cell.y + 3, cell.y + cell.height - 3));
+                int pad = ThemePainting.metric(context, DesignMetrics.Role.PICKER_PADDING), gap = ThemePainting.metric(context, DesignMetrics.Role.PICKER_ROW_GAP);
+                if (kit != Kit.DEFAULT) assertThat(starts.get(kit.id())).as("the label after the padding and gap").isBetween(pad + gap - 1, pad + gap + 4);
+            } finally { release(context); }
+        });
+        assertThat(starts.get(KitFixtures.enterprise().id())).as("a tile earlier than by default").isLessThan(starts.get(Kit.DEFAULT.id()));
     }
 }
 ```
@@ -3302,11 +3502,11 @@ PY
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.gallery.*' --tests 'dev.jasper.ui.swing.ClassicContractTest' --tests 'dev.jasper.ui.testsupport.*' --continue`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.gallery.*' --tests 'dev.jasper.ui.swing.ClassicContractTest' --tests 'dev.jasper.ui.swing.ClassicPickersTest' --tests 'dev.jasper.ui.testsupport.*' --continue`
 Expected: FAIL at compile: "cannot find symbol … method enterpriseCatalog()" in `KitGallery`, "variable EnterpriseFixtures"
 and "method enterpriseLight()" in `KitFixtures`.
 
-- [ ] **Step 3: Add the Enterprise fixtures, the catalog and Enterprise Light**
+- [ ] **Step 3: Add the Enterprise fixtures, the catalog and Enterprise Light, and keep a SLIDER out of the text-field calls**
 
 Create `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures.java`:
 
@@ -3435,7 +3635,7 @@ public final class EnterpriseFixtures {
                 setting("allow-row", "Allow changes", "Clients can upload, rename and delete files", toggle("allow", false)))),
             section("security", "Security & Startup", card("security-card", CardKind.SETTINGS,
                 setting("tls-row", "Use TLS", "", toggle("tls", false)),
-                new SettingRow("require-row", READY, "Require TLS", "Refuse logins and transfers without it",
+                new SettingRow("require-row", DISABLED, "Require TLS", "Refuse logins and transfers without it",
                     new Toggle("require", DISABLED, "Require TLS", false, "require", false), true),
                 setting("startup-row", "Start when Jasper starts", "", toggle("startup", false))))),
             "ftp://127.0.0.1:2121", List.of(button("cancel", "Cancel", ButtonKind.SECONDARY, READY), button("submit", "Add Server", ButtonKind.PRIMARY, DISABLED)));
@@ -3576,16 +3776,49 @@ PY
 `GeneratedTheme` resolve; the test fixtures are outside `ColourLiteralScanTest`'s production scan, as `custom()`'s
 plum and `degenerate()`'s greys already are.
 
+Then keep spec 16.1.9's contract under the classic stepper face (Execution notes E7): `KitView.selectAll` and
+`composing` refuse a SLIDER field whatever control the kit built for it (the default kit builds a slider, which is no
+`FieldControl`, so the default behaviour is unchanged). Run from the worktree root:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 4c Task 4 step 3: a SLIDER is no text field under either kit (spec 16.1.9), though the classic stepper face builds it as a spinner."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+edit("jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java", [
+    ('''        if (!(control instanceof TextFields.FieldControl field)) throw new IllegalArgumentException("Node is not a field: " + fieldId);
+        field.input.selectAll();''',
+     '''        if (!(control instanceof TextFields.FieldControl field) || slider(control)) throw new IllegalArgumentException("Node is not a field: " + fieldId);
+        field.input.selectAll();''', 1),
+    ('''        if (reconciler.control(Objects.requireNonNull(fieldId)) instanceof TextFields.FieldControl field) return field.composing;''',
+     '''        var control = reconciler.control(Objects.requireNonNull(fieldId));
+        if (control instanceof TextFields.FieldControl field && !slider(control)) return field.composing;''', 1),
+    ('''    /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */''',
+     '''    /** A SLIDER field is no text field under either kit, though the classic stepper face builds it as a spinner (spec 16.1.9). */
+    private static boolean slider(ControlRegistry.Control control) {
+        return control.node instanceof Nodes.Field field && field.presentation() == Nodes.FieldPresentation.SLIDER;
+    }
+    /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */''', 1)])
+PY
+```
+
+`KitView` imports `dev.jasper.ui.model.*`, so `Nodes` resolves.
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.gallery.*' --tests 'dev.jasper.ui.swing.ClassicContractTest' --tests 'dev.jasper.ui.testsupport.*' --continue`
-Expected: PASS (`ClassicContractTest` 1 test, `KitFixturesTest` with the new test, `GalleryCoverageTest` with the new test,
-`KitMatrixTest` with six new tests). If `underMarkedEveryClassicAreaIsARoleOrABlendOfTwo`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.gallery.*' --tests 'dev.jasper.ui.swing.ClassicContractTest' --tests 'dev.jasper.ui.swing.ClassicPickersTest' --tests 'dev.jasper.ui.testsupport.*' --continue`
+Expected: PASS (`ClassicContractTest` 2 tests, `ClassicPickersTest` 3 tests, `KitFixturesTest` with the new test,
+`GalleryCoverageTest` with the new test, `KitMatrixTest` with six new tests). If `underMarkedEveryClassicAreaIsARoleOrABlendOfTwo`
 or `underCustomTheEnterpriseKitPaintsNoForeignColour` fails, its message names the fixture, the colour and its position:
 find the painter there (`KitFixtures.capture` of the same fixture under `marked()` shows it); a colour literal, an
 undeclared guard repair or a FlatLaf colour the classic overlay does not map is the bug — fix the painter or
 `UiKeySet.CLASSIC`, never the test. Record the matrix's run time from the test report
-(`jasper-ui/build/test-results/test/TEST-dev.jasper.ui.gallery.KitMatrixTest.xml`, its `time` attribute) for Task 6.
+(`jasper-ui/build/test-results/test/TEST-dev.jasper.ui.gallery.KitMatrixTest.xml`, its `time` attribute) for Task 7.
 
 - [ ] **Step 5: Run the app's contrast suite**
 
@@ -3593,7 +3826,10 @@ Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContr
 Expected: PASS (the new guard test and the default look's pairs unchanged; `ClassicHostedKitContractTest` runs every
 `HostedKitContractTest` case plus its own under the Enterprise kit, the same count as `HostedKitContractTest` plus one;
 `ThemeMigrationCoverageTest` finds the new row). A case that fails only under the Enterprise kit is a classic face that
-changes behaviour: fix the face, never the contract.
+changes behaviour: fix the face, never the contract. The pre-flight found one, `settingsControlsPreserveAuthoredPreview
+MetadataAndNumericEvents` ("Expecting code to raise a throwable": the classic stepper face builds a SLIDER as a spinner,
+a text field, so `selectAll` accepted it); Step 3's `KitView` edit fixes it (Execution notes E7), and with it the whole
+class passed (35 tests, `HostedKitContractTest` 34).
 
 - [ ] **Step 6: Prove the default gallery unchanged**
 
@@ -3633,6 +3869,7 @@ git add jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures
   jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java jasper-ui/src/test/resources/dev/jasper/ui/gallery/control-covering-array.tsv \
   jasper-ui/src/test/java/dev/jasper/ui/gallery/KitMatrixTest.java jasper-ui/src/test/java/dev/jasper/ui/gallery/GalleryCoverageTest.java \
   jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicContractTest.java \
+  jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicPickersTest.java jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java \
   jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java \
   jasper-app/src/test/java/dev/jasper/app/plugins/ClassicHostedKitContractTest.java docs/design/theme-engine/migration.csv
 git commit -F - <<'MSG'
@@ -3644,7 +3881,9 @@ kit over the theme set, and under the complement kit and a checked-in strength-2
 covering array over five palettes; marked() maps every classic area to a role or a
 blend of two, and custom() finds no literal. PaintedContrastTest checks every classic
 pair's guard; ClassicContractTest checks the events under both kits, and
-ClassicHostedKitContractTest runs the host's contract under the Enterprise kit.
+ClassicHostedKitContractTest runs the host's contract under the Enterprise kit;
+KitView refuses a SLIDER in selectAll and composing under both kits, and
+ClassicPickersTest renders 4b's classic picker faces and menu rows.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3662,7 +3901,7 @@ must show, and `tools/visual/check_pairs.py` reports PASS or FAIL for them; `Ent
 the fixtures consistent.
 
 **Files:**
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:92-113` (`main`), `jasper-ui/build.gradle.kts:28-46`
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:140-200` (`main`, `installed`, `capture`), `jasper-ui/build.gradle.kts:28-46`
 - Modify: `tools/visual/pairs.json` (six entries appended), `tools/visual/README.md` (one bullet)
 - Create: `tools/visual/check_pairs.py`, `jasper-ui/src/test/java/dev/jasper/ui/gallery/EnterpriseGalleryTest.java`
 
@@ -3747,14 +3986,14 @@ G = "jasper-ui/build/gallery/enterprise-light-2x/"
 dialog = ["#ECEDEF", "#FFFFFF", "#C4C7CC", "#B4B8BF", "#2F65CA", "#E6E7EA"]
 table = ["#F0F1F3", "#FFFFFF", "#B4B8BF", "#D3D6DA"]
 for name, mock, crop, floor, colours in [
-        ("classic-new-tunnel", "04 New Tunnel/New Tunnel - Local.png", [2, 60, 1040, 898], 0.30, dialog + ["#2E9E4F"]),
-        ("classic-add-host", "03 Add Host/Add Host - Default.png", [2, 60, 1040, 1042], 0.30, dialog),
-        ("classic-new-file-server-ftp", "02 New File Server/New File Server - FTP.png", [2, 60, 1040, 1210], 0.30,
+        ("classic-new-tunnel", "04 New Tunnel/New Tunnel - Local.png", [2, 60, 1040, 898], 0.50, dialog + ["#2E9E4F"]),
+        ("classic-add-host", "03 Add Host/Add Host - Default.png", [2, 60, 1040, 1042], 0.50, dialog),
+        ("classic-new-file-server-ftp", "02 New File Server/New File Server - FTP.png", [2, 60, 1040, 1210], 0.40,
          dialog + ["#2E9E4F", "#8A4FBF", "#B5651D"]),
-        ("classic-notifications-groups", "05 Settings/Settings 03 - Appearance & Behavior - Notifications.png", [522, 504, 1502, 1058], 0.40, table),
+        ("classic-notifications-groups", "05 Settings/Settings 03 - Appearance & Behavior - Notifications.png", [522, 504, 1502, 1058], 0.75, table),
         ("classic-project-markers", "05 Settings/Settings 15 - Tools - Project Index.png", [522, 792, 1502, 184], 0.40,
          ["#FFFFFF", "#F7F8FA", "#B4B8BF", "#ECEDEF"]),
-        ("classic-keymap-tree", "05 Settings/Settings 07 - Keymap.png", [496, 226, 1554, 978], 0.40, table)]:
+        ("classic-keymap-tree", "05 Settings/Settings 07 - Keymap.png", [496, 226, 1554, 978], 0.45, table)]:
     pairs.append({"name": name, "mock": R + mock, "crop": crop, "render": G + name + ".png", "min_agreement": floor, "colours": colours})
 path.write_text(json.dumps(pairs, indent=2) + "\n", encoding="utf-8")
 PY
@@ -3762,7 +4001,8 @@ git diff --stat tools/visual/pairs.json
 ```
 
 Expected: one file changed, 118 insertions and no deletion: `json.dumps(indent=2)` reproduces the existing 34 entries
-byte for byte (checked at `222969926`), and git aligns the former last entry's brace with the new last entry's.
+byte for byte (checked again at `70987ccc4`, with plan 3e's `note` keys), and git aligns the former last entry's brace
+with the new last entry's. The floors are the pre-flight's measurements less a margin (Rulings 21, Execution notes E10).
 
 Then run from the worktree root:
 
@@ -3792,6 +4032,12 @@ edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java", [
      '''                Path directory = output.resolve(label + "-" + (int)scale + "x");''', 1),
     ('''                for (Fixture fixture : fixtures()) {''', '''                for (Fixture fixture : catalog) {''', 1),
     ('''"{\\"theme\\":" + quote(name) + ",\\"scale\\":"''', '''"{\\"theme\\":" + quote(label) + ",\\"scale\\":"''', 1),
+    # Execution notes E5: the developer font follows the gallery's scale, so a 2x render carries 2x text as the 2x mocks do.
+    ('''            UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));''',
+     '''            UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(13)));''', 1),
+    ('''        UIManager.put("defaultFont", new Font(family, Font.PLAIN, fixture.name().contains("font24") ? 24 : 13));''',
+     '''        // The form font at the gallery's scale, so a 2x render carries 2x text as the 2x mocks do (plan 4c).
+        UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(fixture.name().contains("font24") ? 24 : 13)));''', 1),
     ('''    public static GeneratedTheme theme(String name) {''', '''    /** The Enterprise gallery's theme: Enterprise Light (plan 4c Rulings 21; Enterprise Dark is plan 5's). */
     static GeneratedTheme enterpriseTheme(String name) {
         if (!name.equals("light")) throw new IllegalArgumentException("The Enterprise gallery renders Enterprise Light only");
@@ -3817,7 +4063,10 @@ PY
 
 The manifest anchor is the Java text `"{\"theme\":" + quote(name) + ",\"scale\":"` (the Python string doubles its
 backslashes). With the default kit, `label` is the theme name, the catalog is `fixtures()` and the kit `Kit.DEFAULT`, so
-the default run writes the same files.
+the default run writes the same files at scale 1. At scale 2 the gallery's developer `defaultFont` was 13 (or 24)
+whatever the scale, and `SwingTypography.effective` takes a developer font as an exact size, so every 2x render drew 1x
+text in 2x geometry; it is now `UIScale.scale(13)` (or 24), the same at scale 1 (Execution notes E5). `KitGallery`
+imports `UIScale`.
 
 - [ ] **Step 4: Write the comparison tool**
 
@@ -3938,28 +4187,70 @@ ls jasper-ui/build/gallery/enterprise-light-2x | grep -c '^classic-.*\.png$'
 ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=dark 2>&1 | grep -c 'Enterprise Light only'
 ```
 
-Expected: both renders print "Rendered N fixtures with FlatLaf … to …/enterprise-light-2x" (and `-1x`), N being the
-gallery's count plus six; the count prints 6; the dark request fails with "The Enterprise gallery renders Enterprise
-Light only" (the grep prints at least 1).
+Expected: the renders print "Rendered 81 fixtures with Enterprise at 2.0x to …/enterprise-light-2x" and "… at 1.0x to
+…/enterprise-light-1x" (the gallery's 75 plus six); the count prints 6; the dark request fails with "The Enterprise
+gallery renders Enterprise Light only" (the grep prints at least 1).
 
-- [ ] **Step 7: Compare with the mocks**
+- [ ] **Step 7: Compare with the mocks and write the comparison report**
 
+This is the first visual proof of the classic look the user sees, so the comparison is read by eye as well as measured.
 Run from the worktree root:
 
 ```bash
 python3 -I tools/visual/check_pairs.py jasper-ui/build/classic-compare
+python3 -I - <<'PY'
+"""Mock | render views of the six pairs (the first two thirds of each side image), for reading by eye."""
+import pathlib
+from PIL import Image
+out = pathlib.Path("jasper-ui/build/classic-compare/view"); out.mkdir(parents=True, exist_ok=True)
+for side in sorted(pathlib.Path("jasper-ui/build/classic-compare").glob("classic-*-side.png")):
+    image = Image.open(side); third = image.width // 3
+    image.crop((0, 0, 2 * third, image.height)).save(out / side.name.replace("-side", ""))
+    print(out / side.name.replace("-side", ""))
+PY
 ```
 
-Expected: six lines, each `classic-…: PASS agreement=… (floor …)`. For a FAIL, open
-`jasper-ui/build/classic-compare/<name>-side.png` (mock | render | edges) and `<name>-blend.png`:
+Expected: six lines, each `classic-…: PASS agreement=… (floor …)`. The pre-flight measured, on this plan's final state
+(Execution notes E10): `classic-new-tunnel` 0.589, `classic-add-host` 0.559, `classic-new-file-server-ftp` 0.481,
+`classic-notifications-groups` 0.845, `classic-project-markers` 0.494, `classic-keymap-tree` 0.521. Open each view
+image (mock left, render right) and `<name>-blend.png`, and compare them part by part with the pre-flight's reading,
+which found these differences, each a residual owned elsewhere unless marked:
 
-- a missing colour or a misdrawn face (a box, band, separator, edge or glyph in the wrong place or role) is a face
+- every pair: the platform font, not IBM Plex (plan 5), so text is wider or narrower and BODY_STRONG (headings,
+  category rows, section titles) reads as regular weight;
+- New Tunnel: the footer has no strip or rule above it (the dialog footer is plan 6's); the route's arrow is heavier
+  than the mock's thin arrow (Rulings 12's drawn → at `ROUTE_ARROW`); the Port fields are a little wider;
+- Add Host: the side column shows Remove, Move Up and Move Down (Rulings 14; the mock has Add Key… and Remove), so the
+  keys box is taller and the 521-tall body scrolls, hiding "Track shell folder"; "No keys" sits at the box's top (3c's
+  empty line; the mock centres it); the Group dropdown is narrower than the mock's (the setting row's control width,
+  plan 9);
+- New File Server – FTP: the folder's trailing button reads "Browse…" (a PATH field's action; plan 3e's composition has
+  a read-only field and a separate Choose…, plan 10); the Access radios and the help caption start at the field column
+  and the radios wrap (4b's bare-choice inset; the mock starts them at the card's edge, a composition matter for plan
+  10); the account picker reads "Choose…", not "Choose Vault account…" (fixture copy); no warning notice (the fixture
+  places none);
+- Notifications: each heading's count sits at the trailing edge (Rulings 7); an in-cell dropdown's ▼ sits at a fixed
+  offset in its column, where the mock draws it right after the value (3c's in-cell dropdown); band, separators, rule,
+  insets, grouped indent and the white rows match;
+- Project Index: the adopted entry row's field keeps its preferred width (an INLINE stack does not stretch it; the mock
+  runs it to the Add button at the box's edge; plan 9's Project Index composition);
+- Keymap: Scope and Shortcut are content-sized and right-aligned (3c's column tree), where the mock gives them weighted,
+  left-aligned columns; keycaps are text ("⌘C"; the app's keycap trees are plan 9's); the mock's change dot after
+  "Application" is not in the fixture.
+
+Any other difference is classified as follows:
+
+- a missing colour or a misdrawn face (a box, band, separator, edge, fill or glyph in the wrong place or role) is a face
   defect: fix the face in its task's file, re-run Steps 5 to 7 and Task 1 Step 6's gallery proof;
-- a difference of content or font (Plex arrives with plan 5; the mocks' copy differs from a fixture) is a residual:
-  write the measured agreement into that pair's `min_agreement` rounded down to 0.05 and the cause into this plan's
-  banner and the STATUS entry (Task 6).
+- a difference of content, font or composition is a residual: if it takes a pair below its floor, write the measured
+  agreement into that pair's `min_agreement` rounded down to 0.05 and the cause into this plan's banner and the STATUS
+  entry (Task 7).
 
-Record each pair's measured agreement for Task 6's STATUS entry.
+Then write the comparison report at the end of this plan file, after the Execution notes, as a section
+`## Mock comparison (Task 5)`: one table row per pair (pair, mock, measured agreement, floor, colours present in both),
+then one short paragraph per pair naming what matches and each difference with its owner (the list above, as found
+on the real branch: confirm, correct or extend it), and the commands that reproduce the views. Task 7's STATUS entry
+links to it. Record each pair's measured agreement for that entry.
 
 - [ ] **Step 8: Prove the default gallery unchanged**
 
@@ -3997,7 +4288,8 @@ Expected: `changed: none`; the stat shows insertions only, so no existing pair c
 
 ```bash
 git add jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java jasper-ui/build.gradle.kts \
-  jasper-ui/src/test/java/dev/jasper/ui/gallery/EnterpriseGalleryTest.java tools/visual/pairs.json tools/visual/check_pairs.py tools/visual/README.md
+  jasper-ui/src/test/java/dev/jasper/ui/gallery/EnterpriseGalleryTest.java tools/visual/pairs.json tools/visual/check_pairs.py tools/visual/README.md \
+  docs/superpowers/plans/2026-10-16-enterprise-4c-classic-data-faces.md
 git commit -F - <<'MSG'
 Classic faces: the Enterprise gallery and the mock comparison
 
@@ -4005,6 +4297,8 @@ Classic faces: the Enterprise gallery and the mock comparison
 Enterprise fixture kit over Enterprise Light; the default run is unchanged.
 pairs.json gains six classic-* pairs with an edge-agreement floor and the colours each
 crop shows, and tools/visual/check_pairs.py reports PASS or FAIL for them (opt-in).
+The gallery's font follows its scale, so a 2x render carries 2x text. The plan records
+the comparison report.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -4012,14 +4306,217 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 MSG
 ```
 
-### Task 6: Documentation, STATUS and the whole build
+### Task 6: Classic native buttons keep their gradient
+
+Plan 4a's residual, handed on by plan 4b (Execution notes X9; this plan's Execution notes E9): FlatLaf paints a
+button's gradient only while its state colour is `Button.startBackground` itself, and the classic overlay inherits the
+default keys' `Button.focusedBackground`, `hoverBackground` and `pressedBackground`, so a focused, hovered or pressed
+classic native (`JButton`) button paints flat. The classic overlay now gives the first two no colour (FlatLaf's `null`,
+which removes its own default), so a hovered or focused button keeps the gradient while its edge darkens
+(`Button.hoverBorderColor`, already `border.hover`) or its focus ring shows, and a pressed one fills the gradient's end
+(`button.end`, DESIGN_LANGUAGE §8's "slightly darker" pressed state). The default key set is unchanged.
 
 **Files:**
-- Modify: `docs/ui-architecture.md`, `docs/ui-maintenance.md`, `jasper-ui/README.md`, `docs/plugin-ui.md` (the smallest accurate edits)
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java:20-50,212-213` (a `None` source; three overlay keys)
+- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/theme/ui-color-keys-classic.tsv` (three rows), `jasper-ui/src/test/java/dev/jasper/ui/theme/ClassicUiKeysTest.java` (`none`)
+- Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicNativeButtonsTest.java`
+
+**Interfaces:**
+- Consumes: plan 4a's `UiKeySet.CLASSIC` overlay and `DerivedColor.BUTTON_END`; `FlatLafInstaller.install(theme, kit)`.
+- Produces: `UiColorKeys.flatLaf(theme, UiKeySet.CLASSIC)` maps `Button.focusedBackground` and `Button.hoverBackground`
+  to the string `null` and `Button.pressedBackground` to `button.end`; the frozen table's source name `none`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicNativeButtonsTest.java`:
+
+```java
+package dev.jasper.ui.swing;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.testsupport.Edt;
+import dev.jasper.ui.testsupport.KitFixtures;
+import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.SemanticColor;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import javax.swing.JButton;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Plan 4a's residual (plan 4b Execution notes X9, plan 4c Execution notes E9): a classic native FlatLaf button keeps its
+ * gradient while hovered or focused and darkens to the gradient's end while pressed; the default kit's keys are unchanged.
+ */
+class ClassicNativeButtonsTest {
+    static BufferedImage paint(JButton button) {
+        var image = new BufferedImage(button.getWidth(), button.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics(); try { button.paint(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    static void installed(Kit kit, Runnable check) {
+        var prior = UIManager.getLookAndFeel();
+        try {
+            FlatLafInstaller.install(KitFixtures.light(), kit);
+            check.run();
+        } finally {
+            try { UIManager.setLookAndFeel(prior); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
+        }
+    }
+
+    @Test void aClassicNativeButtonKeepsItsGradientWhenHoveredAndDarkensWhenPressed() {
+        Edt.run(() -> installed(KitFixtures.enterprise(), () -> {
+            assertThat(UIManager.get("Button.focusedBackground")).as("no focused fill").isNull();
+            assertThat(UIManager.get("Button.hoverBackground")).as("no hover fill").isNull();
+            var button = new JButton("Open");
+            button.setSize(120, 30);
+            int inset = UIManager.getInt("Component.focusWidth") + 3;
+            var rest = paint(button);
+            button.getModel().setRollover(true);
+            var hovered = paint(button);
+            assertThat(hovered.getRGB(60, inset)).as("the hovered gradient's top").isEqualTo(rest.getRGB(60, inset));
+            assertThat(hovered.getRGB(60, 29 - inset)).as("the hovered gradient's foot").isEqualTo(rest.getRGB(60, 29 - inset));
+            assertThat(hovered.getRGB(60, inset)).as("a gradient, not a flat fill").isNotEqualTo(hovered.getRGB(60, 29 - inset));
+            button.getModel().setArmed(true);
+            button.getModel().setPressed(true);
+            var pressed = paint(button);
+            var end = DerivedColor.BUTTON_END.color(KitFixtures.light());
+            assertThat(new Color(pressed.getRGB(60, inset))).isEqualTo(end);
+            assertThat(new Color(pressed.getRGB(60, 29 - inset))).isEqualTo(end);
+        }));
+    }
+
+    @Test void theDefaultKitKeepsItsStateFills() {
+        Edt.run(() -> installed(Kit.DEFAULT, () -> {
+            var theme = KitFixtures.light();
+            assertThat(UIManager.getColor("Button.focusedBackground")).isEqualTo(theme.semantic().color(SemanticColor.BUTTON_SECONDARY_BG));
+            assertThat(UIManager.getColor("Button.hoverBackground")).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_CONTROL_HOVER));
+            assertThat(UIManager.getColor("Button.pressedBackground")).isEqualTo(theme.semantic().color(SemanticColor.SURFACE_CONTROL_SELECTED));
+        }));
+    }
+}
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicNativeButtonsTest'`
+Expected: FAIL: `aClassicNativeButtonKeepsItsGradientWhenHoveredAndDarkensWhenPressed` with "[no focused fill]
+Expecting actual: … to be null" (the default kit's case passes).
+
+- [ ] **Step 3: Give the classic overlay's state colours none**
+
+Run from the worktree root:
+
+```bash
+python3 -I - <<'PY'
+"""Plan 4c Task 6 step 3: the classic overlay leaves a native button's gradient alone while it is hovered or focused."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+edit("jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java", [
+    ('''    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint {}''',
+     '''    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint, None {}''', 1),
+    ('''    private record ErrorTint() implements Source {}
+    private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint();''',
+     '''    private record ErrorTint() implements Source {}
+    /** No colour: FlatLaf's own default for the key is removed, so the component falls back to its base colour. */
+    private record None() implements Source {}
+    private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint(), NONE = new None();''', 1),
+    ('''     * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours.''',
+     '''     * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours; a
+     * classic key with no colour is {@code null}, which removes FlatLaf's default.''', 1),
+    ('''        sources.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {
+            case Role role -> palette.color(role.role());
+            case Derived role -> role.role().color(theme);
+            case TextSelection ignored -> textSelection;
+            case ErrorTint ignored -> errorTint(palette);
+        })));''',
+     '''        sources.forEach((key, source) -> keys.put(key, switch (source) {
+            case Role role -> ColorMath.hex(palette.color(role.role()));
+            case Derived role -> ColorMath.hex(role.role().color(theme));
+            case TextSelection ignored -> ColorMath.hex(textSelection);
+            case ErrorTint ignored -> ColorMath.hex(errorTint(palette));
+            case None ignored -> "null";
+        }));''', 1),
+    ('''        keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
+        keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));''',
+     '''        keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
+        // FlatLaf paints the gradient only while a button's state colour is Button.startBackground itself (plan 4c): a
+        // hovered or focused button keeps it (its edge darkens, its focus ring shows); a pressed one darkens to its end.
+        keys.put("Button.focusedBackground", NONE);
+        keys.put("Button.hoverBackground", NONE);
+        keys.put("Button.pressedBackground", new Derived(DerivedColor.BUTTON_END));
+        keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));''', 1)])
+edit("jasper-ui/src/test/resources/dev/jasper/ui/theme/ui-color-keys-classic.tsv", [
+    ('''FlatLaf key, then a SemanticColor or a derived role key.''',
+     '''FlatLaf key, then a SemanticColor, a derived role key or none (no colour).''', 1),
+    ('''Button.endBackground	button.end
+''', '''Button.endBackground	button.end
+Button.focusedBackground	none
+Button.hoverBackground	none
+Button.pressedBackground	button.end
+''', 1)])
+edit("jasper-ui/src/test/java/dev/jasper/ui/theme/ClassicUiKeysTest.java", [
+    ('''    /** A source name: a SemanticColor constant, or a derived role's key. */
+    static String colour(GeneratedTheme theme, String source) {''',
+     '''    /** A source name: a SemanticColor constant, a derived role's key, or none (FlatLaf's null). */
+    static String colour(GeneratedTheme theme, String source) {
+        if (source.equals("none")) return "null";''', 1)])
+PY
+```
+
+`flatLaf` keeps each key's place (the overlay replaces the three default keys in place), so `ClassicUiKeysTest`'s
+order check holds; `FlatLafThemeData.json` writes `"null"` as a string, which FlatLaf's loader reads as no value, and
+`explicitColors` skips it (not a colour), so `publish` puts nothing back.
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' --tests 'dev.jasper.ui.theme.*' --tests 'dev.jasper.ui.gallery.*' --continue`
+Expected: PASS (`ClassicNativeButtonsTest` 2 tests, `ClassicUiKeysTest` 2 with the three new rows, `UiColorKeysTest`
+unchanged, `ClassicButtonsTest` and the gallery suites green).
+
+- [ ] **Step 5: Prove the default gallery unchanged**
+
+Run Task 1 Step 6's commands. Expected: `changed: none`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add jasper-ui/src/main/java/dev/jasper/ui/theme/UiColorKeys.java jasper-ui/src/test/resources/dev/jasper/ui/theme/ui-color-keys-classic.tsv \
+  jasper-ui/src/test/java/dev/jasper/ui/theme/ClassicUiKeysTest.java jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicNativeButtonsTest.java
+git commit -F - <<'MSG'
+Classic faces: native buttons keep their gradient
+
+FlatLaf paints a button's gradient only while its state colour is the start
+background itself. The classic overlay now gives Button.focusedBackground and
+hoverBackground no colour, so a hovered or focused native button keeps the gradient
+(its edge darkens, its focus ring shows), and a pressed one fills button.end. The
+default keys are unchanged.
+
+🤖 Generated with Claude Code at The Home Depot
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+MSG
+```
+
+### Task 7: Documentation, STATUS and the whole build
+
+**Files:**
+- Modify: `docs/ui-maintenance.md`, `jasper-ui/README.md`, `docs/plugin-ui.md` (the smallest accurate edits; `docs/ui-architecture.md` needs none, Execution notes E13)
 - Modify: `docs/STATUS.md` (a new entry at the top), this plan's status banner
 
 **Interfaces:**
-- Consumes: Tasks 1 to 5.
+- Consumes: Tasks 1 to 6.
 - Produces: nothing new.
 
 - [ ] **Step 1: Prove the default gallery unchanged and run the architecture tests**
@@ -4060,19 +4557,27 @@ finds `ControlVariants` read only by the kit package, `dev.jasper.app.presentati
 
 Read each document first and keep its voice; find the paragraph by its text; add no section.
 
-- `docs/ui-architecture.md`: in plan 4b's sentence on faces ("A structurally different control draws through a face
-  …"), name the data faces after the form faces: "… the table and tree (sharing their header and box), the empty state,
-  the tag, the route and the ordered list's side column …".
-- `docs/ui-maintenance.md`: where plan 4b lists `face-pairs.tsv`, add `control-covering-array.tsv` ("the seven
-  covering-array kits `KitMatrixTest` renders"); where it describes the gallery, add one sentence: "`-Pjasper.galleryKit=enterprise
+- `docs/ui-architecture.md`: no edit; its sentence on faces ("A structurally different control draws through a face
+  (`KitFaces`, one per control point, …") names no face and stays accurate.
+- `docs/ui-maintenance.md`: in the paragraph that ends "… samples every declared pair over the theme set and
+  `KitFixtures.degenerate()`.", make the `KitMatrixTest` clause accurate: "`KitMatrixTest` renders every fixture under
+  `Kit.DEFAULT` over `KitFixtures.themes()`, and the gallery with the Enterprise fixtures under the Enterprise fixture kit
+  over the theme set and Enterprise Light and under the complement kit and the seven covering-array kits
+  (`control-covering-array.tsv`) over five palettes"; at the end of the gallery paragraph (after "Test and gallery
+  classes stay out of the production jar."), add: "At scale 2 the form font is scaled too. `-Pjasper.galleryKit=enterprise
   -Pjasper.galleryTheme=light` renders the gallery and the Enterprise fixtures under the Enterprise fixture kit into
   `build/gallery/enterprise-light-<scale>x/`; `tools/visual/check_pairs.py` compares the 2× renders with the Enterprise
   mocks (opt-in)."
-- `jasper-ui/README.md`: where plan 4b names `KitFaces` and the faces, add the six data faces' names.
-- `docs/plugin-ui.md`: extend plan 4b's sentence on the classic look ("Under the classic look an EXCLUSIVE choice draws
-  radios …") with: "a Table draws a header band, zebra rows and banded headings, a Tree draws ▶ and ▼, an Empty state
-  shows one button, a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED list's commands move
-  to a side column that acts on the selection; the descriptors and events are the same."
+- `jasper-ui/README.md`: in the sentence "`KitFaces` holds one face per control point, … : the toggle, buttons (with the
+  field policy built with them), exclusive choice, tabs, group, form label, stepper and prompt faces.", replace
+  "stepper and prompt faces" with "stepper, prompt, empty state, table, tree (the two share a header face), ordered
+  list, tag and route faces".
+- `docs/plugin-ui.md`: in the sentence "Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder
+  tabs, a STEPPER or SLIDER draws a spinner, and a Section with its Card draws a titled box; the descriptors and events
+  are the same.", replace "and a Section with its Card draws a titled box;" with "a Section with its Card draws a titled
+  box, a Table draws a header band, zebra rows and banded headings, a Tree draws ▶ and ▼, an Empty state shows one
+  button, a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED list's commands move to a side
+  column that acts on the selection;"
 
 - [ ] **Step 3: Write the STATUS entry**
 
@@ -4085,22 +4590,27 @@ values from Steps 4 and 5, Task 4 Step 4 and Task 5 Step 7, and `git log --oneli
 [plan](superpowers/plans/2026-10-16-enterprise-4c-classic-data-faces.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The data half of spec 6.4's face pairs,
 each default face calling the control's former code, so the default look is pixel-identical (the headless gallery for
-Slate Cobalt Dark and Light matches plan 4a's base: every PNG byte-identical, the JSON differing only in the `class` of
+Slate Cobalt Dark and Light matches the plan-4 base re-recorded at `91153a4ce`: every PNG byte-identical, the JSON differing only in the `class` of
 4b's section surfaces and 4c's list panes, Rulings 25): the table (a header band with column separators and a rule, insets
 after each separator, zebra rows or, grouped, heading bands with the rows under them indented by the new
 `GROUP_ROW_INDENT`, a 1 px box outside panel bodies, `surface.rowHover`), the tree (the same header, box and hover, drawn
 ▶/▼, `TREE_INDENT` per depth, medium category rows), the empty state (no tile, one button), the tag (upper case in a
 1 px `tag.border` box), the route (one boxed strip of equal cells with hue edges and drawn arrows) and the ordered list
 (a square striped box with a data-face index and a side column — the add action, Remove, Move Up, Move Down — acting on
-the selection, spanning a following entry row). Six Enterprise fixtures rebuild the mocks' compositions;
+the selection, spanning a following entry row). A classic native button keeps its gradient when hovered or focused and
+fills `button.end` when pressed (the classic overlay's `Button.focusedBackground` and `hoverBackground` have no colour;
+4a's residual). Six Enterprise fixtures rebuild the mocks' compositions;
 `KitFixtures.enterpriseLight()` is spec 7.6's Light table. The full kit matrix runs in `check`: the gallery and the
 fixtures under the Enterprise kit over the theme set and Enterprise Light, the complement kit and a checked-in
 strength-2 covering array over five palettes, `marked()` mapping every classic area to a role or a blend of two,
 `custom()` finding no literal ([seconds] s for `KitMatrixTest`); `PaintedContrastTest` checks every classic pair's
 guard; `ClassicContractTest` checks spec 16.1.9's events under both kits and `ClassicHostedKitContractTest` runs the
-host's contract under the Enterprise kit. Opt-in: `-Pjasper.galleryKit=enterprise` and
-`tools/visual/check_pairs.py`, whose six pairs measured [name agreement, …] against floors of 0.30 (dialogs) and 0.40
-(tables and lists); residuals: [each, or none beyond the plan's]. Rulings (plan, "Rulings"): a shared header face; the
+host's contract under the Enterprise kit, which found that the classic spinner let `selectAll` and `composing` take a
+SLIDER (`KitView` now refuses one under both kits); `ClassicPickersTest` renders 4b's classic picker faces and menu
+rows. Opt-in: `-Pjasper.galleryKit=enterprise` and
+`tools/visual/check_pairs.py`, whose six pairs measured [name agreement, …] against floors of 0.50, 0.50, 0.40, 0.75,
+0.40 and 0.45; the gallery's font now follows its scale, so a 2x render carries 2x text; the comparison report is the
+plan's "Mock comparison (Task 5)" section; residuals: [each, or none beyond the report's]. Rulings (plan, "Rulings"): a shared header face; the
 box outside panel bodies; zebra only ungrouped; header titles in `text.strong.secondary` (mock `#4A4F57`); separator
 insets; the grouped indent role; the heading count's place; drawn disclosure; row hover for tables and trees; one empty
 button; boxed tags; edged routes with `ROUTE_HEIGHT` kept; the side column in the list's pane, its target, all four
@@ -4108,7 +4618,11 @@ buttons (Add Host's two a residual) and the selection shown unfocused; a LINK ad
 index face; guards checked in jasper-app and sampled in jasper-ui; the marked() rule; the covering array; Enterprise
 Light as a fixture; the opt-in comparison and its floors; Unlock Vault's pair left to plan 6; the host contract run
 under the Enterprise kit now (`HostedKit` reads the installed kit); the default matrix unchanged; the list pane's and
-4b's section surface's class names the only JSON change in the default gallery. Plan 5 turns the classic look on through the Enterprise kit.
+4b's section surface's class names the only JSON change in the default gallery. Pre-flight rulings (plan, "Execution
+notes"): `fades` takes the side column's condition; the classic box fills `surface.card`; the gallery font at the
+gallery's scale; Require TLS disabled as a row; a SLIDER is no text field under either kit; picker render tests; native
+buttons keep the gradient; floors from measurement and the report in the plan; 4b's radio halo clip and 4a's unfocused
+native table and tree selection left as residuals. Plan 5 turns the classic look on through the Enterprise kit.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
@@ -4145,13 +4659,14 @@ Insert below this plan's title:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this
-> plan's text: [none, or each one, including any pair floor Task 5 Step 7 lowered and why].
+> plan's text: [none, or each one, including any pair floor Task 5 Step 7 lowered and why, and spec 6.5's classic
+> overlay list gaining `Button.focusedBackground`, `hoverBackground` and `pressedBackground` (Execution notes E9)].
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add docs/ui-architecture.md docs/ui-maintenance.md jasper-ui/README.md docs/plugin-ui.md docs/STATUS.md \
+git add docs/ui-maintenance.md jasper-ui/README.md docs/plugin-ui.md docs/STATUS.md \
   docs/superpowers/plans/2026-10-16-enterprise-4c-classic-data-faces.md
 git commit -F - <<'MSG'
 Classic data faces: documentation and status
@@ -4164,42 +4679,274 @@ MSG
 
 ## Execution notes (2026-10-16)
 
-Recorded while plan 4b ran on this branch, for this plan's executor.
+Pre-flight for `superpowers:subagent-driven-development`, run on `claude/enterprise-classic-catalog` at `70987ccc4`
+(`main` `265497430` — plans 3a to 3e, 4a, 4b and 5a — plus one STATUS punctuation commit). Every anchor, quoted text,
+path, signature and line number above was re-read against that code, and the text above now carries the current ones
+and the rulings below (E1 was recorded while plan 4b ran; E2 to E17 are this pre-flight's). Evidence, without Gradle:
+on a `git archive` copy of `HEAD`, every `Create` block and edit script of Tasks 1 to 6 was replayed in order and each
+script found its text the stated number of times; jasper-ui's main sources, test fixtures and tests compiled with the
+JBR's `javac -Xlint:all -Xlint:-serial` (no new warning) and `javadoc -Xdoclint:all -Xdoclint:-missing` reported
+nothing; the whole jasper-ui suite passed under a JUnit launcher (801 tests, 0 failures: 766 at `HEAD` plus this plan's
+35); `KitGallery.main` for Slate Cobalt Dark and Light at 1x matched `jasper-ui/build/plan4-base` under the digest script
+(`changed: none`, 161 files per theme); the Enterprise gallery rendered 81 fixtures at 1x and 2x
+and `check_pairs.py` passed all six pairs (E10); against the worktree's last-built jasper-app classes and jars,
+`ClassicHostedKitContractTest` (35), `HostedKitContractTest` (34), the patched `PaintedContrastTest` (4),
+`ThemeMigrationCoverageTest` (5), `StrategyIsolationTest` and `VariantReadTest` (4) passed; the AGENTS.md hygiene scan
+found no bad character. Not run here: Gradle, `verifyUiArchitecture`, `verifyApplicationArchitecture` and `./gradlew
+check`; the executor's runs are the evidence for those.
 
-### E1. Task 3's `ClassicButtonFace` edit also changes `fades`
+### Shared files and interfaces
 
-Plan 4b's Task 2 review made `ButtonFace.fades` take the button (plan 4b, Execution notes X12): the classic face fades
-as one layer the buttons it leaves to the default treatment, and its condition repeats the two lines Task 3 Step 4
-edits for the side column. Step 4's `edit(S + "ClassicButtonFace.java", [...])` list therefore gains a third entry, so a
-disabled LINK add action in the side column draws 4b's flat disabled face (4b's Rulings 6) once, instead of being faded
-again as one layer with its label near 0.18 alpha; verified fact 9 holds for `fades` too:
+| Pair | What they share | Agree? | Ruling |
+|---|---|---|---|
+| Tasks 1, 2 and 3 | `KitFaces.java`: each task's anchors (the field block, the next `switch`, `all()`) are the text the task before it wrote | Yes, in order | E15 |
+| Tasks 1, 2 and 3 | `face-pairs.tsv`: Task 1 inserts after the last `ClassicLabelPolicy` row; Task 2 inserts the empty state's rows after the same row (so before the table's) and the tag's and route's after the last `ClassicFieldPolicy` row; Task 3 after the last `ClassicStepperFace` row; the result follows `all()` (toggle, exclusive, tabs, group, labels, empty, table, tree, stepper, ordered, buttons, fields, tag, route, prompt) | Yes: `PaintSpecTest` passed on the replay | E15 |
+| Task 1 and Task 3 | `InteractiveRows.java`: Task 1 adds the row hooks after `identityRows()`, the bands before the fills and the hover and heading-rule hooks; Task 3 edits `selectionShown`, the ORDERED block just above Task 1's bands and the `getPreferredSize` anchor | Yes, disjoint | none |
+| Task 1 and Task 3 | `Buttons.java`: both anchor on the two `orderedCommand` lines, which each keeps; the fields end `orderedCommand`, `sideColumn`, `disclosure` | Yes | none |
+| Task 2 and Task 3 | `Stacks.java`: Task 3's anchor is the `route.step` line Task 2 writes at the end of `StackControl.children` | Yes, in order | E15 |
+| Task 2 and Task 3 | `ViewReconciler.java`: Task 2 `applyRoute` (`:302-313`), Task 3 `resetComposition` (`:105`); both name control classes only | Yes, disjoint | none |
+| Task 3 and plan 4b | `ClassicButtonFace`: `paintFace` and `text` take `&& !b.sideColumn`, and `fades` repeats `text`'s condition (4b X12) | Only with the `fades` entry | E1 |
+| Task 1 and Task 4 | `ClassicHeaders.Box`'s card fill and Task 4's `marked()` check: `surface.card` is a role | Yes: `KitMatrixTest` passed | E4 |
+| Task 4 and Task 5 | `KitGallery.java`: Task 4 inserts `enterpriseCatalog()` before `panelState`; Task 5 edits `main`, `installed`, `capture` and `theme`; `EnterpriseFixtures`' names, references and sizes are what Task 5's pairs and `EnterpriseGalleryTest` expect | Yes: `EnterpriseGalleryTest` passed | E5 |
+| Task 4 and Task 5 | `KitMatrixTest` captures through `KitGallery.installed` and `capture`, whose font Task 5 scales; tests run at UI scale 1 unless `flatlaf.uiScale` is passed, where 13 stays 13 | Yes | E5 |
+| Task 4 and plan 5a | `ClassicHostedKitContractTest` relies on `HostedKit` reading the installed kit; 5a made the kit a supplier whose default is `FlatLafInstaller::installedKit`, which the tests' constructors use | Yes (Rulings 23 cites the new lines) | E2 |
+| Task 4 and plan 4b | The host contract under the classic stepper face: `selectAll` accepted a SLIDER built as a spinner | No, until Task 4's `KitView` edit | E7 |
+| Task 6 and Tasks 1 to 5 | Task 6 changes only `UiKeySet.CLASSIC`'s keys; the default gallery, `UiColorKeysTest` and every face are untouched; the Enterprise kit's tests re-run green after it | Yes | E9 |
+| Task 7 and Tasks 1 to 6 | The documents' anchors and the STATUS template's facts | Yes, after E13 | E13 |
+| This plan and plans 3e and 5a (merged) | 3e's `note` keys in `pairs.json` (round-trip byte-identical, `compare_all.py` prints them); 5a's `HostedKit` supplier; neither changed a jasper-ui file | Yes | E2 |
+| This plan and plans 6a and 8a (parallel) | 6a and 8a append metric roles to `DesignMetrics`, `compact-roles.tsv`, `NewRolesTest` and edit `VariantReadTest` and `PaintedContrastTest`; Task 1 edits the last enum entry, the last `ADDED` name and appends one row to each table, Task 4 appends one test before `PaintedContrastTest`'s closing brace; this plan does not touch `VariantReadTest` | Textual overlap only, each edit one local hunk | E14 |
+| Workspace and Tasks 1 to 7 | The gallery base, compared at every pixel step | Yes: a render of the final replay matches it | E2 |
 
-```python
-    ('''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;''',
-     '''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;''', 1),
+### Each task against itself
+
+| Task | Finding | Ruling |
+|---|---|---|
+| Workspace | 4b's checks hold (`7a9761f19`; one `final PromptFace prompt;`; `TableRow.heading`); the base is 4b's re-recording at `91153a4ce` | E2 |
+| 1 | Anchors hold; `ClassicTablesTest` 7 pass; under the classic box the rows showed the panel surface (`#F7F7F8`), where every boxed mock draws white rows | E4 |
+| 2 | Anchors hold; `ClassicIndicatorsTest` 5 pass; its Files line numbers had moved | E2 |
+| 3 | Anchors hold; E1's `fades` entry and test belonged in the task text; `ClassicOrderedTest` 7 pass with them | E1 |
+| 4 | `GalleryCoverageTest` has no `nodes(Object, List)` helper (the test did not compile); `ClassicContractTest`'s `JTextComponent` cast is redundant under `-Xlint:all`; `ClassicHostedKitContractTest` failed one inherited case (a SLIDER under the classic spinner); 4b's picker faces had no render test; the Require TLS row of the File Server fixture was enabled where the mock dims it | E3, E6, E7, E8 |
+| 5 | At scale 2 the gallery drew 1x text in 2x geometry (its developer font is an exact 13), so the 2x comparison measured boxes, not text (0.45 to 0.57 before, 0.48 to 0.85 after); the floors sat far below every measurement; the expected "Rendered …" line named FlatLaf instead of the theme; the plan named no place for the comparison report | E5, E10, E16 |
+| 6 (new) | 4a's residual handed on by 4b X9: no task here addressed it | E9 |
+| 7 (was 6) | `docs/ui-architecture.md`'s face sentence lists no faces; `docs/plugin-ui.md` says "Under the Enterprise look"; `docs/ui-maintenance.md`'s `KitMatrixTest` clause names the default kit only; the README's face list | E13 |
+| Residuals handed to this plan | 4b: the radio focus halo loses 2 px to the option's bounds; 4a: an unfocused native classic table or tree takes the terminal-selection wildcard; 4b: LINK unchanged until 4c | E11, E12, E17 |
+
+### Rulings
+
+- **E1. Task 3's `ClassicButtonFace` edit also changes `fades`** (recorded while plan 4b ran; its entry and test are now
+  in Task 3's Steps 1 and 4) — plan 4b's Task 2 review made `ButtonFace.fades` take the button (4b X12), and its
+  condition repeats `text`'s, so it takes the same `&& !b.sideColumn`: a disabled LINK add action in the side column
+  draws 4b's flat disabled face (an opaque `surface.tableHeader` fill inside `border.divider`, the label at 0.42) once.
+  Checked on the replay: `aDisabledLinkAddActionIsFlatAndFadedOnce` passes, and `ClassicOrderedTest` has 7 tests — cost
+  if wrong: a disabled side-column LINK faded twice, its label near 0.18 alpha.
+- **E2. The Verified facts, every Files line number and Rulings 23's citations carry `70987ccc4`'s lines; their meaning
+  is unchanged** — plans 4b, 3e and 5a moved them (5a: `HostedKit` takes a kit supplier, default
+  `FlatLafInstaller::installedKit`, and `HostedKitTest`'s method is now
+  `appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources`); the base needs no re-recording, since 3e and
+  5a changed no jasper-ui file and the replay's final render matches it — cost if wrong: an executor opens a file a few
+  lines off.
+- **E3. `GalleryCoverageTest`'s new test collects with plan 3b's `records(Object, List<Record>)`, and
+  `ClassicContractTest` reads `input` without a cast** — the plan named a `nodes(Object, List)` helper that does not
+  exist (plan 4b's note), and `records` reaches every record, nodes among them, so the `instanceof` patterns hold;
+  `TextFields.FieldControl.input` is already a `JTextComponent`, and the build compiles with `-Xlint:all` — cost if
+  wrong: none.
+- **E4. The classic box fills `surface.card` inside its edge (`ClassicHeaders.Box.paintBorder`), outside panel bodies
+  only** — the Notifications, Keymap and Project Index mocks draw their boxed rows on white (`#FFFFFF`), and
+  `ClassicTreeFace`'s glyph pair is already declared against `surface.card`; a border paints before the pane's children,
+  so the fill lies under the header band and the non-opaque rows; Workstation's panel tables keep their panel's surface
+  until plan 10 compares them. Notifications' agreement rose from 0.696 to 0.845 — cost if wrong: a white table in an
+  unusual boxed host.
+- **E5. The gallery's developer font is the form font at the gallery's scale (`UIScale.scale(13)`, or 24)** — the
+  gallery set an exact 13, and `SwingTypography.effective` takes a developer font as an exact size, so a 2x render drew
+  1x text in 2x geometry and the 2x comparison measured boxes alone; at scale 1 nothing changes (the pixel rule holds),
+  and the default gallery's 2x renders now carry 2x text, which no pair or committed file reads; the dialogs' agreement
+  rose to 0.48 to 0.59 — cost if wrong: someone relying on the old 2x text size; the default 2x gallery differs from
+  earlier 2x renders.
+- **E6. The File Server fixture's Require TLS setting row is DISABLED, not only its toggle** — the mock dims the row's
+  title and description with the toggle — cost if wrong: none (a fixture).
+- **E7. `KitView.selectAll` and `composing` refuse a SLIDER field under every kit (Task 4 Step 3), and
+  `ClassicContractTest.aSliderIsNoTextFieldUnderEitherKit` checks it** — `ClassicHostedKitContractTest` failed the
+  inherited `settingsControlsPreserveAuthoredPreviewMetadataAndNumericEvents`: 4b's classic stepper face builds a SLIDER
+  as a spinner (4b Rulings: SLIDER as a spinner), a `FieldControl`, so `selectAll` stopped throwing; spec 16.1.9 keeps
+  the events and the contract the same under both kits, and the plan's rule is "fix the face, never the contract"; the
+  descriptor, not the built control, decides, and under the default kit a SLIDER is no `FieldControl`, so nothing
+  changes there — cost if wrong: a host that selected a classic slider's text can no longer (no host does).
+- **E8. `ClassicPickersTest` (Task 4) renders 4b's classic picker faces: a plain picker, a rich picker and a rich
+  DROPDOWN are the gradient ending with the drawn ▼ and lead with their text (no tile), the default rich face keeps its
+  tile, and picker menu rows start a tile earlier under the classic face** — 4b covered them by flags only
+  (`tiles()`), and spec 16.1.3 asks for real renders; the test passes as soon as it compiles (it covers 4b's code) and
+  fails under the default kit (checked) — cost if wrong: one test class.
+- **E9. Task 6 gives the classic overlay's `Button.focusedBackground` and `hoverBackground` no colour and
+  `Button.pressedBackground` `button.end`** — 4a's residual, handed to 4c by 4b (X9): FlatLaf paints the gradient only
+  while the state colour is `Button.startBackground` itself (`FlatButtonUI.paintBackground`), and a `"null"` theme value
+  removes FlatLaf's default (checked with FlatLaf 3.7); hover then keeps the gradient and darkens the edge
+  (`Button.hoverBorderColor`), focus adds the ring, and pressed is DESIGN_LANGUAGE §8's "slightly darker" fill (FlatLaf
+  cannot reverse a gradient, as the kit buttons do). Spec 6.5's overlay list gains three keys, as 4a's
+  `default.startBorderColor` did; Task 7's banner records it as a deviation — cost if wrong: a pressed native button
+  flat where a kit button reverses its gradient.
+- **E10. Each pair's floor is the agreement the pre-flight measured on this plan's final state, rounded down to 0.05,
+  less 0.05 (0.50, 0.50, 0.40, 0.75, 0.40, 0.45), and the comparison report is a "Mock comparison (Task 5)" section at
+  the end of this plan** — measured 0.589, 0.559, 0.481, 0.845, 0.494 and 0.521 with every listed colour present in
+  both images; the former flat 0.30 and 0.40 floors would pass a render that lost most of its structure; the report
+  lives with the plan (the renders are build output), and Task 5 Step 7 lists the differences the pre-flight read by
+  eye, with their owners — cost if wrong: a floor one hinting difference too tight on another machine (opt-in tool).
+- **E11. Plan 4b's clipped radio focus halo stays a residual** — the halo's leftmost 2 px fall outside the option's
+  bounds; widening the option moves every radio 2 px off the field column the mocks align, no 4c fixture renders a
+  focused radio, and the radio face is 4b's, which this plan does not edit — cost if wrong: the residual stands until
+  a plan that touches `ClassicRadiosFace`.
+- **E12. Plan 4a's unfocused classic native table and tree selection (the terminal-selection wildcard for
+  `selectionInactive*`) stays a residual** — kit tables and trees are `InteractiveRows`, not `JTable` or `JTree`, so
+  neither this plan's faces nor its comparison renders a native one; spec 6.5 lists neither key — cost if wrong: an
+  unfocused native table under the classic look takes the terminal selection colour until a plan composes one.
+- **E13. Task 7's documentation edits target text that exists** — `docs/ui-architecture.md` needs none (its sentence
+  names no face); `docs/plugin-ui.md`'s sentence reads "Under the Enterprise look …"; `docs/ui-maintenance.md`'s
+  `KitMatrixTest` clause names only the default kit, and the gallery paragraph ends "Test and gallery classes stay out
+  of the production jar."; the README lists the form faces ending "stepper and prompt faces" — cost if wrong: wording.
+- **E14. The overlaps with plans 6a and 8a stay as written and are reconciled at merge** — Task 1's `DesignMetrics`,
+  `NewRolesTest` and two `.tsv` edits are one line each at the lists' ends, and Task 4 appends one method before
+  `PaintedContrastTest`'s closing brace; 6a and 8a append in the same places, so a merge sees adjacent-line conflicts
+  that keep both sides; this plan leaves `VariantReadTest` alone — cost if wrong: a few conflict hunks at merge.
+- **E15. Tasks run in order 1 to 7, one commit each; the old Task 6 is Task 7** — `KitFaces`, `face-pairs.tsv` and
+  `Stacks` anchors chain from task to task, the new Task 6 (E9) needs the Enterprise kit's tests of Task 4 to re-run,
+  and the replay applied them in this order — cost if wrong: a script stops on a missing anchor.
+- **E16. Expected outputs corrected** — Task 3 Step 5: `ClassicOrderedTest` 7; Task 4 Step 4: `ClassicContractTest` 2,
+  `ClassicPickersTest` 3; Task 4 Step 5: `ClassicHostedKitContractTest` 35 and `HostedKitContractTest` 34; Task 5
+  Step 6: "Rendered 81 fixtures with Enterprise at 2.0x to …" (`KitGallery.main` prints the theme's name) — measured on
+  the replay — cost if wrong: none.
+- **E17. A LINK button outside a side column keeps the default treatment under the classic face** — plan 4b deferred
+  LINK to this plan, and spec 6.4 names only the side column's LINK add action ("draws as a standard button"); no mock
+  of this plan's draws another LINK — cost if wrong: a classic LINK elsewhere looks as by default until a composition
+  asks otherwise.
+- **E18. Task 3's review: `OrderedFace.styleIndex` takes the row (`styleIndex(JLabel, KitContext, int row)`), the
+  classic face declares a third pair (`text.tertiary` on `surface.zebra`, a fourth `face-pairs.tsv` row) for odd rows'
+  indices, a selected row's index keeps its selection ink (`ItemLists.populate` styles unselected rows only), and
+  `SideLayout`'s minimum is as tall as the side column** — the index painted `text.tertiary` on `selection.bg` (about
+  1.0:1 in Slate Cobalt Light) and was guarded against the even rows' surface only, and a host sizing to the minimum
+  clipped Move Down — cost if wrong: none (`ClassicOrderedTest` checks all three).
+- **E19. Task 3's second review: an update moves nothing the classic ordered face placed, and a list gives up an entry
+  row no VERTICAL parent adopts again** — `ListControl.childParent` names the side column for a classic ORDERED list
+  (`ListControl.sideColumn()`); `StackControl.adopted` (a child's id to the container a face placed it in) is what its
+  `childParent` reports, the reconciler's reset leaves it alone, and `StackControl.children` runs `ordered.span`, which
+  records it, before it mounts the rest, leaving an adopted row out; `ListControl.entry` returns when it holds the row
+  already and sets `spanned`, which `ViewReconciler.resetComposition` clears and `ListControl.children` reads to give up
+  an entry row its parent did not adopt again; `SideColumn.run` is package-private, so
+  `aRowTheHostRemovedIsNoLongerTheTarget` drives the action path (a disabled command's click fires nothing); with
+  `anUpdateMovesNeitherTheAdoptedEntryRowNorTheAddAction` and `aListThatLeavesItsVerticalParentGivesUpItsEntryRow`,
+  `ClassicOrderedTest` has 9 tests and the jasper-ui suite after Task 3 has 787 — every update took the entry row out
+  of the pane and the add action out of the side column and put them back, so a focused marker field or Add button
+  lost focus and its IME on each host echo, and a list moved out of its VERTICAL parent kept a closed entry row painted
+  in its pane — cost if wrong: none (both tests fail without the change).
+
+## Mock comparison (Task 5)
+
+Run on `claude/enterprise-classic-catalog` after the final review's fixes: the Enterprise gallery at 2x over Enterprise
+Light with the Enterprise fixture kit (82 fixtures), compared by `check_pairs.py`. The first run (base `42707e416`)
+drew every classic role at 13/12 of its size: the gallery's developer font was 13 under every kit, which the 12-based
+classic scale reads as a 13-point body, so the earlier measurements (0.589, 0.559, 0.481, 0.845, 0.494, 0.521) and
+floors belonged to a 13-point variant of the look. The gallery now sets the developer font to the kit's body (12 for
+Enterprise, 13 for the default kit, so the default gallery is unchanged), and the floors are re-derived by E10's rule
+from the 12-point measurements. A seventh pair, `classic-file-servers`, covers the classic tag (the Workstation File
+Servers table and its HTTP chip; the panel draws that table unboxed, so the standalone render's box sits on the mock's
+`#C4C7CC` panel edges). Every listed colour fills a 2 × 2 block within ΔE76 6 in the mock and appears within ΔE76 1.5 in
+the render, as a 2 × 2 block or a three-pixel line; at the former ΔE 6 on both sides the Enterprise neutrals stood in
+for one another. That check dropped `#E6E7EA` from the three dialog pairs (it is the mock's footer strip, which the
+render does not draw, plan 6; a nearby neutral had matched it) and lists FTP's green as `#2D984D`, the radio swatch as
+its guard paints it on `surface.app`. The default gallery for Slate Cobalt Dark and Light at 1x matches the base
+(`changed: none`, 161 files each).
+
+| Pair | Mock | Agreement | Floor | Colours present in both |
+|---|---|---|---|---|
+| `classic-new-tunnel` | 04 New Tunnel – Local | 0.480 | 0.40 | all 6: `#ECEDEF` `#FFFFFF` `#C4C7CC` `#B4B8BF` `#2F65CA` `#2E9E4F` |
+| `classic-add-host` | 03 Add Host – Default | 0.581 | 0.50 | all 5: the dialog set |
+| `classic-new-file-server-ftp` | 02 New File Server – FTP | 0.531 | 0.45 | all 8: the dialog set, `#2D984D` `#8A4FBF` `#B5651D` |
+| `classic-notifications-groups` | Settings 03 Notifications | 0.852 | 0.80 | all 4: `#F0F1F3` `#FFFFFF` `#B4B8BF` `#D3D6DA` |
+| `classic-project-markers` | Settings 15 Project Index | 0.536 | 0.45 | all 4: `#FFFFFF` `#F7F8FA` `#B4B8BF` `#ECEDEF` |
+| `classic-keymap-tree` | Settings 07 Keymap | 0.503 | 0.45 | all 4: the table set |
+| `classic-file-servers` | 01 Workstation – Connected | 0.686 | 0.60 | all 4: `#F0F1F3` `#FFFFFF` `#D3D6DA` and the tag's tint `#E8EEFA` |
+
+Read by eye (mock left, render right) and measured at 2x pixels with Pillow; logical values are halved. No face defect
+was found in the boxes, bands, separators, edges, fills or glyphs. Every pair shares one residual: the platform font,
+not IBM Plex (plan 5). At the same 12-point body the platform face sets body text slightly narrower than the mock's
+Plex (New Tunnel's Type caption fits on one line where the mock wraps it, and the footer's preview is not cut), the
+data face is the platform monospace (heavier than Plex Mono), and BODY_STRONG (section titles, heading and category
+rows, the Notifications heading counts, the tag's label) reads as regular weight.
+
+**New Tunnel – Local.** Matches: the titled Tunnel and Ports boxes, the colon labels and the field column, the plain
+picker's gradient with its drawn ▼ and the host in the data face, the radios, the route strip (one `#B4B8BF` box, three
+equal cells, the neutral, blue and green 3 px hue edges, uppercase captions, data-face values), the checkbox setting,
+the footer's preview and buttons. Differences: the footer has no strip or rule above it (plan 6's dialog footer); the
+route's arrow is heavier and runs to the next cell's edge, where the mock's thin arrow stops a few pixels short (Rulings
+12's drawn → at `ROUTE_ARROW`); the Type caption fits on one line, so the Ports box starts higher (the platform font);
+the Port fields are a little wider; the Listen on and Forward to fields show
+`localhost` in the body face where the mock uses the data face (fixture copy: `FieldKind.TEXT` fields without the
+TECHNICAL presentation).
+
+**Add Host – Default.** Matches: the three titled boxes, the technical fields in the data face, the jump host dropdown,
+the Authentication radios at the field column, the Credential picker, the keys box with Add Key… leading the side
+column, the footer's three buttons. Differences: the side column shows Remove, Move Up and Move Down (Rulings 14; the
+mock has Add Key… and Remove only), so the keys box is about twice the mock's height and the 521-tall body scrolls
+(its scroll bar shows at the right edge), hiding "Track shell folder"; "No keys" sits at the box's top (3c's empty
+line; the mock centres it); the Group dropdown is narrower than the mock's (the setting row's control width, plan 9).
+
+**New File Server – FTP.** Matches: the Server box with the hued protocol radios (blue, amber, green and purple
+squares), the technical Passive ports field, the Reachable from dropdown with its Port field, the Access radios, the
+Account picker, the Allow changes setting under its rule, the Security & Startup box with the disabled Require TLS row
+dimmed and indented (Execution notes E6). Differences: the folder's trailing button reads "Browse…" on an editable
+field (a PATH field's action; plan 3e's composition has a read-only field and a separate Choose…, plan 10); the Access
+radios and the help caption start at the field column and the radios wrap (4b's bare-choice inset; the mock starts
+them at the card's edge, a composition matter for plan 10); the account picker reads "Choose…", not "Choose Vault
+account…" (fixture copy); no warning notice (the fixture places none).
+
+**Settings 03 Notifications.** Matches: the 20 px `#F0F1F3` header band and its `#D3D6DA` rule, the Display separator
+within 1 px of the mock's (the Source separator 4 px earlier, the fixture's column weights), the 22 px heading bands with no rule above them, the white unstriped rows, the
+14 px grouped indent, the in-cell dropdowns under the Display title, the `#B4B8BF` box. Differences: each heading's
+count sits at the trailing edge (Rulings 7); an in-cell dropdown's ▼ sits at a fixed offset in its column, where the
+mock draws it right after the value (3c's in-cell dropdown); the header titles are `#3A3D42`, the mock's `#4A4F57`
+(Rulings 4); every title and cell sits 2 px nearer its column's start than the mock's: the first 7.5 from the box's
+outer edge (mock 9.5) and those after a separator 7.5 to 8 (mock 10 for titles, 11 to 11.5 for cells), because
+`ICON_GAP` is 6 in both catalogs, where this plan's Mock measurements row assumed the mock's 8 (Rulings 5's rule
+holds; a wider classic cell inset needs a new role, left to plan 9's Notifications page).
+
+**Settings 15 Project Index.** Matches: the square `#B4B8BF` box, the white rows with the second striped `#F7F8FA`,
+the data-face markers with their indices, the side column of equal Remove, Move Up and Move Down buttons, 6.5 from the
+box and top-aligned with it. Differences: the adopted entry row's field keeps its preferred width (an INLINE stack does
+not stretch it; the mock runs it to the Add button at the box's edge; plan 9's Project Index composition); the rows are
+22 tall, not 20 (`ORDERED_ROW_HEIGHT` 20 is a minimum and the platform monospace row is taller), so the box is 68 tall
+(mock 64) and the entry row, 4 lower, is clipped by the 92-tall fixture; the side column is 6 px wider (its buttons'
+platform-font width exceeds `SIDE_COLUMN_WIDTH`), so the box ends 6 px earlier; the indices are `#5C6370`, the mock's
+`#9AA0A8`, because spec 7.6 gives Enterprise Light's `text.tertiary` `#5C6370` (the palette is plan 5's); the area
+around the list is the workspace surface (`#F7F7F8`), where the mock shows its Settings page (a bare-stack fixture).
+
+**Settings 07 Keymap.** Matches: the header band, rule and separators as in Notifications, the drawn ▶ and ▼ in
+`#5C6370`, the 22 px category rows, the expanded Clipboard's children indented, no stripes, the white rows inside the
+box. Differences: Scope and Shortcut are content-sized and right-aligned, titles included (3c's column tree), where
+the mock gives them weighted, left-aligned columns; keycaps are text ("⌘C"; the app's keycap trees are plan 9's), so
+the two child rows are about 1.5 px shorter than the mock's keycap rows and the categories below sit about 3 px higher; the
+trailing counts are `#5C6370`, the mock's `#7A808A` (3c's trailing colour); the header titles are `#3A3D42` (Rulings
+4); titles start 2 px earlier (`ICON_GAP`, as in Notifications) and children 4 px earlier (the 2 px `TREE_INDENT`
+residual of the Mock measurements plus that); the mock's change dot after "Application" is not in the fixture.
+
+**Workstation – Connected, File Servers.** Matches: the 20 px `#F0F1F3` band, its `#D3D6DA` rule and separators,
+the white row, the HTTP tag in upper case on its `#E4EBF8` tint (mock `#E8EEFA`). Differences: the tag's box is
+`tag.border.blue` `#ACC1EA` (spec 7.1's 40 % mix with the card; the mock's `#B9C8EA` is lighter) and its label the hue
+`#2F65CA` in regular weight (mock `#2655AE`, bold; plan 5's Plex); the address starts at its column, where the mock
+draws it later, past the Status separator (a mock inconsistency); the render's 1 px `#B4B8BF` box stands where the
+mock's panel has its `#C4C7CC` edges and no bottom line.
+
+Reproduce from the worktree root:
+
+```bash
+./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=light -Pjasper.galleryScale=2
+python3 -I tools/visual/check_pairs.py jasper-ui/build/classic-compare
+python3 -I - <<'PY'
+import pathlib
+from PIL import Image
+out = pathlib.Path("jasper-ui/build/classic-compare/view"); out.mkdir(parents=True, exist_ok=True)
+for side in sorted(pathlib.Path("jasper-ui/build/classic-compare").glob("classic-*-side.png")):
+    image = Image.open(side); third = image.width // 3
+    image.crop((0, 0, 2 * third, image.height)).save(out / side.name.replace("-side", ""))
+PY
 ```
 
-Checked on plan 4b's code with the three entries simulated for a disabled LINK in an ACTIONS stack: with the `fades`
-entry its face is an opaque `surface.tableHeader` fill inside `border.divider` and `fadesDisabled()` is false; without
-it the whole face is at alpha 107 and the 0.42 label is faded again. Step 1's `ClassicOrderedTest` gains this test after
-`aLinkAddActionLeadsTheSideColumnAsAStandardButton`, and Step 5 expects `ClassicOrderedTest` 7 tests:
-
-```java
-    /** Rulings 15 with plan 4b's Rulings 6: a disabled LINK add action is a flat disabled standard button, faded once. */
-    @Test void aDisabledLinkAddActionIsFlatAndFadedOnce() {
-        Edt.run(() -> {
-            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
-            var add = new Nodes.Button("key-add", new ControlState(true, false, false, ""), "Add Key…", "add", Nodes.ButtonKind.LINK, "key-add", "");
-            try (var view = new KitView(context, new ViewSpec(markers(List.of(), Optional.of(add))), e -> {})) {
-                KitFixtures.render(view, 420, 120, 1);
-                var button = find(view, "key-add", Buttons.KitButton.class);
-                assertThat(button.sideColumn).isTrue();
-                assertThat(button.fadesDisabled()).as("the face draws its own disabled state").isFalse();
-                var image = paint(button);
-                assertThat(at(image, 3, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER));
-                assertThat(at(image, 0, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER));
-                assertThat(button.getForeground().getAlpha()).isEqualTo(Math.round(.42f * 255));
-            } finally { release(context); }
-        });
-    }
-```
+The views are `jasper-ui/build/classic-compare/view/classic-*.png` (mock | render); `classic-*-blend.png` and
+`classic-*.txt` (per-band agreement) sit beside them.

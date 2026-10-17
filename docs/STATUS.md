@@ -78,6 +78,77 @@ over the first, the window closing under them, full screen under them, and eithe
 which opens it natively; a known residual: an in-window classic modal dialog blocks only its window, so a modeless
 plugin dialog owned by the same frame stays usable, unlike a native document-modal sheet). Not merged, not pushed.
 
+**Enterprise presentation, plan 4c: the classic data faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
+`.claude/worktrees/enterprise-4`, `dedf877dc..9d11af9b3`, then this documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-4c-classic-data-faces.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The data half of spec 6.4's face pairs,
+each default face calling the control's former code, so the default look is pixel-identical (the headless gallery for
+Slate Cobalt Dark and Light matches the plan-4 base re-recorded at `91153a4ce`: every PNG byte-identical, the JSON differing only in the `class` of
+4b's section surfaces and 4c's list panes, Rulings 25): the table (a header band with column separators and a rule, insets
+after each separator, zebra rows or, grouped, heading bands with the rows under them indented by the new
+`GROUP_ROW_INDENT`, a 1 px box outside panel bodies, `surface.rowHover`), the tree (the same header, box and hover, drawn
+▶/▼, `TREE_INDENT` per depth, medium category rows), the empty state (no tile, one button: the visible PRIMARY action, or
+else the first visible one), the tag (upper case in a 1 px `tag.border` box, its label and box guarded against
+`surface.card`, the ground its faint tint stands on), the route (one boxed strip of equal cells with hue edges and drawn arrows) and the ordered list
+(a square striped box with a data-face index and a side column — the add action, Remove, Move Up, Move Down — acting on
+the selection, spanning a following entry row). A classic native button keeps its gradient when hovered or focused and
+fills `button.end` when pressed (the classic overlay's `Button.focusedBackground` and `hoverBackground` have no colour;
+4a's residual). Seven Enterprise fixtures rebuild the mocks' compositions (the seventh, the Workstation File Servers
+table with its HTTP tag, from the final review);
+`KitFixtures.enterpriseLight()` is spec 7.6's Light table. The full kit matrix runs in `check`: the gallery and the
+fixtures under the Enterprise kit over the theme set and Enterprise Light, the complement kit and a checked-in
+strength-2 covering array over five palettes, `marked()` mapping every classic area of the Enterprise fixtures and of the gallery fixtures that hold an Empty state
+or a Chip to a role or a blend of two, `custom()` finding no literal (27.2 s for `KitMatrixTest`); `PaintedContrastTest` checks every classic pair's
+guard; `ClassicContractTest` checks spec 16.1.9's events under both kits (a STEPPER's arrows included, and a SLIDER's
+spinner arrows under the classic kit) and `ClassicHostedKitContractTest` runs the
+host's contract under the Enterprise kit, which found that the classic spinner let `selectAll` and `composing` take a
+SLIDER (`KitView` now refuses one under both kits); `ClassicPickersTest` renders 4b's classic picker faces and menu
+rows. Opt-in: `-Pjasper.galleryKit=enterprise` and
+`tools/visual/check_pairs.py`, whose seven pairs measured `classic-new-tunnel` 0.480, `classic-add-host` 0.581,
+`classic-new-file-server-ftp` 0.531, `classic-notifications-groups` 0.852, `classic-project-markers` 0.536,
+`classic-keymap-tree` 0.503 and `classic-file-servers` 0.686 against floors of 0.40, 0.50, 0.45, 0.80, 0.45, 0.45 and
+0.60, each listed colour within ΔE76 1.5 in the render and 6 in the mock; the gallery's font now follows its scale and
+the kit's body size, so a 2x render carries 2x text at the Enterprise kit's 12 points; the comparison report is the
+plan's "Mock comparison (Task 5)" section; residuals: none beyond the report's. Rulings (plan, "Rulings"): a shared header face; the
+box outside panel bodies; zebra only ungrouped; header titles in `text.strong.secondary` (mock `#4A4F57`); separator
+insets; the grouped indent role; the heading count's place; drawn disclosure; row hover for tables and trees; one empty
+button; boxed tags; edged routes with `ROUTE_HEIGHT` kept; the side column in the list's pane, its target, all four
+buttons (Add Host's two a residual) and the selection shown unfocused; a LINK add action as a standard button; the
+index face; guards checked in jasper-app and sampled in jasper-ui; the marked() rule; the covering array; Enterprise
+Light as a fixture; the opt-in comparison and its floors; Unlock Vault's pair left to plan 6; the host contract run
+under the Enterprise kit now (`HostedKit` reads the installed kit); the default matrix unchanged; the list pane's and
+4b's section surface's class names the only JSON change in the default gallery. Pre-flight rulings (plan, "Execution
+notes"): `fades` takes the side column's condition; the classic box fills `surface.card`; the gallery font at the
+gallery's scale; Require TLS disabled as a row; a SLIDER is no text field under either kit; picker render tests; native
+buttons keep the gradient; floors from measurement and the report in the plan; 4b's radio halo clip and 4a's unfocused
+native table and tree selection left as residuals. Final review fixes: the tag's pairs stood against the opaque hue
+surface (its label measured 1.0 to 1.4:1 on its painted tint), so `ClassicIndicatorsTest` now samples the painted label
+(at least 3:1 on the tint) and box (1.3:1 on the card and the tint) over the theme set and Enterprise Light; the
+gallery drew the Enterprise kit at 13/12 of its size, so the floors were re-derived at 12 points; the Settings
+Items editor and plugin string-list rows keep the selected row and move it with its item, so the classic side column
+can move a row twice (`EditorsTest`, `PluginPanelPageTest`); the classic box leaves out the Settings navigation tree,
+a manager's rail and a table in its rail or list column; the classic empty state keeps the visible PRIMARY action (the
+Editor's failed load keeps Retry, and shows Close when Retry is hidden); column-tree values are measured as their
+labels paint them; a hidden route step takes its hue edge with it; a list that stops being ORDERED gives back its side
+column, and an ORDERED list without selection keeps its row commands; `KitFixtures.enterpriseLight()` applies the
+ruled roles (focus, status, identity, hue surfaces) as `JasperTheme` does. `ClassicContractTest`'s arrow clicks show
+that an arrow's text change reports a transient empty edit before the stepped value under both kits (the document's
+remove and insert); the test compares the raw events across kits and asserts the settled ones. Deviations (Task 3's reviews; Execution notes E18 and E19): a
+selected row's index keeps its selection ink and odd rows' indices are guarded against `surface.zebra` (a third
+ordered pair); the side layout's minimum is as tall as the side column; an update moves neither the adopted entry row
+nor the add action, and a list gives up an entry row no VERTICAL parent adopts again. Plan 5 turns the classic look on through the Enterprise kit.
+`./gradlew check --continue`: **10919 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
+the user: none new (no shipped kit uses the classic faces until plan 5). Not pushed.
+Merged with main (plans 6a and 8a) as `3165fe220` and reconciled in `e390cb54b`: the `Role` enum, `compact-roles.tsv` and
+`classic-roles.tsv` take `GROUP_ROW_INDENT` after `DOCK_RULE_HIT`, then 8a's `RUN_WINDOW_*` block, then 6a's chrome
+block, and `NewRolesTest.ADDED` holds `GROUP_ROW_INDENT` before 8a's names, so `RunWindowRolesTest` and `ChromeRolesTest`
+hold unchanged; `KitFixtures.enterpriseLight()` is one definition, this plan's (8a R4), and the Run window's renders
+keep their agreements under it (0.900 / 0.841, 0.936 / 0.841); `pairs.json` keeps every pair, and `check_pairs.py`
+passes all thirteen with their floors and colours unchanged (6a Rulings 17: `run-window-*` 0.900, 0.838, 0.941 and
+0.844, `chrome-menu-row-light` 0.988 and `-dark` 0.732, the `classic-*` pairs as above); the default gallery's PNGs
+match the base, its JSON differing only in the `class` of 4b's section surfaces and this plan's list panes;
+`./gradlew check --continue`: **10,996 tests, 0 failures, 0 errors, 25 skipped**.
+
 **Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit and the final review fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-6a-window-chrome-shell.md),
@@ -233,7 +304,7 @@ option's bounds, as does a preview radio's focus ring; spec 6.4's face table
 still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
 login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
 the full kit matrix and the mock comparison.
-`./gradlew check --continue` after the final review fixes: **10,735 tests, 0 failures, 0 errors, 25 skipped** Merged with main (plans 3e and 5a) as `c2f166022`: **10,837 tests, 0 failures, 0 errors, 25 skipped**. (the
+`./gradlew check --continue` after the final review fixes: **10,735 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plans 3e and 5a) as `c2f166022`: **10,837 tests, 0 failures, 0 errors, 25 skipped**. (the
 fixes add 7 jasper-ui tests, now 766; the default gallery still matches the base). GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 

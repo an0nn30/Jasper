@@ -42,7 +42,7 @@
       1362
     ],
     "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png",
-    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File\u2026 (Unassigned) under Application and File Server's Share Folder\u2026, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
+    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File… (Unassigned) under Application and File Server's Share Folder…, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
   },
   {
     "name": "settings-plugins",
@@ -137,7 +137,7 @@
   },
   {
     "name": "workspace-tabs",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25 AM.png",
     "crop": [
       112,
       76,
@@ -148,7 +148,7 @@
   },
   {
     "name": "workspace-rails",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41 AM.png",
     "crop": [
       112,
       76,
@@ -160,7 +160,7 @@
   },
   {
     "name": "workspace-integrated",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       112,
       76,
@@ -172,7 +172,7 @@
   },
   {
     "name": "workspace-palette",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31 AM.png",
     "crop": [
       342,
       84,
@@ -190,7 +190,7 @@
   },
   {
     "name": "sessions-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       168,
       144,
@@ -364,7 +364,7 @@
   },
   {
     "name": "tunnels-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       2220,
       946,
@@ -386,7 +386,7 @@
   },
   {
     "name": "sftp-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       168,
       946,
@@ -408,7 +408,7 @@
   },
   {
     "name": "fileservers-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       2220,
       144,
@@ -583,6 +583,139 @@
     "colours": [
       "#3C3F44",
       "#DFE1E5"
+    ]
+  },
+  {
+    "name": "classic-new-tunnel",
+    "mock": "docs/design/enterprise/reference/04 New Tunnel/New Tunnel - Local.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      898
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-tunnel.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA",
+      "#2E9E4F"
+    ]
+  },
+  {
+    "name": "classic-add-host",
+    "mock": "docs/design/enterprise/reference/03 Add Host/Add Host - Default.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1042
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-add-host.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "classic-new-file-server-ftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - FTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1210
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-file-server-ftp.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA",
+      "#2D984D",
+      "#8A4FBF",
+      "#B5651D"
+    ]
+  },
+  {
+    "name": "classic-notifications-groups",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "crop": [
+      522,
+      504,
+      1502,
+      1058
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-notifications-groups.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF",
+      "#D3D6DA"
+    ]
+  },
+  {
+    "name": "classic-project-markers",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 15 - Tools - Project Index.png",
+    "crop": [
+      522,
+      792,
+      1502,
+      184
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-project-markers.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#FFFFFF",
+      "#F7F8FA",
+      "#B4B8BF",
+      "#ECEDEF"
+    ]
+  },
+  {
+    "name": "classic-keymap-tree",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07 - Keymap.png",
+    "crop": [
+      496,
+      226,
+      1554,
+      978
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-keymap-tree.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF",
+      "#D3D6DA"
+    ]
+  },
+  {
+    "name": "classic-file-servers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      46,
+      992,
+      604,
+      90
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-file-servers.png",
+    "min_agreement": 0.6,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#D3D6DA",
+      "#E8EEFA"
     ]
   },
   {

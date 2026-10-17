@@ -18,8 +18,9 @@ public final class KitFixtures {
 
     /**
      * Spec 7.6's Enterprise Light as a fixture theme (plan 4c Rulings 20): Slate Cobalt Light with the table's named roles
-     * and its eight derived overrides; a role the table does not name keeps Slate Cobalt Light's value. The shipped theme,
-     * with its derived neutrals, is plan 5's.
+     * and its eight derived overrides; the ruled roles (focus, status, identity and the hue surfaces) follow the named
+     * roles as {@code JasperTheme} derives them, and any other role the table does not name keeps Slate Cobalt Light's
+     * value. The shipped theme, with its derived neutrals, is plan 5's.
      */
     public static GeneratedTheme enterpriseLight() {
         var base = light();
@@ -44,6 +45,15 @@ public final class KitFixtures {
         name.accept(0x2E9E4F, new SemanticColor[] {SemanticColor.STATUS_SUCCESS, SemanticColor.HUE_GREEN});
         name.accept(0xD03A3A, new SemanticColor[] {SemanticColor.STATUS_DANGER});
         name.accept(0x8A4FBF, new SemanticColor[] {SemanticColor.HUE_PURPLE});
+        // The roles a theme file never names follow their rules, as JasperTheme derives them when it loads the file.
+        values.put(SemanticColor.BORDER_FOCUS, values.get(SemanticColor.ACCENT));
+        values.put(SemanticColor.SURFACE_STATUS, values.get(SemanticColor.SURFACE_APP));
+        values.put(SemanticColor.BORDER_IDENTITY, values.get(SemanticColor.BORDER_CONTROL));
+        values.put(SemanticColor.HUE_BLUE_SURFACE, values.get(SemanticColor.HUE_BLUE));
+        values.put(SemanticColor.HUE_GREEN_SURFACE, values.get(SemanticColor.HUE_GREEN));
+        values.put(SemanticColor.HUE_AMBER_SURFACE, values.get(SemanticColor.HUE_AMBER));
+        values.put(SemanticColor.HUE_PURPLE_SURFACE, values.get(SemanticColor.HUE_PURPLE));
+        values.put(SemanticColor.HUE_NEUTRAL_SURFACE, values.get(SemanticColor.HUE_NEUTRAL));
         var overrides = new java.util.EnumMap<DerivedColor, java.awt.Color>(DerivedColor.class);
         overrides.put(DerivedColor.SURFACE_HEADER, new java.awt.Color(0xE1E3E6));
         overrides.put(DerivedColor.SURFACE_HEADER_ACTIVE, new java.awt.Color(0xD9DFEA));

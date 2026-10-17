@@ -396,12 +396,18 @@ public final class Editors {
         }
     }
 
-    /** An ordered list: rows move and remove themselves; the entry below adds, with font suggestions when given. */
+    /**
+     * An ordered list: rows move and remove themselves; the entry below adds, with font suggestions when given. Rows are
+     * keyed by position, so the editor keeps the selected row and moves it with its item: the classic side column acts on
+     * the selection.
+     */
     static final class Items implements ValueEditor<List<String>> {
         private final String label;
         private final Optional<Supplier<List<String>>> suggestions;
         private final List<String> items = new ArrayList<>();
         String pending = "";
+        /** The selected row's index, or -1. */
+        int selected = -1;
         Items(String label, Optional<Supplier<List<String>>> suggestions) { this.label = label; this.suggestions = suggestions; }
 
         @Override public Nodes.Node node(String id, ControlState state) {
@@ -409,7 +415,7 @@ public final class Editors {
             for (int i = 0; i < items.size(); i++)
                 rows.add(new ListItem("item-" + i, Optional.empty(),
                     List.of(new Nodes.Text(id + ":item-" + i, ControlState.READY, items.get(i), Nodes.TextRole.BODY)), List.of(), List.of()));
-            var list = new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, Set.of(), "", List.of());
+            var list = new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of());
             // Enter in the entry adds it (the entry's own action); an empty entry leaves Enter to the dialog's OK.
             String submit = pending.isBlank() ? "" : id + ":add";
             Nodes.Node entry = suggestions.isPresent()
@@ -423,11 +429,15 @@ public final class Editors {
         }
 
         @Override public List<String> value() { return List.copyOf(items); }
-        @Override public void show(List<String> value) { items.clear(); items.addAll(value); }
+        @Override public void show(List<String> value) { items.clear(); items.addAll(value); if (selected >= items.size()) selected = -1; }
 
         @Override public boolean event(String id, UiEvent event) {
             switch (event) {
                 case UiEvent.Edited edited when edited.id().equals(id + ":new") -> { pending = edited.text(); return false; }
+                case UiEvent.Selected chosen when chosen.id().equals(id) -> {
+                    selected = chosen.ids().stream().mapToInt(this::index).filter(i -> i >= 0).min().orElse(-1);
+                    return false;
+                }
                 case UiEvent.Action action when action.id().equals(id + ":add") -> {
                     if (pending.isBlank()) return false;
                     items.add(pending);
@@ -438,12 +448,14 @@ public final class Editors {
                     int index = index(removed.itemId());
                     if (index < 0) return false;
                     items.remove(index);
+                    selected = afterRemoval(selected, index);
                     return true;
                 }
                 case UiEvent.Reordered moved when moved.id().equals(id) -> {
                     int index = index(moved.itemId());
                     if (index < 0 || moved.destination() >= items.size()) return false;
                     items.add(moved.destination(), items.remove(index));
+                    selected = afterMove(selected, index, moved.destination());
                     return true;
                 }
                 default -> { return false; }
@@ -455,6 +467,21 @@ public final class Editors {
             int index = Integer.parseInt(itemId.substring("item-".length()));
             return index < items.size() ? index : -1;
         }
+    }
+
+    /** An ordered list's {@code item-N} selection for {@code selected}, or none. */
+    public static Set<String> selectedIds(int selected, int size) { return selected >= 0 && selected < size ? Set.of("item-" + selected) : Set.of(); }
+
+    /** Where the selected row {@code selected} is once row {@code removed} is gone: -1 when it was the one removed. */
+    public static int afterRemoval(int selected, int removed) { return selected == removed ? -1 : selected > removed ? selected - 1 : selected; }
+
+    /** Where the selected row {@code selected} is once row {@code from} moves to {@code to}: with its item. */
+    public static int afterMove(int selected, int from, int to) {
+        if (selected < 0) return selected;
+        if (selected == from) return to;
+        if (from < selected && to >= selected) return selected - 1;
+        if (from > selected && to <= selected) return selected + 1;
+        return selected;
     }
 
     /** Name/Value rows; a blank name is left out of the value. */

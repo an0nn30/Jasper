@@ -426,4 +426,17 @@ class PaintedContrastTest {
             if (image.getRGB(x, y) == color.getRGB()) return true;
         return false;
     }
+
+    /** Spec 16.1.2 for the classic faces (plan 4c Rulings 17): every pair they declare meets its guard as painted, everywhere. */
+    @Test void everyClassicPairMeetsItsGuardOverEveryPaletteAndEnterpriseLight() {
+        var palettes = palettes();
+        palettes.add(KitFixtures.enterpriseLight());
+        for (var kit : List.of(Kit.CLASSIC, KitFixtures.enterprise()))
+            for (var pair : KitFaces.declared(kit).stream().distinct().toList())
+                for (var theme : palettes) {
+                    Color painted = SurfaceContrast.painted(theme, pair);
+                    assertThat(pair.guard().holds(painted, pair.against().color(theme)))
+                        .as("%s, %s: %s on %s", kit.id(), name(theme), pair.slot().key(), pair.against().key()).isTrue();
+                }
+    }
 }

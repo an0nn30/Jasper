@@ -21,17 +21,22 @@ final class Stacks {
         final KitContext context;boolean joined,route;
         /** The stack's layout role, which a classic ghost button reads to know a toolbar row from an actions row. */
         Nodes.LayoutRole role;
+        /** A classic route strip's cell starts and the hue of each visible step's edge (ClassicRouteFace, plan 4c). */
+        int[] cells=new int[0];
+        List<Nodes.Hue> hues=List.of();
+        /** Each route step's hue by its component, so a hidden step takes its hue with it. */
+        java.util.Map<Component,Nodes.Hue> stepHues=java.util.Map.of();
         StackSurface(KitContext context){this.context=context;}
         /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
         int[] arrows=new int[0];
         @Override protected void paintComponent(Graphics graphics){
             super.paintComponent(graphics);
-            if(route){paintRoute(graphics);return;}
+            if(route){context.faces().route.paintStrip(this,graphics);return;}
             if(!joined)return;var g=(Graphics2D)graphics.create();
             try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
         }
         /** The route strip: the input surface inside the input outline, and the connecting arrow before each later step. */
-        private void paintRoute(Graphics graphics){
+        void paintRoute(Graphics graphics){
             var g=(Graphics2D)graphics.create();
             try{
                 ThemePainting.antialias(g);if(!isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(.42f));
@@ -60,6 +65,12 @@ final class Stacks {
         PanelFooters.Footer panelFooter;
         /** A ROUTE strip's step: a tile beside its lines (set by the reconciler, cleared on every update). */
         boolean routeStep;
+        /**
+         * Children a classic face placed in another container on the last pass, by node id, with that container (an
+         * ordered list's entry row in the list's pane, plan 4c). The face's span sets it before the stack mounts the rest;
+         * the reconciler does not clear it, so its next detach pass leaves an adopted row where it is.
+         */
+        java.util.Map<String, Container> adopted = java.util.Map.of();
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -105,8 +116,8 @@ final class Stacks {
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
-                    settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.ROUTE ? new RouteLayout(this)
-                    : routeStep ? new RouteStepLayout(context())
+                    settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.ROUTE ? context().faces().route.layout(this)
+                    : routeStep ? context().faces().route.stepLayout(this)
                     : panelFooter != null && stack.role() == Nodes.LayoutRole.VERTICAL ? new PanelFooters.StackLayout(this, panelFooter)
                     : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.PROMPT_HEADER
                             ? view.runWindow() ? RunWindowPresentation.helpLayout(this) : context().faces().prompt.headerLayout(this)
@@ -131,6 +142,8 @@ final class Stacks {
 
         @Override
         Container childParent(Nodes.Node child) {
+            var adopter = adopted.get(child.id());
+            if (adopter != null) return adopter;
             return ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER
                             && child instanceof Nodes.Icon
                     ? tile
@@ -154,12 +167,17 @@ final class Stacks {
             // label is its accessible name, not a caption stacked above the row.
             if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ACTIONS)
                 controls.forEach(c -> { if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN) Composition.label(c, true); });
+            // The classic ordered face adopts an entry row into its list's pane (plan 4c) before the stack mounts the rest.
+            adopted = java.util.Map.of();
+            context().faces().ordered.span(this, controls);
             var wanted = new java.util.ArrayList<JComponent>();
-            for (var c : controls)
-                if (childParent(c.node) == tile) {
+            for (var c : controls) {
+                var parent = childParent(c.node);
+                if (parent == tile) {
                     mount(tile, List.of(c.component));
                     wanted.add(tile);
-                } else wanted.add(c.component);
+                } else if (parent == component) wanted.add(c.component);
+            }
             mount(component, wanted);
             Separators.settle(controls);
             captions = controls.stream().filter(c -> c.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION).map(c -> (Component)c.component).collect(java.util.stream.Collectors.toSet());
@@ -168,7 +186,13 @@ final class Stacks {
                 .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
             barTexts = controls.stream().filter(c -> c.node instanceof Nodes.Text).map(c -> (Component)c.component)
                 .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
+            // The classic faces adopt what they draw (plan 4c): a route strip's hues, a route step's captions.
+            if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ROUTE) context().faces().route.strip(this, controls);
+            if (routeStep) context().faces().route.step(this, controls);
         }
+
+        /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */
+        boolean routeTiles() { return context().faces().route.tiles(); }
     }
 
     static void mount(Container component, List<JComponent> wanted) {

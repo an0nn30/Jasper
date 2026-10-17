@@ -20,6 +20,12 @@ public final class KitFaces {
     final GroupFace group;
     final LabelPolicy labels;
     final StepperFace stepper;
+    final EmptyFace empty;
+    final TableFace table;
+    final TreeFace tree;
+    final OrderedFace ordered;
+    final TagFace tag;
+    final RouteFace route;
     final PromptFace prompt;
 
     private KitFaces(ControlVariants controls, ColorSlots colors) {
@@ -56,6 +62,30 @@ public final class KitFaces {
             case STEPPER -> new DefaultStepperFace();
             case SPINNER -> new ClassicStepperFace();
         };
+        empty = switch (controls.empty()) {
+            case TILE -> new DefaultEmptyFace();
+            case TEXT -> new ClassicEmptyFace(colors.dialogSurface());
+        };
+        ordered = switch (controls.orderedList()) {
+            case INLINE -> new DefaultOrderedFace();
+            case SIDE_COLUMN -> new ClassicOrderedFace(colors.dialogSurface());
+        };
+        tag = switch (controls.tag()) {
+            case TINT -> new DefaultTagFace();
+            case BOXED -> new ClassicTagFace();
+        };
+        route = switch (controls.route()) {
+            case TILES -> new DefaultRouteFace();
+            case EDGED -> new ClassicRouteFace(colors.dialogSurface());
+        };
+        table = switch (controls.table()) {
+            case PLAIN -> new DefaultTableFace();
+            case CLASSIC -> new ClassicTableFace(colors.dialogSurface());
+        };
+        tree = switch (controls.tree()) {
+            case PLAIN -> new DefaultTreeFace();
+            case CLASSIC -> new ClassicTreeFace(colors.dialogSurface());
+        };
         prompt = switch (controls.prompt()) {
             case TILE -> new DefaultPromptFace();
             case PLAIN -> new ClassicPromptFace(colors.dialogSurface());
@@ -69,7 +99,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, stepper, buttons, fields, prompt); }
+    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, empty, table, tree, stepper, ordered, buttons, fields, tag, route, prompt); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.

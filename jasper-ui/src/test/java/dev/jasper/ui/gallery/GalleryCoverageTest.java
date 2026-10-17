@@ -187,4 +187,26 @@ class GalleryCoverageTest {
         assertThat(records).as("an empty table's line").anyMatch(r -> r instanceof Nodes.Table table && table.rows().isEmpty() && !table.emptyText().isBlank());
         assertThat(records).as("an empty list's line").anyMatch(r -> r instanceof Nodes.ItemList list && list.items().isEmpty() && !list.emptyText().isBlank());
     }
+
+    /** Plan 4c: the Enterprise fixtures hold the classic surfaces, and none shares a name with a gallery fixture. */
+    @Test void theEnterpriseFixturesHoldTheClassicSurfaces() {
+        var nodes = new ArrayList<Record>();
+        EnterpriseFixtures.create().forEach(f -> records(f.spec().root(), nodes));
+        assertThat(nodes).as("a route").anyMatch(n -> n instanceof Nodes.Stack s && s.role() == Nodes.LayoutRole.ROUTE);
+        assertThat(nodes).as("an ordered list followed by its entry row").anyMatch(n -> n instanceof Nodes.Stack s && s.role() == Nodes.LayoutRole.VERTICAL
+            && s.children().size() > 1 && s.children().get(0) instanceof Nodes.ItemList l && l.kind() == Nodes.ListKind.ORDERED
+            && s.children().get(1) instanceof Nodes.Stack e && e.role() == Nodes.LayoutRole.INLINE);
+        assertThat(nodes).as("an ordered list with an add action").anyMatch(n -> n instanceof Nodes.ItemList l && l.kind() == Nodes.ListKind.ORDERED && l.addAction().isPresent());
+        assertThat(nodes).as("a grouped table with cell dropdowns").anyMatch(n -> n instanceof Nodes.Table t
+            && t.rows().stream().anyMatch(r -> r.heading().isPresent()) && t.rows().stream().anyMatch(r -> !r.cellNodes().isEmpty()));
+        assertThat(nodes).as("a column tree").anyMatch(n -> n instanceof Nodes.Tree t && !t.columns().isEmpty());
+        assertThat(nodes).as("a technical picker caption").anyMatch(n -> n instanceof Nodes.Choice c && c.face().filter(Nodes.PickerFace::technicalCaption).isPresent());
+        assertThat(nodes).as("hued options").anyMatch(n -> n instanceof Nodes.Choice c && c.kind() == Nodes.ChoiceKind.EXCLUSIVE && c.options().stream().allMatch(o -> o.hue().isPresent()));
+        assertThat(nodes).as("a PATH field").anyMatch(n -> n instanceof Nodes.Field f && f.kind() == Nodes.FieldKind.PATH);
+        assertThat(nodes).as("a tag in a table cell").anyMatch(n -> n instanceof Nodes.Table t
+            && t.rows().stream().anyMatch(r -> r.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Stack stack
+                && stack.children().stream().anyMatch(Nodes.Chip.class::isInstance))));
+        var names = EnterpriseFixtures.create().stream().map(KitGallery.Fixture::name).toList();
+        assertThat(names).doesNotHaveDuplicates().noneMatch(name -> KitGallery.fixtures().stream().anyMatch(f -> f.name().equals(name)));
+    }
 }
