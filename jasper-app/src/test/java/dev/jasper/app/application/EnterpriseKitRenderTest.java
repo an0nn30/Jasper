@@ -3,6 +3,7 @@ package dev.jasper.app.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.presentation.KitParser;
 import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.ui.gallery.KitGallery;
@@ -17,6 +18,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,13 +30,22 @@ import org.junit.jupiter.api.Test;
 /**
  * Spec 16.1.5: the real {@code enterprise.kit.toml} through the production parser, the real Plex files registered, and
  * the gallery rendered under it in Enterprise Light and Dark. Images go to {@code jasper-app/build/enterprise-kit/}; the
- * four panels are also rendered at 2x for {@code tools/visual/pairs.json}. Like {@code :jasper-ui:gallery}, it holds
- * FlatLaf's user scale at 1 ({@code flatlaf.uiScale}): the gallery's 24-point fixture would otherwise raise the scale
- * that every later capture's default font is computed from.
+ * four panels, and the Tunnels and SFTP panels populated as the mocks show them, are also rendered at 2x for
+ * {@code tools/visual/pairs.json}. Like {@code :jasper-ui:gallery}, it holds FlatLaf's user scale at 1
+ * ({@code flatlaf.uiScale}): the gallery's 24-point fixture would otherwise raise the scale that every later capture's
+ * default font is computed from. It installs the default look again when it finishes, so FlatLaf computes the scale of
+ * the tests that follow without the property.
  */
 class EnterpriseKitRenderTest {
     static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/enterprise-kit");
     static final List<String> PANELS = List.of("sessions", "tunnels", "sftp", "fileservers");
+    /** The fixtures rendered at 2x, each with its panel: the four panels, then Tunnels and SFTP with rows, which the pairs use. */
+    static final Map<String, String> TWICE = new LinkedHashMap<>();
+    static {
+        for (String panel : PANELS) TWICE.put(panel, panel);
+        TWICE.put("tunnels-added", "tunnels");
+        TWICE.put("sftp-connected", "sftp");
+    }
     /** A body-text label of each panel, checked for its face and size in the 2x view. */
     static final Map<String, String> BODY_LABELS = Map.of("sessions", "session-address-amp", "tunnels", "tunnels-new",
         "sftp", "sftp-choose.main", "fileservers", "server-title");
@@ -49,6 +60,8 @@ class EnterpriseKitRenderTest {
         try { render(parsed, theme, fixtures); }
         finally {
             if (priorScale == null) System.clearProperty("flatlaf.uiScale"); else System.setProperty("flatlaf.uiScale", priorScale);
+            // FlatLaf keeps the user scale it computed under the property until a look is installed again.
+            SwingUtilities.invokeAndWait(() -> ThemeTestSupport.controller(true).close());
         }
     }
 
@@ -73,26 +86,28 @@ class EnterpriseKitRenderTest {
                         assertThat(UIScale.getUserScaleFactor()).as("user scale after " + fixture.name()).isEqualTo(1f);
                     }
                     for (var fixture : fixtures) {
-                        if (!PANELS.contains(fixture.name())) continue;
+                        if (!TWICE.containsKey(fixture.name())) continue;
                         assertThat(UIScale.getUserScaleFactor()).as(fixture.name() + "@2x: user scale").isEqualTo(1f);
                         assertThat(UIManager.getFont("defaultFont").getSize2D()).as(fixture.name() + "@2x: default font").isEqualTo(12f);
                         try (var view = new KitView(context, fixture.spec(), event -> { })) {
                             var image = KitFixtures.render(view, fixture.width(), fixture.height(), 2);
                             ImageIO.write(image, "png", directory.resolve(fixture.name() + "@2x.png").toFile());
-                            var title = named(view, fixture.name() + "-header.title").getFont();
+                            var title = named(view, TWICE.get(fixture.name()) + "-header.title").getFont();
                             assertThat(title.getFontName(Locale.ROOT)).as(fixture.name() + " title face").isEqualTo("IBM Plex Sans SmBld");
                             assertThat(title.getSize2D()).as(fixture.name() + " title size")
                                 .isEqualTo(typography.font(Typography.Role.PANEL_TITLE).getSize2D());
-                            var body = named(view, BODY_LABELS.get(fixture.name())).getFont();
-                            assertThat(body.getFontName(Locale.ROOT)).as(fixture.name() + " body face").startsWith("IBM Plex Sans");
-                            assertThat(body.getSize2D()).as(fixture.name() + " body size").isEqualTo(12f);
+                            if (BODY_LABELS.containsKey(fixture.name())) {
+                                var body = named(view, BODY_LABELS.get(fixture.name())).getFont();
+                                assertThat(body.getFontName(Locale.ROOT)).as(fixture.name() + " body face").startsWith("IBM Plex Sans");
+                                assertThat(body.getSize2D()).as(fixture.name() + " body size").isEqualTo(12f);
+                            }
                             plexLabels.add(fixture.name());
                         }
                     }
                 } catch (IOException failure) { throw new UncheckedIOException(failure); }
             }));
-            assertThat(plexLabels).as((dark ? "dark" : "light") + ": every panel paints Plex text").containsAll(PANELS);
-            for (String panel : PANELS) assertThat(directory.resolve(panel + "@2x.png")).isRegularFile();
+            assertThat(plexLabels).as((dark ? "dark" : "light") + ": every panel paints Plex text").containsAll(TWICE.keySet());
+            for (String name : TWICE.keySet()) assertThat(directory.resolve(name + "@2x.png")).isRegularFile();
         }
     }
 

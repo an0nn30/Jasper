@@ -12,23 +12,33 @@ import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.LayoutManager;
 import java.awt.font.FontRenderContext;
+import java.awt.font.TextAttribute;
 import java.util.Map;
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
+import javax.swing.JComponent;
 import javax.swing.JMenuBar;
+import javax.swing.plaf.UIResource;
 
 /**
  * The classic menu row (Enterprise presentation spec 10.1 and 10.2), the mocks' row: 24 px of titles on
  * {@code surface.app} over a 1 px {@code border.divider} rule; a hovered closed title on {@code surface.control.hover},
- * an open one in the accent, square. The titles stand side by side at their text's fractional width, as the mocks set
- * them, so whole-pixel text widths do not add up along the row. Terminal windows and the auxiliary frames of a classic
- * look share it. EDT only.
+ * an open one in the accent, square. The titles stand side by side at their {@link #titleWidth}, as the mocks set them,
+ * so whole-pixel text widths do not add up along the row. Terminal windows and the auxiliary frames of a classic look
+ * share it. EDT only.
  */
 public final class ClassicMenuRow {
+    /** The client property {@link #style} sets on the bars it styles ({@link #styled}). */
+    private static final String STYLED = "Jasper.classicMenuRow";
+    private static final FontRenderContext FRACTIONAL = new FontRenderContext(null, true, true);
+    private static final Map<TextAttribute, Object> KERNED = Map.of(TextAttribute.KERNING, TextAttribute.KERNING_ON);
+
     private ClassicMenuRow() { }
 
     /**
-     * Styles {@code bar} under the installed theme and kit; call it again after a theme change.
+     * Styles {@code bar} under the installed theme and kit; call it again after a theme change. A bar that lays out its
+     * own titles (the terminal window's folding bar) keeps its layout and places them at their {@link #titleWidth} while
+     * {@link #styled} says so; a plain bar's look-and-feel layout gives way to the row's.
      *
      * @param bar the menu row
      */
@@ -47,20 +57,45 @@ public final class ClassicMenuRow {
         int side = UIScale.scale(metrics.value(DesignMetrics.Role.MENU_BAR_SIDE)), rule = UIScale.scale(metrics.value(DesignMetrics.Role.HAIRLINE));
         bar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, rule, 0, DerivedColor.BORDER_DIVIDER.color(theme)),
             BorderFactory.createEmptyBorder(0, side, 0, side)));
-        if (!(bar.getLayout() instanceof Titles)) bar.setLayout(new Titles());
+        bar.putClientProperty(STYLED, Boolean.TRUE);
+        if (bar.getLayout() == null || bar.getLayout() instanceof UIResource) bar.setLayout(new Titles());
         bar.setBackground(palette.color(SemanticColor.SURFACE_APP));
         bar.setOpaque(true);
         bar.revalidate(); bar.repaint();
     }
 
     /**
-     * The titles left to right, each its preferred width with its text measured at fractional advances (as the kit's labels
-     * measure), every edge rounded from the running total: whole-pixel text widths would drift the later titles by up to
-     * a pixel each (IBM Plex's "Session" is 41.8 px, not 43). The row is as tall as its tallest title.
+     * Whether {@link #style} styled {@code bar}, so its titles stand at their {@link #titleWidth}.
+     *
+     * @param bar a menu bar
+     * @return whether it is a classic row
+     */
+    public static boolean styled(JComponent bar) { return Boolean.TRUE.equals(bar.getClientProperty(STYLED)); }
+
+    /**
+     * {@code title}'s width in a classic row: its preferred width with its whole-pixel text width replaced by the text's
+     * kerned fractional advance, as the mocks' browser sets the titles (in IBM Plex "Session" is 41.7 px, not 43, and
+     * "Transfer" 44.5 with its "Tr" kerned; FlatLaf draws a title unkerned, that fraction of a pixel into its right
+     * padding); any other component's preferred width. A row sets each title's edges from the running total of these,
+     * rounded, so the titles do not drift along the row.
+     *
+     * @param title a title, or any other component of the row
+     * @return its width in the row's pixels
+     */
+    public static double titleWidth(Component title) {
+        int preferred = title.getPreferredSize().width;
+        if (!(title instanceof AbstractButton button) || button.getText() == null || button.getText().isEmpty() || button.getFont() == null)
+            return preferred;
+        String text = button.getText();
+        return preferred - button.getFontMetrics(button.getFont()).stringWidth(text)
+            + button.getFont().deriveFont(KERNED).getStringBounds(text, FRACTIONAL).getWidth();
+    }
+
+    /**
+     * A plain bar's titles left to right at their {@link #titleWidth}, every edge rounded from the running total; the row
+     * is as tall as its tallest title.
      */
     static final class Titles implements LayoutManager {
-        private static final FontRenderContext FRACTIONAL = new FontRenderContext(null, true, true);
-
         @Override public void addLayoutComponent(String name, Component component) { }
         @Override public void removeLayoutComponent(Component component) { }
         @Override public Dimension minimumLayoutSize(Container parent) { return preferredLayoutSize(parent); }
@@ -69,7 +104,7 @@ public final class ClassicMenuRow {
             Insets insets = parent.getInsets();
             double width = 0; int height = 0;
             for (Component child : parent.getComponents()) if (child.isVisible()) {
-                width += width(child);
+                width += titleWidth(child);
                 height = Math.max(height, child.getPreferredSize().height);
             }
             return new Dimension(insets.left + (int) Math.round(width) + insets.right, insets.top + height + insets.bottom);
@@ -81,18 +116,9 @@ public final class ClassicMenuRow {
             double run = 0;
             for (Component child : parent.getComponents()) if (child.isVisible()) {
                 int start = insets.left + (int) Math.round(run);
-                run += width(child);
+                run += titleWidth(child);
                 child.setBounds(start, insets.top, insets.left + (int) Math.round(run) - start, height);
             }
-        }
-
-        /** {@code child}'s preferred width with its whole-pixel text width replaced by the fractional one. */
-        static double width(Component child) {
-            int preferred = child.getPreferredSize().width;
-            if (!(child instanceof AbstractButton title) || title.getText() == null || title.getText().isEmpty() || title.getFont() == null)
-                return preferred;
-            String text = title.getText();
-            return preferred - title.getFontMetrics(title.getFont()).stringWidth(text) + title.getFont().getStringBounds(text, FRACTIONAL).getWidth();
         }
     }
 }

@@ -311,7 +311,8 @@ public final class RunWindowPresentation {
 
     /**
      * The help row: the tile, then the text beside it; the text block centred on the tile when shorter, and the reverse,
-     * and the two centred in a taller row.
+     * and the two centred in a taller row. The text block then sits {@code RUN_WINDOW_HELP_TEXT_TOP} lower, where the
+     * mocks set its first line.
      */
     private static final class HelpLayout implements Composition.WidthLayout {
         private final Stacks.StackControl owner;
@@ -345,7 +346,8 @@ public final class RunWindowPresentation {
             var size = owner.tile.getPreferredSize();
             // The row's content centred in a taller row (the Run window's fixed help height).
             int textHeight = text(parent, parent.getWidth()), top = Math.max(0, (parent.getHeight() - height(parent, parent.getWidth())) / 2);
-            int y = top + Math.max(0, (size.height - textHeight) / 2), width = room(parent.getWidth());
+            int y = top + Math.max(0, (size.height - textHeight) / 2) + ThemePainting.metric(owner.context(), DesignMetrics.Role.RUN_WINDOW_HELP_TEXT_TOP);
+            int width = room(parent.getWidth());
             owner.tile.setBounds(0, top + Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
             for (var line : lines(parent)) {
                 int height = Composition.height(line, width);

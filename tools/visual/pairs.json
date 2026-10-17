@@ -746,13 +746,11 @@
       697,
       268
     ],
-    "render": "jasper-app/build/enterprise-kit/light/tunnels@2x.png",
-    "min_agreement": 0.0,
+    "render": "jasper-app/build/enterprise-kit/light/tunnels-added@2x.png",
+    "min_agreement": 0.25,
     "colours": [
-      "#FFFFFF",
       "#ECEDEF",
-      "#F0F1F3",
-      "#E4E6E9"
+      "#F0F1F3"
     ]
   },
   {
@@ -764,8 +762,8 @@
       598,
       759
     ],
-    "render": "jasper-app/build/enterprise-kit/light/sftp@2x.png",
-    "min_agreement": 0.01,
+    "render": "jasper-app/build/enterprise-kit/light/sftp-connected@2x.png",
+    "min_agreement": 0.12,
     "colours": [
       "#FFFFFF",
       "#2F65CA",
@@ -819,8 +817,8 @@
       697,
       268
     ],
-    "render": "jasper-app/build/enterprise-kit/dark/tunnels@2x.png",
-    "min_agreement": 0.0,
+    "render": "jasper-app/build/enterprise-kit/dark/tunnels-added@2x.png",
+    "min_agreement": 0.23,
     "colours": [
       "#3C3F44",
       "#393C41",
@@ -836,8 +834,8 @@
       598,
       759
     ],
-    "render": "jasper-app/build/enterprise-kit/dark/sftp@2x.png",
-    "min_agreement": 0.01,
+    "render": "jasper-app/build/enterprise-kit/dark/sftp-connected@2x.png",
+    "min_agreement": 0.1,
     "colours": [
       "#3D74D6",
       "#3C3F44",

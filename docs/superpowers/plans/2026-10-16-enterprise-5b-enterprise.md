@@ -3274,3 +3274,45 @@ numbers and its GUI checks.
     test of a classic-row `JMenuItem` with a Cmd+Shift accelerator under `EnterpriseLook` (or set
     `MenuItem.acceleratorFont` to the platform face when the look's face cannot draw the text), and list the menus'
     accelerators with the GUI checks.
+
+### Task 4 review, round 2 (2026-10-17)
+
+Task 5 carries these, with rulings 18 to 21, into the status banner's deviations, the STATUS entry's `<mock notes>`, its
+chrome and Run window numbers and its GUI checks.
+
+22. **The classic row keeps a bar's own layout.** Round 1's `ClassicMenuRow.Titles` replaced the terminal window's
+    `CollapsingMenuBar` layout, so under Enterprise a narrow window never folded its menus into "…" or ☰ (and a header
+    would have been laid out as one more title). `ClassicMenuRow.style` now marks the bars it styles (`styled`) and
+    replaces only a plain bar's look-and-feel layout (an auxiliary frame's); `CollapsingMenuBar` keeps its own and, in a
+    classic row, folds and places its menus by `ClassicMenuRow.titleWidth`, each edge rounded from the running total; the
+    default look's bar lays out as before. `WindowChromeMenusTest.aNarrowClassicWindowStillFoldsItsMenus` (1440, 300 and
+    60 px under `EnterpriseLook`) and `ShellChromeTest` hold it. GUI check: narrow an Enterprise window until its menus
+    fold into "…", then into ☰.
+23. **The titles are measured kerned (ruling 20's follow-up for the menu row).** The mocks' browser kerns the titles:
+    unkerned, IBM Plex's "Transfer" and "Tools" are 0.7 and 0.8 px wider than the mocks set them, so Help started 4 px
+    (at 2x) right of the mock. `titleWidth` measures a title's text with kerning (FlatLaf still draws it unkerned, that
+    fraction of a pixel into its right padding): in `EnterpriseMenuRowMockTest` every title now starts within 1 px of the
+    mock in Light and Dark (Help 0), against `within(4)`; the widths are as before (Transfer's ink 3 px wider than the
+    mock's in Light, 2 in Dark). `MENU_BAR_SIDE` and the item padding keep 6a's 5 and 9, which File matches exactly (a
+    side of 4 would have moved File 2 px left to bring Help to 2). Follow-up for the user: kerning the drawn text of a
+    kit's own faces would bring every Plex text to the mocks' widths (the titles' ink, the Run window's "Connect"), and
+    moves every text measurement under Enterprise.
+24. **The Run window's help text sits a pixel lower (ruling 20's follow-up for the Run window).** The mocks set the help
+    text's block 1.5 px under where centring the 36 px block on the 32 px tile puts it (the tile and the field box match
+    the mock exactly; plan 8a measured the first line 16 under the body's top). A new role, `RUN_WINDOW_HELP_TEXT_TOP`
+    (1 in both catalogs, after the Run window block, frozen in both role tables), moves the text block alone, so "help
+    text top" is 84 against the mock's 85 (it was 82), tolerance 3. `RunWindowPresentationTest` holds the offset.
+25. **The Tunnels and SFTP pairs compare the populated panels.** `EnterpriseKitRenderTest` also renders `tunnels-added`
+    and `sftp-connected` at 2x, and the `enterprise-*-tunnels` and `enterprise-*-sftp` pairs compare those, with floors
+    re-derived by ruling 11: Light tunnels 0.301 (floor 0.25), SFTP 0.170 (0.12); Dark tunnels 0.284 (0.23), SFTP 0.155
+    (0.10); `check_pairs.py … enterprise-` prints eight PASS lines. Light tunnels lists `#ECEDEF` and `#F0F1F3` only: the
+    populated list paints no `#FFFFFF` or `#E4E6E9` (the empty panel showed them only in its New Tunnel button, not where
+    the mock paints the filter field, the table and its strip); both stay checked by the Light sessions and SFTP pairs.
+    Neither populated panel paints Dark's card `#2E3135` (the gallery's list and table stand on the panel surface; the
+    mocks' card is the table compositions', plans 7 and 10). These join ruling 19's colours for the user's ruling; the
+    pairs still compare controls, metrics and type only (Rulings 9).
+26. **Test hygiene.** `EnterpriseKitRenderTest` installs the default look again after it restores `flatlaf.uiScale`, so
+    FlatLaf computes the user scale of the tests that follow without the property. jasper-ui's `TypographyTest` covers
+    `Typography.font(Role, String)` with a face that has no modifier symbols (the plugin's IBM Plex Sans renamed "Jasper
+    Glyphs" in its name table and registered; jasper-ui's test task takes the file as an input): a text it can draw keeps
+    the face, "⇧⌘P" takes the platform face for a UI role, and a data role keeps the face.

@@ -86,7 +86,8 @@ class EnterpriseMenuRowMockTest {
         var renderInks = MockProfile.inks(render[0], new Rectangle(2, 2, 900, 44), 12, 25);
         assertThat(mockInks).as("the mock's eight menu titles").hasSize(8);
         assertThat(renderInks).as(what + ": File, Edit, View, Session, Transfer, Tools, Window, Help").hasSize(8);
-        // In IBM Plex, with the titles at their fractional widths (ClassicMenuRow.Titles), Help drifts furthest: 4 px.
+        // In IBM Plex, with the titles at their kerned fractional widths (ClassicMenuRow.titleWidth), every title starts within
+        // 1 px of the mock's; Transfer's ink, drawn unkerned, is 3 px wider in Light.
         for (int i = 0; i < 8; i++) {
             var expected = mockInks.get(i); var actual = renderInks.get(i);
             assertThat(actual.start() + X).as(what + " title " + i + " starts").isCloseTo(expected.start(), within(4));

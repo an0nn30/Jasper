@@ -64,7 +64,7 @@ public class RunWindowRenderTest {
         new Feature("help tile top", 58, 54, 0, 1, RunWindowRenderTest::dialog, false, 1),
         new Feature("help tile left", 4, 108, 1, 0, RunWindowRenderTest::dialog, false, 1),
         new Feature("help text", 92, 95, 1, 0, RunWindowRenderTest::dialog, false, 3),
-        // The first line's ink top follows the face's ascent: within 4 device px of the mock with the platform face.
+        // The first line's ink top follows the face's ascent and RUN_WINDOW_HELP_TEXT_TOP: in IBM Plex 1 device px above the mock's.
         new Feature("help text top", 120, 60, 0, 1, RunWindowRenderTest::dialog, false, 3, Owner.FONTS),
         new Feature("open label", 4, 190, 1, 0, RunWindowRenderTest::dialog, false, 3),
         new Feature("field box left", 92, 186, 1, 0, RunWindowRenderTest::dialog, false, 1),

@@ -213,6 +213,10 @@ class RunWindowPresentationTest {
                 var at = javax.swing.SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), view);
                 var tileAt = javax.swing.SwingUtilities.convertRectangle(tile.getParent(), tile.getBounds(), view);
                 assertThat(at.x - (tileAt.x + tileAt.width)).isEqualTo(m(context, DesignMetrics.Role.RUN_WINDOW_TILE_GAP));
+                // The tile centred on the two-line text block, which then sits RUN_WINDOW_HELP_TEXT_TOP under the row's top.
+                int rowTop = tileAt.y - (at.height - tileAt.height) / 2;
+                assertThat(at.height).as("two lines of the help text").isEqualTo(2 * 18);
+                assertThat(at.y - rowTop).as("the help text under the row's top").isEqualTo(m(context, DesignMetrics.Role.RUN_WINDOW_HELP_TEXT_TOP)).isPositive();
                 assertThat(label.getFont().getSize2D()).as("the help at BODY's size").isEqualTo(12f);
                 assertThat(label.getForeground()).isEqualTo(context.theme().semantic().color(SemanticColor.TEXT_STRONG_SECONDARY));
                 assertThat(((Labels.LiteralLabel) label).wrapped.lineHeight).isEqualTo(18);
