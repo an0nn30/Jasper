@@ -28,7 +28,7 @@ the SDK README's 0.18.0 sentence names the additions. A cell node's own area (an
 beside its content) selects, activates and opens the row's menu, and hovering the chevron keeps the face. Hand-offs: plan 4's classic faces draw the same descriptors
 (grid lines, the indent under headings, the mocks' header strip); plans 9 and 10 adopt them (Notifications, Keymap,
 Sessions, Tunnels, File Servers, SFTP, Add Host's keys); 3e owns the default-look changes of section 13.
-`./gradlew check --continue` after the final review fixes: **10,637 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (no plugin or page uses the vocabulary
+`./gradlew check --continue` after the final review fixes: **10,637 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plan 4a) as `1a69de6a7`: `./gradlew check --continue` **10,669 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (no plugin or page uses the vocabulary
 yet). Not merged, not pushed.
 
 **Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
