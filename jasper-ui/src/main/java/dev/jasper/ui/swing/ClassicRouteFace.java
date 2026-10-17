@@ -59,10 +59,14 @@ final class ClassicRouteFace implements RouteFace {
         ((Stacks.StackSurface) route.component).stepHues = hues;
     }
 
-    /** Upper-case captions in their guarded ink, kept through every later refresh by the text control's hook. */
+    /**
+     * Upper-case captions (a step's CAPTION or DESCRIPTION line) in their guarded ink, kept through every later refresh by
+     * the text control's hook.
+     */
     @Override public void step(Stacks.StackControl step, List<ControlRegistry.Control> controls) {
         for (var control : controls)
-            if (control.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION && control instanceof Labels.TextControl label) {
+            if (control.node instanceof Nodes.Text text && (text.role() == Nodes.TextRole.CAPTION || text.role() == Nodes.TextRole.DESCRIPTION)
+                    && control instanceof Labels.TextControl label) {
                 label.styled = shown -> {
                     shown.setText(text.text().toUpperCase(Locale.ROOT));
                     shown.setForeground(ThemePainting.painted(step.context(), caption));

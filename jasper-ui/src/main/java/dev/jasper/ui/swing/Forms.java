@@ -231,10 +231,12 @@ final class Forms {
                     ? DesignMetrics.Role.PROMPT_COMPACT_FOOTER_TOP : DesignMetrics.Role.PROMPT_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
                     window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
-            // A classic dialog's band (spec 10.8): 8 above and below the buttons' faces, the form's sides, under its rule.
+            // A classic dialog's band (spec 10.8): 8 above and below the buttons' faces (10 in a native dialog, whose card
+            // the dialog does not draw), the form's sides, under its rule.
             footer.band = view.dialogBand();
             if (footer.band) {
-                int vertical = ThemePainting.metric(context(), DesignMetrics.Role.DIALOG_FOOTER_VERTICAL);
+                int vertical = ThemePainting.metric(context(), view.dialogCard()
+                        ? DesignMetrics.Role.DIALOG_FOOTER_VERTICAL : DesignMetrics.Role.NATIVE_DIALOG_FOOTER_VERTICAL);
                 int sides = ThemePainting.metric(context(), DesignMetrics.Role.FORM_SIDES);
                 footer.setBorder(new EmptyBorder(vertical + stroke, sides, vertical, sides));
             }

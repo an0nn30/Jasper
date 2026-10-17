@@ -247,6 +247,22 @@ class ClassicIndicatorsTest {
         });
     }
 
+    /** Plan 10a: a step's DESCRIPTION caption (New Tunnel's) is upper-cased as a CAPTION one is (spec 5.2, the 04 mock). */
+    @Test void aDescriptionCaptionIsUpperCasedToo() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var steps = List.<Nodes.Node>of(new Nodes.Stack("step", READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Icon("step-icon", READY, "laptop", Nodes.Hue.NEUTRAL, Nodes.IconSize.CONTROL, "This computer"),
+                new Nodes.Text("step-what", READY, "This computer", Nodes.TextRole.DESCRIPTION),
+                new Nodes.Text("step-where", READY, "localhost:8080", Nodes.TextRole.MONO_SMALL))));
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("route", READY, Nodes.LayoutRole.ROUTE, steps)), e -> {})) {
+                KitFixtures.render(view, 520, 60, 1);
+                assertThat(find(view, "step-what", JLabel.class).getText()).isEqualTo("THIS COMPUTER");
+                assertThat(find(view, "step-where", JLabel.class).getText()).isEqualTo("localhost:8080");
+            } finally { release(context); }
+        });
+    }
+
     @Test void theDefaultRouteKeepsItsTiles() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light());

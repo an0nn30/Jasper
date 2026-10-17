@@ -2,6 +2,7 @@ package dev.jasper.remote.ui;
 
 import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.Nodes;
@@ -73,6 +74,8 @@ public final class HostEditor implements AutoCloseable {
     private final List<RemoteHost> jumps;
     private final List<String> groups;
     private final UiView view;
+    /** Which composition the form takes; set once by {@link #layout} before the dialog shows (Rulings 3). */
+    private Layout layout = Layout.ROWS;
     private String name = "", hostname = "", port = "22", username = "", group = "", jump = NO_JUMP, message = "", credentialLabel = "none chosen", defaultGroup = HostRows.OTHER;
     private boolean favorite, followDirectory = true, vaultAuth, closed;
     private UUID credentialId;
@@ -311,6 +314,9 @@ public final class HostEditor implements AutoCloseable {
 
     private void render() { if (!closed) view.update(new ViewSpec(form())); }
 
+    /** Composes the form in {@code value}'s layout (Enterprise presentation spec 14.4); call once, right after construction. */
+    public HostEditor layout(Layout value) { layout = java.util.Objects.requireNonNull(value); render(); return this; }
+
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
 
     private Optional<CredentialDescriptor> descriptor(UUID id) {
@@ -362,14 +368,18 @@ public final class HostEditor implements AutoCloseable {
         var face = vaultPresent ? CredentialPresentation.face(descriptor(credentialId).orElse(null), Nodes.PickerDensity.DEFAULT)
             : new Nodes.PickerFace("", "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
         if (credentialId != null && face.primary().isEmpty()) face = new Nodes.PickerFace(credentialName.apply(credentialId).orElse("credential missing"), "", "lock", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT);
-        var authentication = section("host.authentication", "Authentication", Nodes.CardKind.MIXED, List.of(
-            new Nodes.Choice(AUTH, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
+        Nodes.Node authChoice = new Nodes.Choice(AUTH, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
                 new Option(VAULT, vaultPresent ? "Vault Credential" : "Vault credential (needs Credential Vault)", Optional.empty()),
-                new Option(AGENT, "SSH Agent", Optional.empty())), vaultAuth ? VAULT : AGENT, "Authentication", ""),
+                new Option(AGENT, "SSH Agent", Optional.empty())), vaultAuth ? VAULT : AGENT, "Authentication", "");
+        // The classic label column: the unlabelled choice sits in the control column (spec 6.4).
+        if (layout == Layout.CLASSIC) authChoice = new Nodes.FormRow("row." + AUTH, ControlState.READY, "", "", authChoice, Optional.empty());
+        var authentication = section("host.authentication", "Authentication", Nodes.CardKind.MIXED, List.of(
+            authChoice,
             row("row." + CREDENTIAL, "Credential", "", new Nodes.Choice(CHOOSE, state(true, keysEnabled), Nodes.ChoiceKind.PICKER, List.of(), "", "Choose…", CHOOSE, "lock", Optional.empty(), Optional.of(face))),
             row(KEYS_LABEL, "Keys", "Tried in order", new Nodes.ItemList(KEYS, state(true, keysEnabled), Nodes.ListKind.ORDERED, keys,
                 selectedKey == null ? Set.of() : Set.of(selectedKey.toString()), "", List.of(), Nodes.SelectionMode.SINGLE,
-                Optional.of(new Nodes.Button(ADD_KEY, state(true, keysEnabled), "Add Stored Key…", "add", Nodes.ButtonKind.LINK, ADD_KEY, "")), OptionalInt.of(Math.max(2, Math.min(3, keys.size())))))));
+                Optional.of(new Nodes.Button(ADD_KEY, state(true, keysEnabled), "Add Stored Key…", "add", Nodes.ButtonKind.LINK, ADD_KEY, "")), OptionalInt.of(Math.max(2, Math.min(3, keys.size()))), "", "", "", "", "",
+                layout == Layout.CLASSIC ? "No keys" : ""))));
         var options = section("host.options", "Options", Nodes.CardKind.SETTINGS, List.of(
             new Nodes.SettingRow("row." + GROUP, ControlState.READY, "Group", "",
                 new Nodes.Choice(GROUP, state(true, editable), Nodes.ChoiceKind.SEARCHABLE,

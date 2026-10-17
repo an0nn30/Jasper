@@ -595,6 +595,7 @@ public class RemotePlugin implements Plugin {
             })),
             () -> { if (!stopped && !closed[0]) dialog.close(); }, dialog::close,
             host -> { if (!stopped && window.isOpen()) openHost(window, host); });
+        editor[0].layout(layout);
         editor[0].setDefaultGroupName(panelState.defaultGroup());
         currentEditor = editor[0];
         dialog.setContent(editor[0].view());

@@ -5350,3 +5350,35 @@ separators stand at 132 and 203 (mock 136 and 213) because the classic table's s
 where the mock overlays it; Size is a numeric column, right-aligned with its title; Modified values draw in MONO_SMALL's
 primary ink (mock `#5C6370`) (4c's table face). Disconnected: the dropdown is its natural 140 wide (mock 168), and the
 disabled breadcrumbs keep a white field (mock `#F0F1F3`, 4b's breadcrumbs face).
+
+D10 (Task 9). **A native dialog's classic footer band pads its buttons 10** — what: the new role
+`NATIVE_DIALOG_FOOTER_VERTICAL` (10 in both catalogs, read only under `KitView.dialogBand`) pads the band of a dialog whose
+card the host does not draw (`!dialogCard`); a classic dialog drawn in its window keeps `DIALOG_FOOTER_VERTICAL` 8; why:
+the 02, 03 and 04 mocks' band is 44 (buttons 24 + 10 + 10), the 07 Vault mocks' in-window band 40, and the render's
+40 failed `ADD_HOST`. Reach: Enterprise only (native dialogs under the classic mapping: Add Host, New Tunnel, New File
+Server and the other kit forms that open natively).
+
+D11 (Task 9). **Classic `FORM_TOP` 10 and `MIXED_ROW_GAP` 8** (were 12 and 10) — what: a FULL form's first group stands
+10 under the dialog's top and a MIXED card's rows 8 apart; why: the Add Host and New Tunnel mocks set the first group's
+rule 18 below the title bar (the render's 20) and Authentication's radios, Credential and Keys 8 apart (the render's
+10), which put the keys box 6 lower than the mock's. Reach: Enterprise only (every classic FULL form and MIXED card).
+Measured after D10 and D11: light/add-host 0.657 (floor 0.55).
+
+D12 (Task 9). **The classic route face upper-cases a step's DESCRIPTION line as it does a CAPTION one** — what:
+`ClassicRouteFace.step`; why: spec 5.2's `edged` route draws "an uppercase caption" and New Tunnel's steps (the only
+route in the bundled code) caption with DESCRIPTION, which 4c's face left in sentence case against the 04 mock's
+"THIS COMPUTER". `ClassicIndicatorsTest.aDescriptionCaptionIsUpperCasedToo` covers it.
+
+D13 (Task 9). **Residual: New Tunnel's floor is 0.53, not 0.55** — what: `NEW_TUNNEL_FLOOR`; why: spec 5.6 (binding) sets
+SUPPORTING and SETTING_DESCRIPTION at 11 px, where the 04 mock (and the 02 mocks' help and checkbox descriptions) draw
+them at 12, so the explanation keeps one line where the mock wraps it and the Ports group stands 16 px higher: measured
+0.535, and 0.637 with both roles at 12 (a trial, reverted). Owner: spec 5.6's table (a user ruling on the dialog
+descriptions' size closes it, and Task 11's New File Server meets the same difference). The test also types the mock's
+ports (8080, 5432), which are fixture values.
+
+D14 (Task 9). **Residuals: Add Host details** — the keys box is 106 tall (`KEYS_BOX`, R11: its four side buttons); "No
+keys" stands in the box's first row, where the mock centres it in the box (3c's empty line, one row tall, 4c's ordered
+face); the Group dropdown shows "Other" as its placeholder in the placeholder ink (the mock's primary ink); the Via host
+face of New Tunnel adds " · Local Network" (the fixture host's group); disabled footer buttons are `#F0F1F3` with a
+`#D3D6DA` edge (the mock's `#E1E3E6` and `#CDD0D5`, 4b's disabled face). The Username placeholder's data face in the
+mock is a fixture (spec 5.6).

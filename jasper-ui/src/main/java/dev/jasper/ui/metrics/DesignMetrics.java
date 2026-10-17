@@ -147,6 +147,9 @@ public final class DesignMetrics {
         TOOLBAR_SEARCH_WIDTH(300), TOOLBAR_SEARCH_PADDING(8), HINT_KEYCAP_HEIGHT(16), HINT_KEYCAP_PADDING(4), CLASSIC_TAB_LEADING(12), CLASSIC_TAB_GAP(9),
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
         DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
+        // Plan 10a: a native dialog's band pads its buttons 10 above and below (the New File Server, Add Host and New
+        // Tunnel mocks' 44 px band), where a classic dialog drawn in its window keeps DIALOG_FOOTER_VERTICAL.
+        NATIVE_DIALOG_FOOTER_VERTICAL(10),
         // Enterprise plan 7: the count pill, the native header's actions, the header strips' gaps and the bottom strip's
         // height above its rule (Workstation mock); only the classic dock chrome reads them.
         STRIPE_PILL_HEIGHT(14), STRIPE_PILL_WIDTH(16), STRIPE_PILL_PADDING(5), STRIPE_PILL_GAP(5), TOOL_HEADER_ACTION(16),
@@ -229,7 +232,10 @@ public final class DesignMetrics {
         values.put(Role.SECTION_GAP, 12);
         values.put(Role.SHEET_SECTION_GAP, 12);
         values.put(Role.FORM_SIDES, 16);
-        values.put(Role.FORM_TOP, 12);
+        // Plan 10a: a FULL form's first group stands 10 under the dialog's top and a mixed card's rows 8 apart (the Add
+        // Host and New Tunnel mocks: the first group's rule 18 below the title bar, Authentication's rows 8 apart).
+        values.put(Role.FORM_TOP, 10);
+        values.put(Role.MIXED_ROW_GAP, 8);
         values.put(Role.CHIP_HEIGHT, 14);
         values.put(Role.PANEL_CHIP_HEIGHT, 14);
         values.put(Role.SETTING_HEIGHT, 26);

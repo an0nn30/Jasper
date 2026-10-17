@@ -282,4 +282,20 @@ class HostEditorTest {
         });
         assertThat(saved).singleElement().satisfies(host -> assertThat(host.auth()).isEqualTo(new Auth.Vault(login.id())));
     }
+
+    @Test void underClassicTheKeysSayNoKeysAndTheAuthenticationSitsInTheControlColumn() throws Exception {
+        dev.jasper.remote.testsupport.Kits.edt(() -> {
+            var editor = editor(List.of(), Optional.empty(), true, id -> Optional.empty(), () -> new CompletableFuture<>(), () -> { })
+                .layout(dev.jasper.remote.workstation.Layout.CLASSIC);
+            var keys = dev.jasper.remote.testsupport.Kits.node(editor.view(), HostEditor.KEYS, dev.jasper.sdk.ui.Nodes.ItemList.class);
+            org.assertj.core.api.Assertions.assertThat(keys.emptyText()).isEqualTo("No keys");
+            var row = dev.jasper.remote.testsupport.Kits.node(editor.view(), "row." + HostEditor.AUTH, dev.jasper.sdk.ui.Nodes.FormRow.class);
+            org.assertj.core.api.Assertions.assertThat(row.label()).isEmpty();
+            org.assertj.core.api.Assertions.assertThat(row.control().id()).isEqualTo(HostEditor.AUTH);
+            var rows = editor(List.of(), Optional.empty(), true, id -> Optional.empty(), () -> new CompletableFuture<>(), () -> { });
+            org.assertj.core.api.Assertions.assertThat(dev.jasper.remote.testsupport.Kits.node(rows.view(), HostEditor.KEYS, dev.jasper.sdk.ui.Nodes.ItemList.class).emptyText())
+                .as("the default look keeps today's list").isEmpty();
+            org.assertj.core.api.Assertions.assertThat(dev.jasper.remote.testsupport.Kits.find(rows.view(), "row." + HostEditor.AUTH)).isEmpty();
+        });
+    }
 }

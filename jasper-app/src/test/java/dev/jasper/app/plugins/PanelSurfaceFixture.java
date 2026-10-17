@@ -188,6 +188,31 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         });
     }
 
+    /** Runs one of the plugin's actions in the fixture window, as a menu or a shortcut does (plan 10a). */
+    public void invoke(String actionId) throws InterruptedException { vault.invoke(actionId); StagedVaultHost.settle(); }
+
+    /** The open dialog titled {@code title}, once it is shown. */
+    public dev.jasper.app.windows.AuxiliarySurface surface(String title) throws InterruptedException { return vault.awaitSurface(title); }
+
+    /**
+     * A dialog's content at {@code width} by {@code height} logical pixels, painted at 2x over the theme's {@code
+     * surface.dialog}. The headless windows run no shell, so the content takes the flags the Enterprise host gives a
+     * dialog first: {@code hostTitled} (a FULL form under the native title) and {@code dialogBand} (6b's
+     * {@code NativeShells.nativeMarks} under the classic mapping).
+     */
+    public BufferedImage renderSurface(dev.jasper.app.windows.AuxiliarySurface surface, int width, int height) {
+        return onEdtValue(() -> {
+            var holder = surface.holder();
+            for (var child : holder.getComponents())
+                if (child instanceof KitView content && !content.isClosed()) { content.hostTitled(true); content.dialogBand(true); }
+            holder.setSize(width, height);
+            for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(holder);
+            var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics(); try { graphics.scale(2, 2); holder.printAll(graphics); } finally { graphics.dispose(); }
+            return dev.jasper.app.testsupport.MockMatch.onto(image, theme.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_DIALOG));
+        });
+    }
+
     /**
      * Selects a host in the window's Sessions panel (the fixture's panel), as a click does: the view reports the row's
      * selection, so the panel's selection listeners (the window's shared session choice) hear it (plan 10a).

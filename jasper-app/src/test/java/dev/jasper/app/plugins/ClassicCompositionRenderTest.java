@@ -155,4 +155,44 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    static final String ADD_HOST = "0+476 #ECEDEF, 476+1 #C4C7CC, 477+44 #E6E7EA";
+    /**
+     * The keys box's white run under 4c's ordered face: its side column (spec 14.4's Add Stored Key…, Remove, Move Up and
+     * Move Down, which supersedes the mock's two buttons) sets it 106, taller than the mock's 56 (Execution notes R11).
+     */
+    static final int KEYS_BOX = 106;
+    static final String ADD_HOST_KEYS = "0+3 #ECEDEF, 3+1 #B4B8BF, 4+" + KEYS_BOX + " #FFFFFF, " + (4 + KEYS_BOX) + "+1 #B4B8BF, " + (5 + KEYS_BOX) + "+4 #ECEDEF";
+    static final String NEW_TUNNEL = "0+404 #ECEDEF, 404+1 #C4C7CC, 405+44 #E6E7EA";
+    /**
+     * New Tunnel's edge floor, a recorded residual (plan 10a Execution deviations): spec 5.6 sets SUPPORTING and
+     * SETTING_DESCRIPTION at 11 px where the mock draws its explanation and the checkbox's description at 12, so the
+     * explanation keeps one line where the mock wraps it and the Ports group stands 16 px higher (0.535 measured; 0.637
+     * with the mock's 12 px).
+     */
+    static final double NEW_TUNNEL_FLOOR = 0.53;
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void addHostAndNewTunnelMatchTheirMocks() throws Exception {
+        under(false, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("dialogs"), EnterpriseLook.resolved(false), PanelSurfaceFixture.SESSIONS, true)) {
+                fixture.hosts(new String[][] {{"Mac", "192.168.1.119", "dustin", "Local Network"}});
+                fixture.invoke("dev.jasper.remote.hosts.new");
+                var addHost = fixture.surface("Add Host");
+                var hostCrop = new MockMatch.Crop("03 Add Host/Add Host - Default.png", 2, 60, 1040, 1042);
+                var host = fixture.renderSurface(addHost, hostCrop.logicalWidth(), hostCrop.logicalHeight());
+                check("light/add-host", hostCrop, host, 18, ADD_HOST, 1, 0.55, "#ECEDEF", "#E6E7EA", "#B4B8BF", "#2F65CA");
+                assertThat(MockMatch.mismatch(MockMatch.parse(ADD_HOST_KEYS), MockMatch.bands(host, 298, 500, 500 + 2 * (KEYS_BOX + 9)), 1)).as("the keys box").isEmpty();
+                onEdt(addHost::requestClose);
+                fixture.invoke("dev.jasper.remote.tunnels.new");
+                var newTunnel = fixture.surface("New Tunnel");
+                // The mock's ports, typed as a user does.
+                onEdt(() -> { StagedVaultHost.type(newTunnel, "tunnel.listen.port.input", "8080"); StagedVaultHost.type(newTunnel, "tunnel.forward.port.input", "5432"); });
+                StagedVaultHost.settle();
+                var tunnelCrop = new MockMatch.Crop("04 New Tunnel/New Tunnel - Local.png", 2, 60, 1040, 898);
+                check("light/new-tunnel", tunnelCrop, fixture.renderSurface(newTunnel, tunnelCrop.logicalWidth(), tunnelCrop.logicalHeight()),
+                    18, NEW_TUNNEL, 1, NEW_TUNNEL_FLOOR, "#ECEDEF", "#E6E7EA", "#2F65CA", "#2E9E4F");
+            }
+        });
+    }
 }
