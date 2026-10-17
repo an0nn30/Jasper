@@ -119,14 +119,14 @@ the list and the details); ink boxes are asserted on macOS only; a heading's tit
 column; the unused overloads and `ShortcutEditPanel.specForTests()` are gone (`spec()` is package-private);
 `AppearanceSelection` takes `Editors.menuIcon` and leaves `ProjectionReadTest.COMPOSITION_ROOTS`; and
 `tools/visual/pairs.json` gains `enterprise-settings-07b` (0.933 against its 0.4 floor). `./gradlew check --continue`:
-**11,221 tests, 0 failures, 0 errors, 25 skipped**. GUI
+**11,221 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plans 7 and 8b) as `3252ba404` (each side's role values kept: `SIDE_COLUMN_WIDTH` 92 and the classic `THEME_PREVIEW_CAPTION_GAP` 7 from 9b, the stripe label padding and gap from plan 7): **11,315 tests, 0 failures, 0 errors, 25 skipped**. GUI
 checks for the user: under Enterprise, the Keymap's recording band and Find by Shortcut, the Plugins page's checkboxes and
 ⋯, Add Variable… and its sheet with a variable or two in the table, a right-click on a Notifications row and on a plugin
 page's
 setting row. Hand-off to plans 10a, 10b and any later plan
 that changes a face, a `SETTINGS_*` role or a bundled plugin's Settings page: re-run `SettingsPagesMockTest`, and
 re-baseline the seven Tools pages' probes and floors it records (`PROBES`, `FLOORS`) when the change moves them, with the
-cause in that plan's banner. Not merged, not pushed.
+cause in that plan's banner. Not pushed.
 
 **Enterprise presentation, plan 8b: the Run window in the workspace — 2026-10-17** (`claude/enterprise-run-window`, worktree
 `.claude/worktrees/enterprise-8`, `3ce462b60..52978884f`, then this documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-16-enterprise-8b-run-window.md),
