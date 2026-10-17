@@ -19,7 +19,6 @@ import java.awt.event.MouseEvent;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -127,7 +126,7 @@ class FlushFramesTest {
             assertThat(new Color(image.getRGB(sessions.x + 4, sessions.y + 4))).isEqualTo(painter.headerSurface(theme, false));
             assertThat(new Color(image.getRGB(sftp.x + 4, sftp.y + 4))).isEqualTo(painter.headerSurface(theme, true));
             var hide = KitTestSupport.find(fixture.body, "host.hide", javax.swing.AbstractButton.class);
-            assertThat(hide).isNotNull();
+            assertThat(hide.getClientProperty("Jasper.button.icon")).as("its Hide is the minus").isEqualTo("remove");
         } finally { EnterpriseLook.restoreDefault(); }
     }
 }

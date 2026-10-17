@@ -229,10 +229,12 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_HEIGHT, 78);
         values.put(Role.THEME_PREVIEW_GAP, 20);
         values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
-        // Enterprise plan 7: the header strips' paddings and 16 px actions, 18 apart (Workstation mock).
+        // Enterprise plan 7: the header strips' paddings and 16 px actions, 18 apart, each glyph in a 10 px box (Workstation
+        // mock); a strip draws its own, the host's and contributed actions at the contributed glyph size.
         values.put(Role.TOOL_HEADER_LEADING_PADDING, 8);
         values.put(Role.TOOL_HEADER_TRAILING_PADDING, 7);
         values.put(Role.PANEL_HEADER_ACTION, 16);
+        values.put(Role.PANEL_HEADER_CONTRIBUTED_GLYPH, 10);
         values.put(Role.PANEL_HEADER_ACTION_VERTICAL, 0);
         values.put(Role.PANEL_HEADER_TRAILING_PADDING, 7);
         int[] table = declared();

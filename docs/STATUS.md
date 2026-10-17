@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 7: dock chrome — 2026-10-17** (`claude/enterprise-dock-chrome`, worktree
-`.claude/worktrees/enterprise-7`, `947b3d9e1..deb7ea3c1`, then this documentation commit;
+`.claude/worktrees/enterprise-7`, `947b3d9e1..deb7ea3c1`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-7-dock-chrome.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look whose kit says
 `tool_windows = "stripes"` (Enterprise) docks the classic way (spec 10.7): `WorkspaceChrome.of` reads the dock's two
@@ -12,20 +12,28 @@ dividers) instead of the two `ToolStripe` rails, all through one `DockStripe` co
 horizontal groups and a hidden bottom strip takes drops at the workspace's bottom edge; flush frames are divided by
 painted 1 px `border.window` rules (held on `surface.app`) with 6 px drag areas, and every frame has a header strip
 (native or borrowed through `PanelHostHeader.Frame`) on `surface.header`, `surface.header.active` while it holds the
-focus owner, with a parenthesised count, a muted detail, 16 px actions 2 apart and the minus for Hide;
+focus owner (painted through `ChromePainter.FOCUSED_HEADER`, held 1 L* past `surface.header` toward the text, so the
+four Catppuccin flavours, which author the two alike, still show it), with a parenthesised count, a muted detail, 16 px
+actions 2 apart and the minus for Hide, every action (native, the host's own and contributed) drawn in one 10 px glyph
+box (`PANEL_HEADER_CONTRIBUTED_GLYPH` under the classic catalog) in one ink (`text.strong.secondary`, the
+`HEADER_ACTION` pairs);
 `ToolWindowArea`, `ToolWindowHeader` and `DockDrag` read the window's kit (spec 6.6). `UiState` keeps a non-default
 look's dock under `[look."<id>"]` (the default look's file is unchanged), loaded with the presentation's `DockLayoutKey`;
 the Notifications panel is Event Log at Bottom Left under the look (`AppPanels`); `Presentation.LANDED` holds
 `DOCK_CHROME`. Derived surfaces lean toward the variant's text (`SurfaceContrast.beyond`): Slate Cobalt Dark's
 `surface.header.active` is #2d3546, lighter than its other headers (plan 2's and 5b's hand-off); no default painter
-reads it. The classic catalog gains the pill, header-action and header-gap values, `STRIPE_LABEL_PADDING` 9 and
+reads it, but under the Enterprise kit the Run window's title row and the classic dialog strip read it too and follow
+the same side rule (with Slate Cobalt Dark both change from #232b3c to #2d3546). The classic catalog gains the pill, header-action and header-gap values, `STRIPE_LABEL_PADDING` 9 and
 `STRIPE_LABEL_GAP` 0. Mock matching: `DockMockTest` renders every surface at 2x under the Enterprise kit and theme
 (plan 6a's `EnterpriseLook` fixtures until plan 5b) and compares it with its crop of the Workstation (Connected,
 Disconnected), Dark Mode and Unlock Vault mocks (fills within 3, 5 under the Unlock Vault scrim, run counts and inks, the
-first ink a padding sets and the icons' centres within 2 px at 2x), prints the probes that follow the UI face's glyphs
+first ink a padding sets, the icons' centres within 2 px at 2x, their extents within 4 and their ink within 24, 26
+under the Unlock Vault scrim), prints the probes that follow the UI face's glyphs
 until plan 5b's Plex (`MockProfile.fonts`, `MockCrops.fontsFloor`: at 2x in the platform face, the side stripes' label edges 1 to 6 px off and agreement 0.821 to 0.847 for the floor 0.92; the bottom strip's dividers 8 to 14 px right of the mock's, the pill 17 and its label edges 6 to 16, agreement 0.856 to 0.860 for 0.92; the native headers' text runs 4 to 10 px past the mock's, agreement 0.931 to 0.976 for 0.94; the kit headers' 3 to 10 px, 0.933 to 0.975), and checks the whole
-dock's arrangement; `tools/visual/pairs.json` gains 25 `dock-*` pairs that `check_pairs.py` passes (edge agreement 0.852 to 0.975 over floors of 0.80 to 0.90). Residuals:
-none beyond the plan's Rulings 6, 9, 14 and 15 and the printed probes above. Zero pixel change for the
+dock's arrangement; `tools/visual/pairs.json` gains 25 `dock-*` pairs that `check_pairs.py` passes (edge agreement 0.852 to 0.996 over floors of 0.80 to 0.90). Residuals:
+the plan's Rulings 4, 6, 9, 14 and 15, the printed probes above, and the header action glyphs, whose one 10 px box
+sets them at 2x "+" 14 against the mock's 12, the import arrow 12 to 13 against 14, the ellipsis 16 against 19 and the
+minus 14 to 16 against 12 (owner: plan 10 with the anchors, if a per-glyph box is wanted). Zero pixel change for the
 default look: the headless gallery's files for Slate Cobalt Dark and Light and `DefaultDockPixelsTest`'s two renders are
 byte-identical to the base. Rulings (plan, "Rulings"): (1) one plan of 14 tasks; (2) plan 6's names were assumptions,
 re-anchored to 6a/6b's merged code; (3) `DockChrome(labelledStripes, flushFrames)` is the dock's one value, `StripeSet`
@@ -40,7 +48,7 @@ a `border.divider` after each, a top rule only; (9) every badge is a count pill 
 header is the frame holding the permanent focus owner; (13) a word detail in `text.strong.secondary`, a digits-only one
 parenthesised in `text.secondary`, the dot held to 3:1 on the header's surface; (14) the hide glyph is the existing
 "remove"; (15) `HEADER_STRIP_TITLE_GAP` 8 and `HEADER_STRIP_DOT_GAP` 6, header actions 16 px squares 2 apart under the
-classic catalog; (16) derived surfaces lean toward the variant's text (`SurfaceContrast.beyond` replaces `apart`); (17)
+classic catalog (the final review: each glyph in a 10 px box, in one ink); (16) derived surfaces lean toward the variant's text (`SurfaceContrast.beyond` replaces `apart`); (17)
 a non-default look's dock under `[look."<id>"]`, the rest of ui-state global, a bad look entry falls back alone; (18) a
 look's first dock uses the default sizes and each panel's registered slot; (19) Event Log is the panel's title and
 accessible name only; (20) the dock group lands in Task 12; (21) the mock comparisons crop surfaces, aligned on the
@@ -64,15 +72,19 @@ follow-ups. Deviations from the plan's text: Task 9: a native header strip lays 
 home; plan 10 sets Remote's and File Server's Enterprise anchors (Rulings 18); 4a Rulings 16's three package-test
 repairs are all taken here (the kit header's connected dot as a declared pair, `NotificationCardTest`'s count and
 `ConfigurationStatusTest`'s configuration text over every palette), so none is left open; at the merge with plan 5b,
-Execution notes R19's items: `EnterpriseLook.theme(boolean)` and `install(boolean)` read the shipped theme and kit with
+Execution notes R19's items (with the final review's two: the Run window's title row and the classic dialog strip follow
+the side rule, and 5b's `EnterpriseFirstWindowTest` asserts the application's wiring, the loaded `UiState`'s look and
+the Event Log panel's title and Bottom Left slot): `EnterpriseLook.theme(boolean)` and `install(boolean)` read the shipped theme and kit with
 Plex, the printed probes become assertions within their tolerances and floors (retune `STRIPE_LABEL_PADDING`,
 `STRIPE_PILL_GAP` and the header gaps if one misses), the open tile's tolerance is re-measured against 5b's #D7D9DC,
 `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` are recomputed under `SurfaceContrast.beyond`, and the
 every-palette loops include Enterprise once `KitFixtures.themes()` does; candidate follow-ups (R23): a plugin header with
 context actions draws taller than the strip, and labels past a stripe's end are clipped. `./gradlew check --continue`:
-**11,117 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `759b2b7d9`, had 11,052). GUI checks for the user (spec 16.2): stripe drag and drop including the
-bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip, and Enterprise Dark's dock
-against the Dark Mode mock. Not merged, not pushed.
+**11,117 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `759b2b7d9`, had 11,052), before the final
+review's fixes, which add 4 tests (the targeted runs pass: `:jasper-ui:test` and the touched `:jasper-app` packages). GUI checks for the user (spec 16.2): stripe drag and drop including the
+bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip (Catppuccin included), the header action glyphs, and Enterprise Dark's dock
+against the Dark Mode mock; the user's ruling on Rulings 4 for the bottom strip (28 px with its rule against the
+mock's 24 + 1). Not merged, not pushed.
 
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;

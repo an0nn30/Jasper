@@ -29,7 +29,7 @@ class HistoryPerformanceTest {
                 assertThat(center.history()).hasSize(500);
                 var site = new PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> true);
                 long started = System.nanoTime();
-                var panel = new HistoryPanel(controller.appearance().context(ThemeRoute.CHROME), center, site, false);
+                var panel = new HistoryPanel(controller.appearance().context(ThemeRoute.CHROME), center, site, false, "Notifications");
                 long mounted = System.nanoTime();
                 try {
                     panel.setSize(400, 600); paint(panel);

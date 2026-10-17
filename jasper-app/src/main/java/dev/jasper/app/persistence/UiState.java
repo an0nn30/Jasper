@@ -22,8 +22,9 @@ import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
 
 /**
- * Application-owned layout state: where each panel docks, the dock's sizes, Zen mode, whether the stripes show, where
- * main and auxiliary windows were, and where the command palette was dragged. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
+ * Application-owned layout state: where each panel docks and the dock's sizes (the default look's, and each other look's
+ * under {@code [look."<id>"]}), Zen mode, whether the stripes show, where main and auxiliary windows were, and where the
+ * command palette was dragged. It is not user configuration. Caller-thread-confined. A bad panel or window entry or dock
  * key falls back alone; an unreadable file or an unknown version falls back to defaults rather than blocking
  * startup, and failed writes are only logged. Version 1 files (a region and a size per panel) are migrated on read;
  * saving writes version 2.

@@ -244,12 +244,13 @@ final class BottomStrip extends DockStripe {
         try {
             GeneratedTheme theme = ThemeZone.theme(this);
             boolean open = label.isSelected();
-            Color tile = labels.painter().stripeTile(theme, open, label.getModel().isRollover());
+            boolean hover = label.getModel().isRollover();
+            Color tile = labels.painter().stripeTile(theme, open, hover);
             if (tile != null) {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
-            labels.paint(g, label.text(), label.badge(), label.getHeight(), theme, open);
+            labels.paint(g, label.text(), label.badge(), label.getHeight(), theme, open, hover);
         } finally { g.dispose(); }
     }
 }

@@ -294,31 +294,48 @@ public final class ChromePainter {
             value(dark ? DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK : DesignMetrics.Role.POPOVER_SHADOW_PERCENT_LIGHT) / 100.0);
     }
 
-    private static final PaintPair RULE = new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, SurfaceContrast.Guard.STRUCTURAL);
-    private static final PaintPair LABEL = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_STRIPE, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair OPEN_LABEL = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CONTROL_SELECTED, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair ACCENT_PILL = new PaintPair(SemanticColor.ACCENT, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair ERROR_PILL = new PaintPair(SemanticColor.STATUS_DANGER, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair FOCUSED_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair DETAIL = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair FOCUSED_DETAIL = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair COUNT = new PaintPair(SemanticColor.TEXT_SECONDARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair FOCUSED_COUNT = new PaintPair(SemanticColor.TEXT_SECONDARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
-    private static final PaintPair DOT = new PaintPair(SemanticColor.STATUS_SUCCESS, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.INDICATOR);
-    private static final PaintPair FOCUSED_DOT = new PaintPair(SemanticColor.STATUS_SUCCESS, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.INDICATOR);
+    /** The dock's 1 px rules on the window surface. */
+    public static final PaintPair DOCK_RULE = new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, SurfaceContrast.Guard.STRUCTURAL);
+    /** A label on the stripe, on a hovered closed label's tile and on an open label's tile. */
+    public static final PaintPair STRIPE_LABEL = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_STRIPE, SurfaceContrast.Guard.TEXT),
+        HOVERED_STRIPE_LABEL = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CONTROL_HOVER, SurfaceContrast.Guard.TEXT),
+        OPEN_STRIPE_LABEL = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CONTROL_SELECTED, SurfaceContrast.Guard.TEXT);
+    /** The accent and error count pills' text on their grounds. */
+    public static final PaintPair ACCENT_PILL = new PaintPair(SemanticColor.ACCENT, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT),
+        ERROR_PILL = new PaintPair(SemanticColor.STATUS_DANGER, DerivedColor.DANGER_GROUND, SurfaceContrast.Guard.TEXT);
+    /**
+     * The focused header strip's surface, held 1 CIE L* past the other strips' toward the text, so a focused frame shows
+     * whatever the theme authors for the two (spec 10.7): a theme that authors both alike (Catppuccin) still shows it, and
+     * the Workstation mock's own pair, 1.5 apart, paints as authored.
+     */
+    public static final PaintPair FOCUSED_HEADER = new PaintPair(DerivedColor.SURFACE_HEADER_ACTIVE, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.beyond(1));
+    /**
+     * A header strip's title, word detail, count, connected dot and action glyphs, on the inactive strip and on the focused
+     * one; the focused pairs are held on {@link #FOCUSED_HEADER}'s painted surface.
+     */
+    public static final PaintPair HEADER_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT),
+        FOCUSED_HEADER_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT),
+        HEADER_DETAIL = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT),
+        FOCUSED_HEADER_DETAIL = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT),
+        HEADER_COUNT = new PaintPair(SemanticColor.TEXT_SECONDARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.TEXT),
+        FOCUSED_HEADER_COUNT = new PaintPair(SemanticColor.TEXT_SECONDARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT),
+        HEADER_DOT = new PaintPair(SemanticColor.STATUS_SUCCESS, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.INDICATOR),
+        FOCUSED_HEADER_DOT = new PaintPair(SemanticColor.STATUS_SUCCESS, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.INDICATOR),
+        HEADER_ACTION = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER, SurfaceContrast.Guard.INDICATOR),
+        FOCUSED_HEADER_ACTION = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.INDICATOR);
 
     /**
-     * The pairs the classic dock chrome paints (spec 10.7 and 7.3), each through its guard, in this order: the 1 px rules
-     * on the window surface; a label on the stripe and on an open label's tile; the accent and error count pills' text
-     * on their grounds; and the header strips' title, detail, count and connected dot on the inactive, then the focused,
-     * header surface.
+     * The pairs the classic dock chrome paints (spec 10.7 and 7.3), each through its guard, in this order: the 1 px rules;
+     * a label on the stripe, a hovered tile and an open tile; the count pills; the focused strip's surface; and the header
+     * strips' title, detail, count, connected dot and action glyphs, each on the inactive, then the focused, strip.
      */
-    public static final java.util.List<PaintPair> DOCK_PAIRS = java.util.List.of(RULE, LABEL, OPEN_LABEL, ACCENT_PILL, ERROR_PILL,
-        TITLE, FOCUSED_TITLE, DETAIL, FOCUSED_DETAIL, COUNT, FOCUSED_COUNT, DOT, FOCUSED_DOT);
+    public static final java.util.List<PaintPair> DOCK_PAIRS = java.util.List.of(DOCK_RULE, STRIPE_LABEL, HOVERED_STRIPE_LABEL,
+        OPEN_STRIPE_LABEL, ACCENT_PILL, ERROR_PILL, FOCUSED_HEADER, HEADER_TITLE, FOCUSED_HEADER_TITLE, HEADER_DETAIL,
+        FOCUSED_HEADER_DETAIL, HEADER_COUNT, FOCUSED_HEADER_COUNT, HEADER_DOT, FOCUSED_HEADER_DOT, HEADER_ACTION,
+        FOCUSED_HEADER_ACTION);
 
     /** The dock's 1 px rule: between frames, along a stripe's inner edge, under a header strip. */
-    public Color dockRule(GeneratedTheme theme) { return SurfaceContrast.painted(theme, RULE); }
+    public Color dockRule(GeneratedTheme theme) { return SurfaceContrast.painted(theme, DOCK_RULE); }
 
     /** A stripe's and the bottom strip's surface. */
     public Color stripeSurface(GeneratedTheme theme) { return DerivedColor.SURFACE_STRIPE.color(theme); }
@@ -329,8 +346,10 @@ public final class ChromePainter {
         return hover ? theme.semantic().color(SemanticColor.SURFACE_CONTROL_HOVER) : null;
     }
 
-    /** A label's text on the stripe, or on an open label's tile. */
-    public Color stripeLabel(GeneratedTheme theme, boolean open) { return SurfaceContrast.painted(theme, open ? OPEN_LABEL : LABEL); }
+    /** A label's text on the stripe, on a hovered closed label's tile, or on an open label's tile. */
+    public Color stripeLabel(GeneratedTheme theme, boolean open, boolean hover) {
+        return SurfaceContrast.painted(theme, open ? OPEN_STRIPE_LABEL : hover ? HOVERED_STRIPE_LABEL : STRIPE_LABEL);
+    }
 
     /** The bottom strip's divider after each label. */
     public Color stripDivider(GeneratedTheme theme) { return DerivedColor.BORDER_DIVIDER.color(theme); }
@@ -362,18 +381,26 @@ public final class ChromePainter {
         } finally { g.dispose(); }
     }
 
-    /** A header strip's surface: the focused window's, or the others'. */
+    /** A header strip's surface: the focused window's ({@link #FOCUSED_HEADER}), or the others'. */
     public Color headerSurface(GeneratedTheme theme, boolean focused) {
-        return (focused ? DerivedColor.SURFACE_HEADER_ACTIVE : DerivedColor.SURFACE_HEADER).color(theme);
+        return focused ? SurfaceContrast.painted(theme, FOCUSED_HEADER) : DerivedColor.SURFACE_HEADER.color(theme);
+    }
+
+    /** {@code pair}, one of a header strip's, as painted on the strip's own surface. */
+    private Color onHeader(GeneratedTheme theme, PaintPair pair, boolean focused) {
+        return SurfaceContrast.painted(theme, pair, headerSurface(theme, focused));
     }
 
     /** A header strip's title. */
-    public Color headerTitle(GeneratedTheme theme, boolean focused) { return SurfaceContrast.painted(theme, focused ? FOCUSED_TITLE : TITLE); }
+    public Color headerTitle(GeneratedTheme theme, boolean focused) { return onHeader(theme, focused ? FOCUSED_HEADER_TITLE : HEADER_TITLE, focused); }
 
     /** A header strip's detail: muted, a count (a parenthesised number) more so. */
     public Color headerDetail(GeneratedTheme theme, boolean focused, boolean count) {
-        return SurfaceContrast.painted(theme, count ? (focused ? FOCUSED_COUNT : COUNT) : (focused ? FOCUSED_DETAIL : DETAIL));
+        return onHeader(theme, count ? (focused ? FOCUSED_HEADER_COUNT : HEADER_COUNT) : (focused ? FOCUSED_HEADER_DETAIL : HEADER_DETAIL), focused);
     }
+
+    /** A header strip's action glyphs: native, the host's own and contributed actions alike. */
+    public Color headerAction(GeneratedTheme theme, boolean focused) { return onHeader(theme, focused ? FOCUSED_HEADER_ACTION : HEADER_ACTION, focused); }
 
     /** A header strip over {@code width} x {@code height}: its surface, with the 1 px rule along its bottom edge. */
     public void headerStrip(Graphics graphics, int width, int height, GeneratedTheme theme, boolean focused) {
@@ -392,7 +419,7 @@ public final class ChromePainter {
         var g = (Graphics2D) graphics.create();
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(SurfaceContrast.painted(theme, focused ? FOCUSED_DOT : DOT));
+            g.setColor(onHeader(theme, focused ? FOCUSED_HEADER_DOT : HEADER_DOT, focused));
             g.fillOval(x, y, size, size);
         } finally { g.dispose(); }
     }

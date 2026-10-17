@@ -94,8 +94,9 @@ in the window's `DockState` (per slot an ordered list with at most one active wi
 sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
 `ToolWindowHeader` for each showing slot, placed by the pure `DockGeometry`: the bottom area spans
-the full width, the sides and the terminal column run from the toolbar to it), renders the two
-`ToolStripe`s, tells the panels and saves. `DockDrag` drags a window from its stripe button or its
+the full width, the sides and the terminal column run from the toolbar to it), renders the window's
+stripes (the two `ToolStripe` rails, or under the Enterprise look the labelled `LabelledStripe`s and the
+`BottomStrip`, all `DockStripe`s of its `StripeSet`), tells the panels and saves. `DockDrag` drags a window from its stripe button or its
 header with plain mouse events: `DockDropResolver` finds the target under the cursor (a stripe
 group and a position, or one of the workspace's six edge zones: the nearest of its left, right and
 bottom edges, a side split at half the side panels' visible height and the bottom at half its

@@ -4,7 +4,6 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.dock.DockState;
-import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
@@ -23,9 +22,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
-import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

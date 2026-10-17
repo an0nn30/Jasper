@@ -24,7 +24,9 @@ import javax.swing.JPopupMenu;
 /**
  * The header at the top of a tool window's frame, as in IntelliJ's new UI: the title on the left and, on the right,
  * contributed icon actions, an options menu (Move to, Hide), and a collapse chevron. It takes the
- * tool window background and its non-control area is a drag handle. EDT only.
+ * tool window background and its non-control area is a drag handle. A flush frame's header is a header strip instead
+ * (spec 10.7): its surface shows whether the frame holds the focus, a 1 px rule runs under it, a digits-only detail is
+ * parenthesised, and its actions, Hide's minus among them, are small glyphs in one ink. EDT only.
  */
 final class ToolWindowHeader extends JPanel {
     /** The window's kit's header height, in logical pixels, without a flush header's rule. */
@@ -132,8 +134,10 @@ final class ToolWindowHeader extends JPanel {
         add(labels, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
         if (flush) {
-            // A header strip's hide glyph is the minus, and its actions are 16 px squares 2 apart (Rulings 14 and 15).
-            hide.setIcon(AppIcons.semantic("remove"));
+            // A header strip's hide glyph is the minus, and its actions are 16 px squares 2 apart (Rulings 14 and 15), each
+            // glyph in the strip's glyph box and action ink.
+            hide.setIcon(stripGlyph(AppIcons.semantic("remove")));
+            options.setIcon(stripGlyph(AppIcons.semantic("more")));
             for (JButton button : java.util.List.of(options, hide)) actionSize(button);
             contributed.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 2, 0));
             // A box row stretches the actions' row to the strip's height and a flow lays it at the top; a grid bag
@@ -141,6 +145,12 @@ final class ToolWindowHeader extends JPanel {
             buttons.setLayout(new java.awt.GridBagLayout());
             detail.setIconTextGap(styles.metric(DesignMetrics.Role.HEADER_STRIP_DOT_GAP));
         }
+    }
+
+    /** {@code icon} as a header strip draws it: in the strip's glyph box, in its action ink, focused or not. */
+    private javax.swing.Icon stripGlyph(javax.swing.Icon icon) {
+        return AppIcons.stripGlyph(icon, kit.metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH),
+            component -> painter.headerAction(ThemeZone.theme(this), focused));
     }
 
     /** A header strip action's square. */
@@ -214,7 +224,7 @@ final class ToolWindowHeader extends JPanel {
                 actionButtons.add(button); contributed.add(button);
             }
             var button = actionButtons.get(i);
-            button.setIcon(action.icon());
+            button.setIcon(flush ? stripGlyph(action.icon()) : action.icon());
             button.setToolTipText(action.label());
             button.getAccessibleContext().setAccessibleName(action.label());
         }

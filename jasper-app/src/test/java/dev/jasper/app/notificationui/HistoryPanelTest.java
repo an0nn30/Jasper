@@ -37,7 +37,7 @@ class HistoryPanelTest {
     private HistoryPanel panel(dev.jasper.ui.swing.KitContext kit, boolean focused) {
         center.register(GENERAL);
         site = new PanelSite(UUID.randomUUID(), () -> {}, () -> {}, () -> visible[0]);
-        return new HistoryPanel(kit, center, site, focused);
+        return new HistoryPanel(kit, center, site, focused, "Notifications");
     }
 
     private void show() { visible[0] = true; site.notifyVisibility(true); }

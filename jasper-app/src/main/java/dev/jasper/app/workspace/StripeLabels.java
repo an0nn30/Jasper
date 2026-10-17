@@ -66,14 +66,17 @@ final class StripeLabels {
             line + 2 * styles.metric(DesignMetrics.Role.RAIL_EDGE) + styles.metric(DesignMetrics.Role.DOCK_RULE));
     }
 
-    /** Paints a label in text space, from its start, centred across {@code across}: its text, then its badge's pill. */
-    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, GeneratedTheme theme, boolean open) {
+    /**
+     * Paints a label in text space, from its start, centred across {@code across}: its text, held on the stripe, a hovered
+     * tile or an open tile, then its badge's pill.
+     */
+    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, GeneratedTheme theme, boolean open, boolean hover) {
         painter.prepareText(g);
         Font font = font();
         g.setFont(font);
         FontMetrics metrics = g.getFontMetrics(font);
         int x = styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING);
-        g.setColor(painter.stripeLabel(theme, open));
+        g.setColor(painter.stripeLabel(theme, open, hover));
         g.drawString(text, (float) x, (across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent());
         if (badge.isEmpty()) return;
         String count = Integer.toString(badge.get().count());

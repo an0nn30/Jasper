@@ -27,6 +27,8 @@ final class PanelHeaders {
         /** Host header metadata; its actions are matched to {@link #contributed} by position. */
         PanelHostHeader hostHeader = PanelHostHeader.EMPTY;
         final List<Buttons.ButtonControl> contributed = new ArrayList<>();
+        /** The header strip's painter over this view's kit, made once. */
+        private ChromePainter painter;
 
         HeaderControl(KitView view, Nodes.Header node) {
             super(view, node, new JPanel());
@@ -104,6 +106,12 @@ final class PanelHeaders {
         void hostHeader(PanelHostHeader header) {
             Objects.requireNonNull(header);
             var actions = header.actions();
+            if (actions.equals(hostHeader.actions()) && actions.size() == contributed.size()) {
+                // Only the detail, the dot or the frame changed (a focus move re-sends the header): keep the artwork.
+                hostHeader = header;
+                refresh();
+                return;
+            }
             var snapshots = new ArrayList<Buttons.HostArtwork>();
             var next = new ArrayList<Buttons.ButtonControl>();
             var nodes = new ArrayList<Nodes.Button>();
@@ -162,6 +170,12 @@ final class PanelHeaders {
         /** Whether that strip's frame holds the focus owner. */
         boolean focusedFrame() { return hostHeader.frame() == PanelHostHeader.Frame.FLUSH_FOCUSED; }
 
+        /** The header strip's painter over this view's kit. */
+        ChromePainter painter() {
+            if (painter == null || painter.kit() != context().kit()) painter = new ChromePainter(context().kit());
+            return painter;
+        }
+
         /** The connected dot: the success status held to the indicator floor on the panel surface it sits on. */
         private Icon dot() {
             return new Icon() {
@@ -170,7 +184,7 @@ final class PanelHeaders {
                 @Override public void paintIcon(Component c, Graphics graphics, int x, int y) {
                     if (flush()) {
                         // On a header strip the dot is held on the strip's own surface (ChromePainter.DOCK_PAIRS).
-                        new ChromePainter(context().kit()).headerDot(graphics, x, y, getIconWidth(), context().theme(), focusedFrame());
+                        painter().headerDot(graphics, x, y, getIconWidth(), context().theme(), focusedFrame());
                         return;
                     }
                     var g = (Graphics2D) graphics.create();
@@ -198,9 +212,8 @@ final class PanelHeaders {
             Composition.style(
                     count, context(), Typography.Role.PANEL_HEADER_COUNT, SemanticColor.TEXT_TERTIARY);
             if (flush()) {
-                var painter = new ChromePainter(context().kit());
-                title.setForeground(painter.headerTitle(context().theme(), focusedFrame()));
-                count.setForeground(painter.headerDetail(context().theme(), focusedFrame(), true));
+                title.setForeground(painter().headerTitle(context().theme(), focusedFrame()));
+                count.setForeground(painter().headerDetail(context().theme(), focusedFrame(), true));
             }
             title.setEnabled(component.isEnabled());
             count.setEnabled(component.isEnabled());
@@ -217,7 +230,7 @@ final class PanelHeaders {
                 if (digits) detail.setText("(" + hostHeader.detail() + ")");
                 else Composition.style(detail, context(), Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
                 detail.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.HEADER_STRIP_DOT_GAP));
-                detail.setForeground(new ChromePainter(context().kit()).headerDetail(context().theme(), focusedFrame(), digits));
+                detail.setForeground(painter().headerDetail(context().theme(), focusedFrame(), digits));
             }
             detail.setEnabled(component.isEnabled());
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -228,14 +241,18 @@ final class PanelHeaders {
             descriptor.setLayout(flush() ? new Navigation.InlineLayout(context(), DesignMetrics.Role.PANEL_HEADER_ACTION_GAP)
                     : new Navigation.InlineLayout(context()));
             host.setLayout(new Navigation.InlineLayout(context(),DesignMetrics.Role.PANEL_HEADER_ACTION_GAP));
+            // A strip draws every action, its own and contributed alike, at one glyph size in one ink (spec 10.7).
+            var stripInk = flush() ? painter().headerAction(context().theme(), focusedFrame()) : null;
             for (var control : contributed) {
                 control.parentEnabled = interactive();
                 control.button.panel = true;
+                control.button.stripInk = stripInk;
                 control.refresh();
             }
             for (var control : hosts.values()) {
                 control.parentEnabled = interactive();
                 control.button.panel = true;
+                control.button.stripInk = stripInk;
                 control.refresh();
             }
             if (h.overflow().isEmpty()) {
@@ -313,7 +330,7 @@ final class PanelHeaders {
 
         @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
             Graphics copy = g.create(x, y, width, height);
-            try { new ChromePainter(owner.context().kit()).headerStrip(copy, width, height, owner.context().theme(), owner.focusedFrame()); }
+            try { owner.painter().headerStrip(copy, width, height, owner.context().theme(), owner.focusedFrame()); }
             finally { copy.dispose(); }
         }
 

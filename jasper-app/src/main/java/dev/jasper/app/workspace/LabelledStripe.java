@@ -275,14 +275,15 @@ final class LabelledStripe extends DockStripe {
         try {
             GeneratedTheme theme = ThemeZone.theme(this);
             boolean open = label.isSelected();
-            Color tile = labels.painter().stripeTile(theme, open, label.getModel().isRollover());
+            boolean hover = label.getModel().isRollover();
+            Color tile = labels.painter().stripeTile(theme, open, hover);
             if (tile != null) {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
             if (side == Side.LEFT) { g.translate(0, label.getHeight()); g.rotate(-Math.PI / 2); }
             else { g.translate(label.getWidth(), 0); g.rotate(Math.PI / 2); }
-            labels.paint(g, label.text(), label.badge(), label.getWidth(), theme, open);
+            labels.paint(g, label.text(), label.badge(), label.getWidth(), theme, open, hover);
         } finally { g.dispose(); }
     }
 }

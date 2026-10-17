@@ -19,7 +19,6 @@ import java.util.List;
 import javax.swing.AbstractButton;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 

@@ -4,6 +4,8 @@ import static dev.jasper.ui.theme.DerivedColor.SURFACE_HEADER;
 import static dev.jasper.ui.theme.DerivedColor.SURFACE_HEADER_ACTIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.swing.ChromePainter;
 import dev.jasper.ui.testsupport.KitFixtures;
 import java.awt.Color;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,25 @@ class HeaderSideTest {
             boolean lighter = ColorMath.lightness(theme.semantic().color(SemanticColor.TEXT_PRIMARY)) > ColorMath.lightness(header);
             double delta = ColorMath.lightness(active) - ColorMath.lightness(header);
             assertThat(lighter ? delta : -delta).as(theme.name() + (theme.dark() ? " Dark" : " Light")).isGreaterThanOrEqualTo(2 - 1e-9);
+        }
+    }
+
+    /**
+     * Spec 10.7: the focused header strip, as painted, stands past the others toward the text in every shipped variant,
+     * those that author the two alike (Catppuccin) included; a derived pair paints as derived.
+     */
+    @Test void theFocusedStripIsPaintedPastTheOthersInEveryShippedVariant() {
+        var painter = new ChromePainter(Kit.CLASSIC);
+        for (var theme : KitFixtures.themes()) {
+            String where = theme.name() + (theme.dark() ? " Dark" : " Light");
+            var derived = DerivedPalette.of(theme);
+            Color header = derived.color(SURFACE_HEADER), focused = painter.headerSurface(theme, true);
+            assertThat(painter.headerSurface(theme, false)).as(where + ": the others are the role").isEqualTo(header);
+            boolean lighter = ColorMath.lightness(theme.semantic().color(SemanticColor.TEXT_PRIMARY)) > ColorMath.lightness(header);
+            double delta = ColorMath.lightness(focused) - ColorMath.lightness(header);
+            assertThat(lighter ? delta : -delta).as(where).isGreaterThanOrEqualTo(1 - 1e-9);
+            if (!theme.derivedOverrides().containsKey(SURFACE_HEADER_ACTIVE))
+                assertThat(focused).as(where + ": a derived pair paints as derived").isEqualTo(derived.color(SURFACE_HEADER_ACTIVE));
         }
     }
 
@@ -39,5 +60,16 @@ class HeaderSideTest {
         Color near = new Color(250, 250, 250);
         Color fallback = SurfaceContrast.beyond(near, near, 3, Color.WHITE);
         assertThat(ColorMath.lightness(near) - ColorMath.lightness(fallback)).as("no room on the text side: the other side").isGreaterThanOrEqualTo(3);
+    }
+
+    @Test void aBeyondGuardHoldsOnTheTextsSideAndRepairsAsBeyondDoes() {
+        var guard = SurfaceContrast.Guard.beyond(3);
+        Color dark = new Color(0x23, 0x26, 0x2C), light = new Color(0xF2, 0xF4, 0xF7), under = new Color(0x1C, 0x1F, 0x24);
+        assertThat(guard.kind()).isEqualTo(SurfaceContrast.Guard.Kind.BEYOND);
+        assertThat(guard.holds(new Color(0x40, 0x44, 0x4C), dark, light)).as("past it on the text's side").isTrue();
+        assertThat(guard.holds(under, dark, light)).as("on the other side").isFalse();
+        assertThat(guard.holds(new Color(0x08, 0x09, 0x0A), dark, light)).as("far on the other side").isFalse();
+        assertThat(guard.holds(new Color(0x08, 0x09, 0x0A), dark)).as("without the text: either side").isTrue();
+        assertThat(guard.apply(under, dark, light)).isEqualTo(SurfaceContrast.beyond(under, dark, 3, light));
     }
 }

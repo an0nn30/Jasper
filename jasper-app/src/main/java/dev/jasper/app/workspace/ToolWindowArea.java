@@ -42,9 +42,11 @@ import javax.swing.UIManager;
 
 /**
  * The terminal column with the tool windows docked around it, laid out by {@link DockGeometry} from the window's
- * {@link DockState}: a full-width bottom area under the left side, the terminal column and the right side. Each
- * showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the gaps between frames are this
- * area's dividers. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
+ * {@link DockState}: a full-width bottom area under the left side, the terminal column and the right side, sized and
+ * framed by the window's kit. Each showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the
+ * gaps between frames are this area's dividers. Under flush frames (spec 10.7) the frames are square and touch, each
+ * divider is a painted 1 px rule with a wider drag area, and every header is a header strip that shows which frame holds
+ * the focus. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
  * borderless and square on the side of a hidden stripe; with neither stripe it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
  * a theme's tool window colour. The area changes the state only when a divider drag ends; whoever changes the state
  * calls {@link #sync} afterwards. EDT only.
@@ -250,6 +252,8 @@ final class ToolWindowArea extends JPanel {
     private final dev.jasper.ui.kit.Kit kit;
     /** Whether frames are flush (the classic look's frame style). */
     private final boolean flush;
+    /** The window's kit's chrome painter: the rules under flush frames. */
+    private final dev.jasper.ui.swing.ChromePainter painter;
     private final Host center;
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(surfaceArc() / 2)); }
@@ -295,6 +299,7 @@ final class ToolWindowArea extends JPanel {
         this.state = Objects.requireNonNull(state, "state");
         this.kit = Objects.requireNonNull(kit, "kit");
         this.flush = flush;
+        this.painter = new dev.jasper.ui.swing.ChromePainter(kit);
         this.center = new Host(false);
         setLayout(new DockLayout());
         center.add(terminalColumn, BorderLayout.CENTER);
@@ -461,7 +466,7 @@ final class ToolWindowArea extends JPanel {
     @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
         if (!flush) return;
-        graphics.setColor(new dev.jasper.ui.swing.ChromePainter(kit).dockRule(ThemeZone.theme(this)));
+        graphics.setColor(painter.dockRule(ThemeZone.theme(this)));
         for (DividerHandle divider : dividers.values()) {
             if (divider.placed == null) continue;
             Rectangle rule = divider.placed.bounds();
@@ -528,12 +533,17 @@ final class ToolWindowArea extends JPanel {
         return host.focused ? dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH_FOCUSED : dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH;
     }
 
-    /** The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained ones. */
+    /**
+     * The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained
+     * ones. On a header strip a host module glyph is described too, so the strip draws it as its other actions (spec 10.7).
+     */
     private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
                                                                   dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
+        boolean strip = frame != dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
             .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
-                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList(), frame);
+                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData())
+                : strip ? dev.jasper.app.platform.AppIcons.kitName(action.icon()).map(name -> new dev.jasper.ui.swing.PanelHostHeader.Artwork(name, null)).orElse(null) : null)).toList(), frame);
     }
 
     /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */
@@ -623,9 +633,9 @@ final class ToolWindowArea extends JPanel {
     }
 
     /**
-     * Exterior gutters are the installed kit's gutter (6px by default) on each edge of the area a frame touches,
-     * except where the header, a stripe or the status bar already supplies the spacing; facing edges have none,
-     * because the 6px divider is the gap.
+     * Exterior gutters are the window's kit's gutter (6px by default, none under the classic kit) on each edge of the area
+     * a frame touches, except where the header, a stripe or the status bar already supplies the spacing; facing edges have
+     * none, because the divider is the gap.
      */
     private void refreshGutters() {
         int gutter = gutter();

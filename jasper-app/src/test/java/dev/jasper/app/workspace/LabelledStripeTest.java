@@ -24,7 +24,6 @@ import java.util.OptionalInt;
 import javax.swing.AbstractAction;
 import javax.swing.AbstractButton;
 import javax.swing.JMenu;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -74,21 +73,26 @@ class LabelledStripeTest {
     }
 
     /**
-     * Spec 16.1.2: a closed and an open label paint their text in their declared pairs ({@code ChromePainter.DOCK_PAIRS}
-     * 1 and 2), sampled from the 4x render inside the label's tile, over every palette.
+     * Spec 16.1.2: a closed, a hovered and an open label paint their text in their declared pairs
+     * ({@code ChromePainter.STRIPE_LABEL}, {@code HOVERED_STRIPE_LABEL} and {@code OPEN_STRIPE_LABEL}), sampled from the 4x
+     * render inside the label's tile, over every palette.
      */
     @Test void eachLabelPaintsItsDeclaredPairOverEveryPalette() throws Exception {
         var palettes = new ArrayList<>(dev.jasper.ui.testsupport.KitFixtures.themes());
         palettes.addAll(dev.jasper.ui.testsupport.KitFixtures.degenerate());
         try {
-            for (var theme : palettes) for (boolean open : List.of(false, true)) {
+            for (var theme : palettes) for (String state : List.of("closed", "hovered", "open")) {
+                boolean open = state.equals("open");
                 dev.jasper.ui.swing.FlatLafInstaller.install(theme, EnterpriseLook.kit());
                 var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit());
                 stripe.render(List.of(new ToolStripe.Button("sftp", "SFTP", null, Slot.LEFT_TOP, open, Optional.empty(), OptionalInt.empty())), List.of());
+                var label = stripe.buttons().getFirst();
+                label.getModel().setRollover(state.equals("hovered"));
                 var image = MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 4);
-                Color expected = dev.jasper.ui.theme.SurfaceContrast.painted(theme, ChromePainter.DOCK_PAIRS.get(open ? 2 : 1));
-                assertThat(inks(image, stripe.buttons().getFirst().getBounds(), 4, expected))
-                    .as(theme.name() + (theme.dark() ? " Dark" : " Light") + (open ? ", open" : ", closed") + " label "
+                var pair = open ? ChromePainter.OPEN_STRIPE_LABEL : state.equals("hovered") ? ChromePainter.HOVERED_STRIPE_LABEL : ChromePainter.STRIPE_LABEL;
+                Color expected = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair);
+                assertThat(inks(image, label.getBounds(), 4, expected))
+                    .as(theme.name() + (theme.dark() ? " Dark" : " Light") + ", " + state + " label "
                         + dev.jasper.ui.theme.ColorMath.hex(expected)).isTrue();
             }
         } finally { EnterpriseLook.restoreDefault(); }

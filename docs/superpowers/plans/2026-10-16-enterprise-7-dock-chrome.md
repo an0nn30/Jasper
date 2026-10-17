@@ -1,6 +1,6 @@
 # Enterprise presentation 7: dock chrome Implementation Plan
 
-> **Status (2026-10-17): executed on `claude/enterprise-dock-chrome` (`947b3d9e1..deb7ea3c1`, then the documentation commit).** Deviations from this plan's text: plan 6's names are the merged 6a and 6b ones ("Plan 6's names", Execution notes R2), and the Enterprise kit and theme are 6a's fixtures until plan 5b, with the face-dependent probes printed (R4, R5); Task 9: a native header strip lays its actions' row out in a `GridBagLayout`, so every action is centred on the strip as Hide is (a flow layout put the row at the strip's top), and `HeaderStripTest` asserts it. `./gradlew check --continue`: 11,117 tests, 0 failures, 0 errors, 25 skipped.
+> **Status (2026-10-17): executed on `claude/enterprise-dock-chrome` (`947b3d9e1..deb7ea3c1`, then the documentation commit).** Deviations from this plan's text: plan 6's names are the merged 6a and 6b ones ("Plan 6's names", Execution notes R2), and the Enterprise kit and theme are 6a's fixtures until plan 5b, with the face-dependent probes printed (R4, R5); Task 9: a native header strip lays its actions' row out in a `GridBagLayout`, so every action is centred on the strip as Hide is (a flow layout put the row at the strip's top), and `HeaderStripTest` asserts it. `./gradlew check --continue`: 11,117 tests, 0 failures, 0 errors, 25 skipped. Final review fixes (`Plan 7: final review fixes`, 4 more tests): every header strip action draws in one 10 px glyph box (`PANEL_HEADER_CONTRIBUTED_GLYPH` 10 under the classic catalog) in one ink (`ChromePainter.HEADER_ACTION`, `text.strong.secondary`), and `DockMockTest` asserts the glyphs' extents within 4 px at 2x (the ellipsis is 3 short of the mock's text glyph, the minus up to 4 long) and their ink within 24 (26 under the scrim); the focused strip paints through `ChromePainter.FOCUSED_HEADER`, a new `SurfaceContrast.Guard.beyond` held at 1 L* (not the review's 2: the Workstation mock's own pair stands 1.5 apart) so Catppuccin's focused strip shows; the dock pairs are named constants, with the hovered label's pair added; a rebind mid-drag is tested; the four-argument `HistoryPanel` constructor is gone.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6862,8 +6862,10 @@ tolerance is re-measured against 5b's #D7D9DC; `SurfaceContrast.beyond` replaces
 role 5b's theme does not author (`surface.tableHeader`, `surface.zebra`, `surface.footer` where not listed) is
 recomputed and `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` are checked against it; `HeaderSideTest` and the
 every-palette loops then include Enterprise if `KitFixtures.themes()` does; 5b's `EnterpriseHomeTest` and
-`EnterpriseFirstWindowTest` run under the landed dock — the fixtures stand in for 5b only — cost if wrong: the dock is
-compared in the platform face until then.
+`EnterpriseFirstWindowTest` run under the landed dock, and the latter asserts the application's wiring (the loaded
+`UiState`'s look, the Event Log panel's title and Bottom Left slot; the final review); the Run window's title row and the
+classic dialog strip, which read `surface.header.active` where the theme does not author it, follow the side rule too
+— the fixtures stand in for 5b only — cost if wrong: the dock is compared in the platform face until then.
 
 R20. **The pixel rule held in the dry run**: the two default renders and the gallery's 161 files a side are
 byte-identical to the base after every task that can move them; only Slate Cobalt Dark's `surface.header.active`

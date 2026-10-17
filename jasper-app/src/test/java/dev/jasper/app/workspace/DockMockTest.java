@@ -13,7 +13,6 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.awt.Rectangle;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -51,6 +50,9 @@ class DockMockTest {
          * #C9CACC, 2 to 3 bluer than black at 21 % gives; Execution notes R6).
          */
         int fillTolerance() { return scrim > 0 ? 5 : 3; }
+
+        /** How near a header action glyph's ink must be: 24, and the scrim's cool cast (2) under it, as for the fills. */
+        int glyphInkTolerance() { return 24 + fillTolerance() - 3; }
     }
 
     static final Variant LIGHT = new Variant("light", MockCrops.CONNECTED, false, 0, 0);
@@ -62,6 +64,13 @@ class DockMockTest {
     /** Every mock with the connected or disconnected panels it shows. */
     static final List<Map.Entry<Variant, Boolean>> WORKSTATIONS = List.of(Map.entry(LIGHT, true), Map.entry(LIGHT_DISCONNECTED, false),
         Map.entry(DARK, true), Map.entry(VAULT, false));
+    /**
+     * How near a header action glyph's extent along the strip must be to the mock's, at 2x: the module's glyphs share one
+     * 10 px box where the mock sets text glyphs, so "+" is 14 against 12, the import arrow 12 to 13 against 14, the
+     * ellipsis 16 against 19 and the minus 14 to 16 against 12 (its antialiased ends reach the run threshold on the light
+     * strips).
+     */
+    static final int GLYPH_EXTENT = 4;
     /** The header strips' agreement floor over their text, left of their icons. */
     static final double HEADER_FLOOR = 0.94;
     /** Agreement floors (spec 16.1.4): the share of pixels within 24 per channel of the mock. */
@@ -256,9 +265,10 @@ class DockMockTest {
     /**
      * A header strip against its mock crop (2x, its 24 px strip and its rule): the surface and the rule; the ink runs
      * along it, one per title, dot, detail and icon, the title's start within 2 px, each icon's centre within 2 (the icons
-     * stand from the trailing edge, whatever the face) and each text run's ink; the other text edges (a text run's end
-     * within 3, a later run's start within 2) and the agreeing pixels of the text, left of the icons, follow the title's
-     * advance width and glyphs and are printed until plan 5b's Plex (Execution notes R5).
+     * stand from the trailing edge, whatever the face), each icon's extent within {@link #GLYPH_EXTENT} and its ink within
+     * {@link Variant#glyphInkTolerance} (one glyph box and one ink for every action), and each text run's ink; the other
+     * text edges (a text run's end within 3, a later run's start within 2) and the agreeing pixels of the text, left of the
+     * icons, follow the title's advance width and glyphs and are printed until plan 5b's Plex (Execution notes R5).
      */
     static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth) {
         String where = variant.name() + " " + name;
@@ -283,6 +293,10 @@ class DockMockTest {
                 firstIcon = Math.min(firstIcon, mockRun.start());
                 assertThat((run.start() + run.end()) / 2.0).as(where + " icon " + i + " centre")
                     .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
+                assertThat(run.length()).as(where + " icon " + i + " extent")
+                    .isBetween(mockRun.length() - GLYPH_EXTENT, mockRun.length() + GLYPH_EXTENT);
+                assertThat(MockCrops.near(run.ink(), mockRun.ink(), variant.glyphInkTolerance()))
+                    .as(where + " icon " + i + " ink " + run.ink() + " against " + mockRun.ink()).isTrue();
             } else {
                 if (i == 0) assertThat(run.start()).as(where + " title starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
                 else MockProfile.fonts(where + " run " + i + " start", run.start(), mockRun.start(), 2);
@@ -340,6 +354,4 @@ class DockMockTest {
         assertThat(2 * header.y).as(where + " y").isEqualTo(y);
         assertThat(2 * header.width).as(where + " width").isEqualTo(width);
     }
-
-    // Later tasks add their surfaces above this line.
 }

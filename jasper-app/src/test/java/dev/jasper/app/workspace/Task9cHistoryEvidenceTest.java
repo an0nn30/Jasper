@@ -25,7 +25,7 @@ class Task9cHistoryEvidenceTest {
                     var center=new NotificationCenter(Runnable::run,Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"),ZoneOffset.UTC),()->Delivery.Presence.FOCUSED);
                     var group=new NotificationGroup("fixture.history","Synthetic history","jasper",DisplayMode.CARD);center.register(group);
                     var site=new PanelSite(UUID.randomUUID(),()->{},()->{},()->true);
-                    var history=new HistoryPanel(themes.appearance().context(ThemeRoute.CHROME),center,site,false);
+                    var history=new HistoryPanel(themes.appearance().context(ThemeRoute.CHROME),center,site,false,"Notifications");
                     var area=new ToolWindowArea(new JPanel(),new DockState());
                     try {
                         DockTestSupport.show(area,Slot.RIGHT_TOP,history,360);area.setContent(DockTestSupport.id(Slot.RIGHT_TOP),"Notifications",history);area.sync();site.notifyVisibility(true);

@@ -30,10 +30,10 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
- * One window's dock drag: press on a stripe button or a tool window header and move more than 5px. It uses plain mouse
- * events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
- * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
- * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}, except for
+ * One window's dock drag: press on a stripe button or a tool window header and move past the window's kit's drag
+ * threshold (5px by default). It uses plain mouse events, not AWT drag and drop, so it stays inside the window, needs no
+ * OS drag image and can be driven with synthetic events. While it runs, every stripe (the two rails, or the labelled
+ * stripes and the bottom strip) shows all its groups with the dragged button lifted out, the target group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}, except for
  * a stripe drop of a hidden window, which stays hidden and so lands in no frame; the real layout does not change. A
  * stripe hidden because it is empty takes part unseen while {@link #railsEnabled}: it stands over the workspace's edge
  * where it would show, so only the overlay's placeholder marks it, and it shows once a drop gives it a window.

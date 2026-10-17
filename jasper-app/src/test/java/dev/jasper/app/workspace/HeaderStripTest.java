@@ -14,7 +14,6 @@ import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.util.List;
 import javax.swing.JPopupMenu;
-import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -64,12 +63,16 @@ class HeaderStripTest {
         try {
             var header = header(true);
             header.presentation(new PanelHeaderState("", false, List.of(new PanelHeaderState.Action("Add", AppIcons.semantic("add"), () -> { }))));
-            int side = metric(DesignMetrics.Role.TOOL_HEADER_ACTION);
+            int side = metric(DesignMetrics.Role.TOOL_HEADER_ACTION), glyph = metric(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH);
             assertThat(header.optionsButton().getPreferredSize()).isEqualTo(new java.awt.Dimension(side, side));
             assertThat(header.hideButton().getPreferredSize()).isEqualTo(new java.awt.Dimension(side, side));
-            assertThat(header.hideButton().getIcon()).isSameAs(AppIcons.semantic("remove"));
+            assertThat(AppIcons.kitName(header.hideButton().getIcon())).as("Hide is the minus").hasValue("remove");
+            assertThat(AppIcons.kitName(header.optionsButton().getIcon())).hasValue("more");
             MockCrops.render(header, 300, header.getPreferredSize().height, 1);
             var add = SwingFind.button(header, "Add");
+            assertThat(AppIcons.kitName(add.getIcon())).hasValue("add");
+            for (var button : List.of(add, header.optionsButton(), header.hideButton()))
+                assertThat(button.getIcon().getIconWidth()).as(button.getToolTipText() + ": one glyph box for every action").isEqualTo(glyph).isLessThan(side);
             assertThat(add.getPreferredSize()).isEqualTo(new java.awt.Dimension(side, side));
             assertThat(((java.awt.FlowLayout) add.getParent().getLayout()).getHgap()).as("2 apart, 18 between centres").isEqualTo(2);
             var addBounds = javax.swing.SwingUtilities.convertRectangle(add.getParent(), add.getBounds(), header);
@@ -79,14 +82,13 @@ class HeaderStripTest {
     }
 
     /**
-     * Spec 16.1.2: a flush header, focused and not, paints its title, a word detail and a digits-only detail in their
-     * declared pairs ({@code ChromePainter.DOCK_PAIRS} 5 to 10), sampled from the 4x render inside each label, over every
-     * palette.
+     * Spec 16.1.2: a flush header, focused and not, paints its title, a word detail, a digits-only detail and its action
+     * glyphs in their declared pairs on the strip's painted surface, sampled from the 4x render inside each label and
+     * action, over every palette.
      */
     @Test void aFlushHeaderPaintsItsTextInItsDeclaredPairsOverEveryPalette() throws Exception {
         var palettes = new java.util.ArrayList<>(dev.jasper.ui.testsupport.KitFixtures.themes());
         palettes.addAll(dev.jasper.ui.testsupport.KitFixtures.degenerate());
-        var pairs = ChromePainter.DOCK_PAIRS;
         try {
             for (var theme : palettes) for (boolean focused : List.of(false, true)) {
                 dev.jasper.ui.swing.FlatLafInstaller.install(theme, EnterpriseLook.kit());
@@ -94,21 +96,27 @@ class HeaderStripTest {
                 header.setFocused(focused);
                 String where = theme.name() + (theme.dark() ? " Dark" : " Light") + (focused ? ", focused" : "");
                 var detail = (javax.swing.JLabel) header.dragSurfaces().get(2);
-                header.presentation(new PanelHeaderState("Mac", false, List.of()));
+                header.presentation(new PanelHeaderState("Mac", false, List.of(new PanelHeaderState.Action("Add", AppIcons.semantic("add"), () -> { }))));
                 var image = MockCrops.render(header, 300, header.getPreferredSize().height, 4);
-                assertInk(image, header, header.titleLabel(), pairs.get(focused ? 6 : 5), theme, where + " title");
-                assertInk(image, header, detail, pairs.get(focused ? 8 : 7), theme, where + " detail");
+                assertInk(image, header, header.titleLabel(), focused ? ChromePainter.FOCUSED_HEADER_TITLE : ChromePainter.HEADER_TITLE, theme, focused, where + " title");
+                assertInk(image, header, detail, focused ? ChromePainter.FOCUSED_HEADER_DETAIL : ChromePainter.HEADER_DETAIL, theme, focused, where + " detail");
+                for (var button : List.of(SwingFind.button(header, "Add"), header.optionsButton(), header.hideButton()))
+                    assertInk(image, header, button, focused ? ChromePainter.FOCUSED_HEADER_ACTION : ChromePainter.HEADER_ACTION, theme, focused,
+                        where + " " + button.getToolTipText());
                 header.presentation(new PanelHeaderState("2", false, List.of()));
                 image = MockCrops.render(header, 300, header.getPreferredSize().height, 4);
-                assertInk(image, header, detail, pairs.get(focused ? 10 : 9), theme, where + " count");
+                assertInk(image, header, detail, focused ? ChromePainter.FOCUSED_HEADER_COUNT : ChromePainter.HEADER_COUNT, theme, focused, where + " count");
             }
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
-    /** Asserts that {@code label}'s bounds in {@code image}, a 4x render of {@code header}, hold the pair's painted colour. */
+    /**
+     * Asserts that {@code label}'s bounds in {@code image}, a 4x render of {@code header}, hold the pair's colour as painted
+     * on the strip's surface.
+     */
     private static void assertInk(java.awt.image.BufferedImage image, ToolWindowHeader header, javax.swing.JComponent label,
-                                  dev.jasper.ui.theme.PaintPair pair, dev.jasper.ui.theme.GeneratedTheme theme, String what) {
-        Color expected = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair);
+                                  dev.jasper.ui.theme.PaintPair pair, dev.jasper.ui.theme.GeneratedTheme theme, boolean focused, String what) {
+        Color expected = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair, new ChromePainter(EnterpriseLook.kit()).headerSurface(theme, focused));
         var bounds = javax.swing.SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), header);
         assertThat(LabelledStripeTest.inks(image, bounds, 4, expected)).as(what + " " + dev.jasper.ui.theme.ColorMath.hex(expected)).isTrue();
     }

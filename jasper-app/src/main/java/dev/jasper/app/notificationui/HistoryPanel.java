@@ -66,17 +66,8 @@ public final class HistoryPanel extends JPanel {
     private boolean closed;
 
     /**
-     * @param kit the chrome kit context
-     * @param center the notification store
-     * @param site the tool window site the panel lives in
-     * @param focused whether the window is active
-     */
-    public HistoryPanel(KitContext kit, NotificationCenter center, PanelSite site, boolean focused) {
-        this(kit, center, site, focused, "Notifications");
-    }
-
-    /**
-     * As the four-argument form, named {@code title} for screen readers: Event Log under labelled stripes (spec 10.7).
+     * A history panel named {@code title} for screen readers: Notifications, or Event Log under labelled stripes (spec
+     * 10.7).
      *
      * @param kit the kit the panel's views are built with
      * @param center the notification store
