@@ -8,8 +8,8 @@ Plan 3 owns final surface composition; the [completion record](design/theme-engi
 | --- | --- | --- |
 | `theme` | none | Jasper theme files (Slate Cobalt is bundled), semantic palettes and derived roles, terminal and editor schemes, syntax, glass, FlatLaf keys and paint-time contrast guards; EDT appearance binding |
 | `model` | none | Immutable descriptors and events; no secret values |
-| `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`), type scales and faces, central typography/motion roles |
-| `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces and FlatLaf key set; `Kit.DEFAULT` is the default look |
+| `metrics` | `theme` | Logical geometry catalogs (`DesignMetrics`, `DEFAULT` and `CLASSIC`) and the 11 public `MetricTokens` a kit file tunes, type scales and faces, central typography/motion roles |
+| `kit` | `metrics`, `theme` | The look: `Kit` names a metric catalog, type scale, faces, control variants (`ControlVariants`), colour slots (`ColorSlots`) and FlatLaf key set; `Kit.DEFAULT` is the default look and `Kit.CLASSIC` the classic base |
 | `icons` | `theme`, `metrics`, `model` | Named artwork and context-scoped tint caches |
 | `swing` | `model`, `theme`, `metrics`, `icons`, `kit` | EDT views, delegates, owned controls, registrations and FlatLaf installation |
 

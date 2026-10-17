@@ -297,7 +297,7 @@ final class TextFields {
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
             surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
-            surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.CONTROL_RADIUS;
+            surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
             error.setEnabled(component.isEnabled());
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));
@@ -388,7 +388,7 @@ final class TextFields {
     static final class FieldSurface extends JPanel {
         boolean prompt, panelSearch;
         JComponent trailing;
-        DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.CONTROL_RADIUS;
+        DesignMetrics.Role heightRole=DesignMetrics.Role.FIELD_HEIGHT,radiusRole=DesignMetrics.Role.FIELD_RADIUS;
         final KitContext context; final JTextComponent input; final boolean multiline;
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         /** The parent surface is the field's backdrop: no input fill, the outline kept. */

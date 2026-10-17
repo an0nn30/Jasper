@@ -5,6 +5,7 @@ Amended late on 2026-10-15 for the second mock set (reference folders 07 to 10) 
 decisions on my behalf": 5.1, 5.2, 5.9, 7.6, 8.2, 9.1, 10.8, 10.11, 14.1, 14.3, 14.6, 14.8, 16.2, 18 and 19.1.
 Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority: 8.2 (`DialogSpec.swatch`), 10.3 and 15
 (toolbar view admission).
+Amended on 2026-10-16 with plan 4a's Rulings 17, made under the same authority: 5.4 (the provisional token ranges stand).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -620,8 +621,9 @@ exists, under either status layout.
 
 The 11 `[metrics]` tokens fan out to private roles through a host-owned table in `dev.jasper.ui.metrics.MetricTokens`;
 `DesignMetrics.with(MetricTokens)` applies it to the base catalog. The ranges for `control_height` and `row_height` come
-from the approved design and are binding; the others are provisional until plan 4 calibrates them against the mocks
-and records them in this table, and `PresentationConformanceTest` (plan 5) freezes them.
+from the approved design and are binding; plan 4a calibrated the others against the mocks, which draw only
+Enterprise's value of each token, inside its range, so they stand as listed, and `PresentationConformanceTest` (plan 5)
+freezes them.
 
 | Token | Enterprise | Range | Private roles it sets |
 |---|---|---|---|

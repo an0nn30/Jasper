@@ -81,7 +81,7 @@ public final class Typography {
         // the small family-wide tracking adjustment is calibrated from original desktop title ink.
         if (weight == 600 && resolved.equals("Helvetica Neue") && HelveticaMedium.AVAILABLE)
             return HelveticaMedium.FONT.deriveFont(Map.of(TextAttribute.SIZE, size,
-                TextAttribute.TRACKING, platformDefault && role == Role.SECTION_LABEL ? .060f : .018f));
+                TextAttribute.TRACKING, platformDefault && role == Role.SECTION_LABEL && scale.labelTracking() ? .060f : .018f));
         return new Font(resolved, Font.PLAIN, 1).deriveFont(Map.of(
             TextAttribute.SIZE, size,
             TextAttribute.WEIGHT, weight == 600 ? TextAttribute.WEIGHT_SEMIBOLD

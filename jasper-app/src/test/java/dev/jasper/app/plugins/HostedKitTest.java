@@ -55,7 +55,7 @@ class HostedKitTest {
  /** Enterprise presentation plan 1: the app's three context sites take the kit installed when they make a context. */
  @Test void appContextsAreMadeOverTheInstalledKit() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var base=dev.jasper.ui.kit.Kit.DEFAULT;
-  var tall=new dev.jasper.ui.kit.Kit("tall-buttons",base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,40),base.type(),base.faces(),base.uiKeys());
+  var tall=new dev.jasper.ui.kit.Kit("tall-buttons",base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,40),base.type(),base.faces(),base.controls(),base.colors(),base.uiKeys());
   var pair=ThemeTestSupport.pair(true);
   var spec=new ViewSpec(new Nodes.Button("go",ControlState.READY,"Go","",Nodes.ButtonKind.SECONDARY,"go",""));
   var original=UIManager.getLookAndFeel();

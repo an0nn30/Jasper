@@ -6,8 +6,9 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Logical geometry: one value per {@link Role}. {@link #DEFAULT} is the default catalog; other catalogs derive from it
- * with {@link #with(Role, int)}. Display transforms belong to the host; font growth belongs to content bounds.
+ * Logical geometry: one value per {@link Role}. {@link #DEFAULT} is the default catalog; other catalogs derive from it:
+ * {@link #CLASSIC} with the classic delta, a kit's with {@link #with(MetricTokens)}, a test's with {@link #with(Role, int)}.
+ * Display transforms belong to the host; font growth belongs to content bounds.
  */
 public final class DesignMetrics {
     /** Native short-window overflow keeps at least two rows or text lines in its inner body. */
@@ -20,6 +21,11 @@ public final class DesignMetrics {
     public static final float TRANSPARENT_FIELD_FOCUS_WIDTH = 1.5f;
     /** The default catalog: each role's declared value, frozen by compact-roles.tsv. */
     public static final DesignMetrics DEFAULT = new DesignMetrics(declared());
+    /**
+     * The classic catalog (Enterprise presentation spec 5.5): the default with the classic look's delta, measured on the
+     * Enterprise mocks and frozen by classic-roles.tsv. Its own tokens are the shipped Enterprise kit's.
+     */
+    public static final DesignMetrics CLASSIC = classic();
     public enum Role {
         // One-line rows (menus, pickers, navigation, keycap and identity rows) pad their line by ROW_VERTICAL_PADDING; a native
         // menu row's margin is MENU_ITEM_VERTICAL_PADDING; main's Button.margin top and bottom are BUTTON_LABEL_MARGIN.
@@ -122,13 +128,96 @@ public final class DesignMetrics {
         NOTIFICATION_SHADOW_ALPHA_DARK(4), NOTIFICATION_SHADOW_ALPHA_LIGHT(2), NOTIFICATION_SCROLL_STEP(16),
         HISTORY_HEADER_VERTICAL_PADDING(5), HISTORY_HEADER_LEADING_PADDING(8), HISTORY_HEADER_TRAILING_PADDING(5),
         HISTORY_SIDE_PADDING(8), HISTORY_HEADING_TOP_PADDING(6), HISTORY_HEADING_BOTTOM_PADDING(3),
-        HISTORY_ROW_VERTICAL_PADDING(6), HISTORY_ROW_TRAILING_PADDING(5), HISTORY_ROW_GAP(6), HISTORY_TITLE_GAP(5), HISTORY_CONTENT_GAP(2);
+        HISTORY_ROW_VERTICAL_PADDING(6), HISTORY_ROW_TRAILING_PADDING(5), HISTORY_ROW_GAP(6), HISTORY_TITLE_GAP(5), HISTORY_CONTENT_GAP(2),
+        // Enterprise presentation plan 4: the list, table and tree row floor (BUTTON_HEIGHT before) and the field radius
+        // (CONTROL_RADIUS before), then roles only the classic faces and chrome read, measured on the Enterprise mocks.
+        ROW_HEIGHT(24), FIELD_RADIUS(4),
+        RUN_WINDOW_WIDTH(460), CHECKBOX_BOX(13), CHECKBOX_RADIUS(2), CHECKBOX_LABEL_GAP(7), RADIO_RING(14), RADIO_DOT(6), RADIO_LABEL_GAP(6), RADIO_GAP(18), OPTION_SWATCH(7), GROUP_TITLE_INSET(9), GROUP_TITLE_PADDING(4), GROUP_TITLE_GAP(4), SPINNER_WIDTH(82), SPINNER_ARROW_WIDTH(16), SPINNER_GLYPH(7), DROPDOWN_GLYPH(6), DROPDOWN_GLYPH_INSET(7),
+        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(8), STRIPE_LABEL_GAP(1), DOCK_RULE(1), DOCK_RULE_HIT(6);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
     }
     private final int[] values;
     private DesignMetrics(int[] values) { this.values = values; }
+    private static DesignMetrics classic() {
+        var values = new java.util.EnumMap<Role, Integer>(Role.class);
+        values.put(Role.FIELD_HEIGHT, 22);
+        values.put(Role.BUTTON_HEIGHT, 24);
+        values.put(Role.PICKER_DEFAULT_HEIGHT, 22);
+        values.put(Role.FULL_FOOTER_BUTTON_HEIGHT, 24);
+        values.put(Role.JOINED_ACTION_HEIGHT, 24);
+        values.put(Role.PANEL_EMPTY_ACTION_HEIGHT, 24);
+        values.put(Role.PANEL_SEARCH_HEIGHT, 22);
+        values.put(Role.COLUMN_SEARCH_HEIGHT, 22);
+        values.put(Role.KEYMAP_SEARCH_HEIGHT, 22);
+        values.put(Role.FULL_SETTING_CHOICE_HEIGHT, 22);
+        values.put(Role.FIELD_VERTICAL_PADDING, 6);
+        values.put(Role.BUTTON_VERTICAL_PADDING, 6);
+        values.put(Role.ROW_HEIGHT, 22);
+        values.put(Role.MENU_ITEM_HEIGHT, 22);
+        values.put(Role.PICKER_ROW_HEIGHT, 22);
+        values.put(Role.RESULTS_ROW_HEIGHT, 22);
+        values.put(Role.RESULTS_HEADING_HEIGHT, 22);
+        values.put(Role.KEYCAP_TREE_ROW_HEIGHT, 22);
+        values.put(Role.KEYCAP_TREE_GROUP_HEIGHT, 22);
+        values.put(Role.ORDERED_ROW_HEIGHT, 20);
+        values.put(Role.SETTINGS_NAV_ROW, 22);
+        values.put(Role.SETTINGS_NAV_HEADING, 22);
+        values.put(Role.COLUMN_RAIL_ROW, 22);
+        values.put(Role.PANEL_COMPACT_ROW_HEIGHT, 22);
+        values.put(Role.CONTROL_RADIUS, 3);
+        values.put(Role.SEGMENT_TRACK_RADIUS, 3);
+        values.put(Role.SEGMENT_ITEM_RADIUS, 2);
+        values.put(Role.PICKER_SEARCH_RADIUS, 3);
+        values.put(Role.KEYCAP_RADIUS, 2);
+        values.put(Role.CHIP_RADIUS, 1);
+        values.put(Role.ORDERED_RADIUS, 0);
+        values.put(Role.FIELD_RADIUS, 2);
+        values.put(Role.TRANSPARENT_FIELD_RADIUS, 2);
+        values.put(Role.CARD_RADIUS, 3);
+        values.put(Role.FOCUS_RING, 2);
+        values.put(Role.NATIVE_TOOL_HEADER_HEIGHT, 24);
+        values.put(Role.PANEL_HEADER, 24);
+        values.put(Role.CARD_PADDING, 12);
+        values.put(Role.FULL_SETTING_SIDE_PADDING, 12);
+        values.put(Role.SETTINGS_ROW_SIDE, 12);
+        values.put(Role.SETTING_DEPENDENT_INDENT, 20);
+        values.put(Role.SETTINGS_SIDEBAR_WIDTH, 230);
+        values.put(Role.STATUS_DOT, 7);
+        values.put(Role.PANEL_ROW_DOT, 7);
+        values.put(Role.TOOL_HEADER_ACTIVE_DOT, 7);
+        values.put(Role.PALETTE_WINDOW_MARGIN, 8);
+        values.put(Role.WORKSPACE_GUTTER, 0);
+        values.put(Role.WINDOW_RADIUS, 0);
+        values.put(Role.WORKSPACE_SURFACE_ARC, 0);
+        values.put(Role.PALETTE_CORNER_ARC, 0);
+        values.put(Role.DOCK_DROP_ARC, 0);
+        values.put(Role.RAIL_BUTTON_ARC, 0);
+        values.put(Role.NATIVE_TOOLBAR_HOVER_ARC, 0);
+        values.put(Role.TITLE_SEARCH_ARC, 0);
+        values.put(Role.PROMPT_TILE_RADIUS, 0);
+        values.put(Role.PROMPT_TILE, 30);
+        values.put(Role.ICON_PROMPT, 16);
+        values.put(Role.FORM_LABEL_WIDTH, 100);
+        values.put(Role.COLUMN_GAP, 12);
+        values.put(Role.SECTION_GAP, 12);
+        values.put(Role.SHEET_SECTION_GAP, 12);
+        values.put(Role.FORM_SIDES, 16);
+        values.put(Role.FORM_TOP, 12);
+        values.put(Role.CHIP_HEIGHT, 14);
+        values.put(Role.PANEL_CHIP_HEIGHT, 14);
+        values.put(Role.SETTING_HEIGHT, 26);
+        values.put(Role.SETTING_DESCRIPTION_HEIGHT, 42);
+        values.put(Role.FULL_SETTING_DESCRIPTION_HEIGHT, 42);
+        values.put(Role.THEME_PREVIEW_WIDTH, 150);
+        values.put(Role.THEME_PREVIEW_HEIGHT, 78);
+        values.put(Role.THEME_PREVIEW_GAP, 20);
+        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
+        int[] table = declared();
+        values.forEach((role, value) -> table[role.ordinal()] = value);
+        return new DesignMetrics(table);
+    }
     private static int[] declared() {
         var roles = Role.values();
         var values = new int[roles.length];
@@ -145,6 +234,23 @@ public final class DesignMetrics {
         copy[role.ordinal()] = value;
         return new DesignMetrics(copy);
     }
+    /**
+     * This catalog tuned by {@code tokens}: each token's roles move by the token's change from this catalog's own value
+     * (never below zero), and the field and button paddings follow the control height (spec 5.4).
+     */
+    public DesignMetrics with(MetricTokens tokens) {
+        Objects.requireNonNull(tokens, "tokens");
+        var own = MetricTokens.of(this);
+        int[] copy = values.clone();
+        for (var token : MetricTokens.Token.values()) {
+            int delta = tokens.value(token) - own.value(token);
+            for (var role : token.roles()) copy[role.ordinal()] = Math.max(0, values[role.ordinal()] + delta);
+        }
+        int padding = MetricTokens.padding(tokens.value(MetricTokens.Token.CONTROL_HEIGHT));
+        copy[Role.FIELD_VERTICAL_PADDING.ordinal()] = padding;
+        copy[Role.BUTTON_VERTICAL_PADDING.ordinal()] = padding;
+        return new DesignMetrics(copy);
+    }
     /** The vertical padding a content height adds to its font's line. */
     public Role contentPadding(Role height) {
         return switch (Objects.requireNonNull(height)) {
@@ -157,7 +263,7 @@ public final class DesignMetrics {
             case PANEL_DETAIL_ACTION -> Role.PANEL_DETAIL_ACTION_VERTICAL;
             case FIELD_HEIGHT, PROMPT_FIELD_HEIGHT, COLUMN_SEARCH_HEIGHT -> Role.FIELD_VERTICAL_PADDING;
             case PANEL_EMPTY_ACTION_HEIGHT, BUTTON_HEIGHT, PROMPT_BUTTON_HEIGHT, FULL_FOOTER_BUTTON_HEIGHT, ORDERED_ADD_HEIGHT,
-                 PANEL_ACTION, INLINE_ACTION -> Role.BUTTON_VERTICAL_PADDING;
+                 PANEL_ACTION, INLINE_ACTION, ROW_HEIGHT -> Role.BUTTON_VERTICAL_PADDING;
             default -> throw new IllegalArgumentException("Not a content height role: " + height);
         };
     }
