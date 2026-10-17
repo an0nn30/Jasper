@@ -143,6 +143,9 @@ public final class DesignMetrics {
         // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
         // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
         RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
+        // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
+        // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
+        RUN_WINDOW_BUTTON_PADDING(8),
         // Enterprise presentation plan 6: the classic chrome's menu row, toolbar, tabs, status cells and dialogs,
         // measured on the Enterprise mocks and read only by classic chrome.
         MENU_BAR_SIDE(5), MENU_BAR_ITEM_PADDING(9), MENU_BAR_HEIGHT(24), CHROME_BUTTON_PADDING(8), CHROME_BUTTON_GAP(8), CHROME_SEPARATOR_GAP(10),

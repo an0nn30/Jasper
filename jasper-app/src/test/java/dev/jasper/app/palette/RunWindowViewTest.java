@@ -118,6 +118,34 @@ class RunWindowViewTest {
         });
     }
 
+    /** Plan 8b (the orchestrator's footer ruling): each footer button is the mocks' 70 px; a label that needs more grows it, never cut. */
+    @Test void theFooterButtonsAreSeventyUnlessALabelNeedsMore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var context = enterprise();
+            int padding = m(context, DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING);
+            var wide = RunWindowFixtures.scope("test.wide", "Wide", "host", Nodes.Hue.GREEN, "A host with a long verb",
+                List.of(new PaletteVerb("go", "Connect in a new window over SSH")));
+            try (var view = RunWindowFixtures.view(context, new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+                layout(view);
+                for (String id : List.of(RunWindowView.PRIMARY, RunWindowView.CANCEL, RunWindowView.BROWSE)) {
+                    var region = view.viewFor(id);
+                    var button = CardView.find(region, id, javax.swing.AbstractButton.class);
+                    assertThat(button.getInsets().left).as(id + ": the Run window's label padding").isEqualTo(padding);
+                    assertThat(region.getWidth()).as(id).isEqualTo(Math.max(70, region.getPreferredSize().width));
+                }
+                view.setEntries(List.of(RunWindowFixtures.item(wide, "w", "Wide host", "wide.example:22", null)), null, "Nothing found");
+                layout(view);
+                var primary = view.viewFor(RunWindowView.PRIMARY);
+                var button = CardView.find(primary, RunWindowView.PRIMARY, javax.swing.AbstractButton.class);
+                int text = button.getFontMetrics(button.getFont()).stringWidth(button.getText());
+                assertThat(button.getText()).isEqualTo("Connect in a new window over SSH");
+                assertThat(primary.getWidth()).as("the long label grows its button").isGreaterThan(70).isGreaterThanOrEqualTo(text + 2 * padding);
+                assertThat(primary.getX() + primary.getWidth() + 6).as("still packed against Cancel").isEqualTo(view.viewFor(RunWindowView.CANCEL).getX());
+            }
+        });
+    }
+
     @Test void justOpenedReadsAsTheMock() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {
