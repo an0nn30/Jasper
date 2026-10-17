@@ -63,6 +63,20 @@ class LookFontsTest {
             "fonts/cousine-Regular.ttf: its family is " + regular.family() + ", not Another Family; that text uses the platform font");
     }
 
+    /** A file whose names read but that Java cannot load, and one whose name table disagrees with Java, are named. */
+    @Test void aFileJavaCannotReadOrNamesOtherwiseIsNamedAndNotRegistered() throws Exception {
+        var garbage = new FontFile("fonts/garbage.ttf", new byte[] {0, 1, 0, 0, 9, 9, 9, 9}, "Jasper Garbage Face", "Jasper Garbage");
+        var regular = lookFace("Regular");
+        var misnamed = new FontFile("fonts/misnamed.ttf", regular.bytes(), "Jasper Other Name", regular.family());
+        assertThat(LookFonts.register(new KitParser.Faces(Optional.empty(), Optional.of(new KitParser.DataFaces("Jasper Garbage", garbage, garbage)))))
+            .containsExactly("fonts/garbage.ttf: it is not a font Java can read; that text uses the platform font",
+                "fonts/garbage.ttf: it is not a font Java can read; that text uses the platform font");
+        assertThat(LookFonts.register(new KitParser.Faces(Optional.empty(), Optional.of(new KitParser.DataFaces(regular.family(), misnamed, misnamed)))))
+            .containsExactly("fonts/misnamed.ttf: Java names it " + regular.fullName() + ", not Jasper Other Name; that text uses the platform font",
+                "fonts/misnamed.ttf: Java names it " + regular.fullName() + ", not Jasper Other Name; that text uses the platform font");
+        assertThat(new Font("Jasper Other Name", Font.PLAIN, 1).getFontName(Locale.ROOT)).as("not registered under that name").isNotEqualTo("Jasper Other Name");
+    }
+
     /** Spec 5.9: a file whose full name does not resolve once registered (an installed font of its family hides it) is named. */
     @Test void aFileAnInstalledFontHidesIsNamedWhereItIsHidden() throws Exception {
         var regular = cousine("Regular");

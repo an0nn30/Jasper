@@ -851,7 +851,7 @@ size = 14
 `family = "system"` (the default) selects the look's UI font: the platform font under the default look, IBM Plex
 Sans under Enterprise; a named family overrides it. An unset `size` uses the look's size (the platform size, or 12 under
 Enterprise); a set size scales every role. You can
-choose any installed family; an unavailable family falls back to the platform font. This
+choose any installed family; an unavailable family falls back to the look's UI font. This
 works on macOS, Linux and Windows without a downloaded font. An explicit family overrides
 that selection.
 

@@ -51,6 +51,7 @@ class EnterpriseKitRenderTest {
         "sftp", "sftp-choose.main", "fileservers", "server-title");
 
     @Test void theShippedKitRendersInPlexInBothVariants() throws Exception {
+        EnterpriseResources.assumePlexResolves();
         var parsed = EnterpriseResources.facts().parsed().orElseThrow();
         assertThat(LookFonts.register(parsed.faces())).as("every Plex file registers").isEmpty();
         var theme = EnterpriseResources.theme();

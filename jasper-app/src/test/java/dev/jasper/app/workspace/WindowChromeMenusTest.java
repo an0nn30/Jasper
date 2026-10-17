@@ -112,6 +112,7 @@ class WindowChromeMenusTest {
 
     /** Mock measurements: a 24 px row on surface.app over a 1 px border.divider rule, the first title 15 from the edge. */
     @Test void theClassicMenuRowIsTheMocksRow() throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
             try {
@@ -160,6 +161,7 @@ class WindowChromeMenusTest {
      * and a narrow window folds the trailing titles into "…", then every title into ☰ (spec 10.2).
      */
     @Test void aNarrowClassicWindowStillFoldsItsMenus() throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
             try {

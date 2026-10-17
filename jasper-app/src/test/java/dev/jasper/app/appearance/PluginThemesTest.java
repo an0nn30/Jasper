@@ -18,7 +18,7 @@ class PluginThemesTest {
     @TempDir Path home;
 
     static PluginThemes.Declared declared(String plugin, String name, int rank, boolean loadable, String id, String themeName) {
-        return new PluginThemes.Declared(plugin, name, rank, loadable, id, Path.of(plugin, "themes", id + ".json"),
+        return new PluginThemes.Declared(plugin, name, rank, loadable, id, "themes/" + id + ".json", Path.of(plugin),
             Optional.ofNullable(themeName).map(value -> ThemeTestSupport.uiThemeJson(value).getBytes(StandardCharsets.UTF_8)));
     }
 
@@ -89,6 +89,14 @@ class PluginThemesTest {
         assertThat(selection.theme(true).id()).isEqualTo("slate-cobalt");
         assertThat(selection.theme(false).id()).isEqualTo("slate-cobalt");
         assertThat(problems).as("only the unknown pick is reported").containsExactly("ui.theme.light");
+        problems.clear();
+        var dormantScheme = ThemeSelection.of(library, "slate-cobalt", "slate-cobalt",
+            TerminalSchemeChoice.parse("enterprise/dark-terminal").orElseThrow(), (key, message) -> problems.add(key));
+        assertThat(dormantScheme.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
+        assertThat(problems).as("a disabled plugin's scheme falls back silently").isEmpty();
+        ThemeSelection.of(library, "slate-cobalt", "slate-cobalt", TerminalSchemeChoice.parse("nowhere/dark").orElseThrow(),
+            (key, message) -> problems.add(key));
+        assertThat(problems).as("an unknown scheme still warns").containsExactly("terminal.scheme");
         var loaded = ThemeLibrary.of(PluginThemes.of(List.of(declared("dev.jasper.enterprise", "Enterprise", 1, true, "enterprise", "Enterprise"))));
         assertThat(ThemeSelection.of(loaded, "enterprise", "enterprise", TerminalSchemeChoice.MATCH, (key, message) -> problems.add(key))
             .theme(true).id()).as("turning the provider back on restores the pick").isEqualTo("enterprise");
@@ -96,11 +104,22 @@ class PluginThemesTest {
 
     @Test void aPluginsFileThatDoesNotLoadIsReportedAlone() {
         var tier = PluginThemes.of(List.of(
-            new PluginThemes.Declared("p.one", "One", 1, true, "broken", Path.of("p.one/themes/broken.json"), Optional.of("{".getBytes(StandardCharsets.UTF_8))),
-            new PluginThemes.Declared("p.one", "One", 1, true, "absent", Path.of("p.one/themes/absent.json"), Optional.empty()),
+            new PluginThemes.Declared("p.one", "One", 1, true, "broken", "looks/broken.json", Path.of("p.one"), Optional.of("{".getBytes(StandardCharsets.UTF_8))),
+            new PluginThemes.Declared("p.one", "One", 1, true, "absent", "looks/absent.json", Path.of("p.one"), Optional.empty()),
             declared("p.one", "One", 1, true, "fine", "Fine")));
         assertThat(tier.provided()).extracting(provided -> provided.theme().id()).containsExactly("fine");
         assertThat(tier.problems()).extracting(ThemeLibrary.Problem::message).hasSize(2)
-            .anySatisfy(message -> assertThat(message).isEqualTo("The One plugin's theme file themes/absent.json is not in its jars."));
+            .anySatisfy(message -> assertThat(message).isEqualTo("The One plugin's theme file looks/absent.json is not in its jars."))
+            .anySatisfy(message -> assertThat(message).startsWith("The One plugin's theme file looks/broken.json"));
+        assertThat(tier.problems()).extracting(ThemeLibrary.Problem::file).as("the plugin's directory, which exists on disk")
+            .containsOnly(Path.of("p.one"));
+    }
+
+    /** A provided id is reserved for its provider, even when a higher-ranked plugin that does not load declares it too. */
+    @Test void aProvidedIdIsReservedForItsProvider() {
+        var tier = PluginThemes.of(List.of(declared("a.dev", "Development", 0, false, "look", null),
+            declared("b.bundled", "Bundled", 1, true, "look", "Look")));
+        assertThat(tier.provided()).extracting(PluginThemes.Provided::pluginName).containsExactly("Bundled");
+        assertThat(tier.reserved()).containsEntry("look", "Bundled");
     }
 }

@@ -157,7 +157,7 @@ public final class RunWindowPresentation {
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case MONO -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
+                label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL, text.text()));
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, valuePair(kit)));
             }
             default -> { }
@@ -197,7 +197,7 @@ public final class RunWindowPresentation {
         });
         var faint = SurfaceContrast.painted(theme, selected ? SELECTED_DETAIL : ROW_DETAIL);
         for (var node : item.subtitle()) label(row, node).ifPresent(label -> {
-            label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
+            label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL, label.getText()));
             label.setForeground(faint);
             // The mocks cut a long detail at its end, as the row's title is cut.
             label.putClientProperty("Jasper.leadingEllipsis", false);

@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class TypographyTest {
+public class TypographyTest {
     /** Today's platform typography: the default scale and faces with no user setting. */
     static Typography platform() { return Typography.of(TypeScale.DEFAULT, FaceSet.PLATFORM, Typography.UserFont.NONE); }
     /** A size-only user setting, which keeps the platform family policy. */
@@ -142,9 +142,9 @@ class TypographyTest {
 
     /**
      * A kit's own UI face draws a text it has every glyph for; a text with a glyph it lacks (IBM Plex has no macOS modifier
-     * symbols) draws wholly in the platform face for the role, and a data face is kept whatever the text.
+     * symbols, no CJK) draws wholly in the platform face for the role, {@link Font#MONOSPACED} for a data role.
      */
-    @Test void aKitFaceMissingAGlyphGivesThatTextThePlatformFaceAndDataFacesStay() throws Exception {
+    @Test void aKitFaceMissingAGlyphGivesThatTextThePlatformFace() throws Exception {
         String face = registeredWithoutModifierSymbols();
         var kit = Typography.of(TypeScale.DEFAULT, FaceSet.of(face, face, face, face, face), Typography.UserFont.NONE);
         String shortcut = "\u21E7\u2318P";
@@ -154,8 +154,13 @@ class TypographyTest {
             assertThat(kit.font(role, "Run")).as(role + ": as with no text").isEqualTo(kit.font(role));
             assertThat(kit.font(role, shortcut)).as(role + ": the platform face draws the whole text").isEqualTo(platform().font(role));
         }
-        for (var role : List.of(Typography.Role.MONO, Typography.Role.MONO_SMALL, Typography.Role.RUN_DETAIL))
-            assertThat(kit.font(role, shortcut).getFontName(Locale.ROOT)).as(role + ": a data face is kept").isEqualTo(face);
+        String cjk = "\u5831\u544A.txt";
+        for (var role : List.of(Typography.Role.MONO, Typography.Role.MONO_SMALL, Typography.Role.RUN_DETAIL)) {
+            assertThat(kit.font(role, "a.txt").getFontName(Locale.ROOT)).as(role + ": a text the data face draws").isEqualTo(face);
+            assertThat(kit.font(role, shortcut)).as(role + ": the logical monospaced font").isEqualTo(platform().font(role));
+            assertThat(kit.font(role, cjk)).as(role + ": the logical monospaced font").isEqualTo(platform().font(role));
+            assertThat(kit.font(role, cjk).getFamily(Locale.ROOT)).isEqualTo(Font.MONOSPACED);
+        }
         assertThatThrownBy(() -> kit.font(Typography.Role.BODY, (String) null)).isInstanceOf(NullPointerException.class);
     }
 
@@ -163,7 +168,7 @@ class TypographyTest {
      * The Enterprise plugin's IBM Plex Sans Regular, renamed in its name table (same lengths) so that no installed copy
      * hides it, registered in this JVM; its registered full name.
      */
-    private static String registeredWithoutModifierSymbols() throws Exception {
+    public static String registeredWithoutModifierSymbols() throws Exception {
         byte[] bytes = Files.readAllBytes(Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
             .resolve("plugins/enterprise/src/main/resources/presentation/fonts/ibm-plex-sans-regular.ttf"));
         for (var charset : List.of(StandardCharsets.UTF_16BE, StandardCharsets.ISO_8859_1))

@@ -43,9 +43,8 @@ public final class ThemeController implements AutoCloseable {
     private Shown shown;
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
+    /** The look's standard UI font ({@code ui.font.family = "system"}): the kit's own face when registered, else FlatLaf's. */
     private final Font platformFont;
-    /** The look's standard UI font, or null for the platform's. */
-    private final FontUIResource lookFont;
     private final float platformLabelSize;
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
@@ -162,14 +161,17 @@ public final class ThemeController implements AutoCloseable {
         // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
         UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
-        // Under a kit with a registered UI face of its own, FlatLaf's text uses it too (spec 5.6); otherwise the platform's.
-        lookFont = lookFont(kit);
-        UIManager.put("defaultFont", lookFont);
+        // Under a kit with a registered UI face of its own, FlatLaf's component text uses it too (spec 5.6:
+        // FlatLafInstaller), while defaultFont stays FlatLaf's, so neither FlatLaf's user scale nor the kit's roles take the
+        // look's face for a user font size.
+        UIManager.put("defaultFont", null);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = ResolvedTheme.of(shown.dark(), shown.selection());
         appearance = new AppearanceBindings(current.pair(), kit, ThemeController::reportFailure, () -> animationsEnabled);
         new dev.jasper.ui.swing.AppearanceTransaction(appearance.binding(), ignored -> installOrThrow(current.chrome()), ignored -> {}).apply(current.pair());
-        platformFont = UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
+        Font look = lookFace(kit);
+        platformFont = look != null ? new FontUIResource(look.deriveFont(com.formdev.flatlaf.util.UIScale.scale(kit.type().body())))
+            : UIManager.getFont("defaultFont") != null ? UIManager.getFont("defaultFont") : UIManager.getFont("Label.font");
         platformLabelSize = UIManager.getFont("Label.font").getSize2D();
     }
 
@@ -235,12 +237,12 @@ public final class ThemeController implements AutoCloseable {
         try { listener.accept(value, chrome); } catch (Throwable failure) { reportFailure(failure); }
     }
 
-    /** {@code kit}'s regular UI face at its body size when the kit names one and it is registered; else null. */
-    private static FontUIResource lookFont(Kit kit) {
+    /** {@code kit}'s regular UI face when the kit names one and it is registered; else null. */
+    private static Font lookFace(Kit kit) {
         String face = kit.faces().uiFace(400);
         if (face.isEmpty()) return null;
         Font font = new Font(face, Font.PLAIN, 1);
-        return font.getFontName(java.util.Locale.ROOT).equals(face) ? new FontUIResource(font.deriveFont(kit.type().body())) : null;
+        return font.getFontName(java.util.Locale.ROOT).equals(face) ? font : null;
     }
 
     private FontUIResource resolveFont(UiFontConfig choice) {
@@ -255,7 +257,7 @@ public final class ThemeController implements AutoCloseable {
     private void installFontDefaults(UiFontConfig choice) {
         boolean defaults = choice.equals(UiFontConfig.defaults());
         Font family = resolveFont(choice);
-        UIManager.put("defaultFont", defaults ? lookFont : family);
+        UIManager.put("defaultFont", defaults ? null : family);
         // FlatLaf scales relative offsets with the UI scale. Explicit base-control fonts preserve
         // exact configured point sizes, including fractions, without changing unset defaults.
         FontUIResource form = new FontUIResource(family.deriveFont(choice.size() == 0 ? platformLabelSize : choice.size()));

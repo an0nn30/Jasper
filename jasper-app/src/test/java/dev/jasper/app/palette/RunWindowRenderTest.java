@@ -129,6 +129,7 @@ public class RunWindowRenderTest {
      * with the context that drew it to {@code then} on the EDT before {@code KitGallery.installed} closes that context.
      */
     static BufferedImage render(boolean dark, String state, Drawn then) throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
         var kitValue = dev.jasper.app.testsupport.EnterpriseResources.kit();
         var theme = dev.jasper.app.testsupport.EnterpriseResources.theme().generated(dark);
         Path directory = Files.createDirectories(OUT.resolve(dark ? "dark" : "light"));

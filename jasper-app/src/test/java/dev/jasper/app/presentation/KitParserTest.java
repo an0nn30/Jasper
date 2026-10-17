@@ -179,6 +179,16 @@ class KitParserTest {
             "fonts/ibm-plex-sans-medium.ttf", "fonts/ibm-plex-sans-semibold.ttf", "fonts/ibm-plex-mono-regular.ttf", "fonts/ibm-plex-mono-medium.ttf");
     }
 
+    /** A file of another family is not registered (LookFonts), so its role keeps the platform face whatever its name. */
+    @Test void aFileOfAnotherFamilyKeepsThePlatformFace() throws Exception {
+        var files = fonts();
+        files.put("presentation/fonts/ibm-plex-sans-medium.ttf", FontFileTest.face("Helvetica Neue", "Helvetica Neue"));
+        var parsed = KitParser.parse(FULL.getBytes(StandardCharsets.UTF_8), context(files, Map.of("look", Optional.of(look()))));
+        assertThat(parsed.kit().faces()).isEqualTo(dev.jasper.ui.metrics.FaceSet.of(PLEX_SANS, "", "IBM Plex Sans SmBld",
+            PLEX_MONO, "IBM Plex Mono Medm"));
+        assertThat(parsed.faces().ui().orElseThrow().medium().fullName()).as("the file itself is kept for the notice").isEqualTo("Helvetica Neue");
+    }
+
     /** Plan 4a's MetricTokens.of reads each token's first role, so a token left out keeps its base's value exactly. */
     @Test void aTokenLeftOutKeepsItsBasesValue() throws Exception {
         var metrics = parse("kit = 1\nbase = \"classic\"\n[metrics]\nrow_height = 22\n").kit().metrics();

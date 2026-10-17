@@ -72,9 +72,9 @@ public final class Typography {
     /** Selected labels use medium weight. Size settings enlarge every role proportionally. */
     public Font font(Role role, boolean selected) { return font(role, selected, null); }
     /**
-     * {@code role}'s font for {@code text}: {@link #font(Role)}, unless that is a kit's own UI face with no glyph for a
-     * character of {@code text}; the platform face for the role then draws the whole text, as a browser falls back for the
-     * glyphs a web font lacks (IBM Plex has no macOS modifier symbols). Data faces are kept whatever the text.
+     * {@code role}'s font for {@code text}: {@link #font(Role)}, unless that is a kit's own face with no glyph for a
+     * character of {@code text} (IBM Plex has no macOS modifier symbols and no CJK); the whole text then switches to the
+     * role's platform face, {@link Font#MONOSPACED} for a data role, which the platform fills in glyph by glyph.
      */
     public Font font(Role role, String text) { return font(role, false, Objects.requireNonNull(text, "text")); }
 
@@ -88,7 +88,7 @@ public final class Typography {
             // A kit's own face is a whole weight: drawn as it is, at the role's size. One that is not registered draws in
             // the platform face for this role (spec 5.9); nothing is cached, so registration order cannot matter.
             Font named = new Font(face, Font.PLAIN, 1);
-            if (named.getFontName(Locale.ROOT).equals(face) && (data || text == null || named.canDisplayUpTo(text) < 0))
+            if (named.getFontName(Locale.ROOT).equals(face) && (text == null || named.canDisplayUpTo(text) < 0))
                 return named.deriveFont(scale.size(role) * bodySize / scale.base());
         }
         String resolved = data ? Font.MONOSPACED : family;

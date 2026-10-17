@@ -14,7 +14,7 @@ final class Keycaps implements Icon {
     private final int[] widths;
     private final int width,height,pad,gap;
     Keycaps(KitContext context,KeycapSequence sequence) {
-        this.context=context;this.sequence=sequence;font=ThemePainting.font(context,Typography.Role.CAPTION);
+        this.context=context;this.sequence=sequence;font=ThemePainting.font(context,Typography.Role.CAPTION,String.join("",sequence.keys()));
         pad=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_PADDING);gap=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_GAP);
         var metrics=new javax.swing.JLabel().getFontMetrics(font);
         height=metrics.getHeight()+ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_VERTICAL_PADDING);
@@ -27,6 +27,8 @@ final class Keycaps implements Icon {
         Color color=ThemePainting.color(context,role);
         return new Color(color.getRed(),color.getGreen(),color.getBlue(),context.metrics().value(alpha));
     }
+    /** The caps' font: the caption role, in the platform face when the kit's face lacks one of the keys' glyphs. */
+    Font font(){return font;}
     @Override public int getIconWidth(){return width;}
     @Override public int getIconHeight(){return height;}
     int minimumWidth() { return java.util.Arrays.stream(widths).max().orElse(0); }

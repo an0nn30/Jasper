@@ -59,7 +59,9 @@ The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked
 kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
 `dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
 declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
-package and checks `context.services().find(Workstation.class)` in `start`.
+package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
+`try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
+the package is visible only while Enterprise is loaded.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with

@@ -380,15 +380,23 @@ public final class KitParser {
         return new TypeAndFaces(scale, new Faces(ui, data));
     }
 
-    /** The declared faces by their files' full names over {@code base}'s; a file with unreadable names keeps the platform face. */
+    /**
+     * The declared faces by their files' full names over {@code base}'s; a file with unreadable names or of another family
+     * (which the application does not register) keeps the platform face.
+     */
     private static dev.jasper.ui.metrics.FaceSet faces(Faces declared, dev.jasper.ui.metrics.FaceSet base) {
         if (declared.ui().isEmpty() && declared.data().isEmpty()) return base;
         var ui = declared.ui();
         var data = declared.data();
-        return dev.jasper.ui.metrics.FaceSet.of(ui.map(face -> face.regular().fullName()).orElse(base.uiFace(400)),
-            ui.map(face -> face.medium().fullName()).orElse(base.uiFace(500)), ui.map(face -> face.semibold().fullName()).orElse(base.uiFace(600)),
-            data.map(face -> face.regular().fullName()).orElse(base.dataRegular()), data.map(face -> face.medium().fullName()).orElse(base.dataMedium()));
+        return dev.jasper.ui.metrics.FaceSet.of(ui.map(face -> name(face.regular(), face.family())).orElse(base.uiFace(400)),
+            ui.map(face -> name(face.medium(), face.family())).orElse(base.uiFace(500)),
+            ui.map(face -> name(face.semibold(), face.family())).orElse(base.uiFace(600)),
+            data.map(face -> name(face.regular(), face.family())).orElse(base.dataRegular()),
+            data.map(face -> name(face.medium(), face.family())).orElse(base.dataMedium()));
     }
+
+    /** {@code file}'s full name when it is of {@code family}; else "" (the platform face). */
+    private static String name(FontFile file, String family) { return file.family().equals(family) ? file.fullName() : ""; }
 
     private static String family(TomlTable table, String name) throws Invalid {
         String family = string(table, name, "family");

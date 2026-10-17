@@ -56,6 +56,19 @@ public final class EnterpriseResources {
         return parsed.kit();
     }
 
+    /**
+     * Skips the calling test when an installed IBM Plex hides the plugin's files (on macOS an installed family makes
+     * {@code registerFont} refuse the file, so its full names resolve to Dialog: Execution notes, ruling 3); the renders,
+     * menus and probes that measure Plex then have no Plex to measure.
+     */
+    public static void assumePlexResolves() {
+        kit();
+        for (FontFile file : facts().parsed().orElseThrow().faces().files()) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(new Font(file.fullName(), Font.PLAIN, 1).getFontName(java.util.Locale.ROOT)
+                .equals(file.fullName()), () -> "an installed " + file.family() + " hides " + file.path() + "; uninstall it to run this test");
+        }
+    }
+
     /** The shipped kit file's chrome points. */
     public static ChromeSpec chrome() { return facts().parsed().orElseThrow().chrome(); }
 

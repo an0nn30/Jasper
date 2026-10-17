@@ -48,10 +48,12 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
      * @param rank its origin's precedence: 0 for development, 1 for bundled, 2 for installed
      * @param loadable whether the plugin will load at this start
      * @param themeId the file's theme id (its name without {@code .json})
-     * @param file where it is, for problems
+     * @param path the file's path in the plugin's jars, as its descriptor names it
+     * @param directory the plugin's directory, which problems name
      * @param bytes its first bytes, read only for a loadable plugin; empty when absent
      */
-    public record Declared(String pluginId, String pluginName, int rank, boolean loadable, String themeId, Path file, Optional<byte[]> bytes) { }
+    public record Declared(String pluginId, String pluginName, int rank, boolean loadable, String themeId, String path, Path directory,
+                           Optional<byte[]> bytes) { }
 
     /** Copies the parts. */
     public PluginThemes {
@@ -71,18 +73,18 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
             if (builtIn.isEmpty()) reserved.putIfAbsent(file.themeId(), file.pluginName());
             if (!file.loadable()) continue;
             if (builtIn.isPresent()) {
-                problems.add(new ThemeLibrary.Problem(file.file(), 0, builtIn.get().name() + " is built in; the " + file.pluginName() + " plugin's file is ignored."));
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, builtIn.get().name() + " is built in; the " + file.pluginName() + " plugin's file is ignored."));
                 continue;
             }
             var winner = winners.get(file.themeId());
             if (winner != null) {
-                problems.add(new ThemeLibrary.Problem(file.file(), 0, winner.theme().name() + " is provided by the " + winner.pluginName()
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, winner.theme().name() + " is provided by the " + winner.pluginName()
                     + " plugin; the " + file.pluginName() + " plugin's file is ignored."));
                 continue;
             }
-            String where = "themes/" + file.themeId() + ".json";
+            String where = "The " + file.pluginName() + " plugin's theme file " + file.path();
             if (file.bytes().isEmpty()) {
-                problems.add(new ThemeLibrary.Problem(file.file(), 0, "The " + file.pluginName() + " plugin's theme file " + where + " is not in its jars."));
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, where + " is not in its jars."));
                 continue;
             }
             try {
@@ -90,11 +92,15 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
                 winners.put(file.themeId(), new Provided(theme, file.pluginName()));
                 winnerIds.put(file.themeId(), file.pluginId());
             } catch (ThemeFileException failure) {
-                problems.add(new ThemeLibrary.Problem(file.file(), failure.line(), failure.detail()));
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, where + (failure.line() > 0 ? ", line " + failure.line() : "") + ": "
+                    + failure.detail()));
             } catch (CharacterCodingException | RuntimeException failure) {
-                problems.add(new ThemeLibrary.Problem(file.file(), 0, "Could not use this file: " + Objects.requireNonNullElse(failure.getMessage(), failure.getClass().getSimpleName())));
+                problems.add(new ThemeLibrary.Problem(file.directory(), 0, where + " could not be used: "
+                    + Objects.requireNonNullElse(failure.getMessage(), failure.getClass().getSimpleName())));
             }
         }
+        // A provided id is reserved for the plugin that provides it, not a higher-ranked one that does not load.
+        winners.forEach((id, winner) -> reserved.put(id, winner.pluginName()));
         var dormant = new LinkedHashSet<String>();
         for (Declared file : declared) if (!file.loadable() && !winners.containsKey(file.themeId()) && JasperTheme.builtIn(file.themeId()).isEmpty())
             dormant.add(file.themeId());

@@ -191,7 +191,7 @@ public final class PluginSelection {
             int rank = switch (candidate.origin()) { case DEV -> 0; case BUNDLED -> 1; case USER -> 2; };
             for (int i = 0; i < paths.size(); i++)
                 declared.add(new dev.jasper.app.appearance.PluginThemes.Declared(candidate.id(), candidate.descriptor().name(), rank, loadable,
-                    ids.get(i), candidate.directory().resolve(paths.get(i)),
+                    ids.get(i), paths.get(i), candidate.directory(),
                     loadable ? reader.read(paths.get(i), dev.jasper.app.presentation.PresentationFacts.MAX_THEME_BYTES) : java.util.Optional.empty()));
         }
         return dev.jasper.app.appearance.PluginThemes.of(declared);

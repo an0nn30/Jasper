@@ -68,6 +68,7 @@ class EnterpriseMenuRowMockTest {
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void theMenuRowMatchesTheMock(boolean dark) throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
         var mock = MockProfile.mock(dark ? DARK : LIGHT);
         BufferedImage[] render = new BufferedImage[1];
         edt(() -> render[0] = render(dark, owner -> { }));
@@ -90,7 +91,7 @@ class EnterpriseMenuRowMockTest {
         // 1 px of the mock's; Transfer's ink, drawn unkerned, is 3 px wider in Light.
         for (int i = 0; i < 8; i++) {
             var expected = mockInks.get(i); var actual = renderInks.get(i);
-            assertThat(actual.start() + X).as(what + " title " + i + " starts").isCloseTo(expected.start(), within(4));
+            assertThat(actual.start() + X).as(what + " title " + i + " starts").isCloseTo(expected.start(), within(1));
             assertThat(actual.width()).as(what + " title " + i + " width").isCloseTo(expected.width(), within(4));
             assertThat(actual.top() + Y).as(what + " title " + i + " top").isCloseTo(expected.top(), within(3));
         }

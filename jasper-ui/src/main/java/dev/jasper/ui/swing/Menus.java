@@ -507,6 +507,9 @@ final class Menus {
             }
         }
 
+        /** The shortcut's font: the label's role, in the platform face when the kit's face lacks one of its symbols (the macOS modifier keys). */
+        Font shortcutFont() { return ThemePainting.font(context, Typography.Role.BODY, shortcutText); }
+
         javax.swing.Icon tile(boolean highlighted) {
             return context.icons().tile(context.metrics(), descriptor.icon(), context.theme().semantic(), descriptor.hue(),
                 ThemePainting.metric(context, DesignMetrics.Role.MENU_TILE), highlighted);
@@ -527,7 +530,8 @@ final class Menus {
         @Override public Dimension getPreferredSize() {
             var fm = getFontMetrics(getFont());
             int width = labelX() + fm.stringWidth(getText()) + getInsets().right;
-            if (!shortcutText.isEmpty()) width += ThemePainting.metric(context, DesignMetrics.Role.MENU_SHORTCUT_GAP) + fm.stringWidth(shortcutText);
+            if (!shortcutText.isEmpty())
+                width += ThemePainting.metric(context, DesignMetrics.Role.MENU_SHORTCUT_GAP) + getFontMetrics(shortcutFont()).stringWidth(shortcutText);
             return new Dimension(width, ThemePainting.height(context, DesignMetrics.Role.MENU_ITEM_HEIGHT, Typography.Role.BODY));
         }
 
@@ -551,7 +555,8 @@ final class Menus {
                 g.drawString(getText(), labelX(), baseline);
                 if (!shortcutText.isEmpty()) {
                     g.setColor(ThemePainting.color(context, !isEnabled() ? SemanticColor.TEXT_PLACEHOLDER : highlighted ? SemanticColor.TEXT_ONACCENT : SemanticColor.TEXT_TERTIARY));
-                    g.drawString(shortcutText, getWidth() - getInsets().right - fm.stringWidth(shortcutText), baseline);
+                    g.setFont(shortcutFont());
+                    g.drawString(shortcutText, getWidth() - getInsets().right - g.getFontMetrics().stringWidth(shortcutText), baseline);
                 }
             } finally {
                 g.dispose();

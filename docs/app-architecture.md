@@ -245,10 +245,10 @@ through `FlatLafInstaller.installedKit()`, `ChromePainter.installed()` and `Nati
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
-`JasperTheme.bundled()` is Slate Cobalt, `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes and every valid
+`JasperTheme.bundled()` is Slate Cobalt, `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes, the plugin themes (`PluginThemes`) and every valid
 `<home>/themes/*.json`, reusing the parsed theme of an unchanged file, and keeps a problem for each file it skips.
 `appearance.ThemeSelection` is the Dark and Light theme picks and the scheme choice from one library; its `of` replaces
-a pick the library cannot honour by its default and reports it. `ThemeController.configure(dark, selection, font)`
+a pick the library cannot honour by its default and reports it, silently for a disabled plugin's theme or scheme. `ThemeController.configure(dark, selection, font)`
 installs the shown variant for chrome and workspace and resolves the scheme's palette for terminal panes
 (`ResolvedTheme.of`); `ResolvedTheme.surface()`, the
 workspace's `surface.terminal`, is what the window behind panes, tab backgrounds and the tab strip use, so a scheme

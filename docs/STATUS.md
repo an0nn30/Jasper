@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
-`.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit;
+`.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-5b-enterprise.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Turning Enterprise on gives classic
 controls, metrics and fonts. `FaceSet` names UI and data faces by registered full name and `Typography` draws a role in
@@ -25,11 +25,14 @@ theme, and the Run window's FONTS probes are checked (menu row edge agreement Li
 title starting within 1 px of the mock, Help at 0, and Transfer's ink 3 px wider in Light, 2 in Dark; Run window edge
 agreement just opened 0.965 top, 0.888 bottom, typing 0.980 and 0.894; help text top 84 against the mock's 85; the
 FOOTER lines printed for plan 8b: primary button left 428 just opened and 436 typing against 454, cancel 596 against
-606). Plan 6b's chrome targets are left to its merge. Found: spec 7.6 gives
-Enterprise Dark `text.onAccent` #FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard paints selected and accent text
-black there where the Dark Mode mock draws white; awaiting the user's ruling (one red step, #3C74D6, gives 4.505:1).
-Found too: with `ui.font.size` set and `family = "system"`, FlatLaf-drawn text (menus, native tables) takes the platform
-face at that size while Jasper's own text stays IBM Plex (Rulings 2 as written); awaiting the user's ruling.
+606). Plan 6b's chrome targets are left to its merge: port its eight values into `enterprise.json` (this branch deletes
+the fixture theme 6b edits, a modify/delete conflict), regenerate `derived-roles-enterprise.tsv`, drop `surface.tabstrip`
+from `EnterpriseThemeTest.NEUTRAL`, add `BORDER_DIVIDER` to both override maps and re-run the theme-set suites, which
+`KitFixtures.themes()` now runs under Enterprise too. **Merge blocker:** spec 7.6 gives Enterprise Dark `text.onAccent`
+#FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard paints guarded text on the accent black (the Run window's
+selected row, every primary button label) where the Dark Mode mock draws white, while the unguarded Sessions selection
+stays white; it needs the user's ruling (one red step, #3C74D6 for `accent`, `selection.bg` and `hue.blue`, gives
+4.505:1, or a spec amendment) and then a test that locks it.
 The default look is unchanged (gallery byte-identical: 85 PNGs each for Dark and Light, all 322 files equal to
 `e502e102b`'s). Rulings
 (plan, "Rulings"): (1) faces by full name, degrading per face; (2) the look's UI font reaches FlatLaf unless
@@ -38,11 +41,22 @@ in Settings and captioned; (6) the descriptor has an icon; (7) the theme's unnam
 7's; (9) the mock comparison pairs the four gallery panels; (10) the family is name ID 16; (11) the icons and splash
 art of 14.1 are plan 11's; Execution notes (2026-10-17) rulings 1 to 26. Deviations from the plan's text:
 Task 4 renders hold FlatLaf's user scale at 1 and assert it (Execution notes 18); the fact-12 colours the mock crops show but the renders lack are left out of the pairs' `colours` — Light `#D9DFEA` and Dark `#3D4658` (the focused header strips, plan 7's), Dark's card `#2E3135` under the tunnels table and file list, Light `#E4E6E9` in File Servers (anti-aliased glyph pixels only) and Light tunnels' `#FFFFFF` and `#E4E6E9` — awaiting the user's ruling (19, 25); the classic menu row keeps a bar's own layout and `CollapsingMenuBar` folds by `ClassicMenuRow.titleWidth` (22); titles are measured kerned (23); a new role, `RUN_WINDOW_HELP_TEXT_TOP` (1), in both role tables (24); the Tunnels and SFTP pairs compare the populated `tunnels-added` and `sftp-connected` panels (25); three face defects the mock comparisons found under Plex are fixed (a text with a glyph the kit's UI face lacks, such as the macOS modifier symbols, draws in the platform face; the Run window's detail label takes the mocks' 11 px semibold and its shortcut ends at its box; the classic menu row sets its titles at their fractional widths), with `TypographyTest` covering the fallback (26); plan 6b is not on the branch, so Task 3 step 5's chrome targets and `border.divider` and Task 4 step 4's 6b part are left to 6b's merge; Task 5 step 1 changes five files (`docs/STATUS.md`, the sixth, in step 4). `./gradlew check --continue`: **11,027 tests, 0 failures, 0 errors, 25 skipped**.
+The final review's fixes: under a kit with its own UI face, FlatLaf's component text takes that face at the body size
+times FlatLaf's user scale while `defaultFont` stays FlatLaf's, so unset font settings are no user override, FlatLaf
+still derives its scale from the platform font and the kit's roles take that scale once; menu accelerators keep the
+platform face (which has the macOS modifier symbols) at the same size; a text a kit face cannot draw switches to the
+platform face for data roles too (`Font.MONOSPACED`), and menu shortcuts, keycaps, Run window details, property values
+and technical fields (as typed) take that path; a disabled plugin's terminal scheme falls back silently; a font file of
+another family keeps the platform face; plugin theme problems name the declared jar path and the plugin's directory,
+and a provided id is reserved for its provider; the Plex render, menu and probe tests skip when an installed IBM Plex
+hides the files. Deviation: `RunWindowRenderTest`'s FACES-owned "primary" sample moved from y 800 to 782, because
+Plex's wider "Connect" reaches the button's middle row only there; `EnterpriseMenuRowMockTest` now holds every title
+start within 1 px. After these fixes: jasper-ui's 830 tests and the touched jasper-app suites pass; the whole-build
+count above predates them.
 GUI checks for the user: turn Enterprise on in Settings › Plugins, restart, and compare Enterprise Light and Dark with
 the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chrome is plans 6 to 9's); turn it off and
 check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
-hidden files (Execution notes, ruling 3); check that the classic menus' accelerators draw their modifier symbols, not
-boxes (ruling 21); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged, not
+hidden files (Execution notes, ruling 3); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged, not
 pushed.
 
 **Enterprise presentation, plan 4c: the classic data faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
