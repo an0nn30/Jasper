@@ -25,10 +25,18 @@ import static dev.jasper.app.plugins.AppContractTest.*;
  * plugins' own stores; nothing connects, listens or starts. Header placement actions are the dock's More and Collapse.
  */
 public final class PanelSurfaceFixture implements AutoCloseable {
-    public static final String TUNNELS = "dev.jasper.remote.tunnels.panel", SFTP = "dev.jasper.remote.sftp.panel", FILE_SERVERS = "dev.jasper.fileserver.panel";
+    public static final String TUNNELS = "dev.jasper.remote.tunnels.panel", SFTP = "dev.jasper.remote.sftp.panel", FILE_SERVERS = "dev.jasper.fileserver.panel",
+        SESSIONS = "dev.jasper.remote.panel";
     private final StagedVaultHost vault;
     private final WorkspaceAppearanceFixture appearance;
     private final PluginClassLoader loader;
+    /** The staged Enterprise plugin's loader in Enterprise mode (plan 10a), else null. */
+    private final PluginClassLoader enterprise;
+    private final ResolvedTheme theme;
+    /** Enterprise mode frames the panel's header as plan 7's flush strip, as the dock does under Enterprise. */
+    private final boolean flush;
+    /** The id of the header row the panel's view draws on top ({@link #render} cuts it). */
+    private final String headerId;
     private final Plugin plugin;
     private final PanelSite site;
     private final KitView view;
@@ -36,17 +44,27 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     private final Path home;
     private PanelHeaderState header = PanelHeaderState.EMPTY;
 
-    public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel) throws Exception {
-        this.home = home;
+    public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel) throws Exception { this(home, theme, panel, false); }
+
+    /**
+     * {@code enterprise}: the staged Enterprise plugin starts first in the same host and the plugin may see its API, so it
+     * finds Workstation and composes its classic layout (plan 10a). The caller installs the Enterprise kit and theme first
+     * ({@code EnterpriseLook.controller}) and passes the matching {@code theme}.
+     */
+    public PanelSurfaceFixture(Path home, ResolvedTheme theme, String panel, boolean enterprise) throws Exception {
+        this.home = home; this.theme = theme; this.flush = enterprise;
         appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(theme));
         vault = new StagedVaultHost(home, theme.chrome().dark(), appearance);
         vault.createVault("synthetic-panels-password");
         onEdt(() -> vault.surface("Credential Vault").requestClose());
         vault.invoke("dev.jasper.vault.lock");
+        this.enterprise = enterprise ? StagedEnterprise.start(vault.host) : null;
+        Map<String, ClassLoader> exports = enterprise ? Map.of("dev.jasper.vault.api", vault.loader, "dev.jasper.enterprise.api", this.enterprise) : Map.of("dev.jasper.vault.api", vault.loader);
+        var optional = enterprise ? Set.of("dev.jasper.vault", "dev.jasper.enterprise") : Set.of("dev.jasper.vault");
         boolean files = panel.equals(FILE_SERVERS);
         String id = files ? "dev.jasper.fileserver" : "dev.jasper.remote";
         var staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(id);
-        loader = new PluginClassLoader(id, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), Map.of("dev.jasper.vault.api", vault.loader));
+        loader = new PluginClassLoader(id, ManagedVaultLoadingTest.jars(staged), getClass().getClassLoader(), exports);
         if (files) {
             var pluginClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin");
             var environmentClass = loader.loadClass("dev.jasper.fileserver.FileServerPlugin$Environment");
@@ -58,17 +76,19 @@ public final class PanelSurfaceFixture implements AutoCloseable {
                 (BiFunction<java.time.Duration, Runnable, Runnable>) (delay, task) -> () -> { });
             var constructor = pluginClass.getDeclaredConstructor(environmentClass); constructor.setAccessible(true);
             plugin = (Plugin) constructor.newInstance(settings);
-            onEdt(() -> vault.host.start(new HostedPlugin(FileServerRenderEvidenceTest.INFO, Set.of(), Set.of("dev.jasper.vault"), Set.of(), loader, () -> plugin)));
+            onEdt(() -> vault.host.start(new HostedPlugin(FileServerRenderEvidenceTest.INFO, Set.of(), optional, Set.of(), loader, () -> plugin)));
         } else {
             var ssh = Files.createDirectories(home.resolve("synthetic-ssh"));
             var constructor = loader.loadClass("dev.jasper.remote.RemotePlugin").getDeclaredConstructor(java.util.concurrent.Executor.class, Function.class, BiFunction.class, Path.class);
             constructor.setAccessible(true);
             plugin = (Plugin) constructor.newInstance((java.util.concurrent.Executor) SwingUtilities::invokeLater,
                 (Function<Object, Optional<Object>>) c -> Optional.empty(), (BiFunction<java.time.Duration, Runnable, Runnable>) (delay, task) -> () -> { }, ssh);
-            onEdt(() -> vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor"), Set.of("dev.jasper.remote.api"), loader, () -> plugin)));
+            onEdt(() -> vault.host.start(new HostedPlugin(StagedRemoteHost.REMOTE, Set.of(), enterprise ? Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise")
+                : Set.of("dev.jasper.vault", "dev.jasper.editor"), Set.of("dev.jasper.remote.api"), loader, () -> plugin)));
         }
         StagedVaultHost.settle();
-        root = panel.equals(TUNNELS) ? "tunnels" : panel.equals(SFTP) ? "sftp" : "fileserver.panel";
+        root = panel.equals(TUNNELS) ? "tunnels" : panel.equals(SFTP) ? "sftp" : panel.equals(SESSIONS) ? "sessions" : "fileserver.panel";
+        headerId = panel.equals(FILE_SERVERS) ? "fileserver.header" : root + ".header";
         var holder = new KitView[1];
         site = onEdtValue(() -> new PanelSite(vault.window, () -> { }, () -> { }, () -> true, state -> { header = state; if (holder[0] != null) hostHeader(holder[0]); }));
         view = onEdtValue(() -> (KitView) vault.contributions.panels().stream().filter(p -> p.id().equals(panel)).findFirst().orElseThrow().factory().apply(site));
@@ -87,10 +107,41 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     private void hostHeader(KitView target) {
         target.setPanelHostHeader(root, new PanelHostHeader(header.detail(), header.active(), header.actions().stream()
             .map(action -> new PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
-                ? new PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList()));
+                ? new PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList(),
+            flush ? PanelHostHeader.Frame.FLUSH : PanelHostHeader.Frame.STANDARD));
     }
 
     public KitView view() { return view; }
+
+    /** The plugin's {@code layout()} as a name: CLASSIC under Enterprise, ROWS otherwise (plan 10a Task 1). */
+    public String layout() {
+        try { var read = plugin.getClass().getDeclaredMethod("layout"); read.setAccessible(true); return read.invoke(plugin).toString(); }
+        catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /**
+     * The panel's body at {@code width} by {@code height} logical pixels, painted at 2x over the theme's panel surface:
+     * the view is laid out {@link #headerHeight()} taller and its header row is cut off, so the render starts under the
+     * header strip as the mock crops do (plan 7 owns and compares the strip).
+     */
+    public BufferedImage render(int width, int height) {
+        size(width, height);
+        size(width, height + headerHeight());
+        int top = headerHeight();
+        var whole = capture(2);
+        return dev.jasper.app.testsupport.MockMatch.onto(whole.getSubimage(0, 2 * top, whole.getWidth(), 2 * height),
+            theme.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL));
+    }
+
+    /** The bottom, in logical pixels from the view's top, of the header row the panel's view draws (its strip and rule). */
+    public int headerHeight() {
+        return onEdtValue(() -> {
+            var header = StagedVaultHost.named(view, headerId);
+            if (header == null) throw new AssertionError("Missing " + headerId);
+            var bounds = SwingUtilities.convertRectangle(header.getParent(), header.getBounds(), view);
+            return bounds.y + bounds.height;
+        });
+    }
     public String root() { return root; }
 
     /** Puts synthetic Remote hosts through the plugin's own store; returns their ids in order. */
@@ -208,5 +259,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         try { var f = object.getClass().getDeclaredField(name); f.setAccessible(true); return f.get(object); }
         catch (ReflectiveOperationException e) { throw new AssertionError(e); }
     }
-    @Override public void close() throws Exception { try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { loader.close(); } } }
+    @Override public void close() throws Exception {
+        try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { try { loader.close(); } finally { if (enterprise != null) enterprise.close(); } } }
+    }
 }

@@ -47,6 +47,17 @@ public final class EnterpriseLook {
     /** Installs the theme's variant under the kit for a component render, without a controller. EDT. */
     public static void install(boolean dark) { dev.jasper.ui.swing.FlatLafInstaller.install(theme(dark), kit()); }
 
+    /** The shipped theme for both appearances, as a selection (plan 10a). */
+    public static ThemeSelection selection() {
+        var shown = theme();
+        return new ThemeSelection(ThemeLibrary.bundledOnly(), shown, shown, TerminalSchemeChoice.MATCH);
+    }
+
+    /** The shipped theme resolved for {@code dark}, as the staged panel fixtures take it (plan 10a). */
+    public static dev.jasper.app.appearance.ResolvedTheme resolved(boolean dark) {
+        return dev.jasper.app.appearance.ResolvedTheme.of(dark, selection());
+    }
+
     /** Installs Slate Cobalt under the default kit again, with today's fonts, for the tests that follow. EDT. */
     public static void restoreDefault() { ThemeTestSupport.controller(true).close(); }
 }
