@@ -77,7 +77,11 @@ final class RuledCells implements StatusCells {
         folder.setText(bar.folder());
         folder.setToolTipText(bar.folder().isEmpty() ? null : bar.showingContent() ? bar.folder() : bar.directory());
         grid.setText(bar.dimensions());
-        for (JLabel label : List.of(session, folder, encoding)) { label.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT)); label.setForeground(text); }
+        // A session or folder name IBM Plex cannot draw (CJK, say) takes the platform face (plan 5b, ruling 26).
+        for (JLabel label : List.of(session, folder, encoding)) {
+            label.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT, java.util.Objects.toString(label.getText(), "")));
+            label.setForeground(text);
+        }
         grid.setFont(ThemeZone.font(Typography.Role.MONO)); grid.setForeground(text);
         for (var row : new JComponent[] {bar.leftItems, bar.rightItems, bar.contentItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) { item.setForeground(text); item.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT)); }

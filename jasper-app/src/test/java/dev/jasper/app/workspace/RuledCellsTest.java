@@ -106,6 +106,38 @@ class RuledCellsTest {
         });
     }
 
+    /** A session or folder name IBM Plex cannot draw takes the platform face (plan 5b, ruling 26); a Latin one keeps Plex. */
+    @Test void aSessionOrFolderNameIbmPlexCannotDrawTakesThePlatformFace() throws Exception {
+        EnterpriseResources.assumePlexResolves();
+        String name = "\u5831\u544A";
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var bar = new WindowStatusBar(new RuledCells(), null);
+                bar.setMetadata(local("Mac"), "130 × 69", true);
+                var session = cell(bar, "statusSession");
+                assertThat(session.getText()).isEqualTo("Mac");
+                assertThat(session.getFont().getFontName(java.util.Locale.ROOT)).as("a Latin session name").startsWith("IBM Plex Sans");
+                bar.setMetadata(local(name), "130 × 69", true);
+                assertThat(session.getText()).isEqualTo(name);
+                assertThat(session.getFont()).as("the session cell").isEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT, name))
+                    .isNotEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT));
+                var folder = cell(bar, "statusFolder");
+                assertThat(folder.getFont().canDisplayUpTo(folder.getText())).as("the folder cell draws " + folder.getText()).isEqualTo(-1);
+                String path = DesktopTestSupport.HOME.resolve(name).toString();
+                bar.setMetadata(new PaneSnapshot("", Optional.of(DesktopTestSupport.HOME.resolve(name)), 130, 69, true, PaneSnapshot.State.RUNNING,
+                    OptionalInt.empty(), Optional.empty(), Optional.empty(), "Mac"), "130 × 69", true);
+                assertThat(folder.getText()).as("the folder " + path).contains(name);
+                assertThat(folder.getFont()).as("the folder cell").isEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT, folder.getText()))
+                    .isNotEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    static javax.swing.JLabel cell(WindowStatusBar bar, String name) {
+        return (javax.swing.JLabel) java.util.Arrays.stream(bar.getComponents()).filter(c -> name.equals(c.getName())).findFirst().orElseThrow();
+    }
+
     @Test void theConfigurationCellShowsOnlyWhileThereIsAProblem() throws Exception {
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
