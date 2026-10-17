@@ -59,9 +59,7 @@ class SettingsChromeMockTest {
     /** How a check that follows the face is printed when {@link #PLEX} is false, as {@code MockProfile.fonts} prints it. */
     static final String UNCHECKED = "FONTS unchecked (an installed IBM Plex hides the plugin's files): ";
     /** The probes whose place follows the UI face's line: a titled box's border sits at its title line's middle. */
-    static final java.util.Set<String> FONTS = java.util.Set.of("first box top", "Theme box bottom", "Workspace box top");
-    /** The probes whose place follows plan 9b's Appearance composition (the Theme box's height): printed here, 9b's to assert. */
-    static final java.util.Set<String> COMPOSED = java.util.Set.of("Theme box bottom", "Workspace box top");
+    static final java.util.Set<String> FONTS = java.util.Set.of("first box top");
 
     /** The mock's content, as the render covers it: from 2x (2, 60). */
     static BufferedImage content(Page page) {
@@ -72,7 +70,7 @@ class SettingsChromeMockTest {
     /** A probe: a logical point of the content and what it should show. */
     record Probe(String name, int x, int y) { }
 
-    /** The frame's probes, and for two pages the page geometry of Rulings 16 (box edges and the gap between boxes). */
+    /** The frame's probes, and for Command Palette the page geometry of Rulings 16 (its box edges); plan 9b's test holds the rest. */
     static List<Probe> probesOf(Page page) {
         int h = page.height(), selected = 43 + 22 * page.row() + 11;
         var probes = new ArrayList<>(List.of(new Probe("strip", 115, 4), new Probe("strip rule", 115, 38), new Probe("navigation", 115, 41),
@@ -81,8 +79,6 @@ class SettingsChromeMockTest {
             new Probe("selection at the left edge", 1, selected), new Probe("selection at the right edge", 229, selected)));
         if (page.id().equals("command-palette"))
             probes.addAll(List.of(new Probe("first box top", 600, 53), new Probe("box left", 247, 70), new Probe("box right", 1023, 70)));
-        if (page.id().equals("appearance"))
-            probes.addAll(List.of(new Probe("Theme box bottom", 1000, 313), new Probe("Workspace box top", 1000, 334)));
         return probes;
     }
 
@@ -95,8 +91,7 @@ class SettingsChromeMockTest {
             if (distance <= PROBE) continue;
             String failure = String.format("%s %s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", page.id(), probe.name(),
                 probe.x(), probe.y(), render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
-            if (COMPOSED.contains(probe.name())) System.out.println("Plan 9b's composition: " + failure);
-            else if (FONTS.contains(probe.name()) && !PLEX) System.out.println(UNCHECKED + failure);
+            if (FONTS.contains(probe.name()) && !PLEX) System.out.println(UNCHECKED + failure);
             else failures.add(failure);
         }
         return failures;

@@ -38,8 +38,7 @@ final class PreviewChoices extends ControlRegistry.Control {
             }
         }
         // The tiles sit inside the card's stroke; the line below them belongs to the next row.
-        int pad=ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING),stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
-        component.setBorder(new javax.swing.border.EmptyBorder(pad+stroke,pad+stroke,pad,pad+stroke));
+        component.setBorder(new javax.swing.border.EmptyBorder(context().faces().exclusive.previewPadding(context())));
         component.setLayout(context().faces().exclusive.previewLayout(context(), tiles.size()));
         for (var option : choice.options()) {
             var tile = tiles.get(option.id());tile.option=option;tile.setSelected(option.id().equals(choice.selectedId()));tile.setEnabled(interactive());

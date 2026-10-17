@@ -89,6 +89,16 @@ final class ClassicRadiosFace implements ChoiceFace {
 
     @Override public Color selectedText(KitContext context) { return ThemePainting.painted(context, label); }
 
+    /**
+     * The card's padding beside the tiles (a classic Settings box already holds its content inside its stroke), and the
+     * classic card's row gap above and below them (plan 9b Task 1, mock 01).
+     */
+    @Override public Insets previewPadding(KitContext context) {
+        int pad = ThemePainting.metric(context, DesignMetrics.Role.CARD_PADDING), gap = ThemePainting.metric(context, DesignMetrics.Role.ROW_GAP);
+        int stroke = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+        return new Insets(gap + stroke, pad, gap, pad);
+    }
+
     @Override public LayoutManager previewLayout(KitContext context, int count) { return new RowLayout(context, DesignMetrics.Role.THEME_PREVIEW_GAP); }
 
     @Override public Dimension previewSize(PreviewChoices.Tile tile) {

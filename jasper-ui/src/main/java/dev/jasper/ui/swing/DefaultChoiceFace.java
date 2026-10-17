@@ -40,6 +40,10 @@ final class DefaultChoiceFace implements ChoiceFace {
     @Override public Dimension optionSize(Choices.SegmentButton option) { return option.segmentSize(); }
     @Override public void paintOption(Choices.SegmentButton option, Graphics graphics, Runnable label) { option.paintSegment(graphics, label); }
     @Override public Color selectedText(KitContext context) { return ThemePainting.painted(context, SELECTED_LABEL); }
+    @Override public Insets previewPadding(KitContext context) {
+        int pad = ThemePainting.metric(context, DesignMetrics.Role.CARD_PADDING), stroke = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+        return new Insets(pad + stroke, pad + stroke, pad, pad + stroke);
+    }
     @Override public LayoutManager previewLayout(KitContext context, int count) {
         return new GridLayout(1, Math.max(1, count), ThemePainting.metric(context, DesignMetrics.Role.THEME_PREVIEW_GAP), 0);
     }

@@ -22,6 +22,8 @@ interface ChoiceFace extends Face {
     void paintOption(Choices.SegmentButton option, Graphics graphics, Runnable label);
     /** The selected option's label colour. */
     Color selectedText(KitContext context);
+    /** The padding round a PREVIEWS choice's tiles, inside the card's stroke. */
+    Insets previewPadding(KitContext context);
     /** The layout of a PREVIEWS choice's tiles. */
     LayoutManager previewLayout(KitContext context, int count);
     /** A preview tile's size. */

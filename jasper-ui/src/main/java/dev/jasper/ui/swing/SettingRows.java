@@ -137,7 +137,8 @@ final class SettingRows {
             // A form-label row is laid out like a FormRow: the card's inset replaces its side padding and dependent indent.
             component.setBorder(panelFooter ? new EmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE),0,0,0)
                 : formLabel ? new EmptyBorder(vertical, formInset, vertical, formInset)
-                : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
+                : new EmptyBorder(vertical + (settings ? context().faces().group.rowRule(context()) : 0),
+                    side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
             ((SearchHighlight) component).highlight(row.highlighted());
             menu(!row.contextActions().isEmpty());
@@ -210,7 +211,16 @@ final class SettingRows {
         }
         /** The control leads the title (a classic checkbox): the box at the row's leading inset, the text after it. */
         boolean leading(Container p) {
-            return p.getComponentCount() > 2 && p.getComponent(2) instanceof Switches.SwitchButton button && button.face.leads();
+            return p.getComponentCount() > 2 && toggle(p.getComponent(2)) instanceof Switches.SwitchButton button && button.face.leads();
+        }
+
+        /**
+         * The row's toggle: the control itself, or the one child of a SETTINGS_TRAILING stack, as a row whose Reset is in
+         * its menu builds it (spec 12.1; plan 9b Execution notes N6); any other control is returned as it is.
+         */
+        static java.awt.Component toggle(java.awt.Component control) {
+            return control instanceof Container stack && stack.getLayout() instanceof Stacks.SettingsTrailingLayout && stack.getComponentCount() == 1
+                ? stack.getComponent(0) : control;
         }
 
         /** How far the title starts after the leading inset: the box and its gap to the label. */
@@ -249,12 +259,29 @@ final class SettingRows {
             int ring = ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING), lead = lead(p);
             int w = Math.max(0, p.getWidth() - i.left - i.right - lead), text = leadingText(w);
             var control = p.getComponent(2); var size = control.getPreferredSize();
-            int box = size.height - 2 * ring, y = Math.max(i.top, (p.getHeight() - Math.max(text, box)) / 2), th = owner.title.height(w);
+            int box = size.height - 2 * ring, y = centred(p, Math.max(text, box)), th = owner.title.height(w);
             owner.title.setBounds(i.left + lead, y, w, th);
             int gap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
             owner.description.setBounds(i.left + lead, y + th + gap, w, owner.description.isVisible() ? owner.description.height(w) : 0);
-            int line = Math.min(th, owner.title.getFontMetrics(owner.title.getFont()).getHeight());
-            control.setBounds(i.left - ring, y + (line - box) / 2 - ring, size.width, size.height);
+            control.setBounds(i.left - ring, y + boxTop(th, box) - ring, size.width, size.height);
+        }
+
+        /**
+         * Where a leading box starts below its title's top: centred on the middle of the first line's x-height, as the
+         * mocks' checkboxes sit (plan 9b Task 1), within the first line.
+         */
+        int boxTop(int titleHeight, int box) {
+            var metrics = owner.title.getFontMetrics(owner.title.getFont());
+            int line = Math.min(titleHeight, metrics.getHeight());
+            double x = owner.title.getFont().createGlyphVector(metrics.getFontRenderContext(), "x").getVisualBounds().getHeight();
+            int top = (int) Math.round(metrics.getAscent() - x / 2 - box / 2.0);
+            return Math.max(0, Math.min(Math.max(0, line - box), top));
+        }
+
+        /** The top of content {@code height} tall centred in the row below its rule ({@link GroupFace#rowRule}), never above the top inset. */
+        int centred(Container p, int height) {
+            int rule = owner.settings ? owner.context().faces().group.rowRule(owner.context()) : 0;
+            return Math.max(p.getInsets().top, rule + (p.getHeight() - rule - height) / 2);
         }
 
         @Override public Dimension minimumLayoutSize(Container parent) {
@@ -407,7 +434,7 @@ final class SettingRows {
                     w = Math.max(0, p.getWidth() - i.left - i.right - tw + 2 * paintInset(p) - gap()),
                     th = owner.title.height(w),
                     dh = owner.description.isVisible() ? owner.description.height(w) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
-            int y = Math.max(i.top, (p.getHeight() - th - dh) / 2);
+            int y = centred(p, th + dh);
             owner.title.setBounds(i.left, y, w, th);
             int descriptionGap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
             owner.description.setBounds(i.left, y + th + descriptionGap, w, Math.max(0, dh - descriptionGap));
@@ -416,7 +443,7 @@ final class SettingRows {
                 int h = Composition.height(c, tw);
                 c.setBounds(
                         p.getWidth() - i.right - tw + paintInset(p),
-                        Math.max(i.top, (p.getHeight() - h) / 2),
+                        centred(p, h),
                         tw,
                         h);
             }

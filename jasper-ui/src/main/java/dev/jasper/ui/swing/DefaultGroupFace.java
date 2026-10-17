@@ -21,5 +21,6 @@ final class DefaultGroupFace implements GroupFace {
     @Override public void paintCard(Cards.CardSurface card, Graphics2D g) { card.paintDefault(g); }
     @Override public void styleTitle(JLabel title, KitContext context) { Composition.style(title, context, Typography.Role.SECTION_LABEL, SemanticColor.TEXT_TERTIARY); }
     @Override public Border cardBorder(KitContext context, Nodes.CardKind kind, boolean page, EmptyBorder standard) { return standard; }
+    @Override public int rowRule(KitContext context) { return 0; }
     @Override public List<PaintPair> pairs() { return List.of(); }
 }

@@ -180,8 +180,13 @@ public final class Editors {
 
     /** {@code terminal.scheme}: "Same as UI theme", then the installed schemes {@code appearance} lists, read again on refresh. */
     public static Factory<String> schemeChoice(AppearanceChoices appearance) {
-        return new Factory<>((setting, context) -> new SchemePick(setting.label(), appearance.themes(), appearance.imports(), context),
+        return new Factory<>((setting, context) -> new SchemePick(setting.label(), appearance.themes(), appearance.imports(), context, menuIcon(context)),
             List.of(SAME_AS_UI_THEME, "Slate Cobalt Dark", "Slate Cobalt Light", "High Contrast", "Import theme", "Remove theme"));
+    }
+
+    /** The glyph of a theme menu's button: the classic composition's ⋯, else the gear (spec 12.2). */
+    static String menuIcon(PageContext context) {
+        return context.composition() == dev.jasper.app.presentation.Composition.CLASSIC ? "more" : "settings";
     }
 
     /** The Dark / Light / Match System tiles, then the Dark theme and Light theme rows over the installed themes. */

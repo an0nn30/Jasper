@@ -234,7 +234,8 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_WIDTH, 150);
         values.put(Role.THEME_PREVIEW_HEIGHT, 78);
         values.put(Role.THEME_PREVIEW_GAP, 20);
-        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
+        // Plan 9b Task 1: mock 01's radios sit 7 below their tiles.
+        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 7);
         // Plan 9a: the classic Settings frame (Mock measurements).
         values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
         values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);
@@ -257,6 +258,9 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
         values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
         values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
+        // Plan 9b Task 1: the classic Settings rows as mocks 01 and 02 draw them (39 apart; 47 with a description).
+        values.put(Role.SETTINGS_ROW_HEIGHT, 39);
+        values.put(Role.SETTINGS_DESCRIPTION_HEIGHT, 47);
         values.put(Role.SETTINGS_TRAILING_EMPTY_GAP, 0);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);

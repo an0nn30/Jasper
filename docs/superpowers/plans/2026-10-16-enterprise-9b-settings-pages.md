@@ -1,5 +1,25 @@
 # Enterprise presentation 9b: the Settings page compositions Implementation Plan
 
+> **Status, Task 1 (2026-10-17):** calibrated classic `SETTINGS_ROW_HEIGHT` 36 to 39 (Window's rules 102, 141, 180,
+> 219), `SETTINGS_DESCRIPTION_HEIGHT` 52 to 47 (not 48: mock 01's Theme box bottom 313 and mock 02's New Windows bottom
+> 463 need 47; the mocks' 47.5 is a half-pixel residual) and `THEME_PREVIEW_CAPTION_GAP` 8 to 7 (mock 01's radio dot at
+> 164). Deviations, each because the code differs from the plan's model: a classic page card returned the standard
+> border (no `ROW_GAP` padding), so `ClassicGroupFace.cardBorder` now pads a Settings page's card by
+> `SETTING_VERTICAL_PADDING` (6) above and below and by the stroke at the sides (first rule 49 below the box line, box
+> line 45 below the last rule; rules, text and controls 13 inside the box's outer edge, the kit's `group_padding` 12
+> plus the stroke), and its rules run from the row's x plus `SETTINGS_ROW_SIDE` (260 to 1010 as mock 02, not 259 to
+> 1011); the tiles' padding is a face behaviour, `ChoiceFace.previewPadding` (default today's; classic `ROW_GAP` plus
+> the stroke above, `ROW_GAP` below, `CARD_PADDING` beside: ring at 72, rule at 182); `GroupFace.rowRule` (default 0,
+> classic the hairline) makes a page row keep its first line for its rule and centre below it (controls at 191 and 111
+> as the mocks, 1 px lower than before; a single-line title unchanged); a leading checkbox centres on its title's
+> x-height middle (box top 358 as mock 01, was 357); the "Enable opacity checkbox edge" probe became "Enable opacity
+> checkbox" (266, 364) and "above the Enable opacity checkbox" (266, 357), because the unchecked edge is plan 4b's
+> `border.hover` #909399, ΔE 5 from the mock's #9AA0A8. Shares: Appearance 0.968, Window 0.987 (floor 0.93, none
+> lowered). Residuals: the checkbox label gap (mock 13, `CHECKBOX_LABEL_GAP` 7), the dependent indent (2 px), the mocks'
+> description 2 px nearer its title, spinners 83 wide with the value placed differently, the toolbar radios' spacing,
+> the tile miniatures, the fixture texts ("Match theme", "Use platform font size", the View mode box) and box titles'
+> gap widths.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic
