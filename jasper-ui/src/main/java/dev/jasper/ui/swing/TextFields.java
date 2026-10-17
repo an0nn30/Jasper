@@ -283,8 +283,10 @@ final class TextFields {
             }
             var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
+            surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
+            surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;
             surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
-            input.setForeground(field.readOnly() ? context().faces().fields.readOnlyText(context()) : ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
+            input.setForeground(field.readOnly() ? context().faces().fields.readOnlyText(surface) : ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());
             input.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
             input.setSelectedTextColor(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
@@ -296,8 +298,6 @@ final class TextFields {
             input.getAccessibleContext().setAccessibleDescription(bounds.isEmpty() ? described : described.isEmpty() ? bounds : described + ". " + bounds);
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
-            surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
-            surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
             error.setEnabled(component.isEnabled());
             error.setFont(ThemePainting.font(context(), Typography.Role.CAPTION)); error.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ERROR));

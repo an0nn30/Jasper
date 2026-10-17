@@ -59,6 +59,36 @@ class ClassicButtonsTest {
         });
     }
 
+    static int distance(Color a, Color b) {
+        return Math.abs(a.getRed() - b.getRed()) + Math.abs(a.getGreen() - b.getGreen()) + Math.abs(a.getBlue() - b.getBlue());
+    }
+
+    /** A standard button's edge darkens to border.hover on hover, and its gradient runs from button.end at the top while pressed. */
+    @Test void aStandardButtonsEdgeDarkensOnHoverAndItsGradientReversesWhilePressed() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var pairs = context.faces().buttons.pairs();
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.ACTIONS, button("b", Nodes.ButtonKind.SECONDARY, ControlState.READY)), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var b = find(view, "b", Buttons.KitButton.class);
+                int h = b.getHeight();
+                Color top = ThemePainting.color(context, SemanticColor.BUTTON_SECONDARY_BG), end = ThemePainting.role(context, DerivedColor.BUTTON_END);
+                assertThat(distance(top, end)).as("precondition: a visible gradient").isPositive();
+                assertThat(ThemePainting.painted(context, pairs.get(4))).as("precondition: a darker hover edge").isNotEqualTo(ThemePainting.painted(context, pairs.get(2)));
+                assertThat(at(paint(b), 0, h / 2)).as("the resting edge").isEqualTo(ThemePainting.painted(context, pairs.get(2)));
+                b.getModel().setRollover(true);
+                var hovered = paint(b);
+                assertThat(at(hovered, 0, h / 2)).as("the hover edge").isEqualTo(ThemePainting.painted(context, pairs.get(4)));
+                assertThat(distance(at(hovered, 3, 1), top)).as("hovered top").isLessThan(distance(at(hovered, 3, 1), end));
+                b.getModel().setArmed(true); b.getModel().setPressed(true);
+                var pressed = paint(b);
+                assertThat(distance(at(pressed, 3, 1), end)).as("pressed top").isLessThan(distance(at(pressed, 3, 1), top));
+                assertThat(distance(at(pressed, 3, h - 2), top)).as("pressed bottom").isLessThan(distance(at(pressed, 3, h - 2), end));
+                assertThat(at(pressed, 0, h / 2)).isEqualTo(ThemePainting.painted(context, pairs.get(4)));
+            } finally { release(context); }
+        });
+    }
+
     @Test void aPrimaryButtonIsTheAccentWithAMediumLabelAndNoDrop() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
@@ -154,6 +184,126 @@ class ClassicButtonsTest {
         });
     }
 
+    static Nodes.MenuButton menu(Nodes.ButtonKind kind, String action) {
+        return new Nodes.MenuButton("menu", ControlState.READY, "Connect", "", kind, action, List.of(new MenuItem("other", "Other…", "", "other", true, false)), "");
+    }
+
+    /** The highest alpha in {@code image}'s top two rows, above any label or glyph. */
+    static int topAlpha(BufferedImage image) { return maxAlpha(image.getSubimage(0, 0, image.getWidth(), 2)); }
+
+    /** A menu button's parts paint no face of their own: its surface paints one face behind both, with no edge between them. */
+    @Test void aMenuButtonsPartsPaintNoFaceOfTheirOwn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var pairs = context.faces().buttons.pairs();
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.ACTIONS, menu(Nodes.ButtonKind.SECONDARY, "connect")), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var control = (Menus.MenuControl) view.control("menu");
+                assertThat(control.arrow.isVisible()).as("precondition: a split menu button").isTrue();
+                for (var part : List.of(control.main, control.arrow)) {
+                    var image = paint(part);
+                    assertThat(at(image, 0, part.getHeight() / 2).getAlpha()).as(part.getName() + " edge").isZero();
+                    assertThat(topAlpha(image)).as(part.getName() + " fill").isZero();
+                }
+                var surface = paint(control.component);
+                int h = control.component.getHeight(), seam = control.arrow.getX();
+                assertThat(at(surface, 0, h / 2)).isEqualTo(ThemePainting.painted(context, pairs.get(2)));
+                assertThat(at(surface, seam, h / 2)).as("no edge between the parts").isEqualTo(at(surface, seam - 3, h / 2)).isEqualTo(at(surface, seam + 3, h / 2));
+            } finally { release(context); }
+        });
+    }
+
+    /** Rulings 7 for a ghost menu button: flat until hovered in a toolbar row, its face and its label alike; standard among actions. */
+    @Test void aGhostMenuIsFlatInARowAndStandardAmongActions() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var pairs = context.faces().buttons.pairs();
+            try (var inline = new KitView(context, stack(Nodes.LayoutRole.INLINE, menu(Nodes.ButtonKind.GHOST, "")), e -> {});
+                 var actions = new KitView(context, stack(Nodes.LayoutRole.ACTIONS, menu(Nodes.ButtonKind.GHOST, "")), e -> {})) {
+                KitFixtures.render(inline, 300, 60, 1); KitFixtures.render(actions, 300, 60, 1);
+                var flat = (Menus.MenuControl) inline.control("menu");
+                assertThat(topAlpha(paint(flat.component))).as("flat at rest").isZero();
+                assertThat(flat.main.textColor(false)).isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_SECONDARY));
+                flat.main.getModel().setRollover(true);
+                assertThat(at(paint(flat.component), flat.component.getWidth() / 2, 1)).isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL_HOVER));
+                var standard = (Menus.MenuControl) actions.control("menu");
+                assertThat(near(at(paint(standard.component), standard.component.getWidth() / 2, 1), ThemePainting.color(context, SemanticColor.BUTTON_SECONDARY_BG))).isTrue();
+                assertThat(standard.main.textColor(false)).isEqualTo(ThemePainting.painted(context, pairs.get(1)));
+            } finally { release(context); }
+        });
+    }
+
+    /** Spec 6.4: a panel header's ghost overflow menu is flat until hovered. */
+    @Test void aPanelHeadersOverflowMenuIsFlatUntilHovered() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, KitFixtures.panel("sessions"), e -> {})) {
+                KitFixtures.render(view, 320, 480, 1);
+                var overflow = ((PanelHeaders.HeaderControl) view.control("sessions-header")).overflow;
+                assertThat(overflow.main.panel).as("precondition: a panel header's menu").isTrue();
+                assertThat(topAlpha(paint(overflow.component))).as("flat at rest").isZero();
+                overflow.main.getModel().setRollover(true);
+                assertThat(at(paint(overflow.component), overflow.component.getWidth() / 2, 1)).isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL_HOVER));
+            } finally { release(context); }
+        });
+    }
+
+    /** A strip's icon-only menu keeps its borderless face: the classic gradient reaches its edge, with no outline. */
+    @Test void aStripsIconMenuDrawsNoEdge() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var pairs = context.faces().buttons.pairs();
+            try (var view = new KitView(context, KitViewToolbarStripTest.iconMenu(), e -> {})) {
+                view.toolbarStrip(true);
+                KitFixtures.render(view, 120, 30, 1);
+                var surface = (Menus.MenuSurface) view.control("more").component;
+                assertThat(surface.background.borderless).as("precondition: a strip's icon menu").isTrue();
+                var left = at(paint(surface), 0, surface.getHeight() / 2);
+                assertThat(left).isNotEqualTo(ThemePainting.painted(context, pairs.get(2)));
+                assertThat(near(left, ThemePainting.color(context, SemanticColor.BUTTON_SECONDARY_BG))).as("the gradient at the edge " + left).isTrue();
+            } finally { release(context); }
+        });
+    }
+
+    /** A secret's reveal and copy are parts of its field: flat until hovered, wherever the field stands. */
+    @Test void aSecretsRevealAndCopyAreFlatUntilHovered() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var input = new Nodes.Secret("password", ControlState.READY, "", "Password", "");
+            var stored = new Nodes.Secret("stored", ControlState.READY, "", "Stored", "", Nodes.SecretKind.DETAIL, "copy");
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.VERTICAL, input, stored), e -> {})) {
+                KitFixtures.render(view, 300, 160, 1);
+                for (var id : List.of("password.reveal", "stored.reveal", "stored.copy")) {
+                    var part = find(view, id, Buttons.KitButton.class);
+                    assertThat(part.isVisible()).as(id + " precondition").isTrue();
+                    int h = part.getHeight();
+                    assertThat(at(paint(part), 1, h / 2).getAlpha()).as(id + " flat at rest").isZero();
+                    part.getModel().setRollover(true);
+                    assertThat(at(paint(part), 1, h / 2)).as(id + " hovered").isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL_HOVER));
+                }
+            } finally { release(context); }
+        });
+    }
+
+    /** A crumb is a part of its path: flat until hovered, the current one labelled in text.strong.secondary. */
+    @Test void aCrumbIsFlatAndTheCurrentOneKeepsItsStrongLabel() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var path = new Nodes.Breadcrumbs("path", ControlState.READY, List.of(new Crumb("home", "home", List.of()), new Crumb("docs", "docs", List.of())),
+                "Path", false, "/home/docs", "", "", "");
+            try (var view = new KitView(context, new ViewSpec(path), e -> {})) {
+                KitFixtures.render(view, 300, 40, 1);
+                var parent = find(view, "@crumbs/path/home", Buttons.KitButton.class);
+                var current = find(view, "@crumbs/path/docs", Buttons.KitButton.class);
+                assertThat(at(paint(current), 0, current.getHeight() / 2).getAlpha()).as("flat at rest").isZero();
+                assertThat(current.textColor(false)).isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_STRONG_SECONDARY));
+                assertThat(parent.textColor(false)).isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_SECONDARY));
+                parent.getModel().setRollover(true);
+                assertThat(at(paint(parent), 1, parent.getHeight() / 2)).isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL_HOVER));
+            } finally { release(context); }
+        });
+    }
+
     @Test void aDropdownFollowsTheButtonsAndEndsWithItsDrawnArrow() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
@@ -231,8 +381,24 @@ class ClassicButtonsTest {
                 assertThat(((TextFields.FieldControl) plain.control("search")).leading.isVisible()).isTrue();
                 var control = (TextFields.FieldControl) view.control("folder");
                 assertThat(at(paint(control.surface), 3, control.surface.getHeight() / 2)).isEqualTo(ThemePainting.role(classic, DerivedColor.SURFACE_TABLE_HEADER));
-                assertThat(control.input.getForeground()).isEqualTo(classic.faces().fields.readOnlyText(classic));
+                assertThat(control.input.getForeground()).isEqualTo(classic.faces().fields.readOnlyText(control.surface));
             } finally { release(classic); release(standard); }
+        });
+    }
+
+    /** A transparent read-only field keeps its default surface under the classic policy, so its text keeps text.primary. */
+    @Test void aTransparentReadOnlyFieldKeepsItsText() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var name = new Nodes.Field("name", ControlState.READY, Nodes.FieldKind.TEXT, "build-01", "", "Name", "", Optional.empty(),
+                Nodes.FieldPresentation.TRANSPARENT, "", "", "", true);
+            try (var view = new KitView(context, new ViewSpec(name), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var control = (TextFields.FieldControl) view.control("name");
+                assertThat(at(paint(control.surface), 1, control.surface.getHeight() / 2).getAlpha()).as("no fill").isZero();
+                assertThat(control.input.getForeground()).isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_PRIMARY))
+                    .isEqualTo(context.faces().fields.readOnlyText(control.surface));
+            } finally { release(context); }
         });
     }
 

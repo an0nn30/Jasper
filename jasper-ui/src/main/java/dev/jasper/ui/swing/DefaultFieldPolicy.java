@@ -11,6 +11,6 @@ import java.util.List;
 final class DefaultFieldPolicy implements FieldPolicy {
     @Override public boolean glyph(Nodes.FieldKind kind) { return true; }
     @Override public void paintField(TextFields.FieldSurface surface, Graphics2D g) { surface.paintDefault(g); }
-    @Override public Color readOnlyText(KitContext context) { return ThemePainting.color(context, SemanticColor.TEXT_PRIMARY); }
+    @Override public Color readOnlyText(TextFields.FieldSurface surface) { return ThemePainting.color(surface.context, SemanticColor.TEXT_PRIMARY); }
     @Override public List<PaintPair> pairs() { return List.of(); }
 }

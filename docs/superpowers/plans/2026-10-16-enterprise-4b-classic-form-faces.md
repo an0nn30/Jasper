@@ -4533,17 +4533,20 @@ the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labe
 label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
 padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
 notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
-gallery. Deviations (Task 2's review; the plan's Execution notes X12): `ButtonFace.fades` takes the button, so the
-classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's Task 3 edits its
+gallery. Deviations (Task 2's review; the plan's Execution notes X12 and X14): `ButtonFace.fades` takes the button, so
+the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's Task 3 edits its
 condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a classic
-read-only field with an error keeps its `border.error` edge. Residuals: 4a's flat focused, hovered or pressed classic
-native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
-classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
-`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
-disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13);
-spec 6.4's face table still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row
-supersedes; TFTP's read-only login field in the control column (spec 6.4) is left to plan 10's File Server
-composition. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
+read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's surface, so a
+transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a strip's icon-only
+menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface stands; a secret's
+reveal and copy and each crumb are flat until hovered wherever their control stands (`KitButton.inner`). Residuals: 4a's
+flat focused, hovered or pressed classic native button stays for 4c (the classic `ButtonFace` paints kit buttons only,
+its gradient in every state); a disabled classic dropdown without a rich face is faded again over its flat face by
+`ChoiceCombo.paint` (fill `#ECEFF1` and edge `#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button
+paints `#F1F2F2` inside `#D5DAE0`), and a disabled SECONDARY or PRIMARY button on a selected row fades as one layer over
+its flat face (Execution notes X13); spec 6.4's face table still says "small glyph, plain title" for `PromptFace`, which
+the amended 5.2 prompt row supersedes; TFTP's read-only login field in the control column (spec 6.4) is left to plan
+10's File Server composition. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
@@ -4575,7 +4578,7 @@ Insert below this plan's title:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this
-> plan's text: [Task 2's three (Execution notes X12), then each other one].
+> plan's text: [Task 2's three (Execution notes X12) and two (X14), then each other one].
 ```
 
 - [ ] **Step 6: Commit**
@@ -4708,3 +4711,17 @@ changed files. In jasper-app, `StrategyIsolationTest` and `VariantReadTest` comp
   combo's fade through the buttons face (as `fades` does for buttons) is later work; handing buttons on a selected row
   to `paintRaised` instead would give them the default face (no gradient; the primary's inset line and drop) — cost if
   wrong: two disabled faces paler than a disabled button.
+- **X14. Task 2's third review round deviates from its text in two places, which Task 8's STATUS entry and banner
+  list** — `FieldPolicy.readOnlyText` takes the field's surface (`Color readOnlyText(TextFields.FieldSurface)`, where
+  Produces names `readOnlyText(KitContext)`): the classic policy leaves a transparent read-only field on its default
+  surface, so its text keeps `text.primary` instead of the muted text guarded against a grey face it never paints
+  (`TextFields` now sets the surface's `transparent` before its text colour). And composite controls keep their own
+  treatment under the classic buttons face: a menu button's parts paint only their focus ring under both faces
+  (`Menus.Part.paintKitFace` calls `paintRaised`; their fill and border are null), its face honours `borderless` (a
+  strip's icon-only menu has no edge), and its parts and face stand where its surface does (`KitButton.placement()`; the
+  face takes the parts' `panel` flag), so a ghost menu in a toolbar row or a panel header is flat until hovered; a
+  secret's reveal and copy and every crumb set `KitButton.inner`, which `ClassicButtonFace.flat` reads as flat until
+  hovered wherever the control stands, the current crumb keeping `text.strong.secondary`. Rulings 7's places stand
+  otherwise, and `ChoiceCombo.paint` names X13 at its fade — without them the menu parts drew a second gradient and an
+  edge where the main part meets the arrow, a reveal drew a boxed button inside its field and the crumbs boxed
+  buttons, and a transparent read-only field drew muted text — cost if wrong: one accessor and one flag on `KitButton`.

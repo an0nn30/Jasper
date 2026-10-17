@@ -127,6 +127,11 @@ final class Buttons {
         boolean windowFooter;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
         boolean borderless;
+        /**
+         * An inner part of a composite control (a secret's reveal and copy, a crumb), not an action standing in a layout:
+         * the classic face keeps it flat until hovered, as spec 6.4's toolbar ghosts, wherever its control stands.
+         */
+        boolean inner;
         /** An action of a panel body's empty state: the panel references' smaller label and height. */
         boolean panelEmpty;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
@@ -210,6 +215,8 @@ final class Buttons {
         }
         /** The context this button paints in. */
         KitContext context() { return context; }
+        /** The component standing in its parent's layout for this button: itself, or a menu button's surface for its parts and face. */
+        Component placement() { return this; }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
             if (onSelection) return ink.text;

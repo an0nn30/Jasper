@@ -10,6 +10,6 @@ interface FieldPolicy extends Face {
     boolean glyph(Nodes.FieldKind kind);
     /** Paints a field's surface and outline, read-only or not. */
     void paintField(TextFields.FieldSurface surface, Graphics2D g);
-    /** A read-only field's text colour. */
-    Color readOnlyText(KitContext context);
+    /** The text colour of a read-only field painted on {@code surface}. */
+    Color readOnlyText(TextFields.FieldSurface surface);
 }

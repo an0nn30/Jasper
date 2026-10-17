@@ -30,5 +30,8 @@ final class ClassicFieldPolicy implements FieldPolicy {
             s.focus.visible(), s.error, s.radiusRole);
     }
 
-    @Override public Color readOnlyText(KitContext context) { return ThemePainting.painted(context, readOnlyLabel); }
+    /** Muted on the grey face; a transparent field keeps its default surface ({@code paintField}), so its text keeps text.primary. */
+    @Override public Color readOnlyText(TextFields.FieldSurface s) {
+        return s.transparent ? ThemePainting.color(s.context, SemanticColor.TEXT_PRIMARY) : ThemePainting.painted(s.context, readOnlyLabel);
+    }
 }

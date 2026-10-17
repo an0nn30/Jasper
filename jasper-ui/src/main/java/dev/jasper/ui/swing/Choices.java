@@ -444,6 +444,7 @@ final class Choices {
                 PickerMenus.paintFace(this, graphics, context, face, face.primary().isEmpty(), focus != null && focus.visible(), hover, isPopupVisible());
                 return;
             }
+            // Disabled fades the closed face as one layer; the classic face's is already flat, so it reads paler than a disabled button (plan 4b, X13).
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
         @Override protected void paintComponent(Graphics graphics) {

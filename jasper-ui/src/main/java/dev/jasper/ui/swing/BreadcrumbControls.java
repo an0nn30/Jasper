@@ -187,6 +187,7 @@ final class BreadcrumbControls {
                 };
                 KitOwnership.mark(button, "@crumbs/" + node.id() + "/" + crumb.id());
                 button.kind = Nodes.ButtonKind.GHOST;
+                button.inner = true;
                 button.putClientProperty("html.disable", true);
                 // As wide as the label: FlatLaf buttons otherwise pad short names out to a minimum width.
                 button.putClientProperty(FlatClientProperties.MINIMUM_WIDTH, 0);

@@ -33,11 +33,15 @@ final class ClassicButtonFace implements ButtonFace {
 
     @Override public List<PaintPair> pairs() { return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow); }
 
-    /** Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots; a standard button elsewhere. */
+    /**
+     * Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots, and as a composite control's
+     * inner part; a standard button elsewhere. A menu button's parts and face stand where its surface does.
+     */
     static boolean flat(Buttons.KitButton b) {
-        return b.panel || b.panelRow || b.contextual || b.orderedCommand
-            || SwingUtilities.getAncestorOfClass(InteractiveRows.Row.class, b) != null
-            || b.getParent() instanceof Stacks.StackSurface stack && (stack.role == Nodes.LayoutRole.INLINE || stack.role == Nodes.LayoutRole.NAVIGATION);
+        var placed = b.placement();
+        return b.inner || b.panel || b.panelRow || b.contextual || b.orderedCommand
+            || SwingUtilities.getAncestorOfClass(InteractiveRows.Row.class, placed) != null
+            || placed.getParent() instanceof Stacks.StackSurface stack && (stack.role == Nodes.LayoutRole.INLINE || stack.role == Nodes.LayoutRole.NAVIGATION);
     }
 
     private static boolean ghost(Buttons.KitButton b) { return b.kind == Nodes.ButtonKind.GHOST || b.kind == Nodes.ButtonKind.DESTRUCTIVE_GHOST; }
@@ -75,7 +79,8 @@ final class ClassicButtonFace implements ButtonFace {
             gradient(g, c, face, pressed);
             border = ThemePainting.painted(c, hover ? hoverEdge : edge);
         }
-        ThemePainting.rounded(g, b, c, null, border, focused, false, radius, inset, trim);
+        // A borderless face (a strip's icon-only menu) keeps its fill without the outline, as by default.
+        ThemePainting.rounded(g, b, c, null, b.borderless ? null : border, focused, false, radius, inset, trim);
     }
 
     @Override public Color text(Buttons.KitButton b, boolean hover) {
