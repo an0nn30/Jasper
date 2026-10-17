@@ -439,5 +439,105 @@
     ],
     "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png",
     "note": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case. Edge agreement 0.340 before, 0.341 after."
+  },
+  {
+    "name": "run-window-just-opened",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "crop": [
+      60,
+      854,
+      924,
+      632
+    ],
+    "render": "jasper-app/build/run-window/light/just-opened@2x.png",
+    "render_crop": [
+      0,
+      0,
+      924,
+      632
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#D9DFEA",
+      "#ECEDEF",
+      "#2F65CA",
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF"
+    ]
+  },
+  {
+    "name": "run-window-just-opened-lower",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Just opened (recent + most used).png",
+    "crop": [
+      60,
+      1488,
+      924,
+      208
+    ],
+    "render": "jasper-app/build/run-window/light/just-opened@2x.png",
+    "render_crop": [
+      0,
+      646,
+      924,
+      208
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "run-window-typing-auth",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "crop": [
+      60,
+      854,
+      924,
+      632
+    ],
+    "render": "jasper-app/build/run-window/light/typing-auth@2x.png",
+    "render_crop": [
+      0,
+      0,
+      924,
+      632
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#D9DFEA",
+      "#ECEDEF",
+      "#2F65CA",
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF"
+    ]
+  },
+  {
+    "name": "run-window-typing-auth-lower",
+    "mock": "docs/design/enterprise/reference/06 Run Dialog/Run Dialog - Typing auth (filtered).png",
+    "crop": [
+      60,
+      1488,
+      924,
+      208
+    ],
+    "render": "jasper-app/build/run-window/light/typing-auth@2x.png",
+    "render_crop": [
+      0,
+      646,
+      924,
+      208
+    ],
+    "min_agreement": 0.7,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC",
+      "#2F65CA"
+    ]
   }
 ]
