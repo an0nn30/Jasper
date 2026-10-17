@@ -51,9 +51,11 @@ final class PluginAdmin {
     PluginRuntime.Snapshot setEnabled(String id, boolean enabled) throws IOException {
         PluginCatalog.Disk disk = disk();
         PluginCandidate subject = PluginCatalog.subject(disk, id).orElseThrow(() -> new IOException("No such plugin: " + id));
-        if (subject.origin() == PluginCandidate.Origin.USER && !disk.state().containsKey(id))
+        PluginStateStore.Entry entry = disk.state().get(id);
+        if (subject.origin() == PluginCandidate.Origin.USER && (entry == null || entry.optIn()))
             throw new IOException("Review " + subject.descriptor().name() + " before enabling or disabling it");
-        store.transact(PluginStateStore.enabling(id, enabled));
+        boolean optIn = enabled && subject.origin() == PluginCandidate.Origin.BUNDLED && !subject.descriptor().enabledByDefault();
+        store.transact(PluginStateStore.enabling(id, enabled, optIn));
         return snapshot();
     }
 

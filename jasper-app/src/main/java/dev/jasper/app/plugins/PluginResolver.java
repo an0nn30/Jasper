@@ -67,9 +67,11 @@ final class PluginResolver {
             return PluginStatus.of(candidate, PluginStatus.State.SKIPPED,
                 "needs SDK " + candidate.descriptor().sdk() + "; this is SDK " + sdk);
         if (entry != null && entry.remove()) return PluginStatus.of(candidate, PluginStatus.State.DISABLED, "marked for removal");
-        if (entry != null && !entry.enabled()) return PluginStatus.of(candidate, PluginStatus.State.DISABLED, "disabled by the user");
+        if (!PluginStateStore.effective(entry, candidate))
+            return PluginStatus.of(candidate, PluginStatus.State.DISABLED, entry == null ? "off by default" : "disabled by the user");
         if (candidate.origin() != PluginCandidate.Origin.USER) return null;
-        if (entry == null) return PluginStatus.of(candidate, PluginStatus.State.NEEDS_CONSENT, "not reviewed yet");
+        // Only bundled plugins are ever opted in: a user copy behind an opt-in entry has not been reviewed.
+        if (entry == null || entry.optIn()) return PluginStatus.of(candidate, PluginStatus.State.NEEDS_CONSENT, "not reviewed yet");
         Set<String> missing = new TreeSet<>(candidate.descriptor().capabilities());
         missing.removeAll(entry.consented());
         return missing.isEmpty() ? null

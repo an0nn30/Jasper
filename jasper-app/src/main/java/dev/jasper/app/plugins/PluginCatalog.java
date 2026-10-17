@@ -79,8 +79,9 @@ final class PluginCatalog {
             List<String> capabilities = new ArrayList<>(new TreeSet<>(descriptor.capabilities()));
             List<String> unconsented = new ArrayList<>(capabilities);
             if (!user) unconsented.clear();
-            else if (entry != null) unconsented.removeAll(entry.consented());
-            boolean needsConsent = user && !pendingRemoval && (entry == null || !unconsented.isEmpty());
+            else if (entry != null && !entry.optIn()) unconsented.removeAll(entry.consented());
+            boolean reviewed = entry != null && !entry.optIn();
+            boolean needsConsent = user && !pendingRemoval && (!reviewed || !unconsented.isEmpty());
 
             Optional<PluginStatus> atLaunch = status(launch.statuses(), id);
             Optional<PluginStatus> rejectedNext = status(resolution.rejected(), id);
@@ -91,8 +92,8 @@ final class PluginCatalog {
             rows.add(new PluginRuntime.Row(id, descriptor.name(), descriptor.version().toString(), descriptor.description(),
                 descriptor.vendor(), switch (shown.origin()) { case BUNDLED -> "Bundled"; case USER -> "Installed"; case DEV -> "Development"; },
                 state, reason, capabilities, unconsented, requires(descriptor), errors.applyAsInt(id),
-                entry == null || entry.enabled(), needsConsent,
-                !pendingRemoval && !(user && entry == null), user, pendingRemoval, pendingInstall,
+                PluginStateStore.effective(entry, shown), needsConsent,
+                !pendingRemoval && !(user && !reviewed), user, pendingRemoval, pendingInstall,
                 pending(id, launch, willRun, rejectedNext, pendingRemoval, pendingInstall, descriptor),
                 PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id),
                 descriptor.homepage(), List.copyOf(new TreeSet<>(descriptor.exports())), PluginIconFiles.read(shown)));

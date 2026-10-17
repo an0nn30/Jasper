@@ -131,7 +131,9 @@ final class PluginMaintenance {
             try {
                 deleteRecursively(userDirectory.resolve(PENDING).resolve(id));
                 retire(userDirectory.resolve(id));
-                state.remove(id);
+                // Removing a user copy keeps the bundled plugin's opt-in.
+                if (item.getValue().optIn()) state.put(id, new PluginStateStore.Entry(true, java.util.Set.of(), false, true));
+                else state.remove(id);
                 LOG.log(System.Logger.Level.INFO, "Removed plugin " + id);
             } catch (IOException failure) {
                 LOG.log(System.Logger.Level.WARNING, "Could not remove plugin " + id + "; it stays marked and is not loaded", failure);

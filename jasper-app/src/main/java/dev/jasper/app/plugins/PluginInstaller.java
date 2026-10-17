@@ -142,7 +142,12 @@ final class PluginInstaller {
             store.transact(state -> {
                 try { PluginMaintenance.deleteRecursively(userDirectory.resolve(PluginMaintenance.PENDING).resolve(id)); }
                 catch (IOException failure) { throw new UncheckedIOException(failure); }
-                if (!Files.isDirectory(userDirectory.resolve(id))) state.remove(id);
+                if (!Files.isDirectory(userDirectory.resolve(id))) {
+                    PluginStateStore.Entry entry = state.get(id);
+                    // An opted-in bundled plugin stays on; only the install's consent and removal mark go.
+                    if (entry != null && entry.optIn()) state.put(id, new PluginStateStore.Entry(true, java.util.Set.of(), false, true));
+                    else state.remove(id);
+                }
                 return state;
             });
         } catch (UncheckedIOException failure) { throw failure.getCause(); }
