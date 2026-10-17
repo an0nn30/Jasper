@@ -23,6 +23,28 @@ class ShellChromeTest {
         });
     }
 
+    /** Spec 10.1: under in-window classic menus an auxiliary frame's File row is the terminal windows' row; the default look's stays FlatLaf's. */
+    @Test void aClassicLookGivesAFramesMenuRowTheTerminalWindowsRow() throws Exception {
+        edt(() -> {
+            var themes = dev.jasper.app.appearance.ThemeTestSupport.controller(true);
+            try {
+                var classic = new javax.swing.JMenuBar();
+                ShellChrome.of(new ShellLook(false, true, true), true).styleMenus(classic);
+                var reference = new javax.swing.JMenuBar();
+                dev.jasper.app.platform.ClassicMenuRow.style(reference);
+                assertThat(classic.getClientProperty("FlatLaf.style")).isEqualTo(reference.getClientProperty("FlatLaf.style")).isNotNull();
+                assertThat(classic.getBackground()).isEqualTo(reference.getBackground());
+                assertThat(classic.getInsets()).isEqualTo(reference.getInsets());
+                var standard = new javax.swing.JMenuBar();
+                var border = standard.getBorder();
+                ShellChrome.of(new ShellLook(false, false, false), true).styleMenus(standard);
+                ShellChrome.standard().styleMenus(standard);
+                assertThat(standard.getClientProperty("FlatLaf.style")).isNull();
+                assertThat(standard.getBorder()).isSameAs(border);
+            } finally { themes.close(); }
+        });
+    }
+
     @Test void theTitleBarIsTheLooks() {
         assertThat(ShellChrome.of(new ShellLook(true, false, false), true).unifiedTitle()).isTrue();
         assertThat(ShellChrome.of(new ShellLook(false, true, true), true).unifiedTitle()).isFalse();

@@ -478,6 +478,23 @@ class WindowCommandPaletteTest {
             }
         });
     }
+    /** Spec 10.9: under a still look the card opens fully at once, though the window's animation settings are on. */
+    @Test void aStillLookOpensTheCardFullyAtOnce() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            themes.configureAnimations(false);
+            try (var owner = new WindowContent(DesktopTestSupport.launcher(new ArrayDeque<>()), DesktopTestSupport.HOME,
+                    path -> {}, () -> {}, () -> {}, themes, KeyBindings.defaults(true), new CommandHistory(), true)) {
+                var palette = owner.commandPalette();
+                var root = install(owner);
+                owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
+                palette.toggle(); LayoutTestSupport.layoutTree(root);
+                assertThat(palette.revealRunning()).isFalse();
+                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                palette.dismiss();
+            } finally { themes.close(); }
+        });
+    }
     /** theme.md's shadows are black, never theme colours: a red scrim leaves the palette's shadow neutral. */
     @Test void overlayShadowIsBlackWhateverTheScrim() throws Exception {
         DesktopTestSupport.edt(() -> {

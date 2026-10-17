@@ -178,7 +178,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. Bootstrap binds the listener after plugins start; the application closes it at shutdown. |
 | `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
-| `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the projections of spec 9.1 and `Presentation`. The window chrome's projections are read by `WorkspaceChrome.of`, `ShellChrome.of` and the application's `LookMotion`. Values and bounded file stores; `PluginSelection` builds it and the application hands each consumer its kit or projection. |
+| `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the projections of spec 9.1 and `Presentation`. The window chrome's projections are read by the bootstrap (`DesktopFlags`), `WorkspaceChrome.of`, `ShellChrome.of`, `WindowLook`, `WindowTitle` (`TitleFormat`) and the application's `LookMotion`. Values and bounded file stores; `PluginSelection` builds it and the application hands each consumer its kit or projection. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder. SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records. Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
@@ -218,10 +218,10 @@ chosen at startup: on macOS `MacTitleBar` hosts the header in the native title r
 that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
 the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
-Enterprise presentation) gives every platform the system title bar: the bootstrap turns macOS's screen menu bar off, so
-each window's menus are a row in the window, a native-titled macOS frame's appearance follows the theme, and on Windows
-and Linux the system title bar follows the operating system's light or dark setting (JBR has no hint for a title bar it
-does not draw). `WorkspaceChrome.of` (workspace) and `ShellChrome.of` (windows) read the look's projections and choose
+Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
+macOS's screen menu bar off, so each window's menus are a row in the window (an auxiliary frame's File row takes the
+classic row's look, `ClassicMenuRow`). A native-titled macOS frame's appearance follows the theme; Jasper gives the
+Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and `ShellChrome.of` (windows) read the look's projections and choose
 the strategies, among them `MenuBarLayout`: `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session,
 Transfer, plugin menus, Tools, Window, Help). `WindowTitle` fills the look's title template. The field shows `WindowHeaderContext` and opens the palette, which
 `WindowCommandPalette` anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized

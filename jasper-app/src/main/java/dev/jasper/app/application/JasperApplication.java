@@ -208,7 +208,11 @@ public final class JasperApplication {
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
     /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
-    private dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+    /** What terminal windows and the rehearsal's are made of under this process's presentation. */
+    dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+
+    /** The auxiliary windows' shells; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.NativeShells nativeShells() { return shells; }
 
     /** The rehearsal painted: the look proved itself (spec 4.6), recorded off the EDT. */
     void rehearsalPainted() {

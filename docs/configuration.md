@@ -194,7 +194,7 @@ family = "system"
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
-| `window.native_decorations` | `false` | Boolean; Windows and Linux only | Next start |
+| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |
@@ -222,7 +222,7 @@ family = "system"
 | `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-cobalt/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately | Live |
+| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately; a look without motion keeps everything still whatever this says | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
 | `ui.theme.dark` | `"slate-cobalt"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
 | `ui.theme.light` | `"slate-cobalt"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
@@ -863,7 +863,7 @@ labels retain their relative emphasis. Native OS dialogs and system menu renderi
 
 ### Animations
 
-Settings → Appearance → Animations controls motion throughout the app. **Enable animations** is on by default;
+Settings → Appearance → Animations controls motion throughout the app, unless the active look has none. **Enable animations** is on by default;
 turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 

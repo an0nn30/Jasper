@@ -97,13 +97,7 @@ public final class ApplicationBootstrap {
             });
             Runtime.getRuntime().addShutdownHook(shutdown);
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
-            // The look's flags, committed before AWT (spec 9.1): the macOS menu bar and the system title bar.
-            var desktop = startup.selection().presentation().committedDesktop();
-            configureDesktopProperties(desktop);
-            // Before the look and feel and any window: a restart-only choice, like residency.
-            dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
-                service.initialState().snapshot().nativeDecorations(),
-                service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT, desktop.nativeTitle()).configure();
+            applyDesktop(startup.selection().presentation(), service.initialState().snapshot(), System.getProperty("os.name").startsWith("Mac"));
             // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
@@ -123,6 +117,25 @@ public final class ApplicationBootstrap {
     static boolean attemptBeforePresenting(AppArguments options, boolean resident, boolean headless) {
         if (headless || options.noWindow()) return false;
         return !options.background() || resident;
+    }
+
+    /**
+     * The look's flags, committed before AWT (spec 9.1): the macOS menu bar, then, before the look and feel and any
+     * window, the title bar style, a restart-only choice like residency, under the look's system title bar.
+     *
+     * @param presentation the process's presentation, whose committed flags apply
+     * @param snapshot the configuration read at start
+     * @param mac whether this is macOS
+     * @return the title bar style configured
+     */
+    static dev.jasper.app.platform.TitleBarStyle applyDesktop(dev.jasper.app.presentation.Presentation presentation,
+                                                              dev.jasper.app.config.ConfigSnapshot snapshot, boolean mac) {
+        var desktop = presentation.committedDesktop();
+        configureDesktopProperties(desktop);
+        var style = dev.jasper.app.platform.TitleBarStyle.choose(mac, snapshot.nativeDecorations(),
+            snapshot.viewMode() == dev.jasper.app.config.ViewMode.COMPACT, desktop.nativeTitle());
+        style.configure();
+        return style;
     }
 
     /** The default look's desktop properties. */

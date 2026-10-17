@@ -42,7 +42,8 @@ sealed interface MenuBarLayout permits StandardMenuBar, ClassicMenuBar {
      * @param slots the built-in menus by slot, the fresh ones of this pass included, with their contributed sections
      * @param topLevel the contributed top-level menus in registration order
      * @param menu makes an empty menu that refreshes the window's actions when opened
-     * @param toolWindows one item per tool window's toggle action, in registration order
+     * @param toolWindows one item per tool window's toggle action, in registration order; empty for a layout whose
+     *        {@link MenuBarLayout#toolWindowsInView()} is true
      */
     record Pass(Map<MenuTarget.Slot, JMenu> slots, List<TopMenu> topLevel, Function<String, JMenu> menu, List<JMenuItem> toolWindows) {
         /** Copies the lists. */

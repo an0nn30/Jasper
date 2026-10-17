@@ -1,6 +1,6 @@
 # Enterprise presentation 6a: the window shell Implementation Plan
 
-> **Status (2026-10-16): executed on `claude/enterprise-window-chrome` (`c1999c303..7fb8ee9c3`).** Deviations from this plan's text: Execution notes rulings (27) Rename Tab's input dialog follows the window's appearance too, `MacAppearance.follow` is the one writer of NSAppearance and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`; (28) `WindowTitle.format` returns a token-free template as it is, strips an all-empty one and passes `{context}` unstripped; (29) `EnterpriseMenuRowMockTest` compares the titles' positions on macOS only until plan 5b; (30) `ChromeRenderTest.check` asserts structure, and the menu row's painted pairs join it in plan 6b; Task 9's calibration run adds jasper-ui's `KitCalibrationTest` (12 cases), which the plan's jasper-app filter does not reach.
+> **Status (2026-10-16): executed on `claude/enterprise-window-chrome` (`c1999c303..7fb8ee9c3`).** Deviations from this plan's text: Execution notes rulings (27) Rename Tab's input dialog follows the window's appearance too, `MacAppearance.follow` is the one writer of NSAppearance and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`; (28) `WindowTitle.format` returns a token-free template as it is, strips an all-empty one and passes `{context}` unstripped; (29) `EnterpriseMenuRowMockTest` compares the titles' positions on macOS only until plan 5b; (30) `ChromeRenderTest.check` asserts structure, and the menu row's painted pairs join it in plan 6b; Task 9's calibration run adds jasper-ui's `KitCalibrationTest` (12 cases), which the plan's jasper-app filter does not reach; final review rulings (31) an auxiliary frame's in-window File row is the classic row (`ClassicMenuRow`, chosen by `ShellChrome`), a residual against the 07 Credential Vault mocks; (32) Jasper gives the Windows and Linux caption no hint, and the Windows GUI check decides whether Enterprise Dark needs `DWMWA_USE_IMMERSIVE_DARK_MODE`; (33) Settings shows `window.native_decorations` and `ui.animations.enabled` under a look that overrides them until plan 9; (34) the wiring tests, `ApplicationBootstrap.applyDesktop`, `ShellChrome` a record and `WorkspaceChrome` equal by strategy, and a provided pane without a saved identity gives `{session}` its reported host.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -94,7 +94,7 @@ Every name below was checked at `b9178db45`; the table says where a name is abse
 - Pixel rule: the default look stays byte-identical. Every PNG and JSON the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves it); every reference pair in `tools/visual/pairs.json` and every calibration suite stays green unchanged. No existing render may change: under the default projection `WorkspaceChrome.STANDARD` builds today's menus in today's order, `TitleFormat("{context}")` gives today's title, `LookMotion(STANDARD)` passes the setting through, and `ShellChrome.standard()` reads `MacTitleBar.isSupported()` as today. The new metric roles (Task 3) are read only by classic chrome.
 - Spec 9.1 table, exactly: `DesktopFlags.screenMenuBar` false when `menu_bar = "window"`, `nativeTitle` true when `title_bar = "native"`; `WorkspaceLook.menus` CLASSIC when `menu_bar = "window"`; `ShellLook.unifiedTitle` true only when `title_bar = "unified"` and `MacTitleBar.isSupported()`; `ShellLook.windowMenus` true when `menu_bar = "window"`; `ShellLook.followThemeAppearance` true when `title_bar = "native"`; `Motion` NONE when `motion = "none"`; `TitleFormat` is `window_title`.
 - Spec 10.2: `StandardMenuBar` is File, Edit, View, Pane, Tab, Session, Transfer, Tools, plugin menus, Help; `ClassicMenuBar` is File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help, with Window holding the Pane items and the Tab items as two sections, then the tool-window toggles; Help holds About Jasper on every platform, macOS included under in-window menus; each built-in menu with no items of its own shows only while it has entries.
-- Strategies at the owner (spec 3.3, 16.1.7): `WorkspaceChrome.of` is the only reader of the `WorkspaceLook` variant enums, `ShellChrome.of` of `ShellLook`, and `LookMotion` of `Motion`; `ProjectionReadTest` enforces it (Task 9). No other class branches on a look.
+- Strategies at the owner (spec 3.3, 16.1.7): `WorkspaceChrome.of` is the only reader of the `WorkspaceLook` variant enums and `LookMotion` of `Motion`, and `ShellLook`'s values are read by `ShellChrome` and `WindowLook`; `ProjectionReadTest` enforces the enums' and `Motion`'s readers (Task 9). No other class branches on a look.
 - The architecture edges of spec 9.2: `workspace`, `windows` and `application` → `presentation` (5a added `application`); `dev.jasper.app.platform` gains no edge (`TitleBarStyle` takes a boolean); `dev.jasper.app.dock` stays JDK-only (`verifyApplicationArchitecture`).
 - Measured mock targets are halved 2× pixels (Verified facts, "Mock measurements"); a render compares at 2× against the mock with the stated tolerances. Colours are the Enterprise theme's roles; no colour literal enters production code (`ColourLiteralScanTest`).
 - Javadoc doclint fails the build on errors: jasper-app runs `-Xdoclint:all`, jasper-ui `-Xdoclint:all,-missing`; every `{@link}` resolves; no raw `<`, `>`, `&` or `->` in a comment. New public types carry a class comment, record components an `@param`.
@@ -3530,3 +3530,33 @@ The plan's own Rulings are 1 to 12; these continue the numbering.
     `check` samples the run item's and the ruled cells' pairs; the menu row's declared pairs (6b's `WindowPairs`) in
     each look's render, under the complement and covering looks too, are still to be added to `check` there. Cost if
     wrong: a menu-row pair that the theme moves goes unnoticed in the renders until it is.
+31. **An auxiliary frame's in-window File row is the classic row** (final review). Under `menu_bar = "window"` on macOS
+    every auxiliary frame (Credential Vault, File Server, other plugin windows) shows its one-menu File row, as spec
+    10.1 asks, so New Window and Close Window keep their keys; `ShellChrome.styleMenus` gives it the terminal windows'
+    row through `ClassicMenuRow` (platform), which `ClassicMenuBar.style` now calls, at creation and on every theme
+    change. The 07 Credential Vault mocks show the native title directly over the window's toolbar with no menu row:
+    recorded as a residual against them (spec 10.1 wins; the late amendment that added 07 did not revisit 10.1), for
+    plan 6b's and 10's Credential Vault comparisons. Cost if wrong: dropping the row is one branch in `NativeShells.frame`
+    plus root-pane bindings for ⌘N and ⌘W.
+32. **Jasper gives the Windows and Linux system title bar no appearance hint** (final review; revises Rulings 8's
+    wording). JBR has none, but FlatLaf 3.7's `FlatNativeWindowsLibrary` can set `DWMWA_USE_IMMERSIVE_DARK_MODE`, and
+    Win32 captions stay light unless the app opts in, so under Enterprise Dark the Windows caption is probably light
+    whatever the system setting. `docs/app-architecture.md` and `ShellChrome` say only what Jasper does; the Windows GUI
+    check records what the caption shows. If it stays light, a platform helper beside `MacAppearance.follow` sets the
+    attribute once the peer exists and on theme change, from `ShellChrome.followTheme` and `WindowContent`'s
+    native-title branch. Cost if wrong: a light caption over a dark window on Windows until then.
+33. **Settings still shows two overridden rows until plan 9.** A still look ignores `ui.animations.enabled` and a
+    native-titled look ignores `window.native_decorations` from this plan on, but nothing reads
+    `SettingsChrome.hiddenKeys` before plan 9 wires Settings, so gating them on `WINDOW_CHROME` would change nothing.
+    `docs/configuration.md` says the look wins in both rows; plan 9's entry conditions take the hiding. Cost if wrong:
+    two inert rows under Enterprise until plan 9.
+34. **Final review tests and seams.** `PresentationReachTest` checks the wiring: no configuration, a saved
+    `enabled = true` and the blamed-kit fallback against `themes().animationsEnabled()`, About in Help after
+    `startPlugins`, `windowLook()` and the shells' `ShellChrome` against the presentation's projections (both made
+    package-visible; `ShellChrome` is a record and `WorkspaceChrome` is equal by strategy class and template for it);
+    the bootstrap's two calls are `ApplicationBootstrap.applyDesktop(Presentation, ConfigSnapshot, boolean)`, tested in
+    `DesktopFlagsTest`; `WindowTabMotionTest` and `WindowCommandPaletteTest` check a still look under enabled settings;
+    `WindowTitleTest` checks a hosted document through the wiring; `WindowChromeMenusTest` checks Rulings 6's style
+    entries, the titles' ink and an open title's painted accent; `ProjectionReadTest` guards all six `WorkspaceLook`
+    enums; a classic pass builds tool-window items only for a layout that takes them; a provided pane whose saved
+    identity is blank gives `{session}` its reported host, as the header does. Cost if wrong: none.

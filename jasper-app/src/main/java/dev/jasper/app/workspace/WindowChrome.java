@@ -355,8 +355,10 @@ final class WindowChrome {
                 built.forEach(menu::add);
                 topLevel.add(new MenuBarLayout.TopMenu(menu, MenuTarget.HELP.equals(section.target().key())));
             }
-            // The bar orders menus as they are added; the layout gives the order (spec 10.2).
-            for (JMenu menu : layout.contributed(new MenuBarLayout.Pass(standardMenus, topLevel, label -> menu(label), toolWindowItems()))) {
+            // The bar orders menus as they are added; the layout gives the order (spec 10.2). A layout that keeps the
+            // tool windows in View takes no items, so the default look builds none.
+            List<JMenuItem> toolItems = layout.toolWindowsInView() ? List.of() : toolWindowItems();
+            for (JMenu menu : layout.contributed(new MenuBarLayout.Pass(standardMenus, topLevel, label -> menu(label), toolItems))) {
                 menuBar.add(menu); contributedMenus.add(menu);
             }
         }

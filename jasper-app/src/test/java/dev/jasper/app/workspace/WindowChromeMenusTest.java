@@ -132,6 +132,23 @@ class WindowChromeMenusTest {
                 assertThat(file.getInsets().left).isEqualTo(9);
                 assertThat(file.getFont()).as("the kit's body face").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
                 assertThat(file.getFont().getSize()).as("the Enterprise kit's 12 px body").isEqualTo(12);
+                // Rulings 6: a hovered closed title on surface.control.hover, an open one on the accent in text.onAccent, square.
+                var palette = themes.current().chrome().semantic();
+                @SuppressWarnings("unchecked") var style = (java.util.Map<String, Object>) bar.getClientProperty("FlatLaf.style");
+                assertThat(style)
+                    .containsEntry("hoverBackground", palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER))
+                    .containsEntry("selectionBackground", palette.color(dev.jasper.ui.theme.SemanticColor.ACCENT))
+                    .containsEntry("selectionForeground", palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_ONACCENT))
+                    .containsEntry("selectionArc", 0)
+                    .containsEntry("selectionInsets", new Insets(0, 0, 0, 0));
+                // An open title paints the row's accent, whatever its own menu style says.
+                file.setSelected(true);
+                var image = new java.awt.image.BufferedImage(bar.getWidth(), bar.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try { bar.paint(graphics); } finally { graphics.dispose(); file.setSelected(false); }
+                assertThat(new java.awt.Color(image.getRGB(file.getX() + 2, file.getY() + 2), true))
+                    .as("the open title's background").isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.ACCENT));
+                assertThat(file.getForeground()).as("the titles' ink").isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

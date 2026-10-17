@@ -67,7 +67,33 @@ class WindowTitleTest {
         }
     }
 
-    @Test void theTokensComeFromThePaneOrTheDocument() {
+    /** Spec 10.4: a hosted document gives {@code {session}} its title and {@code {directory}} its location. */
+    @Test void aHostedDocumentFillsTheTemplateWithItsTitleAndLocation() throws Exception {
+        try {
+            DesktopTestSupport.edt(() -> {
+                var chrome = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.UNIFIED,
+                    WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false,
+                    WorkspaceLook.FrameStyle.STANDARD), WORKSTATION);
+                var owner = WindowShellTest.window(true, chrome);
+                var titles = new ArrayList<String>();
+                WindowContent.mount(new JRootPane(), owner, new WindowLook(chrome, false, true), titles::add);
+                var model = new dev.jasper.app.contributions.Contributions();
+                owner.connectContributions(model);
+                var entry = model.content().open("dev.editor", "notes", "notes.md", owner.id(), new javax.swing.JTextArea("text"));
+                entry.presentation("notes.md", "", new javax.swing.ImageIcon(), false, "/srv/notes", "mbp");
+                owner.update();
+                assertThat(owner.selectedContent()).isSameAs(entry);
+                assertThat(titles.getLast()).isEqualTo("Workstation — notes.md — /srv/notes");
+                entry.presentation("notes.md", "", new javax.swing.ImageIcon(), false, "", "");
+                owner.update();
+                assertThat(titles.getLast()).as("no location: no trailing separator").isEqualTo("Workstation — notes.md");
+            });
+        } finally {
+            DesktopTestSupport.closeOwners();
+        }
+    }
+
+    @Test void theTokensComeFromThePane() {
         var local = pane(Optional.of(HOME.resolve("src")), Optional.empty(), Optional.empty(), "zsh");
         assertThat(WindowTitle.session(local)).isEqualTo("Local: zsh");
         assertThat(WindowTitle.directory(local, HOME)).isEqualTo("~/src");
@@ -77,6 +103,10 @@ class WindowTitleTest {
         assertThat(WindowTitle.directory(provided, HOME)).as("no reported directory yet").isEmpty();
         var reported = pane(Optional.empty(), Optional.of("dev.jasper.remote"), Optional.of(new RemoteLocation("mbp", "/srv/www")), "Mac");
         assertThat(WindowTitle.directory(reported, HOME)).isEqualTo("/srv/www");
+        var unnamed = pane(Optional.empty(), Optional.of("dev.jasper.remote"), Optional.of(new RemoteLocation("mbp", "/srv/www")), " ");
+        assertThat(WindowTitle.session(unnamed)).as("a provided session without a saved identity: its reported host, as the header")
+            .isEqualTo("mbp");
+        assertThat(WindowTitle.session(pane(Optional.empty(), Optional.of("dev.jasper.remote"), Optional.empty(), ""))).isEmpty();
         var osc = pane(Optional.empty(), Optional.empty(), Optional.of(new RemoteLocation("build-01", "/tmp")), "zsh");
         assertThat(WindowTitle.session(osc)).as("an OSC host names a remote pane").isEqualTo("build-01");
         assertThat(WindowTitle.session(null)).isEmpty();

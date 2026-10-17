@@ -84,7 +84,7 @@ public final class NativeShells {
      * @param terminalWindows finds a terminal window's native window by id, or returns null
      * @param newWindow opens a terminal window
      * @param quit quits the application
-     * @param shell the look's title bar and appearance
+     * @param shell the look's title bar, menu row and appearance
      */
     public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
                         Runnable newWindow, Runnable quit, ShellChrome shell) {
@@ -93,6 +93,13 @@ public final class NativeShells {
         this.terminalWindows = Objects.requireNonNull(terminalWindows);
         this.newWindow = Objects.requireNonNull(newWindow); this.quit = Objects.requireNonNull(quit);
     }
+
+    /**
+     * The look's shells these windows are made under.
+     *
+     * @return the shells' chrome
+     */
+    public ShellChrome chrome() { return shell; }
 
     /**
      * Builds the native window for a surface.
@@ -162,8 +169,10 @@ public final class NativeShells {
             frame.setIconImages(ApplicationIcon.images());
             resources.layout = installChrome(frame.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
-            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key.
-            if (bar != null) bar.setMenuBar(menuBar(surface)); else frame.setJMenuBar(menuBar(surface));
+            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key;
+            // a classic look gives it its terminal windows' row.
+            JMenuBar menus = menuBar(surface);
+            if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }
             shell.followTheme(frame.getRootPane(), bar, themes.current().chrome().dark());
             frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             frame.addWindowListener(new WindowAdapter() {
@@ -178,7 +187,7 @@ public final class NativeShells {
             else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-                if (bar != null) bar.setLight(!resolved.chrome().dark());
+                if (bar != null) bar.setLight(!resolved.chrome().dark()); else shell.styleMenus(menus);
                 shell.followTheme(frame.getRootPane(), bar, resolved.chrome().dark());
                 resources.layout.body().changed();
             });

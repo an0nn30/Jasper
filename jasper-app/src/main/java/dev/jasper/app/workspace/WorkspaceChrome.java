@@ -39,4 +39,11 @@ public final class WorkspaceChrome {
 
     MenuBarLayout menus() { return menus; }
     TitleFormat title() { return title; }
+
+    /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
+    @Override public boolean equals(Object other) {
+        return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && title.equals(chrome.title);
+    }
+
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), title); }
 }

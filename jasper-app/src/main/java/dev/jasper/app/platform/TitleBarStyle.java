@@ -22,7 +22,15 @@ public enum TitleBarStyle {
         return compact ? NATIVE : choose(macOs, nativeDecorations);
     }
 
-    /** A look with a native title ({@code nativeTitle}) gives every platform the operating system title bar. */
+    /**
+     * A look with a native title ({@code nativeTitle}) gives every platform the operating system title bar.
+     *
+     * @param macOs whether this is macOS
+     * @param nativeDecorations the {@code window.native_decorations} setting
+     * @param compact whether the window starts in Compact
+     * @param nativeTitle whether the look has the system title bar
+     * @return the title bar style
+     */
     public static TitleBarStyle choose(boolean macOs, boolean nativeDecorations, boolean compact, boolean nativeTitle) {
         return nativeTitle ? NATIVE : choose(macOs, nativeDecorations, compact);
     }

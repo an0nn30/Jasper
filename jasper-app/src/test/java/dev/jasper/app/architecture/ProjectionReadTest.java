@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 class ProjectionReadTest {
     /** A variant pattern over internal names, and the classes that may read it. */
     static final Map<Pattern, Predicate<String>> PROJECTION_READERS = Map.of(
-        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Tabs|Status)(?=[;$.]|$)"),
+        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle)(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/workspace/WorkspaceChrome")
                 || type.startsWith("dev/jasper/app/workspace/WorkspaceChrome$"),
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),

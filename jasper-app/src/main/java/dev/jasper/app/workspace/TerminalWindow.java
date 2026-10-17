@@ -58,7 +58,18 @@ public final class TerminalWindow implements AutoCloseable {
         this(callbacks, launcher, directory, detached, themes, initial, history, WindowLook.standard());
     }
 
-    /** As above, under {@code look}: its workspace chrome and its title bar (Enterprise presentation spec 9.1 and 10.1). */
+    /**
+     * As above, under {@code look}: its workspace chrome and its title bar (Enterprise presentation spec 9.1 and 10.1).
+     *
+     * @param callbacks the application's window callbacks
+     * @param launcher starts the window's shells
+     * @param directory where the first tab starts, or null for where a new shell starts
+     * @param detached whether the window starts without a tab
+     * @param themes the application's look
+     * @param initial the configuration to apply, or null
+     * @param history the shared command history
+     * @param look the window's chrome and title facts
+     */
     public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
                    ThemeController themes, ConfigSnapshot initial, CommandHistory history, WindowLook look) {
         this.callbacks = callbacks;

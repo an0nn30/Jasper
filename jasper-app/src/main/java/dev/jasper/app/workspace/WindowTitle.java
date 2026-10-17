@@ -58,10 +58,17 @@ final class WindowTitle {
         return out.append(literals.getLast()).toString();
     }
 
-    /** {@code {session}}: a provided session's saved identity, a remote pane's host, else {@code "Local: "} and the shell's label. */
+    /**
+     * {@code {session}}: a provided session's saved identity, a remote pane's host (a provided session without a saved
+     * identity included, as the header names it), else {@code "Local: "} and the shell's label.
+     */
     static String session(PaneSnapshot pane) {
         if (pane == null) return "";
-        if (pane.providerId().isPresent()) return clean(pane.shell());
+        if (pane.providerId().isPresent()) {
+            String identity = clean(pane.shell());
+            if (!identity.isEmpty()) return identity;
+            return pane.remoteDirectory().map(location -> clean(location.host())).orElse("");
+        }
         if (pane.remoteDirectory().isPresent()) return clean(pane.remoteDirectory().get().host());
         String shell = clean(pane.shell());
         return shell.isEmpty() ? "Local" : "Local: " + shell;

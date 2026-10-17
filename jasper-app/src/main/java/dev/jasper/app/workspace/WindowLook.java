@@ -16,12 +16,21 @@ public record WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean f
     /** The chrome is required. */
     public WindowLook { Objects.requireNonNull(chrome, "chrome"); }
 
-    /** The look of {@code projections}. */
+    /**
+     * The look of {@code projections}.
+     *
+     * @param projections the presentation's projections
+     * @return the windows' look
+     */
     public static WindowLook of(Projections projections) {
         return new WindowLook(WorkspaceChrome.of(projections.workspace(), projections.title()), projections.shell().unifiedTitle(),
             projections.shell().followThemeAppearance());
     }
 
-    /** The default look on this host. */
+    /**
+     * The default look on this host.
+     *
+     * @return the default look's windows
+     */
     public static WindowLook standard() { return new WindowLook(WorkspaceChrome.STANDARD, MacTitleBar.isSupported(), false); }
 }
