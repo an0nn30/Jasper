@@ -135,6 +135,103 @@ class PaintedContrastTest {
         } finally { UIManager.setLookAndFeel(original); }
     }
 
+    /**
+     * Plan 8a and spec 16.1.2: the Run window paints each pair RunWindowPresentation declares as its guard makes it, and
+     * each unguarded pair as authored, on the surfaces the pairs name, over every palette; the help tile's edge too.
+     */
+    @Test void theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette() throws Exception {
+        record Sampled(String name, KitView view, String id) { }
+        var enterprise = KitFixtures.enterprise();
+        var initial = KitFixtures.enterpriseLight();
+        var original = UIManager.getLookAndFeel();
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            var kit = KitContext.of(enterprise, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+            var texts = new ViewSpec(new Nodes.Stack("run", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                runText("run.title", "Run", Nodes.TextRole.WINDOW_TITLE), runText("run.shortcut", "\u21e7\u2318P", Nodes.TextRole.CAPTION),
+                runText("run.label", "Open:", Nodes.TextRole.LABEL), runText("run.value", "dustin@192.168.1.119:22", Nodes.TextRole.MONO)), ""));
+            var list = new ViewSpec(new Nodes.ItemList("results", ControlState.READY, Nodes.ListKind.RESULTS, List.of(
+                new ListItem("h", Optional.empty(), List.of(runText("h.title", "Matches", Nodes.TextRole.CAPTION),
+                    runText("h.count", "1 of 2", Nodes.TextRole.CAPTION)), List.of(), List.of(), true),
+                new ListItem("a", Optional.empty(), List.of(runText("a.title", "Mac", Nodes.TextRole.BODY)),
+                    List.of(runText("a.detail", "dustin@host", Nodes.TextRole.MONO)), List.of(runText("a.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("b", Optional.empty(), List.of(runText("b.title", "gcloud auth", Nodes.TextRole.BODY)),
+                    List.of(runText("b.detail", "gcloud auth login", Nodes.TextRole.MONO)), List.of(runText("b.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("m", Optional.empty(), List.of(runText("m.title", "More in SSH", Nodes.TextRole.DESCRIPTION)), List.of(), List.of())),
+                java.util.Set.of("a"), "run", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), java.util.OptionalInt.of(4)));
+            var help = new ViewSpec(new Nodes.Stack("run.help", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+                new Nodes.Icon("run.help.icon", ControlState.READY, "play.filled", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Run"),
+                runText("run.help.text", "Type the name of a session.", Nodes.TextRole.DESCRIPTION)), ""));
+            try (var textView = new KitView(kit, texts, event -> { }); var listView = new KitView(kit, list, event -> { });
+                 var helpView = new KitView(kit, help, event -> { })) {
+                var guarded = List.of(new Sampled("title", textView, "run.title"), new Sampled("shortcut", textView, "run.shortcut"),
+                    new Sampled("label", textView, "run.label"), new Sampled("detail value", textView, "run.value"),
+                    new Sampled("heading", listView, "h.title"), new Sampled("selected title", listView, "a.title"),
+                    new Sampled("list text", listView, "m.title"));
+                var authored = List.of(new Sampled("row detail", listView, "b.detail"), new Sampled("count", listView, "h.count"),
+                    new Sampled("selected detail", listView, "a.detail"));
+                var pairs = RunWindowPresentation.pairs(enterprise);
+                assertThat(guarded).as("every declared Run window pair is sampled").hasSameSizeAs(pairs);
+                assertThat(authored).as("every unguarded Run window pair is sampled").hasSameSizeAs(RunWindowPresentation.authored());
+                var window = new SurfacePanel(kit, SurfacePanel.Kind.RUN_WINDOW, () -> 24, () -> 40);
+                var box = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
+                var field = new SurfacePanel(kit, SurfacePanel.Kind.FIELD);
+                field.focusShown(false);
+                for (var theme : palettes()) {
+                    FlatLafInstaller.install(theme, enterprise); binding.publish(new ThemePair(theme, theme));
+                    for (var view : List.of(textView, listView, helpView)) {
+                        SwingUtilities.updateComponentTreeUI(view);
+                        // Re-reconciles under this theme, so every control refreshes its colours.
+                        view.runWindow(false); view.runWindow(true);
+                    }
+                    var rendered = KitFixtures.render(listView, 436, 100, 1);
+                    String where = name(theme);
+                    // The surfaces the pairs name are the ones painted under them.
+                    var frame = surface(window, 462, 427);
+                    assertThat(frame.getRGB(200, 12)).as(where + ", title band").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme).getRGB());
+                    assertThat(frame.getRGB(200, 200)).as(where + ", dialog surface").isEqualTo(enterprise.colors().dialogSurface().color(theme).getRGB());
+                    assertThat(surface(box, 436, 208).getRGB(100, 100)).as(where + ", list box").isEqualTo(theme.semantic().color(SURFACE_CARD).getRGB());
+                    assertThat(surface(field, 392, 26).getRGB(100, 13)).as(where + ", field box").isEqualTo(theme.semantic().color(SURFACE_INPUT).getRGB());
+                    assertThat(rendered.getRGB(200, 5)).as(where + ", heading band").isEqualTo(DerivedColor.SURFACE_TABLE_HEADER.color(theme).getRGB());
+                    assertThat(rendered.getRGB(300, 19 + 10)).as(where + ", selected row").isEqualTo(theme.semantic().color(ACCENT).getRGB());
+                    // The help tile's edge, an indicator on the dialog surface.
+                    var helpImage = KitFixtures.render(helpView, 436, 40, 1);
+                    var tile = KitTestSupport.require(helpView, "run.help.tile", JComponent.class);
+                    var tileAt = SwingUtilities.convertRectangle(tile.getParent(), tile.getBounds(), helpView);
+                    var edge = RunWindowPresentation.tileEdge(enterprise);
+                    Color painted = SurfaceContrast.painted(theme, edge);
+                    assertThat(edge.guard().holds(painted, edge.against().color(theme))).as(where + ", the help tile's edge meets its guard").isTrue();
+                    assertThat(helpImage.getRGB(tileAt.x + tileAt.width / 2, tileAt.y)).as(where + ", the help tile's edge").isEqualTo(painted.getRGB());
+                    for (int i = 0; i < guarded.size(); i++) {
+                        var pair = pairs.get(i);
+                        var sample = guarded.get(i);
+                        Color expected = SurfaceContrast.painted(theme, pair);
+                        assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(where + ", " + sample.name() + " meets its guard").isTrue();
+                        assertThat(KitTestSupport.require(sample.view(), sample.id(), JLabel.class).getForeground())
+                            .as(where + ", " + sample.name() + " is painted " + ColorMath.hex(expected)).isEqualTo(expected);
+                    }
+                    for (int i = 0; i < authored.size(); i++) {
+                        var pair = RunWindowPresentation.authored().get(i);
+                        var sample = authored.get(i);
+                        assertThat(KitTestSupport.require(sample.view(), sample.id(), JLabel.class).getForeground())
+                            .as(where + ", " + sample.name() + " as authored").isEqualTo(pair.slot().color(theme));
+                    }
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    private static Nodes.Text runText(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
+
+    /** {@code panel} painted at {@code width} by {@code height}. */
+    private static BufferedImage surface(SurfacePanel panel, int width, int height) {
+        panel.setSize(width, height);
+        var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { panel.paint(graphics); } finally { graphics.dispose(); }
+        return image;
+    }
+
     private static boolean searchHint(GeneratedTheme theme, Color expected) {
         var blank = new Icon() {
             public int getIconWidth() { return 16; } public int getIconHeight() { return 16; }
