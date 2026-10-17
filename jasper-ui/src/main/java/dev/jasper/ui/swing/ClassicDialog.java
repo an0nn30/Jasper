@@ -40,6 +40,9 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
     /** The strip's title (spec 16.1.1). */
     public static final PaintPair STRIP_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
 
+    /** The rule over a dialog's footer band, on the band's {@code surface.footer} (spec 10.8; {@code Forms.Footer} paints it). */
+    public static final PaintPair BAND_RULE = new PaintPair(SemanticColor.BORDER_WINDOW, DerivedColor.SURFACE_FOOTER, SurfaceContrast.Guard.STRUCTURAL);
+
     /**
      * The rule under the strip, held apart from the content it parts the strip from (the kit's dialog surface).
      *
@@ -72,13 +75,14 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
     }
 
     /**
-     * Every pair this dialog paints (spec 16.1.1 and 16.1.2): the frame, the strip's rule and title, each swatch.
+     * Every pair this dialog paints (spec 16.1.1 and 16.1.2): the frame, the strip's rule and title, the band's rule, each
+     * swatch.
      *
      * @param dialogSurface the kit's dialog surface slot
      * @return the pairs
      */
     public static java.util.List<PaintPair> pairs(SemanticColor dialogSurface) {
-        var pairs = new java.util.ArrayList<PaintPair>(java.util.List.of(frame(dialogSurface), stripRule(dialogSurface), STRIP_TITLE));
+        var pairs = new java.util.ArrayList<PaintPair>(java.util.List.of(frame(dialogSurface), stripRule(dialogSurface), STRIP_TITLE, BAND_RULE));
         for (Nodes.Hue hue : Nodes.Hue.values()) if (hue != Nodes.Hue.NONE) pairs.add(swatch(hue));
         return java.util.List.copyOf(pairs);
     }
@@ -111,6 +115,7 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
         this.placement = Objects.requireNonNull(placement);
         setOpaque(false);
         setLayout(null);
+        strip.getAccessibleContext().setAccessibleName(title);
         card.add(strip, BorderLayout.NORTH);
         card.add(content, BorderLayout.CENTER);
         add(card);
@@ -291,7 +296,9 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
                 g.setFont(ThemePainting.font(context, Typography.Role.WINDOW_TITLE));
                 FontMetrics metrics = g.getFontMetrics();
                 g.setColor(SurfaceContrast.painted(theme, STRIP_TITLE));
-                g.drawString(title, x, (height - metrics.getHeight()) / 2 + metrics.getAscent());
+                // A long title ends in an ellipsis inside the strip's trailing inset.
+                String shown = ChromePainter.installed().clip(title, metrics, Math.max(0, getWidth() - x - ThemePainting.metric(context, DesignMetrics.Role.DIALOG_HEADER_INSET)));
+                g.drawString(shown, x, (height - metrics.getHeight()) / 2 + metrics.getAscent());
             } finally { g.dispose(); }
         }
     }

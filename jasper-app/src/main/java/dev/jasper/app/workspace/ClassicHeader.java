@@ -91,6 +91,13 @@ final class ClassicHeader implements HeaderComposition {
     @Override public Dimension searchMinimum() { return new Dimension(metric(DesignMetrics.Role.TOOLBAR_SEARCH_WIDTH) / 2, metric(DesignMetrics.Role.FIELD_HEIGHT)); }
     @Override public Dimension searchMaximum() { return searchPreferred(); }
 
+    /** The field reads "Search everywhere", so its tooltip and name say so, the tooltip with the palette's shortcut. */
+    @Override public String searchTooltip(String context, String contextTooltip, String shortcut) {
+        return shortcut == null || shortcut.isBlank() ? SEARCH : SEARCH + " (" + shortcut + ")";
+    }
+    @Override public String searchName(String context) { return SEARCH; }
+    private static final String SEARCH = "Search everywhere";
+
     /**
      * A field on {@code surface.input} in a {@code border.control} edge ({@code border.hover} while hovered), the
      * placeholder "Search everywhere" and, at its trailing edge, the palette's shortcut in a light keycap (Rulings 6).
@@ -129,7 +136,7 @@ final class ClassicHeader implements HeaderComposition {
             g.setFont(ThemeZone.font(Typography.Role.BODY));
             FontMetrics body = g.getFontMetrics();
             g.setColor(SurfaceContrast.painted(theme, WindowPairs.PLACEHOLDER));
-            String text = TitleSearchField.clip("Search everywhere", body, Math.max(0, width - 2 * pad - hint));
+            String text = TitleSearchField.clip(SEARCH, body, Math.max(0, width - 2 * pad - hint));
             FlatUIUtils.drawString(field, g, text, pad, (height - body.getHeight()) / 2 + body.getAscent());
         } finally { g.dispose(); }
     }

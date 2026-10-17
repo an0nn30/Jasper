@@ -230,7 +230,8 @@ public final class AuxiliarySurface {
     /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
     public boolean requestClose() {
         if (closed) return true;
-        if (kind == Kind.OVERLAY) return false;
+        // An overlay in its window has no close button; one opened as a native dialog closes as a dialog does.
+        if (kind == Kind.OVERLAY && !nativeDialog) return false;
         if (!mayClose()) return false;
         close();
         return true;

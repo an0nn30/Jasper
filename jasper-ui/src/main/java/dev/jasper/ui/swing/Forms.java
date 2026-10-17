@@ -196,7 +196,7 @@ final class Forms {
             title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty() && !view.hostTitled());
             Composition.style(
                     title, context(), Typography.Role.PROMPT_TITLE, SemanticColor.TEXT_PRIMARY);
-            boolean hosted = view.dialogBand();
+            boolean hosted = view.dialogCard();
             ((Surface) component).hosted = hosted;
             ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET && !hosted;
             int stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
@@ -345,8 +345,7 @@ final class Forms {
                 var theme = context.theme();
                 graphics.setColor(dev.jasper.ui.theme.DerivedColor.SURFACE_FOOTER.color(theme));
                 graphics.fillRect(0, 0, getWidth(), getHeight());
-                graphics.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(theme, new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW,
-                    dev.jasper.ui.theme.DerivedColor.SURFACE_FOOTER, dev.jasper.ui.theme.SurfaceContrast.Guard.STRUCTURAL)));
+                graphics.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(theme, ClassicDialog.BAND_RULE));
                 graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
             }
             if (window) {

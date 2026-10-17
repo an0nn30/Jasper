@@ -58,7 +58,7 @@ class EnterpriseDialogMockTest {
      * @param card where the card is, in logical pixels
      * @param swatch the theme's colour for the dialog's hue
      */
-    record Rendered(BufferedImage image, Rectangle card, Color swatch) { }
+    record Rendered(BufferedImage image, Rectangle card, Color swatch, Color dialogSurface) { }
 
     static Rendered render(ClassicDialog.Placement placement, String title, Nodes.Hue hue, FormKind kind, String footnote,
                            int width, int height, String name) {
@@ -76,18 +76,31 @@ class EnterpriseDialogMockTest {
             root.setSize(width, height);
             LayoutTestSupport.layoutTree(root);
             try (var view = new KitView(context, new ViewSpec(form(kind, title, footnote)), event -> { })) {
-                view.hostTitled(true); view.dialogBand(true);
-                var dialog = new ClassicDialog(context, view, title, hue, placement);
+                // The production path: the surface's holder around the view, prepared as NativeShells.inWindow prepares it.
+                var windows = ClassicPlacementTest.windows(dev.jasper.app.presentation.DialogMapping.Kind.CLASSIC, true);
+                var surface = placement == ClassicDialog.Placement.SHEET ? windows.dialog(title, true, java.util.UUID.randomUUID())
+                    : windows.modalOverlay(title, java.util.UUID.randomUUID());
+                if (placement == ClassicDialog.Placement.SHEET) surface.attachedSheet(true);
+                surface.setContent(view);
+                NativeShells.classicContent(surface);
+                var dialog = new ClassicDialog(context, surface.holder(), title, hue, placement);
                 // Credential Vault 1's title bar and its rule above the content: 29 px (Task 6's centring).
                 dialog.windowTitleHeight(29);
                 try (var overlay = WindowOverlay.classic(root, dialog)) {
                     overlay.show();
                     var image = MockProfile.print(root, width, height);
                     MockProfile.write(image, "enterprise-" + name);
-                    return new Rendered(image, overlay.cardBounds(), swatch);
+                    return new Rendered(image, overlay.cardBounds(), swatch, palette.color(context.kit().colors().dialogSurface()));
                 }
             }
         } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The body, 12 px (2×) inside the frame's left edge and 64 below its top (under the strip): the kit's dialog surface, the mock's #ECEDEF. */
+    static void body(String what, Rendered rendered, int x, int y, BufferedImage mock, int mockX, int mockY) {
+        var at = MockProfile.at(rendered.image(), x, y);
+        assertThat(at).as(what + " body is the kit's dialog surface").isEqualTo(new Color(rendered.dialogSurface().getRGB() & 0xFFFFFF));
+        assertThat(MockProfile.deltaE(at, MockProfile.at(mock, mockX, mockY))).as(what + " body against the mock").isLessThanOrEqualTo(2.5);
     }
 
     static void same(String what, MockProfile.Run actual, MockProfile.Run expected, int tolerance) {
@@ -113,6 +126,7 @@ class EnterpriseDialogMockTest {
         for (int i = 0; i < 3; i++) same("unlock " + top[i], actual.get(i), expected.get(i), 2);
         String[] bottom = {"frame", "footer band", "band rule"};
         for (int i = 1; i <= 3; i++) same("unlock bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2);
+        body("unlock", rendered, 2 * card.x + 12, 2 * card.y + 64, mock, UNLOCK_FRAME.x + 12, UNLOCK_FRAME.y + 64);
         // The title, 10 in and 8 down in the strip, in the semibold UI face (mock ink 1128-1265, from y 800).
         var mockTitle = MockProfile.inks(mock, new Rectangle(UNLOCK_FRAME.x + 8, UNLOCK_FRAME.y + 4, 560, 46), 12, 25).getFirst();
         var title = MockProfile.inks(image, new Rectangle(2 * card.x + 8, 2 * card.y + 4, 560, 46), 12, 25).getFirst();
@@ -149,6 +163,7 @@ class EnterpriseDialogMockTest {
         same(name + " strip rule", actual.get(1), expected.get(1), 2);
         String[] bottom = {"frame", "footer band", "band rule"};
         for (int i = 1; i <= 3; i++) same(name + " bottom " + bottom[i - 1], actual.get(actual.size() - i), expected.get(expected.size() - i), 2);
+        body(name, rendered, 2 * card.x + 12, 64, mock, frame.x + 12, frame.y + 64);
         // The swatch, 8 square at 10, 9 down (mock 402-417, y 76-91), then the title 7 after it.
         var mockInks = MockProfile.inks(mock, new Rectangle(frame.x + 4, frame.y + 2, 560, 46), 12, 25);
         var inks = MockProfile.inks(image, new Rectangle(2 * card.x + 4, 2, 560, 46), 12, 25);

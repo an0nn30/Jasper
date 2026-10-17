@@ -141,6 +141,11 @@ class WindowPairsTest {
             try { return print(button); } finally { button.getModel().setRollover(false); }
         }
 
+        BufferedImage pressed() {
+            button.getModel().setArmed(true); button.getModel().setPressed(true);
+            try { return print(button); } finally { button.getModel().setPressed(false); button.getModel().setArmed(false); }
+        }
+
         BufferedImage inactiveTabs() {
             tabs.setActive(false);
             try { LayoutTestSupport.layoutTree(tabs); return print(tabs); } finally { tabs.setActive(true); LayoutTestSupport.layoutTree(tabs); }
@@ -157,7 +162,10 @@ class WindowPairsTest {
         return List.of(
             new Declared("open menu title", WindowPairs.OPEN_MENU, (theme, expected) -> f.menuStyle("selectionForeground").equals(expected)),
             new Declared("toolbar button label", WindowPairs.BUTTON_LABEL, (theme, expected) -> paints(f.button, expected)),
+            new Declared("hovered toolbar button label", WindowPairs.HOVERED_BUTTON_LABEL, (theme, expected) -> has(f.hovered(), expected)),
+            new Declared("pressed toolbar button label", WindowPairs.PRESSED_BUTTON_LABEL, (theme, expected) -> has(f.pressed(), expected)),
             new Declared("hovered toolbar button frame", WindowPairs.BUTTON_FRAME, (theme, expected) -> has(f.hovered(), expected)),
+            new Declared("pressed toolbar button frame", WindowPairs.PRESSED_BUTTON_FRAME, (theme, expected) -> has(f.pressed(), expected)),
             new Declared("search edge", WindowPairs.SEARCH_EDGE, (theme, expected) -> has(f.search(false), expected)),
             new Declared("hovered search edge", WindowPairs.SEARCH_HOVER_EDGE, (theme, expected) -> has(f.search(true), expected)),
             new Declared("search placeholder", WindowPairs.PLACEHOLDER, (theme, expected) -> has(f.search(false), expected)),
@@ -191,6 +199,22 @@ class WindowPairsTest {
         try (var dialog = new ClassicDialog(context, sized(new JPanel(), 240, 120), "Unlock Vault", hue, ClassicDialog.Placement.CENTERED)) {
             dialog.setSize(400, 300); dialog.open(); dialog.doLayout(); dialog.card().doLayout();
             return print(dialog);
+        } finally { context.icons().close(); context.binding().close(); }
+    }
+
+    /** A classic dialog around a band-flagged form, at 4x: its footer band and the band's rule. */
+    static BufferedImage bandDialog(GeneratedTheme theme, Kit kit) {
+        var context = KitFixtures.context(theme, kit);
+        var ready = dev.jasper.ui.model.ControlState.READY;
+        var form = new Nodes.Form("form", ready, Nodes.FormKind.SHEET, "Add Login", java.util.Optional.empty(),
+            List.of(new Nodes.Text("note", ready, "A note", Nodes.TextRole.LABEL)), java.util.Optional.empty(),
+            List.of(new Nodes.Button("ok", ready, "Save", "", Nodes.ButtonKind.PRIMARY, "ok", "")), "ok", Nodes.FormSubmission.PRIMARY, "");
+        try (var view = new dev.jasper.ui.swing.KitView(context, new dev.jasper.ui.model.ViewSpec(form), event -> { })) {
+            view.hostTitled(true); view.dialogBand(true); view.dialogCard(true);
+            try (var dialog = new ClassicDialog(context, view, "Add Login", Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED)) {
+                dialog.setSize(800, 600); dialog.open(); LayoutTestSupport.layoutTree(dialog);
+                return print(dialog);
+            }
         } finally { context.icons().close(); context.binding().close(); }
     }
 
@@ -228,10 +252,13 @@ class WindowPairsTest {
                     assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(palette + ", dialog " + pair.slot() + " meets its guard").isTrue();
                     assertThat(has(blue, expected)).as(palette + ", dialog " + pair.slot() + " is painted " + ColorMath.hex(expected)).isTrue();
                 }
+                Color bandRule = SurfaceContrast.painted(theme, ClassicDialog.BAND_RULE);
+                assertThat(ClassicDialog.BAND_RULE.guard().holds(bandRule, ClassicDialog.BAND_RULE.against().color(theme))).as(palette + ", the band's rule meets its guard").isTrue();
+                assertThat(has(bandDialog(theme, kit), bandRule)).as(palette + ", the band's rule is painted " + ColorMath.hex(bandRule)).isTrue();
                 for (var hue : List.of(Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE, Nodes.Hue.NEUTRAL))
                     assertThat(has(dialog(theme, kit, hue), SurfaceContrast.painted(theme, ClassicDialog.swatch(hue)))).as(palette + ", the " + hue + " swatch").isTrue();
                 assertThat(dialogPairs).as("the dialog declares what it paints").contains(ClassicDialog.stripRule(kit.colors().dialogSurface()), ClassicDialog.STRIP_TITLE,
-                    ClassicDialog.frame(kit.colors().dialogSurface()), ClassicDialog.swatch(Nodes.Hue.GREEN));
+                    ClassicDialog.frame(kit.colors().dialogSurface()), ClassicDialog.swatch(Nodes.Hue.GREEN), ClassicDialog.BAND_RULE);
             }
         } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
     }

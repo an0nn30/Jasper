@@ -339,8 +339,9 @@ public final class KitView extends JPanel implements AutoCloseable {
     public boolean hostTitled() { return hostTitled; }
     private boolean hostTitled;
     /**
-     * App-only: this view's form is a classic dialog's content, so its footer is the dialog's band on
-     * {@code surface.footer} under a {@code border.window} rule (spec 10.8). EDT confined.
+     * App-only: this view's form is a dialog's content under the classic mapping, so its footer is the dialog's band on
+     * {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog or a native one. EDT
+     * confined.
      */
     public void dialogBand(boolean value) {
         requireOpen();
@@ -350,6 +351,18 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** Whether this view's form footer is a classic dialog's band. */
     public boolean dialogBand() { return dialogBand; }
     private boolean dialogBand;
+    /**
+     * App-only: this view's form is a classic dialog's content, so the dialog's card paints the form's fill and frame
+     * (spec 10.8). EDT confined.
+     */
+    public void dialogCard(boolean value) {
+        requireOpen();
+        if (dialogCard == value) return;
+        dialogCard = value; refresh(); repaint();
+    }
+    /** Whether a classic dialog's card paints this view's form fill and frame. */
+    public boolean dialogCard() { return dialogCard; }
+    private boolean dialogCard;
     /** A hero hidden because it only repeats a host-titled form's title. */
     private static final java.util.function.Consumer<javax.swing.JLabel> HOSTED_HEADING = label -> label.setVisible(false);
     /**

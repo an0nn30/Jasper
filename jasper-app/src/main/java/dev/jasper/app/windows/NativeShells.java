@@ -131,8 +131,36 @@ public final class NativeShells {
         };
     }
 
-    /** A classic dialog's host flags (spec 10.8): the strip titles it and its footer is the band. */
-    static final java.util.function.Consumer<dev.jasper.ui.swing.KitView> CLASSIC_FLAGS = view -> { view.hostTitled(true); view.dialogBand(true); };
+    /** A classic dialog's host flags (spec 10.8): the strip titles it, its footer is the band and its card paints its fill. */
+    static final java.util.function.Consumer<dev.jasper.ui.swing.KitView> CLASSIC_FLAGS = view -> { view.hostTitled(true); view.dialogBand(true); view.dialogCard(true); };
+
+    /**
+     * Prepares a surface's holder as a classic dialog's content (spec 10.8): it takes the look and feel, it stops painting
+     * (an opaque panel on {@code surface.panel} would cover the card's dialog surface; set by the client, this survives
+     * later look-and-feel updates), and its kit views, now and set later, take {@link #CLASSIC_FLAGS}.
+     */
+    static void classicContent(AuxiliarySurface surface) {
+        SwingUtilities.updateComponentTreeUI(surface.holder());
+        surface.holder().setOpaque(false);
+        for (var child : surface.holder().getComponents())
+            if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) CLASSIC_FLAGS.accept(view);
+        // AuxiliarySurface.setContent marks content set later the same way.
+        surface.laterContent(CLASSIC_FLAGS);
+    }
+
+    /**
+     * The host flags of a native dialog's kit content (spec 10.8): under the classic mapping its form footer is the band,
+     * and when a title bar the system draws ({@code systemTitle}) already shows the dialog's title, a FULL form does not
+     * repeat it.
+     */
+    static java.util.function.Consumer<dev.jasper.ui.swing.KitView> nativeMarks(AuxiliarySurface surface, boolean systemTitle) {
+        boolean band = surface.classic(), titled = systemTitle && surface.hostTitled();
+        return view -> {
+            if (band) view.dialogBand(true);
+            if (titled && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
+                view.hostTitled(true);
+        };
+    }
 
     /**
      * A classic dialog with no showing window opens natively (spec 10.8). A modal overlay becomes a native modal dialog:
@@ -182,11 +210,7 @@ public final class NativeShells {
     private AuxiliarySurface.Shell inWindow(AuxiliarySurface surface, dev.jasper.ui.swing.ClassicDialog.Placement placement) {
         Window owner = owner(surface);
         var container = (javax.swing.RootPaneContainer) owner;
-        SwingUtilities.updateComponentTreeUI(surface.holder());
-        for (var child : surface.holder().getComponents())
-            if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) CLASSIC_FLAGS.accept(view);
-        // AuxiliarySurface.setContent marks content set later the same way.
-        surface.laterContent(CLASSIC_FLAGS);
+        classicContent(surface);
         var dialog = new dev.jasper.ui.swing.ClassicDialog(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), surface.holder(),
             surface.title(), surface.swatch(), placement);
         dialog.windowTitleHeight(owner.getInsets().top);
@@ -389,18 +413,12 @@ public final class NativeShells {
             resources.layout = installChrome(dialog.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
             shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
-            // Spec 10.8: the title bar the system draws titles the dialog, so a FULL form does not repeat it.
-            if (bar == null && surface.hostTitled())
-                for (var child : surface.holder().getComponents())
-                    if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()
-                            && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
-                        view.hostTitled(true);
-            // Content set later takes the same flag (AuxiliarySurface.setContent).
-            if (bar == null && surface.hostTitled())
-                surface.laterContent(view -> {
-                    if (view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
-                        view.hostTitled(true);
-                });
+            // Spec 10.8: under the classic mapping the footer is the band, and the title bar the system draws titles the
+            // dialog, so a FULL form does not repeat it; content set later takes the same flags (AuxiliarySurface.setContent).
+            var marks = nativeMarks(surface, bar == null);
+            for (var child : surface.holder().getComponents())
+                if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) marks.accept(view);
+            surface.laterContent(marks);
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             dialog.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }

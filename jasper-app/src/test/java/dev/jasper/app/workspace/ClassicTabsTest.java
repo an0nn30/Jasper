@@ -171,6 +171,20 @@ class ClassicTabsTest {
                 mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
                 mouse(first, MouseEvent.MOUSE_RELEASED, x + 1, y);
                 assertThat(owner.tabStrip().getTabCount()).as("released over the x, its tab closes").isEqualTo(1);
+                // The x takes the pointer in a square larger than its 7 px glyph, inside its tab.
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                tabs(owner, 800);
+                var tab = strip.entries().get(0);
+                var glyph = tab.closeBounds();
+                var target = tab.closeTarget();
+                assertThat(target.contains(glyph)).isTrue();
+                assertThat(target.width).as("wider than the glyph").isGreaterThan(glyph.width + 8);
+                assertThat(target.x + target.width).as("inside the tab").isLessThanOrEqualTo(tab.getWidth());
+                int beside = glyph.x + glyph.width + 3;
+                mouse(tab, MouseEvent.MOUSE_PRESSED, beside, glyph.y - 3);
+                mouse(tab, MouseEvent.MOUSE_RELEASED, beside, glyph.y - 3);
+                assertThat(owner.tabStrip().getTabCount()).as("a click just beside the glyph closes its tab").isEqualTo(1);
 
                 owner.newTab(DesktopTestSupport.HOME);
                 owner.update();

@@ -51,7 +51,7 @@ class ClassicDialogTest {
             var theme = KitFixtures.enterpriseLight();
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
             try (var view = new KitView(context, new ViewSpec(form(FormKind.PROMPT_COMPACT, "Unlock Vault", "Auto-locks after 15 min idle")), e -> { })) {
-                view.hostTitled(true); view.dialogBand(true);
+                view.hostTitled(true); view.dialogBand(true); view.dialogCard(true);
                 try (var dialog = new ClassicDialog(context, view, "Unlock Vault", Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED)) {
                     dialog.windowTitleHeight(29);
                     dialog.open();
@@ -81,7 +81,7 @@ class ClassicDialogTest {
             var theme = KitFixtures.enterpriseLight();
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
             try (var view = new KitView(context, new ViewSpec(form(FormKind.SHEET, "Add Login", "")), e -> { })) {
-                view.hostTitled(true); view.dialogBand(true);
+                view.hostTitled(true); view.dialogBand(true); view.dialogCard(true);
                 try (var dialog = new ClassicDialog(context, view, "Add Login", Nodes.Hue.BLUE, ClassicDialog.Placement.SHEET)) {
                     dialog.open();
                     var image = print(dialog, 822, 573);
@@ -106,7 +106,7 @@ class ClassicDialogTest {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             try (var view = new KitView(context, KitFixtures.form("unlock"), e -> { })) {
-                view.hostTitled(true); view.dialogBand(true);
+                view.hostTitled(true); view.dialogBand(true); view.dialogCard(true);
                 try (var dialog = new ClassicDialog(context, view, "Unlock Vault", Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED)) {
                     dialog.open();
                     print(dialog, 1440, 871);
@@ -119,6 +119,34 @@ class ClassicDialogTest {
                     assertThat(KitViewTest.find(view, "unlock-hero.tile", Stacks.Tile.class).isVisible()).as("after an update").isTrue();
                     assertThat(KitViewTest.find(view, "unlock-description", javax.swing.JComponent.class).isVisible()).isTrue();
                 }
+            } finally { release(context); }
+        });
+    }
+
+    /** The strip is named from the start, and a long title ends in an ellipsis inside its trailing inset. */
+    @Test void aLongTitleIsShortenedAndTheStripIsNamed() {
+        Edt.run(() -> {
+            var theme = KitFixtures.enterpriseLight();
+            var context = KitFixtures.context(theme, KitFixtures.enterprise());
+            var body = new javax.swing.JPanel();
+            body.setOpaque(false);
+            body.setPreferredSize(new java.awt.Dimension(200, 80));
+            String title = "Grant access to the deployment credentials for every production host in the fleet";
+            try (var dialog = new ClassicDialog(context, body, title, Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED)) {
+                var strip = dialog.card().getComponent(0);
+                assertThat(strip.getAccessibleContext().getAccessibleName()).as("named before any setTitle").isEqualTo(title);
+                dialog.open();
+                var image = print(dialog, 600, 400);
+                var card = dialog.cardBounds();
+                var ground = DerivedColor.SURFACE_HEADER_ACTIVE.color(theme);
+                int inset = context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.DIALOG_HEADER_INSET);
+                boolean inked = false;
+                for (int y = card.y + 2; y < card.y + strip.getHeight() - 2; y++) {
+                    for (int x = card.x + card.width - inset; x < card.x + card.width - 2; x++)
+                        assertThat(at(image, x, y)).as("nothing drawn in the trailing inset at " + x + ", " + y).isEqualTo(ground);
+                    for (int x = card.x + inset; x < card.x + card.width / 2; x++) inked |= !at(image, x, y).equals(ground);
+                }
+                assertThat(inked).as("the title is drawn").isTrue();
             } finally { release(context); }
         });
     }

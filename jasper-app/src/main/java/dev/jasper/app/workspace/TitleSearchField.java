@@ -35,6 +35,7 @@ final class TitleSearchField extends JComponent {
     private final Runnable open;
     private final Supplier<String> shortcut;
     private String context = "Search";
+    private String contextTooltip;
     private Icon contextIcon;
     private boolean collapsed, hover, pressed;
 
@@ -50,6 +51,7 @@ final class TitleSearchField extends JComponent {
         setName("titleSearch");
         setFocusable(false);
         setOpaque(false);
+        // Registers the tip; its text is read when shown (getToolTipText), so it follows the palette's shortcut.
         setToolTipText(context);
         var mouse = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent event) { hover = true; repaint(); }
@@ -72,7 +74,7 @@ final class TitleSearchField extends JComponent {
     /** The focused pane's context, as the header label showed it; blank shows "Search". */
     void setContext(String label, String tooltip, Icon icon) {
         context = label == null || label.isBlank() ? "Search" : label;
-        setToolTipText(tooltip == null || tooltip.isBlank() ? context : tooltip);
+        contextTooltip = tooltip;
         contextIcon = icon;
         repaint();
     }
@@ -87,6 +89,9 @@ final class TitleSearchField extends JComponent {
     @Override public Dimension getMinimumSize() { return composition.searchMinimum(); }
     @Override public Dimension getMaximumSize() { return composition.searchMaximum(); }
 
+    /** The header composition's tip: the context's own under the default look, "Search everywhere" under the classic one. */
+    @Override public String getToolTipText() { return composition.searchTooltip(context, contextTooltip, shortcutText()); }
+
     @Override public JToolTip createToolTip() {
         var tip = new JToolTip();
         tip.putClientProperty("html.disable", true);
@@ -97,7 +102,7 @@ final class TitleSearchField extends JComponent {
     @Override public AccessibleContext getAccessibleContext() {
         if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
             @Override public AccessibleRole getAccessibleRole() { return AccessibleRole.PUSH_BUTTON; }
-            @Override public String getAccessibleName() { return "Search, " + context; }
+            @Override public String getAccessibleName() { return composition.searchName(context); }
         };
         return accessibleContext;
     }

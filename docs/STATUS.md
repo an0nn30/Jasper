@@ -33,16 +33,23 @@ leading pack is a separate branch; (5) the classic header's trailing group, fiel
 shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the configuration
 cell only for a problem; (9) the run item in `accent.edge`, on `surface.control.selected` while the palette is open;
 (10) `ClassicDialog` in jasper-ui, radius 4, **centred on the whole window, a deviation from spec 10.8's "centred in the
-window's content" (the mock wins on layout)**; (11) `AuxiliaryWindows` marks every surface, native without a showing
+window's content" (the mock wins on layout), not approved: it awaits the orchestrator's ruling**; (11) `AuxiliaryWindows` marks every surface, native without a showing
 window (a sheet as a centred dialog), content set later marked too; (12) `hostTitled` hides the form's title label and
-only a hero that repeats it (a prompt keeps its tile and message), and `dialogBand` lets the card own the form's frame;
+only a hero that repeats it (a prompt keeps its tile and message), and `dialogCard` lets the card own the form's frame;
 (13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the Workstation render leads with the
 run item; (16) under a native title the header row is window chrome; (17) the window chrome's declared pairs
 (`WindowPairs`, `ClassicDialog.pairs`) are sampled over every palette under both kits, the `border.divider` rules
 painted as the role; Execution notes (2026-10-17) R18 to R53 (the fixture theme in 5b's place, `ProjectionReadTest`,
 `WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the band's trailing actions,
 the tab strip's dividers painted as the role, the face-width probes printed until 5b, 5b's merge items, and the run item
-on its bar's surface).
+on its bar's surface). **R44 keeps `PluginRuntime.presentation(Kit)`, a deviation from spec 4.9's
+`presentation(Kit kit, DialogMapping dialogs)` and 5a Rulings 20** (the mapping reaches plugin dialogs through
+`AuxiliaryWindows`; spec 9.1's consumer column still names `HostedUi.dialog`); amending 4.9 and 9.1 awaits the
+orchestrator's approval. At the merge with plan 5b (R47): copy the eight chrome values into `enterprise.json` (Light
+`surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim` `#00000036`, `border.divider` `#D3D6DA`; Dark
+`#3A3D42`, `#3D74D6`, `#00000036`, `#4A4D53`), drop `surface.tabstrip` from `EnterpriseThemeTest.NEUTRAL`, add the Dark
+`border.divider` override there, generate `derived-roles-enterprise.tsv` with it, turn R36's printed probes into
+assertions and re-measure R39's swatch under the shipped theme.
 Deviations from the plan's text: Task 2's review: `WindowToolbar`'s leading pack gives way as the trailing one does (a
 button that overflowed before a wide view returns once the view hides, labels return once the row fits them) and the
 overflow button takes the gap only after a shown control; Task 4's review (the plan's banner): past
@@ -57,11 +64,21 @@ window (`NativeShells.drawnInWindow`), an attached sheet is never host-titled, `
 `NativeShells.ClassicRoute`, the host flags are `CLASSIC_FLAGS`, the strip takes no focus, a classic modal overlay that
 opens natively passes through `nativeFallback` (host-titled once native), an owner window under a minimised one is not
 showing, and a centred dialog follows its window's title bar (`NativeShells.followTitleBar`).
-`./gradlew check --continue`: **10,966 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2):
+Final review fixes (the plan's banner): a classic dialog's body is the kit's dialog surface (its holder no longer
+paints `surface.panel`), a modal overlay opened natively closes from its title bar, every native dialog under the
+classic mapping takes the footer band (`KitView.dialogBand` apart from `dialogCard`), the band's rule is a declared
+pair, the strip is named and ellipsises, disabled icon buttons fade, the toolbar button's hover and pressed pairs, the
+classic search field's tip and name, a larger tab × target, and the search placeholder and keycap on the text guard
+(spec 7.3, as 8a). Task 9 Step 4's default-look proof: the headless gallery for Slate Cobalt Dark and Light is
+byte-identical to `50b593f3c` (161 files a side), before and after the final review fixes, and the calibration and
+reference suites pass.
+`./gradlew check --continue` (before the final review fixes): **10,966 tests, 0 failures, 0 errors, 25 skipped**; the
+fixes' targeted suites pass. GUI checks for the user (spec 16.2):
 with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell, "▶ Run…"
 opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog
 over the first, the window closing under them, full screen under them, and either requested over a minimised window,
-which opens it natively). Not merged, not pushed.
+which opens it natively; a known residual: an in-window classic modal dialog blocks only its window, so a modeless
+plugin dialog owned by the same frame stays usable, unlike a native document-modal sheet). Not merged, not pushed.
 
 **Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit and the final review fixes;

@@ -34,6 +34,10 @@ final class UnifiedHeader implements HeaderComposition {
         ChromePainter.installed().search(field, graphics, ThemeZone.theme(field), hover, collapsed,
             field.contextText(), field.shortcutText(), AppIcons.icon("search"), field.contextIcon());
     }
+    @Override public String searchTooltip(String context, String contextTooltip, String shortcut) {
+        return contextTooltip == null || contextTooltip.isBlank() ? context : contextTooltip;
+    }
+    @Override public String searchName(String context) { return "Search, " + context; }
     @Override public void toolbarMode(WindowHeader header, ToolbarMode mode, boolean normal) {
         header.toolbar().setVisible(normal && mode != ToolbarMode.HIDDEN);
         header.toolbar().setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);

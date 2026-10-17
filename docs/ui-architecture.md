@@ -105,9 +105,10 @@ layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stac
 `ClassicDialog` is the classic look's in-window dialog: a still scrim, a card framed in `border.hover` with
 `DIALOG_RADIUS` and the popover shadow, a header strip on `surface.header.active` holding the dialog's swatch and title,
 and the host's content; it is centred on the whole window or, as a sheet, joined under the title bar, and it neither
-fades nor moves. Two `KitView` host flags serve it: `hostTitled` (the form draws no title label and hides a hero that
-only repeats the title) and `dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule, the
-footnote leading and the actions trailing).
+fades nor moves. Three `KitView` host flags serve it: `hostTitled` (the form draws no title label and hides a hero that
+only repeats the title), `dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule, the
+footnote leading and the actions trailing; native dialogs under the classic mapping take it too) and `dialogCard` (the
+card paints the form's fill and frame).
 
 `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Cobalt,
 the bundled `slate-cobalt.json` (the colour reference `docs/design/theme-engine/slate-cobalt.md`'s machine-readable

@@ -24,16 +24,19 @@ final class WindowPairs {
     static final PaintPair OPEN_MENU = dev.jasper.app.platform.ClassicMenuRow.OPEN_TITLE;
     /** The toolbar row's and the status bar's rule, and the toolbar's separators. */
     static final PaintPair RULE = pair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, Guard.STRUCTURAL);
-    /** A classic toolbar button's label and glyphs. */
-    static final PaintPair BUTTON_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_APP, Guard.TEXT);
-    /** A hovered classic toolbar button's frame. */
-    static final PaintPair BUTTON_FRAME = pair(DerivedColor.BORDER_HOVER, SemanticColor.SURFACE_CONTROL_HOVER, Guard.STRUCTURAL);
+    /** A classic toolbar button's label and glyphs: at rest, hovered and pressed, on the fill it lies on. */
+    static final PaintPair BUTTON_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_APP, Guard.TEXT),
+        HOVERED_BUTTON_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CONTROL_HOVER, Guard.TEXT),
+        PRESSED_BUTTON_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
+    /** A hovered classic toolbar button's frame, and a pressed one's. */
+    static final PaintPair BUTTON_FRAME = pair(DerivedColor.BORDER_HOVER, SemanticColor.SURFACE_CONTROL_HOVER, Guard.STRUCTURAL),
+        PRESSED_BUTTON_FRAME = pair(DerivedColor.BORDER_HOVER, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.STRUCTURAL);
     /** The search field's edge, and while hovered. */
     static final PaintPair SEARCH_EDGE = pair(SemanticColor.BORDER_CONTROL, SemanticColor.SURFACE_APP, Guard.CONTROL),
         SEARCH_HOVER_EDGE = pair(DerivedColor.BORDER_HOVER, SemanticColor.SURFACE_APP, Guard.CONTROL);
     /** "Search everywhere", and the keycap's shortcut. */
-    static final PaintPair PLACEHOLDER = pair(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_INPUT, Guard.INDICATOR),
-        KEYCAP_TEXT = pair(SemanticColor.TEXT_PLACEHOLDER, DerivedColor.SURFACE_TABLE_HEADER, Guard.INDICATOR);
+    static final PaintPair PLACEHOLDER = pair(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_INPUT, Guard.TEXT),
+        KEYCAP_TEXT = pair(SemanticColor.TEXT_PLACEHOLDER, DerivedColor.SURFACE_TABLE_HEADER, Guard.TEXT);
     /** A tab's label: the window active or not, the tab selected (on {@code surface.card}) or not. */
     static final PaintPair TAB_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_TABSTRIP, Guard.TEXT),
         SELECTED_TAB_LABEL = pair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CARD, Guard.TEXT),
@@ -65,7 +68,8 @@ final class WindowPairs {
         ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
 
     /** Every window pair, the declared table of spec 16.1.1. */
-    static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, BUTTON_FRAME, SEARCH_EDGE, SEARCH_HOVER_EDGE,
+    static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, HOVERED_BUTTON_LABEL, PRESSED_BUTTON_LABEL, BUTTON_FRAME,
+        PRESSED_BUTTON_FRAME, SEARCH_EDGE, SEARCH_HOVER_EDGE,
         PLACEHOLDER, KEYCAP_TEXT, TAB_LABEL, SELECTED_TAB_LABEL, INACTIVE_TAB_LABEL, INACTIVE_SELECTED_TAB_LABEL,
         RUNNING_TAB_DOT, RUNNING_SELECTED_TAB_DOT, IDLE_TAB_DOT, IDLE_SELECTED_TAB_DOT, TAB_CLOSE, SELECTED_TAB_CLOSE,
         TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, SLASH_RUN, ACTIVE_RUN);

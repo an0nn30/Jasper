@@ -68,15 +68,19 @@ final class ClassicToolbarButton extends JButton {
             var palette = theme.semantic();
             int width = getWidth(), height = getHeight(), arc = 2 * metric(DesignMetrics.Role.CONTROL_RADIUS);
             boolean pressed = getModel().isPressed() || getModel().isSelected();
-            if (isEnabled() && (getModel().isRollover() || pressed)) {
+            boolean filled = isEnabled() && (getModel().isRollover() || pressed);
+            if (filled) {
                 g.setColor(palette.color(pressed ? SemanticColor.SURFACE_CONTROL_SELECTED : SemanticColor.SURFACE_CONTROL_HOVER));
                 g.fillRoundRect(0, 0, width, height, arc, arc);
-                g.setColor(SurfaceContrast.painted(theme, WindowPairs.BUTTON_FRAME));
+                g.setColor(SurfaceContrast.painted(theme, pressed ? WindowPairs.PRESSED_BUTTON_FRAME : WindowPairs.BUTTON_FRAME));
                 g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             }
-            Color ink = SurfaceContrast.painted(theme, WindowPairs.BUTTON_LABEL);
+            // The label is held apart from the fill it lies on.
+            Color ink = SurfaceContrast.painted(theme, !filled ? WindowPairs.BUTTON_LABEL : pressed ? WindowPairs.PRESSED_BUTTON_LABEL : WindowPairs.HOVERED_BUTTON_LABEL);
             if (!isEnabled()) ink = ColorMath.opacity(ink, .42);
             if (getText() == null) {
+                // A disabled icon is drawn at the label's disabled strength, as AppIcons' disabled icons are.
+                if (!isEnabled()) g.setComposite(java.awt.AlphaComposite.SrcOver.derive(.42f));
                 if (icon != null) icon.paintIcon(this, g, (width - icon.getIconWidth()) / 2, (height - icon.getIconHeight()) / 2);
                 return;
             }

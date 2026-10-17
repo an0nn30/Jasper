@@ -69,8 +69,13 @@ class HostedTitleTest {
                 var at = javax.swing.SwingUtilities.convertPoint(save.getParent(), save.getLocation(), view);
                 assertThat(new java.awt.Color(image.getRGB(4, at.y + save.getHeight() / 2) & 0xFFFFFF)).isEqualTo(DerivedColor.SURFACE_FOOTER.color(theme));
                 assertThat(image.getRGB(4, at.y + save.getHeight() / 2)).as("the band is new").isNotEqualTo(before.getRGB(4, at.y + save.getHeight() / 2));
-                // The card owns the frame: the SHEET form's surface has no outline and no inset of its own.
                 var surface = find(view, "form", Forms.Surface.class);
+                assertThat(surface.sheet).as("a native dialog's band: the form keeps its own outline").isTrue();
+                // In a classic dialog the card owns the frame: the SHEET form's surface has no outline and no inset of its own.
+                view.dialogCard(true);
+                KitFixtures.render(view, 440, 300, 1);
+                save = find(view, "save", javax.swing.JComponent.class);
+                at = javax.swing.SwingUtilities.convertPoint(save.getParent(), save.getLocation(), view);
                 assertThat(surface.sheet).as("no sheet outline inside a classic dialog").isFalse();
                 assertThat(surface.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
                 var origin = javax.swing.SwingUtilities.convertPoint(surface.getParent(), surface.getLocation(), view);

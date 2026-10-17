@@ -169,7 +169,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             var mouse = new MouseAdapter() {
                 private void popup(MouseEvent event) { owner.tabMenu(tab).show(Entry.this, event.getX(), event.getY()); }
                 private void hover(MouseEvent event) {
-                    boolean over = closeBounds().contains(event.getPoint());
+                    boolean over = closeTarget().contains(event.getPoint());
                     if (over != closeHover) { closeHover = over; repaint(); }
                 }
                 @Override public void mousePressed(MouseEvent event) {
@@ -179,7 +179,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
                     if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
                     if (!SwingUtilities.isLeftMouseButton(event)) return;
                     // A press on the × neither selects nor drags; dragging off it before the release cancels the close.
-                    if (closeBounds().contains(event.getPoint())) { closePressed = true; return; }
+                    if (closeTarget().contains(event.getPoint())) { closePressed = true; return; }
                     owner.selectTab(tab);
                     origin = SwingUtilities.convertPoint(Entry.this, event.getPoint(), ClassicTabs.this);
                 }
@@ -188,7 +188,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
                     closePressed = false;
                     if (event.isPopupTrigger()) { popup(event); return; }
                     if (closing) {
-                        if (SwingUtilities.isLeftMouseButton(event) && closeBounds().contains(event.getPoint())) closeClicked();
+                        if (SwingUtilities.isLeftMouseButton(event) && closeTarget().contains(event.getPoint())) closeClicked();
                         return;
                     }
                     Point start = origin; origin = null;
@@ -267,6 +267,17 @@ final class ClassicTabs extends JPanel implements TabStrip {
         Rectangle closeBounds() {
             int size = metric(DesignMetrics.Role.CHROME_GLYPH), x = getWidth() - metric(DesignMetrics.Role.CLASSIC_TAB_TRAILING) - size;
             return new Rectangle(x, (getHeight() - size) / 2, size, size);
+        }
+
+        /**
+         * Where the × takes the pointer: a square around the glyph reaching into the gap before it and the trailing inset
+         * after it, at most the tab's height, so the small glyph is easy to hit (as IntelliJ's classic tabs are).
+         */
+        Rectangle closeTarget() {
+            Rectangle glyph = closeBounds();
+            int reach = Math.min(metric(DesignMetrics.Role.CLASSIC_TAB_TRAILING), metric(DesignMetrics.Role.CLASSIC_TAB_GAP));
+            int side = Math.min(getHeight(), glyph.width + 2 * reach);
+            return new Rectangle(glyph.x + glyph.width / 2 - side / 2, (getHeight() - side) / 2, side, side);
         }
 
         void closeClicked() { if (!disposed) owner.closeTab(tab); }

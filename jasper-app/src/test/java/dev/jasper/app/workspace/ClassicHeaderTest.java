@@ -88,6 +88,11 @@ class ClassicHeaderTest {
                 assertThat(field.getSize()).isEqualTo(new Dimension(300, 22));
                 assertThat(field.getX() + field.getWidth()).as("6 before Settings…").isEqualTo(classic.trailing().getX() + settings.getX() - 6);
                 assertThat(field.getY()).as("centred in the 34 px row").isEqualTo(6);
+                // The field reads "Search everywhere": its tip and name say so, not the pane's context.
+                field.setContext("~/projects", "dustin@host:~/projects", null);
+                String shortcut = field.shortcutText();
+                assertThat(field.getToolTipText()).isEqualTo(shortcut.isBlank() ? "Search everywhere" : "Search everywhere (" + shortcut + ")");
+                assertThat(field.getAccessibleContext().getAccessibleName()).isEqualTo("Search everywhere");
                 assertThat(window.owner().chrome().menuBar().getParent()).as("the menus stay a row of their own").isSameAs(window.root().getLayeredPane());
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
@@ -137,6 +142,16 @@ class ClassicHeaderTest {
             var first = (ClassicToolbarButton) window.owner().chrome().windowToolbar().getComponent(0);
             assertThat(first.getText()).as("icons only").isNull();
             assertThat(first.getPreferredSize().width).as("square").isEqualTo(first.getPreferredSize().height);
+            // A disabled icon is drawn faded, as a disabled label is.
+            ClassicToolbarButton maximize = null;
+            for (Component child : window.owner().chrome().windowToolbar().getComponents())
+                if (child instanceof ClassicToolbarButton button && "Maximize".equals(button.getClientProperty("label"))) maximize = button;
+            assertThat(maximize).isNotNull();
+            maximize.setSize(maximize.getPreferredSize());
+            maximize.setEnabled(true);
+            int enabled = strongestAlpha(maximize);
+            maximize.setEnabled(false);
+            assertThat(strongestAlpha(maximize)).as("the disabled icon at 0.42").isLessThanOrEqualTo((int) Math.ceil(enabled * .42) + 1).isPositive();
             window.owner().setToolbarMode(ToolbarMode.HIDDEN);
             assertThat(window.owner().chrome().header().isVisible()).as("hidden: no row").isFalse();
             window.owner().setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
@@ -144,6 +159,16 @@ class ClassicHeaderTest {
             assertThat(window.owner().chrome().header().isVisible()).isTrue();
             assertThat(first.getText()).isEqualTo("New Session");
         });
+    }
+
+    /** The strongest alpha {@code component} paints on a transparent image. */
+    static int strongestAlpha(javax.swing.JComponent component) {
+        var image = new java.awt.image.BufferedImage(component.getWidth(), component.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { component.paint(g); } finally { g.dispose(); }
+        int strongest = 0;
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) strongest = Math.max(strongest, image.getRGB(x, y) >>> 24);
+        return strongest;
     }
 
     @Test void theDefaultHeaderIsTodays() throws Exception {

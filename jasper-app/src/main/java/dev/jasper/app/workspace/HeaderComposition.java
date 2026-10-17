@@ -36,6 +36,12 @@ sealed interface HeaderComposition permits UnifiedHeader, ClassicHeader {
     /** Paints the search field. */
     void paintSearch(TitleSearchField field, Graphics graphics, boolean hover, boolean collapsed);
 
+    /** The search field's tooltip, from the focused pane's context, that context's tooltip and the palette's shortcut. */
+    String searchTooltip(String context, String contextTooltip, String shortcut);
+
+    /** The search field's accessible name, from the focused pane's context. */
+    String searchName(String context);
+
     /** Applies the toolbar setting: which rows show and whether buttons carry labels; {@code normal} is the Normal view mode. */
     void toolbarMode(WindowHeader header, ToolbarMode mode, boolean normal);
 

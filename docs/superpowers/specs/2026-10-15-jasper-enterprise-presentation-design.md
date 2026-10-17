@@ -7,7 +7,7 @@ Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority:
 (toolbar view admission).
 Amended on 2026-10-16 with plan 4a's Rulings 17, made under the same authority: 5.4 (the provisional token ranges stand).
 Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
-Amended on 2026-10-17 with plan 6b's ruling 3: 7.1 and 7.2 (border.divider is overridable).
+Amended on 2026-10-17 with plan 6b's ruling 3: 7.1, 7.2 and 7.7 (border.divider is overridable).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -998,7 +998,7 @@ for the chrome renders (16.1.4), which plans 6 and 7 compare in both variants.
 
 ### 7.7 Converter
 
-`tools/themes/jasper_theme.py` learns the eight override keys (`ROLES` at line 38, `OPTIONAL_ROLES` at 55, and the
+`tools/themes/jasper_theme.py` learns eight of the override keys (all but `border.divider`; `ROLES` at line 38, `OPTIONAL_ROLES` at 55, and the
 role-order check in `validate()` at 184, which accept roles followed by any of the optional and override keys in
 order). It fills them when the
 IntelliJ theme has the key:

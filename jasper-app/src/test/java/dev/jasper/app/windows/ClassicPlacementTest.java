@@ -5,15 +5,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.presentation.DialogMapping;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.model.ControlState;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.ClassicDialog;
 import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.theme.ThemeRoute;
 import java.awt.Dimension;
 import java.util.List;
 import java.util.UUID;
+import javax.swing.JRootPane;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -146,5 +152,96 @@ class ClassicPlacementTest {
         assertThat(sheet.hostTitled()).as("an attached sheet has no title bar to title it").isFalse();
         NativeShells.nativeFallback(sheet);
         assertThat(sheet.hostTitled()).as("its centred native fallback has one").isTrue();
+    }
+
+    /**
+     * The production path of a classic dialog's body (spec 10.8): the surface's holder, an opaque panel on
+     * {@code surface.panel}, wraps the content, so {@code NativeShells.classicContent} makes it transparent and the card's
+     * dialog surface shows, through later look-and-feel updates too.
+     */
+    @Test void aClassicDialogsBodyIsTheKitsDialogSurface() {
+        var themes = EnterpriseLook.controller(false);
+        try {
+            var context = themes.appearance().context(ThemeRoute.CHROME);
+            var windows = windows(DialogMapping.Kind.CLASSIC, true);
+            var unlock = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
+            var form = EnterpriseDialogMockTest.form(Nodes.FormKind.PROMPT_COMPACT, "Unlock Vault", "");
+            try (var view = new KitView(context, new ViewSpec(form), event -> { })) {
+                unlock.setContent(view);
+                NativeShells.classicContent(unlock);
+                assertThat(view.hostTitled() && view.dialogBand() && view.dialogCard()).as("the strip, the band and the card").isTrue();
+                SwingUtilities.updateComponentTreeUI(unlock.holder());
+                assertThat(unlock.holder().isOpaque()).as("the holder stays transparent through a look-and-feel update").isFalse();
+                java.awt.Color dialogSurface = context.theme().semantic().color(context.kit().colors().dialogSurface());
+                assertThat(UIManager.getColor("Panel.background").getRGB()).as("the holder's own fill differs, so the probe means something")
+                    .isNotEqualTo(dialogSurface.getRGB());
+                var root = new JRootPane();
+                root.setSize(900, 600);
+                dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
+                var dialog = new ClassicDialog(context, unlock.holder(), "Unlock Vault", Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED);
+                try (var overlay = WindowOverlay.classic(root, dialog)) {
+                    overlay.show();
+                    var card = overlay.cardBounds();
+                    var image = MockProfile.print(root, 900, 600);
+                    // In the body's side padding, halfway down the card.
+                    assertThat(MockProfile.at(image, 2 * (card.x + 6), 2 * (card.y + card.height / 2)))
+                        .as("the body is the kit's dialog surface").isEqualTo(new java.awt.Color(dialogSurface.getRGB() & 0xFFFFFF));
+                }
+            }
+        } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+    }
+
+    /** A modal overlay opened as a native dialog closes from its title bar as a dialog does, through its guards. */
+    @Test void aNativeFallbackOverlayClosesThroughItsGuards() {
+        var windows = windows(DialogMapping.Kind.CLASSIC, true);
+        var inWindow = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
+        assertThat(inWindow.requestClose()).as("an in-window modal overlay refuses a window close").isFalse();
+        assertThat(inWindow.closed()).isFalse();
+        var unlock = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
+        NativeShells.nativeFallback(unlock);
+        boolean[] allow = {false};
+        int[] asked = {0};
+        unlock.onClosing(() -> { asked[0]++; return allow[0]; });
+        assertThat(unlock.requestClose()).as("a guard that refuses keeps it open").isFalse();
+        assertThat(asked[0]).isEqualTo(1);
+        allow[0] = true;
+        assertThat(unlock.requestClose()).as("its title bar's close button closes it").isTrue();
+        assertThat(unlock.closed()).isTrue();
+    }
+
+    /** A native dialog under the classic mapping takes the footer band, but not the card (spec 10.8's last sentence). */
+    @Test void aNativeClassicDialogTakesTheBand() {
+        var context = KitTestSupport.context();
+        var spec = new ViewSpec(EnterpriseDialogMockTest.form(Nodes.FormKind.FULL, "Add Host", ""));
+        var windows = windows(DialogMapping.Kind.CLASSIC, true);
+        var details = windows.dialog("Add Host", true, UUID.randomUUID());
+        var unlock = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
+        NativeShells.nativeFallback(unlock);
+        var add = windows.dialog("Add Login", true, UUID.randomUUID());
+        add.attachedSheet(true);
+        NativeShells.nativeFallback(add);
+        for (var surface : List.of(details, unlock, add)) {
+            try (var view = new KitView(context, spec, event -> { }); var later = new KitView(context, spec, event -> { })) {
+                surface.setContent(view);
+                var marks = NativeShells.nativeMarks(surface, true);
+                marks.accept(view);
+                surface.laterContent(marks);
+                assertThat(view.dialogBand()).as(surface.title() + ": the band").isTrue();
+                assertThat(view.dialogCard()).as(surface.title() + ": the form paints its own fill").isFalse();
+                assertThat(view.hostTitled()).as(surface.title() + ": the system bar titles a FULL form").isTrue();
+                surface.setContent(later);
+                assertThat(later.dialogBand() && later.hostTitled()).as(surface.title() + ": content set later is marked too").isTrue();
+            }
+        }
+        var plain = windows(DialogMapping.Kind.AS_REQUESTED, false).dialog("Add Host", true, UUID.randomUUID());
+        try (var view = new KitView(context, spec, event -> { })) {
+            NativeShells.nativeMarks(plain, true).accept(view);
+            assertThat(view.dialogBand() || view.hostTitled()).as("the default mapping marks nothing").isFalse();
+        }
+        try (var view = new KitView(context, spec, event -> { })) {
+            NativeShells.nativeMarks(details, false).accept(view);
+            assertThat(view.hostTitled()).as("a Jasper-drawn title bar leaves the form its title").isFalse();
+            assertThat(view.dialogBand()).isTrue();
+        }
     }
 }
