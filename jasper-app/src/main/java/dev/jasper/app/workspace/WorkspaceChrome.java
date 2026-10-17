@@ -12,17 +12,20 @@ import java.util.Objects;
 public final class WorkspaceChrome {
     /** The default look's chrome. */
     public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
-        WorkspaceLook.Header.UNIFIED);
+        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
     /** The header's composition, made for each window by {@link #header()}. */
     private final WorkspaceLook.Header header;
+    /** The editor tabs, made for each window by {@link #tabs(WindowContent)}. */
+    private final WorkspaceLook.Tabs tabs;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs) {
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
         this.header = Objects.requireNonNull(header);
+        this.tabs = Objects.requireNonNull(tabs);
     }
 
     /**
@@ -38,7 +41,7 @@ public final class WorkspaceChrome {
             case STANDARD -> new StandardMenuBar();
             case CLASSIC -> new ClassicMenuBar();
         };
-        return new WorkspaceChrome(menus, title, look.header());
+        return new WorkspaceChrome(menus, title, look.header(), look.tabs());
     }
 
     MenuBarLayout menus() { return menus; }
@@ -51,11 +54,19 @@ public final class WorkspaceChrome {
         };
     }
 
+    /** The tab strip for {@code owner} (spec 10.5). */
+    TabStrip tabs(WindowContent owner) {
+        return switch (tabs) {
+            case EQUAL -> new WindowTabs(owner);
+            case CLASSIC -> new ClassicTabs(owner);
+        };
+    }
+
     /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
     @Override public boolean equals(Object other) {
         return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
-            && title.equals(chrome.title);
+            && tabs == chrome.tabs && title.equals(chrome.title);
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, title); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, title); }
 }
