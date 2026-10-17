@@ -3499,8 +3499,9 @@ The plan's own Rulings are 1 to 12; these continue the numbering.
     test alone before treating it as a failure, and never run `./gradlew --stop`. Cost if wrong: one rerun.
 26. **Plan 5b's merge with this branch** switches `EnterpriseLook` to `EnterpriseResources` (the shipped kit with Plex
     registered, its chrome, the Enterprise theme), deletes `enterprise-fixture.json` and its script's output, restores
-    Rulings 20's family assertion and runs `WindowChromeMenusTest`, `ChromeRenderTest` and `EnterpriseMenuRowMockTest`
-    again; a title that drifts past 4 px is retuned by Rulings 18's measurement. Why: the fixture stands in for 5b only.
+    Rulings 20's family assertion, removes Rulings 29's macOS gate and runs `WindowChromeMenusTest`, `ChromeRenderTest`
+    and `EnterpriseMenuRowMockTest` again; a title that drifts past 4 px is retuned by Rulings 18's measurement. Why: the
+    fixture stands in for 5b only.
     Cost if wrong: the mock comparison stays on the platform face.
 27. **Rename Tab follows the window's appearance too, and one helper sets NSAppearance** (Task 5 review). Rename Tab's
     input dialog is a window of its own, like the diagnostics dialog, so under a native-titled look on macOS
@@ -3515,3 +3516,15 @@ The plan's own Rulings are 1 to 12; these continue the numbering.
     default template is exactly today's label; `onTitle` takes the pane's snapshot and the home directory once; and
     `WindowTitleTest` checks the wiring through `WindowContent.mount` with a Workstation template (its own ledger row).
     Why: the block's all-empty branch repeated a token-free template and left a leading space. Cost if wrong: none.
+29. **The menu titles' positions are compared on macOS only until plan 5b** (Task 8 review).
+    `EnterpriseMenuRowMockTest` asserts the row, the rule, their colours and the eight titles on every platform, then
+    `assumeTrue(SystemInfo.isMacOS, …)` before the loop over the titles' starts, widths and tops. Why: the fixture kit
+    draws the platform face (Rulings 13, 20), and Rulings 18's values were measured with macOS's; Linux's DejaVu Sans is
+    1 to 3 logical px wider per title at 12 px, so the starts drift past 4 px at 2× from the third title. Cost if wrong:
+    the titles go unchecked off macOS until 5b's merge lifts the gate (Rulings 26).
+30. **The chrome renders assert structure; the painted pairs come with 6b** (Task 8 review). Spec 16.1.4 asks
+    `ChromeRenderTest.check` for painted pairs too; this plan's `check` asserts the flush row, no gutter, the
+    composition and Help last, and the menu row's colours are compared only in `EnterpriseMenuRowMockTest`. Plan 6b's
+    `check` samples the run item's and the ruled cells' pairs; the menu row's declared pairs (6b's `WindowPairs`) in
+    each look's render, under the complement and covering looks too, are still to be added to `check` there. Cost if
+    wrong: a menu-row pair that the theme moves goes unnoticed in the renders until it is.

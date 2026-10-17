@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.swing.JRootPane;
@@ -60,7 +61,7 @@ class ChromeRenderTest {
 
     /** The covering array's rows, as chrome specs. */
     static List<ChromeSpec> covering() {
-        try (InputStream in = ChromeRenderTest.class.getResourceAsStream("chrome-covering-array.tsv")) {
+        try (InputStream in = Objects.requireNonNull(ChromeRenderTest.class.getResourceAsStream("chrome-covering-array.tsv"), "chrome-covering-array.tsv")) {
             var rows = new ArrayList<ChromeSpec>();
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 if (line.isBlank() || line.startsWith("#")) continue;
