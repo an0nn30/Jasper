@@ -22,6 +22,11 @@ public enum TitleBarStyle {
         return compact ? NATIVE : choose(macOs, nativeDecorations);
     }
 
+    /** A look with a native title ({@code nativeTitle}) gives every platform the operating system title bar. */
+    public static TitleBarStyle choose(boolean macOs, boolean nativeDecorations, boolean compact, boolean nativeTitle) {
+        return nativeTitle ? NATIVE : choose(macOs, nativeDecorations, compact);
+    }
+
     /** Sets the look-and-feel decoration defaults; FlatLaf decorates Windows frames unless told not to. */
     public void configure() {
         if (this == MAC_UNIFIED) return;

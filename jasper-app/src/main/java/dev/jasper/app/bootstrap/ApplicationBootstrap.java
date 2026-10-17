@@ -97,11 +97,13 @@ public final class ApplicationBootstrap {
             });
             Runtime.getRuntime().addShutdownHook(shutdown);
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
-            configureDesktopProperties();
+            // The look's flags, committed before AWT (spec 9.1): the macOS menu bar and the system title bar.
+            var desktop = startup.selection().presentation().committedDesktop();
+            configureDesktopProperties(desktop);
             // Before the look and feel and any window: a restart-only choice, like residency.
             dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
                 service.initialState().snapshot().nativeDecorations(),
-                service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
+                service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT, desktop.nativeTitle()).configure();
             // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
@@ -123,10 +125,16 @@ public final class ApplicationBootstrap {
         return !options.background() || resident;
     }
 
-    /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */
-    static void configureDesktopProperties() {
+    /** The default look's desktop properties. */
+    static void configureDesktopProperties() { configureDesktopProperties(dev.jasper.app.presentation.DesktopFlags.STANDARD); }
+
+    /**
+     * macOS reads these settings during toolkit/LAF initialization; never change them on reload. {@code flags} decide
+     * whether menus use the screen menu bar or a row in each window (spec 10.1).
+     */
+    static void configureDesktopProperties(dev.jasper.app.presentation.DesktopFlags flags) {
         System.setProperty("apple.awt.application.appearance", "system");
-        System.setProperty("apple.laf.useScreenMenuBar", "true");
+        System.setProperty("apple.laf.useScreenMenuBar", Boolean.toString(flags.screenMenuBar()));
         // Read once when the first tray icon is created: the macOS menu bar glyph is a template image.
         System.setProperty("apple.awt.enableTemplateImages", "true");
     }
