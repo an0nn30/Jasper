@@ -33,11 +33,15 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
         public Provider { Objects.requireNonNull(id); Objects.requireNonNull(name); Objects.requireNonNull(version); Objects.requireNonNull(digest); }
     }
 
-    /** The groups of projections whose plans consume them (spec 19.1 rows 6 to 9). */
-    public enum Landed { WINDOW_CHROME, DOCK_CHROME, RUN_WINDOW, SETTINGS }
+    /**
+     * The groups of projections whose plans consume them (spec 19.1 rows 6 to 9): the window shell (desktop flags,
+     * menus, shell, motion, title), the window content (header, tabs, status, run item, dialogs), the dock, the Run window
+     * and Settings.
+     */
+    public enum Landed { WINDOW_CHROME, WINDOW_CONTENT, DOCK_CHROME, RUN_WINDOW, SETTINGS }
 
-    /** The groups that have landed: none yet, so every chrome value maps to the default projection. */
-    public static final Set<Landed> LANDED = Set.of();
+    /** The groups that have landed; every other group's values map to the default projection. */
+    public static final Set<Landed> LANDED = Set.of(Landed.WINDOW_CHROME);
 
     /** Every part is required. */
     public Presentation {

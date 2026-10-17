@@ -54,6 +54,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
     public static Projections of(ChromeSpec chrome, boolean classicBase, boolean namesUiFace, String providerId, Host host,
                                  Set<Presentation.Landed> landed) {
         ChromeSpec window = landed.contains(Presentation.Landed.WINDOW_CHROME) ? chrome : ChromeSpec.DEFAULT;
+        // The header, tabs, status, run item and dialogs land with the window content (plan 6b).
+        ChromeSpec content = landed.contains(Presentation.Landed.WINDOW_CONTENT) ? window : ChromeSpec.DEFAULT;
         ChromeSpec dock = landed.contains(Presentation.Landed.DOCK_CHROME) ? chrome : ChromeSpec.DEFAULT;
         ChromeSpec run = landed.contains(Presentation.Landed.RUN_WINDOW) ? chrome : ChromeSpec.DEFAULT;
         boolean settingsLanded = landed.contains(Presentation.Landed.SETTINGS);
@@ -63,11 +65,11 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         boolean stripes = dock.toolWindows() == ChromeSpec.ToolWindows.STRIPES, runWindow = run.palette() == ChromeSpec.PaletteKind.RUN_WINDOW;
         var desktop = new DesktopFlags(chrome.menuBar() != ChromeSpec.MenuBar.WINDOW, chrome.titleBar() == ChromeSpec.TitleBar.NATIVE);
         var workspace = new WorkspaceLook(windowMenus ? WorkspaceLook.Menus.CLASSIC : WorkspaceLook.Menus.STANDARD,
-            nativeTitle ? WorkspaceLook.Header.CLASSIC : WorkspaceLook.Header.UNIFIED,
+            content.titleBar() == ChromeSpec.TitleBar.NATIVE ? WorkspaceLook.Header.CLASSIC : WorkspaceLook.Header.UNIFIED,
             stripes ? WorkspaceLook.Stripes.LABELLED : WorkspaceLook.Stripes.RAILS,
-            window.editorTabs() == ChromeSpec.EditorTabs.CLASSIC ? WorkspaceLook.Tabs.CLASSIC : WorkspaceLook.Tabs.EQUAL,
-            window.statusBar() == ChromeSpec.StatusBar.CELLS ? WorkspaceLook.Status.RULED : WorkspaceLook.Status.SLASH,
-            window.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
+            content.editorTabs() == ChromeSpec.EditorTabs.CLASSIC ? WorkspaceLook.Tabs.CLASSIC : WorkspaceLook.Tabs.EQUAL,
+            content.statusBar() == ChromeSpec.StatusBar.CELLS ? WorkspaceLook.Status.RULED : WorkspaceLook.Status.SLASH,
+            content.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
             stripes ? WorkspaceLook.FrameStyle.FLUSH : WorkspaceLook.FrameStyle.STANDARD);
         var shell = new ShellLook(window.titleBar() == ChromeSpec.TitleBar.UNIFIED && host.unifiedTitleSupported(), windowMenus, nativeTitle);
         var palette = new PaletteLook(runWindow ? PaletteLook.View.RUN_WINDOW : PaletteLook.View.CARD,
@@ -78,7 +80,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         var settings = new SettingsChrome(page.titleBar() != ChromeSpec.TitleBar.NATIVE, classic, !classic, hidden,
             faces ? "Use the default font size" : "Use platform font size");
         return new Projections(desktop, workspace, shell, palette, settings, classic ? Composition.CLASSIC : Composition.ROWS,
-            new DialogMapping(window.dialogs() == ChromeSpec.DialogKind.CLASSIC ? DialogMapping.Kind.CLASSIC : DialogMapping.Kind.AS_REQUESTED, nativeTitle),
+            new DialogMapping(content.dialogs() == ChromeSpec.DialogKind.CLASSIC ? DialogMapping.Kind.CLASSIC : DialogMapping.Kind.AS_REQUESTED, nativeTitle),
             window.motion() == ChromeSpec.MotionKind.NONE ? Motion.NONE : Motion.STANDARD, new TitleFormat(window.windowTitle()),
             new DockLayoutKey(landed.contains(Presentation.Landed.DOCK_CHROME) ? providerId : ""),
             stripes ? new AppPanels("Event Log", Slot.BOTTOM_LEFT) : new AppPanels("Notifications", Slot.RIGHT_TOP));

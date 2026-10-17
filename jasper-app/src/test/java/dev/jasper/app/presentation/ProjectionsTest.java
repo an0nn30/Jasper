@@ -47,15 +47,35 @@ class ProjectionsTest {
     }
 
     @Test void untilItsPlanLandsAChromeValueMapsToTheDefaultProjection() {
-        assertThat(Presentation.LANDED).as("plans 6 to 9 add their groups").isEmpty();
-        var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
-        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Presentation.LANDED);
-        assertThat(shipped.desktop()).as("computed now, applied by plan 6").isEqualTo(new DesktopFlags(false, true));
-        assertThat(new Projections(standard.desktop(), shipped.workspace(), shipped.shell(), shipped.palette(), shipped.settings(),
-            shipped.composition(), shipped.dialogs(), shipped.motion(), shipped.title(), shipped.dockLayout(), shipped.panels())).isEqualTo(standard);
+        assertThat(Presentation.LANDED).as("plan 6a lands the window chrome; 6b, 7, 8 and 9 add theirs")
+            .contains(Presentation.Landed.WINDOW_CHROME).doesNotContain(Presentation.Landed.WINDOW_CONTENT);
+        var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, EnumSet.of(Presentation.Landed.WINDOW_CHROME));
+        assertThat(shipped.desktop()).isEqualTo(new DesktopFlags(false, true));
+        assertThat(shipped.workspace().menus()).isEqualTo(WorkspaceLook.Menus.CLASSIC);
+        assertThat(shipped.shell()).isEqualTo(new ShellLook(false, true, true));
+        assertThat(shipped.motion()).isEqualTo(Motion.NONE);
+        assertThat(shipped.title()).isEqualTo(new TitleFormat("{context}"));
+        assertThat(shipped.workspace().header()).as("spec 9.1's fallback row: the unified header under the native title")
+            .isEqualTo(WorkspaceLook.Header.UNIFIED);
+        assertThat(shipped.workspace().tabs()).isEqualTo(WorkspaceLook.Tabs.EQUAL);
+        assertThat(shipped.workspace().status()).isEqualTo(WorkspaceLook.Status.SLASH);
+        assertThat(shipped.workspace().runItem()).isFalse();
+        assertThat(shipped.dialogs()).as("dialogs are window content; the native title still titles them")
+            .isEqualTo(new DialogMapping(DialogMapping.Kind.AS_REQUESTED, true));
+        var content = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC,
+            EnumSet.of(Presentation.Landed.WINDOW_CHROME, Presentation.Landed.WINDOW_CONTENT));
+        assertThat(content.workspace().header()).isEqualTo(WorkspaceLook.Header.CLASSIC);
+        assertThat(content.workspace().tabs()).isEqualTo(WorkspaceLook.Tabs.CLASSIC);
+        assertThat(content.workspace().status()).isEqualTo(WorkspaceLook.Status.RULED);
+        assertThat(content.workspace().runItem()).isTrue();
+        assertThat(content.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
+        var none = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Set.of());
+        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Set.of());
+        assertThat(none.desktop()).as("always computed from the file").isEqualTo(new DesktopFlags(false, true));
+        assertThat(new Projections(standard.desktop(), none.workspace(), none.shell(), none.palette(), none.settings(),
+            none.composition(), none.dialogs(), none.motion(), none.title(), none.dockLayout(), none.panels())).isEqualTo(standard);
         var windowOnly = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, EnumSet.of(Presentation.Landed.WINDOW_CHROME));
         assertThat(windowOnly.workspace().stripes()).as("the dock group has not landed").isEqualTo(WorkspaceLook.Stripes.RAILS);
-        assertThat(windowOnly.workspace().menus()).isEqualTo(WorkspaceLook.Menus.CLASSIC);
     }
 
     @Test void theFallbackIsSpecFourSevensValue() {
@@ -103,12 +123,12 @@ class ProjectionsTest {
         assertThat(look.kit()).isSameAs(parsed.kit());
         assertThat(look.defaults()).isSameAs(parsed.defaults());
         assertThat(look.faces()).isEqualTo(parsed.faces());
-        assertThat(look.committedDesktop()).as("nothing is applied before plan 6").isEqualTo(DesktopFlags.STANDARD);
+        assertThat(look.committedDesktop()).as("plan 6a applies the look's flags").isEqualTo(new DesktopFlags(false, true));
         var fallback = look.fallback(MAC);
         assertThat(fallback.kit()).isSameAs(Kit.DEFAULT);
         assertThat(fallback.provider()).isEmpty();
         assertThat(fallback.defaults()).as("the session keeps the defaults read at start").isSameAs(parsed.defaults());
-        assertThat(fallback.projections()).isEqualTo(Projections.fallback(DesktopFlags.STANDARD, MAC));
+        assertThat(fallback.projections()).isEqualTo(Projections.fallback(new DesktopFlags(false, true), MAC));
         assertThat(fallback.look()).isEqualTo("default");
     }
 }
