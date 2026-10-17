@@ -15,6 +15,8 @@ final class ThemePainting {
     private ThemePainting() {}
     static int metric(KitContext context, DesignMetrics.Role role) { return UIScale.scale(context.metrics().value(role)); }
     static Font font(KitContext context, Typography.Role role) { return SwingTypography.effective(context.typography().font(role)); }
+    /** {@code role}'s effective font for {@code text}: the platform face where the kit's UI face lacks one of its glyphs. */
+    static Font font(KitContext context, Typography.Role role, String text) { return SwingTypography.effective(context.typography().font(role, text)); }
     /** The fractional antialiased context engine labels and native text measure in. */
     private static final FontRenderContext TEXT_CONTEXT = new FontRenderContext(null, true, true);
     /** Literal advance measured with the same fractional context used by engine labels and native text. */

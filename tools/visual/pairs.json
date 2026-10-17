@@ -717,5 +717,151 @@
       "#D3D6DA",
       "#E8EEFA"
     ]
+  },
+  {
+    "name": "enterprise-light-sessions",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sessions@2x.png",
+    "min_agreement": 0.14,
+    "colours": [
+      "#FFFFFF",
+      "#2F65CA",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-light-tunnels",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/tunnels@2x.png",
+    "min_agreement": 0.0,
+    "colours": [
+      "#FFFFFF",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-light-sftp",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sftp@2x.png",
+    "min_agreement": 0.05,
+    "colours": [
+      "#FFFFFF",
+      "#2F65CA",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-light-fileservers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/fileservers@2x.png",
+    "min_agreement": 0.08,
+    "colours": [
+      "#FFFFFF",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sessions",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sessions@2x.png",
+    "min_agreement": 0.15,
+    "colours": [
+      "#2E3135",
+      "#3D74D6",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-tunnels",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/tunnels@2x.png",
+    "min_agreement": 0.0,
+    "colours": [
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sftp",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sftp@2x.png",
+    "min_agreement": 0.05,
+    "colours": [
+      "#3D74D6",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-fileservers",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/fileservers@2x.png",
+    "min_agreement": 0.08,
+    "colours": [
+      "#2E3135",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
   }
 ]

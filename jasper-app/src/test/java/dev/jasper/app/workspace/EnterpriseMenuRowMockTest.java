@@ -3,9 +3,7 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.formdev.flatlaf.util.SystemInfo;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuTarget;
@@ -24,7 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Spec 16.1.4 against the mocks: the Enterprise menu row, rendered at 2× under the Enterprise fixture kit and theme
+ * Spec 16.1.4 against the mocks: the Enterprise menu row, rendered at 2× under the shipped kit, IBM Plex and the theme
  * ({@link EnterpriseLook}), compared with the Workstation (Light) and Dark Mode mocks by profile ("Mock measurements";
  * Rulings 12).
  */
@@ -88,8 +86,7 @@ class EnterpriseMenuRowMockTest {
         var renderInks = MockProfile.inks(render[0], new Rectangle(2, 2, 900, 44), 12, 25);
         assertThat(mockInks).as("the mock's eight menu titles").hasSize(8);
         assertThat(renderInks).as(what + ": File, Edit, View, Session, Transfer, Tools, Window, Help").hasSize(8);
-        // Plan 6a Rulings 29: the fixture kit draws the platform face, and the titles' metrics are the macOS face's.
-        assumeTrue(SystemInfo.isMacOS, "the mocks' title metrics hold for the macOS face until plan 5b registers IBM Plex");
+        // In IBM Plex, with the titles at their fractional widths (ClassicMenuRow.Titles), Help drifts furthest: 4 px.
         for (int i = 0; i < 8; i++) {
             var expected = mockInks.get(i); var actual = renderInks.get(i);
             assertThat(actual.start() + X).as(what + " title " + i + " starts").isCloseTo(expected.start(), within(4));

@@ -132,6 +132,7 @@ class WindowChromeMenusTest {
                 assertThat(file.getInsets().left).isEqualTo(9);
                 assertThat(file.getFont()).as("the kit's body face").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
                 assertThat(file.getFont().getSize()).as("the Enterprise kit's 12 px body").isEqualTo(12);
+                assertThat(file.getFont().getFontName(java.util.Locale.ROOT)).as("plan 6a Rulings 20: the kit's own face").isEqualTo("IBM Plex Sans");
                 // Rulings 6: a hovered closed title on surface.control.hover, an open one on the accent in text.onAccent, square.
                 var palette = themes.current().chrome().semantic();
                 @SuppressWarnings("unchecked") var style = (java.util.Map<String, Object>) bar.getClientProperty("FlatLaf.style");

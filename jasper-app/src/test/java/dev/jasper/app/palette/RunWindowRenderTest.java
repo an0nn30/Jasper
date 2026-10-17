@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.testsupport.MockComparison;
 import dev.jasper.ui.gallery.KitGallery;
 import dev.jasper.ui.swing.KitContext;
-import dev.jasper.ui.testsupport.KitFixtures;
 import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
@@ -22,13 +21,13 @@ import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
 /**
- * Plan 8a Rulings 12: the Run window under the Enterprise fixture kit (the classic catalog with the shipped tokens and
- * its 12-point body) and the Enterprise Light fixture theme against the two 06 Run Dialog mocks, at 2x. The mocks draw
+ * Plan 8a Rulings 12: the Run window under the shipped Enterprise kit (its IBM Plex faces and 12-point body) and the
+ * Enterprise theme against the two 06 Run Dialog mocks, at 2x. The mocks draw
  * the window's frame at x 60-983, y 854-1695; the render is the window alone. The part under the list is compared 12
  * device pixels lower (plan 8a Rulings 5). Images go to {@code jasper-app/build/run-window/}. Every comparison runs on
  * the EDT inside {@code KitGallery.installed}, while the context that drew the render is open (installed closes its
- * binding when its action returns). Plan 4b's classic checkbox and buttons are held to the mock; what plan 5b's IBM Plex
- * draws is measured and printed until that plan is in this branch ({@link #CHECKED}, plan 8a R9).
+ * binding when its action returns). Plan 4b's classic checkbox and buttons and plan 5b's IBM Plex text are held to the
+ * mock; the footer buttons' left edges are measured and printed until plan 8b sizes them ({@link #CHECKED}, plan 8a R9).
  */
 public class RunWindowRenderTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
@@ -38,10 +37,13 @@ public class RunWindowRenderTest {
     /** The scrollbar's column over the list, and the B mock's "1 of 11" (its fixture count), in window pixels. */
     static final Rectangle SCROLLBAR = new Rectangle(870, 228, 28, 406), COUNT = new Rectangle(800, 232, 98, 38);
 
-    /** Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, or plan 5b's IBM Plex text. */
-    enum Owner { RUN_WINDOW, FACES, FONTS }
-    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b; FONTS joins with plan 5b. */
-    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES);
+    /**
+     * Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, plan 5b's IBM
+     * Plex text, or plan 8b's footer buttons (the mocks draw every one 70 px wide).
+     */
+    enum Owner { RUN_WINDOW, FACES, FONTS, FOOTER }
+    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b, FONTS since plan 5b; FOOTER joins with plan 8b. */
+    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES, Owner.FONTS);
 
     /** A probe: from (x, y) step (dx, dy) to the first pixel off {@code background}; {@code lower} probes under the list. */
     record Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance, Owner owner) {
@@ -85,11 +87,10 @@ public class RunWindowRenderTest {
         new Feature("checkbox label", 56, 721, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FACES),
         new Feature("footer rule", 200, 740, 0, 1, RunWindowRenderTest::dialog, true, 1),
         // The buttons are right-packed, each RUN_WINDOW_BUTTON_WIDTH or its label plus the classic 14 px padding if wider, so
-        // these left edges follow the labels' face: the platform face makes "Connect" 76 and "Browse…" 80. With Plex's ink
-        // widths in the mock (45 and 49.5) they would be about 73 and 78 where the mock draws every button 70: a residual
-        // for plan 5b's merge (docs/STATUS.md, plan 8a).
-        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),
-        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),
+        // these left edges follow the labels' face: IBM Plex makes "Connect" 74 where the mock draws every button 70, which
+        // plan 8b rules (FOOTER).
+        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
+        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
         new Feature("browse button right", 920, 796, -1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("button top", 520, 765, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("window bottom", 200, 800, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
@@ -109,7 +110,10 @@ public class RunWindowRenderTest {
         new Sample("body", 20, 400, false), new Sample("help tile", 35, 90, false), new Sample("field", 500, 186, false),
         new Sample("list edge", 26, 300, false), new Sample("heading band", 300, 250, false), new Sample("selected row", 600, 290, false),
         new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false),
-        new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true), new Sample("primary", 462, 800, true, Owner.FACES));
+        new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true),
+        // Above the label: in Plex "Connect" makes the button wider than the mocks' 70 px (FOOTER), so its first letter
+        // reaches the button's middle row at this x.
+        new Sample("primary", 462, 782, true, Owner.FACES));
     /**
      * A only: the checkbox's inside. B selects a snippet, whose scope has no SPLIT verb, so spec 11.2 disables the box the B
      * mock draws enabled (plan 8a R12): there the render's {@code surface.tableHeader} against the mock's white is a
@@ -125,15 +129,13 @@ public class RunWindowRenderTest {
      * with the context that drew it to {@code then} on the EDT before {@code KitGallery.installed} closes that context.
      */
     static BufferedImage render(boolean dark, String state, Drawn then) throws Exception {
-        var kitValue = KitFixtures.enterprise();
-        var theme = dark ? KitFixtures.dark() : KitFixtures.enterpriseLight();
+        var kitValue = dev.jasper.app.testsupport.EnterpriseResources.kit();
+        var theme = dev.jasper.app.testsupport.EnterpriseResources.theme().generated(dark);
         Path directory = Files.createDirectories(OUT.resolve(dark ? "dark" : "light"));
         var image = new BufferedImage[1];
         var failure = new Exception[1];
         try {
             SwingUtilities.invokeAndWait(() -> KitGallery.installed(theme, kitValue, (kit, focus) -> {
-                // The kit's 12-point body as the application's font setting (5a's kit defaults); the gallery installs 13.
-                javax.swing.UIManager.put("defaultFont", new java.awt.Font(KitFixtures.platformFamily(), java.awt.Font.PLAIN, 12));
                 try (var view = RunWindowFixtures.view(kit, new ArrayList<>())) {
                     if (state.equals("typing-auth")) { view.setQueryText("auth"); view.setEntries(RunWindowFixtures.typingAuth(), null, "Nothing found"); }
                     else view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
@@ -250,7 +252,12 @@ public class RunWindowRenderTest {
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_PRIMARY), derived(c, DerivedColor.SURFACE_HEADER_ACTIVE))).as("the title").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), dialog(c))).as("labels and help").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), derived(c, DerivedColor.SURFACE_TABLE_HEADER))).as("headings").isGreaterThanOrEqualTo(4.5);
-            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT))).as("the selected row").isGreaterThanOrEqualTo(4.5);
+            // Spec 7.6 gives Enterprise Dark text.onAccent #FFFFFF on accent #3D74D6, 4.499:1; the row paints its guarded pair.
+            var selected = dev.jasper.ui.theme.SurfaceContrast.painted(c.theme(), dev.jasper.ui.swing.RunWindowPresentation.SELECTED_TITLE);
+            System.out.printf("run-window dark: selected row text %s on %s, %.3f:1 (spec 7.6's #FFFFFF is %.3f:1)%n", ColorMath.hex(selected),
+                ColorMath.hex(palette.color(SemanticColor.ACCENT)), ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT)),
+                ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT)));
+            assertThat(ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT))).as("the selected row, as painted").isGreaterThanOrEqualTo(4.5);
             for (var feature : structure())
                 assertThat(probe(dark, 0, 0, feature, feature.lower() ? SHIFT : 0, c)).as("dark: " + feature.name()).isEqualTo(light.get(feature.name()));
         });

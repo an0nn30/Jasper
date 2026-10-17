@@ -131,10 +131,10 @@ public final class RunWindowPresentation {
     /**
      * {@code text}'s Run window face and colour, after its control set the role's own: WINDOW_TITLE and the title row's
      * CAPTION through {@link #TITLE} and {@link #SHORTCUT}; LABEL, DESCRIPTION and BODY_STRONG through the label pair,
-     * DESCRIPTION at BODY's size on the help's line, BODY_STRONG semibold; MONO in the small data face through the value
-     * pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by {@link #row}. A selected row's ink and a
-     * severity keep their colour. A DESCRIPTION's lines sit centred in their line box, as the mocks' CSS centres them, and
-     * it shows at most {@link #HELP_LINES} lines, the last cut with an ellipsis.
+     * DESCRIPTION at BODY's size on the help's line, BODY_STRONG in the headings' semibold (the mocks' 11 px "Session:");
+     * MONO in the small data face through the value pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by
+     * {@link #row}. A selected row's ink and a severity keep their colour. A DESCRIPTION's lines sit centred in their line
+     * box, as the mocks' CSS centres them, and it shows at most {@link #HELP_LINES} lines, the last cut with an ellipsis.
      */
     static void text(KitContext context, Nodes.Text text, Labels.LiteralLabel label, boolean inked) {
         if (text.severity().isPresent()) return;
@@ -153,7 +153,7 @@ public final class RunWindowPresentation {
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case BODY_STRONG -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.PANEL_TITLE));
+                label.setFont(ThemePainting.font(context, Typography.Role.RUN_HEADING));
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case MONO -> {

@@ -22,11 +22,12 @@ class KitFixturesTest {
         }
     }
 
-    /** Spec 16.1.2's theme set: the shipped variants, then the converter goldens that have a UI variant. */
+    /** Spec 16.1.2's theme set: the shipped variants, the converter goldens that have a UI variant, then Enterprise. */
     @Test void theThemeSetIsTheShippedVariantsThenTheConvertedOnes() {
         assertThat(KitFixtures.themes()).extracting(theme -> theme.name() + (theme.dark() ? " Dark" : " Light")).containsExactly(
             "Slate Cobalt Dark", "Slate Cobalt Light", "Catppuccin Latte Light", "Catppuccin Frappé Dark",
-            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ocean Dark", "Ocean Dawn Light", "Stray Dark");
+            "Catppuccin Macchiato Dark", "Catppuccin Mocha Dark", "Ocean Dark", "Ocean Dawn Light", "Stray Dark",
+            "Enterprise Dark", "Enterprise Light");
         assertThat(KitFixtures.themes().getFirst()).isSameAs(KitFixtures.dark());
     }
 

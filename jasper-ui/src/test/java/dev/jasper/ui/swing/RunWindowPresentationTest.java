@@ -243,7 +243,7 @@ class RunWindowPresentationTest {
                 assertThat(find(view, "label", JLabel.class).getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_STRONG_SECONDARY));
                 var strong = find(view, "strong", JLabel.class);
                 assertThat(strong.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_STRONG_SECONDARY));
-                assertThat(strong.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.PANEL_TITLE));
+                assertThat(strong.getFont()).as("the mocks' 11 px semibold detail label").isEqualTo(ThemePainting.font(context, Typography.Role.RUN_HEADING));
                 var mono = find(view, "mono", JLabel.class);
                 assertThat(mono.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
                 assertThat(mono.getForeground()).isEqualTo(palette.color(SemanticColor.TEXT_SECONDARY));

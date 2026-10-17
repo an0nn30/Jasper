@@ -24,6 +24,8 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/expected")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/intellij/loose")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // KitFixtures.themes() includes the Enterprise plugin's theme (spec 16.1.2).
+    inputs.file(rootProject.file("plugins/enterprise/src/main/resources/themes/enterprise.json")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 tasks.register<JavaExec>("gallery") {
     dependsOn(tasks.testClasses)
