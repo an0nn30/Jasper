@@ -8,6 +8,8 @@ Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority:
 Amended on 2026-10-16 with plan 4a's Rulings 17, made under the same authority: 5.4 (the provisional token ranges stand).
 Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
 Amended on 2026-10-17 with plan 6b's ruling 3: 7.1, 7.2 and 7.7 (border.divider is overridable).
+Amended on 2026-10-17 with plan 6b's rulings 10 and R44, made under the same authority: 10.8 (the overlay's placement),
+4.9, 9.1 and 16.1 (the `DialogMapping` reader).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -466,8 +468,8 @@ beside `startupViewMode` (`:240`), from the `PluginSelection` the bootstrap hand
   `TitlePane.centerTitle` only under a unified title bar.
 - **Kit contexts:** every context is built with `KitContext.of(kit, …)` (6.3). The kit reaches `AppearanceBindings`,
   `PresentationIcons` (from its source context) and `HostedKit`, through a new pre-start setter
-  `PluginRuntime.presentation(Kit kit, DialogMapping dialogs)` beside `appearance()`; motion reaches plugins through
-  the existing animations supplier (10.9).
+  `PluginRuntime.presentation(Kit kit)` beside `appearance()`; plugin dialogs meet the `DialogMapping` in
+  `AuxiliaryWindows`, which is built with it; motion reaches plugins through the existing animations supplier (10.9).
 - **Windows and dialogs:** `composeWindow`, reopen and hand-off, the `--background` rehearsal (`:760-829`),
   `NativeShells`, `AuxiliaryWindows`, `HostedUi` and `SettingsDialog` receive their projections at construction.
 
@@ -1117,7 +1119,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `fontRowCopy` | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
-| `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | plugins (`HostedUi.dialog`), windows (`AuxiliaryWindows`) |
+| `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | windows (`AuxiliaryWindows`, which also hosts plugin dialogs) |
 | `Branding` | `product`, the icon images, the splash art; `Branding.NONE` for a look without `[branding]` | bootstrap: `Splash`; platform: `ApplicationIcon` (10.11) |
 | `Motion` | STANDARD, NONE | application: the one animations supplier that every `MotionPolicy` reads (10.9) |
 | `TitleFormat` | the template | workspace: `WindowContent.onTitle` |
@@ -1126,9 +1128,8 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `DefaultSource` (in `config`) | the kit's defaults | `ConfigService`, `SettingsDraft` |
 
 `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of` are the only classes that read the `WorkspaceLook`,
-`ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by `HostedUi.dialog`
-and `AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed
-roots. Other readers read values (sizes, strings, booleans).
+`ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by
+`AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed roots. Other readers read values (sizes, strings, booleans).
 
 Each field comes from the kit file as below, and the last column is `Presentation.fallback` (4.7). The default look's
 values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.1 lists the Settings ones).
@@ -1300,8 +1301,8 @@ the 07 Credential Vault mocks show them:
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
   its trailing edge;
-- OVERLAY centred in the window's content; ATTACHED_SHEET centred horizontally and joined to the bottom of the title
-  bar, with no top frame edge;
+- OVERLAY centred on the whole window, its title bar included, as the Unlock Vault mock places it; ATTACHED_SHEET
+  centred horizontally and joined to the bottom of the title bar, with no top frame edge;
 - no fade (10.9); keys, focus and closing as each presentation has them today.
 
 A dialog whose owner has no window opens as a native dialog. Progress overlays (`OverlaySpec`) stay in the window,
@@ -1712,8 +1713,7 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 7. **Architecture.**
    - The variant-read scan: `ChromeSpec` and `ControlVariants` only in `dev.jasper.app.presentation`,
      `dev.jasper.ui.kit` and `KitFaces`; the `WorkspaceLook`, `ShellLook` and `PaletteLook` variant enums only in
-     `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of`; `DialogMapping` only in `HostedUi.dialog` and
-     `AuxiliaryWindows`; `Motion` only in the application's animations supplier; `Composition` only in the listed roots.
+     `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of`; `DialogMapping` only in `AuxiliaryWindows`; `Motion` only in the application's animations supplier; `Composition` only in the listed roots.
    - `StrategyIsolationTest` (ASM): faces and strategies never reference `Kit`, `ControlVariants` or `ChromeSpec`, and
      the reconciler references control classes only.
    - `StaticDefaultTest`: no `DesignMetrics.DEFAULT` read or static metric final outside the default catalog, including

@@ -32,8 +32,8 @@ leading pack is a separate branch; (5) the classic header's trailing group, fiel
 `icons`; (6) the search field's light keycap; (7) classic tabs keep `window.tab_height` (the mock's strip is 1 px
 shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the configuration
 cell only for a problem; (9) the run item in `accent.edge`, on `surface.control.selected` while the palette is open;
-(10) `ClassicDialog` in jasper-ui, radius 4, **centred on the whole window, a deviation from spec 10.8's "centred in the
-window's content" (the mock wins on layout), not approved: it awaits the orchestrator's ruling**; (11) `AuxiliaryWindows` marks every surface, native without a showing
+(10) `ClassicDialog` in jasper-ui, radius 4, centred on the whole window as the mock places it (approved on 2026-10-17 by the orchestrator under the user's
+overnight authority; spec 10.8 amended); (11) `AuxiliaryWindows` marks every surface, native without a showing
 window (a sheet as a centred dialog), content set later marked too; (12) `hostTitled` hides the form's title label and
 only a hero that repeats it (a prompt keeps its tile and message), and `dialogCard` lets the card own the form's frame;
 (13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the Workstation render leads with the
@@ -42,10 +42,8 @@ run item; (16) under a native title the header row is window chrome; (17) the wi
 painted as the role; Execution notes (2026-10-17) R18 to R53 (the fixture theme in 5b's place, `ProjectionReadTest`,
 `WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the band's trailing actions,
 the tab strip's dividers painted as the role, the face-width probes printed until 5b, 5b's merge items, and the run item
-on its bar's surface). **R44 keeps `PluginRuntime.presentation(Kit)`, a deviation from spec 4.9's
-`presentation(Kit kit, DialogMapping dialogs)` and 5a Rulings 20** (the mapping reaches plugin dialogs through
-`AuxiliaryWindows`; spec 9.1's consumer column still names `HostedUi.dialog`); amending 4.9 and 9.1 awaits the
-orchestrator's approval. At the merge with plan 5b (R47): copy the eight chrome values into `enterprise.json` (Light
+on its bar's surface). R44 keeps `PluginRuntime.presentation(Kit)`: the mapping reaches plugin dialogs through `AuxiliaryWindows` (approved
+on 2026-10-17 by the orchestrator; spec 4.9, 9.1 and 16.1 amended). At the merge with plan 5b (R47): copy the eight chrome values into `enterprise.json` (Light
 `surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim` `#00000036`, `border.divider` `#D3D6DA`; Dark
 `#3A3D42`, `#3D74D6`, `#00000036`, `#4A4D53`), drop `surface.tabstrip` from `EnterpriseThemeTest.NEUTRAL`, add the Dark
 `border.divider` override there, generate `derived-roles-enterprise.tsv` with it, turn R36's printed probes into
