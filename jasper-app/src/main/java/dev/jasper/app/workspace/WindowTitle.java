@@ -12,16 +12,19 @@ import java.util.regex.Pattern;
 /**
  * The frame title from the look's template (Enterprise presentation spec 10.4). The text between two tokens separates
  * them: a token with no value goes with the separator before it, or after it when it comes first, and a template whose
- * tokens are all empty keeps its leading text without a trailing separator.
+ * tokens are all empty keeps its leading and trailing text without the separators between them. A template without
+ * tokens is the title as it is.
  */
 final class WindowTitle {
     private static final Pattern TOKEN = Pattern.compile("\\{(context|session|directory)\\}");
     /** Spaces and the separators a template may end its leading text with. */
     private static final Pattern TRAILING = Pattern.compile("[\\s—–·:|-]+$");
+    /** Spaces and the separators a template may start its trailing text with. */
+    private static final Pattern LEADING = Pattern.compile("^[\\s—–·:|-]+");
 
     private WindowTitle() { }
 
-    /** {@code format} with its tokens filled in. */
+    /** {@code format} with its tokens filled in; {@code {context}} is used as it is, the others stripped. */
     static String format(TitleFormat format, String context, String session, String directory) {
         var values = Map.of("context", Objects.requireNonNull(context), "session", Objects.requireNonNull(session),
             "directory", Objects.requireNonNull(directory));
@@ -32,10 +35,12 @@ final class WindowTitle {
         int at = 0;
         while (matcher.find()) {
             literals.add(template.substring(at, matcher.start()));
-            tokens.add(values.get(matcher.group(1)).strip());
+            String value = values.get(matcher.group(1));
+            tokens.add(value.isBlank() ? "" : matcher.group(1).equals("context") ? value : value.strip());
             at = matcher.end();
         }
         literals.add(template.substring(at));
+        if (tokens.isEmpty()) return template;
         // literals: the leading text, then the separator before each later token, then the trailing text.
         var out = new StringBuilder(literals.getFirst());
         boolean any = false;
@@ -45,11 +50,15 @@ final class WindowTitle {
             out.append(tokens.get(i));
             any = true;
         }
-        if (!any) return TRAILING.matcher(literals.getFirst()).replaceAll("") + literals.getLast();
+        if (!any) {
+            String head = TRAILING.matcher(literals.getFirst()).replaceAll("");
+            String tail = head.isBlank() ? LEADING.matcher(literals.getLast()).replaceAll("") : literals.getLast();
+            return (head + tail).strip();
+        }
         return out.append(literals.getLast()).toString();
     }
 
-    /** {@code {session}}: a provided session's saved identity, a remote pane's host, else "Local: <shell>". */
+    /** {@code {session}}: a provided session's saved identity, a remote pane's host, else {@code "Local: "} and the shell's label. */
     static String session(PaneSnapshot pane) {
         if (pane == null) return "";
         if (pane.providerId().isPresent()) return clean(pane.shell());

@@ -352,13 +352,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
             var document = content.selectedContent();
-            var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
-                Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
+            var snapshot = pane == null ? null : pane.snapshot();
+            Path home = Path.of(System.getProperty("user.home"));
+            var context = WindowHeaderContext.from(snapshot, home, pane == null ? "" : pane.programTitle(),
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
             // The frame title follows the look's template (spec 10.4); the title field keeps the context.
-            var snapshot = pane == null ? null : pane.snapshot();
-            Path home = Path.of(System.getProperty("user.home"));
             nativeTitle.accept(WindowTitle.format(content.look().title(), context.label(),
                 document != null ? document.title() : WindowTitle.session(snapshot),
                 document != null ? document.location() : WindowTitle.directory(snapshot, home)));

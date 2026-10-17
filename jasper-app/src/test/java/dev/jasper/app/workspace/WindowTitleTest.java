@@ -3,11 +3,14 @@ package dev.jasper.app.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.presentation.TitleFormat;
+import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.terminals.PaneSnapshot;
 import dev.jasper.app.terminals.RemoteLocation;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.OptionalInt;
+import javax.swing.JRootPane;
 import org.junit.jupiter.api.Test;
 
 /** Spec 10.4: the frame title from the look's template, as the Workstation mocks show it. */
@@ -33,6 +36,35 @@ class WindowTitleTest {
         assertThat(WindowTitle.format(WORKSTATION, "x", "", "~")).isEqualTo("Workstation — ~");
         assertThat(WindowTitle.format(WORKSTATION, "x", "  ", "")).isEqualTo("Workstation");
         assertThat(WindowTitle.format(new TitleFormat("{session} | {directory}"), "x", "", "~/src")).isEqualTo("~/src");
+        assertThat(WindowTitle.format(new TitleFormat("Corp Terminal"), "x", "Mac", "~")).as("no tokens: the title as it is")
+            .isEqualTo("Corp Terminal");
+        assertThat(WindowTitle.format(new TitleFormat("{session} at work"), "x", "", "~")).isEqualTo("at work");
+        assertThat(WindowTitle.format(new TitleFormat("{session} — Corp"), "x", "", "~")).isEqualTo("Corp");
+        assertThat(WindowTitle.format(new TitleFormat("Workstation — {session} (corp)"), "x", "", "~")).isEqualTo("Workstation (corp)");
+    }
+
+    @Test void theContextIsTodaysLabelAsItIs() {
+        assertThat(WindowTitle.format(new TitleFormat("{context}"), " notes.md ", "", "")).isEqualTo(" notes.md ");
+        assertThat(WindowTitle.format(new TitleFormat("Jasper — {context}"), "  ", "", "")).isEqualTo("Jasper");
+    }
+
+    /** The frame title through the window's own wiring: the template from its look and the active pane's tokens. */
+    @Test void theFrameTitleFillsTheLooksTemplateFromTheActivePane() throws Exception {
+        try {
+            DesktopTestSupport.edt(() -> {
+                var chrome = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.UNIFIED,
+                    WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false,
+                    WorkspaceLook.FrameStyle.STANDARD), WORKSTATION);
+                var owner = WindowShellTest.window(true, chrome);
+                var titles = new ArrayList<String>();
+                WindowContent.mount(new JRootPane(), owner, new WindowLook(chrome, false, true), titles::add);
+                owner.update();
+                assertThat(titles).isNotEmpty();
+                assertThat(titles.getLast()).isEqualTo("Workstation — Local: idle-test-session — ~");
+            });
+        } finally {
+            DesktopTestSupport.closeOwners();
+        }
     }
 
     @Test void theTokensComeFromThePaneOrTheDocument() {

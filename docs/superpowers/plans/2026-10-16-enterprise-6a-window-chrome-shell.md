@@ -253,8 +253,9 @@ this plan's status banner.
 10. **`{session}` and `{directory}`.** A provider pane's session is its saved identity (`PaneSnapshot.shell()`), a remote
     one's its OSC host, a local one's "Local: <shell>"; a remote pane's directory is the reported path as it is (Jasper does
     not know the remote home), a local one's uses `~`; a hosted document gives its title and location. Separators are the
-    literal text between two tokens; a dropped token takes the separator before it (after it for the first token), and a
-    template whose tokens are all empty loses its trailing separator — cost if wrong: a different title string.
+    literal text between two tokens; a dropped token takes the separator before it (after it for the first token), a
+    template whose tokens are all empty loses the separators between its leading and trailing text, a template without
+    tokens is the title as it is, and `{context}` is today's label unstripped — cost if wrong: a different title string.
 11. **Motion's one supplier is `ThemeController`'s flag**, which `LookMotion.allows(setting)` sets; `WindowTabs` and the
     palette now read it as well as their settings (both must allow), so every consumer reads the one policy — cost if
     wrong: none for the default look, where both are the setting.
@@ -3507,3 +3508,10 @@ The plan's own Rulings are 1 to 12; these continue the numbering.
     `MacAppearance.follow(JRootPane, boolean)` is the one writer of `apple.awt.windowAppearance` (`MacTitleBar`,
     `ShellChrome`, `WindowContent`), and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`. Why: spec 10.1
     names every native-titled frame and dialog, and Rulings 8's list missed this one. Cost if wrong: none.
+28. **`WindowTitle.format` differs from Task 7's block** (Task 7 review). A template without tokens is returned as it is
+    (the block gave `"Corp Terminal"` twice, and spec 7 and 8 accept such a template); when every token is empty the
+    leading text loses its trailing separators, the trailing text loses its leading ones when there is no leading text,
+    and the result is stripped (`"{session} at work"` gives `"at work"`); `{context}` is passed unstripped, so the
+    default template is exactly today's label; `onTitle` takes the pane's snapshot and the home directory once; and
+    `WindowTitleTest` checks the wiring through `WindowContent.mount` with a Workstation template (its own ledger row).
+    Why: the block's all-empty branch repeated a token-free template and left a leading space. Cost if wrong: none.
