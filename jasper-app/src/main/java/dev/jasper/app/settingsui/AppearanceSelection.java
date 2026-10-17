@@ -89,7 +89,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private List<Option> options(boolean dark, String picked) {
         var installed = dark ? themes.dark() : themes.light();
         var options = new ArrayList<Option>();
-        for (var theme : installed) options.add(new Option(theme.id(), theme.label(), Optional.empty()));
+        for (var theme : installed) options.add(new Option(theme.id(), theme.label(), Optional.empty(), "",
+            theme.provider().isEmpty() ? "" : "From the " + theme.provider() + " plugin", Optional.empty()));
         if (installed.stream().noneMatch(theme -> theme.id().equals(picked))) options.add(new Option(picked, unavailable(dark, picked), Optional.empty()));
         return options;
     }

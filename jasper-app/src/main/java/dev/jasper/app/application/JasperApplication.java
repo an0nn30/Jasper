@@ -298,8 +298,8 @@ public final class JasperApplication {
         boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
         // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
         // never stops start-up; the configuration reports it.
-        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.bundledOnly()
-            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
+        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.of(selection.themes())
+            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly(), selection.themes());
         // The configuration reports unusable picks; start-up only replaces them.
         var picks = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
@@ -1073,8 +1073,11 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
+            // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
+            // fixed plugin tier, never ThemeController.library(), which requires the EDT.
+            var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
             Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
-                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
                     this::confirmOver, this::informOver, configuration::save, configuration::reload));
             var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);

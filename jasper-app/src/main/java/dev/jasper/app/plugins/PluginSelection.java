@@ -46,11 +46,13 @@ public final class PluginSelection {
     private final Optional<SkippedLook> skipped;
     private final Presentations presentations;
     private final AttemptStore store;
+    private final dev.jasper.app.appearance.PluginThemes themes;
 
     private PluginSelection(PluginRuntime.Options options, String build, List<PluginCandidate> candidates, List<String> problems,
                             PluginResolver.Resolution resolution, Presentation presentation, PresentationAttempt attempt,
-                            Optional<SkippedLook> skipped, Presentations presentations, AttemptStore store) {
-        this.presentations = presentations; this.store = store;
+                            Optional<SkippedLook> skipped, Presentations presentations, AttemptStore store,
+                            dev.jasper.app.appearance.PluginThemes themes) {
+        this.presentations = presentations; this.store = store; this.themes = themes;
         this.options = options; this.build = build; this.candidates = List.copyOf(candidates); this.problems = List.copyOf(problems);
         this.resolution = resolution; this.presentation = presentation; this.attempt = attempt; this.skipped = skipped;
     }
@@ -74,7 +76,8 @@ public final class PluginSelection {
     /** No plugins and the default look: for an application made without the bootstrap. */
     public static PluginSelection none() {
         return new PluginSelection(null, "", List.of(), List.of(), new PluginResolver.Resolution(List.of(), List.of()),
-            Presentation.standard(host()), PresentationAttempt.NONE, Optional.empty(), Presentations.NONE, null);
+            Presentation.standard(host()), PresentationAttempt.NONE, Optional.empty(), Presentations.NONE, null,
+            dev.jasper.app.appearance.PluginThemes.NONE);
     }
 
     static PluginSelection scan(PluginRuntime.Options options, String build, Version sdk, Projections.Host host) {
@@ -115,7 +118,8 @@ public final class PluginSelection {
                     skipped = Optional.of(new SkippedLook(candidate.descriptor().name(), new PresentationAttempt(store, candidate.id(),
                         candidate.descriptor().version().toString(), presentations.of(candidate).orElseThrow().digest(), build)));
         }
-        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store);
+        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store,
+            themes(candidates, resolution));
     }
 
     /** macOS, and whether its unified title bar is available, read without AWT. */
@@ -158,7 +162,7 @@ public final class PluginSelection {
         if (provider.isEmpty()) return this;
         return new PluginSelection(options, build, candidates, problems,
             PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped,
-            presentations, store);
+            presentations, store, themes);
     }
 
     /**
@@ -171,6 +175,26 @@ public final class PluginSelection {
             if (candidate.id().equals(id) && candidate.origin() == origin)
                 return presentations.of(candidate).map(facts -> PresentationAttempt.announce(store, id, facts.digest())).orElse(true);
         return true;
+    }
+
+    /** The plugin theme tier (spec 7.4): read once here and kept for the whole session, a blamed look's included. */
+    public dev.jasper.app.appearance.PluginThemes themes() { return themes; }
+
+    /** Every discovered plugin's declared theme files; only loadable plugins' files are read. */
+    private static dev.jasper.app.appearance.PluginThemes themes(List<PluginCandidate> candidates, PluginResolver.Resolution resolution) {
+        var declared = new ArrayList<dev.jasper.app.appearance.PluginThemes.Declared>();
+        for (PluginCandidate candidate : candidates) {
+            boolean loadable = resolution.load().stream().anyMatch(loaded -> loaded.id().equals(candidate.id()) && loaded.origin() == candidate.origin());
+            var reader = PluginResources.of(candidate);
+            var paths = candidate.descriptor().themes();
+            var ids = candidate.descriptor().themeIds();
+            int rank = switch (candidate.origin()) { case DEV -> 0; case BUNDLED -> 1; case USER -> 2; };
+            for (int i = 0; i < paths.size(); i++)
+                declared.add(new dev.jasper.app.appearance.PluginThemes.Declared(candidate.id(), candidate.descriptor().name(), rank, loadable,
+                    ids.get(i), candidate.directory().resolve(paths.get(i)),
+                    loadable ? reader.read(paths.get(i), dev.jasper.app.presentation.PresentationFacts.MAX_THEME_BYTES) : java.util.Optional.empty()));
+        }
+        return dev.jasper.app.appearance.PluginThemes.of(declared);
     }
 
     List<PluginCandidate> candidates() { return candidates; }

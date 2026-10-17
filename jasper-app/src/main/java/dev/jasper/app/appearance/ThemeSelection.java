@@ -48,6 +48,8 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
     private static JasperTheme pick(ThemeLibrary library, String id, boolean dark, BiConsumer<String, String> problems) {
         var theme = library.theme(id);
         if (theme.isPresent() && theme.get().has(dark)) return theme.get();
+        // Spec 7.5: the pick of a theme whose plugin is off is kept, and shows the default without a warning.
+        if (theme.isEmpty() && library.dormant().contains(id)) return JasperTheme.bundled();
         String reason = theme.isPresent() ? "\"" + id + "\" has no " + (dark ? "Dark" : "Light") + " variant."
             : "\"" + id + "\" is not an installed theme.";
         problems.accept(dark ? "ui.theme.dark" : "ui.theme.light", reason + " Use one of "
