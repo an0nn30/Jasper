@@ -103,8 +103,8 @@ is 24 + 1 (`BOTTOM_STRIP_HEIGHT`, new, as approved above) and its probes and pai
 `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` pass unchanged under `SurfaceContrast.beyond` (no Enterprise
 derived role moved); `EnterpriseFirstWindowTest` asserts Event Log at Bottom Left and the look's dock layout key; the
 stripe pairs' tile colours are the shipped theme's; all 75 `check_pairs.py` pairs pass (the 25 dock pairs 0.982 to
-1.000) and the default look is byte-identical (gallery, 322 files, and `DefaultDockPixelsTest`); merged counts
-**11,240 tests, 0 failures, 0 errors, 25 skipped**.
+1.000) and the default look is byte-identical (gallery, 322 files, and `DefaultDockPixelsTest`); merged counts, with
+the side labels at the outer edge (`97abf5932`), **11,240 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 9a: the Settings chrome — 2026-10-17** (`claude/enterprise-settings`, worktree
 `.claude/worktrees/enterprise-9`, `87e894a99..82633dd6c`, then this documentation commit;
