@@ -13,7 +13,7 @@ import javax.swing.JComponent;
 /**
  * What the palette's controller drives (Enterprise presentation spec 11.1): the query and chip, the list and its
  * selection, a step's small form and the view's own surface. Two implementations exist, the card ({@link CardView}) and
- * the Run window ({@link RunWindowView}), built by {@code PaletteViews}. EDT only.
+ * the Run window ({@link RunWindowView}), built by {@link PaletteViews}. EDT only.
  */
 public sealed interface PaletteView extends AutoCloseable permits CardView, RunWindowView {
     /**

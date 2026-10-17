@@ -57,9 +57,9 @@ final class WindowCommandPalette implements AutoCloseable {
                          String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit) {
         this.history = history;
         this.owner = owner; this.defaultScopeId = defaultScopeId;
-        controller = new PaletteController(kit, scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
-            owner::updatingActions, owner::updateActions,
-            message -> owner.onError.accept("Command failed", message), this::open);
+        controller = new PaletteController(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, macOs, this::layoutOverlay,
+            this::restoreAndHide, owner::updatingActions, owner::updateActions,
+            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, owner::openFile);
         view = controller.view();
         palette = view.component();
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);

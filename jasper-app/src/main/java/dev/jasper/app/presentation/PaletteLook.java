@@ -16,4 +16,9 @@ public record PaletteLook(View view, Home home) {
 
     /** Both parts are required. */
     public PaletteLook { Objects.requireNonNull(view); Objects.requireNonNull(home); }
+
+    /** The default look's palette: the card dropped from the title field. */
+    public static final PaletteLook DEFAULT = new PaletteLook(View.CARD, Home.TITLE_FIELD);
+    /** The Run window at the bottom-left of the dock work area (spec 11.5). */
+    public static final PaletteLook RUN_WINDOW = new PaletteLook(View.RUN_WINDOW, Home.CORNER);
 }

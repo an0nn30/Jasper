@@ -39,15 +39,28 @@ public final class PaletteController implements AutoCloseable {
     private boolean open, closed, completing, dirty = true, rosterChanged;
     private long generation;
 
+    /** The default look's card, with no opener shortcut and no Browse… action. */
     public PaletteController(dev.jasper.ui.swing.KitContext kit, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
                       Runnable layout, Runnable dismissed, BooleanSupplier batching, Runnable updateActions,
                       Consumer<String> reportError, Consumer<String> reopen) {
+        this(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, macOs, layout, dismissed, batching, updateActions,
+            reportError, reopen, () -> "", () -> { });
+    }
+
+    /**
+     * A controller whose view {@code look} names (spec 11.1); {@code openerShortcut} is the opener's current shortcut text
+     * and {@code browse} runs File, Open File… (spec 11.7).
+     */
+    public PaletteController(dev.jasper.ui.swing.KitContext kit, dev.jasper.app.presentation.PaletteLook look, ScopeRegistry scopes,
+                      dev.jasper.app.commands.CommandHistory history, boolean macOs, Runnable layout, Runnable dismissed,
+                      BooleanSupplier batching, Runnable updateActions, Consumer<String> reportError, Consumer<String> reopen,
+                      java.util.function.Supplier<String> openerShortcut, Runnable browse) {
         this.scopes = scopes; this.history = java.util.Objects.requireNonNull(history); this.macOs = macOs; this.layout = layout; this.dismissed = dismissed;
         this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
-        palette = new CardView(kit, macOs, new PaletteView.Host(this::queryChanged, this::execute, this::prefix,
-            scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, () -> "", this::dismiss, () -> { }));
+        palette = PaletteViews.of(look, kit, macOs, new PaletteView.Host(this::queryChanged, this::execute, this::prefix,
+            scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, openerShortcut, this::dismiss, browse));
         scopesListener = scopes.onChanged(this::rosterChanged);
     }
 
