@@ -16,8 +16,8 @@ paint the frame and bands, the field box and the list box. Enter runs the view's
 window's verb 0 or its SPLIT verb while "Open in a split pane" is ticked (`PaletteViewContractTest`). Compared with the 06
 Run Dialog mocks at 2× under the Enterprise fixture kit and the Enterprise Light fixture theme (`RunWindowRenderTest`):
 the Run window's own geometry probes within a device pixel for edges and three for text, its fills within 3 ΔE76, edge
-agreement 0.901 / 0.807 ("Just opened", top / bottom) and 0.936 / 0.804 ("Typing auth"); the classic checkbox's and buttons' (plan 4b) and IBM Plex's (plan 5b) probes are measured and
-printed until those plans are here (`RunWindowRenderTest.CHECKED`); tuned in the comparison: none. Rulings (plan, "Rulings"): (1) two plans, 8b lands the window; (2) the card renamed `CardView`;
+agreement 0.901 / 0.807 ("Just opened", top / bottom) and 0.936 / 0.804 ("Typing auth"); IBM Plex's (plan 5b) probes are measured and
+printed until that plan is here (`RunWindowRenderTest.CHECKED`); tuned in the comparison: none. Rulings (plan, "Rulings"): (1) two plans, 8b lands the window; (2) the card renamed `CardView`;
 (3) the step form and prefix edit shared; (4) the Run window's roles, two type roles and two filled icons; (5) the list is
 8 × 21 + 2 × 19 = 206 inside its box, 6 px taller than the mock's cut box, so the window is 427 tall; (6) the title
 shortcut and row tags are plain CAPTION text, as drawn; (7) the help tile is a PROMPT_HEADER `play.filled` icon at the
@@ -31,7 +31,18 @@ their presses to the view, so the title text drags; execution notes R1 to R19 (n
 own help tile, 4c's fixture theme, the fixture kit's comparison with owners, the checkbox row from roles, details cut
 at their end). Deviations: (a) Task 3's review round (`c16f1a8dd`): a SWATCH glyph takes a row's glyph size only under `runWindow`, so a compact panel row's swatch keeps its caption size (spec 8.2); `RunWindowPresentation.releaseHelpChildren` returns the help glyph's colours when the flag turns off; `NewRolesTest`'s Run window names sit on their own lines; three more tests (`RunWindowPresentationTest` 2, `SwatchesTest` 1), so the plan adds 36 tests, not 33; (b) Rulings 4's type role sizes are the classic scale's, `RUN_HEADING` 11/600 and `RUN_DETAIL` 10.5/400 (the default scale's are 12/600 and 11.5/400); (c) Task 1 shows the step's card before `step.show` in `CardView.showStep`, so the first field can take focus; (d) the final review's fixes ("Plan 8a: final review fixes"): `RunWindowView.showStep` shows the card first too; a step taller than the list box scrolls inside it (`SurfacePanel.scrolling`) and `StepForm.focusField` scrolls the focused row into view; every pair the Run window paints is declared and guarded (amending Rulings 8): the muted details, tags and count and a selected row's detail TEXT-guarded (Enterprise Light paints #717680 on the card, #686D75 on a heading band and #E3EAF9 on the accent, where the mocks paint #7A808A, #7A808A and #DCE5F7), the help glyph INDICATOR-guarded on the accent, the field and list box edges CONTROL-guarded, and the hue squares INDICATOR-guarded on the card and on the accent, a square that misses keeping its fill inside a hairline ring in the guarded colour (`RunWindowPresentation.authored()` is gone); the help text sits centred in its 18 px line, shows at most two lines and the help row has one height (`RunWindowPresentation.helpHeight`), so the window keeps its height whatever the chip; a row's context-menu verbs are `verb:<verb>:<entry key>` (amending Rulings 11) and run only on the row they name; `setChip` re-reads the ▼ menu; the checkbox's label follows the toggle's drawn width; the 10-argument `PaletteController` constructor and `PaletteEntry.Header(String)` are gone; a "help text top" probe (mock 85, render 81 with the platform face) is FONTS-owned; three more tests. Default look byte-identical: the
 headless gallery's files for Slate Cobalt Dark and Light match the base (Task 4). `./gradlew check --continue`:
-**10,810 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `b9178db45`, had 10,771). GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not merged, not pushed.
+**10,810 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `b9178db45`, had 10,771). GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not pushed.
+Merged with main (plan 4b) as `5fc529882` and reconciled in `d17b2fa43`: the Run window's help layout, glyph ink and
+tile stay ahead of the kit's prompt face, the tile painting through 4b's `ClassicPromptFace.paintAccentTile` (R2); the
+quiet query returns first in `FieldSurface.paintDefault`, where both field policies paint a transparent field (R3);
+FACES joins `RunWindowRenderTest.CHECKED`, the classic checkbox's left, top, label and inside and the primary's fill
+matching the mocks, while the primary and Cancel left edges, which follow the labels' face, are FONTS-owned with a
+residual (the classic 14 px label padding makes "Connect" and "Browse…" 76 and 80 wide in the platform face and about
+73 and 78 in Plex, where the mock draws every button 70) and B's disabled checkbox (`surface.tableHeader` against the
+mock's white, R12) is a printed residual; edge agreement 0.900 / 0.841 and 0.936 / 0.841 (R9); the classic checkbox's
+preferred size is the row's `CHECKBOX_BOX` plus two focus rings, so R7 holds unchanged; `KitFixtures.enterpriseLight()`
+stays for 4c (R4); the default gallery's PNGs match the base, its JSON differing only in 4b's `Cards$SectionSurface`;
+`./gradlew check --continue`: **10,876 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit and the final review fixes;
