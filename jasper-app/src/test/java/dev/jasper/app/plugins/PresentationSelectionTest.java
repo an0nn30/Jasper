@@ -114,4 +114,43 @@ class PresentationSelectionTest {
         assertThat(reasons(resolution)).containsEntry("c.hard", "SKIPPED: requires b.look, which is not available");
         assertThat(resolution.load()).extracting(PluginCandidate::id).contains("a.look", "d.soft").doesNotContain("b.look", "c.hard");
     }
+
+    @Test void aProviderThatNeedsALoserCannotLoadSoTheNextProviderWins() {
+        PluginCandidate direct = provider("a.look", PluginCandidate.Origin.DEV, new PluginDescriptor.Requirement("b.look", VersionRange.ANY, false));
+        PluginCandidate through = provider("a.look", PluginCandidate.Origin.DEV, new PluginDescriptor.Requirement("c.lib", VersionRange.ANY, false));
+        PluginCandidate next = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        var library = plain("c.lib", new PluginDescriptor.Requirement("b.look", VersionRange.ANY, false));
+        for (PluginCandidate winner : List.of(direct, through)) {
+            var resolution = PluginResolver.resolve(List.of(winner, next, library), Map.of(), SDK, false,
+                facts(Map.of(winner, valid("a"), next, valid("b")), AttemptStore.Record.EMPTY));
+            assertThat(resolution.presentation()).as(winner.descriptor().requires().toString()).contains(next);
+            assertThat(resolution.load()).extracting(PluginCandidate::id).containsExactly("b.look", "c.lib");
+            assertThat(resolution.load()).containsAll(resolution.presentation().stream().toList());
+            assertThat(reasons(resolution)).containsOnly(Map.entry("a.look", "SKIPPED: " + PluginStatus.NEEDS_LOOK));
+            assertThat(resolution.rejected()).singleElement().satisfies(status -> assertThat(status.quiet()).isFalse());
+        }
+        var alone = PluginResolver.resolve(List.of(direct, provider("b.look", PluginCandidate.Origin.USER)), Map.of(), SDK, false,
+            facts(Map.of(direct, valid("a")), AttemptStore.Record.EMPTY));
+        assertThat(alone.presentation()).as("its dependency is unreadable, so neither loads").isEmpty();
+        assertThat(alone.load()).isEmpty();
+    }
+
+    @Test void onlyTheLookStatusesAndSupersededCopiesAreQuiet() {
+        var other = new PluginDescriptor("e.sdk", "e.sdk", Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.19.0"), "", "",
+            Set.of(), Set.of(), List.of(), "", "");
+        PluginCandidate broken = provider("f.look", PluginCandidate.Origin.DEV), needs = provider("g.look", PluginCandidate.Origin.DEV,
+            new PluginDescriptor.Requirement("h.look", VersionRange.ANY, false)), winner = provider("h.look", PluginCandidate.Origin.DEV);
+        var candidates = List.of(plain("a.cycle", new PluginDescriptor.Requirement("b.cycle", VersionRange.ANY, false)),
+            plain("b.cycle", new PluginDescriptor.Requirement("a.cycle", VersionRange.ANY, false)),
+            plain("c.missing", new PluginDescriptor.Requirement("nowhere", VersionRange.ANY, false)),
+            plain("d.version", new PluginDescriptor.Requirement("i.plain", VersionRange.parse(">=2.0.0"), false)),
+            new PluginCandidate(other, Path.of("e.sdk"), List.of(), PluginCandidate.Origin.BUNDLED), broken, needs, winner, plain("i.plain"));
+        var resolution = PluginResolver.resolve(candidates, Map.of(), SDK, false, facts(Map.of(broken,
+            new PresentationFacts("x", Optional.of("[metrics].row_height: 40 is outside 18-28"), Optional.empty()), needs, valid("g"),
+            winner, valid("h")), AttemptStore.Record.EMPTY));
+        assertThat(resolution.presentation()).contains(winner);
+        assertThat(resolution.rejected()).extracting(PluginStatus::id)
+            .containsExactlyInAnyOrder("a.cycle", "b.cycle", "c.missing", "d.version", "e.sdk", "f.look", "g.look");
+        assertThat(resolution.rejected()).allSatisfy(status -> assertThat(status.quiet()).as(status.formatted()).isFalse());
+    }
 }

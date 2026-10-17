@@ -14,7 +14,11 @@ import java.util.TreeSet;
 final class PluginResolver {
     /** {@code presentation} is the elected presentation provider, which {@code load} holds. */
     record Resolution(List<PluginCandidate> load, List<PluginStatus> rejected, java.util.Optional<PluginCandidate> presentation) {
-        Resolution { load = List.copyOf(load); rejected = List.copyOf(rejected); java.util.Objects.requireNonNull(presentation); }
+        Resolution {
+            load = List.copyOf(load); rejected = List.copyOf(rejected);
+            if (presentation.filter(load::contains).isPresent() != presentation.isPresent())
+                throw new IllegalArgumentException("the presentation " + presentation.get().id() + " is not loaded");
+        }
         Resolution(List<PluginCandidate> load, List<PluginStatus> rejected) { this(load, rejected, java.util.Optional.empty()); }
     }
 
@@ -78,7 +82,8 @@ final class PluginResolver {
 
     /**
      * Spec 4.4: of the loadable providers without a problem, DEV wins over BUNDLED over USER, then the lowest id; the
-     * losers are skipped whole, and a pending or failed attempt for exactly the winner's look skips it too.
+     * losers are skipped whole, and a pending or failed attempt for exactly the winner's look skips it too. A provider
+     * that could load only beside a loser cannot load at all, so it is skipped and the election runs again without it.
      */
     private static java.util.Optional<PluginCandidate> elect(Map<String, PluginCandidate> chosen, List<PluginStatus> rejected,
                                                              Presentations presentations) {
@@ -94,20 +99,35 @@ final class PluginResolver {
             }
             providers.add(candidate);
         }
-        if (providers.isEmpty()) return java.util.Optional.empty();
+        // Dependents of an invalid provider are explained by the missing dependency, so what fails a trial below is a loser.
+        dropUnmet(chosen, rejected);
+        providers.removeIf(candidate -> !chosen.containsKey(candidate.id()));
         providers.sort(Comparator.comparingInt((PluginCandidate candidate) -> rank(candidate.origin())).thenComparing(PluginCandidate::id));
-        PluginCandidate winner = providers.getFirst();
-        for (PluginCandidate loser : providers.subList(1, providers.size())) {
-            chosen.remove(loser.id());
-            rejected.add(PluginStatus.of(loser, PluginStatus.State.SKIPPED, PluginStatus.lookActive(winner.descriptor().name())));
+        while (!providers.isEmpty()) {
+            PluginCandidate winner = providers.getFirst();
+            List<PluginCandidate> losers = providers.subList(1, providers.size());
+            Map<String, PluginCandidate> trial = new TreeMap<>(chosen);
+            for (PluginCandidate loser : losers) trial.remove(loser.id());
+            dropUnmet(trial, new ArrayList<>());
+            if (!trial.containsKey(winner.id())) {
+                chosen.remove(winner.id());
+                rejected.add(PluginStatus.of(winner, PluginStatus.State.SKIPPED, PluginStatus.NEEDS_LOOK));
+                providers.removeFirst();
+                continue;
+            }
+            for (PluginCandidate loser : losers) {
+                chosen.remove(loser.id());
+                rejected.add(PluginStatus.of(loser, PluginStatus.State.SKIPPED, PluginStatus.lookActive(winner.descriptor().name())));
+            }
+            String digest = presentations.of(winner).orElseThrow().digest();
+            if (presentations.attempts().of(winner.id()).blocks(digest, presentations.build())) {
+                chosen.remove(winner.id());
+                rejected.add(PluginStatus.of(winner, PluginStatus.State.SKIPPED, PluginStatus.ATTEMPT_SKIP));
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(winner);
         }
-        String digest = presentations.of(winner).orElseThrow().digest();
-        if (presentations.attempts().of(winner.id()).blocks(digest, presentations.build())) {
-            chosen.remove(winner.id());
-            rejected.add(PluginStatus.of(winner, PluginStatus.State.SKIPPED, PluginStatus.ATTEMPT_SKIP));
-            return java.util.Optional.empty();
-        }
-        return java.util.Optional.of(winner);
+        return java.util.Optional.empty();
     }
 
     private static int rank(PluginCandidate.Origin origin) {
