@@ -24,7 +24,7 @@ import org.tomlj.Toml;
 
 /** Spec 16.1.6: the shipped Enterprise plugin is what spec 4.1, 5.1, 7.6 and 14.1 say, from the sources and from its jar. */
 class PresentationConformanceTest {
-    /** Every key of spec 5.1's kit file except [branding], which plan 11 adds. */
+    /** Every key of spec 5.1's kit file. */
     static final Set<String> KEYS = Set.of("kit", "base",
         "chrome/title_bar", "chrome/menu_bar", "chrome/window_title", "chrome/tool_windows", "chrome/editor_tabs", "chrome/status_bar",
         "chrome/palette", "chrome/dialogs", "chrome/motion",
@@ -37,7 +37,8 @@ class PresentationConformanceTest {
         "type/base", "type/ui/family", "type/ui/regular", "type/ui/medium", "type/ui/semibold",
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
-        "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height");
+        "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
+        "branding/product", "branding/icons", "branding/splash_art");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
         "presentation/fonts/ibm-plex-sans-regular.ttf", "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
@@ -119,6 +120,37 @@ class PresentationConformanceTest {
             assertThat(component.version()).isEqualTo("1.1.0");
             assertThat(ThirdPartyNotices.read(component.text())).contains("Reserved Font Name \"Plex\"", "SIL OPEN FONT LICENSE Version 1.1");
         });
+    }
+
+    /** Spec 5.1, 5.9 and 14.1: the branding is the reference artwork the user supplied, each icon a PNG of its size. */
+    @Test void theBrandingIsTheReferenceArtwork() throws Exception {
+        var branding = EnterpriseResources.facts().parsed().orElseThrow().branding();
+        assertThat(branding.product()).isEqualTo("JasperOps");
+        Path reference = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
+        var sources = new java.util.LinkedHashMap<Integer, String>();
+        sources.put(16, "09 App Icon/macOS/AppIcon.iconset/icon_16x16.png");
+        sources.put(32, "09 App Icon/macOS/AppIcon.iconset/icon_32x32.png");
+        sources.put(48, "09 App Icon/Linux/hicolor/48x48/apps/jasper.png");
+        sources.put(64, "09 App Icon/macOS/AppIcon.iconset/icon_32x32-2x.png");
+        sources.put(128, "09 App Icon/macOS/AppIcon.iconset/icon_128x128.png");
+        sources.put(256, "09 App Icon/macOS/AppIcon.iconset/icon_256x256.png");
+        sources.put(1024, "09 App Icon/macOS/AppIcon.iconset/icon_512x512-2x.png");
+        assertThat(List.copyOf(sources.keySet())).isEqualTo(dev.jasper.app.presentation.Branding.SIZES);
+        for (var source : sources.entrySet()) {
+            int size = source.getKey();
+            byte[] shipped = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/icons/icon-" + size + ".png"));
+            assertThat(shipped).as("icon-%s.png is the reference file", size).isEqualTo(Files.readAllBytes(reference.resolve(source.getValue())));
+            assertThat(branding.icon(size)).isEqualTo(shipped);
+            assertThat(shipped.length).isLessThanOrEqualTo(512 * 1024);
+            var image = javax.imageio.ImageIO.read(new ByteArrayInputStream(shipped));
+            assertThat(image.getWidth()).as("icon-%s.png width", size).isEqualTo(size);
+            assertThat(image.getHeight()).as("icon-%s.png height", size).isEqualTo(size);
+            assertThat(image.getColorModel().hasAlpha()).as("icon-%s.png alpha", size).isTrue();
+        }
+        byte[] art = Files.readAllBytes(EnterpriseResources.RESOURCES.resolve("presentation/splash/art.svg"));
+        assertThat(art).as("the splash art is the reference file").isEqualTo(Files.readAllBytes(reference.resolve("10 Boot Splash/extracted/art.svg")));
+        assertThat(branding.splashArt()).isEqualTo(art);
+        assertThat(art.length).isLessThanOrEqualTo(256 * 1024);
     }
 
     /** The staged jar carries the same kit: the host reads it with the same digest and no problem. */
