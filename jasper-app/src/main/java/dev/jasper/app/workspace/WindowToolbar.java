@@ -49,7 +49,112 @@ final class WindowToolbar extends JToolBar {
     static int buttonSide(int height) {
         return UIScale.scale(height - dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM));
     }
-    int buttonSide() { return buttonSide(barHeight); }
+    int buttonSide() { return leading != null ? UIScale.scale(leading.side()) : buttonSide(barHeight); }
+
+    /**
+     * How a leading row spaces its controls (Enterprise presentation spec 10.3), in logical pixels.
+     *
+     * @param padding before the first and after the last control
+     * @param gap between two controls
+     * @param separatorGap on each side of a separator
+     * @param separatorInset above and below a separator
+     * @param side a button's height (and an icon button's width)
+     */
+    record Leading(int padding, int gap, int separatorGap, int separatorInset, int side) {
+        /** The classic toolbar's spacing in {@code metrics}. */
+        static Leading classic(DesignMetrics metrics) {
+            return new Leading(metrics.value(DesignMetrics.Role.TOOLBAR_PADDING), metrics.value(DesignMetrics.Role.CHROME_BUTTON_GAP),
+                metrics.value(DesignMetrics.Role.CHROME_SEPARATOR_GAP), metrics.value(DesignMetrics.Role.CHROME_SEPARATOR_INSET),
+                metrics.value(DesignMetrics.Role.BUTTON_HEIGHT));
+        }
+    }
+    private Leading leading;
+
+    /** Packs this row against the leading edge with {@code spacing}: the classic toolbar. Without it the row packs right. */
+    void packLeading(Leading spacing) { leading = java.util.Objects.requireNonNull(spacing); revalidate(); repaint(); }
+    /** Whether this row packs against the leading edge. */
+    boolean leading() { return leading != null; }
+
+    /** The width the shown controls take in a leading row, {@code hidden} left out, without the outer padding. */
+    private int leadingWidth(java.util.Set<Component> hidden) {
+        int gap = UIScale.scale(leading.gap()), rule = UIScale.scale(leading.separatorGap()), line = NativeStyles.installed().metric(DesignMetrics.Role.HAIRLINE);
+        int width = 0;
+        boolean previous = false;
+        for (Component child : getComponents()) {
+            if (child == overflow) continue;
+            if (placed(child)) {
+                if (hidden.contains(child)) continue;
+                if (previous) width += gap;
+                width += child.getPreferredSize().width;
+                previous = true;
+            } else if (child instanceof JSeparator && previous && followedByShown(child, hidden)) {
+                width += 2 * rule + line;
+                previous = false;
+            }
+        }
+        return width;
+    }
+
+    private boolean followedByShown(Component separator, java.util.Set<Component> hidden) {
+        for (int i = getComponentIndex(separator) + 1; i < getComponentCount(); i++) {
+            Component next = getComponent(i);
+            if (next instanceof JSeparator) return false;
+            if (placed(next) && !hidden.contains(next)) return true;
+        }
+        return false;
+    }
+
+    /** The leading layout: controls from the leading edge, then the overflow button after the last one shown. */
+    private void layoutLeading() {
+        int padding = UIScale.scale(leading.padding()), gap = UIScale.scale(leading.gap()), side = buttonSide();
+        int rule = UIScale.scale(leading.separatorGap()), inset = UIScale.scale(leading.separatorInset());
+        int line = NativeStyles.installed().metric(DesignMetrics.Role.HAIRLINE);
+        int available = Math.max(0, getWidth() - 2 * padding);
+        // Labels give way before any control moves into the overflow menu.
+        applyLabels(labelsWanted);
+        var none = java.util.Collections.<Component>emptySet();
+        if (labelsWanted && leadingWidth(none) > available) applyLabels(false);
+        var hidden = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Component, Boolean>());
+        var removable = new ArrayList<Component>();
+        for (Component child : getComponents()) if (placed(child)) removable.add(child);
+        java.util.Collections.reverse(removable);
+        removable.sort(Comparator.comparingInt(control -> ((JComponent) control).getClientProperty(PRIORITY) instanceof Integer p ? p : 50));
+        boolean overflowing = false;
+        for (Component control : removable) {
+            if (leadingWidth(hidden) + (overflowing ? gap + side : 0) <= available) break;
+            boolean view = isView(control);
+            if (!view && !(((JComponent) control).getClientProperty(MENU) instanceof Supplier<?>)) continue;
+            hidden.add(control);
+            if (!view) overflowing = true;
+        }
+        int x = padding;
+        boolean previous = false;
+        for (Component child : getComponents()) {
+            if (child == overflow) continue;
+            if (placed(child)) {
+                boolean shown = !hidden.contains(child);
+                child.setVisible(shown);
+                if (!shown) { child.setBounds(0, 0, 0, 0); continue; }
+                if (previous) x += gap;
+                int width = child.getPreferredSize().width;
+                int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : side;
+                child.setBounds(x, (getHeight() - height) / 2, width, height);
+                x += width;
+                previous = true;
+            } else if (child instanceof JSeparator) {
+                boolean shown = previous && followedByShown(child, hidden);
+                child.setVisible(shown);
+                if (!shown) { child.setBounds(0, 0, 0, 0); continue; }
+                x += rule;
+                child.setBounds(x, inset, line, Math.max(0, getHeight() - 2 * inset));
+                x += line + rule;
+                previous = false;
+            }
+        }
+        overflow.setVisible(overflowing);
+        if (overflowing) overflow.setBounds(x + gap, (getHeight() - side) / 2, side, side);
+        else overflow.setBounds(0, 0, 0, 0);
+    }
     JButton overflowButton() { return overflow; }
 
     private boolean labelsWanted = true;
@@ -98,6 +203,7 @@ final class WindowToolbar extends JToolBar {
 
     /** The width that shows every control; the header never gives the toolbar more. */
     int fullWidth() {
+        if (leading != null) return 2 * UIScale.scale(leading.padding()) + leadingWidth(java.util.Collections.emptySet());
         int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = 0;
         for (Component child : getComponents())
             if (placed(child)) width += child.getPreferredSize().width + gap;
@@ -106,6 +212,13 @@ final class WindowToolbar extends JToolBar {
 
     /** The width with every hideable control in the overflow menu or hidden. */
     int minimumWidth() {
+        if (leading != null) {
+            int width = 2 * UIScale.scale(leading.padding()) + buttonSide();
+            for (Component child : getComponents())
+                if (child instanceof JButton button && button != overflow && !(button.getClientProperty(MENU) instanceof Supplier<?>))
+                    width += button.getPreferredSize().width + UIScale.scale(leading.gap());
+            return width;
+        }
         int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), width = buttonSide();
         for (Component child : getComponents())
             if (child instanceof JButton button && button != overflow && !(button.getClientProperty(MENU) instanceof Supplier<?>))
@@ -148,6 +261,7 @@ final class WindowToolbar extends JToolBar {
     @Override public Dimension getPreferredSize() { return new Dimension(fullWidth(), UIScale.scale(barHeight)); }
 
     @Override public void doLayout() {
+        if (leading != null) { layoutLeading(); return; }
         int padding = NativeStyles.installed().metric(DesignMetrics.Role.TOOLBAR_PADDING), gap = NativeStyles.installed().metric(DesignMetrics.Role.NATIVE_ACTION_PADDING), side = buttonSide();
         int available = Math.max(0, getWidth() - 2 * padding);
         // Labels give way before any control moves into the overflow menu.
