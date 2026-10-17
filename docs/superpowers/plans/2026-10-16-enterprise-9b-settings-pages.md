@@ -1,5 +1,19 @@
 # Enterprise presentation 9b: the Settings page compositions Implementation Plan
 
+> **Executed on 2026-10-17:** `4d9b76a3d..b463f56d0`, then the documentation commit (Task 8); calibrated classic values
+> `SETTINGS_ROW_HEIGHT` 39, `SETTINGS_DESCRIPTION_HEIGHT` 47, `THEME_PREVIEW_CAPTION_GAP` 7, `KEYCAP_TREE_INSET` 0,
+> `KEYCAP_VERTICAL_PADDING` 2, `KEYCAP_SQUARE_EXTRA` 0, `KEYCAP_PADDING` 3, `KEYCAP_GAP` 3, `KEYCAP_EDGE_ALPHA` 116,
+> `KEYCAP_FACE_ALPHA` 8, `KEYMAP_STATUS_GAP` 5, `BUTTON_HORIZONTAL_PADDING` 11, `KEYCAP_DETAIL_EDGE_ALPHA` 49,
+> `KEYCAP_DETAIL_TOP` 6, `KEYCAP_DETAIL_BOTTOM` 10, `KEYCAP_DETAIL_GAP` 5, `KEYCAP_DETAIL_LEADING` 34,
+> `KEYCAP_RECORDER_PADDING` 7, `KEYCAP_RECORDER_HALO` 2 at `KEYCAP_RECORDER_HALO_ALPHA` 0, `LIST_HEADING_HEIGHT` 24,
+> `LIST_TWO_LINE_ROW_HEIGHT` 36, `PLUGIN_MANAGER_PADDING` 16, `PLUGIN_MANAGER_SIDE_PADDING` 16, `PLUGIN_LIST_WIDTH` 292,
+> `PLUGIN_DETAILS_LEADING_PADDING` 12, `PLUGIN_DETAILS_TRAILING_PADDING` 0, `PLUGIN_DETAILS_EDGE_PADDING` 2,
+> `PLUGIN_DETAILS_GAP` 4, `PLUGIN_TEXT_LINE_SPACING` 3 and `SIDE_COLUMN_WIDTH` 92 in both catalogs; floors 0.93 on every
+> page but Project Index's 0.92 (the fixture's empty state, Task 7); deviations: each task's banner below, and Task 8 puts
+> the configuration guide's Enterprise sentence after the Keymap and Plugins sentences rather than right after the Keymap
+> one, so "Click one" keeps its Keymap antecedent. Default look: no file changed (`changed: none`).
+> `./gradlew check --continue`: 11,215 tests, 0 failures, 0 errors, 25 skipped.
+
 > **Status, Task 1 (2026-10-17):** calibrated classic `SETTINGS_ROW_HEIGHT` 36 to 39 (Window's rules 102, 141, 180,
 > 219), `SETTINGS_DESCRIPTION_HEIGHT` 52 to 47 (not 48: mock 01's Theme box bottom 313 and mock 02's New Windows bottom
 > 463 need 47; the mocks' 47.5 is a half-pixel residual) and `THEME_PREVIEW_CAPTION_GAP` 8 to 7 (mock 01's radio dot at
