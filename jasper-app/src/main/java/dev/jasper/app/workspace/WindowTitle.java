@@ -74,6 +74,13 @@ final class WindowTitle {
         return shell.isEmpty() ? "Local" : "Local: " + shell;
     }
 
+    /** The status bar's session cell (plan 6b Rulings 8): a local pane's shell, else {@link #session}. */
+    static String sessionCell(PaneSnapshot pane) {
+        if (pane == null) return "";
+        if (pane.providerId().isEmpty() && pane.remoteDirectory().isEmpty()) return clean(pane.shell());
+        return session(pane);
+    }
+
     /** {@code {directory}}: a remote pane's reported path as it is, a local pane's with {@code ~} for {@code home}. */
     static String directory(PaneSnapshot pane, Path home) {
         if (pane == null) return "";

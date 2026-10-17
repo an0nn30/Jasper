@@ -37,7 +37,7 @@ final class WindowChrome {
     private final WindowToolbar toolbar;
     private final TitleSearchField search;
     private final WindowHeader header;
-    private final WindowStatusBar status = new WindowStatusBar();
+    private final WindowStatusBar status;
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
@@ -63,6 +63,7 @@ final class WindowChrome {
     WindowChrome(WindowContent owner) {
         this.owner = owner;
         composition = owner.look().header();
+        status = owner.look().statusBar(owner.action(ActionId.COMMAND_PALETTE), owner::paletteOpen);
         toolbar = new WindowToolbar(owner::updateActions);
         toolbar.setFloatable(false);
         toolbar.setBorder(BorderFactory.createEmptyBorder());

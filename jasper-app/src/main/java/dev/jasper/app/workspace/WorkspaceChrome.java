@@ -12,7 +12,7 @@ import java.util.Objects;
 public final class WorkspaceChrome {
     /** The default look's chrome. */
     public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
-        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL);
+        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
@@ -20,12 +20,18 @@ public final class WorkspaceChrome {
     private final WorkspaceLook.Header header;
     /** The editor tabs, made for each window by {@link #tabs(WindowContent)}. */
     private final WorkspaceLook.Tabs tabs;
+    /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
+    private final WorkspaceLook.Status status;
+    private final boolean runItem;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs,
+                            WorkspaceLook.Status status, boolean runItem) {
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
         this.header = Objects.requireNonNull(header);
         this.tabs = Objects.requireNonNull(tabs);
+        this.status = Objects.requireNonNull(status);
+        this.runItem = runItem;
     }
 
     /**
@@ -41,7 +47,7 @@ public final class WorkspaceChrome {
             case STANDARD -> new StandardMenuBar();
             case CLASSIC -> new ClassicMenuBar();
         };
-        return new WorkspaceChrome(menus, title, look.header(), look.tabs());
+        return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem());
     }
 
     MenuBarLayout menus() { return menus; }
@@ -62,11 +68,20 @@ public final class WorkspaceChrome {
         };
     }
 
+    /** A status bar for one window, led by "▶ Run…" ({@code open}, active while {@code paletteOpen}) when the look has it. */
+    WindowStatusBar statusBar(javax.swing.Action open, java.util.function.BooleanSupplier paletteOpen) {
+        StatusCells cells = switch (status) {
+            case SLASH -> new SlashSegments();
+            case RULED -> new RuledCells();
+        };
+        return new WindowStatusBar(cells, runItem ? new RunItem(open, paletteOpen) : null);
+    }
+
     /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
     @Override public boolean equals(Object other) {
         return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
-            && tabs == chrome.tabs && title.equals(chrome.title);
+            && tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && title.equals(chrome.title);
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, title); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, title); }
 }
