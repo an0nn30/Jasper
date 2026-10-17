@@ -60,7 +60,16 @@ selected row's index keeps its selection ink and odd rows' indices are guarded a
 ordered pair); the side layout's minimum is as tall as the side column; an update moves neither the adopted entry row
 nor the add action, and a list gives up an entry row no VERTICAL parent adopts again. Plan 5 turns the classic look on through the Enterprise kit.
 `./gradlew check --continue`: **10919 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
-the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
+the user: none new (no shipped kit uses the classic faces until plan 5). Not pushed.
+Merged with main (plans 6a and 8a) as `3165fe220` and reconciled in `e390cb54b`: the `Role` enum, `compact-roles.tsv` and
+`classic-roles.tsv` take `GROUP_ROW_INDENT` after `DOCK_RULE_HIT`, then 8a's `RUN_WINDOW_*` block, then 6a's chrome
+block, and `NewRolesTest.ADDED` holds `GROUP_ROW_INDENT` before 8a's names, so `RunWindowRolesTest` and `ChromeRolesTest`
+hold unchanged; `KitFixtures.enterpriseLight()` is one definition, this plan's (8a R4), and the Run window's renders
+keep their agreements under it (0.900 / 0.841, 0.936 / 0.841); `pairs.json` keeps every pair, and `check_pairs.py`
+passes all thirteen with their floors and colours unchanged (6a Rulings 17: `run-window-*` 0.900, 0.838, 0.941 and
+0.844, `chrome-menu-row-light` 0.988 and `-dark` 0.732, the `classic-*` pairs as above); the default gallery's PNGs
+match the base, its JSON differing only in the `class` of 4b's section surfaces and this plan's list panes;
+`./gradlew check --continue`: **10,996 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit and the final review fixes;
