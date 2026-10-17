@@ -22,8 +22,9 @@ class ClassicUiKeysTest {
         return table;
     }
 
-    /** A source name: a SemanticColor constant, or a derived role's key. */
+    /** A source name: a SemanticColor constant, a derived role's key, or none (FlatLaf's null). */
     static String colour(GeneratedTheme theme, String source) {
+        if (source.equals("none")) return "null";
         for (var role : DerivedColor.values()) if (role.key().equals(source)) return ColorMath.hex(role.color(theme));
         return ColorMath.hex(SemanticColor.valueOf(source).color(theme));
     }

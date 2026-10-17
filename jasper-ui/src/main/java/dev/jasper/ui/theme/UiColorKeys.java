@@ -17,18 +17,21 @@ import java.util.Objects;
 public final class UiColorKeys {
     private UiColorKeys() {}
 
-    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint {}
+    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint, None {}
     private record Role(SemanticColor role) implements Source {}
     private record Derived(DerivedColor role) implements Source {}
     private record TextSelection() implements Source {}
     private record ErrorTint() implements Source {}
-    private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint();
+    /** No colour: FlatLaf's own default for the key is removed, so the component falls back to its base colour. */
+    private record None() implements Source {}
+    private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint(), NONE = new None();
     private static final Map<String, Source> KEYS = keys();
     private static final Map<String, Source> CLASSIC_KEYS = classicKeys();
 
     /**
      * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
-     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours.
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours; a
+     * classic key with no colour is {@code null}, which removes FlatLaf's default.
      */
     public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
         Map<String, Source> sources = switch (Objects.requireNonNull(set)) {
@@ -41,12 +44,13 @@ public final class UiColorKeys {
     private static Map<String, Object> values(Map<String, Source> sources, GeneratedTheme theme, Color textSelection) {
         var palette = theme.semantic();
         var keys = new LinkedHashMap<String, Object>();
-        sources.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {
-            case Role role -> palette.color(role.role());
-            case Derived role -> role.role().color(theme);
-            case TextSelection ignored -> textSelection;
-            case ErrorTint ignored -> errorTint(palette);
-        })));
+        sources.forEach((key, source) -> keys.put(key, switch (source) {
+            case Role role -> ColorMath.hex(palette.color(role.role()));
+            case Derived role -> ColorMath.hex(role.role().color(theme));
+            case TextSelection ignored -> ColorMath.hex(textSelection);
+            case ErrorTint ignored -> ColorMath.hex(errorTint(palette));
+            case None ignored -> "null";
+        }));
         return Collections.unmodifiableMap(keys);
     }
 
@@ -211,6 +215,11 @@ public final class UiColorKeys {
         role(keys, "Tree.selectionForeground", TEXT_ONSELECTION);
         role(keys, "Button.startBackground", BUTTON_SECONDARY_BG);
         keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
+        // FlatLaf paints the gradient only while a button's state colour is Button.startBackground itself (plan 4c): a
+        // hovered or focused button keeps it (its edge darkens, its focus ring shows); a pressed one darkens to its end.
+        keys.put("Button.focusedBackground", NONE);
+        keys.put("Button.hoverBackground", NONE);
+        keys.put("Button.pressedBackground", new Derived(DerivedColor.BUTTON_END));
         keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));
         keys.put("Button.default.borderColor", new Derived(DerivedColor.ACCENT_EDGE));
         // FlatLaf reads the default border from startBorderColor first and ignores borderColor while it is set.
