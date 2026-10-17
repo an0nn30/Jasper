@@ -24,6 +24,7 @@ public final class KitFaces {
     final TableFace table;
     final PropertiesFace properties;
     final SeparatorFace separators;
+    final RevealFace reveal;
     final TreeFace tree;
     final OrderedFace ordered;
     final TagFace tag;
@@ -80,6 +81,10 @@ public final class KitFaces {
             case TILES -> new DefaultRouteFace();
             case EDGED -> new ClassicRouteFace(colors.dialogSurface());
         };
+        reveal = switch (controls.toggle()) {
+            case CHECKBOX -> new ClassicRevealFace(colors.dialogSurface());
+            default -> new DefaultRevealFace();
+        };
         separators = switch (controls.buttons()) {
             case CLASSIC -> new ClassicSeparatorFace(colors.dialogSurface());
             default -> new DefaultSeparatorFace();
@@ -109,7 +114,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, empty, table, properties, separators, tree, stepper, ordered, buttons, fields, tag, route, prompt); }
+    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, empty, table, properties, separators, reveal, tree, stepper, ordered, buttons, fields, tag, route, prompt); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.

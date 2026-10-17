@@ -282,10 +282,18 @@ class ClassicButtonsTest {
         });
     }
 
-    /** A secret's reveal and copy are parts of its field: flat until hovered, wherever the field stands. */
+    /**
+     * A secret's glyph reveal and copy are parts of its field: flat until hovered, wherever the field stands. Under the
+     * checkbox toggle point the classic reveal face draws text buttons instead (plan 10b Rulings 1), so this runs on the
+     * covering-array kit with classic buttons and the switch toggle.
+     */
     @Test void aSecretsRevealAndCopyAreFlatUntilHovered() {
         Edt.run(() -> {
-            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var classic = dev.jasper.ui.kit.ControlVariants.CLASSIC;
+            var controls = new dev.jasper.ui.kit.ControlVariants(dev.jasper.ui.kit.ControlVariants.Toggle.SWITCH, classic.exclusive(), classic.tabs(),
+                classic.group(), classic.formLabel(), classic.empty(), classic.table(), classic.tree(), classic.stepper(), classic.orderedList(),
+                classic.buttons(), classic.tag(), classic.route(), classic.prompt());
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.withControls(KitFixtures.enterprise(), controls));
             var input = new Nodes.Secret("password", ControlState.READY, "", "Password", "");
             var stored = new Nodes.Secret("stored", ControlState.READY, "", "Stored", "", Nodes.SecretKind.DETAIL, "copy");
             try (var view = new KitView(context, stack(Nodes.LayoutRole.VERTICAL, input, stored), e -> {})) {
@@ -297,6 +305,22 @@ class ClassicButtonsTest {
                     assertThat(at(paint(part), 1, h / 2).getAlpha()).as(id + " flat at rest").isZero();
                     part.getModel().setRollover(true);
                     assertThat(at(paint(part), 1, h / 2)).as(id + " hovered").isEqualTo(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL_HOVER));
+                }
+            } finally { release(context); }
+        });
+    }
+
+    /** Under the Enterprise kit a stored secret's "Show" and "Copy" are standard buttons, painted at rest (plan 10b Rulings 1). */
+    @Test void aStoredSecretsShowAndCopyAreStandardButtonsUnderTheCheckboxToggle() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var stored = new Nodes.Secret("stored", ControlState.READY, "", "Stored", "", Nodes.SecretKind.DETAIL, "copy");
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.VERTICAL, stored), e -> {})) {
+                KitFixtures.render(view, 300, 80, 1);
+                for (var id : List.of("stored.reveal", "stored.copy")) {
+                    var part = find(view, id, Buttons.KitButton.class);
+                    assertThat(part.kind).as(id).isEqualTo(Nodes.ButtonKind.SECONDARY);
+                    assertThat(at(paint(part), part.getWidth() / 2, 1).getAlpha()).as(id + " painted at rest").isNotZero();
                 }
             } finally { release(context); }
         });

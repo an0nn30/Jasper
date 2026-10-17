@@ -42,12 +42,19 @@ final class SecretFields {
         boolean revealed, focusWithin;
         int detailValueTop = -1;
         boolean detailActionsBelow;
+        /** How this secret's reveal and copy draw (plan 10b Rulings 1). */
+        final RevealFace face;
+        /** The classic face's "Show" checkbox, its label, the row of both and the row of the field and that row; null under the default face. */
+        Switches.SwitchButton box;
+        JLabel boxLabel;
+        JPanel boxRow, fieldRow;
         int detailActionWidth() { return reveal.getPreferredSize().width + copy.getPreferredSize().width + ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP); }
         int detailActionHeight() { return Math.max(reveal.getPreferredSize().height, copy.getPreferredSize().height); }
         int detailTextHeight() { return component.getFontMetrics(ThemePainting.font(context(), Typography.Role.BODY)).getHeight(); }
 
         SecretControl(KitView view, Nodes.Secret node) {
             super(view, node, new JPanel(new BorderLayout()));
+            face = view.context().faces().reveal;
             detail = node.kind() == Nodes.SecretKind.DETAIL;
             multiline = node.kind() == Nodes.SecretKind.MULTILINE;
             own(() -> java.util.Arrays.fill(detailValue, (char) 0));
@@ -100,12 +107,7 @@ final class SecretFields {
                     };
             reveal.addActionListener(action);
             own(() -> reveal.removeActionListener(action));
-            if (node.kind() == Nodes.SecretKind.DISCREET_INPUT) {
-                var slot=new JPanel(new BorderLayout()) {
-                    @Override public Dimension getPreferredSize() { return reveal.getPreferredSize(); }
-                };
-                slot.setOpaque(false);slot.add(reveal);surface.add(slot,BorderLayout.EAST);
-            } else if (!multiline && node.kind() != Nodes.SecretKind.CONFIRMATION) surface.add(reveal, BorderLayout.EAST);
+            face.mountInput(this);
             var focusListener=new java.awt.event.FocusAdapter() {
                 @Override public void focusGained(java.awt.event.FocusEvent e) { focusWithin=true; revealVisibility(); }
                 @Override public void focusLost(java.awt.event.FocusEvent e) {
@@ -205,19 +207,12 @@ final class SecretFields {
                     }
                 };
                 row.setOpaque(false);
-                var actions = new JPanel(new GridLayout(1, 0)) {
-                    // Reveal and copy keep the detail references' measured spacing at every theme/font refresh.
-                    @Override public void doLayout() { ((GridLayout) getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP)); super.doLayout(); }
-                    @Override public Dimension getPreferredSize() { ((GridLayout) getLayout()).setHgap(ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_GAP)); return super.getPreferredSize(); }
-                };
-                actions.setOpaque(false);
-                actions.add(reveal);
-                actions.add(copy);
+                var actions = face.detailActions(this);
                 row.add(detailDisplay, BorderLayout.CENTER);
                 row.add(actions, BorderLayout.EAST);
                 container.add(row, BorderLayout.CENTER);
                 surface.remove(input);
-            } else container.add(surface, BorderLayout.CENTER);
+            } else container.add(fieldRow != null ? fieldRow : surface, BorderLayout.CENTER);
             label.setLabelFor(detail ? detailDisplay : multiline ? area : input);
             bindSubmit();
             DocumentListener listener =
@@ -315,31 +310,9 @@ final class SecretFields {
             }
         }
 
-        private void revealVisibility() {
-            var kind=((Nodes.Secret)node).kind();
-            reveal.setVisible(!multiline && kind!=Nodes.SecretKind.CONFIRMATION
-                && (kind!=Nodes.SecretKind.DISCREET_INPUT || focusWithin || buffer.getLength()>0));
-        }
+        private void revealVisibility() { face.visibility(this); }
 
-        private void refreshReveal() {
-            reveal.setToolTipText(revealed ? "Hide password" : "Show password");
-            reveal.getAccessibleContext().setAccessibleName(reveal.getToolTipText());
-            reveal.getAccessibleContext()
-                    .setAccessibleDescription(revealed ? "Password visible" : "Password hidden");
-            reveal.setSelected(revealed);
-            reveal.putClientProperty("Jasper.button.icon", "reveal");
-            reveal.setIcon(
-                    context()
-                            .icons()
-                            .icon(
-                                    "reveal",
-                                    context().theme().semantic(),
-                                    SemanticColor.TEXT_SECONDARY,
-                                    com.formdev.flatlaf.util.UIScale.scale(
-                                            context().icons().size(context().metrics(), Nodes.IconSize.CONTROL))));
-            reveal.setDisabledIcon(reveal.getIcon());
-            reveal.repaint();
-        }
+        private void refreshReveal() { face.style(this); }
 
         private void refreshArea(Nodes.Secret secret, boolean enabled) {
             area.setEnabled(enabled);
@@ -384,6 +357,7 @@ final class SecretFields {
             surface.prompt = value;
             label.setVisible(!embedded && !value);
             lock.setVisible(!embedded && !value);
+            face.prompt(this, value);
         }
 
         @Override
