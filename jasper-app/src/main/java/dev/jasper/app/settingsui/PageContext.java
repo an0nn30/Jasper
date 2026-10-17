@@ -1,5 +1,8 @@
 package dev.jasper.app.settingsui;
 
+import dev.jasper.app.presentation.Composition;
+import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.presentation.SettingsChrome;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.ui.swing.KitContext;
 import java.nio.file.Path;
@@ -19,12 +22,31 @@ import java.util.function.Supplier;
  * @param changed tells the dialog a page's validity or modification changed outside the draft
  * @param surface the dialog's surface, for dialogs a page opens over it; null while the dialog is closed
  * @param kit the dialog's kit context (chrome route); read on the EDT when a page builds its view
+ * @param chrome the look's Settings projection (spec 12.1): Reset inline or in the row's menu, the rows it hides, the font
+ *     row's copy
+ * @param composition how the look composes the app's pages (spec 12.2); only the composition roots read it
  */
 public record PageContext(SettingsDraft draft, Consumer<String> navigate, Consumer<Runnable> closeThen,
                           BiFunction<String, Optional<Path>, Optional<Path>> chooseFile, Runnable changed,
-                          Supplier<AuxiliarySurface> surface, Supplier<KitContext> kit) {
+                          Supplier<AuxiliarySurface> surface, Supplier<KitContext> kit, SettingsChrome chrome,
+                          Composition composition) {
     public PageContext {
         Objects.requireNonNull(kit, "kit");
+        Objects.requireNonNull(chrome, "chrome");
+        Objects.requireNonNull(composition, "composition");
+    }
+
+    /** A context under the default look on this host ({@link #standard()}). */
+    public PageContext(SettingsDraft draft, Consumer<String> navigate, Consumer<Runnable> closeThen,
+                       BiFunction<String, Optional<Path>, Optional<Path>> chooseFile, Runnable changed,
+                       Supplier<AuxiliarySurface> surface, Supplier<KitContext> kit) {
+        this(draft, navigate, closeThen, chooseFile, changed, surface, kit, standard().settings(), standard().composition());
+    }
+
+    /** The default look's projections on this host, for pages and dialogs made without a presentation. */
+    public static Projections standard() {
+        boolean mac = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+        return Projections.standard(new Projections.Host(mac, mac && com.formdev.flatlaf.util.SystemInfo.isMacFullWindowContentSupported));
     }
 
     /** A context whose pages build no kit view, such as one that only wraps another component. */
@@ -42,7 +64,7 @@ public record PageContext(SettingsDraft draft, Consumer<String> navigate, Consum
 
     /** The same dialog over another draft, as a plugin's own settings page keeps one. */
     public PageContext withDraft(SettingsDraft other) {
-        return new PageContext(other, navigate, closeThen, chooseFile, changed, surface, kit);
+        return new PageContext(other, navigate, closeThen, chooseFile, changed, surface, kit, chrome, composition);
     }
 
     private static KitContext noKit() {

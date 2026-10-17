@@ -1078,7 +1078,8 @@ public final class JasperApplication {
                         context -> plugins.settingsPages(context))),
                 new dev.jasper.app.settingsui.SettingsDialog.Hooks(configuration::save, configuration::state, configuration::onState,
                     this::openConfigFile, this::migrateConfiguration, this::browse, (parent, count) -> settings.askDiscard(parent, count),
-                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
+                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
+                    presentation.projections().settings(), presentation.projections().composition()));
             configuration.settingsOpener((owner, page) -> openSettings(owner.id(), page));
             // Never on the start-up path: the font families are read once the first output shows or the warm-up ends.
             trace.when(StartupTrace.Milestone.OUTPUT_PAINTED, Runnable::run, dev.jasper.app.settingsui.SettingsDialog::prepareFonts);

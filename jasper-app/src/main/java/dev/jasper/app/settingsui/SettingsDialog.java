@@ -3,6 +3,8 @@ package dev.jasper.app.settingsui;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.presentation.Composition;
+import dev.jasper.app.presentation.SettingsChrome;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import java.awt.Component;
@@ -50,14 +52,26 @@ public final class SettingsDialog {
      * @param browse opens a web page
      * @param confirmDiscard asks, over a component, whether to discard that many unsaved changes
      * @param kit the application's chrome kit context, read on the EDT each time the dialog opens
+     * @param chrome the look's Settings projection (spec 12.1)
+     * @param composition how the look composes the app's pages (spec 12.2), handed to every page
      */
     public record Hooks(Function<SettingsEdit, CompletableFuture<ConfigService.State>> save, Supplier<ConfigService.State> state,
                         Function<Consumer<ConfigService.State>, Subscription> onState, Runnable openConfigFile, Runnable migrate,
-                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit) {
+                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit,
+                        SettingsChrome chrome, Composition composition) {
         public Hooks {
             Objects.requireNonNull(save); Objects.requireNonNull(state); Objects.requireNonNull(onState);
             Objects.requireNonNull(openConfigFile); Objects.requireNonNull(migrate); Objects.requireNonNull(browse);
             Objects.requireNonNull(confirmDiscard); Objects.requireNonNull(kit);
+            Objects.requireNonNull(chrome); Objects.requireNonNull(composition);
+        }
+
+        /** Hooks under the default look on this host ({@link PageContext#standard()}). */
+        public Hooks(Function<SettingsEdit, CompletableFuture<ConfigService.State>> save, Supplier<ConfigService.State> state,
+                     Function<Consumer<ConfigService.State>, Subscription> onState, Runnable openConfigFile, Runnable migrate,
+                     Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit) {
+            this(save, state, onState, openConfigFile, migrate, browse, confirmDiscard, kit,
+                PageContext.standard().settings(), PageContext.standard().composition());
         }
     }
 
@@ -166,7 +180,7 @@ public final class SettingsDialog {
         view = new SettingsView(kit, this::event, this::cancel);
         view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
-            () -> isOpen() ? surface : null, this::kit)));
+            () -> isOpen() ? surface : null, this::kit, hooks.chrome(), hooks.composition())));
         backStack.clear();
         forwardStack.clear();
         current = null;
@@ -209,6 +223,8 @@ public final class SettingsDialog {
     }
 
     SettingsView view() { return view; }
+    /** The look's Settings projection this dialog runs with. */
+    SettingsChrome chrome() { return hooks.chrome(); }
     private KitContext kit() { return kit; }
     SettingsDraft draft() { return draft; }
     List<SettingsPage> pages() { return pages; }
