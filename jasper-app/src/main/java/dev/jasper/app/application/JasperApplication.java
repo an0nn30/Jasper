@@ -207,6 +207,9 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
+    /** The running plugins; null before {@link #startPlugins(AppDirs)}. Tests. */
+    PluginRuntime pluginRuntime() { return plugins; }
+
 
     public JasperApplication() { this(null); }
 
@@ -253,6 +256,14 @@ public final class JasperApplication {
      */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder, bootstrapSelection,
+            dev.jasper.app.appearance.ThemeController.INSTALLERS);
+    }
+
+    /** As above, with the installers that put a theme in place under a kit: the seam of spec 4.7's fallback tests. */
+    JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection,
+                      java.util.function.Function<dev.jasper.ui.kit.Kit, java.util.function.Predicate<dev.jasper.ui.theme.GeneratedTheme>> installers) {
         // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.
         this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
         presentation = this.selection.presentation();
@@ -269,8 +280,18 @@ public final class JasperApplication {
         // The configuration reports unusable picks; start-up only replaces them.
         var picks = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
-        themes = ThemeController.startup(dark, picks, presentation.kit(),
-            failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));
+        var started = ThemeController.start(dark, picks, presentation.kit(), installers,
+            failure -> LOG.log(System.Logger.Level.WARNING, "Could not start with this theme and look; trying the next: " + failure.getMessage(), failure));
+        themes = started.controller();
+        // Spec 4.7: the kit was at fault. Every consumer gets the fallback before plugins start, and the provider is skipped.
+        // The field, not the constructor's bootstrapSelection: startPlugins(AppDirs) starts this.selection.
+        if (started.step().blamesKit()) {
+            LOG.log(System.Logger.Level.WARNING, "The " + presentation.look() + " look could not be installed; Jasper uses its standard look");
+            var attempt = this.selection.attempt();
+            this.selection = this.selection.blamed();
+            presentation = this.selection.presentation();
+            Thread.ofVirtual().name("jasper-presentation-attempt").start(attempt::failed);
+        }
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);

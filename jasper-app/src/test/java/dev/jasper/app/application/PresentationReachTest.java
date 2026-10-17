@@ -77,4 +77,39 @@ class PresentationReachTest {
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }
     }
+
+    /** Spec 4.7 and 16.1.8: a kit that cannot be installed runs the fallback value, and its provider never starts. */
+    @Test void aKitThatCannotBeInstalledRunsTheFallbackValueAndSkipsItsProvider() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path devPlugins = LookFixtures.loadable(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
+            + LookFixtures.provider("look.kit.toml"), Map.of("look.kit.toml", "kit = 1\nbase = \"default\"\n[metrics]\ncontrol_height = 26\n"));
+        var selection = PluginSelection.of(dirs, null, "B", devPlugins, false);
+        var kit = selection.presentation().kit();
+        assertThat(kit).isNotEqualTo(Kit.DEFAULT);
+        JasperApplication[] application = new JasperApplication[1];
+        try {
+            edt(() -> {
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null,
+                    selection, chosen -> theme -> {
+                        if (chosen == kit) throw new IllegalStateException("cannot install under " + chosen.id());
+                        return ThemeController.INSTALLERS.apply(chosen).test(theme);
+                    });
+                assertThat(application[0].presentation()).as("the fallback value").isEqualTo(selection.blamed().presentation());
+                assertThat(application[0].presentation().provider()).isEmpty();
+                assertThat(application[0].themes().kit()).isSameAs(Kit.DEFAULT);
+                assertThat(application[0].themes().appearance().context(ThemeRoute.CHROME).kit()).isSameAs(Kit.DEFAULT);
+                application[0].startPlugins(dirs);
+                assertThat(application[0].pluginRuntime().statusLines()).anySatisfy(line -> assertThat(line)
+                    .contains("dev.example.look", "SKIPPED", "its look could not be installed; Jasper uses its standard look"));
+            });
+            assertThat(dirs.plugins().resolve("dev.example.look/data/started")).as("the provider never started, so it published no service")
+                .doesNotExist();
+            dev.jasper.app.workspace.DesktopTestSupport.until(() -> new dev.jasper.app.presentation.AttemptStore(home).read()
+                .of("dev.example.look").state().equals(java.util.Optional.of(dev.jasper.app.presentation.AttemptStore.State.FAILED)));
+        } finally {
+            edt(() -> { if (application[0] != null) application[0].quitNow(); });
+            edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        }
+    }
 }

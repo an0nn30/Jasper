@@ -5,7 +5,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** Plugin folders on disk for presentation tests: one jar with a descriptor and text resources, and no classes. */
+/** Plugin folders on disk for presentation tests: one jar with a descriptor, text resources and, from {@link #loadable}, a start class. */
 public final class LookFixtures {
     /** A kit file that names only its format and base. */
     public static final String KIT = "kit = 1\nbase = \"default\"\n";
@@ -27,6 +27,20 @@ public final class LookFixtures {
     public static Path plugin(Path root, String id, String descriptor, Map<String, String> resources) throws IOException {
         Path jars = root.resolve(id).resolve("jars");
         Path jar = PluginJars.build(jars, id + ".jar", descriptor, Map.of(), List.of());
+        for (var resource : new java.util.TreeMap<>(resources).entrySet()) PluginJars.addResource(jar, resource.getKey(), resource.getValue());
+        return root.resolve(id);
+    }
+
+    /**
+     * As {@link #plugin}, with a {@code Main} class in package {@code id} (the descriptor's entry) whose start writes
+     * {@code started} into the plugin's data folder: a provider that loads, so only its look decides its attempt.
+     */
+    public static Path loadable(Path root, String id, String descriptor, Map<String, String> resources) throws IOException {
+        String main = "package " + id + ";\npublic final class Main implements dev.jasper.sdk.plugin.Plugin {\n"
+            + "    @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {\n"
+            + "        try { java.nio.file.Files.writeString(context.dataDirectory().resolve(\"started\"), \"yes\"); }\n"
+            + "        catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }\n    }\n}\n";
+        Path jar = PluginJars.build(root.resolve(id).resolve("jars"), id + ".jar", descriptor, Map.of(id + ".Main", main), List.of());
         for (var resource : new java.util.TreeMap<>(resources).entrySet()) PluginJars.addResource(jar, resource.getKey(), resource.getValue());
         return root.resolve(id);
     }
