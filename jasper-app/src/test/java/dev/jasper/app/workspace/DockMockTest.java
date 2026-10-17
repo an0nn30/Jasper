@@ -300,5 +300,46 @@ class DockMockTest {
         for (var workstation : WORKSTATIONS) compareHeaders(workstation.getKey(), workstation.getValue(), true);
     }
 
+    /**
+     * The whole dock against the mocks' arrangement (2x): the mock's dock begins at (2, 180), below the toolbar row's rule,
+     * and the fixture's at (0, 0); left of the terminal everything lies 10 px further right (the left stripe is 28 thick
+     * against 23), right of it 10 px further left, and the bottom strip starts where the mock's rule above it is.
+     */
+    @Test void theWholeDockIsArrangedAsTheMocks() throws Exception {
+        for (var workstation : WORKSTATIONS) {
+            Variant variant = workstation.getKey();
+            try {
+                EnterpriseLook.install(variant.dark());
+                try (var fixture = new DockFixture(EnterpriseLook.kit(), EnterpriseLook.theme(variant.dark()), workstation.getValue(), true)) {
+                    fixture.render(1);
+                    fixture.focus("sftp");
+                    var render = variant.seen(fixture.render(2));
+                    MockCrops.write(variant.name() + "-dock", render, variant.crop(2, 180, 2880, 1578));
+                    int left = 2 * (fixture.stripes.left().getWidth() - 23), right = -2 * (fixture.stripes.right().getWidth() - 23);
+                    String where = variant.name() + " dock";
+                    assertThat(left).as(where + ": the stripes' extra thickness").isEqualTo(10);
+                    assertPlaced(where + " SFTP header", fixture.header("sftp"), 48 - 2 + left, 0, 600);
+                    assertPlaced(where + " File Servers header", fixture.header("servers"), 48 - 2 + left, 944 - 180, 600);
+                    assertPlaced(where + " Sessions header", fixture.header("sessions"), 2136 - 2 + right, 0, 700);
+                    assertPlaced(where + " Tunnels header", fixture.header("tunnels"), 2136 - 2 + right, 1014 - 180, 700);
+                    var strip = fixture.stripes.bottomStrip();
+                    assertThat(2 * strip.getY()).as(where + ": the bottom strip's rule").isEqualTo(1706 - 180);
+                    assertThat(strip.getWidth()).as(where + ": the bottom strip spans the window").isEqualTo(DockFixture.WIDTH);
+                    var rule = MockCrops.at(variant.crop(648, 1000, 1, 1), 0, 0);
+                    assertThat(MockCrops.near(MockCrops.at(render, 648 - 2 + left, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the left rule").isTrue();
+                    assertThat(MockCrops.near(MockCrops.at(render, 2134 - 2 + right, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the right rule").isTrue();
+                    assertThat(MockCrops.near(MockCrops.at(render, 500 - 2 + left, 942 - 180), rule, variant.fillTolerance())).as(where + ": the rule between the left frames").isTrue();
+                }
+            } finally { EnterpriseLook.restoreDefault(); }
+        }
+    }
+
+    /** A header strip's place in the fixture at 2x against the mock's, and its width. */
+    private static void assertPlaced(String where, Rectangle header, int x, int y, int width) {
+        assertThat(2 * header.x).as(where + " x").isEqualTo(x);
+        assertThat(2 * header.y).as(where + " y").isEqualTo(y);
+        assertThat(2 * header.width).as(where + " width").isEqualTo(width);
+    }
+
     // Later tasks add their surfaces above this line.
 }
