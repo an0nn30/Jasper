@@ -65,8 +65,9 @@ face-width probes are asserted under IBM Plex (at 2×: "New Session" 134 for the
 for 143, and, with the status text at 11 px (the ruling above), the status bar's rules before UTF-8 and the warning 2468
 and 2570 for 2470 and 2574 and the run item 122 wide for 122), Add SSH Key's swatch stays `#2C8B48` (ΔE 9.7, R39), the
 warning cell paints its ▲ and the search keycap, classic tab titles and the session and folder cells take the platform
-face where IBM Plex has no glyph (the first three drew boxes), all 32 `check_pairs.py` pairs pass and the default
-gallery is byte-identical (322 files); `./gradlew check --continue`: **11,092 tests, 0 failures, 0 errors, 25 skipped**.
+face where IBM Plex has no glyph (the first three drew boxes), all 32 `check_pairs.py` pairs pass (the status bar
+0.728 Light and 0.732 Dark at 11 px) and the default gallery is byte-identical (322 files);
+`./gradlew check --continue`: **11,093 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;
