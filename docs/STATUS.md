@@ -1,5 +1,56 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
+`.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-4b-classic-form-faces.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). `KitFaces` chooses one face per control
+point from the kit's `ControlVariants`, once per `KitContext`; each control asks its face, and each default face calls
+the control's former code, moved into a named method, so the default look is pixel-identical (the headless gallery for
+Slate Cobalt Dark and Light matches the plan-4 base re-recorded at `91153a4ce`: every PNG byte-identical, the JSON
+differing only in a section's `class`, now `Cards$SectionSurface`, Rulings 23). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
+checkbox leading its label, never animated), the buttons with the field policy (raised, or the classic gradient with an
+accent primary, flat disabled faces, flat toolbar ghosts, dropdown and picker faces ending with a drawn ▼, picker rows
+without tiles, no SEARCH, PATH or PORT glyphs, grey read-only fields), the exclusive choice (segments, or a wrapping row
+of 14 px radios with hue swatches and thumbnails over their radios), the tabs (segments, or folder tabs), the group with
+the label policy (a card, or a titled box; plain labels, or a colon label column as wide as the widest label with a
+"Port:" label, form-card settings as rows and bare choices at the field column), the stepper (stepper, or a spinner, a
+SLIDER included) and the prompt (the tile over the title, or the plain prompt with a 30 px accent tile beside the message
+and the title left to the header strip). The default look's two repaired pairs are now the default choice face's
+declarations. `StrategyIsolationTest` (faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler no
+face), `VariantReadTest` (`ControlVariants` only in the kit package, `dev.jasper.app.presentation` and `KitFaces`) and
+`PaintSpecTest` (`face-pairs.tsv`) guard them. Rulings (plan, "Rulings"): faces package-private with
+`KitFaces.declared` public; default faces call moved code; one `ChoiceFace` for exclusive and tabs; `border.hover`
+edges; pairs against the dialog surface slot; flat disabled buttons; where ghosts are flat; LINK unchanged until 4c;
+`RichOptions` keeps tiles until plan 9; no PORT colon; wrapping radio rows; left-aligned previews; folder tab roles;
+the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labels in `text.strong.secondary`; the
+label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
+padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
+notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
+gallery. Deviations (Task 2's and Task 5's reviews; the plan's Execution notes X12, X14 and X15): `ButtonFace.fades`
+takes the button, so the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's
+Task 3 edits its condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a
+classic read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's
+surface, so a transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a
+strip's icon-only menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface
+stands; a secret's reveal and copy and each crumb are flat until hovered wherever their control stands
+(`KitButton.inner`); a "Port:" label hides and enables with its field, stays beside it in a stacked row and is its
+`labelFor`; a colon label's note starts after the colon; an EXCLUSIVE choice that leaves a form card drops its inset; a
+form-card setting row takes the card's inset in place of its own padding and dependent indent, so its title and control
+sit on the FormRows' columns in FORM, MIXED and SETTINGS cards. Two more from Tasks 4 and 7: the folder tabs' baseline
+runs along the tabs' foot, not the track's, so it stays under them when a layout stretches the track; the classic
+prompt's message is left-aligned beside its tile, where the reconciler's flow pass centres prompt header text for the
+default face. Residuals: 4a's flat focused, hovered or pressed classic
+native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
+classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
+`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
+disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13); a
+classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); spec 6.4's face table
+still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
+login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
+the full kit matrix and the mock comparison.
+`./gradlew check --continue`: **10,728 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
+the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
+
 **Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree
 `.claude/worktrees/enterprise-3c`, `d858e8f57..7ea713687`, then this documentation commit and the final review fixes;
 [plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),

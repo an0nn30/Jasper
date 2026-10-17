@@ -34,7 +34,10 @@ background. Translate by meaning. ANSI arrays are defensively copied.
 
 Install appearance on EDT before widget creation. `AppearanceTransaction` installs real FlatLaf
 and publishes a complete chrome/workspace `ThemePair`, restoring prior global defaults on failure.
-Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route. Binding subscriptions replay and close independently; views retain
+Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route.
+A structurally different control draws through a face (`KitFaces`, one per control point, chosen once from the kit's
+`ControlVariants`); faces declare the pairs they paint and never read the kit. The default faces call the controls' own code.
+Binding subscriptions replay and close independently; views retain
 stable control/document identity on updates. Font-only default changes refresh central typography.
 
 The caller owns binding and registry lifetimes; a view owns listeners, its descriptor controls and

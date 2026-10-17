@@ -1,5 +1,16 @@
 # Enterprise presentation 4b: the classic form faces Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`004866f59..372ae8e67`).** Deviations from this
+> plan's text: Task 2's three (Execution notes X12: `ButtonFace.fades` takes the button; a disabled classic picker is
+> flat; a classic read-only field with an error keeps its error edge) and two (X14: `FieldPolicy.readOnlyText` takes the
+> field's surface; menu buttons, secrets' reveal and copy, and crumbs keep their own treatment under the classic buttons
+> face), Task 5's (X15: the "Port:" label follows its field and stays beside it in a stacked row, a colon label's note
+> starts after the colon, an EXCLUSIVE choice leaving a form card drops its inset, a form-card setting row takes the
+> card's inset; `ClassicGroupsTest` has 13 tests), Task 4's (the folder tabs' baseline runs along the tabs' foot, not the
+> track's, and `ClassicTabsTest` checks it) and Task 7's (the classic prompt's message is left-aligned beside its tile,
+> undoing the centring the reconciler's flow pass gives prompt header text; `ClassicPromptsTest` checks it after an
+> update too).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains `KitFaces` and the form half of spec 6.4's face pairs, each with its default and classic

@@ -48,6 +48,9 @@ and `derived-roles.tsv` in the same commit. A new metric role gets its row, in e
 A change to the classic catalog, type scale or FlatLaf overlay edits `classic-roles.tsv`, `classic-type.tsv` or
 `ui-color-keys-classic.tsv` in the same commit.
 A painter that repairs a pair declares it in `PaintedContrastTest`.
+A face declares the pairs it paints in `pairs()`, and a change to them edits `face-pairs.tsv` (every face's declared
+pairs) in the same commit. Change a control's look through its face; a classic face paints every declared pair with
+`ThemePainting.painted`.
 When changing layout, test normal and enlarged fonts, narrow/short hosts, real viewport boundaries
 and 1×/2× geometry. Focus rings must remain external to full nominal fill bounds. Field placeholders
 have one paint owner. Validate actual FlatLaf delegates and scrollbars rather than fallback Metal.

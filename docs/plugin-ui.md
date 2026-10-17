@@ -58,6 +58,8 @@ visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS, TABS to 
 `Button` (one PRIMARY per surface, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), `MenuButton`, `Chip`, `StatusDot`,
 `Progress`, `Strength`, `Icon`, `Text` with a semantic `TextRole`, `ItemList`, `Table`, `Tree` and `Breadcrumbs`.
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).
+Under the classic look an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER draws a spinner,
+and a Section with its Card draws a titled box; the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
 opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.
