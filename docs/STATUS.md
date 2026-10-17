@@ -51,8 +51,8 @@ another family keeps the platform face; plugin theme problems name the declared 
 and a provided id is reserved for its provider; the Plex render, menu and probe tests skip when an installed IBM Plex
 hides the files. Deviation: `RunWindowRenderTest`'s FACES-owned "primary" sample moved from y 800 to 782, because
 Plex's wider "Connect" reaches the button's middle row only there; `EnterpriseMenuRowMockTest` now holds every title
-start within 1 px. After these fixes: jasper-ui's 830 tests and the touched jasper-app suites pass; the whole-build
-count above predates them.
+start within 1 px. After these fixes, `./gradlew check --continue`:
+**11,033 tests, 0 failures, 0 errors, 25 skipped**.
 GUI checks for the user: turn Enterprise on in Settings › Plugins, restart, and compare Enterprise Light and Dark with
 the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chrome is plans 6 to 9's); turn it off and
 check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
