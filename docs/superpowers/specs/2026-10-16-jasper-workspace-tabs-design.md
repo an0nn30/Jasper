@@ -1,6 +1,6 @@
 # Jasper single instance, windows and workspace tabs
 
-Status: **Draft for the user's review, 2026-10-16.** Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans once Enterprise 6-11 has merged."). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
