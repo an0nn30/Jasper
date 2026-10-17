@@ -38,8 +38,9 @@ final class SettingRows {
         void refresh() {
             state();
             var row = (Nodes.SettingRow) node;
-            title.text((formLabel ? context().faces().labels.label(row.title()) : row.title()) + (row.titleNote().isEmpty() ? "" : " · " + row.titleNote()));
-            title.noteStart = row.titleNote().isEmpty() ? -1 : row.title().length();
+            String shown = formLabel ? context().faces().labels.label(row.title()) : row.title();
+            title.text(shown + (row.titleNote().isEmpty() ? "" : " · " + row.titleNote()));
+            title.noteStart = row.titleNote().isEmpty() ? -1 : shown.length();
             title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY);
             description.text(row.description());
             description.setVisible(!row.description().isEmpty());

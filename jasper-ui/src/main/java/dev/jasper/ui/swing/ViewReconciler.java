@@ -93,6 +93,9 @@ final class ViewReconciler implements AutoCloseable {
         }
         if (control instanceof SettingRows.RowControl row) { row.panelFooter = false; row.formLabel = false; row.column = -1; }
         if (control instanceof FormRows.RowControl row) row.column = -1;
+        // A form card's label column insets a bare EXCLUSIVE choice (Cards.labelColumnFor); the default look sets no border there.
+        if (control instanceof Choices.ChoiceControl choice && choice.node instanceof Nodes.Choice node && node.kind() == Nodes.ChoiceKind.EXCLUSIVE)
+            choice.component.setBorder(null);
         if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;

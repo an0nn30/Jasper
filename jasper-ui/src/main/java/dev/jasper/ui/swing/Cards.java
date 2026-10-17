@@ -47,12 +47,10 @@ final class Cards {
                                                     context(), DesignMetrics.Role.ROW_GAP)));
         }
 
-        private void labelColumn(List<ControlRegistry.Control> controls) { labelColumnFor(this, controls); }
-
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
-            labelColumn(controls);
+            labelColumnFor(this, controls);
             ((CardSurface) component).settings =
                     controls.stream()
                             .filter(c -> c.node instanceof Nodes.SettingRow)
@@ -177,20 +175,18 @@ final class Cards {
 
         /** The rounded card, its edge and its setting rows' dividers (the default face). */
         void paintDefault(Graphics2D g) {
-            {
-                ThemePainting.antialias(g);
-                int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
-                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
-                g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r * 2, r * 2));
-                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
-                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
-                g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r * 2, r * 2));
-                Component previous = null;
-                for (Component child : getComponents()) if (child.isVisible()) {
-                    if (previous != null && (settings.contains(child) || settings.contains(previous)))
-                        g.fillRect(1,child.getY(),getWidth()-2,ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE));
-                    previous = child;
-                }
+            ThemePainting.antialias(g);
+            int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
+            g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
+            g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), r * 2, r * 2));
+            g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_PURE);
+            g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+            g.draw(new RoundRectangle2D.Double(.5, .5, getWidth() - 1, getHeight() - 1, r * 2, r * 2));
+            Component previous = null;
+            for (Component child : getComponents()) if (child.isVisible()) {
+                if (previous != null && (settings.contains(child) || settings.contains(previous)))
+                    g.fillRect(1,child.getY(),getWidth()-2,ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE));
+                previous = child;
             }
         }
     }

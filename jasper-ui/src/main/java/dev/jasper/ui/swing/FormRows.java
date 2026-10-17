@@ -76,6 +76,7 @@ final class FormRows {
                                     ported ? java.util.stream.Stream.of((JComponent) port) : java.util.stream.Stream.<JComponent>empty())
                             .toList());
             label.setLabelFor(controls.getFirst().focusTarget());
+            if (ported) port.setLabelFor(controls.get(1).focusTarget());
         }
     }
 
@@ -90,20 +91,33 @@ final class FormRows {
             return owner.column >= 0 ? owner.column : ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH);
         }
 
-        /** The "Port:" label's width and its gap, when it is mounted after the trailing field. */
+        /** Whether the "Port:" label is mounted after the trailing field and that field shows. */
+        boolean ported(Container p) {
+            return p.getComponentCount() > 4 && p.getComponent(4) == owner.port && p.getComponent(3).isVisible();
+        }
+
+        /** The "Port:" label's width and its gap, while it shows beside the trailing field. */
         int portWidth(Container p) {
-            return p.getComponentCount() > 4 && p.getComponent(4) == owner.port ? owner.port.getPreferredSize().width + gap() : 0;
+            return ported(p) ? owner.port.getPreferredSize().width + gap() : 0;
+        }
+
+        /** A stacked row's line for component {@code i}: the trailing field shares its line with its "Port:" label. */
+        int stackedHeight(Container p, int i, int width) {
+            int ported = i == 3 ? portWidth(p) : 0, height = Composition.height(p.getComponent(i), Math.max(0, width - ported));
+            return ported > 0 ? Math.max(height, owner.port.getPreferredSize().height) : height;
         }
 
         int gap() {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.COLUMN_GAP);
         }
 
+        /** The trailing cell's width: at most half the room beside the label, less the "Port:" label, which it adds back. */
         int trailing(Container p,int width) {
+            int ported = portWidth(p);
             return p.getComponentCount() > 3 && p.getComponent(3).isVisible()
                     ? Math.min(
-                            p.getComponent(3).getPreferredSize().width + portWidth(p),
-                            Math.max(0, (width - labelWidth() - 2 * gap()) / 2))
+                            p.getComponent(3).getPreferredSize().width + ported,
+                            ported + Math.max(0, (width - labelWidth() - 2 * gap() - ported) / 2))
                     : 0;
         }
 
@@ -121,7 +135,7 @@ final class FormRows {
         int captionOffset() { return besideInput() ? 0 : ThemePainting.metric(owner.context(), DesignMetrics.Role.CAPTION_TOP_OFFSET); }
         boolean stacked(Container p,int width) {
             int lane=p.getComponentCount()>2?Math.min(p.getComponent(2).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0;
-            return width<labelWidth()+gap()+lane+(trailingVisible(p)?gap()+Math.min(p.getComponent(3).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0);
+            return width<labelWidth()+gap()+lane+(trailingVisible(p)?gap()+portWidth(p)+Math.min(p.getComponent(3).getPreferredSize().width,SurfacePanel.bodyLaneWidth(owner.context())):0);
         }
         int textHeight(int width) {
             return Composition.height(owner.label,width)+(owner.caption.isVisible()?owner.caption.height(width)
@@ -131,7 +145,7 @@ final class FormRows {
         public int height(Container p, int width) {
             if(stacked(p,width)) {
                 int height=textHeight(width);
-                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible())height+=gap()+Composition.height(p.getComponent(i),width);
+                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible()&&p.getComponent(i)!=owner.port)height+=gap()+stackedHeight(p,i,width);
                 return height;
             }
             int trailing = trailing(p,width),
@@ -154,7 +168,7 @@ final class FormRows {
                 h = Math.max(h, control + shift);
             }
             if (p.getComponentCount() > 3)
-                h = Math.max(h, Composition.height(p.getComponent(3), trailing - portWidth(p)) + shift);
+                h = Math.max(h, Composition.height(p.getComponent(3), Math.max(0, trailing - portWidth(p))) + shift);
             return h;
         }
 
@@ -178,14 +192,22 @@ final class FormRows {
 
         @Override
         public void layoutContainer(Container p) {
+            // The "Port:" label shows only while the field it names does.
+            if (p.getComponentCount() > 4 && p.getComponent(4) == owner.port) owner.port.setVisible(p.getComponent(3).isVisible());
             if(stacked(p,p.getWidth())) {
                 int width=p.getWidth(),labelHeight=Composition.height(owner.label,width);
                 owner.label.setBounds(0,0,width,labelHeight);
                 owner.caption.setBounds(0,labelHeight+ThemePainting.metric(owner.context(),DesignMetrics.Role.CAPTION_TOP_OFFSET),width,owner.caption.height(width));
                 int y=textHeight(width);
-                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible()) {
-                    int height=Composition.height(p.getComponent(i),width);y+=gap();
-                    p.getComponent(i).setBounds(0,y,width,height);y+=height;
+                for(int i=2;i<p.getComponentCount();i++)if(p.getComponent(i).isVisible()&&p.getComponent(i)!=owner.port) {
+                    int ported=i==3?portWidth(p):0,height=stackedHeight(p,i,width);y+=gap();
+                    if(ported>0) {
+                        // The trailing field keeps its "Port:" label beside it on its own line, centred on its first line.
+                        var size=owner.port.getPreferredSize();int field=Composition.height(p.getComponent(i),Math.max(0,width-ported));
+                        owner.port.setBounds(0,y+Math.max(0,(firstLine(i,field)-size.height)/2),Math.min(size.width,width),size.height);
+                        p.getComponent(i).setBounds(ported,y,Math.max(0,width-ported),field);
+                    } else p.getComponent(i).setBounds(0,y,width,height);
+                    y+=height;
                 }
                 return;
             }
@@ -214,9 +236,9 @@ final class FormRows {
                     var size = owner.port.getPreferredSize();
                     owner.port.setBounds(tx, shift + Math.max(0, (line - size.height) / 2), size.width, size.height);
                 }
-                int th = Composition.height(p.getComponent(3), trailing - ported);
+                int tw = Math.max(0, trailing - ported), th = Composition.height(p.getComponent(3), tw);
                 // Shorter trailing content (a unit or note) centres on the control's first line as the label does.
-                p.getComponent(3).setBounds(tx + ported, shift + (th < line ? (line - th) / 2 : 0), trailing - ported, th);
+                p.getComponent(3).setBounds(tx + ported, shift + (th < line ? (line - th) / 2 : 0), tw, th);
             }
         }
     }

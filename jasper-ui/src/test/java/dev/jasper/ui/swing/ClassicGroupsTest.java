@@ -23,13 +23,27 @@ class ClassicGroupsTest {
     }
 
     /** New File Server's Server box: Name, Reachable from with its Port, Passive ports. */
-    static ViewSpec server() {
+    static ViewSpec server() { return server(READY); }
+
+    /** The Server box with its Port field in {@code port}'s state. */
+    static ViewSpec server(ControlState port) {
         var reachable = new Nodes.Choice("reachable", READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("local", "This computer only", Optional.empty())),
             "local", "Reachable from", "reachable");
         return new ViewSpec(new Nodes.Section("server", READY, "Server", new Nodes.Card("server-card", READY, Nodes.CardKind.FORM, List.of(
             new Nodes.FormRow("name-row", READY, "Name", "", field("name", "e.g. Downloads", Nodes.FieldKind.TEXT), Optional.empty()),
-            new Nodes.FormRow("reachable-row", READY, "Reachable from", "", reachable, Optional.of(field("port", "", Nodes.FieldKind.PORT))),
+            new Nodes.FormRow("reachable-row", READY, "Reachable from", "", reachable, Optional.of(new Nodes.Field("port", port, Nodes.FieldKind.PORT, "", "", "port", "", Optional.empty()))),
             new Nodes.FormRow("passive-row", READY, "Passive ports", "", field("passive", "Empty uses the range in Settings", Nodes.FieldKind.TEXT), Optional.empty())))));
+    }
+
+    static Nodes.SettingRow toggleRow(String id) {
+        return new Nodes.SettingRow(id + "-row", READY, "Setting " + id, "", new Nodes.Toggle(id, READY, "Setting " + id, true, id, false), false);
+    }
+
+    /** The face's own painting of {@code card}, without its rows. */
+    static BufferedImage paintCard(KitContext context, Cards.CardSurface card) {
+        var image = new BufferedImage(card.getWidth(), card.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics(); try { context.faces().group.paintCard(card, g); } finally { g.dispose(); }
+        return image;
     }
 
     static BufferedImage paint(JComponent component) {
@@ -93,6 +107,113 @@ class ClassicGroupsTest {
                 assertThat(port.isVisible()).isTrue();
                 var field = find(view, "port", JComponent.class);
                 assertThat(field.getX()).isGreaterThan(port.getX() + port.getWidth());
+            } finally { release(context); }
+        });
+    }
+
+    /** Review Focus 4: at any width, stacked or not, the "Port:" label sits beside its field, never on a line below it. */
+    @Test void aStackedRowKeepsThePortLabelBesideItsField() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, server(), e -> {})) {
+                boolean stacked = false;
+                for (int width = 160; width <= 488; width += 4) {
+                    KitFixtures.render(view, width, 400, 1);
+                    var label = find(view, "reachable-row.label", JLabel.class);
+                    var combo = find(view, "reachable", JComponent.class);
+                    var port = find(view, "reachable-row.port", JLabel.class);
+                    var field = find(view, "port", JComponent.class);
+                    String where = "width " + width;
+                    assertThat(port.isVisible()).as(where).isTrue();
+                    assertThat(port.getX() + port.getWidth()).as(where + ": the label is left of its field").isLessThan(field.getX());
+                    assertThat(port.getY()).as(where + ": the label is not below its field").isLessThan(field.getY() + field.getHeight());
+                    assertThat(port.getY() + port.getHeight()).as(where + ": the label is not above its field").isGreaterThan(field.getY());
+                    assertThat(field.getWidth()).as(where + ": the field keeps its room").isGreaterThanOrEqualTo(Math.min(field.getPreferredSize().width, port.getWidth()));
+                    if (combo.getY() >= label.getY() + label.getHeight()) stacked = true;
+                }
+                assertThat(stacked).as("the row stacks at the narrowest widths").isTrue();
+            } finally { release(context); }
+        });
+    }
+
+    /** A hidden Port field takes its "Port:" label with it, stacked or not. */
+    @Test void aHiddenPortFieldHidesItsLabel() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, server(), e -> {})) {
+                view.update(server(new ControlState(false, true, false, "")));
+                for (int width : new int[] {200, 488}) {
+                    KitFixtures.render(view, width, 400, 1);
+                    assertThat(find(view, "reachable-row.port", JLabel.class).isVisible()).as("width " + width).isFalse();
+                }
+                view.update(server());
+                KitFixtures.render(view, 488, 400, 1);
+                assertThat(find(view, "reachable-row.port", JLabel.class).isVisible()).isTrue();
+            } finally { release(context); }
+        });
+    }
+
+    /** Spec 6.4 and Rulings 19: one border.row divider where a MIXED card's settings begin; a SETTINGS card is transparent, padded ROW_GAP. */
+    @Test void aMixedCardDividesOnceAndASettingsCardIsPaddedAndTransparent() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var spec = new ViewSpec(new Nodes.Stack("root", READY, Nodes.LayoutRole.VERTICAL, List.of(
+                new Nodes.Card("mixed", READY, Nodes.CardKind.MIXED, List.of(
+                    new Nodes.FormRow("user-row", READY, "Username", "", field("user", "root", Nodes.FieldKind.TEXT), Optional.empty()), toggleRow("a"), toggleRow("b"))),
+                new Nodes.Card("settings", READY, Nodes.CardKind.SETTINGS, List.of(toggleRow("c"), toggleRow("d"))))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                KitFixtures.render(view, 488, 400, 1);
+                var mixed = find(view, "mixed", Cards.CardSurface.class);
+                var first = find(view, "a-row", JComponent.class);
+                var second = find(view, "b-row", JComponent.class);
+                assertThat(first.getParent()).isSameAs(mixed);
+                var image = paintCard(context, mixed);
+                var lines = new ArrayList<Integer>();
+                for (int y = 0; y < image.getHeight(); y++) if (image.getRGB(mixed.getWidth() / 2, y) >>> 24 != 0) lines.add(y);
+                assertThat(lines).as("one divider, at the first setting row").containsExactly(first.getY());
+                assertThat(new Color(image.getRGB(mixed.getWidth() / 2, first.getY()), true)).isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_ROW));
+                assertThat(second.getY()).isGreaterThan(first.getY());
+                var settings = find(view, "settings", Cards.CardSurface.class);
+                int gap = ThemePainting.metric(context, DesignMetrics.Role.ROW_GAP);
+                assertThat(((javax.swing.border.EmptyBorder) settings.getBorder()).getBorderInsets()).isEqualTo(new java.awt.Insets(gap, 0, gap, 0));
+                var plain = paintCard(context, settings);
+                for (int y = 0; y < plain.getHeight(); y++) for (int x = 0; x < plain.getWidth(); x++)
+                    assertThat(plain.getRGB(x, y) >>> 24).as("the settings card paints nothing at " + x + "," + y).isZero();
+            } finally { release(context); }
+        });
+    }
+
+    /** A colon label's note starts after the colon, so the colon keeps the label's ink. */
+    @Test void aColonLabelsNoteStartsAfterTheColon() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var group = new Nodes.Choice("group", READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("other", "Other", Optional.empty())), "other", "Group", "group");
+            var spec = new ViewSpec(new Nodes.Card("card", READY, Nodes.CardKind.FORM, List.of(
+                new Nodes.FormRow("user-row", READY, "Username", "", field("user", "root", Nodes.FieldKind.TEXT), Optional.empty()),
+                new Nodes.SettingRow("group-row", READY, "Group", "", group, false, false, "optional"))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                KitFixtures.render(view, 488, 140, 1);
+                var row = (SettingRows.RowControl) view.control("group-row");
+                assertThat(row.formLabel).isTrue();
+                assertThat(row.title.noteStart).isEqualTo("Group:".length());
+            } finally { release(context); }
+        });
+    }
+
+    /** An EXCLUSIVE choice that leaves a classic form card drops the field-column inset it took there. */
+    @Test void aChoiceLeavingAFormCardDropsItsInset() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var mode = new Nodes.Choice("mode", READY, Nodes.ChoiceKind.EXCLUSIVE, List.of(new Option("vault", "Vault Credential", Optional.empty()),
+                new Option("agent", "SSH Agent", Optional.empty())), "vault", "Authentication", "mode");
+            var user = new Nodes.FormRow("user-row", READY, "Username", "", field("user", "root", Nodes.FieldKind.TEXT), Optional.empty());
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("root", READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    new Nodes.Card("card", READY, Nodes.CardKind.FORM, List.of(mode, user))))), e -> {})) {
+                KitFixtures.render(view, 488, 200, 1);
+                assertThat(find(view, "mode", JComponent.class).getBorder()).isNotNull();
+                view.update(new ViewSpec(new Nodes.Stack("root", READY, Nodes.LayoutRole.VERTICAL, List.of(mode, new Nodes.Card("card", READY, Nodes.CardKind.FORM, List.of(user))))));
+                KitFixtures.render(view, 488, 200, 1);
+                assertThat(find(view, "mode", JComponent.class).getBorder()).isNull();
             } finally { release(context); }
         });
     }
