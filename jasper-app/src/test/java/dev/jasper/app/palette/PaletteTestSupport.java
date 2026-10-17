@@ -217,4 +217,14 @@ public final class PaletteTestSupport {
     public static void handle(PaletteView view, String action) {
         ((RunWindowView) view).handle(new dev.jasper.ui.model.UiEvent.Action(action));
     }
+
+    /** Shows one of the 06 Run Dialog mocks' states ("just-opened" or "typing-auth") in an open Run window. */
+    public static void showRunWindowState(PaletteView view, String state) {
+        var run = (RunWindowView) view;
+        if (state.equals("typing-auth")) { run.setQueryText("auth"); run.setEntries(RunWindowFixtures.typingAuth(), null, "Nothing found"); }
+        else run.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+    }
+
+    /** Draws the Run window's field focused, as the mocks show it (headless renders have no keyboard focus). */
+    public static void focusRunWindowField(PaletteView view) { ((RunWindowView) view).fieldBox().focusShown(true); }
 }
