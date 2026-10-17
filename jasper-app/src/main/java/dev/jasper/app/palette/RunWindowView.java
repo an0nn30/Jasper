@@ -60,6 +60,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     private final StepForm step;
     private final AutoCloseable themeSubscription;
     private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
+    /** The list rows that fit the window's home: {@code visibleRows} unless the window is too short (plan 8b Rulings 8). */
+    private int shownRows = visibleRows;
     private String query = "", emptyText = "", listCard = NONE;
     private PaletteScope chip;
     private List<PaletteEntry> entries = List.of();
@@ -170,7 +172,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             case SCOPES -> new Nodes.MenuButton(SCOPES, ControlState.READY, "", "triangle.down", Nodes.ButtonKind.GHOST, "", scopeItems(),
                 "Choose what to open", Nodes.ButtonPresentation.EMBEDDED);
             case RESULTS -> new Nodes.ItemList(RESULTS, ControlState.READY, Nodes.ListKind.RESULTS, items(),
-                selected < 0 ? Set.of() : Set.of(entryId(selected)), RUN, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(visibleRows));
+                selected < 0 ? Set.of() : Set.of(entryId(selected)), RUN, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(shownRows));
             case EMPTY -> text(EMPTY, emptyText, Nodes.TextRole.DESCRIPTION);
             case DETAIL_LABEL -> text(DETAIL_LABEL, RunCopy.detailLabel(selection), Nodes.TextRole.BODY_STRONG);
             case DETAIL_VALUE -> text(DETAIL_VALUE, RunCopy.detailValue(selection), Nodes.TextRole.MONO);
@@ -379,7 +381,23 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         host.execute().accept(entry, index);
     }
 
-    @Override public void setVisibleRows(int rows) { visibleRows = rows; render(RESULTS); }
+    @Override public void setVisibleRows(int rows) { visibleRows = rows; shownRows = rows; render(RESULTS); }
+
+    /** Drops list rows, never below one, until the window's height fits {@code available}; restores them as room returns. */
+    @Override public void fitHeight(int available) {
+        int rows = visibleRows;
+        while (rows > 1 && heightWith(rows) > available) rows--;
+        if (rows != shownRows) { shownRows = rows; render(RESULTS); }
+    }
+
+    private int heightWith(int rows) {
+        int saved = shownRows;
+        shownRows = rows;
+        try { return getPreferredSize().height; } finally { shownRows = saved; }
+    }
+
+    /** The list rows shown. */
+    public int shownRows() { return shownRows; }
     @Override public int visibleRows() { return visibleRows; }
 
     @Override public void showStep(String title, List<PaletteStep.Field> fields) {
@@ -420,7 +438,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     /** The list box's height: {@code visible_rows} rows and two heading bands inside its edge (spec 11.2, Rulings 5). */
     int listHeight() {
         int hair = s(DesignMetrics.Role.HAIRLINE);
-        return 2 * hair + visibleRows * s(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT) + 2 * (s(DesignMetrics.Role.RUN_WINDOW_HEADING_HEIGHT) + hair);
+        return 2 * hair + shownRows * s(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT) + 2 * (s(DesignMetrics.Role.RUN_WINDOW_HEADING_HEIGHT) + hair);
     }
 
     // ---- Package-private access for headless tests ------------------------------------------------------------------

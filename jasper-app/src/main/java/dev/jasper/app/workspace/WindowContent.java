@@ -258,7 +258,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
-            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.palette(), look.paletteHome());
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             this::ownsKeySource);
         addHierarchyListener(event -> {
@@ -756,6 +756,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         java.awt.Insets insets = header.getInsets();
         var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
         return SwingUtilities.convertRectangle(header, row, target);
+    }
+    /**
+     * The dock work area in {@code target}'s coordinates: between the stripes, above the bottom strip and the status bar
+     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root. Plan 7 mounts the bottom
+     * strip under the area, so the area's own bounds end above it.
+     */
+    java.awt.Rectangle paletteWorkArea(Component target) {
+        if (area.getParent() == null || SwingUtilities.getRootPane(area) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
     }
     WindowChrome chrome() { return chrome; }
     WorkspaceChrome look() { return look; }

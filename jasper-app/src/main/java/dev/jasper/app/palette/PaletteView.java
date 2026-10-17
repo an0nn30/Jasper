@@ -91,6 +91,8 @@ public sealed interface PaletteView extends AutoCloseable permits CardView, RunW
     void setReveal(double fraction);
     /** The height currently shown. */
     int revealedHeight();
+    /** Fits the view into {@code available} pixels of height where it can: the Run window drops list rows, never below one. */
+    void fitHeight(int available);
     /** Closes the view's kit views. */
     @Override void close();
 }
