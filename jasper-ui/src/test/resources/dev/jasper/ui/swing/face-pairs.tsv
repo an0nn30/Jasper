@@ -34,3 +34,4 @@ classic	ClassicButtonFace	border.hover	surface.app	CONTRAST:1.5
 classic	ClassicButtonFace	text.secondary	button.secondary.bg	CONTRAST:3.0
 classic	ClassicFieldPolicy	border.divider	surface.app	CONTRAST:1.3
 classic	ClassicFieldPolicy	text.secondary	surface.tableHeader	CONTRAST:4.5
+classic	ClassicPromptFace	accent.edge	surface.app	CONTRAST:3.0

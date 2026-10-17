@@ -117,7 +117,7 @@ final class ViewReconciler implements AutoCloseable {
             text.wrap = false;
             text.flow = false;
         }
-        if (control instanceof Labels.TextControl label) label.override = null;
+        if (control instanceof Labels.TextControl label) { label.override = null; label.styled = null; }
         if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);

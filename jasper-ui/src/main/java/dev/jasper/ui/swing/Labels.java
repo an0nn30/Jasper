@@ -106,6 +106,8 @@ final class Labels {
         Typography.Role override;
         /** On a Settings page supporting text keeps its font's own line height. */
         boolean settings;
+        /** A face's styling of this text, applied at the end of every refresh; set by the face, cleared before each update. */
+        java.util.function.Consumer<JLabel> styled;
         /** On a selected row's fill (set by the row before each refresh), and that fill's ink. */
         boolean inked;
         InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
@@ -141,6 +143,7 @@ final class Labels {
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
             // Supporting paragraphs sit centred in their measured line box rather than on its top.
             ((LiteralLabel)label).wrapped.centeredLeading = supporting;
+            if (styled != null) styled.accept(label);
             label.repaint();
         }
     }
