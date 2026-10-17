@@ -1216,7 +1216,9 @@ final class InteractiveRows {
             if (tw == 0) trailing.setBounds(0, 0, 0, 0);
             else if (countAt >= 0) trailing.setBounds(Math.min(countAt, Math.max(0, getWidth() - pad - tw)), top, tw, line);
             else trailing.setBounds(getWidth() - pad - tw, top, tw, line);
-            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad - (tw > 0 ? tw + pad : 0)), line);
+            // A count under the last column ends the title a pad before it, so a long owner name never runs under it.
+            int titleEnd = tw > 0 ? trailing.getX() - pad : getWidth() - pad;
+            title.setBounds(pad, top, Math.max(0, titleEnd - pad), line);
             title.doLayout();
             trailing.doLayout();
         }

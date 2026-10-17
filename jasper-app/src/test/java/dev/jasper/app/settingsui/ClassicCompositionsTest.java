@@ -44,6 +44,7 @@ class ClassicCompositionsTest {
                     var menu = (Nodes.MenuButton) find(root, id);
                     assertThat(menu.icon()).as(composition + " " + id).isEqualTo(composition == Composition.CLASSIC ? "more" : "settings");
                     assertThat(menu.items()).extracting(MenuItem::label).containsExactly("Import Theme…", "", "Remove Theme");
+                    assertThat(menu.items().get(0).enabled()).as("Import Theme… is enabled").isTrue();
                     assertThat(menu.items().get(2).enabled()).as("only built-in themes: nothing to remove").isFalse();
                 }
                 editor.dispose();

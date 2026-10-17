@@ -31,14 +31,28 @@ both catalogs; `KEYCAP_DETAIL_EDGE_ALPHA` (0; classic 49), `LIST_HEADING_HEIGHT`
 (0; 36). jasper-ui face behaviours, each defaulting to today's value: `ChoiceFace.previewPadding`, `GroupFace.rowRule`,
 `cardGap` and `listUnderTitle`, `ClassicGroupFace.cardBorder` padding a Settings page's card, `TableFace.everyRowOnPage`
 and `cellType`, `ButtonFace.cellChevronLane` and `titleLine`, `ClassicStepperFace.valueWidth` (the classic spinner 82
-wide) and `FieldPolicy.settingsWidth` (a classic Settings text field at least 220 wide). Beyond the Settings pages, two
-jasper-ui behaviours moved that `NavigationLinesTest` pins for plan 7's merge: in both looks a menu button in a NAVIGATION
-line keeps its preferred width while the texts shrink, and under the classic button face the buttons of a NAVIGATION line
-led by a DETAIL_TITLE over further lines without a tile stand at the line's top. `SettingsPagesMockTest` compares all
+wide) and `FieldPolicy.settingsWidth` (a classic Settings text field at least 220 wide). Beyond the Settings pages, these
+classic-wide changes reach every Enterprise surface: `BUTTON_HORIZONTAL_PADDING` 14 to 11 (and FlatLaf's classic
+`Button.margin`: every classic button); `ClassicHeaders.inset` 7 to 9 (every classic table and tree header title and cell
+after a separator); `LIST_TWO_LINE_ROW_HEIGHT`, `LIST_HEADING_HEIGHT` and the heading bands (every classic plain list: the
+Vault picker and key import, Errors, Licenses); `ORDERED_ROW_HEIGHT` (every classic side-column list);
+`ClassicStepperFace.valueWidth` (every spinner); `ClassicTableFace.styleCount`'s semibold count; `ButtonFace.titleLine`
+(also About › Licenses' detail heading link); `Navigation.InlineLayout.flexible`, in both looks (a menu button in a
+NAVIGATION line keeps its preferred width while the texts shrink; main's flush panel header strips use
+`Navigation.InlineLayout`); and under the classic button face the buttons of a NAVIGATION line led by a DETAIL_TITLE over
+further lines without a tile stand at the line's top (`NavigationLinesTest` pins the last two for plan 7's merge). Merge
+checklist: main has merged plans 7 and 8b after `1dcc8fe61`, and `git merge-tree` shows textual conflicts only in
+STATUS.md, migration.csv and `DesignMetrics.java`, but main's dock and Run window mock tests were calibrated before these
+values changed; after merging main, re-run `DockMockTest`, `DockChromeMatrixTest`, `DefaultDockPixelsTest`,
+`RunWindowRenderTest`, `RunWindowWorkspaceRenderTest`, `EnterpriseDialogMockTest` and `tools/visual/check_pairs.py`, and
+attribute any movement to the 9b value that caused it. `SettingsPagesMockTest` compares all
 eighteen pages and 07b with their mocks (probes on every OS, the body's share on macOS: Appearance 0.968, Window 0.987,
-Notifications 0.955, Keymap 0.986, Keymap recording (07b) 0.974, Plugins 0.974, Shell 0.978, Command Palette 0.999, Desk Buddy 0.999,
-System Settings 0.959, Font & Colors 0.985, Cursor 0.998, Credential Vault 0.982, Editor 0.939, File Server 0.981, Remote 0.960, Sample
-0.970, Shell History 0.961, Project Index 0.929; every floor 0.93 but Project Index's 0.92, lowered because the fixture indexes
+Notifications 0.955, Keymap 0.986, Keymap recording (07b) 0.975, Plugins 0.974, Shell 0.978, Command Palette 0.999, Desk
+Buddy 0.999,
+System Settings 0.959, Font & Colors 0.985, Cursor 0.998, Credential Vault 0.982, Editor 0.941, File Server 0.981,
+Remote 0.960, Sample
+0.970, Shell History 0.961, Project Index 0.930; every floor 0.93 but Project Index's 0.92, lowered because the fixture
+indexes
 no project and the plugin shows its empty state in place of the mock's four projects) and checks the composed pages under
 Enterprise Dark; plan 9a's `SettingsFrameRenders` also checks the page composition under every look of 6a's chrome
 renders. Default look: byte-identical, no file changed (`changed: none`; Rulings 2: today's render
@@ -89,13 +103,28 @@ and adds `HALF` for Task 1's half pixel; Task 8 places the configuration guide's
 sentences, not right after the Keymap one. Residuals (printed, not asserted, with their causes in the test and the
 banners): Task 1's checkbox label gap and description offset; the Keymap fixture's counts and the ⌘ glyph's platform face;
 Cancel and Set 3 and 1 px narrower than 07b's; the Plugins fixture's Enterprise plugin and the folder tabs' baseline rule;
-Shell's "Empty" placement and the fixture's Custom profile; Project Index's empty state; Sample's checkboxes at the row's
-end and the plugin pages' (13, 15, 17) controls ending 36 px early, because a plugin page's own setting rows
-(`KitSettingRows`) keep the inline Reset slot and the SDK's `SettingRow` has no menu to take Reset (spec 12.1 under a look
-without inline Reset needs an SDK row menu, a hand-off to a later SDK plan); Shell History's list; File Server's port
-description wrapping one word later. `./gradlew check --continue`: **11,215 tests, 0 failures, 0 errors, 25 skipped**. GUI
+Shell's "Empty" placement and the fixture's Custom profile; Project Index's empty state; Shell History's list; File
+Server's port description wrapping one word later. Final review
+fixes ("Plan 9b: final review fixes"): with variables, the classic environment table is the row's control laid under its
+title (`listUnderTitle`, as the ordered lists) with Add Variable… below it, so its box spans the rows' text inset (260 to
+1010) and the row's padding keeps the next rule off it
+(`SettingsPagesMockTest.shellWithVariablesKeepsItsTableInsideTheRows`);
+its selection follows an edited variable and clears on a new value; a classic selected row's keycaps are opaque light caps
+(`TreeFace.boxesSelectedKeycaps`, `Keycaps` boxed; 07b's "Copy keycap face" probe); a group whose saved mode is unknown
+reads Source "Default" and keeps Reset to Default enabled; `SettingsDialogTest` answers the real Add Variable sheet; plugin
+pages follow `inlineReset`: `KitSettingRows` builds a one-child `SETTINGS_TRAILING` stack and, through
+`HostedKitView.hostModule`, gives each host row Reset to Default in its own menu, so Sample's checkboxes lead and its two
+probes are asserted (Editor 0.941, Project Index 0.930); the classic Plugins split divider paints nothing (a probe between
+the list and the details); ink boxes are asserted on macOS only; a heading's title ends before a count under the last
+column; the unused overloads and `ShortcutEditPanel.specForTests()` are gone (`spec()` is package-private);
+`AppearanceSelection` takes `Editors.menuIcon` and leaves `ProjectionReadTest.COMPOSITION_ROOTS`; and
+`tools/visual/pairs.json` gains `enterprise-settings-07b` (0.933 against its 0.4 floor). `./gradlew check --continue`:
+**11,215 tests, 0 failures, 0 errors, 25 skipped** before the final review fixes, which
+add six tests (their targeted runs pass). GUI
 checks for the user: under Enterprise, the Keymap's recording band and Find by Shortcut, the Plugins page's checkboxes and
-⋯, Add Variable… and its sheet, and a right-click on a Notifications row. Hand-off to plans 10a, 10b and any later plan
+⋯, Add Variable… and its sheet with a variable or two in the table, a right-click on a Notifications row and on a plugin
+page's
+setting row. Hand-off to plans 10a, 10b and any later plan
 that changes a face, a `SETTINGS_*` role or a bundled plugin's Settings page: re-run `SettingsPagesMockTest`, and
 re-baseline the seven Tools pages' probes and floors it records (`PROBES`, `FLOORS`) when the change moves them, with the
 cause in that plan's banner. Not merged, not pushed.

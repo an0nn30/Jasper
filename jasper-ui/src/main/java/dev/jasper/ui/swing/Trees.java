@@ -584,7 +584,7 @@ final class Trees {
             }
             if(presented!=null && presented.keycaps().isPresent()) {
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/keys").component;
-                label.getAccessibleContext().setAccessibleName(presented.keycaps().get().accessibleName());label.setText("");label.setIcon(new Keycaps(context(),presented.keycaps().get()));label.setDisabledIcon(label.getIcon());
+                label.getAccessibleContext().setAccessibleName(presented.keycaps().get().accessibleName());label.setText("");label.setIcon(new Keycaps(context(),presented.keycaps().get(),row.inked && context().faces().tree.boxesSelectedKeycaps()));label.setDisabledIcon(label.getIcon());
             }
             for (int i = 0; presented==null && i < trailingColumns(item); i++) {
                 var label = (javax.swing.JLabel) row.controls.get(trailing.get(i).id()).component;

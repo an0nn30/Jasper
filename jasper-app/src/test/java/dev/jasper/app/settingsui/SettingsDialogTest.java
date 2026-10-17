@@ -783,6 +783,56 @@ class SettingsDialogTest {
         });
     }
 
+    /**
+     * Plan 9b Rulings 13 and 14: under the classic composition, Add Variable… asks the real value sheet over Settings; its
+     * fields' edits reach the answer, its primary button (or Enter) stages the variable, and Cancel, Escape or a closed
+     * sheet change nothing.
+     */
+    @Test void addVariableAsksTheValueSheetOverSettingsAndStagesOnlyAConfirmedAnswer() throws Exception {
+        var answer = new String[1];
+        var typed = new String[2];
+        var sheets = new ArrayList<AuxiliarySurface>();
+        var asking = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> {
+                if (!surface.title().equals("Add Variable")) return;
+                sheets.add(surface);
+                KitTestSupport.require(surface.holder(), "sheet-name.input", javax.swing.text.JTextComponent.class).setText(typed[0]);
+                KitTestSupport.require(surface.holder(), "sheet-value.input", javax.swing.text.JTextComponent.class).setText(typed[1]);
+                var form = KitTestSupport.require(surface.holder(), "value-sheet", javax.swing.JComponent.class);
+                switch (answer[0]) {
+                    case "confirm", "cancel" -> KitTestSupport.require(surface.holder(), answer[0], javax.swing.JButton.class).doClick();
+                    case "enter" -> form.getActionMap().get("primary").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    case "escape" -> form.getActionMap().get("cancel").actionPerformed(new java.awt.event.ActionEvent(form, 0, ""));
+                    default -> surface.close();
+                }
+            }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1000, 700), (title, initial) -> Optional.empty()));
+        var dialog = new SettingsDialog(asking, context -> CorePages.pages(AppearanceFixtures.CHOICES,
+            new CorePages.SystemActions(() -> FILE, () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), page -> fake,
+            page -> new GroupPage("plugins", "Plugins", Optional.empty(), false, List::of, page)).apply(context),
+            new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }),
+                () -> { }, () -> { }, uri -> { }, (parent, count) -> true, KitTestSupport::context, SettingsChromeTest.CLASSIC,
+                dev.jasper.app.presentation.Composition.CLASSIC));
+        String add = CoreSettings.TERMINAL_ENV.name() + ":add";
+        edt(() -> {
+            dialog.open(null, "terminal.shell");
+            for (String keep : List.of("cancel", "escape", "closed")) {
+                answer[0] = keep; typed[0] = "KEEP"; typed[1] = "out";
+                KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+                assertThat(dialog.draft().modified(CoreSettings.TERMINAL_ENV)).as(keep + " changes nothing").isFalse();
+                assertThat(sheets.getLast().closed()).as("the sheet closes").isTrue();
+                assertThat(sheets.getLast().ownerSurface()).as("owned by Settings").hasValueSatisfying(owner -> assertThat(owner.title()).isEqualTo("Settings"));
+            }
+            answer[0] = "confirm"; typed[0] = "EDITOR"; typed[1] = "vim";
+            KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_ENV)).as("the typed variable, staged").containsExactly(java.util.Map.entry("EDITOR", "vim"));
+            answer[0] = "enter"; typed[0] = "LANG"; typed[1] = "C";
+            KitTestSupport.require(page(dialog), add, javax.swing.JButton.class).doClick();
+            assertThat(dialog.draft().value(CoreSettings.TERMINAL_ENV)).containsEntry("LANG", "C").hasSize(2);
+            assertThat(sheets).hasSize(5).allSatisfy(sheet -> assertThat(sheet.closed()).isTrue());
+            dialog.cancel();
+            asking.close();
+        });
+    }
+
     /** A page standing in for Keymap: settable modification, counted applies and recorded highlights. */
     static final class FakePage implements SettingsPage {
         final String id;

@@ -21,10 +21,17 @@ final class KitSettingRows {
     /** A path's Browse action is its row id followed by this. */
     static final String BROWSE=":browse";
     private final java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile;
-    /** @param chooseFile asks for an existing file, as the generated page's Browse does: title and initial path in, choice out */
+    /** The look's Settings projection (spec 12.1): false puts Reset to Default in each row's menu, with no inline slot. */
+    private final boolean inlineReset;
+    /** Each host row's Reset state at its last build, for its menu: the SDK's rows have no menu of their own. */
+    private final Map<String, Boolean> resettable = new HashMap<>();
+    /**
+     * @param chooseFile asks for an existing file, as the generated page's Browse does: title and initial path in, choice out
+     * @param inlineReset the look's {@code SettingsChrome.inlineReset()}
+     */
     KitSettingRows(SettingsPanelHost host, Function<Setting<?>, SettingSpec<?>> specs, java.util.function.Consumer<Setting<?>> unset,
-                   java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile) {
-        this.host=host;this.specs=specs;this.unset=unset;this.chooseFile=chooseFile;
+                   java.util.function.BiFunction<String,Optional<java.nio.file.Path>,Optional<java.nio.file.Path>> chooseFile, boolean inlineReset) {
+        this.host=host;this.specs=specs;this.unset=unset;this.chooseFile=chooseFile;this.inlineReset=inlineReset;
     }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
@@ -58,7 +65,9 @@ final class KitSettingRows {
                     :kind==Nodes.FieldKind.TEXT&&PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.TECHNICAL?Nodes.FieldPresentation.TECHNICAL:Nodes.FieldPresentation.STANDARD);
         }
         boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
-        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,resettable,control),false);
+        this.resettable.put(id,resettable);
+        return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),inlineReset?trailing(id,spec,resettable,control)
+            :new Nodes.Stack(id+":controls",ControlState.READY,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(control)),false);
     }
     /**
      * The generated pages' ordered-list editor ({@code Editors.textList()}) node for node: the rows in order as
@@ -197,6 +206,28 @@ final class KitSettingRows {
         host.changed();return true;
     }
     ViewSpec refresh(ViewSpec spec){return new ViewSpec(replace(spec.root()));}
+    /**
+     * Without an inline Reset (spec 12.1), each host row in {@code spec}, the converted view, gets Reset to Default in its
+     * own menu, enabled while its Reset would show; its action is the inline button's, so {@link #event} handles both.
+     */
+    dev.jasper.ui.model.ViewSpec menus(dev.jasper.ui.model.ViewSpec spec){return inlineReset?spec:new dev.jasper.ui.model.ViewSpec(menus(spec.root()));}
+    private dev.jasper.ui.model.Nodes.Node menus(dev.jasper.ui.model.Nodes.Node n){
+        return switch(n){
+            case dev.jasper.ui.model.Nodes.SettingRow v when v.id().endsWith(":row") && resettable.containsKey(v.id().substring(0,v.id().length()-4)) -> {
+                String id=v.id().substring(0,v.id().length()-4);
+                yield new dev.jasper.ui.model.Nodes.SettingRow(v.id(),v.state(),v.title(),v.description(),v.control(),v.dependent(),v.highlighted(),v.titleNote(),
+                    List.of(new dev.jasper.ui.model.MenuItem(id+":reset","Reset to Default","",id+":reset",resettable.get(id),false)));
+            }
+            case dev.jasper.ui.model.Nodes.Stack v -> new dev.jasper.ui.model.Nodes.Stack(v.id(),v.state(),v.role(),v.children().stream().map(this::menus).toList(),v.cancelAction());
+            case dev.jasper.ui.model.Nodes.Card v -> new dev.jasper.ui.model.Nodes.Card(v.id(),v.state(),v.kind(),v.children().stream().map(this::menus).toList());
+            case dev.jasper.ui.model.Nodes.Section v -> new dev.jasper.ui.model.Nodes.Section(v.id(),v.state(),v.title(),menus(v.body()));
+            case dev.jasper.ui.model.Nodes.Split v -> new dev.jasper.ui.model.Nodes.Split(v.id(),v.state(),v.kind(),v.children().stream().map(this::menus).toList());
+            case dev.jasper.ui.model.Nodes.Panel v -> new dev.jasper.ui.model.Nodes.Panel(v.id(),v.state(),v.header(),v.searchOrNavigation().map(this::menus),menus(v.body()),v.footer().map(this::menus));
+            case dev.jasper.ui.model.Nodes.Form v -> new dev.jasper.ui.model.Nodes.Form(v.id(),v.state(),v.kind(),v.title(),v.hero().map(this::menus),v.sections().stream().map(this::menus).toList(),
+                v.preview().map(this::menus),v.actions(),v.cancelAction(),v.submission(),v.footnote());
+            default -> n;
+        };
+    }
     private Nodes.Node replace(Nodes.Node n){
         // A host row is rebuilt from the draft, keeping the presentation the plugin asked for (its search highlight).
         for(var entry:controls.entrySet())if(n.id().equals(entry.getKey()+":row")){

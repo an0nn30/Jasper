@@ -95,7 +95,9 @@ at once. Plugins lists the installed plugins: installing, enabling, disabling an
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
 Under the Enterprise look the Keymap shows Action, Scope and Shortcut columns, with Find by Shortcut, Expand All
 and Collapse All; Plugins lists checkbox rows, with each plugin's actions in its ⋯; Terminal › Shell lists
-environment variables in a table with Add Variable…, and Edit… and Remove in a variable's context menu.
+environment variables in a table with Add Variable…, and Edit… and Remove in a variable's context menu;
+Notifications › Groups is one table with Display and Source columns, Reset to Default in a group's context menu;
+and the Appearance dropdowns' menu that imports and removes themes is a ⋯ in place of the gear.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
 the Dark theme and Light theme dropdowns and the Terminal scheme dropdown, each with a gear that imports and removes themes; Terminal › Font & Colors links there. See
 [Themes](themes.md).

@@ -125,8 +125,9 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
                 for (var mode : MODES.entrySet()) options.add(new Option(mode.getKey(), mode.getValue(), Optional.empty()));
                 var display = new Nodes.Choice(modeId(id, i), plain, Nodes.ChoiceKind.DROPDOWN, options, mode(group.id()),
                     group.name() + ": how its notifications appear", "");
-                boolean custom = value.containsKey(group.id());
-                var menu = List.of(new dev.jasper.ui.model.MenuItem(resetId(id, i), "Reset to Default", "", resetId(id, i), plain.enabled() && custom, false));
+                // An unknown saved mode shows the group's default, so Source reads Default; Reset to Default still clears the entry.
+                boolean saved = value.containsKey(group.id()), custom = saved && MODES.containsKey(value.get(group.id()));
+                var menu = List.of(new dev.jasper.ui.model.MenuItem(resetId(id, i), "Reset to Default", "", resetId(id, i), plain.enabled() && saved, false));
                 rows.add(new dev.jasper.ui.model.TableRow(id + ":row-" + i, Map.of("group", group.name(), "source", custom ? "Custom" : "Default"),
                     Optional.empty(), false, Optional.of(menu), group.owner() + " · " + group.id(), Map.of("display", display), Optional.empty()));
             }

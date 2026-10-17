@@ -41,6 +41,19 @@ class ClassicListHeadingsTest {
         });
     }
 
+    @Test void aHeadingsTitleEndsBeforeItsCountUnderTheLastColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var view = new KitView(context, groups(), event -> { })) {
+                view.setSize(751, 200);
+                for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                var heading = ((Tables.TableControl) view.control("table")).mounted.get("jasper");
+                assertThat(heading.title.getX() + heading.title.getWidth()).as("a long owner name stops before the count")
+                    .isLessThan(heading.trailing.getX());
+            } finally { release(context); }
+        });
+    }
+
     @Test void theDefaultHeadingsCountStaysAtTheRowsEnd() {
         Edt.run(() -> {
             var context = KitFixtures.context();

@@ -37,7 +37,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         this.draft = context.draft();
         this.context = context;
         // Spec 12.2: the classic composition's theme menus are a ⋯ beside each dropdown, with the gear's items.
-        String icon = context.composition() == dev.jasper.app.presentation.Composition.CLASSIC ? "more" : "settings";
+        String icon = Editors.menuIcon(context);
         darkMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.DARK, () -> render.run(), icon));
         lightMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.LIGHT, () -> render.run(), icon));
         themes = choices.themes().get();

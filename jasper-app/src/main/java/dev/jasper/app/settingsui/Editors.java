@@ -441,7 +441,6 @@ public final class Editors {
         /** The selected row's index, or -1. */
         int selected = -1;
         private final boolean classic;
-        Items(String label, Optional<Supplier<List<String>>> suggestions) { this(label, suggestions, false); }
         /** {@code classic}: the list shows "Empty" while it holds nothing (plan 9b Rulings 15) and its Add has no glyph. */
         Items(String label, Optional<Supplier<List<String>>> suggestions, boolean classic) { this.label = label; this.suggestions = suggestions; this.classic = classic; }
 
@@ -523,9 +522,10 @@ public final class Editors {
     }
 
     /**
-     * Name/Value rows; a blank name is left out of the value. {@code classic} (spec 12.2): a Name / Value table under the
-     * setting's row with Add Variable… at its end, Edit… and Remove in each row's menu, a sheet for Add and Edit; with no
-     * variables, the row alone.
+     * Name/Value rows; a blank name is left out of the value. {@code classic} (spec 12.2): the setting's row with Add
+     * Variable… at its end; once there are variables, a Name / Value table laid under the row's title (the face's
+     * {@code listUnderTitle}, as the ordered lists) with Add Variable… below it; Edit… and Remove in each row's menu, a
+     * sheet for Add and Edit.
      */
     static final class Table implements ValueEditor<Map<String, String>> {
         private final List<String[]> rows = new ArrayList<>();
@@ -534,8 +534,6 @@ public final class Editors {
         private final PageContext context;
         /** The classic table's selected variable, or -1; a double-click or Enter edits it. */
         private int selectedRow = -1;
-
-        Table() { this(null, null, false); }
 
         Table(Setting<Map<String, String>> setting, PageContext context, boolean classic) {
             this.setting = setting; this.context = context; this.classic = classic && setting != null && context != null;
@@ -562,16 +560,18 @@ public final class Editors {
 
         /**
          * The classic composition's own row (a full-span editor builds it): the search highlight, and Reset to Default in
-         * its menu while the variables differ from the setting's effective default (spec 12.1 and 14.7).
+         * its menu while the variables differ from the setting's effective default (spec 12.1 and 14.7). The table is the
+         * row's control, so it takes the rows' side inset and the row's padding keeps the next row's rule off its border.
          */
         private Nodes.Node classicNode(String id, ControlState state, boolean highlighted) {
             String applies = switch (setting.applies()) {
                 case LIVE -> ""; case NEW_PANES -> "Applies to new panes"; case NEW_WINDOWS -> "Applies to new windows"; case RESTART -> "Takes effect after restart";
             };
             var add = new Nodes.Button(id + ":add", plain(state), "Add Variable…", "", Nodes.ButtonKind.SECONDARY, id + ":add", "");
-            var row = new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false, highlighted, "",
-                SchemaPage.resetMenu(context, id + ":reset", !value().equals(Editors.effectiveDefault(context.draft(), setting))));
-            if (rows.isEmpty()) return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL, List.of(row));
+            var menu = SchemaPage.resetMenu(context, id + ":reset", !value().equals(Editors.effectiveDefault(context.draft(), setting)));
+            if (rows.isEmpty())
+                return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL,
+                    List.of(new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false, highlighted, "", menu)));
             var columns = List.of(new dev.jasper.ui.model.Column("name", "Name", Nodes.TextRole.MONO, false),
                 new dev.jasper.ui.model.Column("value", "Value", Nodes.TextRole.MONO, false, 2, Optional.empty()));
             var tableRows = new ArrayList<dev.jasper.ui.model.TableRow>();
@@ -581,7 +581,10 @@ public final class Editors {
                         new MenuItem("remove-" + i, "Remove", "", id + ":remove-" + i, state.enabled(), false)))));
             var selection = selectedRow >= 0 && selectedRow < rows.size() ? Set.of("variable-" + selectedRow) : Set.<String>of();
             var table = new Nodes.Table(id + ":table", plain(state), columns, tableRows, selection, id + ":activate", List.of(), Nodes.SelectionMode.SINGLE);
-            return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL, List.of(row, table));
+            var control = new Nodes.Stack(id + ":variables", plain(state), Nodes.LayoutRole.VERTICAL,
+                List.of(table, new Nodes.Stack(id + ":entry", plain(state), Nodes.LayoutRole.INLINE, List.of(add))));
+            return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL,
+                List.of(new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, control, false, highlighted, "", menu)));
         }
 
         /** Asks the variable sheet with {@code name} and {@code value}; the answer as a name and value, or empty. */
@@ -590,10 +593,17 @@ public final class Editors {
                 .filter(answer -> answer.size() == 2 && !answer.get(0).isBlank()).map(answer -> new String[]{answer.get(0).strip(), answer.get(1)});
         }
 
-        /** Puts {@code entry} at {@code index} (or at the end), dropping another entry with the same name (the file holds one key). */
+        /**
+         * Puts {@code entry} at {@code index} (or at the end), dropping another entry with the same name (the file holds one
+         * key). An edited entry is selected where it ends up; on an add the selection stays on its variable, or clears when
+         * that variable was the one dropped.
+         */
         private void put(int index, String[] entry) {
-            for (int i = rows.size() - 1; i >= 0; i--) if (i != index && rows.get(i)[0].equals(entry[0])) { rows.remove(i); if (i < index) index--; }
+            int selected = selectedRow;
+            for (int i = rows.size() - 1; i >= 0; i--)
+                if (i != index && rows.get(i)[0].equals(entry[0])) { rows.remove(i); if (i < index) index--; selected = afterRemoval(selected, i); }
             if (index < 0) rows.add(entry); else rows.set(index, entry);
+            selectedRow = index >= 0 ? index : selected;
         }
 
         void addRow(String name, String value) { rows.add(new String[]{name, value}); }
@@ -606,6 +616,7 @@ public final class Editors {
 
         @Override public void show(Map<String, String> value) {
             rows.clear();
+            selectedRow = -1;
             new TreeMap<>(value).forEach(this::addRow);
         }
 

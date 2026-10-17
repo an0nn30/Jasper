@@ -214,6 +214,9 @@ final class EnterpriseSettings implements AutoCloseable {
         return new EnterpriseSettings(home, windows, holder, themes[0], runtime[0], dialog[0]);
     }
 
+    /** The dialog's content, which {@link #render} paints from its origin; EDT. */
+    JComponent content() { return holder[0]; }
+
     /** Selects {@code pageId} and paints the dialog's content, {@code width} by {@code height}, at 2x; EDT. */
     BufferedImage render(String pageId, int width, int height) {
         dialog.select(pageId);

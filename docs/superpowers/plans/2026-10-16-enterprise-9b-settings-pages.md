@@ -13,6 +13,16 @@
 > the configuration guide's Enterprise sentence after the Keymap and Plugins sentences rather than right after the Keymap
 > one, so "Click one" keeps its Keymap antecedent. Default look: no file changed (`changed: none`).
 > `./gradlew check --continue`: 11,215 tests, 0 failures, 0 errors, 25 skipped.
+>
+> **Final review fixes (2026-10-17, "Plan 9b: final review fixes"):** deviations from Rulings 13 and from Tasks 4, 5 and 7
+> as executed, each for a review finding: with variables, the classic environment table is the "Environment variables"
+> row's control laid under its title (`GroupFace.listUnderTitle`) with Add Variable… below the table, not a second card
+> child beside the row (its box sat against the group box's stroke); a classic selected row's keycaps are opaque light
+> caps (`TreeFace.boxesSelectedKeycaps`; 07b's "Copy keycap face" probe; 07b share 0.975); an unknown saved mode reads
+> Source "Default"; plugin pages follow `inlineReset` host-side (`KitSettingRows`, `HostedKitView.hostModule`), so Task
+> 7's Sample residual is gone and its two probes are asserted (Editor 0.941, Project Index 0.930); the classic Plugins
+> divider is unpainted; ink boxes are asserted on macOS only (Rulings 16); `enterprise-settings-07b` joins
+> `tools/visual/pairs.json`. Details and the merge checklist: `docs/STATUS.md`.
 
 > **Status, Task 1 (2026-10-17):** calibrated classic `SETTINGS_ROW_HEIGHT` 36 to 39 (Window's rules 102, 141, 180,
 > 219), `SETTINGS_DESCRIPTION_HEIGHT` 52 to 47 (not 48: mock 01's Theme box bottom 313 and mock 02's New Windows bottom

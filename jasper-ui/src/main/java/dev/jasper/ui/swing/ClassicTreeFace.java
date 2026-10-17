@@ -73,4 +73,6 @@ final class ClassicTreeFace implements TreeFace {
         g.fillRect(0, top + height - line, width, line);
     }
     @Override public boolean fillsDetailRow() { return true; }
+    /** Mock 07b: the edited row keeps its accent fill, and its keycaps stand in light boxes on it. */
+    @Override public boolean boxesSelectedKeycaps() { return true; }
 }

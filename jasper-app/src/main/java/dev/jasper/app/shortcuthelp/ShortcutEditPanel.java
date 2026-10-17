@@ -41,11 +41,6 @@ final class ShortcutEditPanel extends JPanel {
     private String problem;
 
     ShortcutEditPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer,
-                      Runnable recordingStarted) {
-        this(context, macOs, writer, recordingStarted, false);
-    }
-
-    ShortcutEditPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer,
                       Runnable recordingStarted, boolean recorderField) {
         super(new BorderLayout());
         this.recorderField = recorderField;
@@ -164,10 +159,8 @@ final class ShortcutEditPanel extends JPanel {
             : "Set stages this shortcut; Apply or OK in Settings saves it.";
     }
 
-    /** The band's descriptor now; for tests. */
-    ViewSpec specForTests() { return spec(); }
-
-    private ViewSpec spec() {
+    /** The band's descriptor now. */
+    ViewSpec spec() {
         String value = recording && binding == null ? "Press a key combination…" : ShortcutText.format(candidate);
         var idle = new ControlState(true, !saving, false, "");
         var options=List.of(

@@ -29,8 +29,6 @@ final class ShortcutTree {
     private boolean searching;
     private String selected;
 
-    ShortcutTree(boolean macOs) { this(macOs, false); }
-
     /** {@code columns}: Action, Scope and Shortcut columns, a section's count in its Shortcut lane (plan 9b Rulings 8). */
     ShortcutTree(boolean macOs, boolean columns) { this.macOs = macOs; this.columns = columns; }
 

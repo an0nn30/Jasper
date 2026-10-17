@@ -78,7 +78,8 @@ final class PluginManagerPanel extends JPanel {
         listLane.setOpaque(false);listLane.add(bar,BorderLayout.NORTH);listLane.add(list.view(),BorderLayout.CENTER);
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listLane, details.component()) {
             @Override public void updateUI() {
-                setUI(dev.jasper.ui.swing.NativeStyles.installed().splitPaneUI(kit::theme));
+                // Mock 08 draws no rule between the boxed list and the details: the classic divider is draggable but unpainted.
+                setUI(shape.checkboxRows() ? new UnpaintedSplitUI() : dev.jasper.ui.swing.NativeStyles.installed().splitPaneUI(kit::theme));
                 setOpaque(false);
             }
         };
@@ -263,6 +264,17 @@ final class PluginManagerPanel extends JPanel {
     KitView headerView() { return headerView; }
     KitView messageView() { return messageView; }
     JSplitPane split() { return split; }
+
+    /** A split whose divider keeps its drag but paints nothing (the classic Plugins page, plan 9b final review). */
+    static final class UnpaintedSplitUI extends javax.swing.plaf.basic.BasicSplitPaneUI {
+        @Override public javax.swing.plaf.basic.BasicSplitPaneDivider createDefaultDivider() {
+            var divider = new javax.swing.plaf.basic.BasicSplitPaneDivider(this) {
+                @Override public void paint(java.awt.Graphics graphics) { }
+            };
+            divider.setBorder(null);
+            return divider;
+        }
+    }
     List<String> menuLabels() { return details.menuLabels(); }
     boolean homepageShown() { return details.homepageShown(); }
 

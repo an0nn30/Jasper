@@ -12,11 +12,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
+import dev.jasper.app.testsupport.KitTestSupport;
 import org.junit.jupiter.api.Test;
 
 /**
  * Enterprise presentation spec 12.2 and 16.1.4: each Settings page's body against its 05 Settings mock (plan 9b Rulings
- * 16): probes on every OS, the pixel share on macOS; a probe or share that follows the UI face is printed where an
+ * 16): probes on every OS, the ink boxes and the pixel share on macOS; a probe or share that follows the UI face is printed where an
  * installed IBM Plex hides the plugin's files, as plan 9a's chrome comparison does. Renders go to
  * jasper-app/build/enterprise-settings/pages.
  */
@@ -93,19 +94,23 @@ class SettingsPagesMockTest {
             probe("Scope separator", 779, 94), probe("Shortcut separator", 886, 94), probe("Copy keycap edge", 911, 180)));
         tight("keymap", "header band");
         face("keymap", "header rule", "Copy keycap edge");
-        // Mock 07b: the band's edges #C9D7F2 and fill #EEF2FA, the field's ring #2F65CA, the dot #D03A3A, Set's disabled fill #E1E3E6.
+        // Mock 07b: the band's edges #C9D7F2 and fill #EEF2FA, the field's ring #2F65CA, the dot #D03A3A, Set's disabled fill #E1E3E6;
+        // the selected row's keycaps stand in light boxes (#F7F8F9) on its accent fill.
         PROBES.put("keymap-recording", List.of(probe("edited row selected", 600, 183), probe("band top edge", 600, 195),
             probe("band fill", 300, 240), probe("band at the tree's left", 250, 240), probe("band bottom edge", 600, 254),
-            probe("recorder field", 500, 213), probe("recorder ring", 600, 202), probe("armed dot", 295, 213), probe("Set disabled", 1000, 213)));
-        face("keymap-recording", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
+            probe("recorder field", 500, 213), probe("recorder ring", 600, 202), probe("armed dot", 295, 213), probe("Set disabled", 1000, 213),
+            probe("Copy keycap face", 915, 183)));
+        face("keymap-recording", "Copy keycap face", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
             "recorder field", "recorder ring", "armed dot", "Set disabled");
         PROBES.put("plugins", List.of(probe("list box", 247, 300), probe("list surface", 400, 400), probe("search strip", 400, 56),
             probe("search strip rule", 400, 90), probe("heading band", 450, 99), probe("selected row", 450, 120),
             probe("checkbox on the selection", 256, 133), probe("active tab", 558, 113), probe("inactive tab", 638, 113),
-            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53), probe("second heading rule", 450, 151)));
+            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53), probe("second heading rule", 450, 151),
+            // The split's divider between the list and the details paints no rule (mock 08; a painted one stood at 2x 1078).
+            probe("between the list and the details", 539, 400)));
         // The second heading's rule is held to PROBE: border.row #E4E5E8 lies ΔE 2.1 from the mock's #DDE0E4 on every heading
         // rule (the band is ΔE 6 away); ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule pins its colour.
-        tight("plugins", "search strip", "heading band", "inactive tab");
+        tight("plugins", "search strip", "heading band", "inactive tab", "between the list and the details");
         face("plugins", "heading band", "second heading rule", "selected row", "checkbox on the selection", "active tab", "inactive tab");
         PROBES.put("terminal.shell", List.of(probe("arguments box top", 400, 205), probe("arguments box bottom", 400, 248),
             probe("arguments box interior", 400, 230), probe("Remove left edge", 919, 217), probe("Add Variable… right edge", 1010, 317),
@@ -147,15 +152,16 @@ class SettingsPagesMockTest {
         tight(index, "projects header band");
         residual(index, "the fixture indexes no project, so the plugin's page shows its empty state for the mock's table",
             "projects table top", "projects header band", "projects header rule", "projects table left", "projects table right");
-        // The fixture's empty state in place of the mock's four projects (Rulings 16: fixture text): 0.929, rounded down.
+        // The fixture's empty state in place of the mock's four projects (Rulings 16: fixture text): 0.930, rounded down.
         FLOORS.put(index, 0.92);
         PROBES.put(remote, List.of(probe("first row rule", 700, 110), probe("fifth row rule", 700, 300), probe("box bottom", 700, 353)));
         tight(remote, "first row rule", "fifth row rule");
         face(remote, "fifth row rule", "box bottom");
         half(remote, 2, "fifth row rule", "box bottom");
-        PROBES.put(sample, List.of(probe("first checkbox top edge", 266, 80)));
-        residual(sample, "a plugin page's own setting rows keep the inline Reset slot (KitSettingRows; the SDK's SettingRow has no menu "
-            + "for Reset), so its checkbox stays at the row's end", "first checkbox top edge");
+        // The host rows take the Reset menu (spec 12.1), so the checkboxes lead their labels; as on Appearance, the unchecked
+        // edge is border.hover (#909399, ΔE 5 from the mock's #9AA0A8), so the probes take the box's inside and the body above it.
+        PROBES.put(sample, List.of(probe("first checkbox", 266, 86), probe("above the first checkbox", 266, 79)));
+        face(sample, "first checkbox", "above the first checkbox");
         PROBES.put(history, List.of(probe("list top", 700, 126), probe("row rule", 700, 286), probe("box bottom", 700, 339)));
         tight(history, "row rule");
         face(history, "row rule", "box bottom");
@@ -206,7 +212,7 @@ class SettingsPagesMockTest {
         return new int[] {darkest, amount};
     }
 
-    /** {@code render}'s ink boxes of {@code key} against {@code mock}; the failures, the face's printed when not PLEX. */
+    /** {@code render}'s ink boxes of {@code key} against {@code mock}; the failures on macOS, the face's printed when not PLEX. */
     static List<String> inks(String key, BufferedImage render, BufferedImage mock) {
         var failures = new ArrayList<String>();
         for (var box : INKS.getOrDefault(key, List.of())) {
@@ -218,6 +224,8 @@ class SettingsPagesMockTest {
             String failure = String.format("%s ink: render #%06X, mock #%06X, ΔE %.1f; amount %d against %d", name, ours[0] & 0xFFFFFF,
                 theirs[0] & 0xFFFFFF, distance, ours[1], theirs[1]);
             if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
+            // An ink amount is as rasterizer-dependent as the body share, so it is asserted where the shares are (Rulings 16).
+            else if (!SettingsChromeMockTest.MAC) System.out.println("Not asserted off macOS (Rulings 16): " + failure);
             else failures.add(failure);
         }
         return failures;
@@ -312,6 +320,34 @@ class SettingsPagesMockTest {
     @Test void shellMatchesItsMock() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("terminal.shell"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    /**
+     * Once the user has variables, the Shell page's environment table is the row's control under its title: its box spans
+     * the rows' text inset (260 to 1010, as the Notifications table and the mocks' rules) and the row's padding keeps the
+     * next row's rule off its border. No mock draws this state; the render goes to pages/11-variables.png.
+     */
+    @Test void shellWithVariablesKeepsItsTableInsideTheRows() throws Exception {
+        try (var settings = EnterpriseSettings.open(false)) {
+            var page = page("terminal.shell");
+            SwingUtilities.invokeAndWait(() -> {
+                settings.dialog().draft().stage(dev.jasper.app.config.CoreSettings.TERMINAL_ENV, java.util.Optional.of(Map.of("EDITOR", "vim", "LANG", "en_US.UTF-8")));
+                var render = settings.render("terminal.shell", 1040, page.height());
+                try {
+                    ImageIO.write(render, "png", Files.createDirectories(EnterpriseSettings.OUT.resolve("pages")).resolve("11-variables.png").toFile());
+                } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+                var content = settings.content();
+                String id = dev.jasper.app.config.CoreSettings.TERMINAL_ENV.name();
+                var table = SwingUtilities.convertRectangle(KitTestSupport.require(content, id + ":table", javax.swing.JComponent.class).getParent(),
+                    KitTestSupport.require(content, id + ":table", javax.swing.JComponent.class).getBounds(), content);
+                var row = KitTestSupport.require(content, "row:" + id, javax.swing.JComponent.class);
+                var rowBounds = SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), content);
+                assertThat(table.x).as("the table's left edge on the rows' text inset").isEqualTo(260);
+                assertThat(table.x + table.width - 1).as("its right edge on the rows' text inset (the Notifications table's 1010)").isEqualTo(1010);
+                assertThat(rowBounds.y + rowBounds.height - (table.y + table.height)).as("the row's padding below the table, above the next row's rule")
+                    .isGreaterThanOrEqualTo(6);
+            });
         }
     }
 

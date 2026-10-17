@@ -28,6 +28,15 @@ class EnvironmentTableTest {
         return new Editors.Table(CoreSettings.TERMINAL_ENV, context, true);
     }
 
+    /** The row, once there are variables: the table under its title, Add Variable… below the table. */
+    static Nodes.SettingRow row(Editors.Table editor) {
+        return (Nodes.SettingRow) ((Nodes.Stack) editor.node(ID, ControlState.READY)).children().getFirst();
+    }
+
+    static Nodes.Table table(Editors.Table editor) {
+        return (Nodes.Table) ((Nodes.Stack) row(editor).control()).children().getFirst();
+    }
+
     @Test void withNoVariablesOnlyTheRowAndAddVariableShow() {
         var editor = editor(new ArrayDeque<>());
         editor.show(Map.of());
@@ -51,12 +60,28 @@ class EnvironmentTableTest {
         assertThat(editor.event(ID, new UiEvent.Action(ID + ":add"))).isTrue();
         assertThat(editor.event(ID, new UiEvent.Action(ID + ":add"))).isTrue();
         assertThat(editor.value()).containsExactly(Map.entry("EMPTY", ""), Map.entry("OPTS", "a=b=c"));
-        var table = (Nodes.Table) ((Nodes.Stack) editor.node(ID, ControlState.READY)).children().get(1);
+        var table = table(editor);
         assertThat(table.columns()).extracting(dev.jasper.ui.model.Column::title).containsExactly("Name", "Value");
         assertThat(table.rows()).extracting(row -> row.cells().get("value")).containsExactly("", "a=b=c");
         assertThat(table.rows().getFirst().contextActions().orElseThrow()).extracting(MenuItem::label).containsExactly("Edit…", "Remove");
-        var row = (Nodes.SettingRow) ((Nodes.Stack) editor.node(ID, ControlState.READY)).children().getFirst();
+        var row = row(editor);
+        assertThat(((Nodes.Stack) editor.node(ID, ControlState.READY)).children()).as("one row: the table is its control").hasSize(1);
+        var entry = (Nodes.Stack) ((Nodes.Stack) row.control()).children().get(1);
+        assertThat(((Nodes.Button) entry.children().getFirst()).label()).as("Add Variable… below the table").isEqualTo("Add Variable…");
         assertThat(row.contextActions().getFirst().enabled()).as("modified: Reset to Default is enabled").isTrue();
+    }
+
+    @Test void theSelectionFollowsItsVariableThroughARenameAndAReset() {
+        var answers = new ArrayDeque<Optional<List<String>>>(List.of(Optional.of(List.of("A", "2"))));
+        var editor = editor(answers);
+        editor.show(Map.of("A", "1", "B", "x", "C", "y"));
+        editor.event(ID, new UiEvent.Selected(ID + ":table", java.util.Set.of("variable-1")));
+        assertThat(editor.event(ID, new UiEvent.Action(ID + ":activate"))).as("rename B to A").isTrue();
+        assertThat(editor.value()).containsExactly(Map.entry("A", "2"), Map.entry("C", "y"));
+        assertThat(table(editor).selectedIds()).as("the renamed variable stays selected").containsExactly("variable-0");
+        editor.show(Map.of("X", "1"));
+        assertThat(table(editor).selectedIds()).as("a new value clears the selection").isEmpty();
+        assertThat(editor.event(ID, new UiEvent.Action(ID + ":activate"))).as("nothing selected to edit").isFalse();
     }
 
     @Test void aRenameReplacesTheOtherEntryAndCancelChangesNothing() {

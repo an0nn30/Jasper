@@ -63,6 +63,36 @@ class PluginPanelPageTest {
         java.util.concurrent.CompletableFuture.allOf(pending.get().toArray(java.util.concurrent.CompletableFuture[]::new)).join();
     }
 
+    /**
+     * Spec 12.1 under a look without an inline Reset: a host row keeps no Reset slot (a checkbox stands alone in its
+     * trailing stack, so it leads its label) and carries Reset to Default in its own menu, enabled once its value changes.
+     */
+    @Test void withoutAnInlineResetAHostRowHasResetToDefaultInItsMenu() throws Exception {
+        var classic = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> changes[0]++, () -> null,
+            dev.jasper.app.testsupport.KitTestSupport::context,
+            new dev.jasper.app.presentation.SettingsChrome(false, true, false, Set.of(), "Use the default font size"), dev.jasper.app.presentation.Composition.CLASSIC);
+        var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
+        var wrap=new AtomicReference<Setting<Boolean>>();
+        onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {
+            wrap.set(context.settings().declare(SettingSpec.of("wrap",SettingKind.bool(),false).label("Wrap lines")));
+            context.settings().page((SettingsPanel) h -> {rows.set(h);var made=(HostedKitView)context.kit().create(new dev.jasper.sdk.ui.ViewSpec(h.row(wrap.get())),e -> {});view.set(made);return made;});
+        })));
+        var page=onEdtValue(() -> (PluginPanelPage)host.settingsPages(classic).getFirst());
+        onEdt(() -> {
+            page.component();
+            var row=(dev.jasper.ui.model.Nodes.SettingRow)view.get().component().spec().root();
+            assertThat(((dev.jasper.ui.model.Nodes.Stack)row.control()).children()).as("no Reset slot").singleElement().isInstanceOf(dev.jasper.ui.model.Nodes.Toggle.class);
+            assertThat(row.contextActions()).extracting(dev.jasper.ui.model.MenuItem::label).containsExactly("Reset to Default");
+            assertThat(row.contextActions().getFirst().enabled()).as("at its default").isFalse();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Toggled("settings:wrap",true));
+            var changed=(dev.jasper.ui.model.Nodes.SettingRow)view.get().component().spec().root();
+            assertThat(changed.contextActions().getFirst().enabled()).as("modified").isTrue();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action(changed.contextActions().getFirst().action()));
+            assertThat(rows.get().pending(wrap.get())).as("the menu's Reset to Default").isFalse();
+            page.dispose();
+        });
+    }
+
     @Test void kitResetRemovesSavedOverrideAndReloadRebasesCleanAndPendingRows() throws Exception {
         var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
         var size=new AtomicReference<Setting<Integer>>();

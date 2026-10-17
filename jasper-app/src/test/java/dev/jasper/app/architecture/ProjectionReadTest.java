@@ -86,7 +86,7 @@ class ProjectionReadTest {
     }
 
     /** Plan 9a: spec 9.1's composition roots, the only classes besides the presentation package that read Composition. */
-    static final Set<String> COMPOSITION_ROOTS = Set.of("dev/jasper/app/settingsui/CorePages", "dev/jasper/app/settingsui/AppearanceSelection",
+    static final Set<String> COMPOSITION_ROOTS = Set.of("dev/jasper/app/settingsui/CorePages",
         "dev/jasper/app/settingsui/NotificationGroupsEditor", "dev/jasper/app/settingsui/Editors",
         "dev/jasper/app/shortcuthelp/KeymapPage", "dev/jasper/app/pluginmanager/PluginsPage");
 

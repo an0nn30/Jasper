@@ -64,6 +64,8 @@ class NotificationsTableTest {
             editor.show(Map.of("jasper.general", "retired-mode"));
             var general = table(editor).rows().stream().filter(row -> "Jasper".equals(row.cells().get("group"))).findFirst().orElseThrow();
             assertThat(((Nodes.Choice) general.cellNodes().get("display")).selectedId()).isEqualTo("card");
+            assertThat(general.cells().get("source")).as("the default shown, so Source reads Default").isEqualTo("Default");
+            assertThat(general.contextActions().orElseThrow().getFirst().enabled()).as("the stale entry can still be reset").isTrue();
             groups.add(EnterpriseSettings.groups().get(2));
             editor.refresh();
             var heading = table(editor).rows().getFirst().heading().orElseThrow();

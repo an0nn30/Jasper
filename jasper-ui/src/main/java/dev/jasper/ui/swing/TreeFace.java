@@ -16,4 +16,6 @@ interface TreeFace extends HeaderFace {
     void paintDetail(Trees.TreeControl tree, java.awt.Graphics2D g, int index, int width);
     /** Whether the edited row keeps its selection fill above its detail (the classic band); today's card covers it. */
     boolean fillsDetailRow();
+    /** Whether a selected row's keycaps are opaque light caps (the classic Keymap's), not today's passive translucent ones. */
+    boolean boxesSelectedKeycaps();
 }
