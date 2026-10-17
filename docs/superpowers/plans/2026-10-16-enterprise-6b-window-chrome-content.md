@@ -1,5 +1,10 @@
 # Enterprise presentation 6b: the window content Implementation Plan
 
+> **Refreshed for execution (2026-10-17):** anchors, paths, signatures and line numbers re-checked against
+> `50b593f3c` (`main` with plans 3a to 3e, 4a, 4b, 5a, 6a and 8a); the changes and their rulings are in
+> "Execution notes (2026-10-17)" at the end, which win over the text above them where they differ. Rulings 3 is
+> approved (Execution notes R20).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look the window's content takes the Workstation and Credential Vault mocks: the classic
@@ -30,37 +35,43 @@ DESIGN_LANGUAGE.md on intent; names, counts, hosts and the Vault forms' content 
 plan 10's).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-6`, branch
-`claude/enterprise-window-chrome`, after plan 6a's last commit. Run every command from the worktree root. Line numbers
-are from `deafed424` and move after the earlier plans; every edit quotes the exact text it replaces and stops when that
+`claude/enterprise-window-chrome`, from `50b593f3c` (plan 6a merged with 4b and 8a). Run every command from the worktree
+root. Line numbers are from `50b593f3c`; every edit quotes the exact text it replaces and stops when that
 text is not found the stated number of times; re-find moved text, never edit around it, and record any re-quoted anchor
 in the status banner. Where a step replaces a whole file it first checks that no earlier plan changed it.
 
 ## Before you start
 
 ```bash
+git merge-base --is-ancestor 50b593f3c HEAD && echo base-ok                                       # base-ok
 git log --format=%s | grep -c 'Window chrome: the shell.s documentation, scan and status'      # 6a: 1
 grep -c 'WINDOW_CONTENT' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java  # 6a: at least 1
-ls jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java
+ls jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java \
+  jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json
 grep -c 'DIALOG_FOOTER_VERTICAL(8)' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java   # 6a Task 3: 1
+grep -c 'public static void closeOwnersNow' jasper-app/src/test/java/dev/jasper/app/workspace/DesktopTestSupport.java   # 6a: 1
+ls plugins/enterprise tools/visual/check_pairs.py 2>&1 | grep -c 'No such file'                     # 5b and 4c not here: 2
 ```
 
 If 6a is not on the branch, execute it first. Plan 6a's "Earlier plans' names" table applies here too.
 Besides it, this plan uses `AuxiliarySurface.swatch()` (a `dev.jasper.ui.model.Nodes.Hue`, NONE when unset) and
-`DialogSpec.swatch` (3d Task 3), `tools/visual/check_pairs.py` with the `pairs.json` fields `render_crop`,
-`min_agreement` and `colours` (4c, its Rulings 21; Rulings 22 left the Unlock Vault pair to this plan), the classic
-prompt face (4b) and the form footnote (3b Task 8).
+`DialogSpec.swatch` (3d Task 3), the `pairs.json` fields `render_crop`, `min_agreement` and `colours` (4c, its Rulings
+21; Rulings 22 left the Unlock Vault pair to this plan; 4c runs in parallel, so the pairs are checked with
+`tools/visual/compare_all.py` as plan 6a's were, Execution notes R42), the classic prompt face (4b) and the form footnote
+(3b Task 8). Plan 5b (the shipped Enterprise kit, Plex and theme) is not on the branch: the Enterprise renders use plan
+6a's `EnterpriseLook` fixtures (`testsupport/enterprise-fixture.json`), Execution notes R19.
 
 ## Global Constraints
 
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop`.
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache; `:jasper-ui:gallery` and headless JUnit renders may be run.
 - Work only in the worktree above on `claude/enterprise-window-chrome`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look stays byte-identical. Every PNG and JSON the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves it), and every reference pair and calibration suite stays green unchanged. `UnifiedHeader`, `WindowTabs`, `SlashSegments` and `ModalOverlay` keep today's code paths (moved, not rewritten), the new `KitView` flags and `WindowToolbar`'s leading pack are off unless a classic strategy sets them, and the Enterprise theme's edits touch no built-in theme. The only existing renders that change are plan 5b's Enterprise renders under `jasper-app/build/enterprise-kit/` (five theme values, Task 1) and `derived-roles-enterprise.tsv`'s `border.divider` rows.
+- Pixel rule: the default look stays byte-identical. Every PNG and JSON the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base (Task 9 proves it), and every reference pair and calibration suite stays green unchanged. `UnifiedHeader`, `WindowTabs`, `SlashSegments` and `ModalOverlay` keep today's code paths (moved, not rewritten), the new `KitView` flags and `WindowToolbar`'s leading pack are off unless a classic strategy sets them, and the Enterprise theme's edits touch no built-in theme. The only existing renders that change are plan 6a's Enterprise fixture renders (`enterprise-*-window.png` under `jasper-app/build/chrome-renders/`: the fixture theme's eight chrome values, Task 1).
 - Spec 10.3: the classic header is a toolbar row of left-packed buttons in separated groups — "+ New Session" (NEW_TAB), "Split ▾" (the Split dropdown), "Maximize" (ZOOM_PANE) — then contributed items and views, then, trailing, the title search field reading "Search everywhere" with the COMMAND_PALETTE keycap, and "Settings…"; `icons_and_labels` gives label-first text buttons with glyphs only where the mock has them, `icons` gives icon buttons, `hidden` gives no row; `window.toolbar_height` is the row's height. New Window and Find stay in the File and Edit menus.
 - Spec 10.5: `ClassicTabs` are always visible and content-sized, with a status dot, a persistent ×, a "+" after the last tab, the active tab on `surface.card` with a 2 px `tab.indicator` underline, 1 px dividers and no motion, driving the same `TerminalDeck` callbacks.
 - Spec 10.6: `RuledCells` divides cells by 1 px `border.divider` rules: the session cell and the folder on the left; plugin items, the grid size, "UTF-8" and the configuration warning (a `warning.ground` cell with "▲") on the right; with the run item, either layout leads with "▶ Run…" bound to COMMAND_PALETTE, shown as an active toggle on `surface.control.selected` while the palette is open.
 - Spec 10.8: `DialogMapping.CLASSIC` draws OVERLAY and ATTACHED_SHEET dialogs inside their owner window with the same modality: a card with the catalog's dialog radius on the dialog surface slot, a 1 px `border.hover` frame and the catalog's popup shadow, over a still scrim covering the window below its title bar; a 26 px header strip on `surface.header.active` above a `border.window` rule with the swatch and the title in the semibold UI face (the form does not repeat the title); the footer on `surface.footer` under a `border.window` rule, the footnote leading and the actions trailing; OVERLAY centred, ATTACHED_SHEET centred horizontally and joined under the title bar with no top frame edge; no fade. A dialog whose owner has no window opens as a native dialog; progress overlays stay as they are; with `windowTitled` a FULL form does not repeat the native title.
-- Strategies at the owner (spec 3.3, 16.1.7): `WorkspaceChrome.of` reads `WorkspaceLook`'s header, tabs, status and run item; `AuxiliaryWindows` is the only reader of `DialogMapping.Kind`; no renderer branches on a look (the classic dialog and strategies are chosen once). `VariantReadTest` enforces it (Task 9).
+- Strategies at the owner (spec 3.3, 16.1.7): `WorkspaceChrome.of` reads `WorkspaceLook`'s header, tabs, status and run item; `AuxiliaryWindows` is the only reader of `DialogMapping.Kind`; no renderer branches on a look (the classic dialog and strategies are chosen once). `ProjectionReadTest` (plan 6a's) enforces it (Task 9).
 - Colours are theme roles or derived roles, never literals (`ColourLiteralScanTest`); every text, indicator and boundary a new painter draws goes through its declared pair in `WindowPairs` or `ClassicDialog.pairs` and `SurfaceContrast.painted` (Task 8; until then a painter may name the pair inline), except the `border.divider` rules, which are painted as the role (Rulings 17).
 - Javadoc doclint, `migration.csv` rows, the smallest documentation edits and source hygiene as in plan 6a's Global Constraints (dispositions begin "New in Enterprise presentation Plan 6b Task N").
 
@@ -87,7 +98,9 @@ prompt face (4b) and the form footnote (3b Task 8).
 
 ## Verified facts
 
-At `deafed424` unless marked; facts about plans 3b to 6a cite the plan.
+At `deafed424` unless marked; facts about plans 3b to 6a cite the plan. Re-checked at `50b593f3c` on 2026-10-17: facts
+8, 9 and 10 carry that commit's line numbers, and every anchor the scripts quote matched its stated count there except
+those Execution notes R18 lists.
 
 1. `WindowChrome`'s constructor builds `WindowToolbar`, `TitleSearchField`, `WindowHeader`, marks the header a
    `ThemeZone.titleBar` zone (`WindowChrome.java:52-62`) and calls `buildToolbar` (`:102`): New Tab, New Window, a rule,
@@ -116,18 +129,20 @@ At `deafed424` unless marked; facts about plans 3b to 6a cite the plan.
    routes OVERLAY to `windows.modalOverlay` and the rest to `windows.dialog`, then marks ATTACHED_SHEET
    (`HostedUi.java:720-750`); plan 3d sets the swatch there. `AuxiliarySurface.setContent` turns a sheet's kit view's
    surface off (`AuxiliarySurface.java:119-127`).
-8. `Forms.FormControl.refresh` shows the title label only for a SHEET form without a hero (`Forms.java:190-191`) and
+8. `Forms.FormControl.refresh` shows the title label only for a SHEET form without a hero (`Forms.java:196`) and
    pads the footer (`:223-227`); `Forms.Footer.paintComponent` paints only the WINDOW footer band (`:324-336`); plan 3b
    adds the footnote at the footer's leading edge (3b Task 8). `KitView.titleStrip` is the precedent for an app-only
-   host flag (`KitView.java:319-330`), and `refresh()` re-runs the reconciler (`:363-366`).
-9. Plan 5b's Enterprise theme sets `surface.tabstrip` `#DDDFE2`/`#474A4F`, `tab.indicator` `#2563C9`/`#5B9BF5` and
-   `surface.scrim` `#1B1F2740`/`#0A0C108C` by its Rulings 7 (5b Task 3); `EnterpriseThemeTest.NEUTRAL` lists
-   `surface.tabstrip`; `DerivedRolesTableTest` freezes the theme's derived roles in `derived-roles-enterprise.tsv`,
-   regenerated from `jasper-ui/build/derived-roles/derived-roles-enterprise.tsv` (5b Task 4).
-10. `DerivedColor.BORDER_DIVIDER` is not overridable (`DerivedColor.java:25`); `JasperTheme.DERIVED_OVERRIDES` is built
-    from the overridable roles (`JasperTheme.java:54-55`); `DerivedColorTest` pins the eight (`DerivedColorTest.java:58-60`)
+   host flag (`KitView.java:325-326`), and `refresh()` re-runs the reconciler (`:388`).
+9. (Refreshed.) Plan 5b is not on the branch. Plan 6a's fixture theme `jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json`
+   (read by `EnterpriseLook.theme()`) sets `surface.tabstrip` `#DADFE6`/`#3F444F`, `tab.indicator` `#2563C9`/`#5B9BF5`
+   and `surface.scrim` `#1B1F2740`/`#0A0C108C` (Slate Cobalt's), lists no `border.divider`, and ends its `light` object
+   with `"warning.border": "#E6CF95"` and its `dark` one with `"warning.border": "#6B5A30"`, each on its own line.
+   Plan 5b's `EnterpriseThemeTest` and `derived-roles-enterprise.tsv` do not exist here.
+10. `DerivedColor.BORDER_DIVIDER` is not overridable (`DerivedColor.java:24`); `JasperTheme.DERIVED_OVERRIDES` is built
+    from the overridable roles (`JasperTheme.java:54-55`); `DerivedColorTest` pins the eight (`DerivedColorTest.java:56-58`)
     and `JasperThemeTest` their count and uses `border.divider` as its example of a key that is not one
-    (`JasperThemeTest.java:238`, `:246-247`); `docs/themes.md:135-137` lists them.
+    (`JasperThemeTest.java:236`, `:246-247`); `docs/themes.md:135-137` lists them; `DerivedPalette.derive` takes any
+    override generically (`DerivedPalette.java:51-55`).
 11. `WindowCommandPalette.isOpen()` (`WindowCommandPalette.java:169`); the palette opens through the COMMAND_PALETTE
     action (`WindowChrome.java:57-59`).
 
@@ -169,20 +184,23 @@ mocks. Light value first, Dark second where the Dark Mode mock shows it.
 
 Decisions where the spec is silent or a literal reading cannot be built; record each in `docs/STATUS.md` (Task 9) and in
 this plan's status banner. Ruling 3 departs from spec 7.2's text and needs the user's approval or a spec amendment line
-before this plan merges; the banner and the STATUS entry record it as awaiting that approval. Ruling 10 departs from
+before this plan merges; it was approved on 2026-10-17 (Execution notes R20), and the banner, the STATUS entry and a
+spec amendment line record it. Ruling 10 departs from
 spec 10.8's text on placement because the mock wins on layout; the banner and the STATUS entry record it as a
 deviation.
 
 1. **The window content lands at the end.** Tasks 2 to 7 build and test the strategies from classic projections made
    in the tests; Task 8 adds `WINDOW_CONTENT` to `Presentation.LANDED`, so every intermediate build runs spec 9.1's
    fallback header row — cost if wrong: none.
-2. **The mocks' tab strip, tab indicator, scrim and dividers are Enterprise theme values.** `enterprise.json` sets
+2. **The mocks' tab strip, tab indicator, scrim and dividers are Enterprise theme values** (refreshed, Execution notes
+   R19: until plan 5b they are the fixture theme's, `enterprise-fixture.json`, and 5b copies them). The theme sets
    Light `surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim` `#00000036` and `border.divider`
    `#D3D6DA`; Dark `surface.tabstrip` `#3A3D42`, `tab.indicator` `#3D74D6`, `surface.scrim` `#00000036` and
    `border.divider` `#4A4D53`. Spec 7.6 names the mock's tab strip a target for these renders; spec 10.8 gives the
    classic scrim as "black at 21 %" for either variant (no Dark mock shows a dialog), so Dark takes it too instead of
-   5b's `#0A0C108C`; plan 5b's Rulings 7 had given them Slate Cobalt's values — cost if wrong: five theme values.
-3. **Deviation (spec 7.2; awaiting the user's approval): `border.divider` becomes a ninth overridable derived role.** The
+   5b's `#0A0C108C`; plan 5b's Rulings 7 had given them Slate Cobalt's values — cost if wrong: eight theme values.
+3. **Deviation (spec 7.2), approved on 2026-10-17 by the orchestrator under the user's overnight authority:
+   `border.divider` becomes a ninth overridable derived role** (Task 9 amends spec 7.1 and 7.2). The
    recipe `mix(border.window′, surface.card, 73 %)` gives Enterprise Dark `#2B2D31`, darker than its surfaces, while the
    Dark Mode mock draws every menu-row and status divider lighter (`#4A4D53`); no recipe change keeps the frozen built-in
    tables. Only themes that list the key change — cost if wrong: one flag, one key and two documents.
@@ -264,7 +282,7 @@ deviation.
 
 ## File structure
 
-- `plugins/enterprise/src/main/resources/themes/enterprise.json`, `jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java` (Task 1).
+- `jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json` (the fixture theme until plan 5b), `jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java`, new `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseChromeTargetsTest.java` (Task 1).
 - `jasper-app/src/main/java/dev/jasper/app/workspace/`: `WindowToolbar.java` (leading pack); new `HeaderComposition.java`,
   `UnifiedHeader.java`, `ClassicHeader.java`, `ClassicToolbarButton.java`; `WindowHeader.java`, `TitleSearchField.java`,
   `WindowChrome.java`; new `TabStrip.java`, `ClassicTabs.java`; `WindowTabs.java`; new `StatusCells.java`,
@@ -282,24 +300,26 @@ deviation.
 ### Task 1: The Enterprise theme's chrome targets
 
 The mocks' tab strip, tab indicator, scrim and dividers become Enterprise theme values (Rulings 2), and `border.divider`
-becomes overridable so Enterprise Dark can carry the mock's divider (Rulings 3).
+becomes overridable so Enterprise Dark can carry the mock's divider (Rulings 3, approved). Until plan 5b ships the
+theme they are the fixture theme's (`enterprise-fixture.json`, which `EnterpriseLook` reads); plan 5b copies the same
+eight values into `enterprise.json` (Execution notes R19, R47).
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java:25`
-- Modify: `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedColorTest.java:52-60`, `JasperThemeTest.java:238-247`
-- Modify: `plugins/enterprise/src/main/resources/themes/enterprise.json` (eight values)
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseThemeTest.java` (5b; `NEUTRAL`, `DARK_OVERRIDES`, one test)
-- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-enterprise.tsv` (regenerated), `docs/themes.md:135-137`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java:24`
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedColorTest.java:52-58`, `JasperThemeTest.java:236-247`, `GeneratedThemeTest.java:21-22`
+- Modify: `jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json` (eight values), `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java` (its javadoc)
+- Create: `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseChromeTargetsTest.java`
+- Modify: `docs/themes.md:135-137`, `docs/design/theme-engine/migration.csv` (one row: the test imports `dev.jasper.ui`)
 
 **Interfaces:**
-- Consumes: plan 2's `DerivedColor`, `JasperTheme.DERIVED_OVERRIDES`; plan 5b's theme and its tests.
-- Produces: `DerivedColor.BORDER_DIVIDER.overridable()` true (nine override keys); the Enterprise values above.
+- Consumes: plan 2's `DerivedColor`, `JasperTheme.DERIVED_OVERRIDES`; plan 6a's `EnterpriseLook.theme()` and its fixture.
+- Produces: `DerivedColor.BORDER_DIVIDER.overridable()` true (nine override keys); the fixture's chrome values above.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 6b Task 1 step 1: nine override keys, and the Enterprise theme's chrome targets."""
+"""Plan 6b Task 1 step 1: nine override keys."""
 import pathlib
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -321,48 +341,76 @@ edit(U + "JasperThemeTest.java", [
             .hasMessageContaining("ui.light: Unknown colour \\"border.divider\\"");''',
      '''        assertThat(failure(json.replace("\\"surface.tableHeader\\"", "\\"border.row\\""))).as("a derived role without an override key")
             .hasMessageContaining("ui.light: Unknown colour \\"border.row\\"");''', 1)])
-T = "jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseThemeTest.java"
-edit(T, [
-    ('''"surface.control.selected", "surface.menu", "surface.tabstrip", "surface.emptyTile",''',
-     '''"surface.control.selected", "surface.menu", "surface.emptyTile",''', 1),
-    ('''        DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30");''',
-     '''        DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30", DerivedColor.BORDER_DIVIDER, "#4A4D53");''', 1),
-    ('''    /** Verified fact 12: where the mocks paint a theme role, at their 2x pixels. */''',
-     '''    /** Plan 6b Rulings 2: the chrome roles the Workstation and Dark Mode mocks paint, as the theme's values. */
-    @Test void theChromeTargetsAreTheMocks() throws Exception {
-        var theme = theme();
-        assertThat(ColorMath.hex(role(theme, false, "surface.tabstrip"))).isEqualToIgnoringCase("#E8E9EB");
-        assertThat(ColorMath.hex(role(theme, true, "surface.tabstrip"))).isEqualToIgnoringCase("#3A3D42");
-        assertThat(ColorMath.hex(role(theme, false, "tab.indicator"))).isEqualToIgnoringCase("#2F65CA");
-        assertThat(ColorMath.hex(role(theme, true, "tab.indicator"))).isEqualToIgnoringCase("#3D74D6");
-        for (boolean dark : new boolean[] {false, true}) {
-            var scrim = role(theme, dark, "surface.scrim");
-            assertThat(scrim.getRGB() & 0xFFFFFF).as("black").isZero();
-            assertThat(scrim.getAlpha()).as("spec 10.8's 21 %%, so white reads #C9CACC").isEqualTo(0x36);
-        }
-        assertThat(ColorMath.hex(theme.generated(false).derivedOverrides().get(DerivedColor.BORDER_DIVIDER))).isEqualToIgnoringCase("#D3D6DA");
-    }
-
-    /** Verified fact 12: where the mocks paint a theme role, at their 2x pixels. */''', 1)])
+# Execution notes R52: GeneratedThemeTest's example of a role without an override key becomes border.row too.
+edit(U + "GeneratedThemeTest.java", [
+    ('''        assertThatThrownBy(() -> with(Map.of(DerivedColor.BORDER_DIVIDER, Color.RED)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Not an override key: border.divider");''',
+     '''        assertThatThrownBy(() -> with(Map.of(DerivedColor.BORDER_ROW, Color.RED)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Not an override key: border.row");''', 1)])
 PY
 ```
 
-The `EnterpriseThemeTest` anchors are plan 5b Task 3's text (its `NEUTRAL` list and `DARK_OVERRIDES` map); `role`,
-`theme()` and `ColorMath` are that class's own. If its `DARK_OVERRIDES` is built with `Map.of`, the eighth pair still
-fits (`Map.of` takes up to ten).
+Create `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseChromeTargetsTest.java`:
 
-- [ ] **Step 2: Run the tests to verify they fail**
+```java
+package dev.jasper.app.workspace;
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedColorTest' --tests 'dev.jasper.ui.theme.JasperThemeTest' :jasper-app:test --tests 'dev.jasper.app.plugins.EnterpriseThemeTest' --continue`
-Expected: FAIL: `DerivedColorTest` lacks "border.divider" among the overridable keys, `JasperThemeTest` expects 9 and
-finds 8, `EnterpriseThemeTest.theChromeTargetsAreTheMocks` finds `#DDDFE2` and `theUnnamedRolesFollowTheRule` is
-unchanged (it passes).
+import static org.assertj.core.api.Assertions.assertThat;
 
-- [ ] **Step 3: The override key and the theme values**
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.ui.theme.ColorMath;
+import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.SemanticColor;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Plan 6b Rulings 2 and 3: the chrome roles the Workstation and Dark Mode mocks paint are the Enterprise theme's values
+ * (the fixture theme until plan 5b, whose shipped theme takes the same eight values).
+ */
+class EnterpriseChromeTargetsTest {
+    @Test void theChromeTargetsAreTheMocks() {
+        var theme = EnterpriseLook.theme();
+        assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#E8E9EB");
+        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#3A3D42");
+        assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#2F65CA");
+        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#3D74D6");
+        for (boolean dark : new boolean[] {false, true}) {
+            var scrim = theme.palette(dark).color(SemanticColor.SURFACE_SCRIM);
+            assertThat(scrim.getRGB() & 0xFFFFFF).as("black").isZero();
+            assertThat(scrim.getAlpha()).as("spec 10.8's 21 %, so white reads #C9CACC").isEqualTo(0x36);
+        }
+        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(false)))).as("the override, not the recipe")
+            .isEqualToIgnoringCase("#D3D6DA");
+        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(true)))).as("lighter than the recipe's #2B2D31")
+            .isEqualToIgnoringCase("#4A4D53");
+    }
+}
+```
+
+Add its ledger row:
 
 ```bash
 python3 -I - <<'PY'
-"""Plan 6b Task 1 step 3: border.divider overridable; the Enterprise theme's chrome targets."""
+import pathlib
+test = "jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseChromeTargetsTest.java"
+row = f"{test},app.workspace,EnterpriseChromeTargetsTest,nonvisual-helper,none,none,{test},Test/fixture ownership; New in Enterprise presentation Plan 6b Task 1; the chrome roles the mocks paint as Enterprise theme values\n"
+ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
+ledger.write_text(text + ("" if text.endswith("\n") else "\n") + row, encoding="utf-8")
+PY
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedColorTest' --tests 'dev.jasper.ui.theme.JasperThemeTest' --tests 'dev.jasper.ui.theme.GeneratedThemeTest' :jasper-app:test --tests 'dev.jasper.app.workspace.EnterpriseChromeTargetsTest' --continue`
+Expected: FAIL: `DerivedColorTest` lacks "border.divider" among the overridable keys, `JasperThemeTest` expects 9 and
+finds 8, `EnterpriseChromeTargetsTest` finds `#dadfe6` for the light tab strip; `GeneratedThemeTest` passes (its new
+example is already not a key) and keeps passing after Step 3.
+
+- [ ] **Step 3: The override key and the fixture theme's values**
+
+```bash
+python3 -I - <<'PY'
+"""Plan 6b Task 1 step 3: border.divider overridable; the fixture theme's chrome targets."""
 import json, pathlib
 def edit(name, edits):
     path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
@@ -372,17 +420,23 @@ def edit(name, edits):
     path.write_text(text, encoding="utf-8")
 edit("jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java", [
     ('''    BORDER_DIVIDER("border.divider", false),''', '''    BORDER_DIVIDER("border.divider", true),''', 1)])
-F = "plugins/enterprise/src/main/resources/themes/enterprise.json"
+F = "jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json"
 edit(F, [
-    ('''"surface.tabstrip": "#DDDFE2"''', '''"surface.tabstrip": "#E8E9EB"''', 1),
-    ('''"surface.tabstrip": "#474A4F"''', '''"surface.tabstrip": "#3A3D42"''', 1),
+    ('''"surface.tabstrip": "#DADFE6"''', '''"surface.tabstrip": "#E8E9EB"''', 1),
+    ('''"surface.tabstrip": "#3F444F"''', '''"surface.tabstrip": "#3A3D42"''', 1),
     ('''"surface.scrim": "#1B1F2740"''', '''"surface.scrim": "#00000036"''', 1),
     ('''"surface.scrim": "#0A0C108C"''', '''"surface.scrim": "#00000036"''', 1),
     ('''"tab.indicator": "#2563C9"''', '''"tab.indicator": "#2F65CA"''', 1),
     ('''"tab.indicator": "#5B9BF5"''', '''"tab.indicator": "#3D74D6"''', 1),
-    ('''      "warning.border": "#E6CF95"''', '''      "warning.border": "#E6CF95", "border.divider": "#D3D6DA"''', 1),
-    ('''"warning.ground": "#4A4128", "warning.border": "#6B5A30"''', '''"warning.ground": "#4A4128", "warning.border": "#6B5A30", "border.divider": "#4A4D53"''', 1)])
+    ('''      "warning.border": "#E6CF95"\n''', '''      "warning.border": "#E6CF95",\n      "border.divider": "#D3D6DA"\n''', 1),
+    ('''      "warning.border": "#6B5A30"\n''', '''      "warning.border": "#6B5A30",\n      "border.divider": "#4A4D53"\n''', 1)])
 json.loads(pathlib.Path(F).read_text(encoding="utf-8"))  # still JSON
+edit("jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java", [
+    ('''    /** The fixture theme: spec 7.6's named roles and overrides, Light and Dark, over Slate Cobalt's other roles. */''',
+     '''    /**
+     * The fixture theme: spec 7.6's named roles and overrides, Light and Dark, over Slate Cobalt's other roles, and plan 6b's
+     * chrome targets (the mocks' tab strip, tab indicator, scrim and {@code border.divider}).
+     */''', 1)])
 edit("docs/themes.md", [
     ('''- A variant may also list eight derived roles, each as `#RRGGBB`: `surface.header`, `surface.header.active`,
   `surface.stripe`, `surface.tableHeader`, `surface.zebra`, `surface.rowHover`, `warning.ground` and
@@ -393,52 +447,36 @@ edit("docs/themes.md", [
 PY
 ```
 
-If `docs/themes.md`'s sentence was reworded by an earlier plan, change only its count and add `border.divider` to its
-list.
+The IntelliJ converter (`tools/themes/jasper_theme.py`) is not changed: it never writes `border.divider`, and its
+`validate` checks only the files it writes (Execution notes R21).
 
-- [ ] **Step 4: Regenerate the frozen Enterprise table**
+- [ ] **Step 4: Check the frozen built-in tables**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedRolesTableTest'`
-Expected: FAIL in `theEnterpriseVariantsDerivedRolesAreFrozen` only (both variants' `border.divider` rows). Then:
-
-```bash
-python3 -I - <<'PY'
-import pathlib
-source = pathlib.Path("jasper-ui/build/derived-roles/derived-roles-enterprise.tsv")
-target = pathlib.Path("jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-enterprise.tsv")
-old = {tuple(l.split("\t")[:3]): l for l in target.read_text(encoding="utf-8").splitlines() if l and not l.startswith("#")}
-new = {tuple(l.split("\t")[:3]): l for l in source.read_text(encoding="utf-8").splitlines() if l and not l.startswith("#")}
-changed = sorted(key for key in new if old.get(key) != new[key])
-if changed != [("enterprise", "dark", "border.divider"), ("enterprise", "light", "border.divider")]:
-    raise SystemExit(f"unexpected changes: {changed}")
-target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-print(new[("enterprise", "dark", "border.divider")]); print(new[("enterprise", "light", "border.divider")])
-PY
-```
-
-Expected: the two rows end in `#4a4d53` and `#d3d6da` (in the table's hex case).
+Expected: PASS unchanged: no built-in theme lists the key, so `derived-roles.tsv` is unchanged (plan 5b's
+`derived-roles-enterprise.tsv` is generated by 5b with the override in place).
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.*' --tests 'dev.jasper.ui.testsupport.*' --tests 'dev.jasper.ui.KitMatrixTest' :jasper-app:test --tests 'dev.jasper.app.plugins.EnterpriseThemeTest' --tests 'dev.jasper.app.plugins.PresentationConformanceTest' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.architecture.ColourLiteralScanTest' --continue`
-Expected: PASS. `KitMatrixTest`'s and `PaintedContrastTest`'s Enterprise cases still hold their guards (the new values
-are the mocks', which meet them); `derived-roles.tsv` is unchanged (no built-in theme lists the key). The tests'
-names of `KitMatrixTest` and `PaintedContrastTest` may live elsewhere; run `:jasper-ui:test` whole if the filter matches none.
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.theme.*' --tests 'dev.jasper.ui.testsupport.*' --tests 'dev.jasper.ui.gallery.KitMatrixTest' :jasper-app:test --tests 'dev.jasper.app.workspace.EnterpriseChromeTargetsTest' --tests 'dev.jasper.app.workspace.ChromeRenderTest' --tests 'dev.jasper.app.workspace.EnterpriseMenuRowMockTest' --tests 'dev.jasper.app.workspace.WindowChromeMenusTest' --tests 'dev.jasper.app.appearance.PaintedContrastTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --tests 'dev.jasper.app.architecture.ColourLiteralScanTest' --continue`
+Expected: PASS. `EnterpriseMenuRowMockTest` still passes its Light rule colour (its Dark rule colour is asserted from
+Task 8, when the comparison takes the override).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add jasper-ui/src plugins/enterprise/src/main/resources/themes/enterprise.json jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseThemeTest.java docs/themes.md
+git add jasper-ui/src jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json \
+  jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseChromeTargetsTest.java \
+  docs/themes.md docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Window content: the Enterprise theme's chrome targets
 
-The Enterprise theme takes the mocks' tab strip, tab indicator, scrim
-(spec 10.8's black at 21 % in both variants) and dividers.
-border.divider becomes the ninth overridable derived role
-(a deviation from spec 7.2 awaiting approval): its recipe gives Enterprise
-Dark a divider darker than its surfaces, where the Dark Mode mock draws a
-lighter one. No built-in theme changes; the Enterprise derived table is
-regenerated for the two divider rows.
+The Enterprise fixture theme takes the mocks' tab strip, tab indicator,
+scrim (spec 10.8's black at 21 % in both variants) and dividers; plan 5b
+copies them into the shipped theme. border.divider becomes the ninth
+overridable derived role (a deviation from spec 7.2, approved): its
+recipe gives Enterprise Dark a divider darker than its surfaces, where
+the Dark Mode mock draws a lighter one. No built-in theme changes.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -483,11 +521,15 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Spec 10.3 and the mocks: the classic toolbar packs left with the classic spacing and gives way as the trailing one does. */
 class WindowToolbarLeadingTest {
     static final WindowToolbar.Leading CLASSIC = new WindowToolbar.Leading(8, 8, 10, 8, 24);
+
+    /** The overflow button styles itself from the installed theme: install one rather than rely on another class's. */
+    @BeforeEach void installTheme() throws Exception { edt(() -> dev.jasper.app.appearance.ThemeTestSupport.install(false)); }
 
     static JButton button(WindowToolbar bar, String label, int width, int priority) {
         var button = new JButton(new AbstractAction(label) { @Override public void actionPerformed(ActionEvent event) { } }) {
@@ -878,7 +920,7 @@ class ClassicHeaderTest {
                 assertThat(field.getX() + field.getWidth()).as("6 before Settings…").isEqualTo(classic.trailing().getX() + settings.getX() - 6);
                 assertThat(field.getY()).as("centred in the 34 px row").isEqualTo(6);
                 assertThat(window.owner().chrome().menuBar().getParent()).as("the menus stay a row of their own").isSameAs(window.root().getLayeredPane());
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -911,7 +953,7 @@ class ClassicHeaderTest {
                 window.width(1440);
                 assertThat(header.field().getWidth()).isEqualTo(300);
                 assertThat(WindowTabsTest.named(bar, "sessionView").isVisible()).isTrue();
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -1581,6 +1623,7 @@ edit(W + "WindowChrome.java", [
     ('''        toolbar.setBackground(ThemeZone.color(toolbar, SemanticColor.SURFACE_APP));''',
      '''        toolbar.setBackground(ThemeZone.color(toolbar, SemanticColor.SURFACE_APP));
         composition.refreshTheme(header);''', 1)])
+# Execution notes R29: the chrome keeps the look's choice and makes each window's strategy from it; equality covers it.
 edit(W + "WorkspaceChrome.java", [
     ('''    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"));
 
@@ -1591,26 +1634,37 @@ edit(W + "WorkspaceChrome.java", [
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
     }''',
-     '''    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"), UnifiedHeader::new);
+     '''    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
+        WorkspaceLook.Header.UNIFIED);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
-    private final java.util.function.Supplier<HeaderComposition> header;
+    /** The header's composition, made for each window by {@link #header()}. */
+    private final WorkspaceLook.Header header;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, java.util.function.Supplier<HeaderComposition> header) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header) {
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
         this.header = Objects.requireNonNull(header);
     }''', 1),
-    ('''        return new WorkspaceChrome(menus, title);''',
-     '''        java.util.function.Supplier<HeaderComposition> header = switch (look.header()) {
-            case UNIFIED -> UnifiedHeader::new;
-            case CLASSIC -> ClassicHeader::new;
-        };
-        return new WorkspaceChrome(menus, title, header);''', 1),
+    ('''        return new WorkspaceChrome(menus, title);''', '''        return new WorkspaceChrome(menus, title, look.header());''', 1),
     ('''    TitleFormat title() { return title; }''', '''    TitleFormat title() { return title; }
-    /** A new header composition for one window. */
-    HeaderComposition header() { return header.get(); }''', 1)])
+    /** A new header composition for one window (spec 10.3). */
+    HeaderComposition header() {
+        return switch (header) {
+            case UNIFIED -> new UnifiedHeader();
+            case CLASSIC -> new ClassicHeader();
+        };
+    }''', 1),
+    ('''        return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && title.equals(chrome.title);
+    }
+
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), title); }''',
+     '''        return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
+            && title.equals(chrome.title);
+    }
+
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, title); }''', 1)])
 edit("jasper-app/src/main/java/dev/jasper/app/platform/ThemeZone.java", [
     ('''    public static void titleBar(JComponent header) { header.putClientProperty(ZONE, TITLE_BAR); }''',
      '''    public static void titleBar(JComponent header) { header.putClientProperty(ZONE, TITLE_BAR); }
@@ -1751,7 +1805,7 @@ class ClassicTabsTest {
                 assertThat(strip.isVisible()).as("always visible").isTrue();
                 assertThat(strip.getPreferredSize().height).as("window.tab_height with its rule").isEqualTo(owner.tabHeight());
                 assertThat(strip.entries()).hasSize(1);
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -1784,7 +1838,7 @@ class ClassicTabsTest {
                     .isEqualTo(palette.color(SemanticColor.BORDER_WINDOW));
                 assertThat(MockProfile.at(image, 2 * (strip.add().getX() + 30), bottom)).as("the strip's rule")
                     .isEqualTo(palette.color(SemanticColor.BORDER_WINDOW));
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -1805,7 +1859,7 @@ class ClassicTabsTest {
                 int before = owner.tabStrip().getTabCount();
                 strip.entries().get(0).closeClicked();
                 assertThat(owner.tabStrip().getTabCount()).isEqualTo(before - 1);
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -2042,6 +2096,14 @@ final class ClassicTabs extends JPanel implements TabStrip {
             addMouseListener(mouse); addMouseMotionListener(mouse);
         }
 
+        // A bare JComponent has no accessible context; this one names its role.
+        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
+                @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.PAGE_TAB; }
+            };
+            return accessibleContext;
+        }
+
         void refresh() {
             String title = owner.tabTitle(tab);
             setToolTipText(owner.tabTooltip(tab));
@@ -2099,6 +2161,14 @@ final class ClassicTabs extends JPanel implements TabStrip {
 
     /** The "+" after the last tab: a new tab. */
     final class Add extends JComponent {
+        // A bare JComponent has no accessible context; this one names its role.
+        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
+                @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.PUSH_BUTTON; }
+            };
+            return accessibleContext;
+        }
+
         Add() {
             setToolTipText("New Tab");
             getAccessibleContext().setAccessibleName("New Tab");
@@ -2160,27 +2230,33 @@ edit(W + "WindowContent.java", [
     ('''        if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }''',
      '''        if (windowTabs != null) { windowTabs.component().revalidate(); windowTabs.component().repaint(); }''', 1)])
 edit(W + "WorkspaceChrome.java", [
-    ('''    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"), UnifiedHeader::new);''',
-     '''    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"), UnifiedHeader::new,
-        WindowTabs::new);''', 1),
-    ('''    private final java.util.function.Supplier<HeaderComposition> header;
+    ('''        WorkspaceLook.Header.UNIFIED);''', '''        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL);''', 1),
+    ('''    private final WorkspaceLook.Header header;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, java.util.function.Supplier<HeaderComposition> header) {''',
-     '''    private final java.util.function.Supplier<HeaderComposition> header;
-    private final java.util.function.Function<WindowContent, TabStrip> tabs;
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header) {''',
+     '''    private final WorkspaceLook.Header header;
+    /** The editor tabs, made for each window by {@link #tabs(WindowContent)}. */
+    private final WorkspaceLook.Tabs tabs;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, java.util.function.Supplier<HeaderComposition> header,
-                            java.util.function.Function<WindowContent, TabStrip> tabs) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs) {
         this.tabs = Objects.requireNonNull(tabs);''', 1),
-    ('''        return new WorkspaceChrome(menus, title, header);''',
-     '''        java.util.function.Function<WindowContent, TabStrip> tabs = switch (look.tabs()) {
-            case EQUAL -> WindowTabs::new;
-            case CLASSIC -> ClassicTabs::new;
+    ('''        return new WorkspaceChrome(menus, title, look.header());''', '''        return new WorkspaceChrome(menus, title, look.header(), look.tabs());''', 1),
+    ('''            case CLASSIC -> new ClassicHeader();
         };
-        return new WorkspaceChrome(menus, title, header, tabs);''', 1),
-    ('''    HeaderComposition header() { return header.get(); }''', '''    HeaderComposition header() { return header.get(); }
-    /** The tab strip for {@code owner}. */
-    TabStrip tabs(WindowContent owner) { return tabs.apply(owner); }''', 1)])
+    }''', '''            case CLASSIC -> new ClassicHeader();
+        };
+    }
+    /** The tab strip for {@code owner} (spec 10.5). */
+    TabStrip tabs(WindowContent owner) {
+        return switch (tabs) {
+            case EQUAL -> new WindowTabs(owner);
+            case CLASSIC -> new ClassicTabs(owner);
+        };
+    }''', 1),
+    ('''&& header == chrome.header
+            && title.equals(chrome.title);''', '''&& header == chrome.header
+            && tabs == chrome.tabs && title.equals(chrome.title);''', 1),
+    ('''Objects.hash(menus.getClass(), header, title)''', '''Objects.hash(menus.getClass(), header, tabs, title)''', 1)])
 PY
 grep -n 'windowTabs\.' jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java
 ```
@@ -2242,7 +2318,7 @@ with "▲" (Rulings 8). With the run item either layout leads with "▶ Run…",
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/StatusCells.java`, `SlashSegments.java`, `RuledCells.java`, `RunItem.java`
 - Modify (whole file): `jasper-app/src/main/java/dev/jasper/app/workspace/WindowStatusBar.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java:38`, `WorkspaceChrome.java`, `WindowCommandPalette.java` (the open and close hook), `WindowContent.java` (`paletteChanged`), `WindowTitle.java` (`sessionCell`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowChrome.java:38`, `WorkspaceChrome.java`, `WindowCommandPalette.java:86-104,119-127` (the open and close hook), `WindowContent.java` (`paletteChanged`), `WindowTitle.java` (`sessionCell`); `jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java:64` (the running dot's owner)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/RuledCellsTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (rows below)
 
@@ -2324,7 +2400,7 @@ class RuledCellsTest {
                 assertThat(opened).as("the run item opens the palette").hasValue(1);
                 bar.setConfiguration(state(null));
                 assertThat(bar.configButton().isVisible()).as("no problem, no cell").isFalse();
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -2344,7 +2420,7 @@ class RuledCellsTest {
                 assertThat(bar.configButton().getText()).startsWith("▲ Config warnings");
                 bar.setConfiguration(state(null));
                 assertThat(bar.configButton().isVisible()).isFalse();
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -2364,7 +2440,7 @@ class RuledCellsTest {
                     .isEqualTo(themes.current().chrome().semantic().color(SemanticColor.SURFACE_CONTROL_SELECTED));
                 assertThat(MockProfile.at(closed, x, y)).isNotEqualTo(MockProfile.at(shown, x, y));
                 assertThat(run.getX()).as("it leads the bar").isZero();
-            } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
 
@@ -2533,6 +2609,14 @@ final class RunItem extends JComponent {
         });
     }
 
+    // A bare JComponent has no accessible context; this one names its role.
+    @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+        if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
+            @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.TOGGLE_BUTTON; }
+        };
+        return accessibleContext;
+    }
+
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
 
     /** Runs the palette's opener, as a click does. */
@@ -2692,13 +2776,7 @@ final class RuledCells implements StatusCells {
         graphics.fillRect(0, 0, bar.getWidth(), line);
         graphics.setColor(DerivedColor.BORDER_DIVIDER.color(theme));
         for (int x : rules) graphics.fillRect(x, line, line, height - line);
-        if (sessionDotX >= 0 && !bar.showingContent()) {
-            int dot = metric(DesignMetrics.Role.STATUS_DOT);
-            graphics.setColor(SurfaceContrast.on(palette, bar.running() ? SemanticColor.STATUS_SUCCESS : SemanticColor.STATUS_IDLE, SemanticColor.SURFACE_APP, SurfaceContrast.INDICATOR));
-            ((java.awt.Graphics2D) graphics).setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-            graphics.fillOval(sessionDotX, line + (height - line - dot) / 2, dot, dot);
-        }
-        // The rule between two left cells is drawn above; the cell rules of the contributed rows are their gaps.
+        // The rule between two left cells is drawn above; in the divider's colour, the cell rules of the contributed rows are their gaps.
         int gap = itemGap();
         for (var row : new JComponent[] {bar.leftItems, bar.rightItems, bar.contentItems}) {
             if (row.getWidth() == 0) continue;
@@ -2708,6 +2786,12 @@ final class RuledCells implements StatusCells {
                 if (previousEnd >= 0) graphics.fillRect(row.getX() + previousEnd + (gap - line) / 2, line, line, height - line);
                 previousEnd = child.getX() + child.getWidth();
             }
+        }
+        if (sessionDotX >= 0 && !bar.showingContent()) {
+            int dot = metric(DesignMetrics.Role.STATUS_DOT);
+            graphics.setColor(SurfaceContrast.on(palette, bar.running() ? SemanticColor.STATUS_SUCCESS : SemanticColor.STATUS_IDLE, SemanticColor.SURFACE_APP, SurfaceContrast.INDICATOR));
+            ((java.awt.Graphics2D) graphics).setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.fillOval(sessionDotX, line + (height - line - dot) / 2, dot, dot);
         }
     }
 }
@@ -2863,7 +2947,7 @@ final class WindowStatusBar extends JPanel {
 
     /** The shell name with its integration dot: filled once the shell has marked a prompt. */
     private String shellLabel() {
-        return shell.isEmpty() ? "" : shell + (integration ? " ●" : " ○");
+        return shell.isEmpty() ? "" : shell + (integration ? " \u25cf" : " \u25cb");
     }
 
     private void updateText() {
@@ -3033,31 +3117,37 @@ edit(W + "WindowChrome.java", [
     ('''        composition = owner.look().header();''', '''        composition = owner.look().header();
         status = owner.look().statusBar(owner.action(ActionId.COMMAND_PALETTE), owner::paletteOpen);''', 1)])
 edit(W + "WorkspaceChrome.java", [
-    ('''        WindowTabs::new);''', '''        WindowTabs::new, SlashSegments::new, false);''', 1),
-    ('''    private final java.util.function.Function<WindowContent, TabStrip> tabs;
+    ('''        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL);''', '''        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false);''', 1),
+    ('''    private final WorkspaceLook.Tabs tabs;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, java.util.function.Supplier<HeaderComposition> header,
-                            java.util.function.Function<WindowContent, TabStrip> tabs) {''',
-     '''    private final java.util.function.Function<WindowContent, TabStrip> tabs;
-    private final java.util.function.Supplier<StatusCells> status;
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs) {''',
+     '''    private final WorkspaceLook.Tabs tabs;
+    /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
+    private final WorkspaceLook.Status status;
     private final boolean runItem;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, java.util.function.Supplier<HeaderComposition> header,
-                            java.util.function.Function<WindowContent, TabStrip> tabs, java.util.function.Supplier<StatusCells> status, boolean runItem) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs,
+                            WorkspaceLook.Status status, boolean runItem) {
         this.status = Objects.requireNonNull(status);
         this.runItem = runItem;''', 1),
-    ('''        return new WorkspaceChrome(menus, title, header, tabs);''',
-     '''        java.util.function.Supplier<StatusCells> status = switch (look.status()) {
-            case SLASH -> SlashSegments::new;
-            case RULED -> RuledCells::new;
+    ('''        return new WorkspaceChrome(menus, title, look.header(), look.tabs());''',
+     '''        return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem());''', 1),
+    ('''            case CLASSIC -> new ClassicTabs(owner);
         };
-        return new WorkspaceChrome(menus, title, header, tabs, status, look.runItem());''', 1),
-    ('''    TabStrip tabs(WindowContent owner) { return tabs.apply(owner); }''',
-     '''    TabStrip tabs(WindowContent owner) { return tabs.apply(owner); }
+    }''', '''            case CLASSIC -> new ClassicTabs(owner);
+        };
+    }
     /** A status bar for one window, led by "▶ Run…" ({@code open}, active while {@code paletteOpen}) when the look has it. */
     WindowStatusBar statusBar(javax.swing.Action open, java.util.function.BooleanSupplier paletteOpen) {
-        return new WindowStatusBar(status.get(), runItem ? new RunItem(open, paletteOpen) : null);
-    }''', 1)])
+        StatusCells cells = switch (status) {
+            case SLASH -> new SlashSegments();
+            case RULED -> new RuledCells();
+        };
+        return new WindowStatusBar(cells, runItem ? new RunItem(open, paletteOpen) : null);
+    }''', 1),
+    ('''&& tabs == chrome.tabs && title.equals(chrome.title);''',
+     '''&& tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && title.equals(chrome.title);''', 1),
+    ('''Objects.hash(menus.getClass(), header, tabs, title)''', '''Objects.hash(menus.getClass(), header, tabs, status, runItem, title)''', 1)])
 edit(W + "WindowContent.java", [
     ('''    boolean lookAnimates() { return themes.animationsEnabled(); }''',
      '''    boolean lookAnimates() { return themes.animationsEnabled(); }
@@ -3076,12 +3166,35 @@ edit(W + "WindowTitle.java", [
 
     /** {@code {directory}}: a remote pane's reported path as it is''', 1)])
 PY
-grep -n 'void open(String id, String queryOrNull, String rowIdOrNull)\|private void restoreAndHide()' jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java
+python3 -I - <<'PY'
+"""Plan 6b Task 5 step 4 (refreshed): the palette repaints the run item when it opens or closes."""
+import pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+edit("jasper-app/src/main/java/dev/jasper/app/workspace/WindowCommandPalette.java", [
+    ('''                view.focusQuery();
+            }
+        }''', '''                view.focusQuery();
+            }
+            owner.paletteChanged();
+        }''', 1),
+    ('''        priorFocus = null; originTab = null; originPane = null;
+    }''', '''        priorFocus = null; originTab = null; originPane = null;
+        owner.paletteChanged();
+    }''', 1)])
+# Execution notes R49: the slash segments paint the running dot now, so the native-adapter check reads them.
+edit("jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java", [
+    ('''        var required = Map.of("WindowStatusBar.java", List.of("ChromePainter.installed().statusDot"),''',
+     '''        var required = Map.of("SlashSegments.java", List.of("ChromePainter.installed().statusDot"),''', 1)])
+PY
 ```
 
-Then add `owner.paletteChanged();` as the last statement of `WindowCommandPalette.open(String, String, String)` (after the
-block that opens the controller) and of `restoreAndHide()`, which the grep located; if the palette closes on another
-path (`dismiss`, `escape` reach `restoreAndHide` through the controller's listener), the run item repaints there too.
+The first anchor ends `open(String, String, String)` (after the block that opens the controller, so a dismissing call
+repaints too), the second `restoreAndHide()`, which the controller calls on every close (`dismiss`, Escape).
 
 Add the ledger rows:
 
@@ -3109,7 +3222,8 @@ Expected: PASS: `RuledCellsTest` 4 and every existing status-bar test (`WindowSt
 - [ ] **Step 6: Commit**
 
 ```bash
-git add jasper-app/src/main/java/dev/jasper/app/workspace jasper-app/src/test/java/dev/jasper/app/workspace/RuledCellsTest.java docs/design/theme-engine/migration.csv
+git add jasper-app/src/main/java/dev/jasper/app/workspace jasper-app/src/test/java/dev/jasper/app/workspace/RuledCellsTest.java \
+  jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Window content: ruled status cells and the run item
 
@@ -3141,7 +3255,7 @@ form's frame and fill, so a SHEET form draws no outline of its own inside it). N
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:62-66,319-330,363-366`, `Forms.java:186-194,223-227,324-336,390-392,430-436` (the title, the hosted surface, the footer band)
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitView.java:66,325-326,388`, `Forms.java:196-201,232-241,327-336,395,437,461-560` (the title, the hosted surface, the footer band and its layout)
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicDialogTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/swing/HostedTitleTest.java`
 
 **Interfaces:**
@@ -3193,9 +3307,14 @@ class ClassicDialogTest {
                 new Nodes.Button("unlock", READY, "Unlock", "", ButtonKind.PRIMARY, "unlock", "")), "cancel", FormSubmission.PRIMARY, footnote);
     }
 
+    static void layout(java.awt.Container container) {
+        container.doLayout();
+        for (var child : container.getComponents()) if (child instanceof java.awt.Container nested) layout(nested);
+    }
+
     static BufferedImage print(ClassicDialog dialog, int width, int height) {
-        dialog.setSize(width, height); dialog.doLayout();
-        dialog.card().doLayout();
+        dialog.setSize(width, height);
+        for (int i = 0; i < 3; i++) layout(dialog);
         var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         var g = image.createGraphics();
         try { g.setColor(Color.WHITE); g.fillRect(0, 0, width, height); dialog.printAll(g); } finally { g.dispose(); }
@@ -3220,8 +3339,10 @@ class ClassicDialogTest {
                     assertThat(card.y).as("centred on the whole window, its title bar included").isEqualTo((871 - 29 - card.height) / 2);
                     var strip = dialog.card().getComponent(0);
                     assertThat(strip.getHeight()).as("26 and the rule").isEqualTo(27);
-                    int scrim = at(image, 5, 5).getRed();
-                    assertThat(scrim).as("white reads about C9").isBetween(0xC8, 0xCA);
+                    // The still scrim over white; EnterpriseDialogMockTest compares it with Credential Vault 1's.
+                    var scrim = theme.semantic().color(SemanticColor.SURFACE_SCRIM);
+                    int white = (int) Math.round(255 + (scrim.getRed() - 255) * scrim.getAlpha() / 255.0);
+                    assertThat(at(image, 5, 5).getRed()).as("the scrim over white").isBetween(white - 1, white + 1);
                     assertThat(at(image, card.x, card.y + card.height / 2)).as("the frame").isEqualTo(DerivedColor.BORDER_HOVER.color(theme));
                     assertThat(at(image, card.x + 40, card.y + 6)).as("the strip").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme));
                     assertThat(at(image, card.x + 40, card.y + 27)).as("its rule").isEqualTo(theme.semantic().color(SemanticColor.BORDER_WINDOW));
@@ -3258,7 +3379,7 @@ class ClassicDialogTest {
     }
 
     /** Credential Vault 1: the strip titles Unlock Vault; the prompt's hero keeps its lock tile and its message. */
-    @Test void aPromptHeroKeepsItsTileAndMessageUnderTheStrip() {
+    @Test void aPromptHeadingKeepsItsTileAndMessageUnderTheStrip() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             try (var view = new KitView(context, KitFixtures.form("unlock"), e -> { })) {
@@ -3324,7 +3445,7 @@ class HostedTitleTest {
             List.of(new Nodes.Button("save", ControlState.READY, "Save", "", Nodes.ButtonKind.PRIMARY, "save", "")), "", Nodes.FormSubmission.PRIMARY, "");
     }
 
-    @Test void aHostTitledFormDrawsNeitherItsTitleNorAHeroThatRepeatsIt() {
+    @Test void aHostTitledFormDrawsNeitherItsTitleNorAHeadingThatRepeatsIt() {
         Edt.run(() -> {
             var context = KitFixtures.context();
             var hero = new Nodes.Text("heading", ControlState.READY, "Add Login", Nodes.TextRole.LABEL);
@@ -3422,7 +3543,6 @@ import java.awt.Shape;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Area;
-import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.util.Objects;
@@ -3568,21 +3688,26 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
             setBorder(new EmptyBorder(placement == Placement.SHEET ? 0 : line, line, line, line));
         }
 
-        private Shape surface() {
-            double radius = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_RADIUS);
-            var round = new Area(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 2 * radius, 2 * radius));
-            if (placement == Placement.SHEET) round.add(new Area(new Rectangle2D.Double(0, 0, getWidth(), radius + 1)));
-            return round;
+        /** A rounded rectangle; a sheet's top corners are square. */
+        private Area outline(double x, double y, double w, double h, double r) {
+            var shape = new Area(new RoundRectangle2D.Double(x, y, w, h, 2 * r, 2 * r));
+            if (placement == Placement.SHEET) shape.add(new Area(new Rectangle2D.Double(x, y, w, Math.min(h, r + 1))));
+            return shape;
         }
 
+        private Shape surface() { return outline(0, 0, getWidth(), getHeight(), ThemePainting.metric(context, DesignMetrics.Role.DIALOG_RADIUS)); }
+
+        /**
+         * The 1 px frame as a filled ring, so it covers whole device pixels at every scale (a stroked line on the half
+         * pixel lands on one device pixel and two half-covered ones at 2x); a sheet's ring has no top edge.
+         */
         private Shape frame() {
-            double line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), half = line / 2, r = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_RADIUS);
+            double line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), r = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_RADIUS);
             double w = getWidth(), h = getHeight();
-            if (placement != Placement.SHEET) return new RoundRectangle2D.Double(half, half, w - line, h - line, 2 * r, 2 * r);
-            var path = new Path2D.Double();
-            path.moveTo(half, 0); path.lineTo(half, h - r); path.quadTo(half, h - half, r, h - half);
-            path.lineTo(w - r, h - half); path.quadTo(w - half, h - half, w - half, h - r); path.lineTo(w - half, 0);
-            return path;
+            boolean sheet = placement == Placement.SHEET;
+            var ring = outline(0, 0, w, h, r);
+            ring.subtract(outline(line, sheet ? -1 : line, w - 2 * line, sheet ? h - line + 1 : h - 2 * line, Math.max(0, r - line)));
+            return ring;
         }
 
         @Override protected boolean isPaintingOrigin() { return true; }
@@ -3600,14 +3725,21 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
             try {
                 ThemePainting.antialias(g);
                 g.setColor(DerivedColor.BORDER_HOVER.color(context.theme()));
-                g.setStroke(new java.awt.BasicStroke(ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE)));
-                g.draw(frame());
+                g.fill(frame());
             } finally { g.dispose(); }
         }
     }
 
     /** The header strip: the swatch and the title above a {@code border.window} rule. */
     private final class Strip extends JComponent {
+        // A bare JComponent has no accessible context; this one names its role.
+        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
+                @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.LABEL; }
+            };
+            return accessibleContext;
+        }
+
         @Override public Dimension getPreferredSize() {
             return new Dimension(0, ThemePainting.metric(context, DesignMetrics.Role.DIALOG_HEADER_HEIGHT) + ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
         }
@@ -3620,7 +3752,8 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
                 int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), height = getHeight() - line;
                 g.setColor(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme));
                 g.fillRect(0, 0, getWidth(), height);
-                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.STRUCTURAL)));
+                // The rule parts the strip from the content: held apart from the dialog surface below it (Execution notes R31).
+                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, context.kit().colors().dialogSurface(), SurfaceContrast.Guard.STRUCTURAL)));
                 g.fillRect(0, height, getWidth(), line);
                 int x = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_HEADER_INSET);
                 SemanticColor hue = switch (swatch) {
@@ -3688,26 +3821,26 @@ edit(S + "KitView.java", [
     public boolean dialogBand() { return dialogBand; }
     private boolean dialogBand;
     /** A hero hidden because it only repeats a host-titled form's title. */
-    private static final java.util.function.Consumer<javax.swing.JLabel> HOSTED_HERO = label -> label.setVisible(false);
+    private static final java.util.function.Consumer<javax.swing.JLabel> HOSTED_HEADING = label -> label.setVisible(false);
     /**
      * Under {@link #hostTitled()} a SHEET or FULL form's hero that is a text repeating the form's title is the host's
      * title too: it stays hidden through every later refresh through {@code TextControl.styled}, as the classic prompt
      * face hides a prompt's title (plan 4b). A prompt's hero (its tile, heading and message) is the prompt face's, and
      * a hero that says more than the title stays. Re-applied after each update, which clears the hook.
      */
-    private void hideHostedHero() {
+    private void hideHostedHeading() {
         if (!(spec.root() instanceof dev.jasper.ui.model.Nodes.Form form) || form.hero().isEmpty()) return;
         if (form.kind() != dev.jasper.ui.model.Nodes.FormKind.SHEET && form.kind() != dev.jasper.ui.model.Nodes.FormKind.FULL) return;
         if (!(form.hero().get() instanceof dev.jasper.ui.model.Nodes.Text text) || !text.text().strip().equals(form.title().strip())) return;
         if (!(reconciler.mounted(text.id()) instanceof Labels.TextControl hero)) return;
-        if (hostTitled && hero.styled == null) { hero.styled = HOSTED_HERO; hero.component.setVisible(false); }
-        else if (!hostTitled && hero.styled == HOSTED_HERO) { hero.styled = null; hero.refresh(); }
+        if (hostTitled && hero.styled == null) { hero.styled = HOSTED_HEADING; hero.component.setVisible(false); }
+        else if (!hostTitled && hero.styled == HOSTED_HEADING) { hero.styled = null; hero.refresh(); }
     }''', 1),
     ('''        try { motion.enabled(); reconciler.refresh(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }''',
-     '''        try { motion.enabled(); reconciler.refresh(); hideHostedHero(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }''', 1),
+     '''        try { motion.enabled(); reconciler.refresh(); hideHostedHeading(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }''', 1),
     ('''        updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }''',
      '''        updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
-        hideHostedHero();''', 1)])
+        hideHostedHeading();''', 1)])
 edit(S + "Forms.java", [
     ('''            title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty());''',
      '''            title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty() && !view.hostTitled());''', 1),
@@ -3732,7 +3865,7 @@ edit(S + "Forms.java", [
                 int r = ThemePainting.metric(view.context(), DesignMetrics.Role.WINDOW_RADIUS);
                 g.setColor(ThemePainting.color(view.context(), SemanticColor.SURFACE_DIALOG));''', 1),
     ('''            footer.setLayout(new FooterLayout(this));''',
-     '''            // A classic dialog's band (spec 10.8): 8 above and below the actions, the form's sides, under its rule.
+     '''            // A classic dialog's band (spec 10.8): 8 above and below the buttons' faces, the form's sides, under its rule.
             footer.band = view.dialogBand();
             if (footer.band) {
                 int vertical = ThemePainting.metric(context(), DesignMetrics.Role.DIALOG_FOOTER_VERTICAL);
@@ -3740,6 +3873,33 @@ edit(S + "Forms.java", [
                 footer.setBorder(new EmptyBorder(vertical + stroke, sides, vertical, sides));
             }
             footer.setLayout(new FooterLayout(this));''', 1),
+    # Execution notes R33: in the band a prompt's actions keep their size at the trailing edge, the footnote leading.
+    ('''            actions.setLayout(
+                    prompt
+                            ? new GridLayout(''', '''            // In a classic dialog's band a prompt's actions keep their size at the trailing edge (spec 10.8).
+            actions.setLayout(
+                    prompt && !footer.band
+                            ? new GridLayout(''', 1),
+    ('''                            ? contentWidth
+                            : Math.min(contentWidth, owner.actions.getPreferredSize().width);
+            int actionHeight = Composition.height(owner.actions, actionWidth);''', '''                            && !owner.view.dialogBand()
+                            ? contentWidth
+                            : Math.min(contentWidth, owner.actions.getPreferredSize().width);
+            int actionHeight = Composition.height(owner.actions, actionWidth);
+            // In a classic dialog's band the row is a button face tall: a prompt's buttons, which carry their focus ring
+            // in their bounds, overhang it into the band's padding.
+            int rowHeight = owner.view.dialogBand() ? Math.min(actionHeight, ThemePainting.metric(owner.context(), DesignMetrics.Role.BUTTON_HEIGHT)) : actionHeight;''', 1),
+    ('''                int actionHeight,
+                int previewWidth,''', '''                int actionHeight,
+                int rowHeight,
+                int previewWidth,''', 1),
+    ('''                    contentWidth, actionWidth, actionHeight, previewWidth, previewHeight, stacked);''',
+     '''                    contentWidth, actionWidth, actionHeight, rowHeight, previewWidth, previewHeight, stacked);''', 1),
+    ('''                            : Math.max(geometry.previewHeight(), geometry.actionHeight()));''',
+     '''                            : Math.max(geometry.previewHeight(), geometry.rowHeight()));''', 1),
+    ('''                            : i.top + Math.max(0, (availableHeight - geometry.actionHeight()) / 2);''',
+     '''                            : i.top + (geometry.rowHeight() < geometry.actionHeight() ? (availableHeight - geometry.actionHeight()) / 2
+                                : Math.max(0, (availableHeight - geometry.actionHeight()) / 2));''', 1),
     ('''        boolean window;
         KitContext context;
         @Override protected void paintComponent(Graphics graphics) {
@@ -3765,8 +3925,8 @@ PY
 
 The footer's rule takes `stroke`, the hairline `FormControl.refresh` computes a few lines above (`int
 stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);`); if 3b moved that line below the footer's border,
-compute the hairline again in the new block. The `Surface` anchors are `Forms.java:186-194` (`refresh`'s surface and
-border), `:390-392` (its fields) and `:430-436` (`paintComponent`) at `deafed424`; `hosted` returns inside the `try`, so
+compute the hairline again in the new block. The `Surface` anchors are `Forms.java:199-201` (`refresh`'s surface and
+border), `:395` (its fields) and `:437` (`paintComponent`) at `50b593f3c`, and `FooterLayout` is `:461`; `hosted` returns inside the `try`, so
 the `finally` still disposes the graphics. `KitView.hostTitled` and `dialogBand` refresh the form, so setting
 `dialogBand` after the first pass re-runs `FormControl.refresh` with the hosted surface. `reconciler.mounted(id)` is
 `ViewReconciler`'s non-focusing lookup (`ViewReconciler.java:393`).
@@ -3811,7 +3971,7 @@ Progress overlays and the default look are unchanged.
 
 **Files:**
 - Modify (whole file): `jasper-app/src/main/java/dev/jasper/app/windows/WindowOverlay.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/AuxiliarySurface.java:75-80`, `AuxiliaryWindows.java:18-26,116-120`, `NativeShells.java:86-92,207-235`, `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (the auxiliary windows)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/windows/AuxiliarySurface.java:75-80`, `AuxiliaryWindows.java:18-26,116-120`, `NativeShells.java:86-92,207-235`, `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:212,937` (the auxiliary windows and their test accessor), `jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java:66-68`
 - Test: `jasper-app/src/test/java/dev/jasper/app/windows/ClassicPlacementTest.java`, `jasper-app/src/test/java/dev/jasper/app/windows/ClassicWindowOverlayTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (two rows: both tests import `dev.jasper.ui` types, the overlay test Swing too)
 
@@ -3819,7 +3979,8 @@ Progress overlays and the default look are unchanged.
 - Consumes: Task 6's `ClassicDialog`, `KitView.hostTitled`, `dialogBand`; 5a's `DialogMapping`; 3d's `AuxiliarySurface.swatch()`.
 - Produces: `AuxiliarySurface.classic()`, `hostTitled()` (package setters) and `void laterContent(Consumer<KitView>)`
   (the shell's host flags for content set after the shell exists); `AuxiliaryWindows(UiState, Function, PathChooser,
-  DialogMapping)`; `static Optional<ClassicDialog.Placement> NativeShells.classicPlacement(AuxiliarySurface, boolean
+  DialogMapping)` and `public DialogMapping AuxiliaryWindows.dialogs()`; `AuxiliaryWindows JasperApplication.auxiliary()` (tests);
+  `static Optional<ClassicDialog.Placement> NativeShells.classicPlacement(AuxiliarySurface, boolean
   ownerShowing)`, `static void NativeShells.nativeFallback(AuxiliarySurface)` and `static final Consumer<KitView>
   NativeShells.IN_WINDOW`; `record WindowOverlay.Layer(JComponent component, JComponent card, Runnable open, Consumer<Runnable>
   dismiss, Runnable close, Supplier<Rectangle> cardBounds)`; `static WindowOverlay WindowOverlay.classic(JRootPane,
@@ -4234,12 +4395,17 @@ edit(W + "AuxiliaryWindows.java", [
      */
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser,
                             dev.jasper.app.presentation.DialogMapping dialogs) {
+        this.dialogs = Objects.requireNonNull(dialogs);
         this.classic = dialogs.kind() == dev.jasper.app.presentation.DialogMapping.Kind.CLASSIC;
         this.windowTitled = dialogs.windowTitled();
         this.chooser = Objects.requireNonNull(chooser);''', 1),
     ('''    private final List<AuxiliarySurface> open = new ArrayList<>();''', '''    private final List<AuxiliarySurface> open = new ArrayList<>();
     /** The look's mapping: classic overlays and sheets, and dialogs a native title bar titles. */
-    private final boolean classic, windowTitled;''', 1),
+    private final boolean classic, windowTitled;
+    private final dev.jasper.app.presentation.DialogMapping dialogs;
+
+    /** The look's dialog mapping these windows were made with (spec 4.9; {@code PresentationReachTest}). */
+    public dev.jasper.app.presentation.DialogMapping dialogs() { return dialogs; }''', 1),
     ('''    private AuxiliarySurface track(AuxiliarySurface surface) {
         boolean first = open.isEmpty();''',
      '''    private AuxiliarySurface track(AuxiliarySurface surface) {
@@ -4341,7 +4507,17 @@ edit(W + "NativeShells.java", [
                 });''', 1)])
 edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java", [
     ('''        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);''',
-     '''        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());''', 1)])
+     '''        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());''', 1),
+    # Execution notes R44: the reach test sees the mapping arrive.
+    ('''    dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }''',
+     '''    dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+    /** The auxiliary windows; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.AuxiliaryWindows auxiliary() { return auxiliary; }''', 1)])
+edit("jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java", [
+    ('''                    .isNotEqualTo(dev.jasper.app.windows.ShellChrome.standard());''',
+     '''                    .isNotEqualTo(dev.jasper.app.windows.ShellChrome.standard());
+                // Spec 4.9: the auxiliary windows are made with the look's dialog mapping (plan 6b).
+                assertThat(application[0].auxiliary().dialogs()).as("the auxiliary windows' dialog mapping").isEqualTo(projections.dialogs());''', 1)])
 PY
 ```
 
@@ -4366,7 +4542,7 @@ PY
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.windows.*' --tests 'dev.jasper.app.plugins.*Dialog*' --tests 'dev.jasper.app.plugins.AppContractTest' --tests 'dev.jasper.app.plugins.HostedUiTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture :jasper-app:javadoc`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.windows.*' --tests 'dev.jasper.app.plugins.*Dialog*' --tests 'dev.jasper.app.plugins.AppContractTest' --tests 'dev.jasper.app.plugins.HostedUiTest' --tests 'dev.jasper.app.application.PresentationReachTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture :jasper-app:javadoc`
 Expected: PASS: `ClassicPlacementTest` 5, `ClassicWindowOverlayTest` 1, every `WindowOverlayTest`,
 `WindowOverlayFocusTest`, `SheetOwnershipTest`, `ModalDialogTest` and contract case (unmarked surfaces take today's paths).
 
@@ -4374,7 +4550,7 @@ Expected: PASS: `ClassicPlacementTest` 5, `ClassicWindowOverlayTest` 1, every `W
 
 ```bash
 git add jasper-app/src/main/java/dev/jasper/app/windows jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java \
-  jasper-app/src/test/java/dev/jasper/app/windows/ClassicPlacementTest.java jasper-app/src/test/java/dev/jasper/app/windows/ClassicWindowOverlayTest.java \
+  jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java jasper-app/src/test/java/dev/jasper/app/windows/ClassicPlacementTest.java jasper-app/src/test/java/dev/jasper/app/windows/ClassicWindowOverlayTest.java \
   docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Window content: the dialog mapping
@@ -4408,10 +4584,10 @@ the opt-in crops, among them the Unlock Vault pair plan 4c left to this plan.
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (`LANDED`)
-- Modify: `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/ChromeRenderTest.java` (`check`), `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseMenuRowMockTest.java` (`workstation`, `mounted`, the Dark rule)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/ChromeRenderTest.java` (`check`), `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseMenuRowMockTest.java` (`workstation`, `mounted`, the Dark rule), `jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java` (`fonts`)
 - Create: `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseWorkstationMockTest.java`, `jasper-app/src/test/java/dev/jasper/app/windows/EnterpriseDialogMockTest.java`
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/WindowPairs.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/WindowPairsTest.java` (Rulings 17)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ClassicMenuBar.java`, `ClassicToolbarButton.java`, `WindowChrome.java` (the classic separator), `ClassicHeader.java`, `ClassicTabs.java`, `RuledCells.java`, `RunItem.java`; `jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java` (their colours through the declared pairs)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/platform/ClassicMenuRow.java` (6a's final review moved the classic row's style there; `ClassicMenuBar.style` calls it), `jasper-app/src/main/java/dev/jasper/app/workspace/ClassicToolbarButton.java`, `WindowChrome.java` (the classic separator), `ClassicHeader.java`, `ClassicTabs.java`, `RuledCells.java`, `RunItem.java`; `jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java` (their colours through the declared pairs)
 - Modify: `tools/visual/pairs.json` (eleven entries appended), `docs/design/theme-engine/migration.csv` (rows below)
 
 **Interfaces:**
@@ -4420,9 +4596,10 @@ the opt-in crops, among them the Unlock Vault pair plan 4c left to this plan.
   Task 7's `WindowOverlay.classic`.
 - Produces: `Presentation.LANDED = Set.of(Landed.WINDOW_CHROME, Landed.WINDOW_CONTENT)`; `final class WindowPairs` (the
   window chrome's declared pairs, `ALL` and the selectors `tabLabel`, `tabDot`, `tabClose`, `sessionDot`,
-  `configuration`, `run`); `ClassicDialog.STRIP_RULE`, `STRIP_TITLE`, `frame(SemanticColor)`, `swatch(Nodes.Hue)`,
-  `pairs(SemanticColor)`; `WindowPairsTest.paints(JComponent, Color)`;
-  `EnterpriseMenuRowMockTest.Mounted(BufferedImage image, WindowContent owner, JRootPane root)` and `static Mounted
+  `configuration`, `run`); `public static final PaintPair ClassicMenuRow.OPEN_TITLE`; `ClassicDialog.stripRule(SemanticColor)`,
+  `STRIP_TITLE`, `frame(SemanticColor)`, `swatch(Nodes.Hue)`, `pairs(SemanticColor)`; `WindowPairsTest.paints(JComponent, Color)`;
+  `public static void MockProfile.fonts(String, int, int, int)`;
+  `EnterpriseMenuRowMockTest.Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle firstTab)` and `static Mounted
   mounted(boolean dark, String name, Consumer<WindowContent> fixture)` (plans 7 to 9 render their chrome through it);
   `EnterpriseWorkstationMockTest.workstation(WindowContent)` (the mocks' window as a fixture).
 
@@ -4485,8 +4662,10 @@ edit(T + "workspace/EnterpriseMenuRowMockTest.java", [
      * @param image the print
      * @param owner the window's content, for the geometry of its parts
      * @param root the root pane it is mounted in
+     * @param field the search field's bounds in the root, read before the window closed
+     * @param firstTab the first classic tab's bounds in the root (empty under equal tabs), read before the window closed
      */
-    record Mounted(BufferedImage image, WindowContent owner, JRootPane root) { }
+    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle firstTab) { }
 
     /** The Enterprise window as the mocks show its content, printed at 2× and written for inspection. EDT. */
     static BufferedImage render(boolean dark, java.util.function.Consumer<WindowContent> fixture) {
@@ -4499,11 +4678,34 @@ edit(T + "workspace/EnterpriseMenuRowMockTest.java", [
     ('''            MockProfile.write(image, "enterprise-" + (dark ? "dark" : "light") + "-window");
             return image;''',
      '''            MockProfile.write(image, "enterprise-" + (dark ? "dark" : "light") + "-" + name);
-            return new Mounted(image, owner, root);''', 1),
+            // Closing the window clears its tab strip: the parts' geometry is read now (Execution notes R35).
+            var field = owner.chrome().header().field();
+            var fieldAt = javax.swing.SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), root);
+            var firstTab = owner.tabBar() instanceof ClassicTabs tabs && !tabs.entries().isEmpty()
+                ? javax.swing.SwingUtilities.convertRectangle(tabs, tabs.entries().getFirst().getBounds(), root) : new Rectangle();
+            return new Mounted(image, owner, root, fieldAt, firstTab);''', 1),
     ('''        if (!dark) assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as("light rule colour").isLessThanOrEqualTo(2.5);
         // Plan 6a Rulings 9: Enterprise Dark's border.divider is darker than the mock's rule until plan 6b's override.''',
      '''        // Plan 6b Task 1 overrides Enterprise Dark's border.divider with the mock's rule (#4A4D53).
         assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as(what + " rule colour").isLessThanOrEqualTo(2.5);''', 1)])
+# Execution notes R36: the probes that follow the face's advance widths, printed until plan 5b.
+edit("jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java", [
+    ('''    /** CIE76 ΔE between two opaque sRGB colours. */''',
+     '''    /**
+     * A probe that follows the UI face's advance widths: the fixture kit draws the platform face where the mocks draw
+     * IBM Plex, so until plan 5b ships Plex it is printed as a residual, not asserted (plan 6a Rulings 26 and 29; plan 6b
+     * Execution notes). The merge with plan 5b turns each into an assertion within {@code tolerance}.
+     *
+     * @param what the probe
+     * @param actual the render's value, in the mock's pixels
+     * @param expected the mock's value
+     * @param tolerance the tolerance it is asserted within under Plex
+     */
+    public static void fonts(String what, int actual, int expected, int tolerance) {
+        System.out.printf("FONTS residual until plan 5b: %s %d, mock %d (tolerance %d)%n", what, actual, expected, tolerance);
+    }
+
+    /** CIE76 ΔE between two opaque sRGB colours. */''', 1)])
 PY
 ```
 
@@ -4523,7 +4725,6 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -4595,22 +4796,23 @@ class EnterpriseWorkstationMockTest {
         var actual = MockProfile.inks(render, new Rectangle(4, 112 - Y, 400, 64), 12, 25);
         for (int i = 0; i < 2; i++) {
             assertThat(actual.get(i).start() + X).as(what + "ink " + i + " starts").isCloseTo(expected.get(i).start(), within(4));
-            assertThat(actual.get(i).width()).as(what + "ink " + i + " width").isCloseTo(expected.get(i).width(), within(4));
+            if (i == 0) assertThat(actual.get(i).width()).as(what + "the + glyph's width").isCloseTo(expected.get(i).width(), within(4));
+            else MockProfile.fonts(what + "New Session's ink width", actual.get(i).width(), expected.get(i).width(), 4);
             assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top(), within(3));
         }
         // The search field: x 2116-2715, y 122-165 in the mock.
-        var field = mounted.owner().chrome().header().field();
-        var at = SwingUtilities.convertPoint(field.getParent(), field.getLocation(), mounted.root());
-        assertThat(2 * at.x + X).as(what + "search field left").isCloseTo(2116, within(4));
-        assertThat(2 * field.getWidth()).as(what + "search field width").isCloseTo(600, within(2));
-        assertThat(2 * at.y + Y).as(what + "search field top").isCloseTo(122, within(2));
-        assertThat(2 * field.getHeight()).as(what + "search field height").isCloseTo(44, within(2));
+        var field = mounted.field();
+        // The field ends 6 before Settings…, whose label follows the face.
+        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116, 4);
+        assertThat(2 * field.width).as(what + "search field width").isCloseTo(600, within(2));
+        assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122, within(2));
+        assertThat(2 * field.height).as(what + "search field height").isCloseTo(44, within(2));
         // "Settings…" at the trailing edge: ink 2742-2846 in the mock.
         var settings = MockProfile.inks(mock, new Rectangle(2722, 112, 160, 64), 12, 25);
         var rendered = MockProfile.inks(render, new Rectangle(2722 - X, 112 - Y, 160, 64), 12, 25);
         assertThat(settings).as("the mock's Settings…").hasSize(1);
         assertThat(rendered).as(what + "Settings…").hasSize(1);
-        assertThat(rendered.getFirst().start() + X).as(what + "Settings… starts").isCloseTo(settings.getFirst().start(), within(4));
+        MockProfile.fonts(what + "Settings… starts", rendered.getFirst().start() + X, settings.getFirst().start(), 4);
         assertThat(rendered.getFirst().end() + X).as(what + "Settings… ends").isCloseTo(settings.getFirst().end(), within(4));
     }
 
@@ -4620,9 +4822,8 @@ class EnterpriseWorkstationMockTest {
         var mock = mock(dark);
         var mounted = window(dark);
         var render = mounted.image();
-        var strip = (ClassicTabs) mounted.owner().tabBar();
-        var first = strip.entries().get(0);
-        int left = 2 * SwingUtilities.convertPoint(first.getParent(), first.getLocation(), mounted.root()).x;
+        assertThat(mounted.firstTab().isEmpty()).as(what + "classic tabs").isFalse();
+        int left = 2 * mounted.firstTab().x;
         // The underline row: mock y 233 (the indicator 232-235 above the rule at 236); the render's strip is 2 px taller.
         int underline = 2 * (25 + 35 + 29) - 3;
         var expected = MockProfile.solid(MockProfile.row(mock, 233, 650, 1100), 4);
@@ -4653,14 +4854,14 @@ class EnterpriseWorkstationMockTest {
         var renderRules = dividers(render, row, 0, 2880, divider);
         assertThat(mockRules).as("the mock's seven rules").containsExactly(108, 164, 1966, 2140, 2322, 2470, 2574);
         assertThat(renderRules.size()).as(what + "a rule after the run item, session and folder and before each right cell").isEqualTo(3 + 5);
-        assertThat(renderRules.get(renderRules.size() - 2) + X).as(what + "the rule before UTF-8").isCloseTo(2470, within(6));
-        assertThat(renderRules.getLast() + X).as(what + "the rule before the warning").isCloseTo(2574, within(6));
+        MockProfile.fonts(what + "the rule before UTF-8", renderRules.get(renderRules.size() - 2) + X, 2470, 6);
+        MockProfile.fonts(what + "the rule before the warning", renderRules.getLast() + X, 2574, 6);
         assertThat(MockProfile.deltaE(MockProfile.at(render, 2860, row), MockProfile.at(mock, 2862, 1782)))
             .as(what + "the warning cell's ground").isLessThanOrEqualTo(2.5);
         // Rulings 15: the run item, 60 wide in the Run Dialog mock (its rule at 122).
         var runMock = MockProfile.mock(RUN);
         assertThat(dividers(runMock, 1782, X, 400, MockProfile.at(runMock, 122, 1782))).as("the Run Dialog mock's first rule").startsWith(122);
-        assertThat(renderRules.getFirst() + X).as(what + "the run item's width").isCloseTo(122, within(4));
+        MockProfile.fonts(what + "the run item's width", renderRules.getFirst() + X, 122, 4);
         MockProfile.write(render.getSubimage(1898, height - 46, 982, 46), "enterprise-" + (dark ? "dark" : "light") + "-status");
     }
 }
@@ -4737,11 +4938,9 @@ class EnterpriseDialogMockTest {
         try {
             var context = themes.appearance().context(ThemeRoute.CHROME);
             var palette = themes.current().chrome().semantic();
-            Color swatch = palette.color(switch (hue) {
-                case BLUE -> SemanticColor.HUE_BLUE;
-                case GREEN -> SemanticColor.HUE_GREEN;
-                default -> SemanticColor.TEXT_PRIMARY;
-            });
+            // The swatch as its declared pair paints it: the hue held to the indicator guard on the strip (spec 7.3).
+            Color swatch = hue == Nodes.Hue.NONE ? palette.color(SemanticColor.TEXT_PRIMARY)
+                : dev.jasper.ui.theme.SurfaceContrast.painted(themes.current().chrome(), ClassicDialog.swatch(hue));
             var root = new JRootPane();
             var behind = new JPanel();
             behind.setBackground(Color.WHITE);
@@ -4777,10 +4976,11 @@ class EnterpriseDialogMockTest {
         // Centred on the whole window, its title bar included: the mock's card centre is (720, 421) in the content.
         assertThat(card.x + card.width / 2.0).as("centred across").isCloseTo((UNLOCK_FRAME.getCenterX() - UNLOCK_CONTENT_X) / 2, within(1.0));
         assertThat(card.y + card.height / 2.0).as("centred on the whole window").isCloseTo((UNLOCK_FRAME.getCenterY() - UNLOCK_CONTENT_Y) / 2, within(1.0));
-        // Down a column 396 px (2×) inside the frame, clear of the title, the footnote and the buttons: the frame, the
+        // Down a column 16 px (2×) inside the frame's right edge, in the content's side padding and so clear of the title,
+        // the footnote and the buttons whatever the fixture form's width: the frame, the
         // 26 px strip and its rule from the top; the band's rule, the 40 px band and the frame from the bottom.
-        var expected = MockProfile.solid(MockProfile.column(mock, UNLOCK_FRAME.x + 396, UNLOCK_FRAME.y, UNLOCK_FRAME.y + UNLOCK_FRAME.height), 2);
-        var actual = MockProfile.solid(MockProfile.column(image, 2 * card.x + 396, 2 * card.y, 2 * (card.y + card.height)), 2);
+        var expected = MockProfile.solid(MockProfile.column(mock, UNLOCK_FRAME.x + UNLOCK_FRAME.width - 16, UNLOCK_FRAME.y, UNLOCK_FRAME.y + UNLOCK_FRAME.height), 2);
+        var actual = MockProfile.solid(MockProfile.column(image, 2 * (card.x + card.width) - 16, 2 * card.y, 2 * (card.y + card.height)), 2);
         String[] top = {"frame", "header strip", "strip rule"};
         for (int i = 0; i < 3; i++) same("unlock " + top[i], actual.get(i), expected.get(i), 2);
         String[] bottom = {"frame", "footer band", "band rule"};
@@ -4790,7 +4990,7 @@ class EnterpriseDialogMockTest {
         var title = MockProfile.inks(image, new Rectangle(2 * card.x + 8, 2 * card.y + 4, 560, 46), 12, 25).getFirst();
         assertThat(title.start() - 2 * card.x).as("the title's inset").isCloseTo(mockTitle.start() - UNLOCK_FRAME.x, within(3));
         assertThat(title.top() - 2 * card.y).as("the title's top").isCloseTo(mockTitle.top() - UNLOCK_FRAME.y, within(3));
-        assertThat(title.width()).as("Unlock Vault").isCloseTo(mockTitle.width(), within(6));
+        MockProfile.fonts("Unlock Vault's title width", title.width(), mockTitle.width(), 6);
         // The still scrim: white reads #C9CACC.
         assertThat(MockProfile.deltaE(MockProfile.at(image, 200, 1600), MockProfile.at(mock, 1500, 1400))).as("the scrim").isLessThanOrEqualTo(2.5);
         MockProfile.write(image.getSubimage(2 * card.x, 2 * card.y, 560, 56), "enterprise-unlock-strip");
@@ -4800,7 +5000,12 @@ class EnterpriseDialogMockTest {
     @ParameterizedTest
     @CsvSource({"07 Credential Vault/Credential Vault 4 - Add Login.png, Add Login, BLUE, add-login, 2F65CA, 550",
                 "07 Credential Vault/Credential Vault 5 - Add SSH Key.png, Add SSH Key, GREEN, add-ssh-key, 2E9E4F, 486"})
-    void aSheetIsCredentialVaultsChrome(String file, String title, Nodes.Hue hue, String name, String mockSwatch, int frameHeight) {
+    void aSheetIsCredentialVaultsChrome(String file, String title, Nodes.Hue hue, String name, String mockSwatch, int frameHeight) throws Exception {
+        // EdtTestExtension intercepts test methods, not a parameterized test's invocations: the body runs on the EDT here.
+        dev.jasper.app.workspace.DesktopTestSupport.edt(() -> sheet(file, title, hue, name, mockSwatch, frameHeight));
+    }
+
+    static void sheet(String file, String title, Nodes.Hue hue, String name, String mockSwatch, int frameHeight) {
         var mock = MockProfile.mock(file);
         // The frame's bottom edge: 606-607 in Credential Vault 4, 542-543 in 5.
         var frame = new Rectangle(SHEET_X, SHEET_TOP, SHEET_WIDTH, frameHeight);
@@ -4824,9 +5029,9 @@ class EnterpriseDialogMockTest {
             assertThat(inks.get(i).top()).as(name + " ink " + i + " top").isCloseTo(mockInks.get(i).top() - frame.y, within(3));
         }
         assertThat(inks.get(0).width()).as(name + " swatch width").isEqualTo(mockInks.get(0).width());
-        assertThat(inks.get(1).width()).as(name + " title width").isCloseTo(mockInks.get(1).width(), within(6));
+        MockProfile.fonts(name + " title width", inks.get(1).width(), mockInks.get(1).width(), 6);
         var swatch = MockProfile.at(image, inks.get(0).start() + 8, inks.get(0).top() + 8);
-        assertThat(swatch).as(name + " swatch: the theme's hue role (Rulings 14)").isEqualTo(rendered.swatch());
+        assertThat(swatch).as(name + " swatch: the theme's hue role through its guard (Rulings 14)").isEqualTo(rendered.swatch());
         System.out.printf("%s swatch: theme %06X, mock %s, delta E %.1f%n", name, swatch.getRGB() & 0xFFFFFF, mockSwatch,
             MockProfile.deltaE(swatch, new Color(Integer.parseInt(mockSwatch, 16))));
         MockProfile.write(image.getSubimage(2 * card.x, 0, 560, 54), "enterprise-" + name + "-strip");
@@ -5017,7 +5222,6 @@ class WindowPairsTest {
             new Declared("tab close", WindowPairs.TAB_CLOSE, (theme, expected) -> paints(f.first, expected)),
             new Declared("selected tab close", WindowPairs.SELECTED_TAB_CLOSE, (theme, expected) -> paints(f.second, expected)),
             new Declared("tab indicator", WindowPairs.TAB_INDICATOR, (theme, expected) -> paints(f.tabs, expected)),
-            new Declared("tab divider and strip rule", WindowPairs.TAB_DIVIDER, (theme, expected) -> paints(f.tabs, expected)),
             new Declared("new tab plus", WindowPairs.TAB_PLUS, (theme, expected) -> paints(f.tabs.add(), expected)),
             new Declared("status rule", WindowPairs.RULE, (theme, expected) -> print(f.warning).getRGB(1200, 1) == expected.getRGB()),
             new Declared("status cell text", WindowPairs.CELL_TEXT, (theme, expected) -> paints(f.warning, expected)),
@@ -5066,19 +5270,20 @@ class WindowPairsTest {
                 assertThat(f.menuRule()).as(palette + ", the menu row's rule").isEqualTo(divider);
                 assertThat(paints(f.warning, divider)).as(palette + ", the status cell rules").isTrue();
                 assertThat(has(f.search(false), divider)).as(palette + ", the keycap's edge").isTrue();
+                assertThat(paints(f.tabs, theme.semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_WINDOW))).as(palette + ", the tab dividers and rule").isTrue();
                 // The classic dialog's frame, strip rule, title and swatches.
                 var blue = dialog(theme, kit, Nodes.Hue.BLUE);
-                for (var pair : List.of(ClassicDialog.frame(kit.colors().dialogSurface()), ClassicDialog.STRIP_RULE, ClassicDialog.STRIP_TITLE, ClassicDialog.swatch(Nodes.Hue.BLUE))) {
+                for (var pair : List.of(ClassicDialog.frame(kit.colors().dialogSurface()), ClassicDialog.stripRule(kit.colors().dialogSurface()), ClassicDialog.STRIP_TITLE, ClassicDialog.swatch(Nodes.Hue.BLUE))) {
                     Color expected = SurfaceContrast.painted(theme, pair);
                     assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(palette + ", dialog " + pair.slot() + " meets its guard").isTrue();
                     assertThat(has(blue, expected)).as(palette + ", dialog " + pair.slot() + " is painted " + ColorMath.hex(expected)).isTrue();
                 }
                 for (var hue : List.of(Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE, Nodes.Hue.NEUTRAL))
                     assertThat(has(dialog(theme, kit, hue), SurfaceContrast.painted(theme, ClassicDialog.swatch(hue)))).as(palette + ", the " + hue + " swatch").isTrue();
-                assertThat(dialogPairs).as("the dialog declares what it paints").contains(ClassicDialog.STRIP_RULE, ClassicDialog.STRIP_TITLE,
+                assertThat(dialogPairs).as("the dialog declares what it paints").contains(ClassicDialog.stripRule(kit.colors().dialogSurface()), ClassicDialog.STRIP_TITLE,
                     ClassicDialog.frame(kit.colors().dialogSurface()), ClassicDialog.swatch(Nodes.Hue.GREEN));
             }
-        } finally { themes.close(); EnterpriseLook.restoreDefault(); }
+        } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
     }
 
     @Test void theClassicWindowChromePaintsEachPairAsItsGuardMakesItOverEveryPaletteUnderBothKits() throws Exception {
@@ -5099,7 +5304,7 @@ its context.
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.presentation.ProjectionsTest' --tests 'dev.jasper.app.workspace.EnterpriseMenuRowMockTest' --tests 'dev.jasper.app.workspace.WindowPairsTest'`
 Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `WindowPairs`, `ClassicDialog.pairs`, `frame`,
-`swatch`, `STRIP_RULE` and `STRIP_TITLE`. Once Step 3's first script has run, `ProjectionsTest.untilItsPlanLandsAChromeValueMapsToTheDefaultProjection`
+`swatch`, `stripRule` and `STRIP_TITLE`. Once Step 3's first script has run, `ProjectionsTest.untilItsPlanLandsAChromeValueMapsToTheDefaultProjection`
 still fails with "plans 6a and 6b land the window" (the set lacks `WINDOW_CONTENT`) until its second script runs; the
 mock tests run against Tasks 2 to 7 already.
 
@@ -5121,7 +5326,8 @@ import java.util.List;
  * The pairs the classic window chrome paints (Enterprise presentation spec 7.3, 16.1.1 and 16.1.2; plan 6b Rulings 17):
  * every text, indicator and boundary of the classic menu row, toolbar row, tab strip, ruled status cells and run item
  * is painted through one of these with {@code SurfaceContrast.painted}. The {@code border.divider} rules (the menu
- * row's, the cells' and the keycap's edge) are painted as the role, as the dock's strip divider is. {@code
+ * row's, the cells' and the keycap's edge) and the tab strip's {@code border.window} dividers and rule are painted as
+ * the role, as the dock's strip divider is. {@code
  * WindowPairsTest} samples each over the theme set and the degenerate palettes under both kits.
  */
 final class WindowPairs {
@@ -5129,8 +5335,8 @@ final class WindowPairs {
 
     private static PaintPair pair(ColorRole slot, ColorRole against, Guard guard) { return new PaintPair(slot, against, guard); }
 
-    /** An open classic menu's title on the accent. */
-    static final PaintPair OPEN_MENU = pair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, Guard.TEXT);
+    /** An open classic menu's title on the accent ({@code ClassicMenuRow} paints it; the row is shared with auxiliary frames). */
+    static final PaintPair OPEN_MENU = dev.jasper.app.platform.ClassicMenuRow.OPEN_TITLE;
     /** The toolbar row's and the status bar's rule, and the toolbar's separators. */
     static final PaintPair RULE = pair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, Guard.STRUCTURAL);
     /** A classic toolbar button's label and glyphs. */
@@ -5158,8 +5364,6 @@ final class WindowPairs {
         SELECTED_TAB_CLOSE = pair(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_CARD, Guard.INDICATOR);
     /** The selected tab's underline: structural, as the card fill marks the tab too (Rulings 17). */
     static final PaintPair TAB_INDICATOR = pair(SemanticColor.TAB_INDICATOR, SemanticColor.SURFACE_CARD, Guard.STRUCTURAL);
-    /** The dividers between tabs and the strip's rule. */
-    static final PaintPair TAB_DIVIDER = pair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_TABSTRIP, Guard.STRUCTURAL);
     /** The "+" after the last tab. */
     static final PaintPair TAB_PLUS = pair(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_TABSTRIP, Guard.TEXT);
     /** A ruled cell's text and contributed items. */
@@ -5178,7 +5382,7 @@ final class WindowPairs {
     static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, BUTTON_FRAME, SEARCH_EDGE, SEARCH_HOVER_EDGE,
         PLACEHOLDER, KEYCAP_TEXT, TAB_LABEL, SELECTED_TAB_LABEL, INACTIVE_TAB_LABEL, INACTIVE_SELECTED_TAB_LABEL,
         RUNNING_TAB_DOT, RUNNING_SELECTED_TAB_DOT, IDLE_TAB_DOT, IDLE_SELECTED_TAB_DOT, TAB_CLOSE, SELECTED_TAB_CLOSE,
-        TAB_INDICATOR, TAB_DIVIDER, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, ACTIVE_RUN);
+        TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, ACTIVE_RUN);
 
     static PaintPair tabLabel(boolean activeWindow, boolean selected) {
         return activeWindow ? (selected ? SELECTED_TAB_LABEL : TAB_LABEL) : (selected ? INACTIVE_SELECTED_TAB_LABEL : INACTIVE_TAB_LABEL);
@@ -5207,11 +5411,18 @@ def edit(name, edits):
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
-edit(W + "ClassicMenuBar.java", [
-    ("""import dev.jasper.ui.theme.SemanticColor;""", """import dev.jasper.ui.theme.SemanticColor;
+edit("jasper-app/src/main/java/dev/jasper/app/platform/ClassicMenuRow.java", [
+    ("""import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.SemanticColor;""", """import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.PaintPair;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;""", 1),
+    ("""    private ClassicMenuRow() { }""", """    /** An open title on the accent (spec 16.1.1), declared for the window chrome's pairs ({@code WindowPairs}). */
+    public static final PaintPair OPEN_TITLE = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
+
+    private ClassicMenuRow() { }""", 1),
     ("""            "selectionBackground", palette.color(SemanticColor.ACCENT), "selectionForeground", palette.color(SemanticColor.TEXT_ONACCENT)));""",
-     """            "selectionBackground", palette.color(SemanticColor.ACCENT), "selectionForeground", SurfaceContrast.painted(theme, WindowPairs.OPEN_MENU)));""", 1)])
+     """            "selectionBackground", palette.color(SemanticColor.ACCENT), "selectionForeground", SurfaceContrast.painted(theme, OPEN_TITLE)));""", 1)])
 edit(W + "ClassicToolbarButton.java", [
     ("""                g.setColor(DerivedColor.BORDER_HOVER.color(theme));""", """                g.setColor(SurfaceContrast.painted(theme, WindowPairs.BUTTON_FRAME));""", 1),
     ("""            Color ink = SurfaceContrast.on(palette, SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_APP, SurfaceContrast.TEXT);""",
@@ -5237,7 +5448,7 @@ edit(W + "ClassicTabs.java", [
     ("""var palette = ThemeZone.theme(this).semantic();""", """var theme = ThemeZone.theme(this); var palette = theme.semantic();""", 3),
     ("""                graphics.setColor(palette.color(SemanticColor.TAB_INDICATOR));""",
      """                graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.TAB_INDICATOR));""", 1),
-    ("""graphics.setColor(palette.color(SemanticColor.BORDER_WINDOW));""", """graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.TAB_DIVIDER));""", 2),
+    # Execution notes R34: the strip's border.window dividers and rule stay the role.
     ("""        private boolean running() {""", """        boolean running() {""", 1),
     ("""                SemanticColor ground = tab == selected ? SemanticColor.SURFACE_CARD : SemanticColor.SURFACE_TABSTRIP;""",
      """                boolean chosen = tab == selected;""", 1),
@@ -5267,10 +5478,16 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java", [
      """    /** Where the card sits in the window. */
     public enum Placement { CENTERED, SHEET }
 
-    /** The strip's rule (spec 16.1.1). */
-    public static final PaintPair STRIP_RULE = new PaintPair(SemanticColor.BORDER_WINDOW, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.STRUCTURAL);
-    /** The strip's title. */
+    /** The strip's title (spec 16.1.1). */
     public static final PaintPair STRIP_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
+
+    /**
+     * The rule under the strip, held apart from the content it parts the strip from (the kit's dialog surface).
+     *
+     * @param dialogSurface the kit's dialog surface slot
+     * @return the pair
+     */
+    public static PaintPair stripRule(SemanticColor dialogSurface) { return new PaintPair(SemanticColor.BORDER_WINDOW, dialogSurface, SurfaceContrast.Guard.STRUCTURAL); }
 
     /**
      * The card's frame on the kit's dialog surface.
@@ -5302,14 +5519,14 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java", [
      * @return the pairs
      */
     public static java.util.List<PaintPair> pairs(SemanticColor dialogSurface) {
-        var pairs = new java.util.ArrayList<PaintPair>(java.util.List.of(frame(dialogSurface), STRIP_RULE, STRIP_TITLE));
+        var pairs = new java.util.ArrayList<PaintPair>(java.util.List.of(frame(dialogSurface), stripRule(dialogSurface), STRIP_TITLE));
         for (Nodes.Hue hue : Nodes.Hue.values()) if (hue != Nodes.Hue.NONE) pairs.add(swatch(hue));
         return java.util.List.copyOf(pairs);
     }""", 1),
     ("""                g.setColor(DerivedColor.BORDER_HOVER.color(context.theme()));""",
-     """                g.setColor(SurfaceContrast.painted(context.theme(), frame(context.kit().colors().dialogSurface())));""", 1),
-    ("""                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.STRUCTURAL)));""",
-     """                g.setColor(SurfaceContrast.painted(theme, STRIP_RULE));""", 1),
+     """                g.setColor(SurfaceContrast.painted(context.theme(), ClassicDialog.frame(context.kit().colors().dialogSurface())));""", 1),
+    ("""                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, context.kit().colors().dialogSurface(), SurfaceContrast.Guard.STRUCTURAL)));""",
+     """                g.setColor(SurfaceContrast.painted(theme, stripRule(context.kit().colors().dialogSurface())));""", 1),
     ("""                SemanticColor hue = switch (swatch) {
                     case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
                     case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL; case NONE -> null;
@@ -5350,8 +5567,10 @@ Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.presentation.*' --tests
 Expected: PASS: `ProjectionsTest`, `ChromeRenderTest` 2 (twelve looks checked for their header, tabs, status cells and run
 item, and the run item's and ruled cells' painted pairs), `WindowPairsTest` 1 (every window pair over the theme set and
 the degenerate palettes under both kits), `EnterpriseMenuRowMockTest` 2, `EnterpriseWorkstationMockTest` 8, `EnterpriseDialogMockTest` 3, and the
-`enterprise-*` PNGs under `jasper-app/build/chrome-renders/`; the test output prints the two swatch lines (record them
-for the STATUS entry). If a comparison fails with the real values, open the render beside the mock crop (`python3 -I
+`enterprise-*` PNGs under `jasper-app/build/chrome-renders/`; the test output prints the two swatch lines and the
+`FONTS residual until plan 5b` lines (record both for the STATUS entry; the dry run printed Add Login's swatch
+`2F65CA` against the mock's `2F65CA`, ΔE 0.0, and Add SSH Key's `2C8B48` against `2E9E4F`, ΔE 9.7, Execution notes
+R39). If a comparison fails with the real values, open the render beside the mock crop (`python3 -I
 tools/visual/region.py "<mock>" jasper-app/build/chrome-renders/<render>.png build/content --crop <x,y,w,h> --region
 <x,y,w,h>`) and fix the strategy's geometry or the role value until it passes; record any value you change in the
 banner and in "Mock measurements". A test elsewhere that pinned plan 6a's interim projection under the shipped
@@ -5397,7 +5616,7 @@ rows = [("jasper-app/src/main/java/dev/jasper/app/workspace/WindowPairs.java", "
         (T + "workspace/WindowPairsTest.java", "app.workspace", "WindowPairsTest",
          "Test/fixture ownership; New in Enterprise presentation Plan 6b Task 8; the window pairs over every palette under both kits"),
         (T + "workspace/EnterpriseWorkstationMockTest.java", "app.workspace", "EnterpriseWorkstationMockTest",
-         "Test/fixture ownership; New in Enterprise presentation Plan 6b Task 8; the toolbar row, tabs and status cells against the Workstation and Dark Mode mocks"),
+         "Test/fixture ownership; New in Enterprise presentation Plan 6b Task 8; the toolbar row; tabs and status cells against the Workstation and Dark Mode mocks"),
         (T + "windows/EnterpriseDialogMockTest.java", "app.windows", "EnterpriseDialogMockTest",
          "Test/fixture ownership; New in Enterprise presentation Plan 6b Task 8; the classic dialog chrome against Credential Vault 1; 4 and 5")]
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv"); text = ledger.read_text(encoding="utf-8")
@@ -5412,10 +5631,14 @@ covers the sheet band.
 
 - [ ] **Step 6: Run the tests and the opt-in check**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*Mock*' --tests 'dev.jasper.app.workspace.WindowPairsTest' --tests 'dev.jasper.app.windows.EnterpriseDialogMockTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --tests 'dev.jasper.app.architecture.*' :jasper-app:javadoc :jasper-ui:test --tests 'dev.jasper.ui.gallery.EnterpriseGalleryTest' --tests 'dev.jasper.ui.swing.ClassicDialogTest' :jasper-ui:javadoc`
-Then: `python3 -I tools/visual/check_pairs.py build/chrome-compare chrome-`
-Expected: BUILD SUCCESSFUL; the check prints a PASS line for each of the thirteen `chrome-*` pairs (6a's two and these
-eleven). Record the agreements for the STATUS entry. A FAIL with a missing colour is a defect to fix as in Step 4; a
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*Mock*' --tests 'dev.jasper.app.workspace.WindowPairsTest' --tests 'dev.jasper.app.windows.EnterpriseDialogMockTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --tests 'dev.jasper.app.architecture.*' :jasper-app:javadoc :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicDialogTest' :jasper-ui:javadoc`
+Then: `python3 -I tools/visual/compare_all.py build/chrome-compare chrome-` (4c's `check_pairs.py` and
+`EnterpriseGalleryTest` are not on the branch; Execution notes R42)
+Expected: BUILD SUCCESSFUL; the comparison prints an `edge_agreement` line for each of the thirteen `chrome-*` pairs
+(6a's two and these eleven), each at or above its `min_agreement` (the dry run: menu row 0.988 and 0.988, toolbar 0.737
+and 0.724, tabs 0.809 and 0.799, status 0.692 and 0.695, Unlock strip 0.985 and footer 0.799, Add Login strip 0.962
+and footer 1.000, Add SSH Key strip 0.925). Record the agreements for the STATUS entry; the colour check of the
+`colours` fields runs at the merge with 4c. A missing colour is a defect to fix as in Step 4; a
 low agreement that comes from the mock's fixture content (the toolbar's Detach button, Session combo and Connect button,
 the tool-window headers beside the tabs, the Vault forms' bodies) is a floor to lower to the measured value rounded down
 to 0.05, recorded in the banner.
@@ -5452,18 +5675,18 @@ EOF
 
 ### Task 9: The variant-read scan, documentation, STATUS and the whole build
 
-`VariantReadTest` gains spec 16.1.7's reader for this plan's last point (`DialogMapping.Kind` only in
+`ProjectionReadTest` (plan 6a's; Execution notes R22) gains spec 16.1.7's reader for this plan's last point (`DialogMapping.Kind` only in
 `AuxiliaryWindows`, besides the presentation package; 6a's `WorkspaceLook` entry already covers the header, tabs and
 status variants, and `WorkspaceChrome` now reads them); the documents spec 17 names for the window content get their
-smallest edits (`docs/themes.md` took its edit in Task 1); `docs/STATUS.md` gets this plan's entry, with Rulings 3
-awaiting the user's approval; the default look is proven unchanged and the whole build runs.
+smallest edits (`docs/themes.md` took its edit in Task 1) and the spec its amendment for Rulings 3; `docs/STATUS.md`
+gets this plan's entry, with Rulings 3 approved; the default look is proven unchanged and the whole build runs.
 
 **Files:**
-- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/VariantReadTest.java` (6a's `PROJECTION_READERS` and its two tests)
-- Modify: `docs/app-architecture.md` (6a's title-bar paragraph and its presentation-row sentence), `docs/app-maintenance.md:631-636`, `docs/ui-architecture.md:87-100`, `docs/STATUS.md:1`, this plan's first lines
+- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java` (6a's `PROJECTION_READERS` and its two tests)
+- Modify: `docs/app-architecture.md:181,226` (6a's presentation-row sentence and title-bar paragraph), `docs/app-maintenance.md:631-637`, `docs/ui-architecture.md:96-103`, `docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md` (the amendment line, 7.1, 7.2), `docs/STATUS.md:1`, this plan's first lines
 
 **Interfaces:**
-- Consumes: everything above; 6a Task 9's `VariantReadTest.PROJECTION_READERS`, `projectionReaders`.
+- Consumes: everything above; 6a Task 9's `ProjectionReadTest.PROJECTION_READERS`, `projectionReaders`, `Scanned`.
 - Produces: `PROJECTION_READERS` with the dialog mapping's entry, which plans 7 to 9 extend.
 
 - [ ] **Step 1: Write the failing scan tests**
@@ -5478,7 +5701,7 @@ def edit(name, edits):
         if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
-edit("jasper-app/src/test/java/dev/jasper/app/architecture/VariantReadTest.java", [
+edit("jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java", [
     ('''        Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/application/LookMotion"));''',
      '''        Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
@@ -5487,9 +5710,9 @@ edit("jasper-app/src/test/java/dev/jasper/app/architecture/VariantReadTest.java"
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"));''', 1),
     ('''        assertThat(projectionReaders(files)).isEmpty();
     }''',
-     '''        assertThat(files.stream().map(StrategyIsolationTest.Scanned::of)
+     '''        assertThat(files.stream().map(Scanned::of)
                 .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/DialogMapping$Kind")))
-                .map(StrategyIsolationTest.Scanned::name))
+                .map(Scanned::name))
             .as("the dialog mapping's scan is live").contains("dev/jasper/app/windows/AuxiliaryWindows");
         assertThat(projectionReaders(files)).isEmpty();
     }''', 1),
@@ -5506,8 +5729,8 @@ entry writes its `$`.
 
 - [ ] **Step 2: Run the scan**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.VariantReadTest'`
-Expected: PASS (4 cases). To see it fail, add `private dev.jasper.app.presentation.DialogMapping.Kind probe;` to
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.architecture.ProjectionReadTest' --tests 'dev.jasper.app.architecture.VariantReadTest'`
+Expected: PASS (`ProjectionReadTest` 2, 4b's `VariantReadTest` unchanged). To see it fail, add `private dev.jasper.app.presentation.DialogMapping.Kind probe;` to
 `NativeShells` temporarily: `onlyTheFactoriesReadTheLooksVariants` names `dev/jasper/app/windows/NativeShells`; remove
 it again.
 
@@ -5531,9 +5754,8 @@ buttons with the search field and Settings… trailing), `TabStrip` (`WindowTabs
 `StatusCells` (`SlashSegments`, or `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's
 dialog mapping and marks the surfaces it makes; `NativeShells` draws a marked modal overlay or attached sheet whose
 window is showing in that window as a `ClassicDialog`.''', 1),
-    ('''The window chrome's projections are read by `WorkspaceChrome.of`, `ShellChrome.of` and the application's `LookMotion`.''',
-     '''The window chrome's projections are read by `WorkspaceChrome.of`, `ShellChrome.of` and the application's `LookMotion`,
-and the dialog mapping by `AuxiliaryWindows`.''', 1)])
+    ('''`WindowTitle` (`TitleFormat`) and the application's `LookMotion`.''',
+     '''`WindowTitle` (`TitleFormat`) and the application's `LookMotion`, and the dialog mapping by `AuxiliaryWindows`.''', 1)])
 edit("docs/app-maintenance.md", [
     ('''overlay's `show` blocks in a secondary loop until it closes and lets Escape reach its form; a progress overlay returns
 at once and keeps Escape from the window.''',
@@ -5548,8 +5770,18 @@ edit("docs/ui-architecture.md", [
 `ClassicDialog` is the classic look's in-window dialog: a still scrim, a card framed in `border.hover` with
 `DIALOG_RADIUS` and the popover shadow, a header strip on `surface.header.active` holding the dialog's swatch and title,
 and the host's content; it is centred on the whole window or, as a sheet, joined under the title bar, and it neither
-fades nor moves. Two `KitView` host flags serve it: `hostTitled` (the form draws neither its title nor its hero) and
-`dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule).''', 1)])
+fades nor moves. Two `KitView` host flags serve it: `hostTitled` (the form draws no title label and hides a hero that
+only repeats the title) and `dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule, the
+footnote leading and the actions trailing).''', 1)])
+# Rulings 3, approved 2026-10-17 (Execution notes R20): the spec's smallest amendment and its status line.
+edit("docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md", [
+    ('''Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
+''', '''Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
+Amended on 2026-10-17 with plan 6b's ruling 3: 7.1 and 7.2 (border.divider is overridable).
+''', 1),
+    ('''| `border.divider` | mix(border.window′, surface.card, 73%) | column separators |''',
+     '''| `border.divider`* | mix(border.window′, surface.card, 73%) | column separators |''', 1),
+    ('''may list the eight starred keys after its roles.''', '''may list the nine starred keys after its roles.''', 1)])
 PY
 ```
 
@@ -5561,7 +5793,7 @@ This plan changes jasper-ui (`DerivedColor.BORDER_DIVIDER`'s flag, `ClassicDialo
 Render the headless gallery here and at the base and compare every file:
 
 ```bash
-B=$(mktemp -d) && git worktree add --detach "$B/base" "$(git log --format=%H -1 --grep='Window chrome: the shell.s documentation, scan and status')"
+B=$(mktemp -d) && git worktree add --detach "$B/base" 50b593f3c
 for theme in dark light; do
   (cd "$B/base" && ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R jasper-ui/build/gallery/$theme-1x "$B/base-$theme")
   ./gradlew -q :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R jasper-ui/build/gallery/$theme-1x "$B/new-$theme"
@@ -5570,11 +5802,11 @@ done
 git worktree remove --force "$B/base"
 ```
 
-Expected: `dark: identical` and `light: identical` (the base is 6a's last commit, so this proves 6b alone). Then run
-the reference pairs, the calibration suites and the frozen built-in derived tables as they are:
-`./gradlew :jasper-app:test --tests '*Calibration*' --tests '*Reference*' :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedRolesTableTest'`
-must pass unchanged, and `git diff "$(git log --format=%H -1 --grep='Window chrome: the shell.s documentation, scan and status')" --stat -- jasper-ui/src/test/resources`
-must list only `derived-roles-enterprise.tsv`.
+Expected: `dark: identical` and `light: identical` (the base is `50b593f3c`, the commit this plan starts from, so this
+proves 6b alone). Then run the reference pairs, the calibration suites and the frozen built-in derived tables as they
+are: `./gradlew :jasper-app:test --tests '*Calibration*' --tests '*Reference*' :jasper-ui:test --tests 'dev.jasper.ui.theme.DerivedRolesTableTest' --tests 'dev.jasper.ui.swing.KitCalibrationTest'`
+must pass unchanged, and `git diff 50b593f3c --stat -- jasper-ui/src/test/resources` must print nothing (plan 5b's
+`derived-roles-enterprise.tsv` is not on the branch).
 
 - [ ] **Step 5: Run the whole build**
 
@@ -5598,11 +5830,12 @@ Expected: 0 failures and 0 errors; note the four numbers.
 
 Insert at the top of `docs/STATUS.md`, right after the `# Jasper — Status and Handoff` heading and its blank line (above
 plan 6a's entry), one paragraph (fill `<range>` with the first and last commit of this plan, `<counts>` with Step 5's
-line, `<agreements>` with Task 8's `check_pairs.py` lines, `<swatches>` with Task 8's two swatch lines, and
+line, `<agreements>` with Task 8's `compare_all.py` lines, `<swatches>` with Task 8's two swatch lines, `<fonts>` with
+Task 8's `FONTS residual` lines, and
 `<deviations>` with every deviation from this plan's text, or "none beyond the plan's Rulings"):
 
 ```markdown
-**Enterprise presentation, plan 6b: the window content — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
+**Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `<range>`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-6b-window-chrome-content.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec 10.3, 10.5, 10.6 and 10.8 land:
@@ -5616,12 +5849,15 @@ cell, divided by `border.divider` rules) and the leading "▶ Run…" item; the 
 every surface; a marked modal overlay or attached sheet over a showing window is a `ClassicDialog` (jasper-ui) hosted by
 `WindowOverlay`, centred on the whole window or joined under its title bar, its form titled by the strip
 (`KitView.hostTitled`) and footed by the band (`dialogBand`); without a showing window it opens natively. The Enterprise
-theme takes the mocks' tab strip, tab indicator, scrim and dividers. `EnterpriseWorkstationMockTest` and
+fixture theme (`enterprise-fixture.json`, until plan 5b, which copies the values) takes the mocks' tab strip, tab
+indicator, scrim and dividers. `EnterpriseWorkstationMockTest` and
 `EnterpriseDialogMockTest` compare the toolbar row, tabs and status cells with the Workstation and Dark Mode mocks and
-the dialogs with Credential Vault 1, 4 and 5 (opt-in pairs: <agreements>; swatches: <swatches>). Rulings (plan,
+the dialogs with Credential Vault 1, 4 and 5 under 6a's fixture kit and theme (opt-in pairs through `compare_all.py`:
+<agreements>; swatches: <swatches>; probes that follow the face's widths, printed until plan 5b's Plex: <fonts>). Rulings (plan,
 "Rulings"): (1) the window content lands at the end; (2) the mocks' tab strip, tab indicator, scrim and dividers are
-Enterprise theme values; (3) **awaiting the user's approval: `border.divider` becomes a ninth overridable derived role,
-a deviation from spec 7.2** (Enterprise Dark's recipe value `#2B2D31` is darker than the mock's `#4A4D53`); (4) the
+Enterprise theme values; (3) **approved on 2026-10-17 by the orchestrator under the user's overnight authority:
+`border.divider` becomes a ninth overridable derived role, a deviation from spec 7.2** (Enterprise Dark's recipe value
+`#2B2D31` is darker than the mock's `#4A4D53`; the spec's 7.1 and 7.2 are amended); (4) the
 toolbar's leading pack is a separate branch; (5) the classic header's trailing group, field shrink and collapse,
 `hidden` and `icons`; (6) the search field's light keycap; (7) classic tabs keep `window.tab_height` (the mock's strip
 is 1 px shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the
@@ -5633,7 +5869,10 @@ the form's title label and only a hero that repeats it (a prompt keeps its tile 
 card own the form's frame; (13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the
 Workstation render leads with the run item; (16) under a native title the header row is window chrome; (17) the
 window chrome's declared pairs (`WindowPairs`, `ClassicDialog.pairs`) are sampled over every palette under both kits,
-the `border.divider` rules painted as the role.
+the `border.divider` rules painted as the role; Execution notes (2026-10-17) R18 to R48 (the fixture theme in 5b's
+place, `ProjectionReadTest`, `WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the
+band's trailing actions, the tab strip's dividers painted as the role, the face-width probes printed until 5b, and
+5b's merge items).
 Deviations from the plan's text: <deviations>. `./gradlew check --continue`: **<counts>**. GUI checks for the user (spec
 16.2): with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell,
 "▶ Run…" opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second
@@ -5643,25 +5882,236 @@ dialog over the first, the window closing under them). Not merged, not pushed.
 Replace this plan's first heading line with the same heading followed by a status banner:
 
 ```markdown
-> **Status (2026-10-16): executed on `claude/enterprise-window-chrome` (`<range>`).** Rulings 3 (`border.divider` overridable) awaits the user's approval; Rulings 10 centres OVERLAY on the whole window, a deviation from spec 10.8's text that follows the mock. Deviations from this plan's text: <deviations>.
+> **Status (2026-10-17): executed on `claude/enterprise-window-chrome` (`<range>`).** Rulings 3 (`border.divider` overridable) was approved on 2026-10-17 by the orchestrator under the user's overnight authority and the spec amended; Rulings 10 centres OVERLAY on the whole window, a deviation from spec 10.8's text that follows the mock. Deviations from this plan's text: <deviations>.
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add docs jasper-app/src/test/java/dev/jasper/app/architecture/VariantReadTest.java
+git add docs jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java
 git commit -F - <<'EOF'
 Window content: documentation, scan and status
 
-VariantReadTest keeps DialogMapping's kind in AuxiliaryWindows. The app
-architecture and maintenance documents describe the header, tab, status
-and dialog strategies; the ui architecture describes ClassicDialog and
-KitView's host flags. STATUS records plan 6b with its rulings, the
-border.divider deviation awaiting approval, the mock comparisons and
-the whole build.
+ProjectionReadTest keeps DialogMapping's kind in AuxiliaryWindows. The
+app architecture and maintenance documents describe the header, tab,
+status and dialog strategies; the ui architecture describes
+ClassicDialog and KitView's host flags; the spec's 7.1 and 7.2 take the
+approved border.divider override. STATUS records plan 6b with its
+rulings, the mock comparisons and the whole build.
 
 🤖 Generated with Claude Code at The Home Depot
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-17)
+
+**Refresh.** Every anchor, quoted text, path, signature and line number this plan relies on was re-checked against the
+worktree at `50b593f3c` (`main`: plans 3a to 3e, 4a, 4b, 5a, 6a and 8a; not 4c, 5b or 7). Method, without Gradle: a dry
+run in a scratch copy of the tree applied every step in order (each edit script with its stated counts, each created or
+replaced file, each ledger row), compiled jasper-ui main, test fixtures and tests and jasper-app main and tests with
+`javac` (JBR 25, the Gradle cache's jars), and ran the tests through the JUnit 6.1.3 launcher headless. The plan as
+written failed in Tasks 1 (5b's files), 2 to 6 (tests), 8 (an anchor, a compile error, the mock comparisons) and 9 (two
+anchors); after the edits below, the blocks re-extracted from this file apply cleanly from `50b593f3c` and every new
+test passes: `EnterpriseChromeTargetsTest` 1, `WindowToolbarLeadingTest` 3, `ClassicHeaderTest` 6, `ClassicTabsTest` 4,
+`RuledCellsTest` 4, `ClassicDialogTest` 4, `HostedTitleTest` 2, `ClassicPlacementTest` 5, `ClassicWindowOverlayTest` 1,
+`EnterpriseWorkstationMockTest` 8, `EnterpriseDialogMockTest` 3 and `WindowPairsTest` 1, with `ProjectionsTest`,
+`ChromeRenderTest`, `EnterpriseMenuRowMockTest`, `ProjectionReadTest` and `PresentationReachTest` passing in their edited
+forms. The wide suites (`application`, `appearance`, `architecture`, `documentation`, `platform`, `plugins`,
+`presentation`, `windows`, `workspace` and all of jasper-ui) fail, class by class, exactly the tests the unchanged tree
+fails in that harness (staged plugins, packaged jars, build info and pty sessions, which need Gradle's task inputs).
+The source-hygiene scan is clean (2,516 files); `javadoc -Xdoclint:all,-missing` over jasper-ui and jasper-app main
+exits 0; `compare_all.py` gives the thirteen opt-in pairs the agreements Task 8 Step 6 lists; the headless gallery
+(`KitGallery`, Slate Cobalt Dark and Light at 1×) is byte-identical to `50b593f3c`'s, 161 files a side. The dry run did
+not run Gradle (`check`, the architecture tasks, the packaged-jar tests): Tasks 1 to 9 still run their stated commands.
+
+Changes made to this plan's text: the opening banner, the Workspace paragraph and "Before you start"; Global
+Constraints (the renders that change, `ProjectionReadTest`); facts 8 to 10 and the facts' heading; Rulings 2 and 3 and
+the Rulings preamble; the file structure; Task 1 (rewritten for the fixture theme); Task 2's test; Tasks 3 to 5's
+`WorkspaceChrome` edits; the Enterprise tests' teardown; Task 4's and 5's accessible contexts; Task 5's status bar
+escapes, cell rules, palette hook and `WorkspaceMetricsTest`; Task 6's test helper, scrim, frame, strip rule, band and
+four renamed identifiers; Task 7's reach accessor and test; Task 8's Files, Interfaces, `Mounted`, `MockProfile.fonts`,
+the two comparison classes, `WindowPairs`, `WindowPairsTest`, the painters' script, Steps 2, 4 and 6 and a ledger row;
+Task 9's scan, documents, spec amendment, gallery base and STATUS template.
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface:
+
+| Tasks | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| 1 → 3, 5, 8 | `border.divider` overridable: the keycap edge (3), the cell rules (5), the menu-row rule and `WindowPairsTest`'s role checks (8) | Agree once Task 1 edits the fixture theme, not 5b's | R19, R20 |
+| 1 → 8 | `enterprise-fixture.json`'s eight values: the Workstation, Dark Mode and Vault comparisons, the menu row's Dark rule | Agree; the Dark menu-row pair rises from 0.732 to 0.988 | R19 |
+| 2 → 3 | `WindowToolbar.Leading`, `packLeading`, `leading()` | Agree | none |
+| 3 → 4 → 5 | `WorkspaceChrome.java`: `STANDARD`, the constructor, `of`, the factories, `equals`/`hashCode` | Each later anchor is the earlier task's output; the factories now switch on the look's enums | R29 |
+| 3 → 5 | `WindowChrome.java`: `composition = owner.look().header();` is Task 5's anchor for the status bar | Agree | none |
+| 3, 4, 5 | `WindowContent.java`: `mount` (3), the tab strip (4), `paletteOpen`/`paletteChanged` after `lookAnimates` (5) | Disjoint spans; counts hold in order | R46 |
+| 3, 4, 5, 6 → 8 | The painters Task 8 routes: `ClassicToolbarButton`, `ClassicHeader`, `ClassicTabs`, `RuledCells`, `RunItem`, `ClassicDialog`, `WindowChrome`'s separator | Three anchors had moved or broke (the menu row's style, the strip rule, the tab rules) and one call did not compile | R31, R34, R40, R41 |
+| 4 → 8 | `WindowContent.tabBar()`, `ClassicTabs.entries()`, read by the Workstation comparison | `ClassicTabs.close()` clears the entries before the comparison reads them | R35 |
+| 5 → 8 | `RuledCellsTest.state`, `local`, used by `EnterpriseWorkstationMockTest` and `WindowPairsTest` | Agree | none |
+| 5 ↔ 8a | `WindowCommandPalette.open(String, String, String)`, `restoreAndHide()` (8a's `PaletteView` file) | The manual step is now a script on 8a's text | R28 |
+| 6 → 7 | `ClassicDialog`, `KitView.hostTitled`, `dialogBand` | Agree | none |
+| 6 → 8 | `ClassicDialog.pairs`, the strip rule's pair, `frame(SemanticColor)` | The strip rule's pair is a function of the dialog surface | R31, R41 |
+| 6 ↔ 4b | `ClassicPromptFace` (Unlock Vault's tile and message), `Forms.FooterLayout` | Agree with the band's trailing actions | R33 |
+| 7 → 8 | `WindowOverlay.classic`, used by `EnterpriseDialogMockTest` | Agree | R37 |
+| 7 → 9 | `DialogMapping.Kind` read only by `AuxiliaryWindows`; `ProjectionReadTest` | Agree: no other class in the jar names it | R22 |
+| 7 ↔ 5a | `PluginRuntime.presentation(Kit)` (5a Rulings 20) and spec 4.9's `DialogMapping` parameter | The mapping reaches plugin dialogs through `AuxiliaryWindows`; the setter keeps the kit alone | R44 |
+| 8 → 9 | The STATUS template's agreements, swatches and face-width residuals | Agree after the template names `compare_all.py` and the residual lines | R36, R42 |
+| 1 to 8 | `docs/design/theme-engine/migration.csv`, append-only | Eight fields per row once Task 8's Workstation row loses its comma; Task 1 adds a row | R50 |
+| 1, 8 (6a's files) | `EnterpriseLook`, `enterprise-fixture.json`, `MockProfile`, `EnterpriseMenuRowMockTest`, `ClassicMenuRow`, `ProjectionReadTest`, `PresentationReachTest` | Edited in task order; each anchor is 6a's merged text | R46 |
+| all ↔ 4c (parallel) | `migration.csv`, `docs/STATUS.md`, `pairs.json`, `KitFixtures` (not edited), `DesignMetrics` (not edited) | Reconciled at merge | R45 |
+| 1, 8 ↔ 5b (later) | `EnterpriseLook`, the fixture theme, `MockProfile.fonts`, the face-width probes | 5b's merge items | R47 |
+
+Each task against itself:
+
+| Task | Agreement of its own text | Ruling |
+|---|---|---|
+| 1 | Edited 5b's `enterprise.json`, `EnterpriseThemeTest` and `derived-roles-enterprise.tsv`, none of which exist; `GeneratedThemeTest` also used `border.divider` as a role without a key | R19, R20, R21, R52 |
+| 2 | The test built a `WindowToolbar` with no theme installed ("No Jasper theme installed" when run alone) | R25 |
+| 3 | Closed the theme controller before the windows; `WorkspaceChrome`'s equality ignored the new strategies | R23, R29 |
+| 4 | `ClassicTabs.Entry` and `Add` dereferenced a null accessible context (every `ClassicTabsTest` case) | R24 |
+| 5 | `RunItem`'s null accessible context; the contributed items' rules took the session dot's colour (7 rules, not 8); the replaced file wrote raw `●`/`○` where today's file escapes them; a manual palette step; `WorkspaceMetricsTest` required the dot in `WindowStatusBar` | R24, R26, R27, R28, R49 |
+| 6 | The test printed an unlaid-out tree; the scrim was asserted against a value `KitFixtures.enterpriseLight()` does not carry; the strip rule's guard moved the mock's `#C4C7CC`; the stroked frame was one device pixel; a prompt's band stacked the footnote over full-width buttons; two identifiers used the prompt kind's old word | R24, R30, R31, R32, R33, R51 |
+| 7 | Agree; spec 4.9's reach is now tested | R44, R48 |
+| 8 | `ClassicMenuBar` no longer holds the style; `frame(…)` inside `Card` resolved to the card's own `frame()`; the Dark tab rule moved 16 ΔE; the geometry was read from a closed window; label widths in the platform face; a parameterized test off the EDT; a column through the fixture's buttons; the swatch compared without its guard; `check_pairs.py` absent | R34 to R42 |
+| 9 | Edited `VariantReadTest`; the presentation-row sentence moved; the gallery base was 6a's documentation commit, before the merge with 4b and 8a; no spec amendment | R20, R22, R43 |
+
+### Rulings
+
+The plan's own Rulings are 1 to 17; these continue the numbering.
+
+18. **Anchors re-checked at `50b593f3c`.** Every quoted anchor of Tasks 2 to 7 matched its stated count unchanged
+    (`WindowStatusBar.java` and `WindowOverlay.java` are unchanged since `deafed424`, so the whole-file replacements and
+    their `git diff deafed424` checks stand); the Files lines give `50b593f3c`'s numbers where a fact or Files line cited
+    `deafed424`'s. The failures are the rulings below. Why: the scripts anchor on text. Cost if wrong: none.
+19. **The Enterprise theme is 6a's fixture theme until plan 5b** (refines Rulings 2). Task 1 sets the eight values in
+    `jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json` (which `EnterpriseLook.theme()`
+    reads, plan 6a Rulings 13) and pins them in a new `EnterpriseChromeTargetsTest`, which reads `EnterpriseLook.theme()`
+    and so checks the shipped theme after 5b's merge; 5b's `enterprise.json`, `EnterpriseThemeTest` and
+    `derived-roles-enterprise.tsv` steps go. Why: the orchestrator: plan 5b ships the theme and is not merged. Cost if
+    wrong: at 5b's merge the values move into `enterprise.json` (R47).
+20. **Rulings 3 is approved.** The orchestrator approved `border.divider` as the ninth overridable derived role on
+    2026-10-17 under the user's overnight authority. Task 9 amends the spec with the smallest edit (7.1's row gains its
+    `*`, 7.2's "eight" becomes "nine") and one status line, "Amended on 2026-10-17 with plan 6b's ruling 3: 7.1 and 7.2
+    (border.divider is overridable).", after the 2026-10-16 lines; the banner and the STATUS entry say approved. Why:
+    the orchestrator's ruling. Cost if wrong: one flag, one key and three documents.
+21. **The IntelliJ converter keeps its eight keys.** `tools/themes/jasper_theme.py`'s `OVERRIDE_KEYS` and spec 7.7 are
+    not edited: the converter fills only the keys an IntelliJ key maps to (`OVERRIDES` has no divider) and its
+    `validate` checks only the files it writes. Why: smallest change; nothing it writes changes. Cost if wrong: a
+    hand-written theme with `border.divider` passes Jasper's loader but not the converter's validation, which never
+    reads it.
+22. **The variant-read scan is `ProjectionReadTest`** (plan 6a Rulings 16). Global Constraints and Task 9 name it;
+    Task 9's liveness check uses its own `Scanned` record, and 4b's `VariantReadTest` is run unchanged beside it. Why:
+    6a's STATUS entry asks for the rename. Cost if wrong: none.
+23. **Tests close their windows before their theme controller** (plan 6a Rulings 19): every workspace-package `finally
+    { themes.close(); EnterpriseLook.restoreDefault(); }` starts with `DesktopTestSupport.closeOwnersNow();`
+    (`ClassicHeaderTest`, `ClassicTabsTest`, `RuledCellsTest`, `WindowPairsTest`); `EnterpriseDialogMockTest` mounts no
+    window. Why: as written the EDT logged "Appearance binding is closed" from every kit view of a window still open.
+    Cost if wrong: none.
+24. **A bare `JComponent` has no accessible context.** `ClassicTabs.Entry` (PAGE_TAB), `ClassicTabs.Add` (PUSH_BUTTON),
+    `RunItem` (TOGGLE_BUTTON) and `ClassicDialog`'s strip (LABEL) override `getAccessibleContext` with an
+    `AccessibleJComponent`, as `TitleSearchField` does. Why: `getAccessibleContext().setAccessibleName(…)` threw a
+    `NullPointerException` in their constructors and `refresh`, failing every `ClassicTabsTest` and two `RuledCellsTest`
+    cases. Cost if wrong: none.
+25. **`WindowToolbarLeadingTest` installs a theme first**, as `WindowToolbarTest` does ("install one rather than rely
+    on another class's"). Why: run alone it failed "No Jasper theme installed". Cost if wrong: none.
+26. **`RuledCells.paint` draws the contributed items' rules before the session dot.** Why: drawn after it, they took the
+    dot's colour, so `theCellsAreTheMocks` found 7 divider rules, not 8. Cost if wrong: none.
+27. **`WindowStatusBar` keeps `" ●"` and `" ○"`** as Java escapes, as today's file writes them. Why: the
+    replacement was to move code, not rewrite it; the raw characters pass the hygiene scan but change the line. Cost if
+    wrong: none.
+28. **The palette's open and close hook is a script**: `owner.paletteChanged();` ends `open(String, String, String)`
+    and `restoreAndHide()` (8a's file, whose anchors are unique). Why: the manual step anchored on a grep. Cost if
+    wrong: none.
+29. **`WorkspaceChrome` keeps the look's choices and makes each window's strategy from them.** Tasks 3 to 5 store
+    `WorkspaceLook.Header`, `Tabs`, `Status` and `runItem` (not suppliers); `header()`, `tabs(WindowContent)` and
+    `statusBar(Action, BooleanSupplier)` switch on them; `equals` and `hashCode` cover them. Why: plan 6a's
+    `PresentationReachTest` compares `windowLook()` with `WindowLook.of(projections)` through this equality, which
+    otherwise ignored the window content; `ProjectionReadTest` allows `WorkspaceChrome` to read the enums. Cost if
+    wrong: none.
+30. **`ClassicDialogTest` lays the whole tree out and compares the scrim with its fixture's role.** `print` lays the
+    dialog out recursively three times, as `KitFixtures.render` does; the scrim over white is computed from
+    `KitFixtures.enterpriseLight()`'s `surface.scrim` (4a's fixture, which 4c also edits, is not changed); the mock's
+    `#C9CACC` is compared in `EnterpriseDialogMockTest` under 6a's fixture theme. Why: `doLayout` on the dialog and card
+    left the form at 0 × 0, and the jasper-ui fixture's scrim reads `#C6` over white. Cost if wrong: none.
+31. **The strip's rule is held apart from the dialog surface below it**: `ClassicDialog.stripRule(dialogSurface)` =
+    `(border.window, the kit's dialog surface, STRUCTURAL)`, replacing `STRIP_RULE` on `surface.header.active`. Why: on
+    `#D9DFEA` the structural guard (1.26:1) moved the mock's `#C4C7CC` to `#BCBFC3` (ΔE 3.1); the rule parts the strip
+    from the content, and the strip's own fill parts it from the card. Cost if wrong: a theme whose rule matches the
+    header strip but not the content keeps an unrepaired rule against the strip.
+32. **`ClassicDialog`'s frame is a filled ring**, not a stroke. Why: a 1 px stroke on the half pixel painted one device
+    pixel and two half-covered ones at 2×, where Credential Vault 1's frame is two device pixels ("unlock frame
+    length" 51 for 2). Cost if wrong: none.
+33. **In the band a prompt's actions keep their size at the trailing edge, the footnote leading** (spec 10.8): under
+    `dialogBand`, `FormControl.refresh` gives a prompt's actions the ordinary stack layout and `FooterLayout` its
+    preferred width; the band's row is `BUTTON_HEIGHT` tall, so a prompt's buttons (28 px with their focus ring) overhang
+    it into the padding and their faces sit 8 from the rule and the foot. Why: Unlock Vault's footnote stacked over two
+    full-width buttons (band 70 px, the mock's 40). Cost if wrong: none; nothing in the default look sets the flag.
+34. **The tab strip's dividers and rule are painted as `border.window`** (extends Rulings 17's exceptions; `TAB_DIVIDER`
+    is not declared). Why: Enterprise Dark's `#2A2C30` on the strip's `#3A3D42` is 1.29:1, and the structural guard
+    moves it toward `text.primary`, a rule lighter than the strip (ΔE 16 from the mock's); the card fill and the
+    indicator mark the selected tab. Cost if wrong: in a theme whose `border.window` equals `surface.tabstrip` the
+    inactive tabs lose their dividers.
+35. **`EnterpriseMenuRowMockTest.Mounted` carries the geometry the comparisons read** (`field`, `firstTab`), read before
+    the window closes. Why: `mounted` closes its windows in its `finally`, and `ClassicTabs.close()` clears the entries,
+    so `theTabsAreTheMocks` read an empty strip. Cost if wrong: none; plans 7 to 9 add the parts they need.
+36. **Probes that follow the UI face's advance widths are printed until plan 5b** (`MockProfile.fonts`, as plan 6a
+    Rulings 29 and plan 8a's FONTS owner do): "New Session"'s ink width (141 for the mock's 134), the search field's left
+    (2110 for 2116) and "Settings…"'s start (2740 for 2742), the status rules before UTF-8 and the warning (2418 and 2536
+    for 2470 and 2574) and the run item's width (130 for 122), and the Vault titles' widths (Add Login 116 for 108, Add
+    SSH Key 154 for 143), all at 2×. Why: the fixture kit draws the platform face where the mocks draw IBM Plex; every geometry
+    that does not follow a text width stays asserted. Cost if wrong: these go unchecked until 5b's merge (R47).
+37. **`EnterpriseDialogMockTest`'s parameterized test runs its body on the EDT** through `DesktopTestSupport.edt`.
+    Why: `EdtTestExtension` intercepts test methods, not a template's invocations ("Theme operations require the EDT").
+    Cost if wrong: none.
+38. **Unlock Vault's column is 16 px (2×) inside the frame's right edge**, in the content's side padding. Why: the
+    fixture form is narrower than Credential Vault 1's, and the column at 396 crossed its buttons. Cost if wrong: none.
+39. **A swatch is compared as its pair paints it** (refines Rulings 14): the theme's hue through the INDICATOR guard on
+    the strip. Add Login paints `#2F65CA` (the mock's, ΔE 0.0); Add SSH Key's `#2E9E4F` on `#D9DFEA` (2.6:1) paints
+    `#2C8B48`, ΔE 9.7 from the mock: a recorded residual, since spec 7.3 lists swatches among the indicators. Cost if
+    wrong: the green swatch is darker than the mock's.
+40. **The open classic title's pair is `ClassicMenuRow.OPEN_TITLE`** (platform), and `WindowPairs.OPEN_MENU` names it.
+    Why: plan 6a's final review moved the row's style from `ClassicMenuBar` to `ClassicMenuRow`, which auxiliary frames
+    share, and `platform` cannot see `workspace`'s package-private `WindowPairs`. Cost if wrong: none.
+41. **`ClassicDialog.Card` calls `ClassicDialog.frame(…)` qualified.** Why: unqualified it resolved to the card's own
+    `frame()` and failed to compile. Cost if wrong: none.
+42. **The opt-in pairs are checked with `compare_all.py`** (plan 6a Rulings 17); `EnterpriseGalleryTest` is not run.
+    Why: 4c's `check_pairs.py` and gallery test run in parallel and are not on the branch. Cost if wrong: the colour
+    checks of the thirteen pairs run at the merge with 4c, where a floor may need lowering.
+43. **The gallery's base is `50b593f3c`**, and `jasper-ui/src/test/resources` must show no change. Why: 6a's documentation
+    commit predates the merge with 4b and 8a, whose JSON differs; 5b's derived table is not here. Cost if wrong: none.
+44. **The dialog mapping reaches its consumer through `AuxiliaryWindows`**, constructed with it (spec 4.9's "Windows and
+    dialogs … receive their projections at construction"); `PluginRuntime.presentation` keeps the kit alone (5a
+    Rulings 20), since plugin dialogs reach the mapping through the application's `AuxiliaryWindows` (`HostedUi.dialog`
+    routes to it). Task 7 adds `AuxiliaryWindows.dialogs()`, a test accessor `JasperApplication.auxiliary()` and a
+    `PresentationReachTest` assertion. Why: Rulings 11 makes `AuxiliaryWindows` the one reader; a mapping parameter on
+    `PluginRuntime` would have no reader. Cost if wrong: spec 4.9's setter signature stays unmet (as since 5a).
+45. **Shared files with parallel or later plans are reconciled at merge**: 4c (`migration.csv`, `docs/STATUS.md`,
+    `pairs.json`; `KitFixtures` and `DesignMetrics` are not edited here), every plan (`migration.csv`, STATUS). Keep
+    every side's rows, pairs and paragraphs. Cost if wrong: merge work only.
+46. **Order is binding; timing-sensitive tests may flake once.** The shared files are edited in task order and each later
+    anchor is the earlier task's output; the window tests and mock comparisons wait on the EDT while another plan's
+    build runs, so re-run such a test alone before treating it as a failure, and never run `./gradlew --stop`. Cost if
+    wrong: one rerun.
+47. **Plan 5b's merge with this branch** also: copies the eight chrome values into `enterprise.json` (Light
+    `surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim` `#00000036`, `border.divider` `#D3D6DA`;
+    Dark `#3A3D42`, `#3D74D6`, `#00000036`, `#4A4D53`), drops `surface.tabstrip` from `EnterpriseThemeTest.NEUTRAL`,
+    adds `border.divider` to its Dark overrides, generates `derived-roles-enterprise.tsv` with the override, turns
+    R36's printed probes into assertions within their stated tolerances, and re-measures R39's swatch under the shipped
+    theme. Why: the fixture stands in for 5b only. Cost if wrong: the comparisons stay on the platform face.
+48. **Under the Enterprise projection a FULL form in a native-titled dialog is host-titled from Task 7**, before Task 8
+    lands `WINDOW_CONTENT`: `Projections` derives `windowTitled` from the window group, which 6a landed. Why: no kit
+    ships a presentation until 5b, so no user sees the intermediate build. Cost if wrong: none.
+49. **`WorkspaceMetricsTest` requires the running dot in `SlashSegments`**, where Task 5 moves `WindowStatusBar`'s dot.
+    The new classic painters are not added to its native-adapter list: they read the classic catalog's tokens
+    (`STATUS_DOT` among them) by design. Why: the test failed on the moved call. Cost if wrong: none.
+50. **Task 8's Workstation ledger row says "the toolbar row; tabs and status cells"**: the ledger is split on commas.
+    Why: the comma gave the row nine fields. Cost if wrong: none.
+51. **The prompt kind's old word stays the form slot's alone** (spec 8.1, `PromptVocabularyTest`): `HOSTED_HERO`,
+    `hideHostedHero` and two test names say "heading" (`HOSTED_HEADING`, `hideHostedHeading`,
+    `aPromptHeadingKeepsItsTileAndMessageUnderTheStrip`, `aHostTitledFormDrawsNeitherItsTitleNorAHeadingThatRepeatsIt`).
+    Why: the vocabulary test named all four. Cost if wrong: none.
+52. **`GeneratedThemeTest`'s role without an override key is `border.row`**, as `JasperThemeTest`'s is (Task 1 Step 1).
+    Why: with `border.divider` overridable, `aGeneratedThemeTakesOnlyOpaqueOverridesOfTheOverridableRoles` no longer
+    threw. Cost if wrong: none.
