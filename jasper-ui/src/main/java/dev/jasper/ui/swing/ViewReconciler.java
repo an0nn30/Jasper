@@ -303,10 +303,12 @@ final class ViewReconciler implements AutoCloseable {
         if (node instanceof Nodes.Stack route && route.role() == Nodes.LayoutRole.ROUTE) {
             int tile = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_TILE),
                 glyph = view.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.ROUTE_GLYPH);
+            // The classic strip edges its cells in the steps' hues instead of tiling their icons.
+            boolean tiled = !(next.get(route.id()) instanceof Stacks.StackControl strip) || strip.routeTiles();
             for (var step : route.children()) {
                 if (!tiles && next.get(step.id()) instanceof Stacks.StackControl control) control.routeStep = true;
                 Nodes.Node lead = step instanceof Nodes.Stack stack && !stack.children().isEmpty() ? stack.children().getFirst() : step;
-                if (tiles && lead instanceof Nodes.Icon && next.get(lead.id()) instanceof Labels.IconControl icon) icon.tile(tile, tile, glyph, false);
+                if (tiles && tiled && lead instanceof Nodes.Icon && next.get(lead.id()) instanceof Labels.IconControl icon) icon.tile(tile, tile, glyph, false);
             }
         }
         for (var child : ControlRegistry.children(node)) applyRoute(child, next, tiles);

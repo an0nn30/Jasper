@@ -42,12 +42,13 @@ final class EmptyStates {
 
         int metric(DesignMetrics.Role role) { return ThemePainting.metric(context(), role); }
 
-        int tileSize() { return metric(panel ? DesignMetrics.Role.PANEL_EMPTY_TILE : DesignMetrics.Role.EMPTY_TILE); }
+        int tileSize() { return !context().faces().empty.tile() ? 0 : metric(panel ? DesignMetrics.Role.PANEL_EMPTY_TILE : DesignMetrics.Role.EMPTY_TILE); }
 
         int textWidth() { return metric(panel ? DesignMetrics.Role.PANEL_EMPTY_TEXT_WIDTH : DesignMetrics.Role.EMPTY_TEXT_WIDTH); }
 
         /** The gap after the tile, the title and the description, in that order. */
         int gap(int index) {
+            if (index == 0 && tileSize() == 0) return 0;
             if (!panel) return metric(DesignMetrics.Role.ICON_GAP);
             return metric(switch (index) {
                 case 0 -> DesignMetrics.Role.PANEL_EMPTY_TITLE_GAP;
@@ -71,6 +72,7 @@ final class EmptyStates {
                     SemanticColor.TEXT_SECONDARY);
             description.lineHeight = panel ? Math.round(context().metrics().value(DesignMetrics.Role.PANEL_EMPTY_LINE_HEIGHT)
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
+            context().faces().empty.style(this);
             content.setLayout(new ContentLayout(this));
             actions.setLayout(new Stacks.StackLayout(context(), Nodes.LayoutRole.ACTIONS));
             int size = tileSize();
@@ -92,9 +94,10 @@ final class EmptyStates {
                 if (action instanceof Buttons.ButtonControl button && button.button.panelEmpty != panel) { button.button.panelEmpty = panel; button.refresh(); }
             }
             Stacks.mount(tile, List.of(controls.getFirst().component));
+            // The classic state places its first action only (spec 5.2: at most one button); the others keep their controls.
             Stacks.mount(
                     actions,
-                    controls.subList(1, controls.size()).stream().map(c -> c.component).toList());
+                    controls.subList(1, controls.size()).stream().limit(context().faces().empty.actions(controls.size() - 1)).map(c -> c.component).toList());
             Stacks.mount(content, List.of(tile, title, description, actions));
         }
 

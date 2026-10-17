@@ -25,6 +25,7 @@ final class Indicators {
             label.setText(chip.label()); label.setFont(ThemePainting.font(context(), panelRow ? Typography.Role.PANEL_ROW_CHIP : Typography.Role.CHIP)); label.setForeground(inked ? ThemePainting.color(context(), ink.text) : Choices.hue(context(), chip.hue()));
             ((ChipLabel) label).fill = inked ? label.getForeground() : Choices.hueSurface(context(), chip.hue());
             int padding = ThemePainting.metric(context(), panelRow ? DesignMetrics.Role.PANEL_CHIP_PADDING : DesignMetrics.Role.CHIP_PADDING); label.setBorder(new EmptyBorder(0, padding, 0, padding));
+            context().faces().tag.style(this, (ChipLabel) label);
             label.getAccessibleContext().setAccessibleName(chip.label()); label.revalidate(); label.repaint();
         }
     }
@@ -33,17 +34,21 @@ final class Indicators {
         boolean panelRow;
         /** The chip's tile surface role colour; the label paints it at the tile share. */
         Color fill;
+        /** The classic tag's 1 px box, or null for none (plan 4c). */
+        Color edge;
         // A chip keeps its label whole on an inline line (Navigation.InlineLayout); the texts beside it shrink instead.
         ChipLabel(KitContext context) { this.context = context; putClientProperty("html.disable", true); putClientProperty("Jasper.chip", Boolean.TRUE); }
         @Override public Dimension getPreferredSize() { var size = super.getPreferredSize(); return new Dimension(size.width, Math.max(size.height, ThemePainting.metric(context, panelRow ? DesignMetrics.Role.PANEL_CHIP_HEIGHT : DesignMetrics.Role.CHIP_HEIGHT))); }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
-            try {
-                ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                int radius = ThemePainting.metric(context, DesignMetrics.Role.CHIP_RADIUS);
-                g.setColor(ColorMath.opacity(fill == null ? getForeground() : fill, ThemePainting.tileShare(context))); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
-            } finally { g.dispose(); }
+            try { context.faces().tag.paint(this, g); } finally { g.dispose(); }
             super.paintComponent(graphics);
+        }
+        /** The tint at the tile share (the default face, and under the classic box). */
+        void paintTile(Graphics2D g) {
+            ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
+            int radius = ThemePainting.metric(context, DesignMetrics.Role.CHIP_RADIUS);
+            g.setColor(ColorMath.opacity(fill == null ? getForeground() : fill, ThemePainting.tileShare(context))); g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
         }
     }
     static final class DotControl extends ControlRegistry.Control {

@@ -21,17 +21,20 @@ final class Stacks {
         final KitContext context;boolean joined,route;
         /** The stack's layout role, which a classic ghost button reads to know a toolbar row from an actions row. */
         Nodes.LayoutRole role;
+        /** A classic route strip's cell starts and the hue of each step's edge (ClassicRouteFace, plan 4c). */
+        int[] cells=new int[0];
+        List<Nodes.Hue> hues=List.of();
         StackSurface(KitContext context){this.context=context;}
         /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
         int[] arrows=new int[0];
         @Override protected void paintComponent(Graphics graphics){
             super.paintComponent(graphics);
-            if(route){paintRoute(graphics);return;}
+            if(route){context.faces().route.paintStrip(this,graphics);return;}
             if(!joined)return;var g=(Graphics2D)graphics.create();
             try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
         }
         /** The route strip: the input surface inside the input outline, and the connecting arrow before each later step. */
-        private void paintRoute(Graphics graphics){
+        void paintRoute(Graphics graphics){
             var g=(Graphics2D)graphics.create();
             try{
                 ThemePainting.antialias(g);if(!isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(.42f));
@@ -100,8 +103,8 @@ final class Stacks {
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
-                    settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.ROUTE ? new RouteLayout(this)
-                    : routeStep ? new RouteStepLayout(context())
+                    settingsHeader ? new SettingsHeaderLayout(context()) : stack.role() == Nodes.LayoutRole.ROUTE ? context().faces().route.layout(this)
+                    : routeStep ? context().faces().route.stepLayout(this)
                     : panelFooter != null && stack.role() == Nodes.LayoutRole.VERTICAL ? new PanelFooters.StackLayout(this, panelFooter)
                     : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.PROMPT_HEADER
                             ? context().faces().prompt.headerLayout(this)
@@ -157,7 +160,13 @@ final class Stacks {
                 .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
             barTexts = controls.stream().filter(c -> c.node instanceof Nodes.Text).map(c -> (Component)c.component)
                 .collect(java.util.stream.Collectors.toCollection(() -> java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>())));
+            // The classic faces adopt what they draw (plan 4c): a route strip's hues, a route step's captions.
+            if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ROUTE) context().faces().route.strip(this, controls);
+            if (routeStep) context().faces().route.step(this, controls);
         }
+
+        /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */
+        boolean routeTiles() { return context().faces().route.tiles(); }
     }
 
     static void mount(Container component, List<JComponent> wanted) {
