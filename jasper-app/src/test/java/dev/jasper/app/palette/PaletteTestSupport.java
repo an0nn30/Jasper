@@ -21,13 +21,16 @@ import javax.swing.JTextField;
 public final class PaletteTestSupport {
     private PaletteTestSupport() {}
 
+    /** {@code palette} as the card it is in the default look. */
+    static CardView card(JComponent palette) { return (CardView) palette; }
+
     /** The mounted kit query input (kit components are named after their node). */
-    public static JTextField query(CommandPalette palette) {
-        return KitTestSupport.require(palette.queryView(), CommandPalette.QUERY + ".input", JTextField.class);
+    public static JTextField query(JComponent palette) {
+        return KitTestSupport.require(card(palette).queryView(), CardView.QUERY + ".input", JTextField.class);
     }
 
     /** The query the palette holds, which the field shows once a host normalization (a typed scope prefix) applies. */
-    public static String queryText(CommandPalette palette) { return palette.queryText(); }
+    public static String queryText(JComponent palette) { return card(palette).queryText(); }
 
     /**
      * Runs the events already queued behind the current one, on the EDT, as the next turn of the event loop would: a
@@ -41,25 +44,25 @@ public final class PaletteTestSupport {
     }
 
     /** The results list's mounted scroll pane and its canvas of row components. */
-    public static JScrollPane resultsScroll(CommandPalette palette) {
-        return KitTestSupport.require(palette.resultsView(), CommandPalette.RESULTS, JScrollPane.class);
+    public static JScrollPane resultsScroll(JComponent palette) {
+        return KitTestSupport.require(card(palette).resultsView(), CardView.RESULTS, JScrollPane.class);
     }
 
-    public static JComponent resultsCanvas(CommandPalette palette) { return (JComponent) resultsScroll(palette).getViewport().getView(); }
+    public static JComponent resultsCanvas(JComponent palette) { return (JComponent) resultsScroll(palette).getViewport().getView(); }
 
     /** The results view, which carries the list's accessible name ("All", or the chip's scope) and description. */
-    public static JComponent resultsView(CommandPalette palette) { return palette.resultsView(); }
+    public static JComponent resultsView(JComponent palette) { return card(palette).resultsView(); }
 
     /** The results list descriptor the palette last rendered. */
-    public static Nodes.ItemList resultsSpec(CommandPalette palette) { return (Nodes.ItemList) palette.resultsView().spec().root(); }
+    public static Nodes.ItemList resultsSpec(JComponent palette) { return (Nodes.ItemList) card(palette).resultsView().spec().root(); }
 
     /** How many times the host replaced the list. */
-    public static long revision(CommandPalette palette) { return palette.revision(); }
+    public static long revision(JComponent palette) { return card(palette).revision(); }
 
     /** Every entry as text: {@code # Label} for a header, {@code scopeId/rowId} for a row, {@code more:scopeId}. */
-    public static List<String> entries(CommandPalette palette) {
+    public static List<String> entries(JComponent palette) {
         var texts = new ArrayList<String>();
-        for (PaletteEntry entry : palette.entries()) texts.add(describe(entry));
+        for (PaletteEntry entry : card(palette).entries()) texts.add(describe(entry));
         return texts;
     }
 
@@ -72,24 +75,24 @@ public final class PaletteTestSupport {
     }
 
     /** The rows shown, in order, without headers or "More in" entries. */
-    public static List<PaletteRow> rows(CommandPalette palette) {
+    public static List<PaletteRow> rows(JComponent palette) {
         var rows = new ArrayList<PaletteRow>();
-        for (PaletteEntry entry : palette.entries()) if (entry instanceof PaletteEntry.Item item) rows.add(item.row());
+        for (PaletteEntry entry : card(palette).entries()) if (entry instanceof PaletteEntry.Item item) rows.add(item.row());
         return rows;
     }
 
-    public static int rowCount(CommandPalette palette) { return rows(palette).size(); }
-    public static PaletteRow rowAt(CommandPalette palette, int index) { return rows(palette).get(index); }
+    public static int rowCount(JComponent palette) { return rows(palette).size(); }
+    public static PaletteRow rowAt(JComponent palette, int index) { return rows(palette).get(index); }
 
     /** The selected row, or null when nothing or a "More in" entry is selected. */
-    public static PaletteRow selectedRow(CommandPalette palette) {
-        return palette.selectedEntry() instanceof PaletteEntry.Item item ? item.row() : null;
+    public static PaletteRow selectedRow(JComponent palette) {
+        return card(palette).selectedEntry() instanceof PaletteEntry.Item item ? item.row() : null;
     }
 
     /** The selected row's position among the rows, or -1. */
-    public static int selectedRowIndex(CommandPalette palette) {
-        int selected = palette.selectedIndex();
-        var entries = palette.entries();
+    public static int selectedRowIndex(JComponent palette) {
+        int selected = card(palette).selectedIndex();
+        var entries = card(palette).entries();
         for (int i = 0, row = 0; i < entries.size(); i++) {
             if (!(entries.get(i) instanceof PaletteEntry.Item)) continue;
             if (i == selected) return row;
@@ -99,15 +102,15 @@ public final class PaletteTestSupport {
     }
 
     /** The entry index of the {@code index}th row. */
-    public static int entryIndex(CommandPalette palette, int index) {
-        var entries = palette.entries();
+    public static int entryIndex(JComponent palette, int index) {
+        var entries = card(palette).entries();
         for (int i = 0, row = 0; i < entries.size(); i++)
             if (entries.get(i) instanceof PaletteEntry.Item && row++ == index) return i;
         throw new IndexOutOfBoundsException(index);
     }
 
     /** The mounted kit row component of entry {@code entry}, found through its title label (named after the entry). */
-    public static Component entryComponent(CommandPalette palette, int entry) {
+    public static Component entryComponent(JComponent palette, int entry) {
         var title = KitTestSupport.find(resultsCanvas(palette), "entry." + entry + ".title", JLabel.class);
         if (title == null) return null;
         Component row = title;
@@ -116,25 +119,25 @@ public final class PaletteTestSupport {
     }
 
     /** The canvas bounds of the {@code index}th row's mounted kit row. */
-    public static Rectangle rowBounds(CommandPalette palette, int index) {
+    public static Rectangle rowBounds(JComponent palette, int index) {
         var row = entryComponent(palette, entryIndex(palette, index));
         if (row == null) throw new AssertionError("Row " + index + " is not mounted");
         return row.getBounds();
     }
 
     /** The chip's label, or null while no chip is set. */
-    public static String chipText(CommandPalette palette) { return palette.chipText(); }
-    public static JComponent chip(CommandPalette palette) { return KitTestSupport.require(palette.chipView(), CommandPalette.CHIP, JComponent.class); }
+    public static String chipText(JComponent palette) { return card(palette).chipText(); }
+    public static JComponent chip(JComponent palette) { return KitTestSupport.require(card(palette).chipView(), CardView.CHIP, JComponent.class); }
     public static boolean backspace(PaletteController controller) { return controller.backspacePressed(); }
-    public static String placeholder(CommandPalette palette) { return palette.placeholder(); }
-    public static JPanel hintBar(CommandPalette palette) { return palette.hintBar(); }
-    public static JPanel fieldRow(CommandPalette palette) { return palette.fieldRow(); }
-    public static String hint(CommandPalette palette) { return palette.hintText(); }
+    public static String placeholder(JComponent palette) { return card(palette).placeholder(); }
+    public static JPanel hintBar(JComponent palette) { return card(palette).hintBar(); }
+    public static JPanel fieldRow(JComponent palette) { return card(palette).fieldRow(); }
+    public static String hint(JComponent palette) { return card(palette).hintText(); }
 
     /** The text of every visible label and button the hint bar shows, in component order (empty texts skipped). */
-    public static List<String> hintBarTexts(CommandPalette palette) {
+    public static List<String> hintBarTexts(JComponent palette) {
         var texts = new ArrayList<String>();
-        visibleTexts(palette.hintBar(), texts);
+        visibleTexts(card(palette).hintBar(), texts);
         return texts;
     }
 
@@ -147,34 +150,34 @@ public final class PaletteTestSupport {
         }
     }
 
-    public static List<String> hintActions(CommandPalette palette) { return palette.hintActionTexts(); }
+    public static List<String> hintActions(JComponent palette) { return card(palette).hintActionTexts(); }
 
     /** Clicks the {@code index}th hint verb's mounted kit link. */
-    public static void clickHintAction(CommandPalette palette, int index) {
-        KitTestSupport.require(palette.hintView(), CommandPalette.VERB + index, javax.swing.AbstractButton.class).doClick(0);
+    public static void clickHintAction(JComponent palette, int index) {
+        KitTestSupport.require(card(palette).hintView(), CardView.VERB + index, javax.swing.AbstractButton.class).doClick(0);
     }
 
-    public static int itemHeight(CommandPalette palette) { return palette.itemHeight(); }
-    public static String stepTitle(CommandPalette palette) { return palette.stepTitleText(); }
+    public static int itemHeight(JComponent palette) { return card(palette).itemHeight(); }
+    public static String stepTitle(JComponent palette) { return card(palette).stepTitleText(); }
 
     /** The step's mounted kit inputs, in order. */
-    public static List<javax.swing.text.JTextComponent> stepFields(CommandPalette palette) {
+    public static List<javax.swing.text.JTextComponent> stepFields(JComponent palette) {
         var fields = new ArrayList<javax.swing.text.JTextComponent>();
-        for (int i = 0; i < palette.stepFieldCount(); i++) fields.add(palette.stepInput(i));
+        for (int i = 0; i < card(palette).stepFieldCount(); i++) fields.add(card(palette).stepInput(i));
         return fields;
     }
 
-    public static int stepFocusIndex(CommandPalette palette) { return palette.stepFocusIndex(); }
+    public static int stepFocusIndex(JComponent palette) { return card(palette).stepFocusIndex(); }
     /** The step's error text, or null while none shows. */
-    public static String stepError(CommandPalette palette) { return palette.stepErrorText(); }
-    public static void selectRow(CommandPalette palette, String id) { palette.selectRow(id); }
-    public static void selectRelative(CommandPalette palette, int delta) { palette.selectRelative(delta); }
-    public static void executeSelected(CommandPalette palette, int verb) { palette.executeSelected(verb); }
-    public static void executeSelected(CommandPalette palette) { palette.executeSelected(); }
+    public static String stepError(JComponent palette) { return card(palette).stepErrorText(); }
+    public static void selectRow(JComponent palette, String id) { card(palette).selectRow(id); }
+    public static void selectRelative(JComponent palette, int delta) { card(palette).selectRelative(delta); }
+    public static void executeSelected(JComponent palette, int verb) { card(palette).executeSelected(verb); }
+    public static void executeSelected(JComponent palette) { card(palette).executeSelected(); }
 
     /** Shows {@code rows} as {@code scope}'s own tab would, selecting {@code selectionId}. */
-    public static void setRows(CommandPalette palette, PaletteScope scope, List<PaletteRow> rows, String selectionId) {
-        palette.setEntries(rows.stream().<PaletteEntry>map(row -> new PaletteEntry.Item(scope, row)).toList(),
+    public static void setRows(JComponent palette, PaletteScope scope, List<PaletteRow> rows, String selectionId) {
+        card(palette).setEntries(rows.stream().<PaletteEntry>map(row -> new PaletteEntry.Item(scope, row)).toList(),
             selectionId == null ? null : PaletteEntry.key(scope, selectionId), "No matching " + scope.label());
     }
 

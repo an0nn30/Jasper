@@ -277,18 +277,18 @@ class WindowCommandPaletteTest {
                 var card = palette.component();
                 Rectangle placed = card.getBounds();
                 assertThat(palette.revealRunning()).isTrue();
-                assertThat(card.revealedHeight()).as("the reveal starts closed").isZero();
+                assertThat(palette.view().revealedHeight()).as("the reveal starts closed").isZero();
                 int previous = 0;
                 for (int quarter = 1; quarter <= 4; quarter++) {
                     clock.addAndGet(WindowCommandPalette.REVEAL_MILLIS * 1_000_000L / 4);
                     palette.animate(clock.get());
                     LayoutTestSupport.layoutTree(root);
                     assertThat(card.getBounds()).as("only the visible edge moves").isEqualTo(placed);
-                    assertThat(card.revealedHeight()).as("quarter %d", quarter).isGreaterThanOrEqualTo(previous);
-                    previous = card.revealedHeight();
+                    assertThat(palette.view().revealedHeight()).as("quarter %d", quarter).isGreaterThanOrEqualTo(previous);
+                    previous = palette.view().revealedHeight();
                     if (quarter == 1) assertThat(previous).as("fast at first").isGreaterThan(placed.height / 2);
                 }
-                assertThat(card.revealedHeight()).isEqualTo(placed.height);
+                assertThat(palette.view().revealedHeight()).isEqualTo(placed.height);
                 assertThat(palette.revealRunning()).isFalse();
             }
         });
@@ -455,7 +455,7 @@ class WindowCommandPaletteTest {
                 owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 palette.toggle(); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.revealRunning()).isFalse();
-                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
+                assertThat(palette.view().revealedHeight()).isEqualTo(palette.component().getHeight()).isPositive();
                 palette.dismiss();
 
                 owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
@@ -463,7 +463,7 @@ class WindowCommandPaletteTest {
                 assertThat(palette.revealRunning()).isTrue();
                 owner.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 475, 425, 0));
                 assertThat(palette.revealRunning()).isFalse();
-                assertThat(palette.component().revealedHeight()).isEqualTo(palette.component().getHeight());
+                assertThat(palette.view().revealedHeight()).isEqualTo(palette.component().getHeight());
                 palette.dismiss();
 
                 owner.setAnimations(dev.jasper.app.config.AnimationSettings.defaults());
@@ -474,7 +474,7 @@ class WindowCommandPaletteTest {
                 assertThat(palette.revealRunning()).as("dismissing stops the reveal").isFalse();
                 palette.toggle(); LayoutTestSupport.layoutTree(root);
                 assertThat(palette.revealRunning()).as("every fresh open drips again").isTrue();
-                assertThat(palette.component().revealedHeight()).isZero();
+                assertThat(palette.view().revealedHeight()).isZero();
             }
         });
     }

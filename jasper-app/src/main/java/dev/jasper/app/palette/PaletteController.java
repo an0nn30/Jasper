@@ -22,7 +22,7 @@ public final class PaletteController implements AutoCloseable {
     private final ScopeRegistry scopes;
     private final dev.jasper.app.commands.CommandHistory history;
     private final boolean macOs;
-    private final CommandPalette palette;
+    private final PaletteView palette;
     private final Runnable layout, dismissed, updateActions;
     private final BooleanSupplier batching;
     private final Consumer<String> reportError, reopen;
@@ -46,7 +46,8 @@ public final class PaletteController implements AutoCloseable {
         this.batching = batching; this.updateActions = updateActions;
         this.reportError = reportError; this.reopen = reopen;
         context = new PaletteContext(macOs, PaletteTarget.none());
-        palette = new CommandPalette(kit, macOs, this::queryChanged, this::execute, this::prefix, scope -> selectTab(scope.id()));
+        palette = new CardView(kit, macOs, new PaletteView.Host(this::queryChanged, this::execute, this::prefix,
+            scope -> selectTab(scope == null ? PaletteScope.ALL_ID : scope.id()), this::modeScopes, () -> "", this::dismiss, () -> { }));
         scopesListener = scopes.onChanged(this::rosterChanged);
     }
 
@@ -77,7 +78,8 @@ public final class PaletteController implements AutoCloseable {
             context = new PaletteContext(macOs, target);
             palette.setQueryText("");
             open = true;
-            palette.setVisible(true);
+            palette.component().setVisible(true);
+            palette.opened();
             activate(tabId);
         }
         if (queryOrNull != null) palette.setQueryText(queryOrNull);
@@ -115,7 +117,7 @@ public final class PaletteController implements AutoCloseable {
     }
 
     private void showChip() {
-        palette.setChip(active == null ? null : active.label(), active == null ? null : active.icon());
+        palette.setChip(active);
         palette.setPlaceholder(active == null ? "Search everything" : active.placeholder());
     }
 
@@ -132,7 +134,10 @@ public final class PaletteController implements AutoCloseable {
     /** The chip: {@link PaletteScope#ALL_ID} for none, or a scope id; null while closed. */
     public String activeScopeId() { return tab; }
     public boolean composing() { return palette.composing(); }
-    public CommandPalette component() { return palette; }
+    /** The view's Swing surface. */
+    public javax.swing.JComponent component() { return palette.component(); }
+    /** The view this controller drives. */
+    public PaletteView view() { return palette; }
 
     /** Enter and its modifier variants: completes an open step, otherwise acts on the selected entry. */
     public void enterPressed(int verb) {
@@ -408,7 +413,7 @@ public final class PaletteController implements AutoCloseable {
     private void restoreAndHide() {
         generation++;
         open = false; step = null; stepScope = null; completing = false;
-        palette.hideStep(); palette.setVisible(false);
+        palette.hideStep(); palette.component().setVisible(false);
         tabListeners.forEach(Subscription::close);
         tabListeners.clear();
         tab = null;

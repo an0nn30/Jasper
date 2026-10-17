@@ -60,17 +60,17 @@ class CommandPaletteTest {
         };
     }
 
-    private static CommandPalette palette(List<String> events) { return palette(KitTestSupport.context(), true, events); }
+    private static CardView palette(List<String> events) { return palette(KitTestSupport.context(), true, events); }
 
-    private static CommandPalette palette(KitContext kit, boolean macOs, List<String> events) {
-        return new CommandPalette(kit, macOs, query -> { },
+    private static CardView palette(KitContext kit, boolean macOs, List<String> events) {
+        return new CardView(kit, macOs, query -> { },
             (entry, verb) -> events.add(PaletteTestSupport.describe(entry) + ":" + verb),
             text -> java.util.Optional.empty(), scope -> events.add("chip:" + scope.id()));
     }
 
     private static PaletteEntry item(PaletteScope scope, String id) { return new PaletteEntry.Item(scope, PaletteRow.of(id, "Row " + id)); }
 
-    private static Component row(CommandPalette palette, int entry) {
+    private static Component row(CardView palette, int entry) {
         var row = PaletteTestSupport.entryComponent(palette, entry);
         if (row == null) throw new AssertionError("Entry " + entry + " is not mounted");
         return row;
@@ -130,7 +130,7 @@ class CommandPaletteTest {
     @Test void queryNotifiesWhenClearedAndKeepsNativeEditingActions() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var changes = new ArrayList<String>();
-            var palette = new CommandPalette(KitTestSupport.context(), false, changes::add, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { });
+            var palette = new CardView(KitTestSupport.context(), false, changes::add, (entry, verb) -> { }, text -> java.util.Optional.empty(), scope -> { });
             var query = PaletteTestSupport.query(palette);
             query.setText("split 2");
             query.setText("");
@@ -146,7 +146,7 @@ class CommandPaletteTest {
             assertThat(PaletteTestSupport.resultsView(palette).getAccessibleContext().getAccessibleDescription()).isEqualTo("0 results");
             assertThat(palette.placeholder()).isEqualTo("Search everything");
             assertThat(((Nodes.Field) palette.queryView().spec().root()).hint()).as("the kit field paints the placeholder").isEqualTo("Search everything");
-            assertThat(KitTestSupport.find(palette.queryView(), CommandPalette.QUERY + ".label", JLabel.class).isVisible())
+            assertThat(KitTestSupport.find(palette.queryView(), CardView.QUERY + ".label", JLabel.class).isVisible())
                 .as("the search field shows no label in the 44 px row").isFalse();
             palette.close();
         });
@@ -155,7 +155,7 @@ class CommandPaletteTest {
     @Test void theChipNamesTheScopeAndATypedPrefixBecomesAChip() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var chips = new ArrayList<String>();
-            var palette = new CommandPalette(KitTestSupport.context(), true, query -> { }, (entry, verb) -> { },
+            var palette = new CardView(KitTestSupport.context(), true, query -> { }, (entry, verb) -> { },
                 text -> ScopePrefix.parse(text, List.of(COMMANDS, HISTORY)), scope -> chips.add(scope.id()));
             var query = PaletteTestSupport.query(palette);
             palette.setChip("History", null);
@@ -202,9 +202,9 @@ class CommandPaletteTest {
     @Test void aKeyQueuedBeforeTheChipSettlesStillLeavesThePrefixOut() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var chips = new ArrayList<String>();
-            CommandPalette[] holder = new CommandPalette[1];
+            CardView[] holder = new CardView[1];
             // As the controller: a prefix makes a chip only while none is set.
-            holder[0] = new CommandPalette(KitTestSupport.context(), true, query -> { }, (entry, verb) -> { },
+            holder[0] = new CardView(KitTestSupport.context(), true, query -> { }, (entry, verb) -> { },
                 text -> holder[0].chipText() != null ? java.util.Optional.empty() : ScopePrefix.parse(text, List.of(COMMANDS, HISTORY)),
                 scope -> { chips.add(scope.id()); holder[0].setChip(scope.label(), null); });
             var palette = holder[0];
@@ -465,7 +465,7 @@ class CommandPaletteTest {
                     assertThat(palette.hintActionTexts()).as(name).isNotEmpty();
                     assertThat(label(hintBar, "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_TERTIARY));
                     for (int verb = 0; verb < palette.hintActionTexts().size(); verb++)
-                        assertThat(KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class).getForeground())
+                        assertThat(KitTestSupport.require(palette.hintView(), CardView.VERB + verb, AbstractButton.class).getForeground())
                             .as(name + " verb " + verb).isEqualTo(semantic.color(SemanticColor.TEXT_LINK));
                     layoutTree(palette);
                     assertThat(label(row(palette, 4), "a detail").getForeground()).as(name).isEqualTo(semantic.color(SemanticColor.TEXT_ONACCENT_SECONDARY));
@@ -598,7 +598,7 @@ class CommandPaletteTest {
                 assertThat(hintBar.getHeight()).as(macOs + ": the bar keeps one line").isEqualTo(oneLine);
                 var lines = new java.util.HashSet<Integer>();
                 for (int verb = 0; verb < 3; verb++) {
-                    var button = KitTestSupport.require(palette.hintView(), CommandPalette.VERB + verb, AbstractButton.class);
+                    var button = KitTestSupport.require(palette.hintView(), CardView.VERB + verb, AbstractButton.class);
                     var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), hintBar);
                     lines.add(bounds.y);
                     assertThat(bounds.x + bounds.width).as(macOs + " verb " + verb + " inside the bar").isLessThanOrEqualTo(hintBar.getWidth());
@@ -655,7 +655,7 @@ class CommandPaletteTest {
             assertThat(fields.getFirst().getAccessibleContext().getAccessibleName()).isEqualTo("branch");
             assertThat(palette.stepFocusIndex()).isZero();
             assertThat(palette.stepTitleText()).isEqualTo("Rebase");
-            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".title", JLabel.class).getText()).isEqualTo("Rebase");
+            assertThat(KitTestSupport.require(palette.stepPanel(), CardView.STEP + ".title", JLabel.class).getText()).isEqualTo("Rebase");
             assertThat(palette.hintBar().isVisible()).isFalse();
             Insets insets = palette.getInsets();
             assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 22) + 2 * palette.stepRow(0).getPreferredSize().height + insets.top + insets.bottom);
@@ -666,7 +666,7 @@ class CommandPaletteTest {
             var panel = palette.stepPanel();
             var titleRow = palette.stepTitleRow();
             assertThat(titleRow.getHeight()).isEqualTo(UIScale.scale(22));
-            assertThat(SwingUtilities.convertPoint(KitTestSupport.require(panel, CommandPalette.STEP + ".title", JLabel.class), 0, 0, titleRow).x)
+            assertThat(SwingUtilities.convertPoint(KitTestSupport.require(panel, CardView.STEP + ".title", JLabel.class), 0, 0, titleRow).x)
                 .as("the title is inset like the rows").isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
             for (int i = 0; i < 2; i++) {
                 var row = palette.stepRow(i);
@@ -676,13 +676,13 @@ class CommandPaletteTest {
                 var label = palette.stepLabelView(i);
                 assertThat(label.getX()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
                 assertThat(label.getWidth()).as("the label column").isEqualTo(UIScale.scale(140));
-                assertThat(KitTestSupport.require(label, CommandPalette.STEP + ".label." + i, JLabel.class).getText()).isEqualTo(i == 0 ? "branch" : "remote");
+                assertThat(KitTestSupport.require(label, CardView.STEP + ".label." + i, JLabel.class).getText()).isEqualTo(i == 0 ? "branch" : "remote");
                 var field = palette.stepFieldView(i);
                 assertThat(field.getX()).as("the label gap").isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING) + 140 + m(DesignMetrics.Role.PALETTE_STEP_LABEL_GAP)));
                 assertThat(field.getY()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING)));
                 assertThat(field.getHeight()).isEqualTo(stepRow - 2 * UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_ROW_PADDING)));
                 assertThat(row.getWidth() - field.getX() - field.getWidth()).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING)));
-                assertThat(KitTestSupport.find(field, CommandPalette.STEP + ".field." + i + ".label", JLabel.class).isVisible())
+                assertThat(KitTestSupport.find(field, CardView.STEP + ".field." + i + ".label", JLabel.class).isVisible())
                     .as("the row's label column labels the field").isFalse();
             }
             palette.focusStepField(1);
@@ -695,8 +695,8 @@ class CommandPaletteTest {
             assertThat(palette.stepValues()).hasSize(2).containsEntry("branch", "main").containsEntry("remote", "origin");
             palette.setStepError("Nope");
             assertThat(palette.stepErrorText()).isEqualTo("Nope");
-            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isTrue();
-            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error.text", JLabel.class).getText()).isEqualTo("Nope");
+            assertThat(KitTestSupport.require(palette.stepPanel(), CardView.STEP + ".error", JComponent.class).isVisible()).isTrue();
+            assertThat(KitTestSupport.require(palette.stepPanel(), CardView.STEP + ".error.text", JLabel.class).getText()).isEqualTo("Nope");
             assertThat(fields.get(1).getText()).as("an error keeps what was typed").isEqualTo("origin");
             assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 22 + 22) + 2 * palette.stepRow(0).getPreferredSize().height + insets.top + insets.bottom);
             palette.setSize(palette.getPreferredSize());
@@ -705,7 +705,7 @@ class CommandPaletteTest {
             assertThat(SwingUtilities.convertPoint(palette.stepErrorRow(), 0, 0, palette.stepPanel()).y).isEqualTo(UIScale.scale(22) + 2 * palette.stepRow(0).getHeight());
             palette.setStepError(null);
             assertThat(palette.stepErrorText()).isNull();
-            assertThat(KitTestSupport.require(palette.stepPanel(), CommandPalette.STEP + ".error", JComponent.class).isVisible()).isFalse();
+            assertThat(KitTestSupport.require(palette.stepPanel(), CardView.STEP + ".error", JComponent.class).isVisible()).isFalse();
             palette.hideStep();
             assertThat(palette.stepShowing()).isFalse();
             assertThat(PaletteTestSupport.stepFields(palette)).isEmpty();
@@ -725,7 +725,7 @@ class CommandPaletteTest {
                     .isEqualTo(new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.RESULTS_HEADING));
                 assertThat(label(palette.hintView(),"in ~/src").getFont()).as("footer detail").isEqualTo(hint);
                 for(int verb=1;verb<3;verb++)
-                    assertThat(KitTestSupport.require(palette.hintView(),CommandPalette.VERB+verb,AbstractButton.class).getFont()).as("footer verb").isEqualTo(hint);
+                    assertThat(KitTestSupport.require(palette.hintView(),CardView.VERB+verb,AbstractButton.class).getFont()).as("footer verb").isEqualTo(hint);
                 // The transparent query shows the rail-size search glyph its reference depicts.
                 assertThat(icons(PaletteTestSupport.fieldRow(palette))).anySatisfy(icon -> assertThat(icon.getIconWidth())
                     .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(dev.jasper.ui.metrics.DesignMetrics.DEFAULT.value(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_RAIL))));
