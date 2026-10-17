@@ -1,0 +1,214 @@
+package dev.jasper.app.settingsui;
+
+import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.config.ConfigLoader;
+import dev.jasper.app.config.ConfigService;
+import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.notifications.ActivityNotifier;
+import dev.jasper.app.persistence.UiState;
+import dev.jasper.app.pluginmanager.PluginManager;
+import dev.jasper.app.plugins.PluginRuntime;
+import dev.jasper.app.presentation.Presentation;
+import dev.jasper.app.presentation.Projections;
+import dev.jasper.app.restart.ResidentControl;
+import dev.jasper.app.restart.RestartFlow;
+import dev.jasper.app.shortcuthelp.KeymapPage;
+import dev.jasper.app.terminals.TerminalRegistry;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.app.testsupport.PluginJars;
+import dev.jasper.app.windows.AuxiliarySurface;
+import dev.jasper.app.windows.AuxiliaryWindows;
+import dev.jasper.buddy.view.BuddyTestSupport;
+import dev.jasper.ui.model.Option;
+import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.ThemeRoute;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import javax.swing.JComponent;
+import javax.swing.SwingUtilities;
+
+/**
+ * The real Settings dialog under the Enterprise look, headless: plan 6a's {@link EnterpriseLook} (the fixture kit and theme
+ * until plan 5b ships the kit, Plex and the theme), spec 9.1's projections and the dialog mapping the application gives
+ * its windows, over the bundled plugins and a fixture user plugin (plan 9a Rulings 18). The look is installed for the
+ * whole JVM, so {@link #close} (and a failed {@link #open}) installs the default look again. Never creates a native
+ * window. Open on any thread; every method but {@link #open} and {@link #close} runs on the EDT.
+ */
+final class EnterpriseSettings implements AutoCloseable {
+    /** Where the renders go, under {@code light/} and {@code dark/}. */
+    static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/enterprise-settings");
+    /** The values the mocks show, as a config file (plan 9a Rulings 18). */
+    static final String CONFIG = """
+        [ui]
+        appearance = "light"
+        [ui.theme]
+        dark = "slate-cobalt"
+        light = "slate-daylight"
+        [window]
+        toolbar = "icons_and_labels"
+        toolbar_height = 34
+        status_bar = true
+        status_bar_height = 30
+        memory_indicator = false
+        tab_height = 30
+        rail_width = 28
+        columns = 100
+        lines = 35
+        [notifications]
+        system = true
+        long_command_seconds = 10
+        [palette]
+        visible_rows = 18
+        [terminal.font]
+        family = "Cousine Nerd Font Mono"
+        size = 12
+        fallback = ["Symbols Nerd Font Mono", "Apple Color Emoji"]
+        ligatures = true
+        line_height = 1
+        """;
+
+    private final Path home;
+    private final AuxiliaryWindows windows;
+    private final JComponent[] holder;
+    private final ThemeController themes;
+    private final PluginRuntime runtime;
+    private final SettingsDialog dialog;
+
+    private EnterpriseSettings(Path home, AuxiliaryWindows windows, JComponent[] holder, ThemeController themes, PluginRuntime runtime, SettingsDialog dialog) {
+        this.home = home; this.windows = windows; this.holder = holder; this.themes = themes; this.runtime = runtime; this.dialog = dialog;
+    }
+
+    SettingsDialog dialog() { return dialog; }
+
+    /** A Slate Cobalt-shaped preview of {@code theme}'s variant, as the application builds tile previews. */
+    static Option.Palette preview(JasperTheme theme, boolean dark) {
+        var palette = theme.palette(dark);
+        return new Option.Palette(palette.color(SemanticColor.SURFACE_INPUT).getRGB(), palette.color(SemanticColor.SURFACE_SIDEBAR).getRGB(),
+            palette.color(SemanticColor.SURFACE_APP).getRGB(), palette.color(SemanticColor.TEXT_PRIMARY).getRGB(),
+            palette.color(SemanticColor.ACCENT).getRGB());
+    }
+
+    /** The mocks' notification groups (Settings 03), as the application lists them. */
+    static List<NotificationGroupChoices.Group> groups() {
+        record G(String owner, String ownerId, String id, String name, String mode) { }
+        var rows = List.of(new G("Jasper", "jasper", "jasper.general", "Jasper", "card"), new G("Jasper", "jasper", "jasper.config", "Configuration", "sticky"),
+            new G("Jasper", "jasper", "jasper.plugins", "Plugin problems", "card"), new G("Jasper", "jasper", "jasper.errors", "Internal errors", "card"),
+            new G("Jasper", "jasper", "jasper.commands", "Long-running commands", "card"), new G("Jasper", "jasper", "jasper.memory", "Memory & VM options", "card"),
+            new G("THD Sourcing Crypto", "com.homedepot.sourcing.crypto", "com.homedepot.sourcing.crypto", "THD Sourcing Crypto", "card"),
+            new G("THD Sourcing Crypto", "com.homedepot.sourcing.crypto", "com.homedepot.sourcing.crypto.activities", "THD Sourcing Crypto activities", "card"),
+            new G("Editor", "dev.jasper.editor", "dev.jasper.editor", "Editor", "card"), new G("Editor", "dev.jasper.editor", "dev.jasper.editor.activities", "Editor activities", "card"),
+            new G("Credential Vault", "dev.jasper.vault", "dev.jasper.vault", "Credential Vault", "card"),
+            new G("Credential Vault", "dev.jasper.vault", "dev.jasper.vault.activities", "Credential Vault activities", "card"),
+            new G("Credential Vault", "dev.jasper.vault", "dev.jasper.vault.copies", "Vault copies", "card"),
+            new G("File Server", "dev.jasper.fileserver", "dev.jasper.fileserver", "File Server", "card"),
+            new G("File Server", "dev.jasper.fileserver", "dev.jasper.fileserver.activities", "File Server activities", "card"),
+            new G("Snippets", "dev.jasper.snippets", "dev.jasper.snippets", "Snippets", "card"), new G("Snippets", "dev.jasper.snippets", "dev.jasper.snippets.activities", "Snippets activities", "card"));
+        return rows.stream().map(g -> new NotificationGroupChoices.Group(g.id(), g.name(), g.owner(), g.mode(), g.ownerId(), "")).toList();
+    }
+
+    /** Opens the dialog at Appearance under Enterprise Light ({@code dark} false) or Dark. */
+    static EnterpriseSettings open(boolean dark) throws Exception {
+        var enterprise = EnterpriseLook.theme();
+        Path home = Files.createTempDirectory("jasper-enterprise-settings");
+        // The mocks' user-installed plugin (a fixture): THD Sourcing Crypto 1.2.0 by The Home Depot Sourcing.
+        PluginJars.build(home.resolve("plugins/com.homedepot.sourcing.crypto/jars"), "main.jar",
+            PluginJars.descriptor("com.homedepot.sourcing.crypto", "1.2.0", "fix.crypto.Main").replace("name = \"com.homedepot.sourcing.crypto\"", "name = \"THD Sourcing Crypto\"")
+                + "description = \"Encrypt or decrypt strings with the THD Sourcing crypto library (com.homedepot.ta.aa.crypto).\"\nvendor = \"The Home Depot Sourcing\"\n",
+            Map.of("fix.crypto.Main", PluginJars.emptyPlugin("fix.crypto", "Main")), List.of());
+        Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"com.homedepot.sourcing.crypto\"]\nenabled = true\nconsented = []\n");
+        Path file = home.resolve("config.toml");
+        Files.writeString(file, CONFIG);
+        // The core defaults until plan 5b's kit file supplies the look's own (Execution notes E2); CONFIG sets every shown value.
+        var loaded = ConfigLoader.parse(file, CONFIG, true);
+        var state = new ConfigService.State(loaded.snapshot(), loaded.diagnostics(), file, true, loaded.legacyKeys(), loaded.deadTables(),
+            loaded.values(), false);
+        // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
+        // named UI face, on the macOS host the mocks were drawn on.
+        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true),
+            Presentation.LANDED);
+        var holder = new JComponent[1];
+        // The application's mapping (plan 6b): under Enterprise the dialog's sheets and confirmations take the classic path.
+        var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {
+            holder[0] = surface.holder();
+            return new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { }, () -> new Rectangle(0, 0, 1040, 691), (title, initial) -> Optional.empty());
+        }, (choice, cancel) -> List.of(), projections.dialogs());
+        var themes = new ThemeController[1]; var runtime = new PluginRuntime[1]; var dialog = new SettingsDialog[1];
+        var contributions = new Contributions();
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                themes[0] = EnterpriseLook.controller(dark);
+                runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
+                    home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
+                    PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
+                runtime[0].start(Map.of(), dark);
+                var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
+                var manager = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
+                    ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                var installed = new InstalledThemes(
+                    List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", preview(enterprise, true)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, true))),
+                    List.of(new InstalledThemes.ThemeOption("slate-daylight", "Slate Daylight", preview(enterprise, false)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, false))),
+                    List.of(new InstalledThemes.SchemeOption("enterprise/light", "Enterprise Light")),
+                    Map.of("slate-cobalt", "Slate Cobalt", "slate-daylight", "Slate Daylight", "enterprise", "Enterprise"));
+                var choices = new AppearanceChoices(100f, true, Optional::empty, ignored -> new Subscription(() -> { }), () -> installed, Optional.empty());
+                // The plugins' display names as the application supplies them (JasperApplication passes plugins::pluginNames).
+                var keymapHooks = new KeymapPage.Hooks(contributions, Map::of, runtime[0]::pluginNames, true,
+                    edits -> CompletableFuture.completedFuture(null));
+                var pages = new CorePages.Pages(context -> new KeymapPage(keymapHooks, context), context -> manager.page(context), context -> runtime[0].settingsPages(context));
+                dialog[0] = new SettingsDialog(windows, CorePages.pages(choices, new CorePages.SystemActions(() -> Path.of("/Users/RQ7RQVF/.config/jasper/config.toml"),
+                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages),
+                    new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
+                        uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
+                dialog[0].open(null, "appearance");
+            });
+            var ready = new CompletableFuture<Void>();
+            runtime[0].snapshot(outcome -> ready.complete(null));
+            ready.get(10, TimeUnit.SECONDS);
+        } catch (Exception | Error failure) {
+            // A failed opening leaves no Enterprise look behind for the tests that follow.
+            SwingUtilities.invokeAndWait(() -> {
+                try { if (dialog[0] != null) dialog[0].cancel(); if (themes[0] != null) themes[0].close(); } finally { EnterpriseLook.restoreDefault(); }
+            });
+            throw failure;
+        }
+        return new EnterpriseSettings(home, windows, holder, themes[0], runtime[0], dialog[0]);
+    }
+
+    /** Selects {@code pageId} and paints the dialog's content, {@code width} by {@code height}, at 2x; EDT. */
+    BufferedImage render(String pageId, int width, int height) {
+        dialog.select(pageId);
+        var content = holder[0];
+        content.setSize(width, height);
+        for (int i = 0; i < 4; i++) KitTestSupport.layout(content);
+        var image = new BufferedImage(2 * width, 2 * height, BufferedImage.TYPE_INT_RGB);
+        var g = image.createGraphics();
+        try { g.scale(2, 2); content.printAll(g); } finally { g.dispose(); }
+        return image;
+    }
+
+    /** Closes the dialog, stops the plugins and installs the default look again for the tests that follow (6a's restoreDefault). */
+    @Override public void close() throws Exception {
+        try {
+            SwingUtilities.invokeAndWait(dialog::cancel);
+            var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
+            SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
+            CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            SwingUtilities.invokeAndWait(() -> { windows.close(); themes.close(); });
+        } finally {
+            try { SwingUtilities.invokeAndWait(EnterpriseLook::restoreDefault); }
+            finally { try (var paths = Files.walk(home)) { for (var path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); } }
+        }
+    }
+}

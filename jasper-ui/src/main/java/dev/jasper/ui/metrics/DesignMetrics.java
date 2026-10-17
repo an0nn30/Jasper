@@ -240,7 +240,7 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_HEADER_TITLE_GAP, 31);
         values.put(Role.SETTINGS_CRUMB_GAP, 6);
         values.put(Role.SETTINGS_PAGE_INSET, 16);
-        values.put(Role.SETTINGS_PAGE_TOP, 10);
+        values.put(Role.SETTINGS_PAGE_TOP, 11);
         values.put(Role.SETTINGS_CARD_WIDTH, 4000);
         values.put(Role.SETTINGS_SECTION_GAP, 13);
         values.put(Role.SETTINGS_CHOICE_WIDTH, 220);
