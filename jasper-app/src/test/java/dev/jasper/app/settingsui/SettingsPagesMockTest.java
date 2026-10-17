@@ -89,9 +89,11 @@ class SettingsPagesMockTest {
         PROBES.put("plugins", List.of(probe("list box", 247, 300), probe("list surface", 400, 400), probe("search strip", 400, 56),
             probe("search strip rule", 400, 90), probe("heading band", 450, 99), probe("selected row", 450, 120),
             probe("checkbox on the selection", 256, 133), probe("active tab", 558, 113), probe("inactive tab", 638, 113),
-            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53)));
+            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53), probe("second heading rule", 450, 151)));
+        // The second heading's rule is held to PROBE: border.row #E4E5E8 lies ΔE 2.1 from the mock's #DDE0E4 on every heading
+        // rule (the band is ΔE 6 away); ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule pins its colour.
         tight("plugins", "search strip", "heading band", "inactive tab");
-        face("plugins", "heading band", "selected row", "checkbox on the selection", "active tab", "inactive tab");
+        face("plugins", "heading band", "second heading rule", "selected row", "checkbox on the selection", "active tab", "inactive tab");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */

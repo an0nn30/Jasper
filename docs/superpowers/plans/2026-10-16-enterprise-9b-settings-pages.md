@@ -116,7 +116,18 @@
 > (N19), the folder tabs' baseline rule across the details (the mock's rule at 126), tabs 1 px high, the name 1 px and the
 > metadata 2.5 px low, the state dot before "Enabled", a row's name and metadata 4 px further apart than the mock's (the
 > list's title and subtitle split), the checkbox on the selection (plan 4b's face), Disable 63 wide against 66, and the
-> fixture's Enterprise plugin ("8 of 9 enabled").
+> fixture's Enterprise plugin ("8 of 9 enabled"). Review round 1: a plain list's heading takes the row's hairline only
+> where the table face rules it (`ItemLists.ListControl.headingRule`; classic false, so every later heading keeps the
+> band's `border.row` top rule, which `border.subtle` overdrew; the default look is unchanged), pinned by
+> `ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule` and a "second heading rule" probe at (450, 151) held to
+> `PROBE`, not `TIGHT` (`border.row` #E4E5E8 lies ΔE 2.1 from the mock's #DDE0E4 on every heading rule);
+> `PluginsCompositionTest` names the removal each row's menu and the details' ⋯ hold (Remove…, Keep, Discard Install);
+> `NavigationLinesTest` pins the two jasper-ui behaviours this task changed beyond Plugins, for the STATUS entry (Task 8)
+> and plan 7's merge: in both looks a menu button in a NAVIGATION line keeps its preferred width while the texts shrink,
+> and under the classic button face the buttons of a NAVIGATION line led by a DETAIL_TITLE over further lines without a
+> tile stand at the line's top (the default face centres them). The classic `PLUGIN_*` values (the side padding 16, the
+> details' trailing padding 0, `PLUGIN_TEXT_LINE_SPACING` 3) assume the CLASSIC composition: a kit with base "classic"
+> under another composition lays the ROWS Plugins page with the Enterprise mock's paddings and line spacing.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

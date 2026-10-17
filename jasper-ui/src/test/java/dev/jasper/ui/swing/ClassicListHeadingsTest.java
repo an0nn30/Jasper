@@ -166,8 +166,32 @@ class ClassicListHeadingsTest {
         return new ViewSpec(new Nodes.ItemList("plugins", ControlState.READY, Nodes.ListKind.DOUBLE, List.of(
             new dev.jasper.ui.model.ListItem("group:Installed", Optional.empty(), List.of(new Nodes.Text("title", ControlState.READY, "User-installed", Nodes.TextRole.SECTION_LABEL)), List.of(), List.of(), true),
             new dev.jasper.ui.model.ListItem("thd", Optional.of(new Nodes.Toggle("toggle:thd", ControlState.READY, "Enable THD Sourcing Crypto", true, "toggle:thd", true)),
-                List.of(new Nodes.Text("name:thd", ControlState.READY, "THD Sourcing Crypto", Nodes.TextRole.BODY)), List.of(), List.of())),
+                List.of(new Nodes.Text("name:thd", ControlState.READY, "THD Sourcing Crypto", Nodes.TextRole.BODY)), List.of(), List.of()),
+            new dev.jasper.ui.model.ListItem("group:Bundled", Optional.empty(), List.of(new Nodes.Text("title:bundled", ControlState.READY, "Bundled", Nodes.TextRole.SECTION_LABEL)), List.of(), List.of(), true),
+            new dev.jasper.ui.model.ListItem("vault", Optional.of(new Nodes.Toggle("toggle:vault", ControlState.READY, "Enable Credential Vault", true, "toggle:vault", true)),
+                List.of(new Nodes.Text("name:vault", ControlState.READY, "Credential Vault", Nodes.TextRole.BODY)), List.of(), List.of())),
             Set.of("thd"), "", List.of()));
+    }
+
+    /** A heading after other rows: the classic band keeps its own {@code border.row} top rule; the default list keeps its subtle hairline. */
+    @Test void aLaterHeadingKeepsItsOwnTopRule() {
+        Edt.run(() -> {
+            for (boolean classic : new boolean[] {false, true}) {
+                var context = classic ? KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise()) : KitFixtures.context();
+                try (var view = new KitView(context, plugins(), event -> { })) {
+                    view.setSize(290, 200);
+                    for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                    var heading = ((ItemLists.ListControl) view.control("plugins")).mounted.get("group:Bundled");
+                    var image = new java.awt.image.BufferedImage(290, 200, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var g = image.createGraphics(); try { view.printAll(g); } finally { g.dispose(); }
+                    var top = javax.swing.SwingUtilities.convertPoint(heading, 200, 0, view);
+                    var expected = classic ? dev.jasper.ui.theme.DerivedColor.BORDER_ROW.color(context.theme())
+                        : ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE);
+                    assertThat(image.getRGB(top.x, top.y) & 0xFFFFFF).as(classic ? "classic: the band's border.row rule" : "default: the subtle hairline")
+                        .isEqualTo(expected.getRGB() & 0xFFFFFF);
+                } finally { release(context); }
+            }
+        });
     }
 
     @Test void aClassicListsHeadingIsABandBetweenRules() {

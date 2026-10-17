@@ -174,6 +174,10 @@ final class ItemLists {
         @Override
         void paintBands(java.awt.Graphics2D g, int width) { if (plainRows()) context().faces().table.paintListHeadings(this, g, width); }
 
+        /** A plain list's heading opens with the row hairline only where the table face rules it (the classic band draws its own rules). */
+        @Override
+        boolean headingRule() { return !plainRows() || context().faces().table.headingRule(); }
+
         /** A plain list's heading height with its rules ({@code LIST_HEADING_HEIGHT}), or 0 when headings are as tall as the rows. */
         int headingHeight() { return plainRows() ? ThemePainting.metric(context(), DesignMetrics.Role.LIST_HEADING_HEIGHT) : 0; }
 

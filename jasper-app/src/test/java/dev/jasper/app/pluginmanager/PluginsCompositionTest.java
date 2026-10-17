@@ -22,15 +22,20 @@ class PluginsCompositionTest {
     }
 
     @Test void everyRowsStateAndActionStayReachable() {
-        for (var row : List.of(TestRows.plugin("dev.example.review", "Review").needsReview("network").row(),
-                TestRows.plugin("dev.example.failed", "Failed").state("FAILED", "boom").row(),
-                TestRows.plugin("dev.example.gone", "Gone").removing().row())) {
+        // Each row with the removal its menu must hold: Remove… while installed, Keep while pending removal, Discard Install while pending install.
+        var removals = new java.util.LinkedHashMap<dev.jasper.app.plugins.PluginRuntime.Row, String>();
+        removals.put(TestRows.plugin("dev.example.review", "Review").needsReview("network").row(), "Remove…");
+        removals.put(TestRows.plugin("dev.example.failed", "Failed").state("FAILED", "boom").row(), "Remove…");
+        removals.put(TestRows.plugin("dev.example.gone", "Gone").removing().row(), "Keep");
+        removals.put(TestRows.plugin("dev.example.new", "New").installing().row(), "Discard Install");
+        removals.forEach((row, removal) -> {
             var item = PluginCard.item(row, false, "plugin", PluginShape.CLASSIC);
             var toggle = (Nodes.Toggle) item.leading().orElseThrow();
             assertThat(toggle.checked()).as(row.id()).isEqualTo(PluginCard.checked(row));
             if (!PluginCard.toggleable(row)) assertThat(toggle.tooltip()).as(row.id()).isEqualTo(PluginCard.why(row));
-            assertThat(item.contextActions().orElseThrow()).extracting(MenuItem::label).as(row.id()).containsAll(PluginCard.menu(row, false).stream().map(MenuItem::label).toList());
-        }
+            assertThat(item.contextActions().orElseThrow()).extracting(MenuItem::label).as(row.id())
+                .contains("Open Settings", "Open Plugin Folder", "Open Data Folder", removal);
+        });
     }
 
     @Test void theDetailsUseTabsInBothLooksAndTheClassicEllipsisSitsBesideDisable() throws Exception {
@@ -44,6 +49,12 @@ class PluginsCompositionTest {
                     assertThat(section.kind()).as(shape.toString()).isEqualTo(Nodes.ChoiceKind.TABS);
                     var more = (Nodes.MenuButton) dev.jasper.app.settingsui.ResetMenuTestAccess.find(root, PluginDetails.MORE);
                     assertThat(more.icon()).isEqualTo(shape.ellipsisActions() ? "more" : "chevron.down");
+                    assertThat(more.items()).extracting(MenuItem::label).as(shape + ": the plugin's removal in its menu").contains("Remove…");
+                    details.show(TestRows.plugin("dev.example.new", "New").installing().row(), false);
+                    var pending = (Nodes.MenuButton) dev.jasper.app.settingsui.ResetMenuTestAccess.find(details.header().spec().root(), PluginDetails.MORE);
+                    assertThat(pending.items()).extracting(MenuItem::label).as(shape + ": a pending install's discard in its menu").contains("Discard Install");
+                    details.show(TestRows.plugin("dev.example.tidy", "Tidy Tabs").row(), false);
+                    root = details.header().spec().root();
                     var head = (Nodes.Stack) dev.jasper.app.settingsui.ResetMenuTestAccess.find(root, "head");
                     assertThat(head.children().stream().anyMatch(node -> node.id().equals(PluginDetails.MORE))).as(shape + ": the ⋯ in the head").isEqualTo(shape.ellipsisActions());
                     assertThat(head.children().stream().anyMatch(node -> node.id().equals("icon"))).as(shape + ": the identity icon").isEqualTo(!shape.checkboxRows());
