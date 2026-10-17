@@ -357,7 +357,8 @@ public final class ApplicationBootstrap {
             application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
-                application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
+                application.backgroundOnQuit(new DockControl(dockShow(MacDock::show, ApplicationIcon::installTaskbarIcon),
+                    MacDock::prepare, MacDock::poweringOff), !options.background());
             if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
             application.startPlugins(dirs);
             // After the plugins started, so a call that arrives first finds its handler.
@@ -367,6 +368,20 @@ public final class ApplicationBootstrap {
             acquired.transfer();
             return application;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
+    }
+
+    /**
+     * Spec 10.11: switching the activation policy gives a packaged Jasper a new Dock item, which shows the bundle's icon,
+     * so each switch into the Dock sets the look's icon again ({@code reapply}). A {@code --background} resident's first
+     * window and a reopen after Quit both come back this way.
+     */
+    static Consumer<Boolean> dockShow(Consumer<Boolean> show, Runnable reapply) {
+        Objects.requireNonNull(show, "show");
+        Objects.requireNonNull(reapply, "reapply");
+        return visible -> {
+            show.accept(visible);
+            if (visible) reapply.run();
+        };
     }
 
     /** EDT acquisition transaction; factories keep resource creation explicit and rollback testable. */

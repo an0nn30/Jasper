@@ -724,6 +724,8 @@ public final class PluginRuntime {
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
                     outcome.reason(), Optional.empty()));
         }
+        // The splash's steps are past the plugins: keep nothing of the splash.
+        starting = plugin -> { };
         // Spec 4.6: a provider that fails to load or start fails its look; this session keeps the chrome, without its services.
         resolution.presentation().ifPresent(provider -> {
             if (statuses.stream().anyMatch(status -> status.id().equals(provider.id()) && status.state() == PluginStatus.State.FAILED))

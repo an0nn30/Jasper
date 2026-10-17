@@ -55,6 +55,8 @@ public final class Splash {
                 @Override public void update(Graphics g) { draw(g); }
             };
             window.setFocusableWindowState(false);
+            // The native window's first fill, before the splash paints, matches the splash: no light flash.
+            window.setBackground(SplashColors.TOP);
             window.setIconImages(icons);
             window.setSize(SplashPainter.WIDTH, SplashPainter.HEIGHT);
             window.setLocation(centred(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice()

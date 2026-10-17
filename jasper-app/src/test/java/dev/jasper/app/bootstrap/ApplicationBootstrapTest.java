@@ -423,6 +423,39 @@ class ApplicationBootstrapTest {
         }
     }
 
+    /** Spec 10.11: a windowed branded start opens the splash on its first step, four steps plus one per plugin. */
+    @Test void aWindowedBrandedStartOpensTheSplashOnItsFirstStep() throws Exception {
+        var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
+        var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
+            dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
+        try {
+            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded);
+            // Headless here: the screen scale falls back to 1 and the posted window logs that it cannot open.
+            var steps = ApplicationBootstrap.openSplash(windowed, false);
+            assertThat(steps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            assertThat(steps.active()).isTrue();
+            assertThat(steps.current()).isEqualTo(new dev.jasper.app.startup.StartupSteps.Step("Starting Java runtime…", 1,
+                4 + branded.loading().size()));
+            SwingUtilities.invokeAndWait(steps::workstation);
+            assertThat(steps.current().text()).as("the product name").isEqualTo("Starting JasperOps Workstation…");
+            SwingUtilities.invokeAndWait(steps::done);
+            assertThat(steps.active()).isFalse();
+        } finally {
+            dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
+    /** Spec 10.11: each switch into the Dock sets the look's icon again; leaving the Dock does not. */
+    @Test void enteringTheDockSetsTheIconAgain() {
+        var calls = new java.util.ArrayList<String>();
+        var show = ApplicationBootstrap.dockShow(visible -> calls.add("show " + visible), () -> calls.add("icon"));
+        show.accept(false);
+        show.accept(true);
+        show.accept(false);
+        show.accept(true);
+        assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
+    }
+
     /** Spec 10.11: the splash shows the look's files, the version line and About's copyright. */
     @Test void theSplashContentIsTheLooksBrandingWithAboutsVersionAndCopyright() throws Exception {
         var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));

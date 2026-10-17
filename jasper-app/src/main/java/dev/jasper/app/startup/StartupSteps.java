@@ -47,8 +47,8 @@ public final class StartupSteps {
 
     private final String product;
     private final int plugins;
-    private final Consumer<Step> show;
-    private final Runnable close;
+    private Consumer<Step> show;
+    private Runnable close;
     private Step current;
     private int loaded;
     private boolean done;
@@ -107,11 +107,17 @@ public final class StartupSteps {
     /** The first window is about to show. */
     public void workstation() { advance(count(), "Starting " + product + " Workstation…"); }
 
-    /** Start-up showed its first window or failed: the splash closes, once, and later calls do nothing. */
+    /**
+     * Start-up showed its first window or failed: the splash closes, once, and later calls do nothing. The steps then let
+     * go of the splash, so a process that keeps them (a resident with no window) holds none of its images or fonts.
+     */
     public void done() {
         if (done) return;
         done = true;
-        try { close.run(); }
+        Runnable closing = close;
+        show = step -> { };
+        close = () -> { };
+        try { closing.run(); }
         catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "The splash could not be closed", failure); }
     }
 

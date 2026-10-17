@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 11: branding — 2026-10-17** (`claude/enterprise-branding`, worktree
-`.claude/worktrees/enterprise-11`, `0b3ab7cd5..15b190c0d`, then this documentation commit;
+`.claude/worktrees/enterprise-11`, `0b3ab7cd5..15b190c0d`, then the documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-11-branding.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look with `[branding]` brands Jasper's
 start-up and windows. `KitParser` reads the table (`product`, `icons`, `splash_art`) into `Branding`, the files' bytes,
@@ -26,11 +26,12 @@ properties, not at the selection; (10) step timing and count; (11) faces from th
 `BuildInfo.buildLine` and `BuildInfo.COPYRIGHT`; (13) fixed colours in `SplashColors`, exempt from the scan; (14)
 measured window-pixel geometry and baselines; (15) the comparison's tolerances; (16) a plain AWT window with the
 look's icons, centred on the main screen; (17) 1x pairs; (18) the text compared with the frames on macOS only.
-Deviations from the plan's text: the app architecture's `startup` row also gains `splash` in its list of dependent packages, since `dev.jasper.app.splash` depends on `dev.jasper.app.startup`; Task 6's `SplashPainterTest.theSplashIgnoresTheTheme` restored `Label.foreground` and `defaultFont` by putting back the values it had read, which left them as overrides of every later look and feel and failed `WorkspaceThemeTest` in the full build, so `15b190c0d` removes the overrides instead; otherwise none beyond the plan's Rulings. `./gradlew check --continue`: **11,130 tests, 0 failures, 0 errors, 25 skipped**. GUI
+Deviations from the plan's text: the app architecture's `startup` row also gains `splash` in its list of dependent packages, since `dev.jasper.app.splash` depends on `dev.jasper.app.startup`; Task 6's `SplashPainterTest.theSplashIgnoresTheTheme` restored `Label.foreground` and `defaultFont` by putting back the values it had read, which left them as overrides of every later look and feel and failed `WorkspaceThemeTest` in the full build, so `15b190c0d` removes the overrides instead; otherwise none beyond the plan's Rulings. The final review's fixes (beyond the plan): each switch into the macOS Dock sets the look's icon again (`ApplicationBootstrap.dockShow`), since a new Dock item shows the bundle's icon; `StartupSteps.done()` and `PluginRuntime` let go of the splash, so a resident holds none of its images or fonts; the splash window's first fill is the splash's top colour. `./gradlew check --continue` before those fixes: **11,130 tests, 0 failures, 0 errors, 25 skipped**; the fixes add three tests and two invalid-branding cases, run targeted. GUI
 checks for the user (spec 16.2): on a cold start with Enterprise on, the splash appears centred, unfocused, with the
-JasperOps art, icon, version line, steps and bar, crisp on a Retina screen, and closes as the first window shows; the
-Dock icon (packaged and development builds) and the window icons on Windows and Linux are the Enterprise icon from the
-splash on; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
+JasperOps art, icon, version line, steps and bar, crisp on a Retina screen, with no light flash as it opens, and closes
+as the first window shows; the Dock icon (packaged and development builds) and the window icons on Windows and Linux
+are the Enterprise icon from the splash on; in a packaged Enterprise build, the Dock icon is the Enterprise icon when
+a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
 

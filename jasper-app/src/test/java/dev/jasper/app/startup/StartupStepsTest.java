@@ -35,6 +35,29 @@ class StartupStepsTest {
         assertThat(shown).as("nothing after done").hasSize(5);
     }
 
+    /** Spec 10.11: a splash never outlives its start, so steps a resident keeps hold nothing of it once done. */
+    @Test void doneLetsGoOfTheSplash() throws InterruptedException {
+        var steps = held(new byte[8 << 20]);
+        var art = steps.reference();
+        steps.steps().done();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (art.get() != null && System.nanoTime() < deadline) {
+            System.gc();
+            Thread.sleep(20);
+        }
+        assertThat(art.get()).as("the splash's art, reachable only through the steps").isNull();
+        assertThat(steps.steps().active()).isFalse();
+    }
+
+    private record Held(StartupSteps steps, java.lang.ref.WeakReference<byte[]> reference) { }
+
+    /** Steps whose show and close are the only holders of {@code art}. */
+    private static Held held(byte[] art) {
+        var reference = new java.lang.ref.WeakReference<>(art);
+        return new Held(StartupSteps.of("JasperOps", 0, step -> { if (art.length == 0) throw new AssertionError(); },
+            () -> { if (art.length == 0) throw new AssertionError(); }), reference);
+    }
+
     @Test void stepsOnlyMoveForward() {
         var shown = new ArrayList<StartupSteps.Step>();
         var steps = StartupSteps.of("JasperOps", 1, shown::add, () -> { });
