@@ -340,7 +340,7 @@ final class Panels {
                 if (column >= 0) {
                     g.fillRect(0,0,getWidth(),getHeight());
                     if (column < 2) {
-                        g.setColor(ThemePainting.color(context, SemanticColor.BORDER_SUBTLE));
+                        g.setColor(context.faces().separators.rule(context));
                         int stroke=ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE);
                         g.fillRect(getWidth()-stroke,0,stroke,getHeight());
                     }

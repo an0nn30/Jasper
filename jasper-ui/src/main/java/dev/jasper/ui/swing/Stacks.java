@@ -864,6 +864,9 @@ final class Stacks {
         }
         int natural(Component child, Component fill) {
             int width = child.getPreferredSize().width;
+            // A field that does not fill takes the catalog's search width where it has one (plan 10b Rulings 4).
+            int search = metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH);
+            if (search > 0 && child != fill && owner.barFields.contains(child) && !owner.barTexts.contains(child)) return search;
             return owner.barTexts.contains(child) && child != fill ? Math.max(width, metric(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH)) : width;
         }
         int gap(Component before, Component after) {

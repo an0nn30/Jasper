@@ -164,8 +164,14 @@ final class PanelHeaders {
             Stacks.mount(host, controls);
         }
 
-        /** Whether the host frames this header as a flush frame's strip (spec 10.7). */
-        boolean flush() { return hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }
+        /** Whether this header heads a manager column (plan 10b Rulings 2); the reconciler sets it before each update. */
+        boolean pane;
+
+        /**
+         * Whether the host frames this header as a flush frame's strip (spec 10.7), or it heads a manager column under a
+         * kit whose separators draw pane strips.
+         */
+        boolean flush() { return pane && context().faces().separators.paneStrips() || hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }
 
         /** Whether that strip's frame holds the focus owner. */
         boolean focusedFrame() { return hostHeader.frame() == PanelHostHeader.Frame.FLUSH_FOCUSED; }

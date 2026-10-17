@@ -195,6 +195,9 @@ final class ViewReconciler implements AutoCloseable {
         boolean detail = inheritedDetail || node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
         var control = next.get(node.id());
         if (control instanceof Panels.PanelControl panel) panel.column = column;
+        // A manager column's header asks the kit whether it draws as a header strip (plan 10b Rulings 2).
+        if (node instanceof Nodes.Panel panel && next.get(panel.header().id()) instanceof PanelHeaders.HeaderControl header)
+            header.pane = column >= 0;
         if (control instanceof InteractiveRows.RowsControl rows) rows.column = column;
         if (control instanceof SettingRows.RowControl row) row.detail = detail;
         if (control instanceof Stacks.StackControl stack) stack.detail = detail;

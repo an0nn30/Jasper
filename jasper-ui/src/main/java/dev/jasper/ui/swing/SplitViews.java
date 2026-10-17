@@ -26,13 +26,13 @@ final class SplitViews {
             component.setLayout(new Layout(this));
         }
 
-        /** DOCUMENT: the children that may fill the remaining height (Custom and Empty), in order. */
+        /** DOCUMENT: the children that may fill the remaining height (Custom, Empty and Split), in order. */
         final java.util.Set<Component> fills = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
             fills.clear();
-            for (var c : controls) if (c.node instanceof Nodes.Custom || c.node instanceof Nodes.Empty) fills.add(c.component);
+            for (var c : controls) if (c.node instanceof Nodes.Custom || c.node instanceof Nodes.Empty || c.node instanceof Nodes.Split) fills.add(c.component);
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
         }
 
@@ -52,7 +52,7 @@ final class SplitViews {
             if (children.size() < 2) return;
             var g = graphics.create();
             try {
-                g.setColor(ThemePainting.color(owner.context(), dev.jasper.ui.theme.SemanticColor.BORDER_SUBTLE));
+                g.setColor(owner.context().faces().separators.rule(owner.context()));
                 int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
                 for (int i = 1; i < children.size(); i++) {
                     Component above = children.get(i - 1), below = children.get(i);
@@ -98,7 +98,7 @@ final class SplitViews {
             return result;
         }
 
-        /** DOCUMENT: the first visible Custom or Empty child, which takes the height the others leave. */
+        /** DOCUMENT: the first visible Custom, Empty or Split child, which takes the height the others leave. */
         Component fill(List<Component> children) {
             for (Component c : children) if (owner.fills.contains(c)) return c;
             return null;

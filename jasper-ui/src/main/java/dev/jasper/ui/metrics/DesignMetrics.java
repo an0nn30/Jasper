@@ -94,7 +94,7 @@ public final class DesignMetrics {
         TOOL_HEADER_LEADING_PADDING(10), TOOL_HEADER_TRAILING_PADDING(6), TOOL_HEADER_DETAIL_GAP(6), TOOL_HEADER_ACTIVE_DOT(6), RAIL_BADGE_DOT(6),
         FIND_GAP(6), FIND_SIDE_PADDING(6), FIND_CONTROL_GAP(4), FIND_CLOSE_SPACER(16),
         // Compact document bars (an editor's find/replace rows, notice and command strip) inside a DOCUMENT split.
-        DOCUMENT_BAR_VERTICAL_PADDING(4), DOCUMENT_BAR_SIDE_PADDING(6), DOCUMENT_BAR_GAP(8), DOCUMENT_BAR_ACTION_GAP(3), DOCUMENT_BAR_STATUS_WIDTH(84), DOCUMENT_BAR_FILL_MIN_WIDTH(120), DOCUMENT_BAR_LINE_GAP(4),
+        DOCUMENT_BAR_VERTICAL_PADDING(4), DOCUMENT_BAR_SIDE_PADDING(6), DOCUMENT_BAR_GAP(8), DOCUMENT_BAR_ACTION_GAP(3), DOCUMENT_BAR_STATUS_WIDTH(84), DOCUMENT_BAR_FILL_MIN_WIDTH(120), DOCUMENT_BAR_LINE_GAP(4), DOCUMENT_BAR_SEARCH_WIDTH(0), SEPARATOR_HEIGHT(18),
         TITLE_SEARCH_PADDING(8), TITLE_SEARCH_GAP(6), NATIVE_MENU_ARROW_GAP(3),
         NOTICE_VERTICAL_PADDING(8), NOTICE_HORIZONTAL_PADDING(12), NOTICE_BUTTON_GAP(8), BREADCRUMB_COLLAPSED_HEIGHT(16),
         // Kit breadcrumbs and the opt-in overlay scroll policy (Plan 2 Task 6b), keeping the chooser's former geometry.
@@ -355,6 +355,11 @@ public final class DesignMetrics {
         // The overview 14 below the folder tabs, its lines 17.5 apart.
         values.put(Role.PLUGIN_DETAILS_GAP, 4);
         values.put(Role.PLUGIN_TEXT_LINE_SPACING, 3);
+        // Plan 10b: the classic manager (Rulings 4), the 07 Credential Vault mocks' columns, bar padding and search width.
+        values.put(Role.MANAGER_SIDEBAR_WIDTH, 171);
+        values.put(Role.MANAGER_LIST_WIDTH, 348);
+        values.put(Role.DOCUMENT_BAR_VERTICAL_PADDING, 6);
+        values.put(Role.DOCUMENT_BAR_SEARCH_WIDTH, 200);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);
