@@ -64,6 +64,7 @@ public final class KitView extends JPanel implements AutoCloseable {
         reconciler.validateFieldTrailing(spec, null, null);
         ViewSpec previous = this.spec;
         updating = true; try { reconciler.update(spec); this.spec = spec; } finally { updating = false; }
+        hideHostedHeading();
         artworkPresentations.keySet().removeIf(id -> !hasIcon(spec.root(),id));
         if (pointerOnly) unfocusable(this);
         // Native panel hosts reborrow a replacement header after reconciliation, never during it.
@@ -330,6 +331,60 @@ public final class KitView extends JPanel implements AutoCloseable {
     public boolean titleStrip() { return titleStrip; }
     private boolean titleStrip;
     /**
+     * App-only: the host shows this view's form title (a classic dialog's header strip, or a title bar the system draws),
+     * so the form draws neither its title label nor a hero that only repeats it (Enterprise presentation spec 10.8). EDT
+     * confined.
+     */
+    public void hostTitled(boolean value) {
+        requireOpen();
+        if (hostTitled == value) return;
+        hostTitled = value; refresh(); repaint();
+    }
+    /** Whether the host shows this view's form title. */
+    public boolean hostTitled() { return hostTitled; }
+    private boolean hostTitled;
+    /**
+     * App-only: this view's form is a dialog's content under the classic mapping, so its footer is the dialog's band on
+     * {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog or a native one. EDT
+     * confined.
+     */
+    public void dialogBand(boolean value) {
+        requireOpen();
+        if (dialogBand == value) return;
+        dialogBand = value; refresh(); repaint();
+    }
+    /** Whether this view's form footer is a classic dialog's band. */
+    public boolean dialogBand() { return dialogBand; }
+    private boolean dialogBand;
+    /**
+     * App-only: this view's form is a classic dialog's content, so the dialog's card paints the form's fill and frame
+     * (spec 10.8). EDT confined.
+     */
+    public void dialogCard(boolean value) {
+        requireOpen();
+        if (dialogCard == value) return;
+        dialogCard = value; refresh(); repaint();
+    }
+    /** Whether a classic dialog's card paints this view's form fill and frame. */
+    public boolean dialogCard() { return dialogCard; }
+    private boolean dialogCard;
+    /** A hero hidden because it only repeats a host-titled form's title. */
+    private static final java.util.function.Consumer<javax.swing.JLabel> HOSTED_HEADING = label -> label.setVisible(false);
+    /**
+     * Under {@link #hostTitled()} a SHEET or FULL form's hero that is a text repeating the form's title is the host's
+     * title too: it stays hidden through every later refresh through {@code TextControl.styled}, as the classic prompt
+     * face hides a prompt's title (plan 4b). A prompt's hero (its tile, heading and message) is the prompt face's, and
+     * a hero that says more than the title stays. Re-applied after each update, which clears the hook.
+     */
+    private void hideHostedHeading() {
+        if (!(spec.root() instanceof dev.jasper.ui.model.Nodes.Form form) || form.hero().isEmpty()) return;
+        if (form.kind() != dev.jasper.ui.model.Nodes.FormKind.SHEET && form.kind() != dev.jasper.ui.model.Nodes.FormKind.FULL) return;
+        if (!(form.hero().get() instanceof dev.jasper.ui.model.Nodes.Text text) || !text.text().strip().equals(form.title().strip())) return;
+        if (!(reconciler.mounted(text.id()) instanceof Labels.TextControl hero)) return;
+        if (hostTitled && hero.styled == null) { hero.styled = HOSTED_HEADING; hero.component.setVisible(false); }
+        else if (!hostTitled && hero.styled == HOSTED_HEADING) { hero.styled = null; hero.refresh(); }
+    }
+    /**
      * App-only: this view is part of the Run window (Enterprise presentation spec 11.2). Its RESULTS lists take the Run
      * window's rows, heading bands and counts, its PROMPT_HEADER tile the Run window's tile, its transparent fields the
      * data face and no ring of their own (the host's field box shows focus), and its text the Run window's colours.
@@ -390,7 +445,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     }
     private void refresh() {
         if (closeRequested.get()) return;
-        try { motion.enabled(); reconciler.refresh(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }
+        try { motion.enabled(); reconciler.refresh(); hideHostedHeading(); if (pointerOnly) unfocusable(this); } catch (Throwable failure) { report(failure); }
     }
     /** Whether this view's controls never take keyboard focus. */
     public boolean pointerOnly() { return pointerOnly; }

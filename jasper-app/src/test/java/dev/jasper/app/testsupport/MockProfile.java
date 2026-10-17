@@ -101,6 +101,40 @@ public final class MockProfile {
         return inks;
     }
 
+    /**
+     * A probe that follows the UI face's advance widths (plan 6b Execution notes R36 and R47), asserted within
+     * {@code tolerance} under the shipped kit's IBM Plex; printed, not asserted, where an installed IBM Plex hides the
+     * plugin's files, so that the render draws the platform face (plan 5b Execution notes, ruling 3).
+     *
+     * @param what the probe
+     * @param actual the render's value, in the mock's pixels
+     * @param expected the mock's value
+     * @param tolerance the tolerance it is asserted within under Plex
+     */
+    public static void fonts(String what, int actual, int expected, int tolerance) {
+        if (!EnterpriseResources.plexResolves()) {
+            System.out.printf("FONTS unchecked (an installed IBM Plex hides the plugin's files): %s %d, mock %d (tolerance %d)%n", what, actual, expected, tolerance);
+            return;
+        }
+        org.assertj.core.api.Assertions.assertThat(actual).as(what + " under IBM Plex, mock " + expected)
+            .isCloseTo(expected, org.assertj.core.api.Assertions.within(tolerance));
+    }
+
+    /**
+     * A face-width probe that misses the mock under Plex for a recorded reason, printed with its measurement rather than
+     * asserted (plan 5b's merge with plan 6b: the mocks set the status bar's text at 11 px where spec 5.6 gives
+     * {@code STATUS_TEXT} 12).
+     *
+     * @param what the probe
+     * @param actual the render's value, in the mock's pixels
+     * @param expected the mock's value
+     * @param tolerance the tolerance it would be asserted within
+     * @param why the recorded reason
+     */
+    public static void residual(String what, int actual, int expected, int tolerance, String why) {
+        System.out.printf("FONTS residual: %s %d, mock %d (tolerance %d): %s%n", what, actual, expected, tolerance, why);
+    }
+
     /** CIE76 ΔE between two opaque sRGB colours. */
     public static double deltaE(Color a, Color b) {
         double[] p = lab(a), q = lab(b);

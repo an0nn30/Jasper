@@ -1,11 +1,8 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.ChromePainter;
 
-import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.platform.AppIcons;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
@@ -38,15 +35,23 @@ final class TitleSearchField extends JComponent {
     private final Runnable open;
     private final Supplier<String> shortcut;
     private String context = "Search";
+    private String contextTooltip;
     private Icon contextIcon;
     private boolean collapsed, hover, pressed;
 
-    TitleSearchField(Runnable open, Supplier<String> shortcut) {
+    private final HeaderComposition composition;
+
+    TitleSearchField(Runnable open, Supplier<String> shortcut) { this(open, shortcut, new UnifiedHeader()); }
+
+    /** A field drawn and sized by {@code composition}. */
+    TitleSearchField(Runnable open, Supplier<String> shortcut, HeaderComposition composition) {
+        this.composition = Objects.requireNonNull(composition);
         this.open = Objects.requireNonNull(open);
         this.shortcut = Objects.requireNonNull(shortcut);
         setName("titleSearch");
         setFocusable(false);
         setOpaque(false);
+        // Registers the tip; its text is read when shown (getToolTipText), so it follows the palette's shortcut.
         setToolTipText(context);
         var mouse = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent event) { hover = true; repaint(); }
@@ -69,19 +74,23 @@ final class TitleSearchField extends JComponent {
     /** The focused pane's context, as the header label showed it; blank shows "Search". */
     void setContext(String label, String tooltip, Icon icon) {
         context = label == null || label.isBlank() ? "Search" : label;
-        setToolTipText(tooltip == null || tooltip.isBlank() ? context : tooltip);
+        contextTooltip = tooltip;
         contextIcon = icon;
         repaint();
     }
 
     String contextText() { return context; }
+    Icon contextIcon() { return contextIcon; }
     String shortcutText() { String text = shortcut.get(); return text == null ? "" : text; }
     boolean collapsed() { return collapsed; }
     void setCollapsed(boolean value) { if (collapsed != value) { collapsed = value; repaint(); } }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(UIScale.scale(preferredWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(minimumWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMaximumSize() { return new Dimension(UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_MAX_WIDTH)), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
+    @Override public Dimension getPreferredSize() { return composition.searchPreferred(); }
+    @Override public Dimension getMinimumSize() { return composition.searchMinimum(); }
+    @Override public Dimension getMaximumSize() { return composition.searchMaximum(); }
+
+    /** The header composition's tip: the context's own under the default look, "Search everywhere" under the classic one. */
+    @Override public String getToolTipText() { return composition.searchTooltip(context, contextTooltip, shortcutText()); }
 
     @Override public JToolTip createToolTip() {
         var tip = new JToolTip();
@@ -93,14 +102,13 @@ final class TitleSearchField extends JComponent {
     @Override public AccessibleContext getAccessibleContext() {
         if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
             @Override public AccessibleRole getAccessibleRole() { return AccessibleRole.PUSH_BUTTON; }
-            @Override public String getAccessibleName() { return "Search, " + context; }
+            @Override public String getAccessibleName() { return composition.searchName(context); }
         };
         return accessibleContext;
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        ChromePainter.installed().search(this, graphics, ThemeZone.theme(this), hover || pressed, collapsed,
-            context, shortcutText(), AppIcons.icon("search"), contextIcon);
+        composition.paintSearch(this, graphics, hover || pressed, collapsed);
     }
 
     /** {@code text}, cut at a code point boundary with an ellipsis when it is wider than {@code width}. */

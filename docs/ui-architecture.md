@@ -102,6 +102,14 @@ mid-way. While it moves the card paints one snapshot of its content, so it fades
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
 layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window.
 
+`ClassicDialog` is the classic look's in-window dialog: a still scrim, a card framed in `border.hover` with
+`DIALOG_RADIUS` and the popover shadow, a header strip on `surface.header.active` holding the dialog's swatch and title,
+and the host's content; it is centred on the whole window or, as a sheet, joined under the title bar, and it neither
+fades nor moves. Three `KitView` host flags serve it: `hostTitled` (the form draws no title label and hides a hero that
+only repeats the title), `dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule, the
+footnote leading and the actions trailing; native dialogs under the classic mapping take it too) and `dialogCard` (the
+card paints the form's fill and frame).
+
 `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Cobalt,
 the bundled `slate-cobalt.json` (the colour reference `docs/design/theme-engine/slate-cobalt.md`'s machine-readable
 block, kept identical by a test). A theme has the Dark and/or Light semantic palettes (roles the file omits follow
@@ -110,7 +118,7 @@ variant (`EditorColors` and syntax styles, written as colours or as references i
 palette, the matching terminal scheme, the editor scheme and syntax and the glass; `FlatLafInstaller.install(theme, kit)`
 derives FlatLaf's UI keys from the roles when it installs one (`UiColorKeys.flatLaf(theme, kit.uiKeys())`). Components paint theme.md's roles; alpha treatments (focus and error rings, hover, category tiles)
 apply one kit metric to a base role, and a role that carries alpha (the scrim, `border.subtle`) is painted as given.
-A variant may also list eight of its derived roles (`GeneratedTheme.derivedOverrides()`); `DerivedPalette.of(theme)`
+A variant may also list nine of its derived roles (`GeneratedTheme.derivedOverrides()`); `DerivedPalette.of(theme)`
 gives all 23 `DerivedColor`s, each the override or its recipe over semantic roles and the derived roles before it,
 kept by theme identity (header chrome passes `TitleBarTheme.of(theme)`). `PaintPair` declares a pair a painter paints,
 naming either kind of `ColorRole`, with its `SurfaceContrast.Guard` (text 4.5:1, indicator 3:1, structural boundary

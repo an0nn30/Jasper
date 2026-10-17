@@ -99,6 +99,7 @@ final class WindowCommandPalette implements AutoCloseable {
                 if (!wasOpen) startReveal();
                 view.focusQuery();
             }
+            owner.paletteChanged();
         }
 
     /** The terminal adapter stays here; providers see only narrow captured capabilities. */
@@ -124,6 +125,7 @@ final class WindowCommandPalette implements AutoCloseable {
                 && SwingUtilities.isDescendingFrom(priorFocus, owner)) priorFocus.requestFocusInWindow();
         else owner.focusSelected();
         priorFocus = null; originTab = null; originPane = null;
+        owner.paletteChanged();
     }
 
     void setAnimations(AnimationSettings settings) {

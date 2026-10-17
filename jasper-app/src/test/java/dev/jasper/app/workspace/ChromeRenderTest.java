@@ -105,6 +105,24 @@ class ChromeRenderTest {
             assertThat(titles).as(look.name()).contains("Window").doesNotContain("Pane", "Tab");
         else assertThat(titles).as(look.name()).contains("Pane", "Tab").doesNotContain("Window");
         assertThat(titles.getLast()).as(look.name() + ": Help is last").isEqualTo("Help");
+        // Plan 6b: the header, tabs, status cells and run item the look names.
+        var workspace = look.projections().workspace();
+        assertThat(owner.chrome().composition() instanceof ClassicHeader).as(look.name() + ": the header")
+            .isEqualTo(workspace.header() == WorkspaceLook.Header.CLASSIC);
+        assertThat(owner.tabBar() instanceof ClassicTabs).as(look.name() + ": the tabs").isEqualTo(workspace.tabs() == WorkspaceLook.Tabs.CLASSIC);
+        assertThat(owner.tabBar().component().isVisible() || workspace.tabs() == WorkspaceLook.Tabs.EQUAL).as(look.name() + ": classic tabs always show").isTrue();
+        assertThat(owner.status().cells() instanceof RuledCells).as(look.name() + ": the status cells")
+            .isEqualTo(workspace.status() == WorkspaceLook.Status.RULED);
+        assertThat(owner.status().runItem() != null).as(look.name() + ": the run item").isEqualTo(workspace.runItem());
+        // Spec 16.1.4: the run item and the ruled cells paint their declared pairs as this look renders them.
+        var installed = dev.jasper.ui.swing.FlatLafInstaller.installedTheme();
+        if (owner.status().runItem() != null)
+            assertThat(WindowPairsTest.paints(owner.status().runItem(), dev.jasper.ui.theme.SurfaceContrast.painted(installed,
+                WindowPairs.run(false, owner.status().cells() instanceof RuledCells))))
+                .as(look.name() + ": the run item's declared pair").isTrue();
+        if (owner.status().cells() instanceof RuledCells)
+            assertThat(WindowPairsTest.paints(owner.status(), dev.jasper.ui.theme.SurfaceContrast.painted(installed, WindowPairs.RULE)))
+                .as(look.name() + ": the ruled cells' rule pair").isTrue();
     }
 
     @Test void everyLookBuildsItsChromeFlush() throws Exception {

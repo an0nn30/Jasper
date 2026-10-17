@@ -253,11 +253,11 @@ public class RunWindowRenderTest {
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_PRIMARY), derived(c, DerivedColor.SURFACE_HEADER_ACTIVE))).as("the title").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), dialog(c))).as("labels and help").isGreaterThanOrEqualTo(4.5);
             assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_STRONG_SECONDARY), derived(c, DerivedColor.SURFACE_TABLE_HEADER))).as("headings").isGreaterThanOrEqualTo(4.5);
-            // Spec 7.6 gives Enterprise Dark text.onAccent #FFFFFF on accent #3D74D6, 4.499:1; the row paints its guarded pair.
+            // Spec 7.6 (plan 5b's accent ruling): Enterprise Dark's accent #3C74D6 keeps text.onAccent #FFFFFF at 4.505:1, so the
+            // selected row paints white, unrepaired, as the Dark Mode mock draws it.
             var selected = dev.jasper.ui.theme.SurfaceContrast.painted(c.theme(), dev.jasper.ui.swing.RunWindowPresentation.SELECTED_TITLE);
-            System.out.printf("run-window dark: selected row text %s on %s, %.3f:1 (spec 7.6's #FFFFFF is %.3f:1)%n", ColorMath.hex(selected),
-                ColorMath.hex(palette.color(SemanticColor.ACCENT)), ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT)),
-                ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT)));
+            assertThat(ColorMath.hex(palette.color(SemanticColor.ACCENT))).as("the accent").isEqualToIgnoringCase("#3C74D6");
+            assertThat(ColorMath.hex(selected)).as("the selected row's text, as painted").isEqualToIgnoringCase("#FFFFFF");
             assertThat(ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT))).as("the selected row, as painted").isGreaterThanOrEqualTo(4.5);
             for (var feature : structure())
                 assertThat(probe(dark, 0, 0, feature, feature.lower() ? SHIFT : 0, c)).as("dark: " + feature.name()).isEqualTo(light.get(feature.name()));

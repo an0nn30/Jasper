@@ -45,11 +45,30 @@ class EnterpriseMenuRowMockTest {
         model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TRANSFER)).set(List.of(new MenuEntry.Item("dev.x.upload")));
         model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TOOLS)).set(List.of(new MenuEntry.Item("dev.x.tool")));
         model.addMenuSection(MenuTarget.topLevel(MenuTarget.HELP, "Help")).set(List.of(new MenuEntry.Item("dev.x.about")));
+        // The mocks' right-hand status cells (plan 6b).
+        model.addStatus("dev.x.vault", false, 10).setText("Vault: Locked");
+        model.addStatus("dev.x.ssh", false, 20).setText("1 SSH session");
         return model;
     }
 
+    /**
+     * A mounted Enterprise window and its 2× print.
+     *
+     * @param image the print
+     * @param owner the window's content, for the geometry of its parts
+     * @param root the root pane it is mounted in
+     * @param field the search field's bounds in the root, read before the window closed
+     * @param firstTab the first classic tab's bounds in the root (empty under equal tabs), read before the window closed
+     */
+    record Mounted(BufferedImage image, WindowContent owner, JRootPane root, Rectangle field, Rectangle firstTab) { }
+
     /** The Enterprise window as the mocks show its content, printed at 2× and written for inspection. EDT. */
     static BufferedImage render(boolean dark, java.util.function.Consumer<WindowContent> fixture) {
+        return mounted(dark, "window", fixture).image();
+    }
+
+    /** As {@link #render}, written as {@code enterprise-<light|dark>-<name>.png}, keeping the window. EDT. */
+    static Mounted mounted(boolean dark, String name, java.util.function.Consumer<WindowContent> fixture) {
         var themes = EnterpriseLook.controller(dark);
         try {
             var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false),
@@ -61,8 +80,13 @@ class EnterpriseMenuRowMockTest {
             var root = new JRootPane();
             WindowContent.mount(root, owner, look, title -> { });
             var image = MockProfile.print(root, WIDTH, HEIGHT);
-            MockProfile.write(image, "enterprise-" + (dark ? "dark" : "light") + "-window");
-            return image;
+            MockProfile.write(image, "enterprise-" + (dark ? "dark" : "light") + "-" + name);
+            // Closing the window clears its tab strip: the parts' geometry is read now (Execution notes R35).
+            var field = owner.chrome().header().field();
+            var fieldAt = javax.swing.SwingUtilities.convertRectangle(field.getParent(), field.getBounds(), root);
+            var firstTab = owner.tabBar() instanceof ClassicTabs tabs && !tabs.entries().isEmpty()
+                ? javax.swing.SwingUtilities.convertRectangle(tabs, tabs.entries().getFirst().getBounds(), root) : new Rectangle();
+            return new Mounted(image, owner, root, fieldAt, firstTab);
         } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
     }
 
@@ -81,8 +105,8 @@ class EnterpriseMenuRowMockTest {
         assertThat(renderRuns.get(0).length()).as(what + " row").isCloseTo(mockRuns.get(0).length(), within(2));
         assertThat(MockProfile.deltaE(renderRuns.get(0).color(), mockRuns.get(0).color())).as(what + " row colour").isLessThanOrEqualTo(2.5);
         assertThat(renderRuns.get(1).length()).as(what + " rule").isCloseTo(mockRuns.get(1).length(), within(1));
-        if (!dark) assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as("light rule colour").isLessThanOrEqualTo(2.5);
-        // Plan 6a Rulings 9: Enterprise Dark's border.divider is darker than the mock's rule until plan 6b's override.
+        // Plan 6b Task 1 overrides Enterprise Dark's border.divider with the mock's rule (#4A4D53).
+        assertThat(MockProfile.deltaE(renderRuns.get(1).color(), mockRuns.get(1).color())).as(what + " rule colour").isLessThanOrEqualTo(2.5);
         var mockInks = MockProfile.inks(mock, new Rectangle(X + 2, Y + 2, 900, 44), 12, 25);
         var renderInks = MockProfile.inks(render[0], new Rectangle(2, 2, 900, 44), 12, 25);
         assertThat(mockInks).as("the mock's eight menu titles").hasSize(8);

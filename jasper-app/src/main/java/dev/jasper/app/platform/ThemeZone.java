@@ -24,6 +24,9 @@ public final class ThemeZone {
     /** Marks {@code header} as the window's title bar: it and everything in it paint with the title bar's theme. */
     public static void titleBar(JComponent header) { header.putClientProperty(ZONE, TITLE_BAR); }
 
+    /** Makes {@code component} window chrome again, not a title-bar zone (a header row under a native title). */
+    public static void chrome(JComponent component) { component.putClientProperty(ZONE, null); }
+
     /** Live module palette; there is no second cache of installed appearance. */
     public static dev.jasper.ui.theme.GeneratedTheme theme(Component component) {
         JComponent zone = root(component);
@@ -40,6 +43,11 @@ public final class ThemeZone {
 
     public static java.awt.Font font(Typography.Role role) {
         return NativeStyles.installed().font(role);
+    }
+
+    /** {@code role}'s font for {@code text}: the platform face when the kit's own face has no glyph for a character of it. */
+    public static java.awt.Font font(Typography.Role role, String text) {
+        return NativeStyles.installed().font(role, text);
     }
 
     public static boolean workspace(Component component) {

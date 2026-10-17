@@ -25,14 +25,12 @@ theme, and the Run window's FONTS probes are checked (menu row edge agreement Li
 title starting within 1 px of the mock, Help at 0, and Transfer's ink 3 px wider in Light, 2 in Dark; Run window edge
 agreement just opened 0.965 top, 0.888 bottom, typing 0.980 and 0.894; help text top 84 against the mock's 85; the
 FOOTER lines printed for plan 8b: primary button left 428 just opened and 436 typing against 454, cancel 596 against
-606). Plan 6b's chrome targets are left to its merge: port its eight values into `enterprise.json` (this branch deletes
-the fixture theme 6b edits, a modify/delete conflict), regenerate `derived-roles-enterprise.tsv`, drop `surface.tabstrip`
-from `EnterpriseThemeTest.NEUTRAL`, add `BORDER_DIVIDER` to both override maps and re-run the theme-set suites, which
-`KitFixtures.themes()` now runs under Enterprise too. **Merge blocker:** spec 7.6 gives Enterprise Dark `text.onAccent`
-#FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard paints guarded text on the accent black (the Run window's
-selected row, every primary button label) where the Dark Mode mock draws white, while the unguarded Sessions selection
-stays white; it needs the user's ruling (one red step, #3C74D6 for `accent`, `selection.bg` and `hue.blue`, gives
-4.505:1, or a spec amendment) and then a test that locks it.
+606). Plan 6b's chrome targets and `border.divider` came in at the merge with plan 6b (the last sentence). Found: spec
+7.6 gave Enterprise Dark `text.onAccent` #FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard painted guarded text
+on the accent black (the Run window's selected row, every primary button label) where the Dark Mode mock draws white;
+approved on 2026-10-17 by the orchestrator under the user's overnight authority: `accent`, `selection.bg` and
+`hue.blue` (and 6b's Dark `tab.indicator`) are #3C74D6, one red step, 4.505:1, so that text stays white (spec 7.6
+amended; `EnterpriseThemeTest` locks it).
 The default look is unchanged (gallery byte-identical: 85 PNGs each for Dark and Light, all 322 files equal to
 `e502e102b`'s). Rulings
 (plan, "Rulings"): (1) faces by full name, degrading per face; (2) the look's UI font reaches FlatLaf unless
@@ -40,7 +38,7 @@ The default look is unchanged (gallery byte-identical: 85 PNGs each for Dark and
 in Settings and captioned; (6) the descriptor has an icon; (7) the theme's unnamed roles; (8) the apart direction is plan
 7's; (9) the mock comparison pairs the four gallery panels; (10) the family is name ID 16; (11) the icons and splash
 art of 14.1 are plan 11's; Execution notes (2026-10-17) rulings 1 to 26. Deviations from the plan's text:
-Task 4 renders hold FlatLaf's user scale at 1 and assert it (Execution notes 18); the fact-12 colours the mock crops show but the renders lack are left out of the pairs' `colours` — Light `#D9DFEA` and Dark `#3D4658` (the focused header strips, plan 7's), Dark's card `#2E3135` under the tunnels table and file list, Light `#E4E6E9` in File Servers (anti-aliased glyph pixels only) and Light tunnels' `#FFFFFF` and `#E4E6E9` — awaiting the user's ruling (19, 25); the classic menu row keeps a bar's own layout and `CollapsingMenuBar` folds by `ClassicMenuRow.titleWidth` (22); titles are measured kerned (23); a new role, `RUN_WINDOW_HELP_TEXT_TOP` (1), in both role tables (24); the Tunnels and SFTP pairs compare the populated `tunnels-added` and `sftp-connected` panels (25); three face defects the mock comparisons found under Plex are fixed (a text with a glyph the kit's UI face lacks, such as the macOS modifier symbols, draws in the platform face; the Run window's detail label takes the mocks' 11 px semibold and its shortcut ends at its box; the classic menu row sets its titles at their fractional widths), with `TypographyTest` covering the fallback (26); plan 6b is not on the branch, so Task 3 step 5's chrome targets and `border.divider` and Task 4 step 4's 6b part are left to 6b's merge; Task 5 step 1 changes five files (`docs/STATUS.md`, the sixth, in step 4). `./gradlew check --continue`: **11,027 tests, 0 failures, 0 errors, 25 skipped**.
+Task 4 renders hold FlatLaf's user scale at 1 and assert it (Execution notes 18); the fact-12 colours the mock crops show but the renders lack are left out of the pairs' `colours` — Light `#D9DFEA` and Dark `#3D4658` (the focused header strips, plan 7's), Dark's card `#2E3135` under the tunnels table and file list, Light `#E4E6E9` in File Servers (anti-aliased glyph pixels only) and Light tunnels' `#FFFFFF` and `#E4E6E9` — approved on 2026-10-17 by the orchestrator under the user's overnight authority, since those colours belong to the surfaces plans 7 (the focused header strips) and 10 (the populated panels) draw (19, 25); the classic menu row keeps a bar's own layout and `CollapsingMenuBar` folds by `ClassicMenuRow.titleWidth` (22); titles are measured kerned (23); a new role, `RUN_WINDOW_HELP_TEXT_TOP` (1), in both role tables (24); the Tunnels and SFTP pairs compare the populated `tunnels-added` and `sftp-connected` panels (25); three face defects the mock comparisons found under Plex are fixed (a text with a glyph the kit's UI face lacks, such as the macOS modifier symbols, draws in the platform face; the Run window's detail label takes the mocks' 11 px semibold and its shortcut ends at its box; the classic menu row sets its titles at their fractional widths), with `TypographyTest` covering the fallback (26); plan 6b is not on the branch, so Task 3 step 5's chrome targets and `border.divider` and Task 4 step 4's 6b part are left to 6b's merge (done there); Task 5 step 1 changes five files (`docs/STATUS.md`, the sixth, in step 4). `./gradlew check --continue`: **11,027 tests, 0 failures, 0 errors, 25 skipped**.
 The final review's fixes: under a kit with its own UI face, FlatLaf's component text takes that face at the body size
 times FlatLaf's user scale while `defaultFont` stays FlatLaf's, so unset font settings are no user override, FlatLaf
 still derives its scale from the platform font and the kit's roles take that scale once; menu accelerators keep the
@@ -58,6 +56,84 @@ the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chr
 check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
 hidden files (Execution notes, ruling 3); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged, not
 pushed.
+
+**Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
+`.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-6b-window-chrome-content.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec 10.3, 10.5, 10.6 and 10.8 land:
+`Presentation.LANDED` holds `WINDOW_CHROME` and `WINDOW_CONTENT`. `WorkspaceChrome.of` picks `ClassicHeader` (the
+Workstation mock's toolbar row: "+ New Session", "Split ▾", "Maximize", contributed items and views packed left by
+`WindowToolbar`'s leading pack, then "Search everywhere" with a light keycap and "Settings…"), `ClassicTabs`
+(content-sized, a dot, a persistent ×, a "+", the active tab on `surface.card` with a 2 px `tab.indicator` underline),
+`RuledCells` (session, folder, contributed items, grid, UTF-8 and, only while there is a problem, the configuration
+cell, divided by `border.divider` rules) and the leading "▶ Run…" item; the default look keeps `UnifiedHeader`,
+`WindowTabs` and `SlashSegments`, moved unchanged. `AuxiliaryWindows` is the one reader of `DialogMapping` and marks
+every surface; a marked modal overlay or attached sheet over a showing window is a `ClassicDialog` (jasper-ui) hosted by
+`WindowOverlay`, centred on the whole window or joined under its title bar, its form titled by the strip
+(`KitView.hostTitled`) and footed by the band (`dialogBand`); without a showing window it opens natively. The Enterprise
+fixture theme (`enterprise-fixture.json`, until plan 5b, which copies the values) takes the mocks' tab strip, tab
+indicator, scrim and dividers. `EnterpriseWorkstationMockTest` and `EnterpriseDialogMockTest` compare the toolbar row,
+tabs and status cells with the Workstation and Dark Mode mocks and the dialogs with Credential Vault 1, 4 and 5 under
+6a's fixture kit and theme (opt-in pairs through `compare_all.py`: menu row 0.988 and 0.988, toolbar 0.737 and 0.724,
+tabs 0.809 and 0.799, status 0.692 and 0.695 (Light and Dark), Unlock Vault strip 0.985 and footer 0.799, Add Login
+strip 0.962 and footer 1.000, Add SSH Key strip 0.925; swatches: Add Login `2F65CA` against the mock's `2F65CA` (ΔE
+0.0), Add SSH Key `2C8B48` against `2E9E4F` (ΔE 9.7, Execution notes R39); probes that follow the face's widths, printed
+until plan 5b's Plex: at 2×, Light and Dark: "New Session"'s ink width 141 and 140 for 134, the search field's left 2110
+for 2116, "Settings…" from 2740 for 2742, the rules before UTF-8 and the warning 2418 and 2536 for 2470 and 2574, the
+run item 130 wide for 122; the titles Unlock Vault 143 for 138, Add Login 116 for 108 and Add SSH Key 154 for 143).
+Rulings (plan, "Rulings"): (1) the window content lands at the end; (2) the mocks' tab strip, tab indicator, scrim and
+dividers are Enterprise theme values; (3) **approved on 2026-10-17 by the orchestrator under the user's overnight
+authority: `border.divider` becomes a ninth overridable derived role, a deviation from spec 7.2** (Enterprise Dark's
+recipe value `#2B2D31` is darker than the mock's `#4A4D53`; the spec's 7.1 and 7.2 are amended); (4) the toolbar's
+leading pack is a separate branch; (5) the classic header's trailing group, field shrink and collapse, `hidden` and
+`icons`; (6) the search field's light keycap; (7) classic tabs keep `window.tab_height` (the mock's strip is 1 px
+shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the configuration
+cell only for a problem; (9) the run item in `accent.edge`, on `surface.control.selected` while the palette is open;
+(10) `ClassicDialog` in jasper-ui, radius 4, centred on the whole window as the mock places it (approved on 2026-10-17 by the orchestrator under the user's
+overnight authority; spec 10.8 amended); (11) `AuxiliaryWindows` marks every surface, native without a showing
+window (a sheet as a centred dialog), content set later marked too; (12) `hostTitled` hides the form's title label and
+only a hero that repeats it (a prompt keeps its tile and message), and `dialogCard` lets the card own the form's frame;
+(13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the Workstation render leads with the
+run item; (16) under a native title the header row is window chrome; (17) the window chrome's declared pairs
+(`WindowPairs`, `ClassicDialog.pairs`) are sampled over every palette under both kits, the `border.divider` rules
+painted as the role; Execution notes (2026-10-17) R18 to R53 (the fixture theme in 5b's place, `ProjectionReadTest`,
+`WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the band's trailing actions,
+the tab strip's dividers painted as the role, the face-width probes printed until 5b, 5b's merge items, and the run item
+on its bar's surface). R44 keeps `PluginRuntime.presentation(Kit)`: the mapping reaches plugin dialogs through `AuxiliaryWindows` (approved
+on 2026-10-17 by the orchestrator; spec 4.9, 9.1 and 16.1 amended). At the merge with plan 5b (R47): copy the eight chrome values into `enterprise.json` (Light
+`surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim` `#00000036`, `border.divider` `#D3D6DA`; Dark
+`#3A3D42`, `#3D74D6`, `#00000036`, `#4A4D53`), drop `surface.tabstrip` from `EnterpriseThemeTest.NEUTRAL`, add the Dark
+`border.divider` override there, generate `derived-roles-enterprise.tsv` with it, turn R36's printed probes into
+assertions and re-measure R39's swatch under the shipped theme.
+Deviations from the plan's text: Task 2's review: `WindowToolbar`'s leading pack gives way as the trailing one does (a
+button that overflowed before a wide view returns once the view hides, labels return once the row fits them) and the
+overflow button takes the gap only after a shown control; Task 4's review (the plan's banner): past
+`CLASSIC_TAB_MIN_LABEL` the strip clips its last tabs under a "+" kept at its trailing edge (clipped tabs are reached by
+Next Tab, Previous Tab, Select Tab N and their accessible actions; no list, no scroll into view, a candidate follow-up),
+the "+" is a flat unfocusable `JButton`, a tab's × closes on a release over it and is the tab's "Close tab" action, and
+tab tips are capped with HTML off; Task 5's review: `RuledCells` rules each contributed item halfway between it and the
+one before it, progress views are cells, a content tab hides "UTF-8", a narrow bar collapses cells without a rule, and
+the idle run item lies on its bar's surface (`WindowPairs.SLASH_RUN`, Execution notes R53), CHECKED while the palette is
+open and run on a release; Task 7's review (the plan's banner): a surface owned by a classic dialog hangs from its
+window (`NativeShells.drawnInWindow`), an attached sheet is never host-titled, `create` decides through
+`NativeShells.ClassicRoute`, the host flags are `CLASSIC_FLAGS`, the strip takes no focus, a classic modal overlay that
+opens natively passes through `nativeFallback` (host-titled once native), an owner window under a minimised one is not
+showing, and a centred dialog follows its window's title bar (`NativeShells.followTitleBar`).
+Final review fixes (the plan's banner): a classic dialog's body is the kit's dialog surface (its holder no longer
+paints `surface.panel`), a modal overlay opened natively closes from its title bar, every native dialog under the
+classic mapping takes the footer band (`KitView.dialogBand` apart from `dialogCard`), the band's rule is a declared
+pair, the strip is named and ellipsises, disabled icon buttons fade, the toolbar button's hover and pressed pairs, the
+classic search field's tip and name, a larger tab × target, and the search placeholder and keycap on the text guard
+(spec 7.3, as 8a). Task 9 Step 4's default-look proof: the headless gallery for Slate Cobalt Dark and Light is
+byte-identical to `50b593f3c` (161 files a side), before and after the final review fixes, and the calibration and
+reference suites pass.
+`./gradlew check --continue` after the final review fixes: **10,970 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plan 4c) as `5e8f48dbe`: **11,052 tests, 0 failures, 0 errors, 25 skipped**; with 4c's `check_pairs.py` all fourteen chrome pairs pass (the dark menu row 0.988 now that `border.divider` is overridable).
+GUI checks for the user (spec 16.2):
+with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell, "▶ Run…"
+opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog
+over the first, the window closing under them, full screen under them, and either requested over a minimised window,
+which opens it natively; a known residual: an in-window classic modal dialog blocks only its window, so a modeless
+plugin dialog owned by the same frame stays usable, unlike a native document-modal sheet). Not pushed.
 
 **Enterprise presentation, plan 4c: the classic data faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `dedf877dc..9d11af9b3`, then this documentation commit and the final review's fixes;

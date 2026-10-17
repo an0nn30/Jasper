@@ -28,7 +28,10 @@ public final class EnterpriseLook {
     /** The shipped kit file's chrome points. */
     public static ChromeSpec chrome() { return EnterpriseResources.chrome(); }
 
-    /** The shipped Enterprise theme, Light and Dark. */
+    /**
+     * The shipped Enterprise theme, Light and Dark, with plan 6b's chrome targets (the mocks' tab strip, tab indicator,
+     * scrim and {@code border.divider}).
+     */
     public static JasperTheme theme() { return EnterpriseResources.theme(); }
 
     /** A controller showing the Enterprise theme's Light or Dark variant under the shipped kit. EDT. */

@@ -12,10 +12,10 @@ enterprise	dark	danger.border	#824545
 enterprise	dark	info.ground	#303a4c
 enterprise	dark	info.border	#344c75
 enterprise	dark	surface.footer	#414449
-enterprise	dark	border.divider	#3f4145
+enterprise	dark	border.divider	#4a4d53
 enterprise	dark	border.row	#393b3f
 enterprise	dark	border.hover	#7a7d84
-enterprise	dark	accent.edge	#5a89dc
+enterprise	dark	accent.edge	#5989dc
 enterprise	dark	button.end	#4b4e53
 enterprise	dark	tag.border.blue	#344c75
 enterprise	dark	tag.border.green	#3a674a
@@ -35,7 +35,7 @@ enterprise	light	danger.border	#ecb0b0
 enterprise	light	info.ground	#e2e9f8
 enterprise	light	info.border	#acc1ea
 enterprise	light	surface.footer	#e6e7e9
-enterprise	light	border.divider	#d4d6da
+enterprise	light	border.divider	#d3d6da
 enterprise	light	border.row	#e4e5e8
 enterprise	light	border.hover	#909399
 enterprise	light	accent.edge	#2754a8

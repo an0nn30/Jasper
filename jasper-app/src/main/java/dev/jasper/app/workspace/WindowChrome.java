@@ -32,10 +32,12 @@ import javax.swing.event.MenuListener;
 /** Menus, toolbar and status all route through the window's shared actions. */
 final class WindowChrome {
     private final WindowContent owner;
+    /** This window's header composition (spec 10.3), built once. */
+    private final HeaderComposition composition;
     private final WindowToolbar toolbar;
     private final TitleSearchField search;
     private final WindowHeader header;
-    private final WindowStatusBar status = new WindowStatusBar();
+    private final WindowStatusBar status;
     private final CollapsingMenuBar menuBar = new CollapsingMenuBar();
     private final ButtonGroup toolbarModes = new ButtonGroup();
     private final JCheckBoxMenuItem statusVisible = new MenuBarItems.CheckBox("Status Bar", true);
@@ -60,14 +62,17 @@ final class WindowChrome {
 
     WindowChrome(WindowContent owner) {
         this.owner = owner;
+        composition = owner.look().header();
+        status = owner.look().statusBar(owner.action(ActionId.COMMAND_PALETTE), owner::paletteOpen);
         toolbar = new WindowToolbar(owner::updateActions);
         toolbar.setFloatable(false);
         toolbar.setBorder(BorderFactory.createEmptyBorder());
         search = new TitleSearchField(() -> owner.action(ActionId.COMMAND_PALETTE).actionPerformed(
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
-            owner::paletteShortcut);
-        header = new WindowHeader(search, toolbar);
-        dev.jasper.app.platform.ThemeZone.titleBar(header);
+            owner::paletteShortcut, composition);
+        header = new WindowHeader(search, toolbar, composition);
+        // With a native title the toolbar row is chrome, not a title-bar zone (spec 10.1).
+        if (composition.titleBarZone()) dev.jasper.app.platform.ThemeZone.titleBar(header);
         header.setOpaque(true);
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
@@ -106,14 +111,14 @@ final class WindowChrome {
         statusVisible.setAction(owner.windowCommands().view("view.status_bar"));
         railVisible.setAction(owner.windowCommands().view("view.rail"));
         pluginSeparator.setName("pluginSeparator");
-        buildToolbar();
+        composition.build(this);
         owner.action(ActionId.COMMAND_PALETTE).addPropertyChangeListener(event -> {
             if (Action.ACCELERATOR_KEY.equals(event.getPropertyName())) search.repaint();
         });
     }
 
     /** IntelliJ grouping: tab and window, pane, plugin items, then Find and Settings, all packed right. */
-    private void buildToolbar() {
+    void buildUnifiedToolbar() {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         addSplitButton();
@@ -125,6 +130,69 @@ final class WindowChrome {
         addButton(ActionId.OPEN_SETTINGS, "settings");
         toolbar.finish();
     }
+
+    /** A classic toolbar button for {@code id} in {@code into} (spec 10.3), its icon {@code icon} under icons only. */
+    ClassicToolbarButton classicButton(WindowToolbar into, ActionId id, String label, ClassicToolbarButton.Glyph glyph, String icon, int priority) {
+        var button = new ClassicToolbarButton(owner.action(id), label, glyph, false, AppIcons.icon(icon));
+        WindowToolbar.entry(button, priority, () -> WindowToolbar.menuItem(owner.action(id)));
+        into.add(button);
+        return button;
+    }
+
+    /** The classic "Split ▾": a label and a caret opening Split Right and Split Down. */
+    void classicSplit() {
+        var split = new ClassicToolbarButton(null, "Split", ClassicToolbarButton.Glyph.NONE, true, AppIcons.icon("columns-2"));
+        split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        WindowToolbar.entry(split, 90, () -> {
+            var menu = new JMenu("Split");
+            menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_RIGHT)));
+            menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_DOWN)));
+            return menu;
+        });
+        split.addActionListener(event -> {
+            owner.updateActions(); JPopupMenu popup = new JPopupMenu();
+            popup.add(owner.action(ActionId.SPLIT_RIGHT)); popup.add(owner.action(ActionId.SPLIT_DOWN));
+            NativeStyles.installed().menuTree(popup, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+            popup.show(split, 0, split.getHeight());
+        });
+        owner.action(ActionId.SPLIT_RIGHT).addPropertyChangeListener(event -> {
+            if (event.getPropertyName().equals("enabled")) split.setEnabled(owner.action(ActionId.SPLIT_RIGHT).isEnabled());
+        });
+        toolbar.add(split);
+    }
+
+    /** A toolbar rule; a classic one is a 1 px {@code border.window} line. */
+    JSeparator separator(boolean classic) { var rule = new ToolbarSeparator(); rule.classic = classic; return rule; }
+
+    /** The group contributed controls join, after its rule. */
+    void addPluginGroup(boolean classic) {
+        pluginSeparator.classic = classic;
+        pluginSeparator.setVisible(false);
+        toolbar.add(pluginSeparator);
+    }
+
+    WindowToolbar windowToolbar() { return toolbar; }
+    HeaderComposition composition() { return composition; }
+
+    /** Today's contributed button, as UnifiedHeader draws it; a dropdown's shows its chevron and keeps its label. */
+    JButton referenceButton(Action action, String label, Icon icon, boolean dropdown) {
+        ReferenceButton button = contributedButton(action, label, icon);
+        if (dropdown) { button.chevron = true; button.putClientProperty("keepLabel", true); }
+        return button;
+    }
+
+    /** Set once a native title draws above the header: the row is window chrome, not a title-bar zone (spec 10.1). */
+    private boolean chromeRow;
+
+    /** Makes the header a row of window chrome under a native title (Rulings 16); its views follow on the next pass. */
+    void chromeRow() {
+        chromeRow = true;
+        dev.jasper.app.platform.ThemeZone.chrome(header);
+        renderContributedToolbar();
+    }
+
+    /** Whether the header paints from the title bar's theme. */
+    boolean headerIsTitleBar() { return composition.titleBarZone() && !chromeRow; }
 
     private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
@@ -221,16 +289,15 @@ final class WindowChrome {
                 switch (entry) {
                     case ToolbarEntry.Button placed -> {
                         Action action = contributions.action(placed.actionId());
-                        if (action != null) contributedToolbar.add(contributedButton(action,
-                            (String) action.getValue(Action.NAME), (Icon) action.getValue(Command.ICON)));
+                        // The composition draws a contributed button in its own style (spec 10.3).
+                        if (action != null) contributedToolbar.add(composition.contributed(this, action,
+                            (String) action.getValue(Action.NAME), (Icon) action.getValue(Command.ICON), false));
                     }
                     case ToolbarEntry.Dropdown dropdown -> {
                         List<Action> live = new ArrayList<>();
                         for (String id : dropdown.actionIds()) if (contributions.action(id) != null) live.add(contributions.action(id));
                         if (live.isEmpty()) break;
-                        ReferenceButton button = contributedButton(null, dropdown.title(), dropdown.icon());
-                        button.chevron = true;
-                        button.putClientProperty("keepLabel", true);
+                        JButton button = composition.contributed(this, null, dropdown.title(), dropdown.icon(), true);
                         WindowToolbar.entry(button, 80, () -> {
                             var menu = new JMenu(dropdown.title());
                             menu.putClientProperty("html.disable", true);
@@ -255,9 +322,11 @@ final class WindowChrome {
                         }
                         ToolbarEntry.Mounted mounted = views.get(view);
                         if (mounted == null) break;
-                        // The header is a title bar zone: a kit view paints from the title bar's theme, as the header's own controls do.
+                        // A kit view paints from the header's theme, as the header's own controls do: the title bar's
+                        // in a title-bar zone, the window chrome's in a classic row or under a native title.
                         if (mounted.component() instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) {
-                            kit.toolbarStrip(true); kit.route(dev.jasper.ui.theme.ThemeRoute.TITLE_BAR);
+                            kit.toolbarStrip(true);
+                            kit.route(headerIsTitleBar() ? dev.jasper.ui.theme.ThemeRoute.TITLE_BAR : dev.jasper.ui.theme.ThemeRoute.CHROME);
                         }
                         WindowToolbar.view(mounted.component(), VIEW_PRIORITY);
                         contributedToolbar.add(mounted.component());
@@ -481,8 +550,14 @@ final class WindowChrome {
     }
 
     private static final class ToolbarSeparator extends JSeparator {
+        /** A classic rule (spec 10.3): the toolbar's 1 px border.window line. */
+        boolean classic;
         ToolbarSeparator() { super(SwingConstants.VERTICAL); }
-        @Override protected void paintComponent(Graphics g) { ChromePainter.installed().rule(this, g, ThemeZone.theme(null)); }
+        @Override protected void paintComponent(Graphics g) {
+            if (!classic) { ChromePainter.installed().rule(this, g, ThemeZone.theme(null)); return; }
+            g.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(ThemeZone.theme(this), WindowPairs.RULE));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
     }
 
     JPopupMenu contextMenu() {
@@ -504,8 +579,7 @@ final class WindowChrome {
     }
 
     void setToolbarMode(ToolbarMode mode) {
-        toolbar.setVisible(owner.viewMode() == ViewMode.NORMAL && mode != ToolbarMode.HIDDEN);
-        toolbar.setLabelsWanted(mode == ToolbarMode.ICONS_AND_LABELS);
+        composition.toolbarMode(header, mode, owner.viewMode() == ViewMode.NORMAL);
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
@@ -513,6 +587,7 @@ final class WindowChrome {
         header.setBackground(ThemeZone.color(header, SemanticColor.SURFACE_APP));
         search.repaint();
         toolbar.setBackground(ThemeZone.color(toolbar, SemanticColor.SURFACE_APP));
+        composition.refreshTheme(header);
         for (Component child : toolbar.getComponents())
             if (child instanceof ReferenceButton button) button.setFont(button.chromeFont());
         status.refreshTheme();

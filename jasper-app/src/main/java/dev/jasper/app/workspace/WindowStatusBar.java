@@ -17,38 +17,66 @@ import java.util.List;
 import java.util.function.Function;
 import javax.swing.*;
 
-/** Bounded status segments: long shell/path metadata never displaces dimensions/defaults. */
+/**
+ * Bounded status segments: long shell/path metadata never displaces dimensions/defaults. The look's {@link StatusCells}
+ * lays the model out (spec 10.6): today's slash segments or ruled cells, each led by the run item when the look has one.
+ */
 final class WindowStatusBar extends JPanel {
-    private final PathBreadcrumbs breadcrumbs = new PathBreadcrumbs();
-    private final Segment left = new Segment(breadcrumbs);
+    final PathBreadcrumbs breadcrumbs = new PathBreadcrumbs();
+    final Segment left = new Segment(breadcrumbs);
     private final JButton configButton = new JButton("Built-in defaults");
-    private final Segment right = new Segment(configButton);
+    final Segment right = new Segment(configButton);
     private final java.util.Map<String, JComponent> itemViews = new java.util.HashMap<>();
-    private final Box contentItems = Box.createHorizontalBox();
+    final Box contentItems = Box.createHorizontalBox();
     private java.util.List<dev.jasper.app.contributions.ContentStatus> contentStatus = java.util.List.of();
     private boolean showingContent;
-    private final Box leftItems = Box.createHorizontalBox();
-    private final Box rightItems = Box.createHorizontalBox();
+    final Box leftItems = Box.createHorizontalBox();
+    final Box rightItems = Box.createHorizontalBox();
     Runnable onConfigurationDetails = () -> {};
     private String configText = "Built-in defaults";
     private SemanticColor configColor = SemanticColor.STATUS_SUCCESS;
-    private String shell = "", directory = "", dimensions = "";
+    private boolean configProblem;
+    private String shell = "", directory = "", dimensions = "", session = "", folder = "";
     private boolean running;
     private boolean integration;
     private String text = "Built-in defaults";
     /** Height in logical pixels; the bar is taller only when the status font needs more. */
     private int barHeight = ConfigSnapshot.DEFAULT_STATUS_BAR_HEIGHT;
+    private final StatusCells cells;
+    private final RunItem run;
 
-    WindowStatusBar() {
+    WindowStatusBar() { this(new SlashSegments(), null); }
+
+    /** A bar laid out by {@code cells}, led by {@code run} when it is not null. */
+    WindowStatusBar(StatusCells cells, RunItem run) {
         super(null);
+        this.cells = java.util.Objects.requireNonNull(cells);
+        this.run = run;
         configButton.setBorder(BorderFactory.createEmptyBorder());
         configButton.setContentAreaFilled(false); configButton.setOpaque(false);
         configButton.setEnabled(false); configButton.putClientProperty("html.disable", true);
         configButton.addActionListener(event -> onConfigurationDetails.run());
-        add(left); add(leftItems); add(rightItems); add(right); add(contentItems); refreshTheme();
+        if (run != null) add(run);
+        cells.install(this);
+        refreshTheme();
         getAccessibleContext().setAccessibleName("Terminal status");
         dev.jasper.app.platform.AppIcons.chromeReceiver(this);
     }
+
+    StatusCells cells() { return cells; }
+    RunItem runItem() { return run; }
+    boolean showingContent() { return showingContent; }
+    boolean running() { return running; }
+    String session() { return session; }
+    String folder() { return folder; }
+    /** The pane's full directory, as the slash layout's tip gives it. */
+    String directory() { return directory; }
+    /** Whether the shell has marked a prompt, as a tip; null without a shell. */
+    String integrationToolTip() { return shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected"; }
+    String dimensions() { return dimensions; }
+    String configurationText() { return configText; }
+    /** The status role of a configuration problem, or null when there is none. */
+    SemanticColor configurationProblem() { return configProblem ? configColor : null; }
 
     /** Sets the height in logical pixels; the caller validates the range. */
     void setBarHeight(int height) {
@@ -62,11 +90,13 @@ final class WindowStatusBar extends JPanel {
         this.running = running; this.shell = pane == null ? "" : pane.shell();
         this.directory = location.path(); this.dimensions = dimensions;
         this.integration = pane != null && pane.shellIntegration();
+        this.session = WindowTitle.sessionCell(pane);
+        this.folder = WindowTitle.directory(pane, java.nio.file.Path.of(System.getProperty("user.home")));
         breadcrumbs.setLocation(location);
         // The remote breadcrumb already names the provider's host.
         left.setParts(pane != null && pane.providerId().isPresent() ? "" : shellLabel(), directory);
         left.setToolTipText(directory);
-        left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
+        left.setFirstToolTip(integrationToolTip());
         updateText();
     }
 
@@ -96,8 +126,9 @@ final class WindowStatusBar extends JPanel {
                 crumbs.add(new PathBreadcrumbs.Crumb(part, built, crumbs.isEmpty() ? "FOLDER" : null));
             }
             breadcrumbs.setLocation(new PathBreadcrumbs.Location(crumbs, path));
-            left.setParts("", path); dimensions = ""; updateText();
+            left.setParts("", path); dimensions = ""; folder = path; session = entry.title(); updateText();
         }
+        cells.refresh(this);
         revalidate(); repaint();
     }
 
@@ -108,6 +139,7 @@ final class WindowStatusBar extends JPanel {
         if (warning) state.diagnostics().stream().filter(d -> d.line() > 0).findFirst()
             .ifPresent(d -> configText += " (line " + d.line() + ")");
         configColor = error ? SemanticColor.STATUS_DANGER : warning ? SemanticColor.STATUS_WARNING : SemanticColor.STATUS_SUCCESS;
+        configProblem = warning;
         configButton.setToolTipText(state.file().toString());
         configButton.setEnabled(true);
         updateText(); refreshTheme();
@@ -128,6 +160,7 @@ final class WindowStatusBar extends JPanel {
             : shell + (integration ? ", shell integration active" : ", shell integration not detected");
         getAccessibleContext().setAccessibleDescription(shell.isEmpty() ? text
             : spoken + "  |  " + directory + "  |  " + dimensions + "  |  " + configText);
+        cells.refresh(this);
         revalidate(); repaint();
     }
     /** Replaces the contributed items. An item with a live action is a button; any other is inert text. */
@@ -163,18 +196,18 @@ final class WindowStatusBar extends JPanel {
             (entry.left() ? leftViews : rightViews).add(view);
         }
         itemViews.keySet().retainAll(liveIds);
-        replaceStructure(leftItems, leftViews);
-        replaceStructure(rightItems, rightViews);
+        replaceStructure(leftItems, leftViews, cells.itemGap());
+        replaceStructure(rightItems, rightViews, cells.itemGap());
         refreshTheme();
         revalidate(); repaint();
     }
 
-    private static void replaceStructure(Box row, List<JComponent> views) {
+    private static void replaceStructure(Box row, List<JComponent> views, int gap) {
         var current = java.util.Arrays.stream(row.getComponents()).filter(c -> !(c instanceof Box.Filler)).toList();
         if (current.equals(views)) return;
         row.removeAll();
         for (var view : views) {
-            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(NativeStyles.installed().metric(DesignMetrics.Role.STATUS_GAP)));
+            if (row.getComponentCount() > 0) row.add(Box.createHorizontalStrut(gap));
             row.add(view);
         }
     }
@@ -187,7 +220,7 @@ final class WindowStatusBar extends JPanel {
 
     JButton configButton() { return configButton; }
     String getText() { return text; }
-    private static java.awt.Font statusFont() {
+    static java.awt.Font statusFont() {
         return ThemeZone.font(Typography.Role.STATUS_TEXT);
     }
 
@@ -196,7 +229,7 @@ final class WindowStatusBar extends JPanel {
         return dev.jasper.ui.theme.SurfaceContrast.on(ThemeZone.theme(null).semantic(), role, SemanticColor.SURFACE_STATUS,
             dev.jasper.ui.theme.SurfaceContrast.TEXT);
     }
-    private Color muted() { return ThemeZone.color(null, SemanticColor.TEXT_SECONDARY); }
+    Color muted() { return ThemeZone.color(null, SemanticColor.TEXT_SECONDARY); }
     private static Color surface() {
         return ThemeZone.color(null, SemanticColor.SURFACE_STATUS);
     }
@@ -209,9 +242,11 @@ final class WindowStatusBar extends JPanel {
                 item.setFont(statusFont());
             } else if (child instanceof StatusProgressView progress) progress.refreshTheme();
         configButton.setForeground(onStatus(configColor));
+        if (run != null) { run.setFont(statusFont()); run.repaint(); }
+        cells.refresh(this);
     }
 
-    private final class Segment extends JPanel {
+    final class Segment extends JPanel {
         private final JLabel first = new JLabel(), slash = new JLabel("/", SwingConstants.CENTER);
         private final JComponent last;
         Segment(JComponent last) {
@@ -222,12 +257,13 @@ final class WindowStatusBar extends JPanel {
         void setParts(String first, String last) {
             this.first.setText(first);
             if (this.last instanceof JLabel label) label.setText(last);
-            else if (this.last instanceof JButton button) button.setText(last);
+            else if (this.last instanceof JButton button && !(cells instanceof RuledCells)) button.setText(last);
             slash.setVisible(!first.isEmpty());
         }
         void setFirstToolTip(String tip) { first.setToolTipText(tip); }
         void refreshTheme() {
             for (JComponent label : new JComponent[]{first, slash, last}) {
+                if (label == last && cells instanceof RuledCells) continue;
                 label.setForeground(label == slash ? ThemeZone.color(null, SemanticColor.BORDER_SUBTLE) : muted());
                 label.setFont(statusFont());
             }
@@ -249,34 +285,9 @@ final class WindowStatusBar extends JPanel {
         // Items and segments are laid out at the bar's height; only the text sets a floor, so it never clips.
         return new Dimension(0, Math.max(UIScale.scale(barHeight), Math.max(left.getPreferredSize().height, getFontMetrics(statusFont()).getHeight())));
     }
-    @Override public void doLayout() {
-        int edge = Math.min(NativeStyles.installed().metric(DesignMetrics.Role.STATUS_GAP), getWidth() / 2), leftInset = Math.min(getWidth(), NativeStyles.installed().metric(DesignMetrics.Role.STATUS_LEADING));
-        int gap = NativeStyles.installed().metric(DesignMetrics.Role.STATUS_GAP);
-        int available = Math.max(0, getWidth() - edge * 2);
-        int rightWidth = Math.min(available, right.getPreferredSize().width);
-        right.setBounds(Math.max(edge, getWidth() - edge - rightWidth), 0, rightWidth, getHeight());
-        int rightEdge = right.getX();
-        int documentWidth = Math.min(contentItems.getPreferredSize().width, Math.max(0, (rightEdge - leftInset) * 2 / 3));
-        contentItems.setBounds(Math.max(leftInset, rightEdge - documentWidth), 0, documentWidth, getHeight());
-        if (documentWidth > 0) rightEdge -= documentWidth + gap;
-        int remaining = Math.max(0, rightEdge - leftInset - edge);
-        int rightItemsWidth = rightItems.getComponentCount() == 0 ? 0 : Math.min(rightItems.getPreferredSize().width, remaining / 3);
-        int rightItemsSpace = rightItemsWidth == 0 ? 0 : rightItemsWidth + gap;
-        // An empty row collapses at the origin: no child may ever extend past the bar, however narrow it is.
-        if (rightItemsWidth == 0) rightItems.setBounds(0, 0, 0, 0);
-        else rightItems.setBounds(rightEdge - rightItemsSpace, 0, rightItemsWidth, getHeight());
-        remaining -= rightItemsSpace;
-        int leftItemsWidth = leftItems.getComponentCount() == 0 ? 0 : Math.min(leftItems.getPreferredSize().width, remaining / 4);
-        int leftItemsSpace = leftItemsWidth == 0 ? 0 : leftItemsWidth + gap;
-        int leftWidth = Math.max(0, Math.min(left.getPreferredSize().width, remaining - leftItemsSpace));
-        if (leftItemsWidth == 0) leftWidth = Math.max(0, remaining);
-        left.setBounds(leftInset, 0, leftWidth, getHeight());
-        if (leftItemsWidth == 0) leftItems.setBounds(0, 0, 0, 0);
-        else leftItems.setBounds(Math.min(leftInset + leftWidth + gap, Math.max(0, getWidth() - leftItemsWidth)), 0, leftItemsWidth, getHeight());
-    }
+    @Override public void doLayout() { cells.layout(this); }
     @Override protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (showingContent) return;
-        dev.jasper.ui.swing.ChromePainter.installed().statusDot(this, g, ThemeZone.theme(null), running);
+        cells.paint(this, g);
     }
 }

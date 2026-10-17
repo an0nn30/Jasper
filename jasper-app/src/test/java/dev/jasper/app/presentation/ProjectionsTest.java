@@ -47,8 +47,8 @@ class ProjectionsTest {
     }
 
     @Test void untilItsPlanLandsAChromeValueMapsToTheDefaultProjection() {
-        assertThat(Presentation.LANDED).as("plan 6a lands the window chrome; 6b, 7, 8 and 9 add theirs")
-            .contains(Presentation.Landed.WINDOW_CHROME).doesNotContain(Presentation.Landed.WINDOW_CONTENT);
+        assertThat(Presentation.LANDED).as("plans 6a and 6b land the window; 7, 8 and 9 add theirs")
+            .contains(Presentation.Landed.WINDOW_CHROME, Presentation.Landed.WINDOW_CONTENT);
         var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, EnumSet.of(Presentation.Landed.WINDOW_CHROME));
         assertThat(shipped.desktop()).isEqualTo(new DesktopFlags(false, true));
         assertThat(shipped.workspace().menus()).isEqualTo(WorkspaceLook.Menus.CLASSIC);

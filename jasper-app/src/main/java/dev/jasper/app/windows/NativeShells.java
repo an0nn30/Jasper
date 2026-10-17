@@ -24,6 +24,9 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -60,6 +63,8 @@ public final class NativeShells {
     private final Runnable newWindow;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
+    /** Classic dialogs drawn inside their owner's window (spec 10.8): they have no native window of their own. */
+    private final java.util.Set<AuxiliarySurface> drawnInWindow = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     private final ShellChrome shell;
 
     /**
@@ -108,10 +113,138 @@ public final class NativeShells {
      * @return the functions the core drives
      */
     public AuxiliarySurface.Shell create(AuxiliarySurface surface) {
+        if (surface.classic()) {
+            Window owner = surface.kind() == AuxiliarySurface.Kind.WINDOW ? null : owner(surface);
+            boolean showing = owner instanceof javax.swing.RootPaneContainer && onScreen(owner);
+            switch (classicRoute(surface, showing)) {
+                case IN_WINDOW -> { return inWindow(surface, classicPlacement(surface, showing).orElseThrow()); }
+                // A classic dialog whose owner has no showing window opens natively (spec 10.8): an overlay as a modal
+                // dialog, an attached sheet as a centred one, since it has no showing window to hang from.
+                case MODAL_DIALOG -> { nativeFallback(surface); return dialog(surface); }
+                case AS_REQUESTED -> nativeFallback(surface);
+            }
+        }
         return switch (surface.kind()) {
             case WINDOW -> frame(surface);
             case DIALOG -> dialog(surface);
             case OVERLAY -> overlay(surface);
+        };
+    }
+
+    /** A classic dialog's host flags (spec 10.8): the strip titles it, its footer is the band and its card paints its fill. */
+    static final java.util.function.Consumer<dev.jasper.ui.swing.KitView> CLASSIC_FLAGS = view -> { view.hostTitled(true); view.dialogBand(true); view.dialogCard(true); };
+
+    /**
+     * Prepares a surface's holder as a classic dialog's content (spec 10.8): it takes the look and feel, it stops painting
+     * (an opaque panel on {@code surface.panel} would cover the card's dialog surface; set by the client, this survives
+     * later look-and-feel updates), and its kit views, now and set later, take {@link #CLASSIC_FLAGS}.
+     */
+    static void classicContent(AuxiliarySurface surface) {
+        SwingUtilities.updateComponentTreeUI(surface.holder());
+        surface.holder().setOpaque(false);
+        for (var child : surface.holder().getComponents())
+            if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) CLASSIC_FLAGS.accept(view);
+        // AuxiliarySurface.setContent marks content set later the same way.
+        surface.laterContent(CLASSIC_FLAGS);
+    }
+
+    /**
+     * The host flags of a native dialog's kit content (spec 10.8): under the classic mapping its form footer is the band,
+     * and when a title bar the system draws ({@code systemTitle}) already shows the dialog's title, a FULL form does not
+     * repeat it.
+     */
+    static java.util.function.Consumer<dev.jasper.ui.swing.KitView> nativeMarks(AuxiliarySurface surface, boolean systemTitle) {
+        boolean band = surface.classic(), titled = systemTitle && surface.hostTitled();
+        return view -> {
+            if (band) view.dialogBand(true);
+            if (titled && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
+                view.hostTitled(true);
+        };
+    }
+
+    /**
+     * A classic dialog with no showing window opens natively (spec 10.8). A modal overlay becomes a native modal dialog:
+     * its system title bar titles it and it holds what it owns. An attached sheet, with no showing window to hang from,
+     * becomes a centred native dialog: its attachment is cleared, which {@code dialog} would otherwise refuse, and its kit
+     * views paint their surface again.
+     */
+    static void nativeFallback(AuxiliarySurface surface) {
+        if (surface.kind() == AuxiliarySurface.Kind.OVERLAY && surface.modal()) surface.nativeDialog(true);
+        if (surface.kind() != AuxiliarySurface.Kind.DIALOG || !surface.attachedSheet()) return;
+        surface.attachedSheet(false);
+        for (var child : surface.holder().getComponents())
+            if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) view.paintsSurface(true);
+    }
+
+    /** Where {@link #create} puts a surface the look marks classic (spec 10.8). */
+    enum ClassicRoute {
+        /** In its owner's showing window, as a classic dialog. */
+        IN_WINDOW,
+        /** A modal overlay whose owner has no showing window: a native modal dialog ({@link #nativeFallback}). */
+        MODAL_DIALOG,
+        /** Its own presentation, an attached sheet first losing its attachment ({@link #nativeFallback}). */
+        AS_REQUESTED
+    }
+
+    /** The route of a surface whose owner window is showing or not; a surface the look does not mark is as requested. */
+    static ClassicRoute classicRoute(AuxiliarySurface surface, boolean ownerShowing) {
+        if (classicPlacement(surface, ownerShowing).isPresent()) return ClassicRoute.IN_WINDOW;
+        if (surface.classic() && surface.kind() == AuxiliarySurface.Kind.OVERLAY && surface.modal()) return ClassicRoute.MODAL_DIALOG;
+        return ClassicRoute.AS_REQUESTED;
+    }
+
+    /** Where a marked modal overlay or attached sheet sits in its owner's showing window, or empty when it is not in one. */
+    static Optional<dev.jasper.ui.swing.ClassicDialog.Placement> classicPlacement(AuxiliarySurface surface, boolean ownerShowing) {
+        if (!surface.classic() || !surface.modal() || !ownerShowing) return Optional.empty();
+        return switch (surface.kind()) {
+            case OVERLAY -> Optional.of(dev.jasper.ui.swing.ClassicDialog.Placement.CENTERED);
+            case DIALOG -> surface.attachedSheet() ? Optional.of(dev.jasper.ui.swing.ClassicDialog.Placement.SHEET) : Optional.empty();
+            case WINDOW -> Optional.empty();
+        };
+    }
+
+    /**
+     * A classic dialog in the owner's window (spec 10.8): the content's form loses its own title and gains the footer
+     * band, the card is centred on the window or joined under its title bar, and a modal show blocks until it closes.
+     */
+    private AuxiliarySurface.Shell inWindow(AuxiliarySurface surface, dev.jasper.ui.swing.ClassicDialog.Placement placement) {
+        Window owner = owner(surface);
+        var container = (javax.swing.RootPaneContainer) owner;
+        classicContent(surface);
+        var dialog = new dev.jasper.ui.swing.ClassicDialog(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), surface.holder(),
+            surface.title(), surface.swatch(), placement);
+        dialog.windowTitleHeight(owner.getInsets().top);
+        var titleBar = followTitleBar(owner, dialog);
+        owner.addComponentListener(titleBar);
+        var overlay = WindowOverlay.classic(container.getRootPane(), dialog);
+        surface.holder().getAccessibleContext().setAccessibleName(surface.title());
+        var close = new WindowAdapter() {
+            @Override public void windowClosed(WindowEvent event) { surface.close(); }
+        };
+        owner.addWindowListener(close);
+        // Surfaces it owns hang from its owner's window, as an overlay's do.
+        drawnInWindow.add(surface);
+        Runnable show = () -> {
+            overlay.show();
+            if (surface.closed()) return;
+            var loop = Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+            var closed = surface.onClosed(loop::exit);
+            try { if (!surface.closed()) loop.enter(); } finally { closed.close(); }
+        };
+        return new AuxiliarySurface.Shell(show, overlay::focus, () -> {
+                drawnInWindow.remove(surface); owner.removeWindowListener(close); owner.removeComponentListener(titleBar); overlay.close();
+            },
+            title -> { dialog.setTitle(title); surface.holder().getAccessibleContext().setAccessibleName(title); }, overlay::cardBounds,
+            (title, initial) -> chooseFile(TopModal.over(owner), title, initial, Optional.empty()));
+    }
+
+    /**
+     * Keeps a centred classic dialog centred on its whole window as the window's title bar (its top inset) changes under
+     * it, as macOS full screen hides it: added to the owner window, it re-reads the inset on every resize.
+     */
+    static ComponentListener followTitleBar(java.awt.Container window, dev.jasper.ui.swing.ClassicDialog dialog) {
+        return new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent event) { dialog.windowTitleHeight(window.getInsets().top); }
         };
     }
 
@@ -210,12 +343,36 @@ public final class NativeShells {
     }
 
     private Window owner(AuxiliarySurface surface) {
-        if (surface.ownerSurface().isPresent()) {
-            var parent = surface.ownerSurface().orElseThrow();
-            if (parent.kind() == AuxiliarySurface.Kind.OVERLAY) return owner(parent);
-            return natives.get(parent);
+        var placed = windowed(surface, drawnInWindow::contains);
+        if (placed.ownerSurface().isPresent()) return natives.get(placed.ownerSurface().orElseThrow());
+        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(terminalWindows).orElse(null));
+    }
+
+    /**
+     * The surface whose owner holds {@code surface}'s window: the nearest one up the owner chain whose owner surface, if
+     * any, has a native window. An overlay or a classic dialog drawn in its owner's window ({@code drawnInWindow}) has
+     * none, so what it owns hangs from its own owner's window; an overlay that opened as a native dialog has its own.
+     */
+    static AuxiliarySurface windowed(AuxiliarySurface surface, java.util.function.Predicate<AuxiliarySurface> drawnInWindow) {
+        var at = surface;
+        for (var parent = at.ownerSurface(); parent.isPresent(); parent = at.ownerSurface()) {
+            var owner = parent.orElseThrow();
+            boolean windowless = owner.kind() == AuxiliarySurface.Kind.OVERLAY && !owner.nativeDialog() || drawnInWindow.test(owner);
+            if (!windowless) break;
+            at = owner;
         }
-        return surface.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
+        return at;
+    }
+
+    /**
+     * Whether a classic dialog can be drawn in {@code window} for the user to see: it is showing, and neither it nor a
+     * window it hangs from is minimised (a minimised frame still reports that it is showing).
+     */
+    private static boolean onScreen(Window window) {
+        if (!window.isShowing()) return false;
+        for (Window at = window; at != null; at = at.getOwner())
+            if (at instanceof java.awt.Frame frame && (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) return false;
+        return true;
     }
     private boolean liveOwner(AuxiliarySurface surface, Window expected) {
         return !surface.closed() && expected != null && expected.isShowing() && owner(surface) == expected
@@ -256,6 +413,12 @@ public final class NativeShells {
             resources.layout = installChrome(dialog.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
             shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
+            // Spec 10.8: under the classic mapping the footer is the band, and the title bar the system draws titles the
+            // dialog, so a FULL form does not repeat it; content set later takes the same flags (AuxiliarySurface.setContent).
+            var marks = nativeMarks(surface, bar == null);
+            for (var child : surface.holder().getComponents())
+                if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) marks.accept(view);
+            surface.laterContent(marks);
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             dialog.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }

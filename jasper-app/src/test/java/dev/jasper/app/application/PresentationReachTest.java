@@ -66,6 +66,8 @@ class PresentationReachTest {
                 assertThat(application[0].nativeShells().chrome()).as("auxiliary windows, dialogs and the chooser")
                     .isEqualTo(dev.jasper.app.windows.ShellChrome.of(projections.shell()))
                     .isNotEqualTo(dev.jasper.app.windows.ShellChrome.standard());
+                // Spec 4.9: the auxiliary windows are made with the look's dialog mapping (plan 6b).
+                assertThat(application[0].auxiliary().dialogs()).as("the auxiliary windows' dialog mapping").isEqualTo(projections.dialogs());
                 // With the screen menu bar off, About is in Help on every platform; on macOS it otherwise stays in the application menu.
                 assertThat(help(application[0])).contains("app.about");
             });

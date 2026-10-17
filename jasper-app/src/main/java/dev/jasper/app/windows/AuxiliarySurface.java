@@ -80,6 +80,23 @@ public final class AuxiliarySurface {
         if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
         attachedSheet = value;
     }
+    private boolean classic, hostTitled, nativeDialog;
+    /** Whether a modal overlay or attached sheet of this surface is drawn in its window as a classic dialog (spec 10.8). */
+    public boolean classic() { return classic; }
+    void classic(boolean value) { classic = value; }
+    /**
+     * Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8): a
+     * dialog's, or a modal overlay's that opens as a native dialog; never an attached sheet's, which has no title bar.
+     */
+    public boolean hostTitled() { return hostTitled && !attachedSheet && (kind != Kind.OVERLAY || nativeDialog); }
+    void hostTitled(boolean value) { hostTitled = value; }
+    /** Whether this modal overlay opens as a native modal dialog, its owner having no showing window (spec 10.8). */
+    boolean nativeDialog() { return nativeDialog; }
+    void nativeDialog(boolean value) { nativeDialog = value; }
+    /** The shell's host flags for a kit view set as content after the shell exists (spec 10.8); none by default. */
+    private java.util.function.Consumer<dev.jasper.ui.swing.KitView> laterContent = view -> { };
+    /** The shell marks content set from now on with {@code marks}, as it marked the content it found. */
+    void laterContent(java.util.function.Consumer<dev.jasper.ui.swing.KitView> marks) { laterContent = Objects.requireNonNull(marks); }
     private dev.jasper.ui.model.Nodes.Hue swatch = dev.jasper.ui.model.Nodes.Hue.NONE;
     /** The hue of the square drawn before this surface's title wherever Jasper draws it; NONE draws none. Set before the first show. */
     public void swatch(dev.jasper.ui.model.Nodes.Hue value) { swatch = Objects.requireNonNull(value); }
@@ -127,6 +144,8 @@ public final class AuxiliarySurface {
         if (!closed && content != null) {
             if (attachedSheet && content instanceof dev.jasper.ui.swing.KitView view) view.paintsSurface(false);
             holder.add(content, BorderLayout.CENTER);
+            // Content replaced later keeps the shell's treatment (a classic dialog's strip and band).
+            if (content instanceof dev.jasper.ui.swing.KitView kit && !kit.isClosed()) laterContent.accept(kit);
         }
         holder.revalidate(); holder.repaint();
     }
@@ -211,7 +230,8 @@ public final class AuxiliarySurface {
     /** A user's attempt to close: every guard is consulted; one that throws cannot trap the window open. */
     public boolean requestClose() {
         if (closed) return true;
-        if (kind == Kind.OVERLAY) return false;
+        // An overlay in its window has no close button; one opened as a native dialog closes as a dialog does.
+        if (kind == Kind.OVERLAY && !nativeDialog) return false;
         if (!mayClose()) return false;
         close();
         return true;

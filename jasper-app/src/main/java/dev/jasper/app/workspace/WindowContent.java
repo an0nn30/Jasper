@@ -58,7 +58,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable bringToFront = () -> {};
     private final boolean detached;
     private final JTabbedPane tabs = new TerminalDeck();
-    private final WindowTabs windowTabs;
+    /** The look's editor tabs: the equal tabs, or the classic ones (spec 10.5). */
+    private final TabStrip windowTabs;
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -262,12 +263,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = new WindowTabs(this);
+        windowTabs = look.tabs(this);
         // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
-        terminalColumn.add(windowTabs, BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
+        terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
         area = new ToolWindowArea(terminalColumn, dock);
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
@@ -322,6 +323,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
         if (bar == null) installCustomTitleBar(root, content);
+        // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
+        // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
+        if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
     }
@@ -754,6 +758,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WorkspaceChrome look() { return look; }
     /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
     boolean lookAnimates() { return themes.animationsEnabled(); }
+    /** Whether the palette is open; the run item shows it (spec 10.6). Null-safe while the window is being built. */
+    boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
+    /** The palette opened or closed: the run item repaints. */
+    void paletteChanged() { var run = chrome.status().runItem(); if (run != null) run.paletteChanged(); }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
@@ -937,7 +945,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
     JTabbedPane tabStrip() { return tabs; }
-    WindowTabs windowTabs() { return windowTabs; }
+    /** The equal tabs; the default look's tests read them. */
+    WindowTabs windowTabs() { return (WindowTabs) windowTabs; }
+    TabStrip tabBar() { return windowTabs; }
     private void refreshTabs() { windowTabs.refresh(); }
 
     public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
@@ -1306,7 +1316,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             rightStripe.refreshTheme();
             area.refreshTheme();
             area.setTerminalBackground(theme.surface());
-            WorkspaceTheme.apply(windowTabs, theme);
+            WorkspaceTheme.apply(windowTabs.component(), theme);
             windowTabs.refresh();
             for (var component : new ArrayList<>(hosted.keySet())) {
                 var entry = hosted.get(component);
@@ -1453,7 +1463,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
-        if (windowTabs != null) { windowTabs.revalidate(); windowTabs.repaint(); }
+        if (windowTabs != null) { windowTabs.component().revalidate(); windowTabs.component().repaint(); }
         onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);

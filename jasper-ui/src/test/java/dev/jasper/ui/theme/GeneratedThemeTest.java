@@ -18,8 +18,8 @@ class GeneratedThemeTest {
     }
 
     @Test void aGeneratedThemeTakesOnlyOpaqueOverridesOfTheOverridableRoles() {
-        assertThatThrownBy(() -> with(Map.of(DerivedColor.BORDER_DIVIDER, Color.RED)))
-            .isInstanceOf(IllegalArgumentException.class).hasMessage("Not an override key: border.divider");
+        assertThatThrownBy(() -> with(Map.of(DerivedColor.BORDER_ROW, Color.RED)))
+            .isInstanceOf(IllegalArgumentException.class).hasMessage("Not an override key: border.row");
         assertThatThrownBy(() -> with(Map.of(DerivedColor.SURFACE_HEADER, new Color(1, 2, 3, 4))))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("Translucent override: surface.header");
         assertThatThrownBy(() -> with(null)).isInstanceOf(NullPointerException.class);

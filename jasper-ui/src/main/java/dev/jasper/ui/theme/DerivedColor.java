@@ -21,7 +21,7 @@ public enum DerivedColor implements ColorRole {
     INFO_GROUND("info.ground", false),
     INFO_BORDER("info.border", false),
     SURFACE_FOOTER("surface.footer", false),
-    BORDER_DIVIDER("border.divider", false),
+    BORDER_DIVIDER("border.divider", true),
     BORDER_ROW("border.row", false),
     BORDER_HOVER("border.hover", false),
     ACCENT_EDGE("accent.edge", false),

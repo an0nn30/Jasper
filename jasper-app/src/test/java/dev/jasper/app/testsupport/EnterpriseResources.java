@@ -64,9 +64,19 @@ public final class EnterpriseResources {
     public static void assumePlexResolves() {
         kit();
         for (FontFile file : facts().parsed().orElseThrow().faces().files()) {
-            org.junit.jupiter.api.Assumptions.assumeTrue(new Font(file.fullName(), Font.PLAIN, 1).getFontName(java.util.Locale.ROOT)
-                .equals(file.fullName()), () -> "an installed " + file.family() + " hides " + file.path() + "; uninstall it to run this test");
+            org.junit.jupiter.api.Assumptions.assumeTrue(resolves(file),
+                () -> "an installed " + file.family() + " hides " + file.path() + "; uninstall it to run this test");
         }
+    }
+
+    /** Whether every IBM Plex file of the shipped kit resolves by its full name once registered ({@link #assumePlexResolves}). */
+    public static boolean plexResolves() {
+        kit();
+        return facts().parsed().orElseThrow().faces().files().stream().allMatch(EnterpriseResources::resolves);
+    }
+
+    private static boolean resolves(FontFile file) {
+        return new Font(file.fullName(), Font.PLAIN, 1).getFontName(java.util.Locale.ROOT).equals(file.fullName());
     }
 
     /** The shipped kit file's chrome points. */

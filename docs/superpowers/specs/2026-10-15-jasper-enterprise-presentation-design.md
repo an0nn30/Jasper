@@ -7,6 +7,10 @@ Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority:
 (toolbar view admission).
 Amended on 2026-10-16 with plan 4a's Rulings 17, made under the same authority: 5.4 (the provisional token ranges stand).
 Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
+Amended on 2026-10-17 with plan 6b's ruling 3: 7.1, 7.2 and 7.7 (border.divider is overridable).
+Amended on 2026-10-17 with plan 6b's rulings 10 and R44, made under the same authority: 10.8 (the overlay's placement),
+4.9, 9.1 and 16.1 (the `DialogMapping` reader).
+Amended on 2026-10-17 with plan 5b's accent ruling, made under the same authority: 7.6 (Enterprise Dark's accent is #3C74D6).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -465,8 +469,8 @@ beside `startupViewMode` (`:240`), from the `PluginSelection` the bootstrap hand
   `TitlePane.centerTitle` only under a unified title bar.
 - **Kit contexts:** every context is built with `KitContext.of(kit, …)` (6.3). The kit reaches `AppearanceBindings`,
   `PresentationIcons` (from its source context) and `HostedKit`, through a new pre-start setter
-  `PluginRuntime.presentation(Kit kit, DialogMapping dialogs)` beside `appearance()`; motion reaches plugins through
-  the existing animations supplier (10.9).
+  `PluginRuntime.presentation(Kit kit)` beside `appearance()`; plugin dialogs meet the `DialogMapping` in
+  `AuxiliaryWindows`, which is built with it; motion reaches plugins through the existing animations supplier (10.9).
 - **Windows and dialogs:** `composeWindow`, reopen and hand-off, the `--background` rehearsal (`:760-829`),
   `NativeShells`, `AuxiliaryWindows`, `HostedUi` and `SettingsDialog` receive their projections at construction.
 
@@ -882,7 +886,7 @@ role after its boundary guard.
 | `danger.ground`, `danger.border` | as the warning pair from `status.danger` | DANGER Notices and pills |
 | `info.ground`, `info.border` | as the warning pair from `accent` | INFO Notices |
 | `surface.footer` | apart(mix(text.primary, surface.dialog, 3%), surface.dialog, 2 L*) | dialog, Settings and Run footers |
-| `border.divider` | mix(border.window′, surface.card, 73%) | column separators |
+| `border.divider`* | mix(border.window′, surface.card, 73%) | column separators |
 | `border.row` | mix(border.window′, surface.card, 46%) | faint row dividers |
 | `border.hover` | mix(text.primary, border.control′, 24%) | button hover borders, keycap bottom edges |
 | `accent.edge` | accent moved 7 L* away from `surface.card` | the primary button, a checked box, a selected radio ring |
@@ -899,7 +903,7 @@ header #F1F2F2 against #F0F1F3, row hover #EEF3FB against #EEF2FA.
 
 ### 7.2 Override keys
 
-A theme's `ui.light` or `ui.dark` object may list the eight starred keys after its roles. They get their own parse table
+A theme's `ui.light` or `ui.dark` object may list the nine starred keys after its roles. They get their own parse table
 in `JasperTheme` (`DERIVED_OVERRIDES`, a `Map<String, DerivedColor>`), consulted before `SemanticColor.of`, so every
 existing file still loads and an unknown key still fails. The parsed overrides travel on the variant and on
 `GeneratedTheme` (`Map<DerivedColor, Color> derivedOverrides()`), and `TitleBarTheme` copies them.
@@ -983,7 +987,7 @@ keeps the ΔL* it has from `surface.card` in Light, on the lighter side; a hue o
 | `surface.titlebar` | #36393E | `border.control`, `border.input`, `button.secondary.border` | #5A5E65 |
 | `surface.panel`, `surface.sidebar` | #35383D | `text.primary` | #DFE1E5 |
 | `surface.card`, `surface.input`, `surface.terminal` | #2E3135 | `text.strong.secondary` | #C4C8CE |
-| `accent`, `selection.bg`, `hue.blue` | #3D74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
+| `accent`, `selection.bg`, `hue.blue` | #3C74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
 | `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #8E939B |
 | `button.secondary.bg` | #45484D | `status.success`, `hue.green` | #4CB86A |
 | `surface.control.selected` | #50545B | `status.warning` | #E3C27A |
@@ -997,7 +1001,7 @@ for the chrome renders (16.1.4), which plans 6 and 7 compare in both variants.
 
 ### 7.7 Converter
 
-`tools/themes/jasper_theme.py` learns the eight override keys (`ROLES` at line 38, `OPTIONAL_ROLES` at 55, and the
+`tools/themes/jasper_theme.py` learns eight of the override keys (all but `border.divider`; `ROLES` at line 38, `OPTIONAL_ROLES` at 55, and the
 role-order check in `validate()` at 184, which accept roles followed by any of the optional and override keys in
 order). It fills them when the
 IntelliJ theme has the key:
@@ -1116,7 +1120,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `fontRowCopy` | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
-| `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | plugins (`HostedUi.dialog`), windows (`AuxiliaryWindows`) |
+| `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | windows (`AuxiliaryWindows`, which also hosts plugin dialogs) |
 | `Branding` | `product`, the icon images, the splash art; `Branding.NONE` for a look without `[branding]` | bootstrap: `Splash`; platform: `ApplicationIcon` (10.11) |
 | `Motion` | STANDARD, NONE | application: the one animations supplier that every `MotionPolicy` reads (10.9) |
 | `TitleFormat` | the template | workspace: `WindowContent.onTitle` |
@@ -1125,9 +1129,8 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `DefaultSource` (in `config`) | the kit's defaults | `ConfigService`, `SettingsDraft` |
 
 `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of` are the only classes that read the `WorkspaceLook`,
-`ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by `HostedUi.dialog`
-and `AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed
-roots. Other readers read values (sizes, strings, booleans).
+`ShellLook` and `PaletteLook` variant enums and pick implementations; `DialogMapping` is read only by
+`AuxiliaryWindows`, `Motion` only by the application's animations supplier, and `Composition` only by the listed roots. Other readers read values (sizes, strings, booleans).
 
 Each field comes from the kit file as below, and the last column is `Presentation.fallback` (4.7). The default look's
 values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.1 lists the Settings ones).
@@ -1299,8 +1302,8 @@ the 07 Credential Vault mocks show them:
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
   its trailing edge;
-- OVERLAY centred in the window's content; ATTACHED_SHEET centred horizontally and joined to the bottom of the title
-  bar, with no top frame edge;
+- OVERLAY centred on the whole window, its title bar included, as the Unlock Vault mock places it; ATTACHED_SHEET
+  centred horizontally and joined to the bottom of the title bar, with no top frame edge;
 - no fade (10.9); keys, focus and closing as each presentation has them today.
 
 A dialog whose owner has no window opens as a native dialog. Progress overlays (`OverlaySpec`) stay in the window,
@@ -1711,8 +1714,7 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 7. **Architecture.**
    - The variant-read scan: `ChromeSpec` and `ControlVariants` only in `dev.jasper.app.presentation`,
      `dev.jasper.ui.kit` and `KitFaces`; the `WorkspaceLook`, `ShellLook` and `PaletteLook` variant enums only in
-     `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of`; `DialogMapping` only in `HostedUi.dialog` and
-     `AuxiliaryWindows`; `Motion` only in the application's animations supplier; `Composition` only in the listed roots.
+     `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of`; `DialogMapping` only in `AuxiliaryWindows`; `Motion` only in the application's animations supplier; `Composition` only in the listed roots.
    - `StrategyIsolationTest` (ASM): faces and strategies never reference `Kit`, `ControlVariants` or `ChromeSpec`, and
      the reconciler references control classes only.
    - `StaticDefaultTest`: no `DesignMetrics.DEFAULT` read or static metric final outside the default catalog, including

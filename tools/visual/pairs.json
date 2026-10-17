@@ -42,7 +42,7 @@
       1362
     ],
     "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png",
-    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File\u2026 (Unassigned) under Application and File Server's Share Folder\u2026, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
+    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File… (Unassigned) under Application and File Server's Share Folder…, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
   },
   {
     "name": "settings-plugins",
@@ -137,7 +137,7 @@
   },
   {
     "name": "workspace-tabs",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.25 AM.png",
     "crop": [
       112,
       76,
@@ -148,7 +148,7 @@
   },
   {
     "name": "workspace-rails",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.41 AM.png",
     "crop": [
       112,
       76,
@@ -160,7 +160,7 @@
   },
   {
     "name": "workspace-integrated",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       112,
       76,
@@ -172,7 +172,7 @@
   },
   {
     "name": "workspace-palette",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.31 AM.png",
     "crop": [
       342,
       84,
@@ -190,7 +190,7 @@
   },
   {
     "name": "sessions-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       168,
       144,
@@ -364,7 +364,7 @@
   },
   {
     "name": "tunnels-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       2220,
       946,
@@ -386,7 +386,7 @@
   },
   {
     "name": "sftp-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       168,
       946,
@@ -408,7 +408,7 @@
   },
   {
     "name": "fileservers-panel",
-    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50\u202fAM.png",
+    "mock": "docs/design/theme-engine/reference/desktop-2026-10-10/Screenshot 2026-10-06 at 11.16.50 AM.png",
     "crop": [
       2220,
       144,
@@ -859,6 +859,254 @@
       "#3C3F44",
       "#393C41",
       "#383B40"
+    ]
+  },
+  {
+    "name": "chrome-toolbar-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      110,
+      2880,
+      70
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-workstation.png",
+    "render_crop": [
+      0,
+      50,
+      2880,
+      70
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#ECEDEF",
+      "#C4C7CC",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "chrome-toolbar-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      110,
+      2880,
+      70
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-workstation.png",
+    "render_crop": [
+      0,
+      50,
+      2880,
+      70
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#3C3F44",
+      "#2A2C30"
+    ]
+  },
+  {
+    "name": "chrome-tabs-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      650,
+      180,
+      700,
+      58
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-tabs.png",
+    "render_crop": [
+      0,
+      0,
+      700,
+      58
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#E8E9EB",
+      "#FFFFFF",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "chrome-tabs-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      650,
+      180,
+      700,
+      58
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-tabs.png",
+    "render_crop": [
+      0,
+      0,
+      700,
+      58
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#3A3D42",
+      "#2E3135",
+      "#3D74D6"
+    ]
+  },
+  {
+    "name": "chrome-status-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      1900,
+      1756,
+      982,
+      46
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-status.png",
+    "render_crop": [
+      0,
+      0,
+      982,
+      46
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#ECEDEF",
+      "#D3D6DA",
+      "#FBF1DA"
+    ]
+  },
+  {
+    "name": "chrome-status-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      1900,
+      1756,
+      982,
+      46
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-status.png",
+    "render_crop": [
+      0,
+      0,
+      982,
+      46
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#3C3F44",
+      "#4A4D53",
+      "#4A4128"
+    ]
+  },
+  {
+    "name": "chrome-dialog-unlock-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1104,
+      782,
+      560,
+      56
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-unlock-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      56
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#8E949C",
+      "#D9DFEA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "chrome-dialog-unlock-footer",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1104,
+      1064,
+      560,
+      86
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-unlock-footer.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      86
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "chrome-dialog-add-login-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      380,
+      58,
+      560,
+      54
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-login-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      54
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "chrome-dialog-add-ssh-key-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 5 - Add SSH Key.png",
+    "crop": [
+      380,
+      58,
+      560,
+      54
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-ssh-key-strip.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      54
+    ],
+    "min_agreement": 0.4,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "chrome-dialog-add-login-footer",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      380,
+      522,
+      560,
+      86
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-add-login-footer.png",
+    "render_crop": [
+      0,
+      0,
+      560,
+      86
+    ],
+    "min_agreement": 0.3,
+    "colours": [
+      "#E6E7EA",
+      "#C4C7CC"
     ]
   }
 ]

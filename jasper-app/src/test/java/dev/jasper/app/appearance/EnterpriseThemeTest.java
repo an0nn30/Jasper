@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.JasperTheme;
+import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,7 +34,7 @@ class EnterpriseThemeTest {
     static final Map<String, String> DARK = Map.ofEntries(Map.entry("surface.app", "#3C3F44"), Map.entry("surface.dialog", "#3C3F44"),
         Map.entry("surface.titlebar", "#36393E"), Map.entry("surface.panel", "#35383D"), Map.entry("surface.sidebar", "#35383D"),
         Map.entry("surface.card", "#2E3135"), Map.entry("surface.input", "#2E3135"), Map.entry("surface.terminal", "#2E3135"),
-        Map.entry("accent", "#3D74D6"), Map.entry("selection.bg", "#3D74D6"), Map.entry("hue.blue", "#3D74D6"),
+        Map.entry("accent", "#3C74D6"), Map.entry("selection.bg", "#3C74D6"), Map.entry("hue.blue", "#3C74D6"),
         Map.entry("text.onAccent", "#FFFFFF"), Map.entry("text.onSelection", "#FFFFFF"), Map.entry("button.secondary.bg", "#45484D"),
         Map.entry("surface.control.selected", "#50545B"), Map.entry("hue.amber", "#D08A4A"), Map.entry("border.window", "#2A2C30"),
         Map.entry("border.control", "#5A5E65"), Map.entry("border.input", "#5A5E65"), Map.entry("button.secondary.border", "#5A5E65"),
@@ -41,13 +43,14 @@ class EnterpriseThemeTest {
         Map.entry("hue.green", "#4CB86A"), Map.entry("status.warning", "#E3C27A"));
     static final Map<DerivedColor, String> LIGHT_OVERRIDES = Map.of(DerivedColor.SURFACE_HEADER, "#E1E3E6", DerivedColor.SURFACE_HEADER_ACTIVE, "#D9DFEA",
         DerivedColor.SURFACE_STRIPE, "#E4E6E9", DerivedColor.SURFACE_TABLE_HEADER, "#F0F1F3", DerivedColor.SURFACE_ZEBRA, "#F7F8FA",
-        DerivedColor.SURFACE_ROW_HOVER, "#EEF2FA", DerivedColor.WARNING_GROUND, "#FBF1DA", DerivedColor.WARNING_BORDER, "#E6CF95");
+        DerivedColor.SURFACE_ROW_HOVER, "#EEF2FA", DerivedColor.WARNING_GROUND, "#FBF1DA", DerivedColor.WARNING_BORDER, "#E6CF95",
+        DerivedColor.BORDER_DIVIDER, "#D3D6DA");
     static final Map<DerivedColor, String> DARK_OVERRIDES = Map.of(DerivedColor.SURFACE_HEADER, "#36393E", DerivedColor.SURFACE_HEADER_ACTIVE, "#3D4658",
         DerivedColor.SURFACE_STRIPE, "#383B40", DerivedColor.SURFACE_TABLE_HEADER, "#393C41", DerivedColor.SURFACE_ZEBRA, "#313439",
-        DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30");
+        DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30", DerivedColor.BORDER_DIVIDER, "#4A4D53");
     /** The neutral roles 7.6 leaves to its rule (Rulings 7). */
     static final List<String> NEUTRAL = List.of("surface.panel.raised", "surface.field.raised", "surface.control", "surface.control.hover",
-        "surface.control.selected", "surface.menu", "surface.tabstrip", "surface.emptyTile", "border.field.raised", "border.field.raised.hover",
+        "surface.control.selected", "surface.menu", "surface.emptyTile", "border.field.raised", "border.field.raised.hover",
         "border.menu", "text.field.raised", "segment.track", "segment.selected.bg", "toggle.track.off", "toggle.knob", "button.secondary.bg",
         "button.secondary.bg.hover", "status.idle", "hue.neutral");
 
@@ -86,6 +89,23 @@ class EnterpriseThemeTest {
         assertThat(ColorMath.hex(theme.matching(true).colors().background())).isEqualToIgnoringCase("#2E3135");
     }
 
+    /**
+     * Spec 7.6, amended with plan 5b's accent ruling: Enterprise Dark's accent is #3C74D6, one red step from the Dark Mode
+     * mock's #3D74D6, so white text on it meets the text guard (4.505:1, where #3D74D6 gives 4.499:1) and selected rows and
+     * primary labels stay white, as the mock draws them.
+     */
+    @Test void theDarkAccentKeepsWhiteText() throws Exception {
+        var theme = theme();
+        var dark = theme.generated(true);
+        for (String key : List.of("accent", "selection.bg", "hue.blue"))
+            assertThat(ColorMath.hex(role(theme, true, key))).as("dark " + key).isEqualToIgnoringCase("#3C74D6");
+        assertThat(ColorMath.hex(role(theme, true, "tab.indicator"))).as("the tab indicator follows the accent").isEqualToIgnoringCase("#3C74D6");
+        assertThat(ColorMath.contrast(Color.WHITE, role(theme, true, "accent"))).as("white on the accent").isGreaterThanOrEqualTo(SurfaceContrast.TEXT);
+        for (var pair : List.of(new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT),
+                new PaintPair(SemanticColor.TEXT_ONSELECTION, SemanticColor.SELECTION_BG, SurfaceContrast.Guard.TEXT)))
+            assertThat(ColorMath.hex(SurfaceContrast.painted(dark, pair))).as(pair + " passes the text guard unchanged").isEqualToIgnoringCase("#FFFFFF");
+    }
+
     /** Verified fact 12: where the mocks paint a theme role, at their 2x pixels. */
     @Test void theThemeMatchesTheMocksWhereTheyShowIt() throws Exception {
         var reference = ROOT.resolve("docs/design/enterprise/reference");
@@ -95,7 +115,9 @@ class EnterpriseThemeTest {
         for (boolean dark : new boolean[] {false, true}) {
             var image = ImageIO.read(mocks.get(dark).toFile());
             var generated = theme.generated(dark);
-            Map<int[], Color> points = Map.of(new int[] {2592, 835}, role(theme, dark, "surface.card"), new int[] {2448, 455}, role(theme, dark, "selection.bg"),
+            // The Dark Mode mock's selection is #3D74D6; the theme's is one red step lower (theDarkAccentKeepsWhiteText).
+            Color selection = dark ? new Color(0x3D74D6) : role(theme, dark, "selection.bg");
+            Map<int[], Color> points = Map.of(new int[] {2592, 835}, role(theme, dark, "surface.card"), new int[] {2448, 455}, selection,
                 new int[] {1728, 144}, role(theme, dark, "surface.app"), new int[] {2434, 204}, generated.derivedOverrides().get(DerivedColor.SURFACE_HEADER_ACTIVE),
                 new int[] {2600, 1158}, generated.derivedOverrides().get(DerivedColor.SURFACE_TABLE_HEADER),
                 new int[] {700, 1730}, generated.derivedOverrides().get(DerivedColor.SURFACE_STRIPE), new int[] {1296, 864}, theme.matching(dark).colors().background());

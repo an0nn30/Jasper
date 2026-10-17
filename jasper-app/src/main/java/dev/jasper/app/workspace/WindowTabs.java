@@ -19,8 +19,8 @@ import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /** Equal-width, centered workspace tabs over the retained Swing selection model. EDT only. */
-final class WindowTabs extends JPanel implements AutoCloseable {
-    private static final int TITLE_LIMIT = 200;
+final class WindowTabs extends JPanel implements TabStrip {
+    static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
@@ -42,7 +42,9 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         viewport.setOpaque(false); viewport.setName("tabViewport"); add(viewport);
     }
 
-    void refresh() {
+    @Override public JComponent component() { return this; }
+
+    @Override public void refresh() {
         if (disposed) return;
         long now = clock.getAsLong(); sample(now);
         var updated = new ArrayList<Component>();
@@ -95,10 +97,10 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         doLayout(); syncTimer(); revalidate(); repaint();
     }
 
-    void setActive(boolean active) { this.active = active; refresh(); }
+    @Override public void setActive(boolean active) { this.active = active; refresh(); }
 
     /** Literal bounded titles, also used by hosted-content integrations. */
-    JPopupMenu tabList() {
+    @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Component tab : order) {
             var item = new JCheckBoxMenuItem(capped(owner.tabTitle(tab)), owner.tabIcon(tab), tab == selected);
@@ -152,14 +154,15 @@ final class WindowTabs extends JPanel implements AutoCloseable {
         return ChromePainter.installed().tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
     }
 
-    private static String capped(String title) {
+    /** {@code title}, or past {@code TITLE_LIMIT} characters its start and an ellipsis within that limit, for tips and menus. */
+    static String capped(String title) {
         if (title.length() <= TITLE_LIMIT) return title;
         int end = TITLE_LIMIT - 1;
         if (Character.isHighSurrogate(title.charAt(end - 1))) end--; // never split an emoji
         return title.substring(0, end) + "\u2026";
     }
 
-    void setAnimations(AnimationSettings settings) {
+    @Override public void setAnimations(AnimationSettings settings) {
         if (disposed || animations.equals(settings)) return;
         animations = settings; settle(); doLayout(); repaint();
     }

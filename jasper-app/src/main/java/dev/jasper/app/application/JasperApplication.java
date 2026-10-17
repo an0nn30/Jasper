@@ -212,6 +212,8 @@ public final class JasperApplication {
     /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
     /** What terminal windows and the rehearsal's are made of under this process's presentation. */
     dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+    /** The auxiliary windows; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.AuxiliaryWindows auxiliary() { return auxiliary; }
 
     /** The auxiliary windows' shells; null before {@link #startPlugins(AppDirs)}. Tests. */
     dev.jasper.app.windows.NativeShells nativeShells() { return shells; }
@@ -938,7 +940,7 @@ public final class JasperApplication {
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
-        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
+        auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();
             else updateDock();
