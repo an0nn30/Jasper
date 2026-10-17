@@ -57,7 +57,7 @@ option's bounds, as does a preview radio's focus ring; spec 6.4's face table
 still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
 login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
 the full kit matrix and the mock comparison.
-`./gradlew check --continue` after the final review fixes: **10,735 tests, 0 failures, 0 errors, 25 skipped** (the
+`./gradlew check --continue` after the final review fixes: **10,735 tests, 0 failures, 0 errors, 25 skipped** Merged with main (plans 3e and 5a) as `c2f166022`: **10,837 tests, 0 failures, 0 errors, 25 skipped**. (the
 fixes add 7 jasper-ui tests, now 766; the default gallery still matches the base). GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 
