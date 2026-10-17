@@ -34,7 +34,9 @@ final class Cards {
                             : ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE);
             int closing = (fullForm || detail) && ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS ? ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE) : 0;
             int bottom = settings && ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS ? ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE) : pad + closing;
-            component.setBorder(new EmptyBorder(pad, pad, bottom, pad));
+            component.setBorder(context().faces().group.cardBorder(context(), ((Nodes.Card) node).kind(), settings, new EmptyBorder(pad, pad, bottom, pad)));
+            ((CardSurface) component).kind = ((Nodes.Card) node).kind();
+            ((CardSurface) component).page = settings;
             component.setLayout(
                     ((Nodes.Card) node).kind() == Nodes.CardKind.MIXED
                             ? new MixedLayout(this)
@@ -45,9 +47,12 @@ final class Cards {
                                                     context(), DesignMetrics.Role.ROW_GAP)));
         }
 
+        private void labelColumn(List<ControlRegistry.Control> controls) { labelColumnFor(this, controls); }
+
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
+            labelColumn(controls);
             ((CardSurface) component).settings =
                     controls.stream()
                             .filter(c -> c.node instanceof Nodes.SettingRow)
@@ -57,6 +62,33 @@ final class Cards {
             boolean grouped = settings && controls.stream().anyMatch(c -> c.node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER);
             controls.forEach(c -> { if (c instanceof SettingRows.RowControl row && row.grouped != grouped) { row.grouped = grouped; row.refresh(); } });
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
+        }
+    }
+
+    /**
+     * The label policy's shared column for a form card (spec 6.4): its FormRows and non-Toggle SettingRows take it, and a
+     * bare EXCLUSIVE choice is inset to the field column; the default policy keeps each row's fixed column.
+     */
+    private static void labelColumnFor(CardControl card, List<ControlRegistry.Control> controls) {
+        var labels = card.context().faces().labels;
+        boolean form = card.fullForm || controls.stream().anyMatch(c -> c instanceof FormRows.RowControl);
+        var widths = new java.util.ArrayList<Integer>();
+        for (var c : controls) {
+            if (c instanceof FormRows.RowControl row) widths.add(row.label.getPreferredSize().width);
+            if (c instanceof SettingRows.RowControl row && !(((Nodes.SettingRow) row.node).control() instanceof Nodes.Toggle))
+                widths.add(ThemePainting.measureText(row.title.getFont(), labels.label(((Nodes.SettingRow) row.node).title())));
+        }
+        int column = form ? labels.column(card.context(), widths) : -1;
+        for (var c : controls) {
+            if (c instanceof FormRows.RowControl row && row.column != column) { row.column = column; row.component.revalidate(); }
+            if (c instanceof SettingRows.RowControl row && !(((Nodes.SettingRow) row.node).control() instanceof Nodes.Toggle)) {
+                boolean asRow = column >= 0;
+                if (row.formLabel != asRow || row.column != column) { row.formLabel = asRow; row.column = column; row.refresh(); }
+            }
+            if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE) {
+                var inset = labels.choiceInset(card.context(), column);
+                if (inset != null || c.component.getBorder() != null) c.component.setBorder(inset);
+            }
         }
     }
 
@@ -121,6 +153,9 @@ final class Cards {
 
     static final class CardSurface extends JPanel {
         List<JComponent> settings = List.of();
+        /** The card's kind and whether it is on a Settings page, which the group face reads to place its dividers. */
+        Nodes.CardKind kind = Nodes.CardKind.FORM;
+        boolean page;
         final KitContext context;
 
         CardSurface(KitContext context) {
@@ -137,7 +172,12 @@ final class Cards {
         @Override
         protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
-            try {
+            try { context.faces().group.paintCard(this, g); } finally { g.dispose(); }
+        }
+
+        /** The rounded card, its edge and its setting rows' dividers (the default face). */
+        void paintDefault(Graphics2D g) {
+            {
                 ThemePainting.antialias(g);
                 int r = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
@@ -151,9 +191,23 @@ final class Cards {
                         g.fillRect(1,child.getY(),getWidth()-2,ThemePainting.metric(context,DesignMetrics.Role.HAIRLINE));
                     previous = child;
                 }
-            } finally {
-                g.dispose();
             }
+        }
+    }
+
+    /** A section's surface: the classic group face paints its titled box here; the default face paints nothing. */
+    static final class SectionSurface extends JPanel {
+        final KitContext context;
+
+        SectionSurface(KitContext context) {
+            this.context = context;
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            var g = (Graphics2D) graphics.create();
+            try { context.faces().group.paintSection(this, g); } finally { g.dispose(); }
         }
     }
 
@@ -161,7 +215,7 @@ final class Cards {
         final JLabel title = Labels.literal();
 
         SectionControl(KitView view, Nodes.Section node) {
-            super(view, node, new JPanel());
+            super(view, node, new SectionSurface(view.context()));
             component.setOpaque(false);
             KitOwnership.mark(title, node.id() + ".title");
             component.add(title);
@@ -173,11 +227,8 @@ final class Cards {
             state();
             title.setText(((Nodes.Section) node).title());
             title.setEnabled(component.isEnabled());
-            Composition.style(
-                    title, context(), Typography.Role.SECTION_LABEL, SemanticColor.TEXT_TERTIARY);
-            component.setLayout(
-                    new Composition.Vertical(
-                            ThemePainting.metric(context(), DesignMetrics.Role.SECTION_LABEL_GAP)));
+            context().faces().group.styleTitle(title, context());
+            component.setLayout(context().faces().group.sectionLayout(this));
         }
 
         @Override

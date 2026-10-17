@@ -17,11 +17,16 @@ final class FormRows {
         final JLabel label = Labels.literal();
         final Composition.WrappedText caption;
         java.util.List<ControlRegistry.Control> controls = java.util.List.of();
+        /** The card's shared label column (the label policy's), or -1 for the fixed FORM_LABEL_WIDTH column. */
+        int column = -1;
+        /** A trailing PORT field's own label, mounted only when the label policy gives one. */
+        final JLabel port = Labels.literal();
 
         RowControl(KitView view, Nodes.FormRow node) {
             super(view, node, new SettingRows.SearchHighlight(view.context()));
             caption = Composition.text(node.id() + ".caption");
             KitOwnership.mark(label, node.id() + ".label");
+            KitOwnership.mark(port, node.id() + ".port");
             component.setOpaque(false);
             component.add(label);
             component.add(caption);
@@ -32,17 +37,19 @@ final class FormRows {
         void refresh() {
             state();
             var row = (Nodes.FormRow) node;
-            label.setText(row.label());
+            label.setText(context().faces().labels.label(row.label()));
             ((Labels.LiteralLabel)label).wrap = true;
             caption.text(row.caption());
             caption.setVisible(!row.caption().isEmpty());
             // A caption is one line under its label, shortened at its end; its whole text is the tooltip.
-            caption.single = true;
+            caption.single = context().faces().labels.singleCaption();
             caption.setToolTipText(row.caption().isEmpty() ? null : row.caption());
             Composition.style(
                     label, context(), row.control() instanceof Nodes.Choice choice && choice.face().filter(face -> face.density()==Nodes.PickerDensity.COMPACT).isPresent()?Typography.Role.PICKER_COMPACT:Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
-            Composition.style(
-                    caption, context(), Typography.Role.CAPTION, SemanticColor.TEXT_TERTIARY);
+            label.setForeground(context().faces().labels.labelInk(context(), label.getForeground()));
+            context().faces().labels.styleCaption(caption, context());
+            port.setText(context().faces().labels.label("Port")); port.setFont(label.getFont()); port.setForeground(label.getForeground());
+            port.setEnabled(component.isEnabled());
             label.setEnabled(component.isEnabled());
             caption.setEnabled(component.isEnabled());
             component.setLayout(new RowLayout(this));
@@ -59,11 +66,14 @@ final class FormRows {
                     label.wrap = text.role() == Nodes.TextRole.CAPTION || text.role() == Nodes.TextRole.DESCRIPTION || text.role() == Nodes.TextRole.SUPPORTING;
                 }
             }
+            boolean ported = controls.size() > 1 && controls.get(1).node instanceof Nodes.Field field && field.kind() == Nodes.FieldKind.PORT
+                && context().faces().labels.portLabel();
             Stacks.mount(
                     component,
-                    java.util.stream.Stream.concat(
+                    java.util.stream.Stream.concat(java.util.stream.Stream.concat(
                                     java.util.stream.Stream.of(label, caption),
-                                    controls.stream().map(c -> c.component))
+                                    controls.stream().map(c -> c.component)),
+                                    ported ? java.util.stream.Stream.of((JComponent) port) : java.util.stream.Stream.<JComponent>empty())
                             .toList());
             label.setLabelFor(controls.getFirst().focusTarget());
         }
@@ -77,7 +87,12 @@ final class FormRows {
         }
 
         int labelWidth() {
-            return ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH);
+            return owner.column >= 0 ? owner.column : ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH);
+        }
+
+        /** The "Port:" label's width and its gap, when it is mounted after the trailing field. */
+        int portWidth(Container p) {
+            return p.getComponentCount() > 4 && p.getComponent(4) == owner.port ? owner.port.getPreferredSize().width + gap() : 0;
         }
 
         int gap() {
@@ -87,7 +102,7 @@ final class FormRows {
         int trailing(Container p,int width) {
             return p.getComponentCount() > 3 && p.getComponent(3).isVisible()
                     ? Math.min(
-                            p.getComponent(3).getPreferredSize().width,
+                            p.getComponent(3).getPreferredSize().width + portWidth(p),
                             Math.max(0, (width - labelWidth() - 2 * gap()) / 2))
                     : 0;
         }
@@ -139,7 +154,7 @@ final class FormRows {
                 h = Math.max(h, control + shift);
             }
             if (p.getComponentCount() > 3)
-                h = Math.max(h, Composition.height(p.getComponent(3), trailing) + shift);
+                h = Math.max(h, Composition.height(p.getComponent(3), trailing - portWidth(p)) + shift);
             return h;
         }
 
@@ -194,9 +209,14 @@ final class FormRows {
             owner.label.setBounds(0, y, lw, lh);
             owner.caption.setBounds(0, y + lh, lw, owner.caption.height(lw));
             if (p.getComponentCount() > 3) {
-                int th = Composition.height(p.getComponent(3), trailing);
+                int ported = portWidth(p), tx = x + w + gap();
+                if (ported > 0) {
+                    var size = owner.port.getPreferredSize();
+                    owner.port.setBounds(tx, shift + Math.max(0, (line - size.height) / 2), size.width, size.height);
+                }
+                int th = Composition.height(p.getComponent(3), trailing - ported);
                 // Shorter trailing content (a unit or note) centres on the control's first line as the label does.
-                p.getComponent(3).setBounds(x + w + gap(), shift + (th < line ? (line - th) / 2 : 0), trailing, th);
+                p.getComponent(3).setBounds(tx + ported, shift + (th < line ? (line - th) / 2 : 0), trailing - ported, th);
             }
         }
     }

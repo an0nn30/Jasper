@@ -17,6 +17,8 @@ public final class KitFaces {
     final ButtonFace buttons;
     final FieldPolicy fields;
     final ChoiceFace exclusive, tabs;
+    final GroupFace group;
+    final LabelPolicy labels;
 
     private KitFaces(ControlVariants controls, ColorSlots colors) {
         toggle = switch (controls.toggle()) {
@@ -37,6 +39,14 @@ public final class KitFaces {
             case SEGMENTS -> new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL));
             case FOLDER -> new ClassicFolderTabsFace(colors.dialogSurface());
         };
+        group = switch (controls.group()) {
+            case CARD -> new DefaultGroupFace();
+            case TITLED_BOX -> new ClassicGroupFace(colors.dialogSurface());
+        };
+        labels = switch (controls.formLabel()) {
+            case PLAIN -> new DefaultLabelPolicy();
+            case COLON -> new ClassicLabelPolicy(colors.dialogSurface());
+        };
     }
 
     /** The faces {@code kit} draws with. */
@@ -46,7 +56,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle, exclusive, tabs, buttons, fields); }
+    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, buttons, fields); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.

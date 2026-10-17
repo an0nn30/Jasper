@@ -19,6 +19,11 @@ classic	ClassicRadiosFace	hue.neutral	surface.app	CONTRAST:3.0
 classic	ClassicFolderTabsFace	text.primary	surface.card	CONTRAST:4.5
 classic	ClassicFolderTabsFace	text.primary	surface.stripe	CONTRAST:4.5
 classic	ClassicFolderTabsFace	border.control	surface.app	CONTRAST:1.5
+classic	ClassicGroupFace	border.window	surface.app	CONTRAST:1.3
+classic	ClassicGroupFace	text.primary	surface.app	CONTRAST:4.5
+classic	ClassicLabelPolicy	text.strong.secondary	surface.app	CONTRAST:4.5
+classic	ClassicLabelPolicy	text.primary	surface.app	CONTRAST:4.5
+classic	ClassicLabelPolicy	text.secondary	surface.app	CONTRAST:4.5
 classic	ClassicButtonFace	text.onAccent	accent	CONTRAST:4.5
 classic	ClassicButtonFace	text.primary	button.secondary.bg	CONTRAST:4.5
 classic	ClassicButtonFace	button.secondary.border	surface.app	CONTRAST:1.5

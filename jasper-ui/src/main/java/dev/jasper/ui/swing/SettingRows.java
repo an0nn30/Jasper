@@ -17,6 +17,10 @@ final class SettingRows {
     static final class RowControl extends ControlRegistry.Control {
         final Composition.WrappedText title, description;
         boolean panelFooter, prompt, fullForm, detail, settings, grouped;
+        /** In a classic form card: the title is a colon label in the card's column and the control sits at the field column (spec 6.4). */
+        boolean formLabel;
+        /** That shared column, or -1. */
+        int column = -1;
         SecretFields.SecretControl secret;
         @Override void prompt(boolean value) { prompt=value; }
 
@@ -34,7 +38,7 @@ final class SettingRows {
         void refresh() {
             state();
             var row = (Nodes.SettingRow) node;
-            title.text(row.title() + (row.titleNote().isEmpty() ? "" : " · " + row.titleNote()));
+            title.text((formLabel ? context().faces().labels.label(row.title()) : row.title()) + (row.titleNote().isEmpty() ? "" : " · " + row.titleNote()));
             title.noteStart = row.titleNote().isEmpty() ? -1 : row.title().length();
             title.noteColor = ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY);
             description.text(row.description());
@@ -42,6 +46,7 @@ final class SettingRows {
             Composition.style(title, context(), detail ? Typography.Role.SETTING_DESCRIPTION : Typography.Role.LABEL, detail ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_STRONG_SECONDARY);
             Composition.style(
                     description, context(), detail ? Typography.Role.BODY : Typography.Role.SETTING_DESCRIPTION, detail ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY);
+            if (!detail) title.setForeground(context().faces().labels.settingInk(context(), formLabel, title.getForeground()));
             if (row.highlighted()) {
                 title.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONSELECTION));
                 description.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_ONSELECTION_SECONDARY));
@@ -210,9 +215,35 @@ final class SettingRows {
                 : Math.min(parent.getInsets().right, ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING)) : 0;
         }
 
+        int column() { return owner.column >= 0 ? owner.column : ThemePainting.metric(owner.context(), DesignMetrics.Role.FORM_LABEL_WIDTH); }
+
+        /** A form-card row: the title (and description) in the label column, the control at the field column at its own width. */
+        boolean formRow(Container p) { return owner.formLabel && p.getComponentCount() > 2 && !leading(p); }
+
+        int formHeight(Container p, int width) {
+            Insets i = p.getInsets(); int col = column();
+            int text = owner.title.height(col) + (owner.description.isVisible()
+                ? owner.description.height(col) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0);
+            var control = p.getComponent(2); int room = Math.max(0, width - i.left - i.right - col - gap());
+            return i.top + i.bottom + Math.max(text, Composition.height(control, Math.min(room, control.getPreferredSize().width)));
+        }
+
+        void layoutForm(Container p) {
+            Insets i = p.getInsets(); int col = column(); var control = p.getComponent(2);
+            int room = Math.max(0, p.getWidth() - i.left - i.right - col - gap()), cw = Math.min(room, control.getPreferredSize().width);
+            int ch = Composition.height(control, cw), th = owner.title.height(col);
+            int line = Math.min(ch, ThemePainting.height(owner.context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY));
+            int y = i.top + Math.max(0, (line - th) / 2);
+            owner.title.setBounds(i.left, y, col, th);
+            int gap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
+            owner.description.setBounds(i.left, y + th + gap, col, owner.description.isVisible() ? owner.description.height(col) : 0);
+            control.setBounds(i.left + col + gap(), i.top, cw, ch);
+        }
+
         @Override
         public int height(Container p, int width) {
             if (leading(p)) return leadingHeight(p, width);
+            if (formRow(p)) return formHeight(p, width);
             Insets i = p.getInsets();
             if(stackedSettings(p,width)){int content=Math.max(0,width-i.left-i.right);return i.top+i.bottom+settingsTextHeight(content)+gap()+Composition.height(p.getComponent(2),Math.min(content,p.getComponent(2).getPreferredSize().width));}
             if (owner.detail) {
@@ -244,6 +275,10 @@ final class SettingRows {
                     + Math.max(owner.title.getPreferredSize().width, owner.description.isVisible() ? owner.description.getPreferredSize().width : 0);
                 return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
             }
+            if (formRow(p)) {
+                int w = p.getInsets().left + p.getInsets().right + column() + gap() + p.getComponent(2).getPreferredSize().width;
+                return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+            }
             int control = p.getComponentCount() > 2 ? p.getComponent(2).getPreferredSize().width : 0;
             // The trailing control takes at most half the row, so a wide control (a list) needs twice its width.
             int w =
@@ -256,6 +291,7 @@ final class SettingRows {
         @Override
         public void layoutContainer(Container p) {
             if (leading(p)) { layoutLeading(p); return; }
+            if (formRow(p)) { layoutForm(p); return; }
             Insets i = p.getInsets();
             if(stackedSettings(p,p.getWidth())){
                 int content=Math.max(0,p.getWidth()-i.left-i.right),title=owner.title.height(content),text=settingsTextHeight(content);

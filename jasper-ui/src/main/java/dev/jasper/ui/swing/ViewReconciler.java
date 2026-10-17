@@ -91,7 +91,8 @@ final class ViewReconciler implements AutoCloseable {
             secret.detailValueTop = -1;
             secret.detailActionsBelow = false;
         }
-        if (control instanceof SettingRows.RowControl row) row.panelFooter = false;
+        if (control instanceof SettingRows.RowControl row) { row.panelFooter = false; row.formLabel = false; row.column = -1; }
+        if (control instanceof FormRows.RowControl row) row.column = -1;
         if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;
