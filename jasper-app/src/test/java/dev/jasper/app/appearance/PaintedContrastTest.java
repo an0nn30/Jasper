@@ -56,10 +56,8 @@ class PaintedContrastTest {
             (theme, expected) -> badge(theme, expected, true)),
         new Declared("connected dot", new PaintPair(STATUS_SUCCESS, SURFACE_PANEL, SurfaceContrast.Guard.INDICATOR),
             PaintedContrastTest::connectedDot),
-        new Declared("selected segment label", new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedSegment),
-        new Declared("selected preview caption", new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedPreview),
+        new Declared("selected segment label", faces().get(0), PaintedContrastTest::selectedSegment),
+        new Declared("selected preview caption", faces().get(1), PaintedContrastTest::selectedPreview),
         // Plan 3b: a Notice's text on its severity's ground, and its border held apart from that ground.
         new Declared("information notice text", new PaintPair(TEXT_PRIMARY, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT),
             (theme, expected) -> noticeText(theme, expected, Nodes.Severity.INFO)),
@@ -86,6 +84,14 @@ class PaintedContrastTest {
             (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.WARNING)),
         new Declared("error property value", new PaintPair(STATUS_DANGER, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
             (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.DANGER)));
+
+    /** The default look's face declarations (plan 4b): the selected segment label, then the selected preview caption. */
+    private static List<PaintPair> faces() { return KitFaces.declared(Kit.DEFAULT).stream().distinct().toList(); }
+
+    @Test void theDefaultFacesDeclareExactlyTheTwoRepairsTheDefaultLookMakes() {
+        assertThat(faces()).containsExactly(new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
+            new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT));
+    }
 
     /** The theme set, then the degenerate palettes. */
     private static List<GeneratedTheme> palettes() {
@@ -133,6 +139,161 @@ class PaintedContrastTest {
                 }
             }
         } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /**
+     * Plan 8a and spec 16.1.2: the Run window paints each pair RunWindowPresentation declares as its guard makes it, on
+     * the surfaces the pairs name, over Enterprise Light, the theme set and the degenerate palettes: its texts, the help
+     * glyph and tile edge, the field and list box edges and the hue squares, which keep their fill and take a ring in the
+     * guarded colour where the fill misses its guard. Enterprise Light paints each text as authored but the muted ones.
+     */
+    @Test void theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette() throws Exception {
+        record Sampled(String name, KitView view, String id) { }
+        var enterprise = KitFixtures.enterprise();
+        var initial = KitFixtures.enterpriseLight();
+        var original = UIManager.getLookAndFeel();
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            var kit = KitContext.of(enterprise, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+            var texts = new ViewSpec(new Nodes.Stack("run", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                runText("run.title", "Run", Nodes.TextRole.WINDOW_TITLE), runText("run.shortcut", "\u21e7\u2318P", Nodes.TextRole.CAPTION),
+                runText("run.label", "Open:", Nodes.TextRole.LABEL), runText("run.value", "dustin@192.168.1.119:22", Nodes.TextRole.MONO)), ""));
+            var list = new ViewSpec(new Nodes.ItemList("results", ControlState.READY, Nodes.ListKind.RESULTS, List.of(
+                new ListItem("h", Optional.empty(), List.of(runText("h.title", "Matches", Nodes.TextRole.CAPTION),
+                    runText("h.count", "1 of 2", Nodes.TextRole.CAPTION)), List.of(), List.of(), true),
+                new ListItem("a", Optional.empty(), List.of(runText("a.title", "Mac", Nodes.TextRole.BODY)),
+                    List.of(runText("a.detail", "dustin@host", Nodes.TextRole.MONO)), List.of(runText("a.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("b", Optional.empty(), List.of(runText("b.title", "gcloud auth", Nodes.TextRole.BODY)),
+                    List.of(runText("b.detail", "gcloud auth login", Nodes.TextRole.MONO)), List.of(runText("b.tag", "K", Nodes.TextRole.CAPTION))),
+                new ListItem("m", Optional.empty(), List.of(runText("m.title", "More in SSH", Nodes.TextRole.DESCRIPTION)), List.of(), List.of())),
+                java.util.Set.of("a"), "run", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), java.util.OptionalInt.of(4)));
+            var help = new ViewSpec(new Nodes.Stack("run.help", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+                new Nodes.Icon("run.help.icon", ControlState.READY, "play.filled", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Run"),
+                runText("run.help.text", "Type the name of a session.", Nodes.TextRole.DESCRIPTION)), ""));
+            try (var textView = new KitView(kit, texts, event -> { }); var listView = new KitView(kit, list, event -> { });
+                 var helpView = new KitView(kit, help, event -> { })) {
+                var guarded = List.of(new Sampled("title", textView, "run.title"), new Sampled("shortcut", textView, "run.shortcut"),
+                    new Sampled("label", textView, "run.label"), new Sampled("detail value", textView, "run.value"),
+                    new Sampled("heading", listView, "h.title"), new Sampled("selected title", listView, "a.title"),
+                    new Sampled("list text", listView, "m.title"), new Sampled("row detail", listView, "b.detail"),
+                    new Sampled("count", listView, "h.count"), new Sampled("selected detail", listView, "a.detail"));
+                var pairs = RunWindowPresentation.pairs(enterprise);
+                assertThat(guarded).as("every declared Run window text pair is sampled").hasSameSizeAs(pairs);
+                // The muted texts the mocks draw under 4.5:1 in Enterprise Light; every other text pair holds there as authored.
+                var mutedInEnterprise = java.util.Set.of(RunWindowPresentation.ROW_DETAIL, RunWindowPresentation.COUNT, RunWindowPresentation.SELECTED_DETAIL);
+                var window = new SurfacePanel(kit, SurfacePanel.Kind.RUN_WINDOW, () -> 24, () -> 40);
+                var box = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
+                var field = new SurfacePanel(kit, SurfacePanel.Kind.FIELD);
+                field.focusShown(false);
+                var themes = new ArrayList<GeneratedTheme>(List.of(initial));
+                themes.addAll(palettes());
+                for (var theme : themes) {
+                    FlatLafInstaller.install(theme, enterprise); binding.publish(new ThemePair(theme, theme));
+                    for (var view : List.of(textView, listView, helpView)) {
+                        SwingUtilities.updateComponentTreeUI(view);
+                        // Re-reconciles under this theme, so every control refreshes its colours.
+                        view.runWindow(false); view.runWindow(true);
+                    }
+                    var rendered = KitFixtures.render(listView, 436, 100, 1);
+                    String where = name(theme);
+                    // The surfaces the pairs name are the ones painted under them.
+                    var frame = surface(window, 462, 427);
+                    assertThat(frame.getRGB(200, 12)).as(where + ", title band").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme).getRGB());
+                    assertThat(frame.getRGB(200, 200)).as(where + ", dialog surface").isEqualTo(enterprise.colors().dialogSurface().color(theme).getRGB());
+                    var boxImage = surface(box, 436, 208);
+                    assertThat(boxImage.getRGB(100, 100)).as(where + ", list box").isEqualTo(theme.semantic().color(SURFACE_CARD).getRGB());
+                    var fieldImage = surface(field, 392, 26);
+                    assertThat(fieldImage.getRGB(100, 13)).as(where + ", field box").isEqualTo(theme.semantic().color(SURFACE_INPUT).getRGB());
+                    // The edges, control boundaries on what they stand on.
+                    var fieldEdge = RunWindowPresentation.FIELD_EDGE;
+                    var boxEdge = RunWindowPresentation.boxEdge(enterprise);
+                    assertThat(RunWindowPresentation.edges(enterprise)).containsExactly(fieldEdge, boxEdge);
+                    for (var line : List.of(fieldEdge, boxEdge))
+                        assertThat(line.guard().holds(SurfaceContrast.painted(theme, line), line.against().color(theme))).as(where + ", " + line + " meets its guard").isTrue();
+                    int ring = com.formdev.flatlaf.util.UIScale.scale(enterprise.metrics().value(DesignMetrics.Role.FOCUS_RING));
+                    assertThat(fieldImage.getRGB(200, ring)).as(where + ", the field box's edge").isEqualTo(SurfaceContrast.painted(theme, fieldEdge).getRGB());
+                    assertThat(boxImage.getRGB(0, 100)).as(where + ", the list box's edge").isEqualTo(SurfaceContrast.painted(theme, boxEdge).getRGB());
+                    assertThat(rendered.getRGB(200, 5)).as(where + ", heading band").isEqualTo(DerivedColor.SURFACE_TABLE_HEADER.color(theme).getRGB());
+                    assertThat(rendered.getRGB(300, 19 + 10)).as(where + ", selected row").isEqualTo(theme.semantic().color(ACCENT).getRGB());
+                    // The help tile's edge, an indicator on the dialog surface.
+                    var helpImage = KitFixtures.render(helpView, 436, 40, 1);
+                    var tile = KitTestSupport.require(helpView, "run.help.tile", JComponent.class);
+                    var tileAt = SwingUtilities.convertRectangle(tile.getParent(), tile.getBounds(), helpView);
+                    var edge = RunWindowPresentation.tileEdge(enterprise);
+                    Color painted = SurfaceContrast.painted(theme, edge);
+                    assertThat(edge.guard().holds(painted, edge.against().color(theme))).as(where + ", the help tile's edge meets its guard").isTrue();
+                    assertThat(helpImage.getRGB(tileAt.x + tileAt.width / 2, tileAt.y)).as(where + ", the help tile's edge").isEqualTo(painted.getRGB());
+                    // The help glyph, an indicator on the accent.
+                    var glyph = RunWindowPresentation.HELP_GLYPH;
+                    Color ink = SurfaceContrast.painted(theme, glyph);
+                    assertThat(glyph.guard().holds(ink, glyph.against().color(theme))).as(where + ", the help glyph meets its guard").isTrue();
+                    assertThat(hasColor(helpImage.getSubimage(tileAt.x, tileAt.y, tileAt.width, tileAt.height), ink)).as(where + ", the help glyph is inked " + ColorMath.hex(ink)).isTrue();
+                    swatches(kit, theme, where);
+                    for (int i = 0; i < guarded.size(); i++) {
+                        var pair = pairs.get(i);
+                        var sample = guarded.get(i);
+                        Color expected = SurfaceContrast.painted(theme, pair);
+                        assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(where + ", " + sample.name() + " meets its guard").isTrue();
+                        assertThat(KitTestSupport.require(sample.view(), sample.id(), JLabel.class).getForeground())
+                            .as(where + ", " + sample.name() + " is painted " + ColorMath.hex(expected)).isEqualTo(expected);
+                        if (theme == initial && !mutedInEnterprise.contains(pair))
+                            assertThat(expected).as(where + ", " + sample.name() + " as authored").isEqualTo(pair.slot().color(theme));
+                    }
+                    if (theme == initial)
+                        for (var pair : List.of(fieldEdge, boxEdge, glyph, edge))
+                            assertThat(SurfaceContrast.painted(theme, pair)).as(where + ", " + pair + " as authored").isEqualTo(pair.slot().color(theme));
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    private static Nodes.Text runText(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
+
+    /**
+     * The Run window's hue squares under {@code theme}, one row per hue with each selected in turn: a square keeps its
+     * fill and, where the fill misses {@link RunWindowPresentation#swatch}'s guard, takes a ring in the guarded colour.
+     */
+    private static void swatches(KitContext kit, GeneratedTheme theme, String where) {
+        var hues = List.of(Nodes.Hue.BLUE, Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE, Nodes.Hue.NEUTRAL);
+        int side = com.formdev.flatlaf.util.UIScale.scale(kit.metrics().value(DesignMetrics.Role.RUN_WINDOW_ROW_SIDE));
+        int square = com.formdev.flatlaf.util.UIScale.scale(kit.metrics().value(DesignMetrics.Role.RUN_WINDOW_SWATCH));
+        int row = com.formdev.flatlaf.util.UIScale.scale(kit.metrics().value(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT));
+        var sampled = new java.util.HashSet<PaintPair>();
+        for (int chosen = 0; chosen < hues.size(); chosen++) {
+            var items = new ArrayList<ListItem>();
+            for (int i = 0; i < hues.size(); i++)
+                items.add(new ListItem("r" + i, Optional.of(new Nodes.Icon("r" + i + ".swatch", ControlState.READY, "file", hues.get(i), Nodes.IconSize.SWATCH, "Scope")),
+                    List.of(runText("r" + i + ".title", "Row", Nodes.TextRole.BODY)), List.of(), List.of()));
+            var spec = new ViewSpec(new Nodes.ItemList("swatches", ControlState.READY, Nodes.ListKind.RESULTS, items, java.util.Set.of("r" + chosen), "run",
+                List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), java.util.OptionalInt.of(hues.size())));
+            try (var view = new KitView(kit, spec, event -> { })) {
+                view.runWindow(true);
+                var image = KitFixtures.render(view, 436, row * hues.size(), 1);
+                for (int i = 0; i < hues.size(); i++) {
+                    boolean selected = i == chosen;
+                    var pair = RunWindowPresentation.swatch(hues.get(i), selected);
+                    sampled.add(pair);
+                    Color fill = pair.slot().color(theme), guarded = SurfaceContrast.painted(theme, pair);
+                    assertThat(pair.guard().holds(guarded, pair.against().color(theme))).as(where + ", " + pair + " meets its guard").isTrue();
+                    int ground = pair.against().color(theme).getRGB(), x = side + square / 2, top = i * row;
+                    // Off the selection the list is transparent: the list box under it paints surface.card.
+                    while (top < (i + 1) * row && (image.getRGB(x, top) == ground || image.getRGB(x, top) >>> 24 == 0)) top++;
+                    String name = where + ", the " + hues.get(i) + (selected ? " selected" : "") + " square";
+                    assertThat(new Color(image.getRGB(x, top + square / 2))).as(name + "'s fill").isEqualTo(fill);
+                    assertThat(new Color(image.getRGB(x, top))).as(name + "'s edge").isEqualTo(guarded);
+                }
+            }
+        }
+        assertThat(sampled).as(where + ", every hue square pair is sampled").containsExactlyInAnyOrderElementsOf(RunWindowPresentation.swatches());
+    }
+
+    /** {@code panel} painted at {@code width} by {@code height}. */
+    private static BufferedImage surface(SurfacePanel panel, int width, int height) {
+        panel.setSize(width, height);
+        var image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { panel.paint(graphics); } finally { graphics.dispose(); }
+        return image;
     }
 
     private static boolean searchHint(GeneratedTheme theme, Color expected) {

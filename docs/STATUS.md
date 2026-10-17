@@ -46,6 +46,111 @@ or run now under a development plugin whose kit says `title_bar = "native"`, `me
 Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
 menu row, nothing moving with animations on. Not merged, not pushed.
 
+**Enterprise presentation, plan 8a: the Run window view — 2026-10-17** (`claude/enterprise-run-window`, worktree
+`.claude/worktrees/enterprise-8`, `b6baeeab3..720b22d27`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-8a-run-window-view.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The palette has two views behind
+`PaletteView` (spec 11.1): today's card, renamed `CardView`, and `RunWindowView`, built by `PaletteViews.of` from the
+look's `PaletteLook`; the step form and the prefix-to-chip edit are shared (`StepForm`, `QueryEdits`). Headings are typed
+(`PaletteEntry.Header.Kind`: RECENT, USED, SUGGESTED, SECTION, MATCHES) and `RunCopy` words them for the Run window
+("Recent", "Most used", "Suggested", one "Matches" with "i of n"). The Run window is kit views laid out by the app:
+jasper-ui's `KitView.runWindow(true)` gives a view the Run window's rows (21), heading bands (18 and a `border.row` rule)
+and counts, 7 px hue squares that keep their hue on the selection (inside a guarded ring where it would vanish), the 32 px help tile with the filled ▶, a data-face
+query with no ring of its own and the mocks' text colours, from thirty `RUN_WINDOW_*` roles (equal in both catalogs),
+`RUN_HEADING` (11/600) and `RUN_DETAIL` (data face, 10.5/400) in the classic scale; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds
+paint the frame and bands, the field box and the list box. Enter runs the view's primary verb: the card's verb 0, the Run
+window's verb 0 or its SPLIT verb while "Open in a split pane" is ticked (`PaletteViewContractTest`). Compared with the 06
+Run Dialog mocks at 2× under the Enterprise fixture kit and the Enterprise Light fixture theme (`RunWindowRenderTest`):
+the Run window's own geometry probes within a device pixel for edges and three for text, its fills within 3 ΔE76, edge
+agreement 0.901 / 0.807 ("Just opened", top / bottom) and 0.936 / 0.804 ("Typing auth"); IBM Plex's (plan 5b) probes are measured and
+printed until that plan is here (`RunWindowRenderTest.CHECKED`); tuned in the comparison: none. Rulings (plan, "Rulings"): (1) two plans, 8b lands the window; (2) the card renamed `CardView`;
+(3) the step form and prefix edit shared; (4) the Run window's roles, two type roles and two filled icons; (5) the list is
+8 × 21 + 2 × 19 = 206 inside its box, 6 px taller than the mock's cut box, so the window is 427 tall; (6) the title
+shortcut and row tags are plain CAPTION text, as drawn; (7) the help tile is a PROMPT_HEADER `play.filled` icon at the
+Run mock's 32; (8) the Run window's text colours as declared pairs (`RunWindowPresentation.pairs(Kit)`, TEXT-guarded,
+painted over every palette by `PaintedContrastTest`), its list details, tags and count in `text.placeholder` and a
+selected row's detail in the card's supporting ink, TEXT-guarded too since the final review (deviation d), the empty
+line guarded against the dialog surface (a residual); (9) no placeholder in the Open field, the query in the data face; (10) the copy; (11) the second and third
+verbs in each row's context menu; (12) the JUnit comparison with its floors, run on the EDT while each context is open;
+(13) the matches count is the heading's second title node (a heading has a title only); (14) the title row's labels hand
+their presses to the view, so the title text drags; execution notes R1 to R19 (no 4b, 4c or 5b code: the Run window's
+own help tile, 4c's fixture theme, the fixture kit's comparison with owners, the checkbox row from roles, details cut
+at their end). Deviations: (a) Task 3's review round (`c16f1a8dd`): a SWATCH glyph takes a row's glyph size only under `runWindow`, so a compact panel row's swatch keeps its caption size (spec 8.2); `RunWindowPresentation.releaseHelpChildren` returns the help glyph's colours when the flag turns off; `NewRolesTest`'s Run window names sit on their own lines; three more tests (`RunWindowPresentationTest` 2, `SwatchesTest` 1), so the plan adds 36 tests, not 33; (b) Rulings 4's type role sizes are the classic scale's, `RUN_HEADING` 11/600 and `RUN_DETAIL` 10.5/400 (the default scale's are 12/600 and 11.5/400); (c) Task 1 shows the step's card before `step.show` in `CardView.showStep`, so the first field can take focus; (d) the final review's fixes ("Plan 8a: final review fixes"): `RunWindowView.showStep` shows the card first too; a step taller than the list box scrolls inside it (`SurfacePanel.scrolling`) and `StepForm.focusField` scrolls the focused row into view; every pair the Run window paints is declared and guarded (amending Rulings 8): the muted details, tags and count and a selected row's detail TEXT-guarded (Enterprise Light paints #717680 on the card, #686D75 on a heading band and #E3EAF9 on the accent, where the mocks paint #7A808A, #7A808A and #DCE5F7), the help glyph INDICATOR-guarded on the accent, the field and list box edges CONTROL-guarded, and the hue squares INDICATOR-guarded on the card and on the accent, a square that misses keeping its fill inside a hairline ring in the guarded colour (`RunWindowPresentation.authored()` is gone); the help text sits centred in its 18 px line, shows at most two lines and the help row has one height (`RunWindowPresentation.helpHeight`), so the window keeps its height whatever the chip; a row's context-menu verbs are `verb:<verb>:<entry key>` (amending Rulings 11) and run only on the row they name; `setChip` re-reads the ▼ menu; the checkbox's label follows the toggle's drawn width; the 10-argument `PaletteController` constructor and `PaletteEntry.Header(String)` are gone; a "help text top" probe (mock 85, render 81 with the platform face) is FONTS-owned; three more tests. Default look byte-identical: the
+headless gallery's files for Slate Cobalt Dark and Light match the base (Task 4). `./gradlew check --continue`:
+**10,810 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `b9178db45`, had 10,771). GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not pushed.
+Merged with main (plan 4b) as `5fc529882` and reconciled in `d17b2fa43`: the Run window's help layout, glyph ink and
+tile stay ahead of the kit's prompt face, the tile painting through 4b's `ClassicPromptFace.paintAccentTile` (R2); the
+quiet query returns first in `FieldSurface.paintDefault`, where both field policies paint a transparent field (R3);
+FACES joins `RunWindowRenderTest.CHECKED`, the classic checkbox's left, top, label and inside and the primary's fill
+matching the mocks, while the primary and Cancel left edges, which follow the labels' face, are FONTS-owned with a
+residual (the classic 14 px label padding makes "Connect" and "Browse…" 76 and 80 wide in the platform face and about
+73 and 78 in Plex, where the mock draws every button 70) and B's disabled checkbox (`surface.tableHeader` against the
+mock's white, R12) is a printed residual; edge agreement 0.900 / 0.841 and 0.936 / 0.841 (R9); the classic checkbox's
+preferred size is the row's `CHECKBOX_BOX` plus two focus rings, so R7 holds unchanged; `KitFixtures.enterpriseLight()`
+stays for 4c (R4); the default gallery's PNGs match the base, its JSON differing only in 4b's `Cards$SectionSurface`;
+`./gradlew check --continue`: **10,876 tests, 0 failures, 0 errors, 25 skipped**.
+
+**Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
+`.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit and the final review fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-4b-classic-form-faces.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). `KitFaces` chooses one face per control
+point from the kit's `ControlVariants`, once per `KitContext`; each control asks its face, and each default face calls
+the control's former code, moved into a named method, so the default look is pixel-identical (the headless gallery for
+Slate Cobalt Dark and Light matches the plan-4 base re-recorded at `91153a4ce`: every PNG byte-identical, the JSON
+differing only in a section's `class`, now `Cards$SectionSurface`, Rulings 23). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
+checkbox leading its label, never animated), the buttons with the field policy (raised, or the classic gradient with an
+accent primary, flat disabled faces, flat toolbar ghosts, dropdown and picker faces ending with a drawn ▼, picker rows
+without tiles, no SEARCH, PATH or PORT glyphs, grey read-only fields), the exclusive choice (segments, or a wrapping row
+of 14 px radios with hue swatches and thumbnails over their radios), the tabs (segments, or folder tabs), the group with
+the label policy (a card, or a titled box; plain labels, or a colon label column as wide as the widest label with a
+"Port:" label, form-card settings as rows and bare choices at the field column), the stepper (stepper, or a spinner, a
+SLIDER included) and the prompt (the tile over the title, or the plain prompt with a 30 px accent tile beside the message
+and the title left to the header strip). The default look's two repaired pairs are now the default choice face's
+declarations, painted through `SurfaceContrast.painted`, which lays a translucent role over `surface.app` before
+measuring it (the same colour as before for the opaque roles of every shipped theme; a user theme with a translucent
+`segment.selected.bg`, `surface.card` or `text.primary` now gets the composited repair). `StrategyIsolationTest` (faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler no
+face), `VariantReadTest` (`ControlVariants` only in the kit package, `dev.jasper.app.presentation` and `KitFaces`) and
+`PaintSpecTest` (`face-pairs.tsv`) guard them. Rulings (plan, "Rulings"): faces package-private with
+`KitFaces.declared` public; default faces call moved code; one `ChoiceFace` for exclusive and tabs; `border.hover`
+edges; pairs against the dialog surface slot; flat disabled buttons; where ghosts are flat; LINK unchanged until 4c;
+`RichOptions` keeps tiles until plan 9; no PORT colon; wrapping radio rows; left-aligned previews; folder tab roles;
+the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labels in `text.strong.secondary`; the
+label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
+padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
+notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
+gallery. Deviations (Task 2's and Task 5's reviews; the plan's Execution notes X12, X14 and X15): `ButtonFace.fades`
+takes the button, so the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's
+Task 3 edits its condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a
+classic read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's
+surface, so a transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a
+strip's icon-only menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface
+stands; a secret's reveal and copy and each crumb are flat until hovered wherever their control stands
+(`KitButton.inner`); a "Port:" label hides and enables with its field, stays beside it in a stacked row and is its
+`labelFor`; a colon label's note starts after the colon; an EXCLUSIVE choice that leaves a form card drops its inset; a
+form-card setting row takes the card's inset in place of its own padding and dependent indent, so its title and control
+sit on the FormRows' columns in FORM, MIXED and SETTINGS cards. Two more from Tasks 4 and 7: the folder tabs' baseline
+runs along the tabs' foot, not the track's, so it stays under them when a layout stretches the track; the classic
+prompt's message is left-aligned beside its tile, where the reconciler's flow pass centres prompt header text for the
+default face. Final review fixes: a prompt header without an icon (About's hero and facts) lays its lines from the
+leading edge; the colon label column is measured again after a theme or interface font refresh, skips hidden rows and
+counts a setting row's note; the classic prompt's glyph (`text.onAccent` on `accent`), the pending checkbox's dash
+(`text.onAccent` on `status.warning`) and a hovered or pressed primary's label (`text.onAccent` on `accent.hover`) are
+declared pairs painted through their guards, so `face-pairs.tsv` has three more rows; a disabled checkbox on a selected
+row fades to 0.42; a primary menu button takes the primary's medium label; on a wrapping radio row or folder tabs, Up
+and Down move to the same place on the line above or below (Rulings 11). Residuals: 4a's flat focused, hovered or pressed classic
+native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
+classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
+`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
+disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13); a
+classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); a classic radio's focus halo loses its leftmost 2 px to the
+option's bounds, as does a preview radio's focus ring; spec 6.4's face table
+still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
+login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
+the full kit matrix and the mock comparison.
+`./gradlew check --continue` after the final review fixes: **10,735 tests, 0 failures, 0 errors, 25 skipped** Merged with main (plans 3e and 5a) as `c2f166022`: **10,837 tests, 0 failures, 0 errors, 25 skipped**. (the
+fixes add 7 jasper-ui tests, now 766; the default gallery still matches the base). GUI checks for
+the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
+
 **Enterprise presentation, plan 5a: the presentation provider — 2026-10-16** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `d65dc99f8..934c33f1e`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-5a-provider.md),

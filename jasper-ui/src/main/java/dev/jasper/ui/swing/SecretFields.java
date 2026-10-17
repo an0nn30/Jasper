@@ -85,6 +85,7 @@ final class SecretFields {
             }
             reveal = new Buttons.KitButton(context());
             reveal.kind = Nodes.ButtonKind.GHOST;
+            reveal.inner = true;
             KitOwnership.mark(reveal, node.id() + ".reveal");
             reveal.setOpaque(false);
             reveal.setContentAreaFilled(false);
@@ -116,6 +117,7 @@ final class SecretFields {
             own(()->{input.removeFocusListener(focusListener);reveal.removeFocusListener(focusListener);});
             copy = new Buttons.KitButton(context());
             copy.kind = Nodes.ButtonKind.GHOST;
+            copy.inner = true;
             KitOwnership.mark(copy, node.id() + ".copy");
             copy.setOpaque(false);
             copy.setContentAreaFilled(false);

@@ -19,7 +19,7 @@ final class NumericControls {
             var center = new JPanel(new ValueLayout()); center.setOpaque(false);
             surface.remove(input); center.add(input); center.add(unit);
             surface.add(center, BorderLayout.CENTER);
-            ((JTextField)input).setHorizontalAlignment(SwingConstants.CENTER);
+            ((JTextField)input).setHorizontalAlignment(context().faces().stepper.alignment());
             javax.swing.event.DocumentListener resize = new javax.swing.event.DocumentListener() {
                 @Override public void insertUpdate(javax.swing.event.DocumentEvent event) { center.revalidate(); }
                 @Override public void removeUpdate(javax.swing.event.DocumentEvent event) { center.revalidate(); }
@@ -27,7 +27,7 @@ final class NumericControls {
             };
             var document = ((JTextField)input).getDocument(); document.addDocumentListener(resize); own(() -> document.removeDocumentListener(resize));
             minus = button("minus", "−", -1); plus = button("plus", "+", 1);
-            surface.add(minus, BorderLayout.WEST); surface.add(plus, BorderLayout.EAST);
+            context().faces().stepper.arrange(surface, minus, plus);
             refresh();
         }
         /** The value and its unit read as one centred phrase; the value cell keeps a stable minimum width. */
@@ -39,11 +39,15 @@ final class NumericControls {
             @Override public void removeLayoutComponent(Component component) { }
             @Override public Dimension preferredLayoutSize(Container parent) {
                 int pad = ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_VALUE_PADDING);
-                return new Dimension(Math.max(ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_VALUE_WIDTH), valueWidth() + unitWidth() + 2 * pad), input.getPreferredSize().height);
+                return new Dimension(Math.max(context().faces().stepper.valueWidth(context()), valueWidth() + unitWidth() + 2 * pad), input.getPreferredSize().height);
             }
             @Override public Dimension minimumLayoutSize(Container parent) { return preferredLayoutSize(parent); }
             @Override public void layoutContainer(Container parent) {
-                int value = valueWidth(), unitWidth = unitWidth(), x = Math.max(0, (parent.getWidth() - value - unitWidth) / 2);
+                int value = valueWidth(), unitWidth = unitWidth();
+                // The default centres the value and its unit; the classic spinner sets them against the arrows.
+                int x = context().faces().stepper.alignment() == SwingConstants.RIGHT
+                    ? Math.max(0, parent.getWidth() - value - unitWidth - ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_VALUE_PADDING))
+                    : Math.max(0, (parent.getWidth() - value - unitWidth) / 2);
                 input.setBounds(x, 0, Math.min(value, parent.getWidth()), parent.getHeight());
                 unit.setBounds(x + value, 0, unitWidth, parent.getHeight());
             }
@@ -51,10 +55,15 @@ final class NumericControls {
         private JButton button(String suffix, String text, int direction) {
             var cue = new ThemePainting.Focus[1];
             var button = new JButton(text) {
-                @Override public Dimension getPreferredSize() { return new Dimension(ThemePainting.metric(context(), DesignMetrics.Role.STEPPER_BUTTON_WIDTH), ThemePainting.height(context(), DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY)); }
+                @Override public Dimension getPreferredSize() { return context().faces().stepper.stepSize(context(), direction); }
                 @Override protected void paintComponent(Graphics graphics) {
                     var g = (Graphics2D)graphics.create();
-                    try {
+                    try { context().faces().stepper.paintStep(this, g, context(), direction, cue[0] != null && cue[0].visible(), () -> standard(g)); }
+                    finally { g.dispose(); }
+                }
+                /** The default look's step button: its focus edge, its rule and its "−" or "+". */
+                private void standard(Graphics2D g) {
+                    {
                         ThemePainting.antialias(g);
                         if(cue[0]!=null&&cue[0].visible()) ThemePainting.rounded(g,this,context(),null,ThemePainting.color(context(),SemanticColor.BORDER_FOCUS),false,false);
                         g.setColor(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
@@ -62,7 +71,7 @@ final class NumericControls {
                         if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                         g.setColor(getForeground()); g.setFont(getFont()); var fm = g.getFontMetrics();
                         g.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2, (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
-                    } finally { g.dispose(); }
+                    }
                 }
             };
             button.setOpaque(false); button.setBorderPainted(false); button.setContentAreaFilled(false);
@@ -76,11 +85,11 @@ final class NumericControls {
             super.refresh();
             if (unit == null) return;
             var field = (Nodes.Field)node;
-            surface.hint = ""; surface.setBorder(new EmptyBorder(0, 0, 0, 0));
-            // A compact value reads at label size, its unit set after one space.
-            input.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); ((JTextField)input).setBorder(new EmptyBorder(0, 0, 0, 0));
+            var insets = context().faces().stepper.surfaceInsets(context());
+            surface.hint = ""; surface.setBorder(new EmptyBorder(insets.top, insets.left, insets.bottom, insets.right));
+            ((JTextField)input).setBorder(new EmptyBorder(0, 0, 0, 0));
             unit.setText(field.hint().isBlank() ? "" : " " + field.hint());
-            unit.setFont(input.getFont()); unit.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY));
+            context().faces().stepper.styleValue(context(), input, unit);
             for (var button : new JButton[]{minus, plus}) {
                 button.setFont(input.getFont()); button.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY));
                 button.setEnabled(interactive());

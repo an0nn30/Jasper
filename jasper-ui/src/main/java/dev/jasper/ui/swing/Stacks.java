@@ -18,7 +18,10 @@ final class Stacks {
     private Stacks() {}
 
     static final class StackSurface extends JPanel {
-        final KitContext context;boolean joined,route;StackSurface(KitContext context){this.context=context;}
+        final KitContext context;boolean joined,route;
+        /** The stack's layout role, which a classic ghost button reads to know a toolbar row from an actions row. */
+        Nodes.LayoutRole role;
+        StackSurface(KitContext context){this.context=context;}
         /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
         int[] arrows=new int[0];
         @Override protected void paintComponent(Graphics graphics){
@@ -47,6 +50,8 @@ final class Stacks {
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup, hint, settingsHeader, keycapDetail;
         /** An INLINE row among a DOCUMENT split's bars, assigned by the reconciler; see {@link DocumentBarLayout}. */
         boolean documentBar;
+        /** The Run window's help row inked this PROMPT_HEADER's glyph (plan 8a); turning the flag off returns it. */
+        boolean helpInked;
         /** A VERTICAL group of a DOCUMENT split's bars: its rows carry their own padding, so they stack without gaps. */
         boolean documentBarGroup;
         /** Components of Field and Text children, in order: the bar's fill candidates; Text ones also hold status. */
@@ -91,8 +96,12 @@ final class Stacks {
         void refresh() {
             state();
             var stack = (Nodes.Stack) node;
+            // The Run window's help tile (Enterprise presentation plan 8a) is its own size.
+            tile.sizeRole = view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_TILE : DesignMetrics.Role.PROMPT_TILE;
+            tile.run = view.runWindow();
             ((StackSurface)component).joined=stack.role()==Nodes.LayoutRole.JOINED_ACTIONS;
             ((StackSurface)component).route=stack.role()==Nodes.LayoutRole.ROUTE;
+            ((StackSurface)component).role=stack.role();
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(
@@ -100,7 +109,7 @@ final class Stacks {
                     : routeStep ? new RouteStepLayout(context())
                     : panelFooter != null && stack.role() == Nodes.LayoutRole.VERTICAL ? new PanelFooters.StackLayout(this, panelFooter)
                     : stack.role() == Nodes.LayoutRole.SETTINGS_NAVIGATION ? new FillLayout() : stack.role() == Nodes.LayoutRole.SETTINGS_TRAILING ? new SettingsTrailingLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_GROUP_HEADER ? new SettingsGroupLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_FOOTER ? new SettingsFooterLayout(context()) : stack.role() == Nodes.LayoutRole.SETTINGS_PAGE ? new SettingsLayout(context()) : sheetHeading ? new Navigation.InlineLayout(context(),DesignMetrics.Role.COLUMN_GAP) : stack.role() == Nodes.LayoutRole.PROMPT_HEADER
-                            ? new PromptLayout(this)
+                            ? view.runWindow() ? RunWindowPresentation.helpLayout(this) : context().faces().prompt.headerLayout(this)
                             : stack.role() == Nodes.LayoutRole.FOOTER ? new FooterStatusLayout(context()) : stack.role() == Nodes.LayoutRole.SUPPORTING ? new SupportingLayout(context()) : stack.role() == Nodes.LayoutRole.NAVIGATION ? new Navigation.InlineLayout(context(), hint ? DesignMetrics.Role.PALETTE_HINT_ACTION_GAP : identityHeader ? DesignMetrics.Role.IDENTITY_HEADER_GAP : panelDetail && stack.children().stream().anyMatch(n -> n instanceof Nodes.Icon icon && icon.size() == Nodes.IconSize.PROMPT) ? DesignMetrics.Role.PANEL_DETAIL_IDENTITY_GAP : detail && !panelDetail ? DesignMetrics.Role.DETAIL_HEADING_GAP : DesignMetrics.Role.ICON_GAP) : new StackLayout(context(), stack.role(), stack.children().size()==2 && stack.children().getFirst() instanceof Nodes.Text text && text.role()==Nodes.TextRole.DETAIL_TITLE, captions) {
                                 @Override int gap() { return identityGroup ? ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_HEADER_AFTER) : keycapDetail && stack.role() == Nodes.LayoutRole.VERTICAL ? ThemePainting.metric(context(),DesignMetrics.Role.KEYCAP_DETAIL_GAP) : panelDetail ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_DETAIL_GAP) : super.gap(); }
                                 @Override int verticalGap(Component previous, Component child) {
@@ -131,6 +140,13 @@ final class Stacks {
         @Override
         void children(List<ControlRegistry.Control> controls) {
             children = List.copyOf(controls);
+            boolean prompt = ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER;
+            // The Run window's help row is the Run window's, whatever the kit's prompt face (plan 8a, R2).
+            if (view.runWindow() && prompt) { RunWindowPresentation.helpChildren(controls); helpInked = true; }
+            else {
+                if (helpInked) { RunWindowPresentation.releaseHelpChildren(controls); helpInked = false; }
+                if (prompt) context().faces().prompt.children(this, controls);
+            }
             if(((Nodes.Stack)node).role()==Nodes.LayoutRole.SETTINGS_GROUP_HEADER)
                 controls.forEach(c->{if(c instanceof Labels.IconControl icon)icon.tile(context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(context().metrics(), Nodes.IconSize.CONTROL),false);});
             if (embedded && settings) controls.forEach(c -> Composition.label(c, true));
@@ -168,7 +184,10 @@ final class Stacks {
 
     static final class Tile extends JPanel {
         final KitContext context;
-        final DesignMetrics.Role sizeRole;
+        /** The tile's size: the prompt tile, or the Run window's (set by its stack on every refresh). */
+        DesignMetrics.Role sizeRole;
+        /** The Run window's help tile (plan 8a): the accent tile with its edge (set by its stack on every refresh). */
+        boolean run;
 
         Tile(KitContext context) {
             this(context, DesignMetrics.Role.PROMPT_TILE);
@@ -191,15 +210,19 @@ final class Stacks {
         protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
             try {
-                ThemePainting.antialias(g);
-                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL));
-                int radius = ThemePainting.metric(context, DesignMetrics.Role.PROMPT_TILE_RADIUS);
-                g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
-                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_CONTROL));
-                g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radius * 2, radius * 2);
-            } finally {
-                g.dispose();
-            }
+                if (run) RunWindowPresentation.paintTile(this, g);
+                else context.faces().prompt.paintTile(this, g);
+            } finally { g.dispose(); }
+        }
+
+        /** The control-tone tile and its edge (the default face). */
+        void paintDefault(Graphics2D g) {
+            ThemePainting.antialias(g);
+            g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CONTROL));
+            int radius = ThemePainting.metric(context, DesignMetrics.Role.PROMPT_TILE_RADIUS);
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), radius * 2, radius * 2);
+            g.setColor(ThemePainting.color(context, SemanticColor.BORDER_CONTROL));
+            g.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, radius * 2, radius * 2);
         }
     }
 

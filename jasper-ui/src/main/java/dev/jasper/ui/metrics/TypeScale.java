@@ -94,6 +94,8 @@ public final class TypeScale {
             case MONO_SMALL -> new float[] {11, 400};
             case MONO_CAPTION -> new float[] {11, 400};
             case ORDERED_ACTION -> new float[] {12, 400};
+            case RUN_HEADING -> new float[] {11, 600};
+            case RUN_DETAIL -> new float[] {10.5f, 400};
         };
     }
 

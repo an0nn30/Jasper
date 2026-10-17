@@ -1,5 +1,17 @@
 # Enterprise presentation 4b: the classic form faces Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`004866f59..372ae8e67`).** Deviations from this
+> plan's text: Task 2's three (Execution notes X12: `ButtonFace.fades` takes the button; a disabled classic picker is
+> flat; a classic read-only field with an error keeps its error edge) and two (X14: `FieldPolicy.readOnlyText` takes the
+> field's surface; menu buttons, secrets' reveal and copy, and crumbs keep their own treatment under the classic buttons
+> face), Task 5's (X15: the "Port:" label follows its field and stays beside it in a stacked row, a colon label's note
+> starts after the colon, an EXCLUSIVE choice leaving a form card drops its inset, a form-card setting row takes the
+> card's inset; `ClassicGroupsTest` has 13 tests), Task 4's (the folder tabs' baseline runs along the tabs' foot, not the
+> track's, and `ClassicTabsTest` checks it) and Task 7's (the classic prompt's message is left-aligned beside its tile,
+> undoing the centring the reconciler's flow pass gives prompt header text; `ClassicPromptsTest` checks it after an
+> update too). The final review fixes add three declared pairs beyond this plan's `face-pairs.tsv` (the classic prompt's
+> glyph, the pending checkbox's dash and the hovered or pressed primary's label; `docs/STATUS.md` lists the fixes).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains `KitFaces` and the form half of spec 6.4's face pairs, each with its default and classic
@@ -31,26 +43,38 @@ Settings, Credential Vault). The measured targets are in plan 4a's "Mock measure
 ([plan 4a](2026-10-16-enterprise-4a-classic-catalog.md)), whose values (roles, catalogs, fixture kits) this plan reads.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-4`, branch
-`claude/enterprise-classic-catalog`, continuing after plan 4a's last commit. Before Task 1 check that 4a is complete:
+`claude/enterprise-classic-catalog`, continuing from `91153a4ce` (`main`, which holds plans 3a to 3d and 4a). Before
+Task 1 check that 4a is complete:
 
 ```bash
-git log --oneline -1 --grep 'Classic catalog: documentation and status'   # prints 4a's last commit
+git log --oneline -1 --grep 'Classic catalog: documentation and status'   # prints 4a's 46aa55a80
 grep -c 'public static final Kit CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java   # 1
-ls jasper-ui/build/plan4-base/dark-1x | head -1                                                  # the gallery base exists
+git merge-base --is-ancestor 91153a4ce HEAD && echo contains-main                               # contains-main
 ```
 
-If the base directory is gone, re-create it from 4a's last commit with plan 4a Task 1 Step 1 (4a changed no pixel).
-Run every command from the worktree root. Every quoted anchor is post-3a text read at `222969926` with 3a applied
-(3a's branch head `deafed424`), plus 4a's edits; where plans 3b to 3e change a quoted line, the line is quoted in its
-post-3b form and the step says so. The edit scripts stop with a message when their text is not found the stated number
-of times; re-find the quoted text and re-run, never edit around a missing anchor.
+Then, before Task 1's first edit, re-record the gallery base at the current `HEAD` with plan 4a Task 1 Step 1's
+commands (the base left by 4a predates plan 3c's `tables-0-18` fixture, so its `manifest.json`, `sheet-10.png` and
+`tables-0-18.*` differ from today's gallery; Execution notes X1):
+
+```bash
+./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
+rm -rf jasper-ui/build/plan4-base && mkdir -p jasper-ui/build/plan4-base
+cp -R jasper-ui/build/gallery/dark-1x jasper-ui/build/gallery/light-1x jasper-ui/build/plan4-base/
+ls jasper-ui/build/plan4-base/dark-1x | wc -l   # 161: 75 fixtures' PNG and JSON, 10 contact sheets, the manifest
+```
+
+Keep this directory in place through plan 4c. Run every command from the worktree root. Every quoted anchor was re-read
+at `91153a4ce` (`main` with plans 3a to 3d and 4a merged; plan 3e is not on this branch and shares only
+`docs/STATUS.md` with this plan); lines that plans 3b and 3c changed are quoted in their current form. The edit scripts
+stop with a message when their text is not found the stated number of times; re-find the quoted text and re-run, never
+edit around a missing anchor.
 
 ## Global Constraints
 
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md). `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run.
 - Work only in the worktree above on `claude/enterprise-classic-catalog`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to plan 4a's base (`jasper-ui/build/plan4-base/`), and every JSON file is identical except the `class` field of a section's surface, `javax.swing.JPanel` before and `dev.jasper.ui.swing.Cards$SectionSurface` from Task 5 on (Rulings 23; the digest script reads that one name as the class it replaces, and plan 4c adds `ItemLists$ListPane` for `javax.swing.JScrollPane`); no `tools/visual/` pair changes. Classic renders are new files under `jasper-ui/build/classic-faces/` only (inspection output, not committed). Tasks 1 to 7 each prove it; Task 8 proves it once more.
+- Pixel rule: the default look does not change. Every PNG file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to the base (`jasper-ui/build/plan4-base/`, re-recorded at `HEAD` before Task 1; Workspace), and every JSON file is identical except the `class` field of a section's surface, `javax.swing.JPanel` before and `dev.jasper.ui.swing.Cards$SectionSurface` from Task 5 on (Rulings 23; the digest script reads that one name as the class it replaces, and plan 4c adds `ItemLists$ListPane` for `javax.swing.JScrollPane`); no `tools/visual/` pair changes. Classic renders are new files under `jasper-ui/build/classic-faces/` only (inspection output, not committed). Tasks 1 to 7 each prove it; Task 8 proves it once more.
 - Faces never reference `Kit`, `ControlVariants` or (plan 5's) `ChromeSpec`; only `KitFaces` reads the variants outside the kit package; the reconciler references control classes only (spec 3.3, 6.4, 16.1.7).
 - A default face's implementation is the control's former code, moved into a named method on the control and called unchanged; renderers never branch on a look (spec 3.6), they ask their face.
 - Each face declares every pair it repairs (spec 7.3); a classic face paints each declared pair with `ThemePainting.painted`; default faces declare only the two pairs the default look repairs today (the selected segment label and the selected preview caption), so the default look is unchanged.
@@ -164,69 +188,71 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
 
 ## Verified facts
 
-Read at `222969926` with 3a's renames (3a's branch head `deafed424`) and plan 4a's edits.
+Re-read at `91153a4ce` (`main`: plans 3a to 3d and 4a merged; Execution notes, 2026-10-16).
 
-1. `ControlRegistry.Control` holds `view`, `component`, `node` and `context()` (`ControlRegistry.java:85-120`);
+1. `ControlRegistry.Control` holds `view`, `component`, `node` and `context()` (`ControlRegistry.java:92-110`);
    `ControlRegistry.create` builds a `Field` as `NumericControls.Stepper`, `NumericControls.Slider` or
-   `TextFields.FieldControl` by presentation (`:30`), and a `Choice` as `PreviewChoices` or `Choices.ChoiceControl`
-   (`:32`).
-2. `KitContext` has a private constructor taking the kit and a copy constructor (`KitContext.java:22-34`); `kit()` at
-   `:44`.
+   `TextFields.FieldControl` by presentation (`:33`), and a `Choice` as `PreviewChoices` or `Choices.ChoiceControl`
+   (`:35`).
+2. `KitContext` has a private constructor taking the kit (`KitContext.java:24-30`), a copy constructor (`:32-34`) and
+   `KitContext.of` (`:39-42`); `kit()` at `:44`.
 3. `Switches.SwitchButton` holds `context`, `focus`, `position`, `compact`, `error`, `pending`, `onSelection`, `ink`
-   (`Switches.java:66-76`); its `getPreferredSize` and `paintComponent` bodies are at `:78-109`; `ToggleControl.refresh`
-   animates `if (view.motion().enabled())` (`:52`).
-4. `SettingRows.RowControl` mounts `[title, description, control]` (`SettingRows.java:63-67`); `RowLayout.height` and
-   `layoutContainer` handle settings-stacked, detail and plain rows (`:165-258`), and the plain row's floor expression is
-   in `height` (`:186-193`); `paintInset` reserves a switch's halo (`:157-162`).
-5. `ItemLists.ListControl.inlineHeight` returns a toggle's `COMPACT_SWITCH_HEIGHT` or `SWITCH_HEIGHT` (`ItemLists.java:316-321`).
+   (`Switches.java:64-73`); its `getPreferredSize` and `paintComponent` bodies are at `:75-108`; `ToggleControl.refresh`
+   animates `if (view.motion().enabled())` (`:55`).
+4. `SettingRows.RowControl` mounts `[title, description, control]` (`SettingRows.java:66`); `RowLayout` (`:101-259`):
+   `height` and `layoutContainer` handle settings-stacked, detail and plain rows (`:165-189`, `:202-258`), and the plain
+   row's floor expression is in `height` (`:180-187`); `paintInset` reserves a switch's halo (`:157-162`).
+5. `ItemLists.ListControl.inlineHeight` returns a toggle's `COMPACT_SWITCH_HEIGHT` or `SWITCH_HEIGHT` (`ItemLists.java:322-327`).
 6. `Buttons.KitButton` has `private final KitContext context` (`Buttons.java:104`), flags `prompt, panel, fullFooter,
-   orderedAction, panelDetail, circular, hint`, `embedded, contextual, panelRow`, `toggle`, `onSelection`, `ink`,
-   `focus` (`:105-139`), `textRole` and `textColor` (`:191-203`), `fill` and `border` (`:239-249`); `paintComponent`
-   fades a disabled button as one layer (`:315-320`) and `paintFace` computes fill and border, paints the shape,
-   `primaryShadows`, then the glyph and label (`:322-375`). `ButtonControl.refresh` sets the label font from a role
-   chosen by flags (`:65`).
-7. `Choices.ChoiceControl` builds EXCLUSIVE (and, after 3b, TABS) as a `SegmentTrack` of `SegmentButton`s laid out by
-   `SegmentLayout` (`Choices.java:66`, `:132-160`); the UP and DOWN bindings cast the layout to `SegmentLayout`
-   (`:140-141`); the per-option styling block sets the font, foreground, `HueDot` icon and padding (`:152-160`).
-   `HueDot` is a private record (`:216-222`). `SegmentButton.textColor` uses `SurfaceContrast.on` (`:481-485`), and its
-   `getPreferredSize` and `paintComponent` are at `:486-497`; `SegmentTrack.paintComponent` at `:464-474`.
-   `ChoiceCombo.paintComponent` paints the control face (`:382-384`); the arrow button paints the chevron
-   (`:318-330`), which plan 3c colours `bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY`
-   (a bare cell dropdown on a selected row takes the row's ink; 3c plan, the `Choices.java` edit of its Task 3), and
-   before which 3c's `paintComponent` returns early for a bare cell; `PickerButton.paintComponent` paints a rich face or
-   itself and a chevron (`:233-243`).
-8. `PreviewChoices.Tile` is a private inner class; its `getPreferredSize` and `paintComponent` are at
-   `PreviewChoices.java:63-84`, `miniature` at `:89-104`; the tiles are laid out by `GridLayout` (`:45`).
+   orderedAction, panelDetail, circular, hint`, `embedded, contextual, panelRow`, `toggle`, `focus` (`:123-139`),
+   `onSelection`, `ink` and `textRole` (`:188-202`); plan 3b's `noticeGround` and `textColor`, which holds a Notice
+   link to the text floor on its severity's ground before the role's colour (`:203-210`); `fill` and `border`
+   (`:246-256`); `paintComponent` fades a disabled button as one layer (`:322-328`) and `paintFace` computes fill and
+   border, paints the shape, `primaryShadows`, then the glyph and label (`:330-385`). `ButtonControl.refresh` sets the
+   label font from a role chosen by flags (`:73`).
+7. `Choices.ChoiceControl` builds EXCLUSIVE and TABS as a `SegmentTrack` of `SegmentButton`s laid out by
+   `SegmentLayout` (`Choices.java:80`, `:142-172`); the UP and DOWN bindings cast the layout to `SegmentLayout`
+   (`:151-152`); the per-option styling block sets the font, foreground, `HueDot` icon and padding (`:165-172`).
+   `HueDot` is a private record (`:231`). `SegmentButton.textColor` uses `SurfaceContrast.on` (`:535-539`), and its
+   `getPreferredSize` and `paintComponent` are at `:540-552`; `SegmentTrack.paintComponent` at `:517-526`.
+   `ChoiceCombo.paintComponent` returns early for a bare cell (plan 3c), then paints the control face (`:439-442`); the
+   arrow button paints the chevron in `bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY`
+   (`:364-375`, 3c's selected-row ink); `bare()` at `:321`; `PickerButton.paintComponent` paints a rich face or itself
+   and a chevron (`:248-258`).
+8. `PreviewChoices.Tile` is a private inner class (`PreviewChoices.java:53`); its `getPreferredSize` and
+   `paintComponent` are at `:58-84`, `miniature` at `:89-104`; the tiles are laid out by `GridLayout` (`:43`).
 9. `PickerMenus.paintFace(JComponent, Graphics, KitContext, PickerFace, boolean, boolean, boolean, boolean)` paints the
-   rich face (`PickerMenus.java:22-38`); `line` is private and gains a `technical` parameter in 3b Task 2; menu rows
-   reserve and paint a tile (`:127-146`); the footer divider is `BORDER_MENU` (`:69`); the search glyph is set in
-   `refresh` (`:106-107`).
-10. `TextFields.FieldControl` holds `label`, `error`, `leading` (`TextFields.java:21`); `refresh` sets the input's
-    foreground to `text.primary`, the leading glyph and its visibility (`:265-294`); 3b Task 1 makes `readOnly` a
-    descriptor field (`Nodes.Field.readOnly()`), read in `refresh` beside `surface.setEnabled(component.isEnabled());`.
-    `FieldSurface.paintComponent` paints the field (`:428-435`).
-11. `Cards.CardControl.refresh` pads FORM cards by `CARD_PADDING + HAIRLINE` (`Cards.java:28-45`); `children` embeds
-    EXCLUSIVE labels and mounts children (`:47-60`); `CardSurface.paintComponent` paints the rounded card and the
-    settings dividers (`:126-146`); `SectionControl` is a plain `JPanel` with a SECTION_LABEL title over its body
-    (`:150-176`).
-12. `FormRows.RowControl` mounts `[label, caption, controls…]` (`FormRows.java:56-70`); `RowLayout.labelWidth()` is
-    `FORM_LABEL_WIDTH` (`:80-82`), `trailing` sizes component 3 (`:88-94`).
+   rich face (`PickerMenus.java:23-54`); `line` is private with 13 parameters, `technical` last (`:55`); menu rows
+   reserve and paint a tile (`:141-150`); the footer divider is `BORDER_MENU` (`:74`); the search glyph's border is set
+   in `refresh` (`:111`).
+10. `TextFields.FieldControl` holds `label`, `error`, `leading` (`TextFields.java:21`); `refresh` (`:273`) sets
+    `input.setEditable(component.isEnabled() && !field.readOnly()); surface.setEnabled(component.isEnabled());`
+    (`:276`), the input's foreground to `text.primary` (`:287`), the leading glyph (`:306`) and its visibility (`:316`);
+    `FieldSurface` (`:388`) holds `port` (`:397`) and paints the field in `paintComponent` (`:449-456`).
+11. `Cards.CardControl.refresh` pads FORM cards (`Cards.java:29-47`, the border at `:37`); `children` embeds EXCLUSIVE
+    labels and mounts children (`:49-60`); `CardSurface.paintComponent` paints the rounded card and the settings
+    dividers (`:138-157`); `SectionControl` is a plain `JPanel` with a SECTION_LABEL title over its body (`:160-187`).
+12. `FormRows.RowControl` mounts `[label, caption, controls…]` (`FormRows.java:16-70`, `Stacks.mount` at `:62`);
+    `RowLayout.labelWidth()` is `FORM_LABEL_WIDTH` (`:79-81`), `trailing` sizes component 3 (`:87-93`).
 13. `NumericControls.Stepper` puts `minus` WEST and `plus` EAST on the field surface with a centred `ValueLayout`
-    (`NumericControls.java:13-56`); `button(...)` paints "−" and "+" (`:57-82`); `refresh` sets the value to LABEL and
-    the unit to `text.tertiary` (`:83-102`).
-14. `Stacks.StackSurface` holds `joined` and `route` (`Stacks.java:20-21`); `StackControl.refresh` sets them and the
-    layout, PROMPT_HEADER using `PromptLayout` (`Stacks3a :95-110`); `childParent` puts a PROMPT_HEADER's Icon in the
-    `Tile` (`:123-129`); `Tile.paintComponent` paints `surface.control` with a `border.control` edge at
-    `PROMPT_TILE_RADIUS` (`:189-202`).
-15. `Labels.IconControl.refresh` paints a glyph in the row ink when `inked` (`Labels.java:168-180`); `InteractiveRows.Ink`
-    has `ACCENT` and `SELECTION` (`InteractiveRows.java:1250-1262`).
-16. `PaintedContrastTest.DEFAULT_PAIRS` declares "selected segment label" `(TEXT_PRIMARY, SEGMENT_SELECTED_BG, TEXT)`
-    and "selected preview caption" `(TEXT_PRIMARY, SURFACE_CARD, TEXT)` (`PaintedContrastTest.java:46-62`).
+    (`NumericControls.java:13-50`); `button(...)` paints "−" and "+" with its `cue` focus (`:51-74`); `refresh` sets
+    the value to LABEL and the unit to `text.tertiary` (`:75-93`).
+14. `Stacks.StackSurface` holds `joined` and `route` (`Stacks.java:21`); `StackControl.refresh` sets them and the
+    layout, PROMPT_HEADER using `PromptLayout` (`:91-121`, the route flag at `:95`, `PromptLayout` at `:103`);
+    `childParent` puts a PROMPT_HEADER's Icon in the `Tile` (`:124-130`); `children` starts at `:132`;
+    `Tile.paintComponent` paints `surface.control` with a `border.control` edge at `PROMPT_TILE_RADIUS` (`:190-203`).
+15. `Labels.TextControl` (`Labels.java:100`) holds `override` and `settings` (`:106-108`) and ends `refresh` with
+    `centeredLeading` (`:143-145`); `Labels.IconControl.refresh` paints a glyph in the row ink when `inked`
+    (`:161-180`); `InteractiveRows.Ink` has `ACCENT` and `SELECTION` (`InteractiveRows.java:1268-1270`).
+16. `PaintedContrastTest.DEFAULT_PAIRS` (`PaintedContrastTest.java:46`) declares "selected segment label"
+    `(TEXT_PRIMARY, SEGMENT_SELECTED_BG, TEXT)` and "selected preview caption" `(TEXT_PRIMARY, SURFACE_CARD, TEXT)`
+    (`:58-62`), then plan 3b's Notice and Properties pairs; `palettes()` follows the list (`:90`).
 17. `StaticDefaultTest.classFiles(Path, int)` reads a jar's class files and is package-visible to other
-    `dev.jasper.app.architecture` tests (`StaticDefaultTest.java:154-162`); jasper-app's tests get `jasper.appJar` and
-    `jasper.uiJar` system properties.
+    `dev.jasper.app.architecture` tests (`StaticDefaultTest.java:157`); jasper-app's tests get `jasper.appJar` and
+    `jasper.uiJar` system properties (`jasper-app/build.gradle.kts:95-98`).
 18. `KitViewTest.find(Component, String, Class)` and `release(KitContext)` are static helpers other swing tests import
-    (`KitViewTest.java:24-39`); `KitView.control(id)` is package-private (`KitView.java:344`).
+    (`KitViewTest.java:24-39`); `KitView.control(id)` is package-private (`KitView.java:353`); `ViewReconciler`
+    resets a SettingRow's `panelFooter` at `:94` and a TextControl's `override` at `:116`.
 
 ## File structure
 
@@ -256,7 +282,7 @@ and variant-read tests and `PaintSpecTest` start here.
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/Face.java`, `KitFaces.java`, `ClassicGlyphs.java`, `ToggleFace.java`, `DefaultToggleFace.java`, `ClassicToggleFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitContext.java:22-44`, `ThemePainting.java:20`, `Switches.java:24-110`, `SettingRows.java:111-258`, `ItemLists.java:316-321`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitContext.java:22-44`, `ThemePainting.java:27`, `Switches.java:52-108`, `SettingRows.java:101-259`, `ItemLists.java:322-327`
 - Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java` (`capture`)
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicTogglesTest.java`, `PaintSpecTest.java`, `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv`
 - Create: `jasper-app/src/test/java/dev/jasper/app/architecture/StrategyIsolationTest.java`, `VariantReadTest.java`
@@ -1091,7 +1117,7 @@ Run from the worktree root:
 ```bash
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 python3 -I - <<'PY'
-"""The headless gallery matches plan 4a's base: every PNG byte-identical, every JSON identical once the class names of
+"""The headless gallery matches the plan-4 base: every PNG byte-identical, every JSON identical once the class names of
 plan 4's two component substitutions (4b's Cards$SectionSurface for a section's JPanel, 4c's ItemLists$ListPane for an
 item list's JScrollPane) are read as the classes they replace (pixel rule)."""
 import hashlib, pathlib, sys
@@ -1150,7 +1176,7 @@ with a grey read-only face (Rulings 10).
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/ButtonFace.java`, `DefaultButtonFace.java`, `ClassicButtonFace.java`, `FieldPolicy.java`, `DefaultFieldPolicy.java`, `ClassicFieldPolicy.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Buttons.java:65-73,191-203,315-345`, `Choices.java:225-243,318-330,382-384`, `PickerMenus.java:22-56,69,106-107,127-146`, `TextFields.java:254,265,294,365-372,428-435`, `Stacks.java:20-21,95`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Buttons.java:73,203-210,322-350`, `Choices.java:248-258,321,364-375,439-442`, `PickerMenus.java:23-55,74,111,141-150`, `TextFields.java:276,287,316,397,449-456`, `Stacks.java:21,95`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicButtonsTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (rows appended)
 
@@ -1193,7 +1219,6 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.*;
 import javax.swing.*;
-import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.Test;
 
 /** Spec 5.2's buttons point and 6.4's classic button and field details. */
@@ -1328,7 +1353,7 @@ class ClassicButtonsTest {
                 assertThat(((TextFields.FieldControl) plain.control("search")).leading.isVisible()).isTrue();
                 var control = (TextFields.FieldControl) view.control("folder");
                 assertThat(at(paint(control.surface), 3, control.surface.getHeight() / 2)).isEqualTo(ThemePainting.role(classic, DerivedColor.SURFACE_TABLE_HEADER));
-                assertThat(((JTextComponent) control.input).getForeground()).isEqualTo(classic.faces().fields.readOnlyText(classic));
+                assertThat(control.input.getForeground()).isEqualTo(classic.faces().fields.readOnlyText(classic));
             } finally { release(classic); release(standard); }
         });
     }
@@ -1734,10 +1759,13 @@ edit(S + "KitFaces.java", [
 edit(S + "Buttons.java", [
     ('''            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));''',
      '''            button.setText(value.label()); button.setFont(ThemePainting.font(context(), context().faces().buttons.label(value.kind(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL)));''', 1),
-    ('''        /** Final paint color; specialized shared controls may apply a surface-specific readability floor. */
-        Color textColor(boolean hover) { return ThemePainting.color(context, textRole(hover)); }''',
-     '''        /** Final paint color; specialized shared controls may apply a surface-specific readability floor. */
-        Color textColor(boolean hover) { return context.faces().buttons.text(this, hover); }
+    # Post-3b text: 3b's Notice link floor stays ahead of the face under both kits.
+    ('''                return SurfaceContrast.painted(context.theme(), Notices.link(noticeGround, hover));
+            return ThemePainting.color(context, textRole(hover));
+        }''',
+     '''                return SurfaceContrast.painted(context.theme(), Notices.link(noticeGround, hover));
+            return context.faces().buttons.text(this, hover);
+        }
         /** The context this button paints in. */
         KitContext context() { return context; }''', 1),
     ('''            // Disabled is the whole button at disabledOpacity, faded as one layer.
@@ -1889,7 +1917,9 @@ PY
 
 The arrow button's anchor is its post-3c text (3c gives the chevron the bare cell's ink); `arrowRole()` keeps that
 colour for the default face, and the classic face uses the same ink while the cell is bare, so 3c's selected-row
-dropdown paints as before. `KitButton.paintFace` now computes `hover` and `focused`, asks `paintKitFace` (the buttons face), sets the label's font and
+dropdown paints as before. `KitButton.textColor`'s anchor is its post-3b text: a Notice's link keeps 3b's text floor
+on its severity's ground ahead of the face under both kits, and every other label asks the buttons face (the default
+face returns the role's colour, as before; Execution notes X2). `KitButton.paintFace` now computes `hover` and `focused`, asks `paintKitFace` (the buttons face), sets the label's font and
 colour and calls `paintContent`, which holds the former glyph, label and recorder drawing unchanged; `paintRaised` holds
 the former fill, border, shape and `primaryShadows` lines unchanged.
 
@@ -1936,7 +1966,7 @@ with its hue as a 7 px swatch, and thumbnails above their radios (Rulings 12).
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/ChoiceFace.java`, `DefaultChoiceFace.java`, `ClassicRadiosFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Choices.java:66,132-160,216-222,464-497`, `PreviewChoices.java:23-104`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Choices.java:80,142-172,193,231,514-552`, `PreviewChoices.java:43-104`
 - Modify: `jasper-ui/src/test/java/dev/jasper/ui/swing/ControlRolesTest.java:37`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicChoicesTest.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java:46-62`
@@ -2797,7 +2827,7 @@ PY
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.ClassicTabsTest'`
-Expected: FAIL. The classic tabs are still segments: "expected: 26 but was: …" on the tab height.
+Expected: FAIL. The classic tabs are still segments: "expected: 26 but was: 36" on the tab height.
 
 - [ ] **Step 3: Add the folder tabs face**
 
@@ -2968,7 +2998,7 @@ field column (Rulings 18).
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/GroupFace.java`, `DefaultGroupFace.java`, `ClassicGroupFace.java`, `LabelPolicy.java`, `DefaultLabelPolicy.java`, `ClassicLabelPolicy.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Cards.java:28-176`, `FormRows.java:17-203`, `SettingRows.java:20-67,111-258`, `ViewReconciler.java:94`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Cards.java:29-187`, `FormRows.java:16-203`, `SettingRows.java:19-66,101-259`, `ViewReconciler.java:94`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicGroupsTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (rows inserted in `KitFaces` order)
 
@@ -3737,7 +3767,7 @@ spinner (Rulings 20).
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/StepperFace.java`, `DefaultStepperFace.java`, `ClassicStepperFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `NumericControls.java:14-102`, `ControlRegistry.java:30`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `NumericControls.java:13-93`, `ControlRegistry.java:33`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicSpinnersTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (rows inserted in `KitFaces` order)
 
@@ -3764,7 +3794,6 @@ import dev.jasper.ui.testsupport.*;
 import dev.jasper.ui.theme.*;
 import java.util.*;
 import javax.swing.*;
-import javax.swing.text.JTextComponent;
 import org.junit.jupiter.api.Test;
 
 /** Spec 5.2's stepper point: the classic face is a spinner, and a SLIDER draws the same. */
@@ -3804,7 +3833,7 @@ class ClassicSpinnersTest {
                 assertThat(view.control("opacity")).isInstanceOf(NumericControls.Stepper.class);
                 assertThat(plain.control("opacity")).isInstanceOf(NumericControls.Slider.class);
                 find(view, "opacity.minus", JButton.class).doClick(0);
-                assertThat(((JTextComponent) ((TextFields.FieldControl) view.control("opacity")).input).getText()).isEqualTo("33");
+                assertThat(((TextFields.FieldControl) view.control("opacity")).input.getText()).isEqualTo("33");
             } finally { release(classic); release(standard); }
         });
     }
@@ -4109,7 +4138,7 @@ message.
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/swing/PromptFace.java`, `DefaultPromptFace.java`, `ClassicPromptFace.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Stacks.java:102-160,189-202`, `Labels.java:105-145` (`TextControl.styled`), `ViewReconciler.java:115`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java`, `Stacks.java:102-133,190-203`, `Labels.java:107-145` (`TextControl.styled`), `ViewReconciler.java:116`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/ClassicPromptsTest.java`
 - Modify: `jasper-ui/src/test/resources/dev/jasper/ui/swing/face-pairs.tsv` (one row appended)
 
@@ -4422,7 +4451,7 @@ clears before each update.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' --tests 'dev.jasper.ui.gallery.*' --continue`
-Expected: PASS (`ClassicPromptsTest` 2 tests; `HeroCompositionTest`, `FormsTest` unchanged; `PaintSpecTest` with the
+Expected: PASS (`ClassicPromptsTest` 2 tests; `PromptCompositionTest`, `FormsTest` unchanged; `PaintSpecTest` with the
 complete `face-pairs.tsv`; `StrategyIsolationTest` in jasper-app is run in Task 8).
 
 - [ ] **Step 5: Prove the default gallery unchanged**
@@ -4468,13 +4497,16 @@ Expected: `changed: none`; BUILD SUCCESSFUL (`StrategyIsolationTest` finds every
 
 Read each document first and keep its voice; find the paragraph by its text; add no section.
 
-- `docs/ui-architecture.md`: where it describes the swing controls and the kit seam, add: "A structurally different
-  control draws through a face (`KitFaces`, one per control point, chosen once from the kit's `ControlVariants`); faces
+- `docs/ui-architecture.md`: after the sentence "Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit
+  and selects a route.", add: "A structurally different control draws through a face (`KitFaces`, one per control point, chosen once from the kit's `ControlVariants`); faces
   declare the pairs they paint and never read the kit. The default faces call the controls' own code."
-- `docs/ui-maintenance.md`: where it lists the frozen tables, add `face-pairs.tsv` ("every face's declared pairs"); where
-  it explains a renderer change, add one sentence: "Change a control's look through its face; a classic face paints
-  every declared pair with `ThemePainting.painted`."
-- `jasper-ui/README.md`: where it lists the swing package's parts, name `KitFaces` and the faces.
+- `docs/ui-maintenance.md`: after "A painter that repairs a pair declares it in `PaintedContrastTest`." (the end of the
+  paragraph that lists the frozen tables), add: "A face declares the pairs it paints in `pairs()`, and a change to them
+  edits `face-pairs.tsv` (every face's declared pairs) in the same commit. Change a control's look through its face; a
+  classic face paints every declared pair with `ThemePainting.painted`."
+- `jasper-ui/README.md`: after "`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies
+  host-owned values.", add one sentence naming `KitFaces` (one face per control point, chosen from the kit's
+  `ControlVariants`) and the eight form points' faces (the field policy built with the buttons point).
 - `docs/plugin-ui.md`: in plan 3a's "`Toggle` (a boolean, drawn as a switch or a checkbox)" paragraph (or the controls
   list), add only what plugin authors see: "Under the classic look an EXCLUSIVE choice draws radios, TABS draws folder
   tabs, a STEPPER or SLIDER draws a spinner, and a Section with its Card draws a titled box; the descriptors and events
@@ -4482,8 +4514,9 @@ Read each document first and keep its voice; find the paragraph by its text; add
 
 - [ ] **Step 3: Write the STATUS entry**
 
-Insert a new entry at the top of `docs/STATUS.md`, in the style of the plan-1 and plan-2 entries, filling the bracketed
-values from Step 4 and `git log --oneline`:
+Insert a new entry at the top of `docs/STATUS.md`, in the style of plan 4a's entry, filling the bracketed values from
+Step 4 and `git log --oneline` (if plan 3e's entry has reached this branch's `docs/STATUS.md` by then, insert above it;
+otherwise the two are reconciled at merge):
 
 ```text
 **Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
@@ -4492,8 +4525,8 @@ values from Step 4 and `git log --oneline`:
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). `KitFaces` chooses one face per control
 point from the kit's `ControlVariants`, once per `KitContext`; each control asks its face, and each default face calls
 the control's former code, moved into a named method, so the default look is pixel-identical (the headless gallery for
-Slate Cobalt Dark and Light matches plan 4a's base: every PNG byte-identical, the JSON differing only in a section's
-`class`, now `Cards$SectionSurface`, Rulings 23). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
+Slate Cobalt Dark and Light matches the plan-4 base re-recorded at `91153a4ce`: every PNG byte-identical, the JSON
+differing only in a section's `class`, now `Cards$SectionSurface`, Rulings 23). The form half of spec 6.4's pairs: the toggle (switch, or a 13 px
 checkbox leading its label, never animated), the buttons with the field policy (raised, or the classic gradient with an
 accent primary, flat disabled faces, flat toolbar ghosts, dropdown and picker faces ending with a drawn ▼, picker rows
 without tiles, no SEARCH, PATH or PORT glyphs, grey read-only fields), the exclusive choice (segments, or a wrapping row
@@ -4512,7 +4545,25 @@ the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labe
 label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
 padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
 notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
-gallery. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
+gallery. Deviations (Task 2's and Task 5's reviews; the plan's Execution notes X12, X14 and X15): `ButtonFace.fades`
+takes the button, so the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's
+Task 3 edits its condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a
+classic read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's
+surface, so a transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a
+strip's icon-only menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface
+stands; a secret's reveal and copy and each crumb are flat until hovered wherever their control stands
+(`KitButton.inner`); a "Port:" label hides and enables with its field, stays beside it in a stacked row and is its
+`labelFor`; a colon label's note starts after the colon; an EXCLUSIVE choice that leaves a form card drops its inset; a
+form-card setting row takes the card's inset in place of its own padding and dependent indent, so its title and control
+sit on the FormRows' columns in FORM, MIXED and SETTINGS cards. Residuals: 4a's flat focused, hovered or pressed classic
+native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
+classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
+`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
+disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13); a
+classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); spec 6.4's face table
+still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
+login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
+the full kit matrix and the mock comparison.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
@@ -4544,7 +4595,7 @@ Insert below this plan's title:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this
-> plan's text: [none, or each one].
+> plan's text: [Task 2's three (Execution notes X12) and two (X14), Task 5's (X15), then each other one].
 ```
 
 - [ ] **Step 6: Commit**
@@ -4560,3 +4611,153 @@ Classic form faces: documentation and status
 Co-Authored-By: Claude <noreply@anthropic.com>
 MSG
 ```
+
+## Execution notes (2026-10-16)
+
+Pre-flight for `superpowers:subagent-driven-development`, run on `claude/enterprise-classic-catalog` at `91153a4ce`
+(`main`, with plans 3a to 3d and 4a merged, and nothing else). Every anchor, quoted text, path, signature and line
+number above was re-read against that code, and the text above now carries the current ones. Evidence without Gradle:
+every `Create` block and edit script of Tasks 1 to 7 was replayed in order on a `git archive` copy of `HEAD`, and each
+script found its text the stated number of times (after X2). The replay was also stopped after each task: at every stop
+jasper-ui's main sources, test fixtures and tests compiled with the JBR's `javac`, the whole jasper-ui suite passed
+under a JUnit launcher (705 tests at `HEAD`; 713, 721, 727, 729, 734, 737 and 739 after Tasks 1 to 7, 0 failures,
+which matches each task's new test count), and `KitGallery.main` for Slate Cobalt Dark and Light at 1x matched a fresh
+render of `HEAD` under Task 1 Step 5's digest script (`changed: none`, 161 files per theme). On the final state,
+`javadoc -Xdoclint:all -Xdoclint:-missing` reported nothing on jasper-ui's main sources, `javac -Xlint:all` added only
+`serial` warnings (the build turns `serial` off), and the AGENTS.md hygiene scan found no bad character in the 58 new or
+changed files. In jasper-app, `StrategyIsolationTest` and `VariantReadTest` compiled with `StaticDefaultTest` and passed
+(4 tests) against the patched jasper-ui jar and the worktree's last-built `jasper-app.jar`, and the patched
+`PaintedContrastTest` compiled and passed against the worktree's last-built jasper-app classes. Not run here:
+`ThemeMigrationCoverageTest`, `verifyUiArchitecture`, `verifyApplicationArchitecture`, the Gradle gallery task and
+`./gradlew check`; the executor's runs are the evidence for those.
+
+### Shared files and interfaces
+
+| Pair | What they share | Agree? | Ruling |
+|---|---|---|---|
+| Task 1 and Tasks 2 to 7 | `KitFaces.java`: each task's anchors (the field block, the end of the previous `switch`, `all()`) are the text the task before it wrote | Yes, in order | X3 |
+| Tasks 1 to 7 | `face-pairs.tsv`: Task 1 writes it; Tasks 2 and 7 append; Task 3 puts the default rows first and the classic choice rows after the toggle's; Task 4 replaces the tabs point's classic default row; Tasks 5 and 6 anchor on rows Tasks 4 and 5 wrote. `PaintSpecTest` freezes the order of `KitFaces.all()`, which each task extends to match | Yes: `PaintSpecTest` passed after every task | X3 |
+| Task 1 and Task 5 | `SettingRows.java`: Task 5's `height`, `preferredLayoutSize` and `layoutContainer` anchors contain Task 1's leading-row lines | Yes, Task 5 after Task 1 (its Consumes says Tasks 1 to 3) | X3 |
+| Task 2 and Task 3 | `Buttons.KitButton`'s `paintKitFace`, `fadesDisabled`, `paintRaised` and `textColor` (Task 2), which `Choices.SegmentButton` overrides or bypasses (Task 3); their `Choices.java` anchors are disjoint | Yes | X3 |
+| Task 2 and Task 7 | `Stacks.java`: Task 2 the `StackSurface` field and `refresh`'s route line (`:21`, `:95`); Task 7 the PROMPT_HEADER layout (`:102-103`), `children` (`:132`) and `Tile.paintComponent` (`:190-203`) | Yes, disjoint | none |
+| Task 5 and Task 7 | `ViewReconciler.java`'s resets (`:94`, `:116`); both reset control fields only, which `StrategyIsolationTest` allows | Yes, disjoint | none |
+| Task 1 and Task 3 | `PaintedContrastTest`: Task 1 runs it unchanged; Task 3 reads its two default repairs from `KitFaces.declared(Kit.DEFAULT)` | Yes | none |
+| Task 1 and Task 8 | `migration.csv` (Task 1's two eight-field rows, appended) and the documents Task 8 edits | Yes | X7 |
+| Workspace and Tasks 1 to 8 | The gallery base, compared at every Step 5 and in Task 8 Step 1 | Only once re-recorded at `HEAD` | X1 |
+| Task 2 and plan 3b | `KitButton.textColor`: 3b added the Notice link floor to it | No: the anchor was the pre-3b one-line method | X2 |
+| Task 2 and plan 3c | The `ChoiceCombo` arrow's bare-cell ink and `paintComponent`'s bare-cell return; `ClassicButtonsTest`'s use of `TableVocabularyTest.groups` and `combo` | Yes: already quoted post-3c | none |
+| This plan and plan 3e (parallel) | `docs/STATUS.md` only: 3e's branch (`claude/enterprise-default-look`, `e9cffab2d`) changes no file Tasks 1 to 7 change and nothing in jasper-ui | Yes | X6 |
+| This plan and plan 5a (parallel) | 5a's precondition lists `KitFaces.java`, `ClassicButtonFace.java` and `ClassicFolderTabsFace.java`; `VariantReadTest` allows `dev.jasper.app.presentation`, where 5a's `KitParser` reads `ControlVariants`; `StrategyIsolationTest` forbids 5a's `dev.jasper.app.presentation.ChromeSpec` in faces | Yes: the names match | X6 |
+| This plan and plan 4c (next on this branch) | 4c consumes `Face`, `KitFaces`' fields and `all()` order, `ThemePainting.role` and `painted`, `ClassicGlyphs.down` and `right`, `KitButton.paintContent`, `StackSurface.role`, the prompt face's call at the start of `StackControl.children`, `TextControl.styled`, `KitFixtures.capture`, the final `face-pairs.tsv` rows (4c's verified fact 17), the digest script's two substitutions and the base; 4c's Task 3 edits `ClassicButtonFace.paintFace` and `text` so a side-column LINK draws as a standard button, and since Task 2's review `ClassicButtonFace.fades(KitButton)` repeats their condition | Yes: each is produced here under that name; `fades` only once 4c's Task 3 edits it too (4c's Execution notes) | X1, X12 |
+
+### Each task against itself
+
+| Task | Finding | Ruling |
+|---|---|---|
+| Workspace | 4a's checks hold (`46aa55a80`; one `Kit.CLASSIC`); the base left by 4a predates 3c's `tables-0-18` fixture | X1 |
+| 1 | Anchors hold; `ClassicTogglesTest` 5 and `PaintSpecTest` 3 pass on the replay; its Files line numbers had moved | X4 |
+| 2 | The `textColor` anchor was pre-3b; `ClassicButtonsTest` 8 pass once it is current | X2 |
+| 3 | Anchors hold; `ClassicChoicesTest` 6 and the patched `PaintedContrastTest` pass | none |
+| 4 | Step 2's red is measured: "expected: 26 but was: 36" | X5 |
+| 5 | Anchors hold; `ClassicGroupsTest` 5 pass; spec 6.4's TFTP read-only field in the control column is not in this plan | X10 |
+| 6 | Anchors hold; `ClassicSpinnersTest` 3 pass | none |
+| 7 | Anchors hold; `ClassicPromptsTest` 2 pass; the face follows spec 5.2's amended prompt row, while 6.4's face table still says "small glyph, plain title"; Step 4 named `HeroCompositionTest`, which 3a renamed `PromptCompositionTest` | X5, X8 |
+| 8 | `jasper-ui/README.md` has no list of the swing package's parts and `docs/ui-architecture.md` no paragraph on the swing controls; the form points are eight, not seven; 4a's STATUS residual for `ButtonFace` (flat focused, hovered or pressed native buttons) was not addressed | X7, X9 |
+| 2, 6 (tests) | `javac -Xlint:all` reports two redundant `JTextComponent` casts (`input` is already one) and a third on `ClassicGroupsTest`'s `EmptyBorder` cast, which `getBorderInsets()` needs | X11 |
+
+### Rulings
+
+- **X1. Re-record `jasper-ui/build/plan4-base` at `HEAD` before Task 1's first edit, and keep it through plan 4c** — the
+  base 4a left predates plan 3c's `tables-0-18` fixture and differs from a render of `91153a4ce` in eight files
+  (`manifest.json`, `sheet-10.png`, `tables-0-18.json` and `.png`, in each theme), while the replay of every task
+  matched a fresh render of `HEAD` — cost if wrong: every Step 5 reports those eight files, or a base taken after an
+  edit hides a real change.
+- **X2. Task 2's `textColor` edit keeps 3b's Notice link floor ahead of the face and asks the buttons face for every
+  other label** — 3b put the floor into `textColor` after this plan was written; the default face's `text` returns
+  the role's colour, the former last line, so the default look is unchanged (replayed gallery identical) and a Notice
+  link keeps its floor under both kits — cost if wrong: the script stops on the old anchor, or classic Notice links
+  lose their floor.
+- **X3. Tasks run in order 1 to 8, one commit each, as written** — `KitFaces`, `face-pairs.tsv` and `SettingRows`
+  anchors chain from task to task, and the replay applied them in that order with every intermediate state compiling,
+  passing and pixel-identical — cost if wrong: a script stops on a missing anchor.
+- **X4. The Verified facts and every Files line number carry `91153a4ce`'s lines; their meaning is unchanged** — plans
+  3b to 3d and 4a moved them; the scripts match by text, so lines only guide reading — cost if wrong: an executor
+  opens a file a few lines off.
+- **X5. Two expected outputs corrected: Task 4 Step 2's red reads 36, and Task 7 Step 4 names `PromptCompositionTest`**
+  — the first measured on the replay, the second 3a's rename — cost if wrong: none.
+- **X6. Plans 3e and 5a are not merged here and this plan does not adapt to them** — 3e shares only
+  `docs/STATUS.md` (Task 8 inserts above 3e's entry if it has arrived, else the merge keeps both) and 5a's branch holds
+  plans only, whose plan-4 names this plan produces — cost if wrong: one `docs/STATUS.md` hunk at merge.
+- **X7. Task 8's documentation edits target text that exists** — after the `KitContext` sentence of
+  `docs/ui-architecture.md`, after the `PaintedContrastTest` sentence that ends `docs/ui-maintenance.md`'s frozen-table
+  paragraph, after the `KitContext.of` sentence of `jasper-ui/README.md`, and in `docs/plugin-ui.md`'s `Toggle`
+  paragraph (`:57`); the points are eight — cost if wrong: wording only.
+- **X8. Task 7 follows spec 5.2's amended prompt row** (no 54 px tile and body title; the title goes to the dialog
+  header strip, plan 6; a 30 px accent tile with an on-accent glyph beside the message), **and records 6.4's face-table
+  row ("small glyph, plain title") as a residual instead of editing the spec** — the amendment is the later, binding
+  text and spec edits are outside this plan — cost if wrong: a reader of 6.4's table expects a small glyph.
+- **X9. 4a's residual stays open for plan 4c: a focused, hovered or pressed classic native (FlatLaf) button paints
+  flat** — the classic `ButtonFace` paints kit buttons, which keep the gradient in every state (the edge darkens to
+  `border.hover` on hover, the gradient reverses while pressed, focus adds the ring), but no face reaches FlatLaf's
+  `Button.focusedBackground`, `hoverBackground` and `pressedBackground` keys; Task 8's STATUS entry says so — cost if
+  wrong: native buttons in app dialogs stay flat on hover until 4c.
+- **X10. TFTP's read-only login field in the control column (spec 6.4's composition rules) is left to plan 10's File
+  Server composition** — the label policy insets only an unlabelled EXCLUSIVE choice (Rulings 18), and the spec's own
+  remedy for such a field is the composition's empty-label FormRow (as for Add Host) — cost if wrong: the field sits
+  flush left under the classic kit until plan 10.
+- **X11. The two redundant `JTextComponent` casts and their imports are dropped from `ClassicButtonsTest` and
+  `ClassicSpinnersTest`; `ClassicGroupsTest`'s `EmptyBorder` cast stays** — the build compiles with `-Xlint:all`, and
+  without the third cast `getBorderInsets()` does not compile — cost if wrong: none.
+- **X12. Task 2's first review round deviates from its text in three places, which Task 8's STATUS entry and banner
+  list** — `ButtonFace.fades` takes the button (`boolean fades(Buttons.KitButton)`, where Produces names `fades()`): the
+  classic face fades as one layer the buttons it leaves to the default treatment (those `paintFace` hands to
+  `paintRaised`, and those on a selected row, whose labels `text` keeps in their role), so a disabled LINK still fades
+  and a disabled button whose face draws its own state paints its glyph at 0.42; a disabled classic picker is flat like
+  a disabled button (`surface.tableHeader`, a `border.divider` edge, its line and ▼ at 0.42), not its gradient at
+  `PICKER_DISABLED_PERCENT`; a classic read-only field with an error keeps its `border.error` edge. The `fades`
+  condition repeats `paintFace`'s and `text`'s, and plan 4c's Task 3 changes those two to
+  `b.kind == Nodes.ButtonKind.LINK && !b.sideColumn`, so plan 4c's Execution notes (E1) give `fades` the same edit and
+  a test — cost if wrong: after 4c a disabled side-column LINK add action is faded twice, its label near 0.18 alpha on a
+  faded flat fill (Rulings 6, spec 6.4).
+- **X13. Two disabled faces are faded over their flat faces; Task 8's STATUS entry lists them as residuals** — a
+  disabled classic dropdown without a rich face paints its flat face, and `ChoiceCombo.paint` then fades the closed
+  face to 0.42 (measured with the Enterprise fixture kit on Slate Cobalt Light's `surface.app`: fill `#ECEFF1`, edge
+  `#E2E6EA`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`); a disabled SECONDARY or PRIMARY button on a
+  selected row draws its flat face with its label in its kind's role (`text.strong.secondary`, `text.onAccent`) and
+  fades as one layer, because `text` and `fades` leave buttons on a selected row to the default treatment. Routing the
+  combo's fade through the buttons face (as `fades` does for buttons) is later work; handing buttons on a selected row
+  to `paintRaised` instead would give them the default face (no gradient; the primary's inset line and drop) — cost if
+  wrong: two disabled faces paler than a disabled button.
+- **X14. Task 2's third review round deviates from its text in two places, which Task 8's STATUS entry and banner
+  list** — `FieldPolicy.readOnlyText` takes the field's surface (`Color readOnlyText(TextFields.FieldSurface)`, where
+  Produces names `readOnlyText(KitContext)`): the classic policy leaves a transparent read-only field on its default
+  surface, so its text keeps `text.primary` instead of the muted text guarded against a grey face it never paints
+  (`TextFields` now sets the surface's `transparent` before its text colour). And composite controls keep their own
+  treatment under the classic buttons face: a menu button's parts paint only their focus ring under both faces
+  (`Menus.Part.paintKitFace` calls `paintRaised`; their fill and border are null), its face honours `borderless` (a
+  strip's icon-only menu has no edge), and its parts and face stand where its surface does (`KitButton.placement()`; the
+  face takes the parts' `panel` flag), so a ghost menu in a toolbar row or a panel header is flat until hovered; a
+  secret's reveal and copy and every crumb set `KitButton.inner`, which `ClassicButtonFace.flat` reads as flat until
+  hovered wherever the control stands, the current crumb keeping `text.strong.secondary`. Rulings 7's places stand
+  otherwise, and `ChoiceCombo.paint` names X13 at its fade — without them the menu parts drew a second gradient and an
+  edge where the main part meets the arrow, a reveal drew a boxed button inside its field and the crumbs boxed
+  buttons, and a transparent read-only field drew muted text — cost if wrong: one accessor and one flag on `KitButton`.
+- **X15. Task 5's review rounds deviate from its text as follows, which Task 8's STATUS entry and banner list** — round
+  1: the "Port:" label hides with its field and is the field's `labelFor`; a stacked row keeps the label beside its
+  field on the field's line (`RowLayout.stackedHeight` and a stacked branch in `layoutContainer`), `stacked` and
+  `trailing` count the label, and the trailing field's width never goes negative; a colon label's title note starts
+  after the colon; `ViewReconciler.resetComposition` clears an EXCLUSIVE `ChoiceControl`'s border, so a choice that
+  leaves a form card drops its field-column inset; `CardControl.children` calls `labelColumnFor` itself (no private
+  `labelColumn`), and `CardSurface.paintDefault` has no bare block. Round 2: a form-card SettingRow (Rulings 17) renders
+  like a FormRow (spec 6.4), where Step 3 kept the row's own side padding and dependent indent, 10 px or more right of
+  the FormRows in a FORM card: `labelColumnFor` sets `SettingRows.RowControl.formInset`, none in a FORM card, which pads
+  its rows, and `CARD_PADDING` + `HAIRLINE` in a MIXED or SETTINGS card, which lays setting rows edge to edge, and the
+  row's border takes it in place of its side padding, so its title starts on the card's labels and its control on the
+  field column in all three, Add Host's Options › Group included; the "Port:" label shows and enables with its field
+  (`FormRows.RowControl.followPort`, called from `refresh` and `children`, reads the field's node and inherited state,
+  so a refresh that reaches the row first keeps it right), not from layout code, and `preferredLayoutSize` counts it
+  only while it shows. `ClassicGroupsTest` has 13 tests, not 5. One residual for plan 4c's mock comparison: a classic
+  checkbox row in a FULL form's SETTINGS or MIXED card leads at its side padding (`FULL_SETTING_SIDE_PADDING`, 12 in the
+  Enterprise fixture kit), 1 px left of the labels at `CARD_PADDING` + `HAIRLINE` (13), which the mocks align — cost if
+  wrong: a form-card setting row off the FormRows' columns, or a "Port:" label that reads enabled beside a disabled
+  field.

@@ -8,7 +8,7 @@ import dev.jasper.ui.swing.NativeStyles;
 import dev.jasper.app.config.AnimationSettings;
 import dev.jasper.app.config.ViewMode;
 import dev.jasper.app.persistence.UiState;
-import dev.jasper.app.palette.CommandPalette;
+import dev.jasper.app.palette.PaletteView;
 import dev.jasper.app.palette.PaletteController;
 import dev.jasper.app.palette.PaletteTarget;
 import dev.jasper.app.palette.ScopeRegistry;
@@ -32,7 +32,8 @@ final class WindowCommandPalette implements AutoCloseable {
     private final WindowContent owner;
     private final String defaultScopeId;
     private final PaletteController controller;
-    private final CommandPalette palette;
+    private final PaletteView view;
+    private final JComponent palette;
     private final Overlay overlay = new Overlay();
     private final Drag drag = new Drag();
     private JRootPane root;
@@ -56,10 +57,11 @@ final class WindowCommandPalette implements AutoCloseable {
                          String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit) {
         this.history = history;
         this.owner = owner; this.defaultScopeId = defaultScopeId;
-        controller = new PaletteController(kit, scopes, history, macOs, this::layoutOverlay, this::restoreAndHide,
-            owner::updatingActions, owner::updateActions,
-            message -> owner.onError.accept("Command failed", message), this::open);
-        palette = controller.component();
+        controller = new PaletteController(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, macOs, this::layoutOverlay,
+            this::restoreAndHide, owner::updatingActions, owner::updateActions,
+            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, owner::openFile);
+        view = controller.view();
+        palette = view.component();
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
         // Presses that no row, field or link takes reach the card itself: those empty areas move it.
         palette.addMouseListener(drag); palette.addMouseMotionListener(drag);
@@ -95,7 +97,7 @@ final class WindowCommandPalette implements AutoCloseable {
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
                 if (!wasOpen) startReveal();
-                palette.focusQuery();
+                view.focusQuery();
             }
         }
 
@@ -137,7 +139,7 @@ final class WindowCommandPalette implements AutoCloseable {
         stopReveal();
         if (!animations.enabled() || !owner.lookAnimates()) return;
         revealStart = clock.getAsLong();
-        palette.setReveal(0); overlay.repaint();
+        view.setReveal(0); overlay.repaint();
         reveal = new Timer(8, event -> animate(clock.getAsLong()));
         reveal.start();
     }
@@ -146,7 +148,7 @@ final class WindowCommandPalette implements AutoCloseable {
     void animate(long now) {
         if (reveal == null) return;
         double elapsed = Math.max(0, Math.min(1, (now - revealStart) / (REVEAL_MILLIS * 1_000_000.0)));
-        palette.setReveal(drip(elapsed)); overlay.repaint();
+        view.setReveal(drip(elapsed)); overlay.repaint();
         if (elapsed >= 1) stopReveal();
     }
 
@@ -160,7 +162,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
     private void stopReveal() {
         if (reveal != null) { reveal.stop(); reveal = null; }
-        palette.setReveal(1); overlay.repaint();
+        view.setReveal(1); overlay.repaint();
     }
 
     void setVisibleRows(int value) { controller.setVisibleRows(value); }
@@ -169,7 +171,8 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean isOpen() { return controller.isOpen(); }
     String activeScopeId() { return controller.activeScopeId(); }
     boolean composing() { return controller.composing(); }
-    CommandPalette component() { return controller.component(); }
+    JComponent component() { return palette; }
+    PaletteView view() { return view; }
     void enterPressed(int verb) { controller.enterPressed(verb); }
     void moveSelection(int delta) { controller.moveSelection(delta); }
     boolean stepOpen() { return controller.stepOpen(); }
@@ -408,7 +411,7 @@ final class WindowCommandPalette implements AutoCloseable {
         @Override protected void paintComponent(Graphics graphics) {
             if (!controller.isOpen()) return;
             Rectangle card = palette.getBounds();
-            card.height = palette.revealedHeight();
+            card.height = view.revealedHeight();
             if (card.height <= 0) return;
             ChromePainter.installed().popupShadow(graphics, card, ThemeZone.theme(null), owner.theme().chrome().dark());
         }

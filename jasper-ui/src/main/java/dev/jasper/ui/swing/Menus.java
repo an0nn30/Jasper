@@ -190,7 +190,7 @@ final class Menus {
             for (var button : java.util.List.of(main, arrow)) {
                 button.kind = menu.kind();
                 button.setEnabled(component.isEnabled());
-                Composition.style(button, context(), Typography.Role.LABEL, button.textRole(false));
+                Composition.style(button, context(), context().faces().buttons.label(menu.kind(), Typography.Role.LABEL), button.textRole(false));
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING),
                         pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
                 button.embedded = embedded;
@@ -306,6 +306,18 @@ final class Menus {
         Color border() {
             return null;
         }
+
+        /** A part paints no face of its own under either buttons face, only its focus ring: the surface paints the face. */
+        @Override
+        void paintKitFace(Graphics2D g, boolean hover, boolean focused) {
+            paintRaised(g, hover, focused);
+        }
+
+        /** A part stands where its menu button's surface does. */
+        @Override
+        Component placement() {
+            return getParent() instanceof MenuSurface surface ? surface : this;
+        }
     }
 
     static final class Main extends Part {
@@ -345,7 +357,13 @@ final class Menus {
 
         MenuSurface(KitContext context) {
             super(new BorderLayout());
-            background = new Buttons.KitButton(context);
+            // The face is never added to a parent: it stands where this surface does.
+            background = new Buttons.KitButton(context) {
+                @Override
+                Component placement() {
+                    return MenuSurface.this;
+                }
+            };
             background.setText("");
         }
 
@@ -355,6 +373,7 @@ final class Menus {
             background.setSize(getSize());
             background.setEnabled(isEnabled());
             background.focus = owner.main.focus;
+            background.panel = owner.main.panel;
             background
                     .getModel()
                     .setRollover(

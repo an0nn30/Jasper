@@ -46,7 +46,7 @@ Pick the composition from what the surface is, not from how it should look:
 
 Inside cards:
 
-- `CardKind.FORM` holds `FormRow`s: a label (with an optional caption below it) in the fixed label column beside
+- `CardKind.FORM` holds `FormRow`s: a label (with an optional caption below it) in a label column (fixed in the default look) beside
   its control, plus an optional trailing control such as a port field or a Browse button.
 - `CardKind.SETTINGS` holds `SettingRow`s: a title and description with a trailing switch, dropdown or stepper.
   Mark a row `dependent` when it only applies while the row above is on.
@@ -58,6 +58,8 @@ visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS, TABS to 
 `Button` (one PRIMARY per surface, SECONDARY, GHOST, DESTRUCTIVE_GHOST, LINK), `MenuButton`, `Chip`, `StatusDot`,
 `Progress`, `Strength`, `Icon`, `Text` with a semantic `TextRole`, `ItemList`, `Table`, `Tree` and `Breadcrumbs`.
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).
+Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER draws a spinner,
+and a Section with its Card draws a titled box; the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`
 opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holding a `Card` is a titled group.

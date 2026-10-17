@@ -1,7 +1,6 @@
 package dev.jasper.app.palette;
 
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.platform.AppIcons;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.ControlState;
 import dev.jasper.ui.model.ListItem;
@@ -22,7 +21,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,29 +38,27 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.text.JTextComponent;
 
 /**
- * Jasper's palette: a query row with an optional scope chip, a one-line result list with section headings (or the
- * empty line, or a step's small form), and a hint bar with the selected row's detail and, when there are several, its scope's verbs.
- * The module supplies its shared surface, outline and measured rows on the chrome {@link KitContext}. Every control
- * remains a retained kit view. The
- * query field keeps focus; the host moves the selection and routes the keys. EDT only.
+ * Jasper's palette card: a query row with an optional scope chip, a one-line result list with section headings (or the
+ * empty line, or a step's small form), and a hint bar with the selected row's detail and, when there are several, its
+ * scope's verbs. The module supplies its shared surface, outline and measured rows on the chrome {@link KitContext}.
+ * Every control remains a retained kit view. The query field keeps focus; the host moves the selection and routes the
+ * keys. The palette's first {@link PaletteView} (Enterprise presentation spec 11.1). EDT only.
  */
-public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel implements AutoCloseable {
-    static final String QUERY = "query", CHIP = "chip", RESULTS = "results", HINT = "hint", EMPTY = "empty", STEP = "step",
+public final class CardView extends dev.jasper.ui.swing.SurfacePanel implements PaletteView {
+    static final String QUERY = "query", CHIP = "chip", RESULTS = "results", HINT = "hint", EMPTY = "empty", STEP = StepForm.STEP,
         RUN = "run", VERB = "verb:";
-    private static final String STEP_FIELD = "step.field.";
 
     private final KitContext kit;
     private final dev.jasper.app.platform.PresentationIcons presentationIcons = new dev.jasper.app.platform.PresentationIcons();
     private final boolean macOs;
     private final Consumer<String> queryChanged;
     private final ObjIntConsumer<PaletteEntry> execute;
-    private final Function<String, Optional<ScopePrefix>> prefixes;
     private final Consumer<PaletteScope> chipTyped;
+    private final QueryEdits edits;
     private final List<KitView> views = new ArrayList<>();
-    private final KitView chipView, queryView, resultsView, emptyView, hintView, stepTitleView, stepErrorView;
-    private final JPanel fieldRow, hintBar, cards, stepPanel, stepTitleRow, stepErrorRow;
-    /** One shell row per step field: a fixed label column and the field, each its own kit view. */
-    private final List<StepRow> stepRows = new ArrayList<>();
+    private final KitView chipView, queryView, resultsView, emptyView, hintView;
+    private final JPanel fieldRow, hintBar, cards;
+    private final StepForm step;
     private final CardLayout cardLayout = new CardLayout();
     private final AutoCloseable themeSubscription;
     private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
@@ -72,25 +68,20 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     private int selected = -1;
     private long resultCount, revision;
     private String listCard = EMPTY;
-    private String stepTitle;
-    private List<PaletteStep.Field> stepFields = List.of();
-    private final List<String> stepTexts = new ArrayList<>();
-    private String stepError;
-    private int stepFocus = -1;
     private boolean closed;
     /** The shown fraction of the card's height while it drips open; 1 when fully open. */
     private double reveal = 1;
 
-    CommandPalette(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
-                   Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
+    /** A card calling back {@code host}; the card uses its query, execute, prefix and scope callbacks. */
+    CardView(KitContext kit, boolean macOs, PaletteView.Host host) {
         super(kit, dev.jasper.ui.swing.SurfacePanel.Kind.POPUP);
         this.kit = presentationIcons.context(Objects.requireNonNull(kit));
         kit = this.kit;
         this.macOs = macOs;
-        this.queryChanged = Objects.requireNonNull(queryChanged);
-        this.execute = Objects.requireNonNull(execute);
-        this.prefixes = Objects.requireNonNull(prefixes);
-        this.chipTyped = Objects.requireNonNull(chipTyped);
+        this.queryChanged = host.queryChanged();
+        this.execute = host.execute();
+        this.edits = new QueryEdits(host.prefixes());
+        this.chipTyped = host.chooseScope();
         setOpaque(false);
         // AWT retargets a press to the nearest ancestor that has mouse listeners. Without one here, a
         // press on the chip, the hint bar's detail text or the field row's padding would bubble past
@@ -123,25 +114,12 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         var empty = new JPanel(new GridBagLayout());
         empty.setOpaque(false);
         empty.add(emptyView);
-        stepTitleView = view(stepTitleSpec());
-        stepErrorView = view(stepErrorSpec());
-        stepTitleRow = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT, false);
-        stepTitleRow.setLayout(new BorderLayout());
-        stepTitleRow.setOpaque(false);
-        stepTitleRow.add(stepTitleView, BorderLayout.CENTER);
-        stepErrorRow = dev.jasper.ui.swing.SurfacePanel.row(kit, DesignMetrics.Role.PALETTE_STEP_TITLE_HEIGHT, false);
-        stepErrorRow.setLayout(new BorderLayout());
-        stepErrorRow.setOpaque(false);
-        stepErrorRow.add(stepErrorView, BorderLayout.CENTER);
-        stepErrorRow.setVisible(false);
-        stepPanel = new JPanel();
-        stepPanel.setLayout(new javax.swing.BoxLayout(stepPanel, javax.swing.BoxLayout.Y_AXIS));
-        stepPanel.setOpaque(false);
+        step = new StepForm(kit);
         cards = new JPanel(cardLayout);
         cards.setOpaque(false);
         cards.add(resultsView, RESULTS);
         cards.add(empty, EMPTY);
-        cards.add(stepPanel, STEP);
+        cards.add(step.panel(), STEP);
         cardLayout.show(cards, listCard);
         add(cards, BorderLayout.CENTER);
 
@@ -157,11 +135,21 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         updateHint();
     }
 
+    /** For the card's own tests: a card whose scope list, opener, cancel and Browse… callbacks do nothing. */
+    CardView(KitContext kit, boolean macOs, Consumer<String> queryChanged, ObjIntConsumer<PaletteEntry> execute,
+             Function<String, Optional<ScopePrefix>> prefixes, Consumer<PaletteScope> chipTyped) {
+        this(kit, macOs, new PaletteView.Host(queryChanged, execute, prefixes, chipTyped, List::of, () -> "", () -> { }, () -> { }));
+    }
+
+    @Override public JComponent component() { return this; }
+    @Override public boolean modeless() { return false; }
+    @Override public void opened() { }
+
     /**
      * Shows only the top {@code fraction} of the card, 0-1: its fill, border, corners and hit area follow that edge while
      * the content stays laid out at full height, so an opening reveal uncovers the card without moving its rows.
      */
-    public void setReveal(double fraction) {
+    @Override public void setReveal(double fraction) {
         double clamped = Math.max(0, Math.min(1, fraction));
         if (clamped == reveal) return;
         reveal = clamped;
@@ -169,7 +157,7 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     }
 
     /** The height currently shown; the full height unless a reveal is under way. */
-    public int revealedHeight() { return reveal >= 1 ? getHeight() : (int) Math.ceil(getHeight() * reveal); }
+    @Override public int revealedHeight() { return reveal >= 1 ? getHeight() : (int) Math.ceil(getHeight() * reveal); }
 
     @Override protected int surfaceHeight() { return revealedHeight(); }
 
@@ -253,56 +241,6 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         return new ViewSpec(new Nodes.Stack(HINT, ControlState.READY, Nodes.LayoutRole.NAVIGATION, children));
     }
 
-    private ViewSpec stepTitleSpec() {
-        return new ViewSpec(text(STEP + ".title", stepTitle == null ? "" : stepTitle, Nodes.TextRole.CAPTION));
-    }
-
-    private ViewSpec stepErrorSpec() {
-        var shown = new ControlState(stepError != null, true, false, "");
-        return new ViewSpec(new Nodes.Stack(STEP + ".error", shown, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.StatusDot(STEP + ".error.status", ControlState.READY, Nodes.StatusKind.DANGER),
-            text(STEP + ".error.text", stepError == null ? "" : stepError, Nodes.TextRole.BODY))));
-    }
-
-    private static String stepLabel(PaletteStep.Field field) { return field.label().isBlank() ? field.name() : field.label(); }
-
-    /** The row's own label column names the field, so the field is EMBEDDED: its label stays its accessible name. */
-    private ViewSpec stepFieldSpec(int index) {
-        return new ViewSpec(new Nodes.Field(STEP_FIELD + index, ControlState.READY, Nodes.FieldKind.TEXT, stepTexts.get(index), "",
-            stepLabel(stepFields.get(index)), "", Optional.empty(), Nodes.FieldPresentation.EMBEDDED));
-    }
-
-    /** Rebuilds the step's rows: the title row, one row per field and the (hidden) error row. */
-    private void buildStepRows() {
-        clearStepRows();
-        stepPanel.add(stepTitleRow);
-        for (int i = 0; i < stepFields.size(); i++) {
-            var row = new StepRow(view(new ViewSpec(text(STEP + ".label." + i, stepLabel(stepFields.get(i)), Nodes.TextRole.CAPTION))), view(stepFieldSpec(i)));
-            stepRows.add(row);
-            stepPanel.add(row.panel);
-        }
-        stepPanel.add(stepErrorRow);
-        stepPanel.add(javax.swing.Box.createVerticalGlue());
-        applyStepGeometry();
-    }
-
-    private void clearStepRows() {
-        for (StepRow row : stepRows) {
-            row.label.close(); row.field.close();
-            views.remove(row.label); views.remove(row.field);
-        }
-        stepRows.clear();
-        stepPanel.removeAll();
-    }
-
-    /** The former step geometry: 4/12 row padding, a fixed label column and a gap before the field. */
-    private void applyStepGeometry() {
-        int side = scaled(DesignMetrics.Role.PALETTE_STEP_SIDE_PADDING);
-        stepTitleRow.setBorder(new EmptyBorder(0, side, 0, side));
-        stepErrorRow.setBorder(new EmptyBorder(0, side, 0, side));
-        stepPanel.revalidate();
-    }
-
     private void render(KitView view, ViewSpec spec) { if (!view.isClosed()) view.update(spec); }
 
     // ---- Events -----------------------------------------------------------------------------------------------------
@@ -311,10 +249,6 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         if (closed) return;
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(QUERY) -> edited(edited.text(), true);
-            case UiEvent.Edited edited when edited.id().startsWith(STEP_FIELD) -> {
-                int index = Integer.parseInt(edited.id().substring(STEP_FIELD.length()));
-                if (index < stepTexts.size()) stepTexts.set(index, edited.text());
-            }
             case UiEvent.Selected chosen when chosen.id().equals(RESULTS) ->
                 chosen.ids().stream().findFirst().ifPresent(id -> select(Integer.parseInt(id.substring("entry.".length()))));
             case UiEvent.Action action when action.id().equals(RUN) -> executeSelected(0);
@@ -324,54 +258,27 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     }
 
     /**
-     * The scope prefix text a chip consumed while the field may still show it. The kit applies the shortened query one
-     * event-loop turn after the edit (Swing forbids document writes while it notifies), so a key queued before then
-     * reports text that still begins with the prefix; that text is stripped, as the old synchronous filter never let
-     * it into the field. Cleared once the field shows the query, or by any edit without the prefix.
-     */
-    private String consumedPrefix;
-
-    /**
      * The query changed, typed ({@code typed}) or set by the host. A scope prefix typed with no chip ("history > ls")
      * leaves the query and becomes the chip, as the field's prefix filter did; deleting text never makes a chip.
      */
     private void edited(String text, boolean typed) {
-        if (consumedPrefix != null) {
-            if (typed && text.startsWith(consumedPrefix)) text = text.substring(consumedPrefix.length());
-            else consumedPrefix = null;
-        }
-        String previous = query;
-        Optional<ScopePrefix> prefix = text.equals(previous) || removal(previous, text) ? Optional.empty() : prefixes.apply(text);
-        if (prefix.isPresent()) consumedPrefix = text.substring(0, text.length() - prefix.get().rest().length());
-        query = prefix.map(ScopePrefix::rest).orElse(text);
+        var outcome = edits.edited(query, text, typed);
+        query = outcome.query();
         render(queryView, querySpec());
-        if (consumedPrefix != null) settleConsumedPrefix();
+        if (edits.pending()) edits.settle(() -> closed, () -> queryInput() instanceof JTextComponent input ? input.getText() : null, () -> query);
         queryChanged.accept(query);
-        prefix.ifPresent(found -> chipTyped.accept(found.scope()));
-    }
-
-    /** After the kit's own deferred update (queued first), forgets the consumed prefix once the field shows the query. */
-    private void settleConsumedPrefix() {
-        java.awt.EventQueue.invokeLater(() -> {
-            if (closed || consumedPrefix == null) return;
-            if (queryInput() instanceof JTextComponent input && input.getText().equals(query)) consumedPrefix = null;
-        });
+        outcome.prefix().ifPresent(found -> chipTyped.accept(found.scope()));
     }
 
     /** Whether {@code next} is {@code previous} with one stretch of it deleted. */
-    static boolean removal(String previous, String next) {
-        if (next.length() >= previous.length()) return false;
-        int common = 0;
-        while (common < next.length() && previous.charAt(common) == next.charAt(common)) common++;
-        return previous.endsWith(next.substring(common));
-    }
+    static boolean removal(String previous, String next) { return QueryEdits.removal(previous, next); }
 
     // ---- Query and chip ---------------------------------------------------------------------------------------------
 
     /** Moves keyboard focus to the query field. */
-    public void focusQuery() { if (!queryView.isClosed()) queryView.focus(QUERY); }
+    @Override public void focusQuery() { if (!queryView.isClosed()) queryView.focus(QUERY); }
 
-    String queryText() { return query; }
+    @Override public String queryText() { return query; }
 
     /** The query view's mounted text input, the palette's one focus target. */
     private Component queryInput() { return first(queryView, JTextComponent.class); }
@@ -386,7 +293,9 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     }
 
     /** Replaces the query as if typed (a typed scope prefix still becomes the chip); the same text changes nothing. */
-    void setQueryText(String text) { if (!Objects.requireNonNull(text).equals(query)) edited(text, false); }
+    @Override public void setQueryText(String text) { if (!Objects.requireNonNull(text).equals(query)) edited(text, false); }
+
+    @Override public void setChip(PaletteScope scope) { setChip(scope == null ? null : scope.label(), null); }
 
     /** Shows {@code label}'s chip, or none for null; the field and list are named after it. The icon stays off the chip. */
     void setChip(String label, Icon ignoredIcon) {
@@ -402,14 +311,14 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
 
     /** The chip's label; null while no chip is set. */
     String chipText() { return chip; }
-    void setPlaceholder(String text) { placeholder = text == null ? "" : text; render(queryView, querySpec()); }
+    @Override public void setPlaceholder(String text) { placeholder = text == null ? "" : text; render(queryView, querySpec()); }
     String placeholder() { return placeholder; }
-    boolean composing() { return !queryView.isClosed() && queryView.composing(QUERY); }
+    @Override public boolean composing() { return !queryView.isClosed() && queryView.composing(QUERY); }
 
     // ---- Results ----------------------------------------------------------------------------------------------------
 
     /** Replaces the list, selecting {@code selectionKey} when present and otherwise the first selectable entry. */
-    void setEntries(List<PaletteEntry> next, String selectionKey, String empty) {
+    @Override public void setEntries(List<PaletteEntry> next, String selectionKey, String empty) {
         long rows = next.stream().filter(entry -> entry instanceof PaletteEntry.Item).count();
         if (rows > PaletteResults.MAX_ROWS) throw new IllegalArgumentException("Too many palette results");
         int chosen = -1, first = -1;
@@ -432,21 +341,21 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         repaint();
     }
 
-    PaletteEntry selectedEntry() { return selected < 0 || selected >= entries.size() ? null : entries.get(selected); }
+    @Override public PaletteEntry selectedEntry() { return selected < 0 || selected >= entries.size() ? null : entries.get(selected); }
 
-    String selectedKey() {
+    @Override public String selectedKey() {
         PaletteEntry entry = selectedEntry();
         return entry == null ? null : entry.key();
     }
 
     /** Selects the first row with {@code rowId}, whichever scope it came from. */
-    void selectRow(String rowId) {
+    @Override public void selectRow(String rowId) {
         for (int i = 0; i < entries.size(); i++)
             if (entries.get(i) instanceof PaletteEntry.Item item && item.row().id().equals(rowId)) { select(i); return; }
     }
 
     /** Moves {@code delta} selectable entries, skipping headings and stopping at either end. */
-    void selectRelative(int delta) {
+    @Override public void selectRelative(int delta) {
         if (selected < 0 || delta == 0) return;
         int direction = Integer.signum(delta), remaining = Math.abs(delta), target = selected;
         for (int i = selected + direction; remaining > 0 && i >= 0 && i < entries.size(); i += direction)
@@ -463,7 +372,8 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
 
     void executeSelected() { executeSelected(0); }
 
-    void executeSelected(int verb) {
+    /** The card's primary verb is verb 0 (spec 11.4). */
+    @Override public void executeSelected(int verb) {
         PaletteEntry entry = selectedEntry();
         if (entry != null) execute.accept(entry, verb);
     }
@@ -471,8 +381,8 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     int itemHeight() { return dev.jasper.ui.swing.ResultMetrics.height(kit, false); }
 
     /** How many result rows the list shows before it scrolls; section headings among them add their own height. */
-    void setVisibleRows(int rows) { visibleRows = rows; renderResults(); revalidate(); }
-    int visibleRows() { return visibleRows; }
+    @Override public void setVisibleRows(int rows) { visibleRows = rows; renderResults(); revalidate(); }
+    @Override public int visibleRows() { return visibleRows; }
 
     String hintText() {
         return switch (selectedEntry()) {
@@ -521,91 +431,49 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     // ---- Step -------------------------------------------------------------------------------------------------------
 
     /** Shows a form instead of the list; the chip and query stay and the hint bar hides. The first field takes focus. */
-    void showStep(String title, List<PaletteStep.Field> fields) {
-        stepTitle = title;
-        stepFields = List.copyOf(fields);
-        stepTexts.clear();
-        for (PaletteStep.Field field : stepFields) stepTexts.add(field.prefill());
-        stepError = null;
-        render(stepTitleView, stepTitleSpec());
-        render(stepErrorView, stepErrorSpec());
-        stepErrorRow.setVisible(false);
-        buildStepRows();
+    @Override public void showStep(String title, List<PaletteStep.Field> fields) {
+        // The step's card shows first: its first field can take focus only while it is showing.
         cardLayout.show(cards, STEP);
         hintBar.setVisible(false);
-        stepFocus = -1;
-        focusStepField(1);
+        step.show(title, fields);
         revalidate(); repaint();
     }
 
-    void hideStep() {
-        stepTitle = null;
-        stepFields = List.of();
-        stepTexts.clear();
-        stepError = null;
-        stepFocus = -1;
-        clearStepRows();
-        render(stepTitleView, stepTitleSpec());
-        render(stepErrorView, stepErrorSpec());
-        stepErrorRow.setVisible(false);
+    @Override public void hideStep() {
+        step.hide();
         hintBar.setVisible(true);
         cardLayout.show(cards, listCard);
         revalidate(); repaint();
     }
 
-    boolean stepShowing() { return stepFocus >= 0; }
-    int stepFocusIndex() { return stepFocus; }
-    String stepTitleText() { return stepTitle; }
+    @Override public boolean stepShowing() { return step.showing(); }
+    int stepFocusIndex() { return step.focusIndex(); }
+    String stepTitleText() { return step.titleText(); }
     /** The step's error; null while none shows. */
-    String stepErrorText() { return stepError; }
-    int stepFieldCount() { return stepFields.size(); }
-
-    /** Moves focus to the next (or previous) field, wrapping, and selects its text for replacement. */
-    void focusStepField(int delta) {
-        if (stepFields.isEmpty()) return;
-        stepFocus = Math.floorMod(stepFocus + delta, stepFields.size());
-        var view = stepRows.get(stepFocus).field;
-        if (view.isClosed()) return;
-        view.focus(STEP_FIELD + stepFocus);
-        var input = stepInput(stepFocus);
-        if (input != null) input.selectAll();
-    }
-
-    /** The mounted kit input of the {@code index}th step field (kit components are named after their node). */
-    JTextComponent stepInput(int index) { return find(stepRows.get(index).field, STEP_FIELD + index + ".input", JTextComponent.class); }
-
-    Map<String, String> stepValues() {
-        var values = new LinkedHashMap<String, String>();
-        for (int i = 0; i < stepFields.size(); i++) values.put(stepFields.get(i).name(), stepTexts.get(i));
-        return values;
-    }
-
-    void setStepError(String message) {
-        stepError = message;
-        render(stepErrorView, stepErrorSpec());
-        stepErrorRow.setVisible(message != null);
-        revalidate(); repaint();
-    }
+    String stepErrorText() { return step.errorText(); }
+    int stepFieldCount() { return step.fieldCount(); }
+    @Override public void focusStepField(int delta) { step.focusField(delta); }
+    JTextComponent stepInput(int index) { return step.input(index); }
+    @Override public Map<String, String> stepValues() { return step.values(); }
+    @Override public void setStepError(String message) { step.setError(message); revalidate(); repaint(); }
 
     // ---- Shell ------------------------------------------------------------------------------------------------------
 
     /** The kit views follow the theme themselves; the shell repaints its surface, outline and rule and re-measures. */
-    void refreshTheme() {
+    @Override public void refreshTheme() {
         hintBar.setBorder(new EmptyBorder(scaled(DesignMetrics.Role.HAIRLINE), scaled(DesignMetrics.Role.PALETTE_HINT_SIDE_PADDING),
             0, scaled(DesignMetrics.Role.PALETTE_HINT_SIDE_PADDING)));
         int vertical = scaled(DesignMetrics.Role.PALETTE_FIELD_VERTICAL_PADDING), side = scaled(DesignMetrics.Role.PALETTE_FIELD_SIDE_PADDING);
         fieldRow.setBorder(new EmptyBorder(vertical, side, vertical, side));
         ((BorderLayout) fieldRow.getLayout()).setHgap(scaled(DesignMetrics.Role.PALETTE_CHIP_GAP));
-        applyStepGeometry();
+        step.applyGeometry();
         revalidate();
         repaint();
     }
 
     @Override public Dimension getPreferredSize() {
         Insets insets = getInsets();
-        int height = fieldRow.getPreferredSize().height + (stepShowing()
-            ? stepTitleRow.getPreferredSize().height + stepRows.stream().mapToInt(row -> row.panel.getPreferredSize().height).sum()
-                + (stepError != null ? stepErrorRow.getPreferredSize().height : 0)
+        int height = fieldRow.getPreferredSize().height + (stepShowing() ? step.preferredHeight()
             : listHeight() + hintBar.getPreferredSize().height);
         return new Dimension(scaled(DesignMetrics.Role.PALETTE_WIDTH), height + insets.top + insets.bottom);
     }
@@ -628,6 +496,7 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
         closed = true;
         try { themeSubscription.close(); } catch (Exception ignored) { /* closing a subscription has nothing to report */ }
         views.forEach(KitView::close);
+        step.close();
         presentationIcons.close();
     }
 
@@ -637,12 +506,12 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
     KitView chipView() { return chipView; }
     KitView resultsView() { return resultsView; }
     KitView hintView() { return hintView; }
-    JPanel stepPanel() { return stepPanel; }
-    JPanel stepTitleRow() { return stepTitleRow; }
-    JPanel stepErrorRow() { return stepErrorRow; }
-    JPanel stepRow(int index) { return stepRows.get(index).panel; }
-    JComponent stepLabelView(int index) { return stepRows.get(index).label; }
-    KitView stepFieldView(int index) { return stepRows.get(index).field; }
+    JPanel stepPanel() { return step.panel(); }
+    JPanel stepTitleRow() { return step.titleRow(); }
+    JPanel stepErrorRow() { return step.errorRow(); }
+    JPanel stepRow(int index) { return step.row(index); }
+    JComponent stepLabelView(int index) { return step.labelView(index); }
+    KitView stepFieldView(int index) { return step.fieldView(index); }
     KitView emptyView() { return emptyView; }
     JPanel fieldRow() { return fieldRow; }
     JPanel hintBar() { return hintBar; }
@@ -659,15 +528,5 @@ public final class CommandPalette extends dev.jasper.ui.swing.SurfacePanel imple
             if (found != null) return found;
         }
         return null;
-    }
-
-    /** Retained views, laid out by the module's responsive native label/control composition. */
-    private final class StepRow {
-        final KitView label, field;
-        final JPanel panel;
-        StepRow(KitView label, KitView field) {
-            this.label=label; this.field=field;
-            panel=dev.jasper.ui.swing.SurfacePanel.labelledRow(kit,label,field);
-        }
     }
 }

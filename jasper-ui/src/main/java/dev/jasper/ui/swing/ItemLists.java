@@ -173,6 +173,7 @@ final class ItemLists {
         @Override
         int rowHeightAt(int index) {
             if(identityRows())return value().items().get(index).heading()?ThemePainting.height(context(),DesignMetrics.Role.IDENTITY_HEADING_HEIGHT,Typography.Role.CAPTION):rowHeight;
+            if (results() && view.runWindow()) return RunWindowPresentation.rowHeight(context(), value().items().get(index).heading());
             return ResultMetrics.height(context(), value().items().get(index).heading());
         }
 
@@ -193,7 +194,7 @@ final class ItemLists {
 
         @Override
         int reservedRowHeight() {
-            return results() ? ResultMetrics.height(context(), false) : rowHeight;
+            return results() && view.runWindow() ? RunWindowPresentation.rowHeight(context(), false) : results() ? ResultMetrics.height(context(), false) : rowHeight;
         }
 
         @Override
@@ -320,12 +321,7 @@ final class ItemLists {
                         com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), icon.size()));
                 case Nodes.Button _, Nodes.MenuButton _ ->
                         inputHeight(DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
-                case Nodes.Toggle toggle ->
-                        ThemePainting.metric(
-                                context(),
-                                toggle.compact()
-                                        ? DesignMetrics.Role.COMPACT_SWITCH_HEIGHT
-                                        : DesignMetrics.Role.SWITCH_HEIGHT);
+                case Nodes.Toggle toggle -> context().faces().toggle.rowHeight(context(), toggle.compact());
                 default -> fontHeight(Typography.Role.BODY);
             };
         }
@@ -422,7 +418,8 @@ final class ItemLists {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
             } else if (item.leading().orElse(null) instanceof Nodes.Icon icon && row.controls.get(icon.id()) instanceof Labels.IconControl glyph)
                 // A compact panel row draws its leading glyph at the panel-row size; elsewhere the icon's size role holds.
-                glyph.glyph(panelCompact ? context().metrics().value(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH) : 0);
+                glyph.glyph(results() && view.runWindow() && icon.size() == Nodes.IconSize.SWATCH ? context().metrics().value(DesignMetrics.Role.RUN_WINDOW_SWATCH)
+                    : panelCompact ? context().metrics().value(DesignMetrics.Role.PANEL_COMPACT_ROW_GLYPH) : 0);
             for(var control:row.controls.values()) if(control instanceof Indicators.DotControl dot) ((Indicators.Dot)dot.component).panelRow=panelSingle||panelCompact;
             for(var control:row.controls.values()) if(control instanceof Indicators.ChipControl chip) chip.panelRow(panelCompact);
             row.slot(row.title, item.title());
@@ -452,6 +449,7 @@ final class ItemLists {
                 resultSelection(row, item.trailing(), false);
             }
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
+            if (results() && view.runWindow()) RunWindowPresentation.row(context(), row, item, selected.contains(item.id()));
             row.tooltip(item.tooltip());
             row.name(item.title());
             if (value().kind() == Nodes.ListKind.ORDERED) {

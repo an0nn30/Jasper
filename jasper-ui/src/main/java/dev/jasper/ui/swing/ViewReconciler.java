@@ -91,7 +91,11 @@ final class ViewReconciler implements AutoCloseable {
             secret.detailValueTop = -1;
             secret.detailActionsBelow = false;
         }
-        if (control instanceof SettingRows.RowControl row) row.panelFooter = false;
+        if (control instanceof SettingRows.RowControl row) { row.panelFooter = false; row.formLabel = false; row.column = -1; row.formInset = 0; }
+        if (control instanceof FormRows.RowControl row) row.column = -1;
+        // A form card's label column insets a bare EXCLUSIVE choice (Cards.labelColumnFor); the default look sets no border there.
+        if (control instanceof Choices.ChoiceControl choice && choice.node instanceof Nodes.Choice node && node.kind() == Nodes.ChoiceKind.EXCLUSIVE)
+            choice.component.setBorder(null);
         if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;
@@ -106,14 +110,14 @@ final class ViewReconciler implements AutoCloseable {
             menu.main.panel = false;
             menu.arrow.panel = false;
         }
-        if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.tile(0, false); }
+        if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.facePair = null; icon.tile(0, false); }
         if (control instanceof EmptyStates.EmptyControl empty) empty.panel = false;
         if (control instanceof Labels.TextControl preview) preview.formPreview = false;
         if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) {
             text.wrap = false;
             text.flow = false;
         }
-        if (control instanceof Labels.TextControl label) label.override = null;
+        if (control instanceof Labels.TextControl label) { label.override = null; label.styled = null; }
         if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);
@@ -411,6 +415,11 @@ final class ViewReconciler implements AutoCloseable {
         for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret
                 && (secret == source || !group.isEmpty() && group.equals(((Nodes.Secret)secret.node).revealGroup()))) secret.reveal(revealed);
     }
-    void refresh() { applyArtworkComposition(view.spec().root(),mounted,false); mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();}); view.revalidate(); view.repaint(); }
+    void refresh() {
+        applyArtworkComposition(view.spec().root(),mounted,false); mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();});
+        // A form card's label column follows its labels' refreshed fonts (a theme or interface font change).
+        mounted.values().forEach(c -> { if (c instanceof Cards.CardControl card) card.relabel(); });
+        view.revalidate(); view.repaint();
+    }
     @Override public void close() { mounted.values().forEach(ControlRegistry.Control::close); mounted.clear(); view.removeAll(); }
 }

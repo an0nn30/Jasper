@@ -34,7 +34,10 @@ background. Translate by meaning. ANSI arrays are defensively copied.
 
 Install appearance on EDT before widget creation. `AppearanceTransaction` installs real FlatLaf
 and publishes a complete chrome/workspace `ThemePair`, restoring prior global defaults on failure.
-Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route. Binding subscriptions replay and close independently; views retain
+Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route.
+A structurally different control draws through a face (`KitFaces`, one per control point, chosen once from the kit's
+`ControlVariants`); faces declare the pairs they paint and never read the kit. The default faces call the controls' own code.
+Binding subscriptions replay and close independently; views retain
 stable control/document identity on updates. Font-only default changes refresh central typography.
 
 The caller owns binding and registry lifetimes; a view owns listeners, its descriptor controls and
@@ -229,7 +232,10 @@ Workspace chrome and palette calibration (Plan 3 Task 10): RESULTS headings use 
 for their text and measured height; a TRANSPARENT search field shows the rail-size glyph with `TRANSPARENT_FIELD_ICON_GAP`.
 The host-only `KitView.setHintPresentation(stackId, hint)` gives one stack (the palette footer) the compact hint face:
 its CAPTION text and embedded links use `PALETTE_HINT` (11) and its children `PALETTE_HINT_ACTION_GAP`; same-id updates
-keep it and it is not part of the plugin SDK. `ChromePainter` (one per kit; app chrome paints with `ChromePainter.installed()`) owns the native chrome's painting (tab strip, toolbar
+keep it and it is not part of the plugin SDK. The host-only `KitView.runWindow(true)` presents a view as part of the
+Run window: its RESULTS rows, heading bands and counts, PROMPT_HEADER tile, transparent field and text take the
+`RUN_WINDOW_*` roles, `RUN_HEADING` and `RUN_DETAIL`; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds paint the
+window's frame and bands, its field box and its list box. `ChromePainter` (one per kit; app chrome paints with `ChromePainter.installed()`) owns the native chrome's painting (tab strip, toolbar
 rules and action widths, status dot, rail badges, connected dot, split dividers, drop guides, find and title-bar rules,
 palette shadow) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
 chrome text sizes. `IconRegistry.chromeIcon` is the native chrome's receiving context: the meanings the workspace chrome

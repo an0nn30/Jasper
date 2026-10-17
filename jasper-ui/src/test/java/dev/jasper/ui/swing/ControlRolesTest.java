@@ -34,7 +34,7 @@ class ControlRolesTest {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.marked());
             try {
-                var track = new Choices.SegmentTrack(context); track.setSize(120, 30);
+                var track = new Choices.SegmentTrack(context, context.faces().exclusive); track.setSize(120, 30);
                 assertThat(pixel(track, 60, 15)).isEqualTo(KitFixtures.marker(SemanticColor.SEGMENT_TRACK).getRGB());
                 assertThat(pixel(track, 60, 0)).isEqualTo(KitFixtures.marker(SemanticColor.BORDER_INPUT).getRGB());
             } finally { release(context); }

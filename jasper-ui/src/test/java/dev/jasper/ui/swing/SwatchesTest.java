@@ -37,6 +37,22 @@ class SwatchesTest {
         });
     }
 
+    @Test void aSwatchInACompactPanelRowKeepsItsCaptionSize() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            var item = new ListItem("a", java.util.Optional.of(new Nodes.Icon("a.swatch", ControlState.READY, "file", Hue.AMBER, IconSize.SWATCH, "FTP")),
+                java.util.List.of(new Text("a.name", ControlState.READY, "tester", TextRole.BODY)),
+                java.util.List.of(new Text("a.address", ControlState.READY, "127.0.0.1:8080", TextRole.MONO_SMALL)), java.util.List.of());
+            var list = new ItemList("rows", ControlState.READY, ListKind.DOUBLE, java.util.List.of(item), java.util.Set.of(), "open", java.util.List.of());
+            try (var view = new KitView(context, new ViewSpec(PanelSurfacesTest.plain(list, java.util.Optional.empty())), e -> {})) {
+                KitFixtures.render(view, PanelCompositionTest.s(260), PanelCompositionTest.s(395), 1);
+                assertThat(((InteractiveRows.RowsControl) view.control("rows")).panelCompact).isTrue();
+                assertThat(find(view, "a.swatch", JLabel.class).getIcon().getIconWidth())
+                    .as("the panel row's glyph size is not the swatch's").isEqualTo(UIScale.scale(context.metrics().value(DesignMetrics.Role.ICON_CAPTION)));
+            } finally { release(context); }
+        });
+    }
+
     @Test void aSwatchKeepsItsSquareWhenTheIconChangesSize() {
         Edt.run(() -> {
             var context = KitFixtures.context();

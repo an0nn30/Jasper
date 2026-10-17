@@ -36,7 +36,10 @@ logical `DesignMetrics`, a `TypeScale`, a `FaceSet`, `ControlVariants` and `Colo
 `ThemeBinding` publishes complete chrome/workspace pairs on EDT; subscriptions replay and
 close independently. `AppearanceTransaction` installs real FlatLaf global defaults before
 publication and restores the old LAF, LAF defaults and developer overrides on failure.
-`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values. Every node renderer and four working panel controllers are implemented. The headless gallery
+`KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values.
+`KitFaces` holds one face per control point, chosen from the kit's `ControlVariants`: the toggle, buttons (with the
+field policy built with them), exclusive choice, tabs, group, form label, stepper and prompt faces.
+Every node renderer and four working panel controllers are implemented. The headless gallery
 now exercises the eight initial mock compositions, panel transitions and state variants; final
 whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
 
