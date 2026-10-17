@@ -217,8 +217,12 @@ public final class PaletteController implements AutoCloseable {
                 if (seen.add(item.key())) ranked.add(item);
             }
         }
-        if (!recent.isEmpty()) { entries.add(new PaletteEntry.Header("Recently used")); entries.addAll(recent); }
-        if (!ranked.isEmpty()) { entries.add(new PaletteEntry.Header(used ? "Most used" : "Suggested")); entries.addAll(ranked); }
+        if (!recent.isEmpty()) { entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.RECENT, "Recently used")); entries.addAll(recent); }
+        if (!ranked.isEmpty()) {
+            entries.add(used ? new PaletteEntry.Header(PaletteEntry.Header.Kind.USED, "Most used")
+                : new PaletteEntry.Header(PaletteEntry.Header.Kind.SUGGESTED, "Suggested"));
+            entries.addAll(ranked);
+        }
     }
 
     /** The row a use names, found by searching its title in its scope; empty when the scope or row is gone. */
@@ -350,7 +354,7 @@ public final class PaletteController implements AutoCloseable {
         String initial = null;
         if (active != null) {
             PaletteResults results = active.search(query, context);
-            if (results.sectionLabel() != null && !results.rows().isEmpty()) entries.add(new PaletteEntry.Header(results.sectionLabel()));
+            if (results.sectionLabel() != null && !results.rows().isEmpty()) entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, results.sectionLabel()));
             for (PaletteRow row : results.rows()) entries.add(new PaletteEntry.Item(active, row));
             if (results.initialSelectionId() != null) initial = PaletteEntry.key(active, results.initialSelectionId());
         } else if (query.isBlank()) {
@@ -372,7 +376,7 @@ public final class PaletteController implements AutoCloseable {
                 }
                 if (results.rows().isEmpty()) continue;
                 List<PaletteRow> shown = results.rows().subList(0, Math.min(remaining, results.rows().size()));
-                entries.add(new PaletteEntry.Header(scope.label()));
+                entries.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.MATCHES, scope.label()));
                 for (PaletteRow row : shown) entries.add(new PaletteEntry.Item(scope, row));
                 if (results.rows().size() > shown.size()) entries.add(new PaletteEntry.More(scope));
                 remaining -= shown.size();
