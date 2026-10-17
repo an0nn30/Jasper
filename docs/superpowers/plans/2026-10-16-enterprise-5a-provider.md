@@ -26,48 +26,45 @@ and AssertJ 3.27.7, Python 3.11+ standard library for the mechanical edit script
 (sections 1, 3, 4, 5.1 to 5.9 without the `[branding]` table, 9.1, 9.2, 15, 16.1.6 to 16.1.8 and row 5 of 19.1). The spec
 row is delivered as two plans: this one (5a, the provider machinery, proven with fixture providers) and
 [5b](2026-10-16-enterprise-5b-enterprise.md) (faces and fonts, the plugin theme tier, the Enterprise plugin, its theme,
-conformance and the shipped-kit renders). Plans 1, 2 and 3a are on `main`; 3b, 3c, 3d, 3e and 4 (4a, 4b, 4c) execute
-before this plan, in that order.
+conformance and the shipped-kit renders). Plans 1, 2, 3a, 3b, 3d and 4a are on `main` (`867940b55`) and in this branch;
+3c, 3e, 4b and 4c are not, and this plan uses none of their APIs (see "Execution notes (2026-10-16)" at the end).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-5`, branch
-`claude/enterprise-provider`, cut from `main` at `222969926`. Run every command from the worktree root, never in
-`~/projects/moray`. Line numbers below are from `222969926` and move after the earlier plans; every edit quotes the exact
-text it replaces, and the edit scripts stop with a message when that text is not found the stated number of times. If a
+`claude/enterprise-provider`, which holds `main` at `867940b55` plus the plan commits. Run every command from the
+worktree root, never in `~/projects/moray`. Line numbers below were re-verified at `867940b55` on 2026-10-16; every edit
+quotes the exact text it replaces, and the edit scripts stop with a message when that text is not found the stated number of times. If a
 script stops, re-find the quoted text (it moves, it does not change), adjust the anchor, and re-run; never edit around a
 missing anchor. Plan 5b executes on the same branch after this plan.
 
 ## Before you start
 
-Bring the branch up to `main` and check that every earlier plan is in it:
+Do not rebase or merge: the branch already holds `main` at `867940b55`, and plans 3c, 3e and 4b, which finish in other
+worktrees at the same time, are reconciled with this branch at merge. Check that the plans this one reads are in it:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 867940b55 HEAD && echo ok                                      # ok
 grep -c 'VERSION = "0.18.0"' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java          # 3a: 1
 grep -c 'PRESENTATION_PROVIDE' jasper-sdk/src/main/java/dev/jasper/sdk/Capabilities.java      # 3a: at least 1
 grep -c 'record Separator(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java              # 3b: 1
-grep -c 'cellNodes' jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java                   # 3c: at least 1
 grep -c 'TRANSFER' jasper-sdk/src/main/java/dev/jasper/sdk/ui/StandardMenu.java                # 3d: at least 1
 grep -c 'Kit CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java                       # 4: 1
 ls jasper-ui/src/main/java/dev/jasper/ui/kit/ControlVariants.java jasper-ui/src/main/java/dev/jasper/ui/kit/ColorSlots.java \
    jasper-ui/src/main/java/dev/jasper/ui/metrics/MetricTokens.java                             # 4: all three exist
 grep -c 'TypeScale CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/metrics/TypeScale.java       # 4: 1
-grep -cE 'ROW_HEIGHT\(|FIELD_RADIUS\(' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java   # 4a: 2
+grep -oE '(^|[ ,(])(ROW_HEIGHT|FIELD_RADIUS)\(' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java | wc -l   # 4a: 2
 grep -c 'enterpriseTokens' jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java   # 4a: at least 1
-ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicButtonFace.java \
-   jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicFolderTabsFace.java                       # 4b: all three exist
-ls jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTableFace.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTagFace.java \
-   jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/EnterpriseFixtures.java                # 4c: all three exist
 ```
 
-If any check prints 0 or a file is missing, stop: this plan needs those plans on `main`. Plan 4 is delivered as 4a (the
-classic catalog), 4b (the form faces) and 4c (the data faces), and all three execute before this plan: 5a reads only
-4a's values, but 5b's renders and "Turning Enterprise on gives classic controls" need 4b's and 4c's faces.
+If any check prints 0, something other than `ok`, or a missing file, stop. Plan 4 is delivered as 4a (the classic
+catalog), 4b (the form faces) and 4c (the data faces). 5a reads only 4a's values, so it runs before 4b and 4c land;
+5b's renders and "Turning Enterprise on gives classic controls" need 4b's and 4c's faces, which is 5b's entry condition.
 
 **Plan 4's names.** Plan 4 was written at the same time as this plan. This plan uses the names below, which are spec
-5.2, 5.4, 6.1 and 19.1's, read against plans 4a, 4b and 4c as written. Before Task 1, read plan 4's merged code (4a, 4b
-and 4c) and, where a name differs, change it in this plan's code blocks before executing: a renamed member is one search
-and replace per row; a member whose shape differs (a class instead of a record, another factory) means adapting the code
-that uses it to the merged API without changing behaviour. Record any change in this plan's status banner.
+5.2, 5.4, 6.1 and 19.1's. On 2026-10-16 every row was checked against 4a's merged code at `867940b55` and matches it
+(`UiKeySet` is `dev.jasper.ui.theme.UiKeySet`; the `ControlVariants` enums also implement `ControlVariants.Variant`,
+whose `key()` is the lower-cased name), so no code block needed a rename. If a later merge changes one, a renamed member
+is one search and replace per row; a member whose shape differs means adapting the code that uses it to the merged API
+without changing behaviour. Record any change in this plan's status banner.
 
 | This plan uses | Spec source |
 |---|---|
@@ -124,7 +121,7 @@ that uses it to the merged API without changing behaviour. Record any change in 
 
 ## Verified facts
 
-At `222969926` unless marked otherwise; facts about plans 3a to 4 cite the plan.
+Re-verified at `867940b55` on 2026-10-16 (the line numbers are that commit's); facts about plans 3a to 4 cite the plan.
 
 1. `DescriptorParser.CAPABILITIES` lists eleven capabilities (`DescriptorParser.java:15-17`) and `KEYS` fifteen keys
    (`:21-23`); `parse` rejects unknown keys (`:51`) and unknown capabilities (`:61-62`) and builds the descriptor at
@@ -146,7 +143,7 @@ At `222969926` unless marked otherwise; facts about plans 3a to 4 cite the plan.
 8. `PluginRuntime.start(tables, dark)` discovers (`PluginRuntime.java:615-624`), prepares settings files for every
    candidate (`:625-628`), reads the state (`:632-638`), resolves (`:641`), records every non-superseded SKIPPED status as
    a NOT_STARTED problem (`:643-646`), builds the host and copies the pre-start values (`:647-655`), loads and starts in
-   order (`:672-694`) and builds the catalog launch (`:695`). Pre-start setters throw once started (`:360-393`).
+   order (`:669-691`) and builds the catalog launch (`:692`). Pre-start setters throw once started (`:360-393`).
 9. `PluginRuntime.Snapshot` is `(rows, restartNeeded, safeMode)` (`:188-191`); the banner reads "Restart Jasper to apply
    your changes." (`PluginManager.java:153-154`); `pluginmanager.Capabilities.describe` maps each capability
    (`Capabilities.java:7-23`).
@@ -160,7 +157,7 @@ At `222969926` unless marked otherwise; facts about plans 3a to 4 cite the plan.
     `ThemeController.startup(dark, selection, Kit.DEFAULT, …)` (`JasperApplication.java:236-253`); `preparePlugins`
     (`:833-836`); `startPlugins(codeLocation, developmentDirectory, safeMode, dirs)` (`:843`) builds the runtime and calls
     `plugins.start` (`:906`) and `PluginProblemNotices.announce` (`:907-908`); `quitNow` (`:1749-1753`); FIRST_PAINT is
-    marked in `timeFirstTerminal` (`:1387-1392`); the rehearsal's stage paints with `Rehearsal.paint` (`:828`).
+    marked in `timeFirstTerminal` (`:1387-1392`); the rehearsal's stage paints with `Rehearsal.paint` (`:829`).
 12. `ThemeController.startup` tries the selection, then Slate Cobalt Dark (`ThemeController.java:56-73`); the private
     constructor builds `AppearanceBindings` (`:100`); controllers made without a kit install `Kit.DEFAULT` (`:76-88`).
 13. Plan 1 left the app reading the kit from the installed look and feel: `AppearanceBindings.context`
@@ -179,7 +176,9 @@ At `222969926` unless marked otherwise; facts about plans 3a to 4 cite the plan.
 16. `StartupTrace.line` prints `Startup (<kind>, AOT cache <x>, CDS <y>):` (`StartupTrace.java:301-321`); four
     `StartupTraceTest` lines assert it.
 17. `StaticDefaultTest.DEFAULT_KIT_READERS` is FlatLafInstaller, ThemeController and JasperApplication
-    (`StaticDefaultTest.java:53-55`) and the test fails on any other `Kit.DEFAULT` reader.
+    (`StaticDefaultTest.java:58-59`) and the test fails on any other `Kit.DEFAULT` reader. Plan 4a added `CLASSIC_KIT`
+    (`:44-45`), the classic catalogs to `CATALOGS` (`:50-51`) and the pin that nothing reads `Kit.CLASSIC` (`:173`), which
+    Task 3 lifts for `KitParser`.
 18. `ThemeMigrationCoverageTest.CANDIDATE` matches any `import dev.jasper.ui` among others
     (`ThemeMigrationCoverageTest.java:17-18`), over jasper-app, the SDK, the testkit and plugins (`:62-77`).
 19. JBR 25.0.4.1 (checked on 2026-10-16 with the IBM Plex 1.1.0 files): after `GraphicsEnvironment.registerFont`, a
@@ -892,7 +891,7 @@ the public tokens, the type base, the control variants and the colour slots), a 
 - Create: `jasper-app/src/main/java/dev/jasper/app/presentation/package-info.java`, `ChromeSpec.java`, `FontFile.java`, `KitParser.java`
 - Create: `jasper-app/src/main/java/dev/jasper/app/config/DefaultSource.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/presentation/FontFileTest.java`, `KitParserTest.java`; `jasper-app/src/test/java/dev/jasper/app/config/DefaultSourceTest.java`
-- Modify: `docs/design/theme-engine/migration.csv` (two rows), `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:53-55`
+- Modify: `docs/design/theme-engine/migration.csv` (two rows), `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java:37-38,44,59,173-174`
 
 **Interfaces:**
 - Consumes: plan 4's `Kit.CLASSIC`, the 7-component `Kit`, `ControlVariants`, `ColorSlots`, `MetricTokens`,
@@ -2023,6 +2022,10 @@ edits = [
      'static final Set<String> DEFAULT_KIT_READERS = Set.of("dev/jasper/app/presentation/KitParser", '),
     ("    /** The classic base; until plan 5's kit parser names it, no production class reads it. */",
      "    /** The classic base; only the kit parser, which starts a classic kit from it, reads it. */"),
+    (" * FaceSet.PLATFORM, DesignMetrics.CLASSIC, TypeScale.CLASSIC or Kit.CLASSIC, only the classes that choose the start-up\n"
+     " * kit or fall back to it read Kit.DEFAULT, and no static\n",
+     " * FaceSet.PLATFORM, DesignMetrics.CLASSIC or TypeScale.CLASSIC, only the kit parser reads Kit.CLASSIC, only the classes\n"
+     " * that choose the start-up kit or fall back to it read Kit.DEFAULT, and no static\n"),
     ('        assertThat(found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))).as("readers of Kit.CLASSIC").isEmpty();\n',
      '        Set<String> classicReaders = found.stream().filter(read -> read.endsWith(": " + CLASSIC_KIT))\n'
      '            .map(read -> read.substring(0, read.indexOf(\'.\'))).collect(Collectors.toCollection(TreeSet::new));\n'
@@ -2695,8 +2698,8 @@ class PresentationSelectionTest {
     }
 
     @Test void twoEnabledProvidersElectOneByOriginThenIdAndLosersPostNoProblem() {
-        var bundledB = provider("b.look", PluginCandidate.Origin.BUNDLED), bundledA = provider("a.look", PluginCandidate.Origin.BUNDLED);
-        var user = provider("0.look", PluginCandidate.Origin.USER), dev = provider("z.look", PluginCandidate.Origin.DEV);
+        PluginCandidate bundledB = provider("b.look", PluginCandidate.Origin.BUNDLED), bundledA = provider("a.look", PluginCandidate.Origin.BUNDLED);
+        PluginCandidate user = provider("0.look", PluginCandidate.Origin.USER), dev = provider("z.look", PluginCandidate.Origin.DEV);
         var reviewed = new PluginStateStore.Entry(true, Set.of("presentation.provide"), false);
         var all = facts(Map.of(bundledA, valid("a"), bundledB, valid("b"), user, valid("u"), dev, valid("z")), AttemptStore.Record.EMPTY);
         var resolution = PluginResolver.resolve(List.of(bundledA, bundledB, user, dev), Map.of("0.look", reviewed), SDK, false, all);
@@ -2709,7 +2712,7 @@ class PresentationSelectionTest {
     }
 
     @Test void aProviderWithAProblemIsSkippedWithItsMessageAndDoesNotWin() {
-        var broken = provider("a.look", PluginCandidate.Origin.DEV), good = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        PluginCandidate broken = provider("a.look", PluginCandidate.Origin.DEV), good = provider("b.look", PluginCandidate.Origin.BUNDLED);
         var resolution = PluginResolver.resolve(List.of(broken, good), Map.of(), SDK, false, facts(Map.of(
             broken, new PresentationFacts("x", Optional.of("[metrics].row_height: 40 is outside 18-28"), Optional.empty()), good, valid("g")),
             AttemptStore.Record.EMPTY));
@@ -2721,7 +2724,7 @@ class PresentationSelectionTest {
     }
 
     @Test void safeModeDisablesEveryPresentationWhateverItsOrigin() {
-        var bundled = provider("a.look", PluginCandidate.Origin.BUNDLED), dev = provider("b.look", PluginCandidate.Origin.DEV),
+        PluginCandidate bundled = provider("a.look", PluginCandidate.Origin.BUNDLED), dev = provider("b.look", PluginCandidate.Origin.DEV),
             user = provider("c.look", PluginCandidate.Origin.USER);
         var resolution = PluginResolver.resolve(List.of(bundled, dev, user, plain("d.other")), Map.of(), SDK, true,
             facts(Map.of(bundled, valid("a"), dev, valid("b"), user, valid("c")), AttemptStore.Record.EMPTY));
@@ -2732,7 +2735,7 @@ class PresentationSelectionTest {
     }
 
     @Test void aMatchingPendingOrFailedAttemptSkipsTheWinnerAndLeavesTheOthersLosers() {
-        var winner = provider("a.look", PluginCandidate.Origin.BUNDLED), other = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        PluginCandidate winner = provider("a.look", PluginCandidate.Origin.BUNDLED), other = provider("b.look", PluginCandidate.Origin.BUNDLED);
         for (var state : List.of(AttemptStore.State.PENDING, AttemptStore.State.FAILED)) {
             var record = new AttemptStore.Record(Map.of("a.look", AttemptStore.Attempt.NONE.tried("0.1.0", "d1", BUILD, state)));
             var resolution = PluginResolver.resolve(List.of(winner, other), Map.of(), SDK, false,
@@ -2750,7 +2753,7 @@ class PresentationSelectionTest {
     }
 
     @Test void hardDependentsOfASkippedProviderAreSkippedAsUnmetAndOptionalOnesLoad() {
-        var winner = provider("a.look", PluginCandidate.Origin.DEV), loser = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        PluginCandidate winner = provider("a.look", PluginCandidate.Origin.DEV), loser = provider("b.look", PluginCandidate.Origin.BUNDLED);
         var hard = plain("c.hard", new PluginDescriptor.Requirement("b.look", VersionRange.ANY, false));
         var optional = plain("d.soft", new PluginDescriptor.Requirement("b.look", VersionRange.ANY, true));
         var resolution = PluginResolver.resolve(List.of(winner, loser, hard, optional), Map.of(), SDK, false,
@@ -3154,9 +3157,10 @@ agrees with the launch, including after an attempt-record skip.
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginStateStore.java` (two transactions)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginAdmin.java:34-67`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginCatalog.java:18-25,62`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:188-191,695` (Snapshot, Launch)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:188-191,692` (Snapshot, Launch)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/pluginmanager/PluginManager.java:153-154`
 - Test: `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationSelectionTest.java`, `jasper-app/src/test/java/dev/jasper/app/pluginmanager/PluginManagerTest.java`
+- Create: `jasper-app/src/test/java/dev/jasper/app/pluginmanager/PluginManagerAccess.java` (test access bridge)
 
 **Interfaces:**
 - Consumes: `Presentations.read`, the five-argument `resolve` (Task 5), `PluginStateStore.effective`, `enabling(id, enabled, optIn)` (Task 2).
@@ -3243,7 +3247,8 @@ public final class PluginManagerAccess {
 and append to `PluginManagerTest` (before its final closing brace):
 
 ```java
-    @org.junit.jupiter.api.Test void theRestartBannerNamesTheLooksTurnedOff() {
+    @org.junit.jupiter.api.Test void theRestartBannerNamesTheLooksTurnedOff() throws Exception {
+        start(false, false); // the class's @AfterEach stops the runtime and closes the windows that start makes
         var plain = new dev.jasper.app.plugins.PluginRuntime.Snapshot(java.util.List.of(), true, false);
         org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain)).isEqualTo("Restart Jasper to apply your changes.");
         org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain.withTurnedOff(java.util.List.of("Alpha", "Beta"))))
@@ -4498,12 +4503,12 @@ under its kit, and `PluginRuntime.start(selection, …)` consumes it without a s
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:615-641,695`, `PluginResolver.java` (`without`),
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:615-641,692`, `PluginResolver.java` (`without`),
   `PluginStatus.java` (`LOOK_FAILED`), `plugins/package-info.java:3-4`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java:41-84,104-125,162-204,297-331`, `bootstrap/package-info.java:3`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:225-253,833-906`, `application/package-info.java:3`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/startup/StartupTrace.java:301-303` and `document`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java` (JasperApplication no longer reads `Kit.DEFAULT`)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/StaticDefaultTest.java` (JasperApplication no longer reads `Kit.DEFAULT`), `docs/design/theme-engine/migration.csv` (two rows)
 - Test: `jasper-app/src/test/java/dev/jasper/app/plugins/PluginSelectionTest.java`, `jasper-app/src/test/java/dev/jasper/app/bootstrap/ApplicationBootstrapTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/startup/StartupTraceTest.java`
 
@@ -4584,14 +4589,14 @@ class PluginSelectionTest {
     }
 
     @Test void aSkippedLookIsNamedAndBlamingTheKitFallsBackKeepingTheDefaults() throws Exception {
-        Path dev = provider();
-        var first = PluginSelection.of(dirs(), null, "B", dev, false);
+        Path devPlugins = provider();
+        var first = PluginSelection.of(dirs(), null, "B", devPlugins, false);
         first.attempt().pending();
-        var again = PluginSelection.of(dirs(), null, "B", dev, false);
+        var again = PluginSelection.of(dirs(), null, "B", devPlugins, false);
         assertThat(again.presentation().look()).isEqualTo("default");
         assertThat(again.skipped()).hasValueSatisfying(skipped -> assertThat(skipped.name()).isEqualTo("Example"));
         again.skipped().orElseThrow().attempt().clear();
-        var cleared = PluginSelection.of(dirs(), null, "B", dev, false);
+        var cleared = PluginSelection.of(dirs(), null, "B", devPlugins, false);
         assertThat(cleared.presentation().look()).as("Try Again").isEqualTo("dev.example.look");
         var blamed = cleared.blamed();
         assertThat(blamed.presentation().look()).isEqualTo("default");
@@ -5137,17 +5142,25 @@ PY
 Check that nothing else in `JasperApplication` reads the removed `codeLocation`, `developmentDirectory` or `safeMode`
 parameters of the old body (`grep -n "codeLocation\|developmentDirectory" jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java`
 must show only the new convenience method's lines), and that `ApplicationBootstrap` imports `java.util.Objects`
-(add the import if the compiler reports it). The StaticDefaultTest edit anchors on plan 1's text: if plan 4 added
-readers to the set, keep them and remove only JasperApplication.
+(add the import if the compiler reports it). The StaticDefaultTest edit anchors on the set as Tasks 3 and 8 leave it
+(plan 4a added no reader to it; its `Kit.CLASSIC` pin is the separate `CLASSIC_KIT` check Task 3 lifted): remove only
+JasperApplication.
 
 - [ ] **Step 6: Run the tests to verify they pass**
+
+Add the two ledger rows at the end of `docs/design/theme-engine/migration.csv` first (each one line; `PluginSelection` uses `new ArrayList`
+and `PluginSelectionTest` imports `javax.swing`):
+
+```
+jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java,app.plugins,PluginSelection,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/plugins/PluginSelectionTest.java,New in Enterprise plan 5a Task 9; the bootstrap pre-pass that discovers plugins once and builds the one selection; no Swing
+jasper-app/src/test/java/dev/jasper/app/plugins/PluginSelectionTest.java,app.plugins,PluginSelectionTest,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/plugins/PluginSelectionTest.java,Test/fixture ownership; New in Enterprise plan 5a Task 9; the pre-pass's selection; attempt skips and the blamed fallback
+```
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.startup.*' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture`
 Expected: PASS: `PluginSelectionTest` (4), the new `ApplicationBootstrapTest` case, `StartupTraceTest` with the look,
 every `JasperApplication*Test` (which call `startPlugins(null, dev, false, dirs)`), `StaticDefaultTest`, and the
 architecture check with the new `bootstrap → plugins`, `bootstrap → presentation`, `plugins → presentation` and
-`application → presentation` edges and no cycle. Add a ledger row for `PluginSelection.java` or `PluginSelectionTest.java`
-if `ThemeMigrationCoverageTest` names them (both use `new ArrayList`, so expect both), in the Global Constraints' form.
+`application → presentation` edges and no cycle; `ThemeMigrationCoverageTest` names no missing row.
 
 - [ ] **Step 7: Commit**
 
@@ -5186,7 +5199,7 @@ met here (Rulings 3): no `KitContext` is made from the installed look and feel a
 - Modify: `jasper-app/src/main/java/dev/jasper/app/platform/PresentationIcons.java:23-26`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java` (setter and host), `PluginHost.java:98`,
   `HostedContext.java:91`, `HostedKit.java:29-56`, `HostedKitView.java:30`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`startPlugins`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`startPlugins`), `docs/design/theme-engine/migration.csv` (one row)
 - Test: `jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/HostedKitTest.java`
   (a new case, and plan 1's `appContextsAreMadeOverTheInstalledKit`, whose `PresentationIcons` assertion becomes the new rule)
 
@@ -5471,11 +5484,17 @@ PY
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Add `PresentationReachTest.java`'s ledger row at the end of `docs/design/theme-engine/migration.csv` first (one line; it imports
+`dev.jasper.ui` and `javax.swing`):
+
+```
+jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java,app.application,PresentationReachTest,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java,Test/fixture ownership; New in Enterprise plan 5a Task 10; the presentation's kit reaches every KitContext
+```
+
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.platform.*' --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.architecture.StaticDefaultTest'`
 Expected: PASS: `PresentationReachTest` (2), the new `HostedKitTest` case, the renamed
 `appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources` and every existing appearance, platform, plugin,
-workspace and application test. Add `PresentationReachTest.java`'s ledger row (it imports `dev.jasper.ui`) in the
-Global Constraints' form, and any other row `ThemeMigrationCoverageTest` names.
+workspace and application test, and `ThemeMigrationCoverageTest` (in `appearance.*`) names no missing row.
 
 - [ ] **Step 5: Commit**
 
@@ -5512,7 +5531,7 @@ parameter (`bootstrapSelection`), so `startPlugins(AppDirs)` starts the blamed s
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java:49-73`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (constructor, `pluginRuntime()`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (constructor, `pluginRuntime()`), `docs/design/theme-engine/migration.csv` (one row)
 - Test: `jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/application/PresentationReachTest.java` (one case),
   `jasper-app/src/test/java/dev/jasper/app/testsupport/LookFixtures.java` (`loadable`)
@@ -5646,9 +5665,9 @@ Append to `PresentationReachTest` (before its final closing brace):
     @Test void aKitThatCannotBeInstalledRunsTheFallbackValueAndSkipsItsProvider() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         var dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
-        Path dev = LookFixtures.loadable(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
+        Path devPlugins = LookFixtures.loadable(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
             + LookFixtures.provider("look.kit.toml"), Map.of("look.kit.toml", "kit = 1\nbase = \"default\"\n[metrics]\ncontrol_height = 26\n"));
-        var selection = PluginSelection.of(dirs, null, "B", dev, false);
+        var selection = PluginSelection.of(dirs, null, "B", devPlugins, false);
         var kit = selection.presentation().kit();
         assertThat(kit).isNotEqualTo(Kit.DEFAULT);
         JasperApplication[] application = new JasperApplication[1];
@@ -5818,10 +5837,16 @@ PY
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Add `ThemeControllerFallbackTest.java`'s ledger row at the end of `docs/design/theme-engine/migration.csv` first (one line; it imports
+`dev.jasper.ui`):
+
+```
+jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java,app.appearance,ThemeControllerFallbackTest,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/appearance/ThemeControllerFallbackTest.java,Test/fixture ownership; New in Enterprise plan 5a Task 11; the four fallback steps at start
+```
+
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.workspace.ThemeControllerTest' --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.architecture.StaticDefaultTest'`
 Expected: PASS: `ThemeControllerFallbackTest` (5), `PresentationReachTest` (3) and the existing controller and
-application tests (`startup` behaves as before for the default kit). Add `ThemeControllerFallbackTest`'s ledger row (it
-imports `dev.jasper.ui`) in the Global Constraints' form, and any other row `ThemeMigrationCoverageTest` names.
+application tests (`startup` behaves as before for the default kit); `ThemeMigrationCoverageTest` names no missing row.
 
 - [ ] **Step 5: Commit**
 
@@ -5857,7 +5882,7 @@ posts one Warning with Try Again; an invalid kit's plugin-problem notice appears
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java` (`prepareDesktop`'s hook, `startDesktop`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`presentationAttempt`, `startPlugins`, `rehearsalWindow`, `quitNow`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java` (`start`), `PluginSelection.java` (`announceInvalid`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java` (`start`), `PluginSelection.java` (`announceInvalid`), `docs/design/theme-engine/migration.csv` (one row)
 - Test: `jasper-app/src/test/java/dev/jasper/app/application/PresentationAttemptTest.java`, `jasper-app/src/test/java/dev/jasper/app/bootstrap/ApplicationBootstrapTest.java`
 
 **Interfaces:**
@@ -6090,7 +6115,7 @@ Append to `ApplicationBootstrapTest` (before its final closing brace):
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.PresentationAttemptTest' --tests 'dev.jasper.app.bootstrap.ApplicationBootstrapTest'`
-Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `presentationAttempt()` and `attemptBeforePresenting`.
+Expected: FAIL; `compileTestJava` reports "cannot find symbol" for `presentationAttempt()`, `attemptBeforePresenting` and `rehearsalPainted()`.
 
 - [ ] **Step 3: Write the record where spec 4.6 says**
 
@@ -6246,10 +6271,17 @@ PY
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Add `PresentationAttemptTest.java`'s ledger row at the end of `docs/design/theme-engine/migration.csv` first (one line; it imports
+`javax.swing`):
+
+```
+jasper-app/src/test/java/dev/jasper/app/application/PresentationAttemptTest.java,app.application,PresentationAttemptTest,nonvisual-helper,none,none,jasper-app/src/test/java/dev/jasper/app/application/PresentationAttemptTest.java,Test/fixture ownership; New in Enterprise plan 5a Task 12; the attempt lifecycle; proof; Try Again and the once-per-digest notice
+```
+
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
 Expected: PASS: `PresentationAttemptTest` (8: the first paint and the rehearsal's paint prove the look, Try Again
 clears the record and restarts, a not-orderly exit keeps `pending`, and the four cases above), the new bootstrap case and
-every existing application, bootstrap and plugin test. Add `PresentationAttemptTest.java`'s ledger row if the coverage test names it.
+every existing application, bootstrap and plugin test; `ThemeMigrationCoverageTest` names no missing row.
 
 - [ ] **Step 5: Commit**
 
@@ -6281,8 +6313,8 @@ package list), a new `docs/STATUS.md` entry at the top in the style of the plan-
 the full build with its counts.
 
 **Files:**
-- Modify: `docs/plugin-authoring.md:20-23,36` and the capability table (`:268`), `docs/sdk-architecture.md:28-36`,
-  `docs/app-architecture.md:181` (a `presentation` row), `docs/diagnostics.md:33`, `AGENTS.md:24`, `docs/STATUS.md:1`
+- Modify: `docs/plugin-authoring.md:20-23,37` and the capability table (`:278`), `docs/sdk-architecture.md:29-36`,
+  `docs/app-architecture.md:181` (a `presentation` row), `docs/diagnostics.md:33,40`, `AGENTS.md:24`, `docs/STATUS.md:1`
 - Modify: this plan's status banner (first lines of this file)
 
 **Interfaces:**
@@ -6352,10 +6384,11 @@ PY
 This plan changes no file under `jasper-ui`, so the headless gallery's pixels cannot move. Run:
 
 ```bash
-git diff --stat main -- jasper-ui
+git diff --stat main...HEAD -- jasper-ui
 ```
 
-Expected: no output. (If an earlier step had to touch jasper-ui, run `./gradlew :jasper-ui:gallery
+Expected: no output. (Three dots: `main` may have moved on with 3c, 3e or 4b, which change jasper-ui; only this branch's
+own commits count.) (If an earlier step had to touch jasper-ui, run `./gradlew :jasper-ui:gallery
 -Pjasper.galleryTheme=dark` and `=light` on this branch and on `main` in a scratch worktree, and compare every file
 with `cmp`; record the result in the status banner.)
 
@@ -6380,7 +6413,7 @@ Expected: 0 failures and 0 errors; note the four numbers for the entry below.
 - [ ] **Step 4: Write the STATUS entry and the banner**
 
 Insert at the top of `docs/STATUS.md`, right after the `# Jasper — Status and Handoff` heading and its blank line, one
-paragraph (fill `<range>` with `git log --format=%h main..HEAD | tail -1`..`git log -1 --format=%h`, `<counts>` with Step 3's
+paragraph (fill `<range>` with the Task 1 commit, `git log -1 --format=%h --fixed-strings --grep='Presentation provider: the descriptor keys and the capability'`, then `..` and `git log -1 --format=%h`; the plan commits before it are not part of the range, `<counts>` with Step 3's
 line, and `<deviations>` with every deviation from this plan's text, or "none beyond the plan's Rulings"):
 
 ```markdown
@@ -6410,7 +6443,7 @@ presentation check comes first and dependents of a skipped provider are unmet; (
 `startPlugins(AppDirs)` starts it; (10) core-look overloads stay for tests; (11) the bootstrap pre-pass is injectable;
 (12) faces are named by the name table and registered in 5b; (13) deep nesting is invalid TOML; (14) colour-literal,
 title and face rules; (15) the classic base's chrome is the Enterprise column; (16) a blamed kit posts the ordinary
-problem; (17) the four audited editors keep core comparisons, pinned; (18) `look=` in the trace's parenthesis; (19)
+problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
 host facts without AWT. Deviations from the plan's text: <deviations>. Plan-5b entry conditions: register the fonts and
 name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
 --continue`: **<counts>**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
@@ -6440,3 +6473,112 @@ plan 5a with its rulings and the full build's counts.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-16)
+
+**Refresh.** Every anchor, quoted text, path, signature and line number this plan relies on was re-checked against the
+worktree at `279e23bea` (code identical to `main` at `867940b55`: plans 3a, 3b, 3d and 4a). Method: a dry run in a scratch
+copy of the tree applied every step in order (each edit script with its stated counts, each created or appended file and
+each ledger row); after every task, `javac` (JBR 25, the Gradle cache's jars, no Gradle) compiled jasper-app's main and
+test sources with zero errors; after each Step 1 the compile failed with the symbols that task's Step 2 names. The plan's
+new and touched test classes then ran headless through the JUnit 6.1.3 launcher at the end of every task (165 of 165 at
+the end), and the wide suites (`plugins`, `pluginmanager`, `config`, `settingsui`, `startup`, `bootstrap`,
+`presentation`, `architecture`, `application`, `appearance`, `platform`, `workspace.ThemeControllerTest`) failed exactly
+the same tests as the unchanged tree (staged-plugin and jar-property tests that need Gradle's task inputs, nothing else).
+`javadoc -Xdoclint:all` reports no error; `jdeps` shows exactly the new edges Tasks 3, 8 and 9 name and no cycle; the
+source-hygiene scan is clean; every new ledger row has eight fields. Nothing under `jasper-ui` changes. None of the code
+uses an API of plans 3c, 3e, 4b or 4c.
+
+Changes made to this plan's text by the refresh: the header, Workspace and "Before you start" (no rebase; checks for 3a,
+3b, 3d and 4a only; the `ROW_HEIGHT`/`FIELD_RADIUS` count is per name, not per line); "Plan 4's names" (checked, no
+renames); facts 8, 11 and 17 and the Files line numbers of Tasks 3, 6, 9 and 13; Task 3 also edits
+`StaticDefaultTest`'s class comment; Task 5's compound `var` declarations; Task 6's banner case starts the runtime and
+its Files list names the bridge; the local `dev` renamed `devPlugins` in Tasks 9 and 11; Tasks 9 to 12 carry their
+ledger rows as text; Task 9's note on `DEFAULT_KIT_READERS`; Task 12's Step 2 symbols; Task 13's diff, range and STATUS
+item (17).
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface:
+
+| Tasks | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| 1 → 2, 5, 9 | `PluginDescriptor`: the 18-component constructor, `enabledByDefault()`, `declaresPresentation()`, `presentation()`, `themes()`, `themeIds()` | Consumers use the produced shapes; compiles after each task | 9 |
+| 2 → 5 → 9 | `PluginResolver.java`: `admit` and `effective` (2), the five-argument `resolve` and the election (5), `without` (9) | Each later anchor is the earlier task's output; applied in order with its counts | 9 |
+| 2 → 6 | `PluginStateStore`, `PluginAdmin`, `PluginCatalog`: `enabling(id, enabled, optIn)` and `effective` (2), then `enablingPresentation`, `consentingPresentation`, `Disk` with `Presentations` (6) | Agree | 9 |
+| 2 → 11 | `LookFixtures`: `plugin`, `descriptor`, `provider`, `KIT` (2); `loadable` appended (11) | Agree | 9 |
+| 3 → 5, 8, 9 | `KitParser.parse`, `Parsed`, `Faces`, `Files`, `Context`; `ChromeSpec` | Agree; `ChromeSpec` stays inside `presentation` | 9 |
+| 3 → 7 | `DefaultSource` (`ALLOWED`, `CORE`, `value`) created in 3, threaded through the configuration in 7 | Agree | 9 |
+| 3 → 8 → 9 | `StaticDefaultTest`: `KitParser` joins the readers and lifts 4a's `Kit.CLASSIC` pin (3), `Presentation` joins (8), `JasperApplication` leaves (9) | Agree; 4a added no reader to the set | 4, 9 |
+| 3, 5, 8, 9, 10, 11, 12 | `docs/design/theme-engine/migration.csv`: append-only rows | Distinct paths, eight fields each; the coverage test passes at every task's end | 3 |
+| 4 → 5, 9, 12 | `AttemptStore.Record`, `Attempt.blocks` (5); `PresentationAttempt` handle and `announce` (9, 12) | Agree | 9 |
+| 5 → 6 | `PresentationSelectionTest` (6 appends two cases); `Presentations.read` and the five-argument `resolve` | Agree | 1, 9 |
+| 5 → 6 → 9 → 10 → 12 | `PluginRuntime.java`: facts read in `start` (5, interim), `Snapshot`/`Launch` (6), `start(selection, …)` replacing 5's interim (9), `presentation(Kit)` (10), `failed` on load or start failure (12) | Agree; 9's anchors exist after 5 | 9 |
+| 5 → 9 | `PluginStatus`: `SAFE_MODE_LOOK`, `INVALID`, `ATTEMPT_SKIP`, `lookActive`, `quiet` (5); `LOOK_FAILED` (9) | Agree | 9 |
+| 6 → 9 | `PluginCatalog.Launch(…, build)` built by the runtime from the selection's build | Agree | 9 |
+| 7 → 9 | `ConfigService(Path, boolean, DefaultSource)` used by the bootstrap | Agree | 9 |
+| 8 → 9, 10, 11 | `Presentation` (`standard`, `of`, `fallback`, `look`), `Projections.Host` | Agree | 9 |
+| 9 → 10 → 11 → 12 | `JasperApplication.java`: the selection constructor and `startPlugins(AppDirs)` (9), the kit to plugins (10), the installers constructor and `this.selection = this.selection.blamed()` (11), the attempt lifecycle (12) | Agree; 11's case guards 9's field/parameter split | 2, 9 |
+| 9 → 12 | `ApplicationBootstrap.java`, `ApplicationBootstrapTest`, `PluginSelection.java` (`announceInvalid` added in 12) | Agree | 9 |
+| 10 → 11 | `ThemeController` (kit constructor, then `start` and `Step`), `PresentationReachTest` (11 appends a case) | Agree | 2, 9 |
+| 1, 9 → 13 | The keys and `presentation.provide` (1) and `look=` (9) as Task 13 documents them | Agree | 7, 8 |
+| 7, 13 | `config.example.toml`, `docs/configuration.md` (7 only); 13 edits other documents | No overlap | none |
+
+Each task against itself:
+
+| Task | Agreement of its own text | Ruling |
+|---|---|---|
+| 1 | Files, Interfaces, tests, Step 2 symbols, commit list agree; 5 new `DescriptorParserTest` cases pass | none |
+| 2 | Agree; 4 `PluginStateStoreOptInTest` cases pass | none |
+| 3 | Agree after the class-comment edit; 3 + 10 + 2 cases as stated | 4 |
+| 4 | Agree; 5 cases | none |
+| 5 | Did not compile (compound `var`); fixed; 2 + 6 cases as stated | 1 |
+| 6 | The banner case failed in teardown; fixed; the bridge needs no ledger row; the bridge added to Files | 2, 3 |
+| 7 | Agree; 4 cases and the new `AppearanceSelectionTest` case pass | 10 |
+| 8 | Agree; 6 cases; three ledger rows as stated | none |
+| 9 | Did not compile (`dev` shadowed the package); fixed; ledger rows made explicit; `DEFAULT_KIT_READERS` note corrected | 1, 3 |
+| 10 | Agree; ledger row made explicit; 2 cases | 3 |
+| 11 | Did not compile (`dev` shadowed the package); fixed; ledger row made explicit; 5 + 3 cases | 1, 3 |
+| 12 | Step 2 also reports `rehearsalPainted()`; ledger row made explicit; 8 cases | 3 |
+| 13 | STATUS item (17) contradicted Rulings 17; `main..HEAD` and `git diff main` would count other plans' commits; doc line numbers moved; fixed | 5, 7, 8 |
+
+### Rulings
+
+1. **Compile fixes in test code.** Task 5's compound `var` declarations become `PluginCandidate …` (javac: "'var' is not
+   allowed in a compound declaration"), and the locals named `dev` in Task 9's `PluginSelectionTest` and Task 11's
+   `PresentationReachTest` case become `devPlugins`, because a local `dev` hides the package in `dev.jasper.ui.kit.Kit`
+   and `dev.jasper.app.workspace.DesktopTestSupport`. Why: the tests did not compile as written. Cost if wrong: none; the
+   meaning is unchanged.
+2. **The banner case starts the runtime.** `PluginManagerTest`'s `@AfterEach` stops `runtime` and closes `windows`, so
+   Task 6's `theRestartBannerNamesTheLooksTurnedOff` calls `start(false, false)` first instead of moving to a new class.
+   Why: without it the case passes and its teardown throws a `NullPointerException`. Cost if wrong: milliseconds per run.
+3. **Ledger rows are written out.** Tasks 9 to 12 add five named rows (`PluginSelection`, `PluginSelectionTest`,
+   `PresentationReachTest`, `ThemeControllerFallbackTest`, `PresentationAttemptTest`) before their test runs; Task 6's
+   bridge needs none. Why: the dry run's `ThemeMigrationCoverageTest` names exactly these, and the Global Constraints
+   want each row in its file's commit. Cost if wrong: a disposition's wording.
+4. **`StaticDefaultTest`'s class comment.** Task 3 also rewrites the sentence "nothing reads … Kit.CLASSIC". Why: after
+   Task 3 `KitParser` reads it, and AGENTS.md documents only what the system does. Cost if wrong: none.
+5. **Task 13 counts only this branch.** The jasper-ui check is `git diff --stat main...HEAD`, and the STATUS range starts
+   at Task 1's commit. Why: `main` moves while 3c, 3e and 4b merge, and `main..HEAD` starts at the plan commits. Cost if
+   wrong: a wrong range or a false pixel alarm.
+6. **No rebase, no dependency on 3c, 3e, 4b or 4c.** The branch already holds `867940b55`; the pre-flight checks name
+   3a, 3b, 3d and 4a only, and 4b and 4c are 5b's entry condition. Why: the dry run builds and passes without them, and
+   the orchestrator forbids rebasing. Cost if wrong: none for 5a; 5b checks its own entry conditions.
+7. **Line numbers.** Facts 8, 11 and 17 and the Files of Tasks 3, 6, 9 and 13 now give `867940b55`'s numbers; the other
+   facts were checked and hold. Why: the Files numbers are guides, and every edit anchors on quoted text. Cost if wrong:
+   none.
+8. **STATUS item (17)** reads as Rulings 17 and Task 7's code do (the audited editors compare with the effective
+   default through `Editors.effectiveDefault`). Why: the summary said the opposite of the plan's ruling. Cost if wrong:
+   an inaccurate STATUS entry.
+9. **Order is binding.** Every shared file above is edited in task order, and each later anchor is the earlier task's
+   output, as the dry run shows. Execute the tasks in order, one commit each; a task run early stops at its anchor
+   check by design. Cost if wrong: none when run in order.
+10. **Shared files with the parallel plans are reconciled at merge, not here.** Task 7 edits `SchemaPage` (`edited`,
+    `showValue`), `SettingsDraft`, `AppearanceSelection`, `SettingsDialog` and three editors; Task 6 edits the Plugins
+    page's banner; Tasks 3 to 13 append to `migration.csv` and Task 13 prepends to `docs/STATUS.md`. Plan 3e changes
+    `SchemaPage` (titled groups), settings labels and the Plugins page; 3c and 4b add ledger rows and STATUS entries.
+    Keep this plan's anchors at `867940b55`; at merge keep both sides (5a's effective-default comparisons inside 3e's
+    layout; all ledger rows; each STATUS paragraph). Cost if wrong: merge work only.
+11. **Timing-sensitive tests.** `PresentationAttemptTest`, `PresentationReachTest` and the application tests wait on the
+    EDT and on files (`DesktopTestSupport.until`); other plans' Gradle builds run at the same time, so one may flake once.
+    Re-run such a test alone before treating it as a failure, and never run `./gradlew --stop`. Cost if wrong: one rerun.
