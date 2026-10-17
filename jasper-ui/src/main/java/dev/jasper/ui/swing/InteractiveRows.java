@@ -33,7 +33,7 @@ final class InteractiveRows {
         boolean selectionShown(int index) {
             String id = itemId(index);
             if (!dataRow(index) || passive() || !selected.contains(id)) return false;
-            if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return false;
+            if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id) && !context().faces().tree.fillsDetailRow()) return false;
             // A classic side column takes focus from the rows to act on them, so its list shows the selection unfocused.
             return !(node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) || canvas.isFocusOwner()
                 || !context().faces().ordered.rowCommands();
@@ -791,15 +791,7 @@ final class InteractiveRows {
                 int index=tree.indexOf(tree.detail.itemId);
                 if(index>=0) {
                     var g=(Graphics2D)graphics.create();
-                    try {
-                        ThemePainting.antialias(g);
-                        int inset=ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(owner.context(),DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.SURFACE_CONTROL));
-                        int card=Math.max(0,tree.heightAt(index)-tree.detailAfter());
-                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),card,radius,radius);
-                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.BORDER_FOCUS));
-                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,card-1),radius,radius);
-                    }finally{g.dispose();}
+                    try { tree.context().faces().tree.paintDetail(tree, g, index, getWidth()); } finally { g.dispose(); }
                 }
             }
             if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) owner.context().faces().ordered.paintCanvas(this, graphics);
@@ -872,7 +864,7 @@ final class InteractiveRows {
         /** This row's selection or hover fill across the list's full {@code width}, in the canvas's coordinates. */
         void paintFill(Graphics graphics, int width) {
             if (!owner.dataRow(index) || owner.passive()) return;
-            if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return;
+            if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id) && !tree.context().faces().tree.fillsDetailRow()) return;
             boolean focusedOnly = Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner() && !owner.selected.contains(id);
             Color fill = owner.selectionShown(index)
                 ? ThemePainting.color(owner.context(), owner.ink().fill)

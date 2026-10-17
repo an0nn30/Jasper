@@ -75,6 +75,24 @@
 > ▶ 1 px narrower than the mock's, the buttons' gradient (plan 4b's face) and the search placeholder (#7A808A, 1 px
 > higher than the mock's #9AA0A8; the shared field face).
 
+> **Status, Task 4 (2026-10-17):** the recording band matches mock 07b's probes (share 0.974, floor 0.93; Keymap 0.986
+> unchanged); the default look is unchanged (`changed: none`). Calibration, measured from 07b (classic values): band 60
+> tall from the row's bottom (`KEYCAP_DETAIL_TOP` 6 and `KEYCAP_DETAIL_BOTTOM` 10, not 7 and 7; `KEYCAP_DETAIL_GAP` 6 to
+> 5), because the 22 px field centres on the 24 px Cancel and Set, so the field's ring lands on the mock's 202 with the
+> buttons 1 px above the mock's (the mock top-aligns the field), and the hint line at the mock's 234; `KEYCAP_DETAIL_LEADING`
+> 34, not 32 (the field's focus halo is painted outside its bounds, so the ring sits at the leading edge, canvas 34 as
+> the mock); `KEYCAP_DETAIL_EDGE_ALPHA` 49, not 51 (#C9D6F1 for the mock's #C9D7F2; `border.focus` is the accent
+> #2F65CA); the armed dot is 8 px (the mock's, the default `KEYCAP_RECORDER_DOT`, not 7) at 9 into the field with the
+> prompt 9 after it: `KEYCAP_RECORDER_PADDING` 7, `KEYCAP_RECORDER_HALO` 2 at `KEYCAP_RECORDER_HALO_ALPHA` 0 (not halo
+> 0), as the shared `ICON_GAP` (7) follows the halo. Deviations: the classic face's recorder keeps the error edge
+> (`KitButton.border()`) when not ringed and takes its fill from `KitButton.fill`; the plan's `ClassicButtonFace.text`
+> line is not added, because `KitButton.textRole` already gives an armed recorder without keycaps `text.placeholder`;
+> the band's edge alpha is read unscaled (`metrics().value`, as the recorder's halo alpha is), not through
+> `ThemePainting.metric`, which would double it at 2x UI scale; `keymapRecordingMatchesItsMock` writes its share to
+> `pages-keymap-recording.txt`. Residuals: Cancel 59 and Set 47 wide against the mock's 62 and 48 (the shared button
+> paddings), so the field ends 4 px later; the field's focus halo is the kit's graded ring, not the mock's flat
+> #C9D7F2; the hint line's ⋯ (Rulings 11, N19).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

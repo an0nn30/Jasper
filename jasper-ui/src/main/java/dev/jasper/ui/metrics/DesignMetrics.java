@@ -156,7 +156,9 @@ public final class DesignMetrics {
         // the classic rows, whose Reset is in the row's menu, keep none).
         SETTINGS_TRAILING_EMPTY_GAP(10),
         // Plan 9b: the lanes of a keycap tree with columns (the classic Keymap mock), read only there; equal in both catalogs.
-        KEYMAP_SCOPE_COLUMN(107), KEYMAP_SHORTCUT_COLUMN(137), KEYMAP_KEYS_INSET(25), KEYMAP_SCOPE_GAP(30);
+        KEYMAP_SCOPE_COLUMN(107), KEYMAP_SHORTCUT_COLUMN(137), KEYMAP_KEYS_INSET(25), KEYMAP_SCOPE_GAP(30),
+        // Plan 9b: the alpha of the classic recording band's edges over its fill; 0 draws none (today's card has its own edge).
+        KEYCAP_DETAIL_EDGE_ALPHA(0);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -267,6 +269,21 @@ public final class DesignMetrics {
         values.put(Role.KEYCAP_GROUP_SIDE, 8);
         values.put(Role.KEYCAP_TREE_LEAF_INDENT, 26);
         values.put(Role.KEYCAP_DETAIL_INSET, 4);
+        // Plan 9b: the classic recording band, measured from mock 07b: 60 tall from the row's bottom with #C9D7F2 edges; the
+        // field 22 tall at the canvas's 34 and 7 below the band's top (centred on the 24 px Cancel and Set, which therefore
+        // stand 1 px above the mock's), the hint line 4 below them, Set ending 8 before the box; the armed dot 8 px at 9
+        // into the field and the prompt 9 after it (a halo at alpha 0 keeps that room).
+        values.put(Role.KEYCAP_DETAIL_EDGE_ALPHA, 49);
+        values.put(Role.KEYCAP_DETAIL_TOP, 6);
+        values.put(Role.KEYCAP_DETAIL_BOTTOM, 10);
+        values.put(Role.KEYCAP_DETAIL_GAP, 5);
+        values.put(Role.KEYCAP_DETAIL_LEADING, 34);
+        values.put(Role.KEYCAP_CONTENT_TRAILING, 8);
+        values.put(Role.KEYCAP_DETAIL_AFTER, 0);
+        values.put(Role.KEYCAP_RECORDER_PADDING, 7);
+        values.put(Role.KEYCAP_RECORDER_HALO, 2);
+        values.put(Role.KEYCAP_RECORDER_HALO_ALPHA, 0);
+        values.put(Role.KEYCAP_RECORDER_HEIGHT, 22);
         // Plan 9b Task 3: the mock's rows from the header rule, 16 px square keycaps 3 apart in #B4B8BF on #F7F8F9, and buttons
         // with 11 px sides (Find by Shortcut 110 wide; Shell's Add Variable… and Browse… keep the same sides).
         values.put(Role.KEYCAP_TREE_INSET, 0);

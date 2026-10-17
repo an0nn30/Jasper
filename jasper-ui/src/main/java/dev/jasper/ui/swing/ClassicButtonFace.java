@@ -58,7 +58,8 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     @Override public void paintFace(Buttons.KitButton b, Graphics2D g, boolean hover, boolean focused) {
-        if (b.embedded || b.recorder() || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
+        if (b.recorder()) { recorder(b, g, focused); return; }
+        if (b.embedded || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
         var c = b.context();
         boolean flat = ghost(b) && flat(b), selected = b.toggle && b.isSelected(), pressed = b.isEnabled() && b.getModel().isPressed();
         if (flat && !hover && !selected) { ThemePainting.rounded(g, b, c, null, null, focused, false); return; }
@@ -220,5 +221,16 @@ final class ClassicButtonFace implements ButtonFace {
      */
     @Override public int cellChevronLane(KitContext context) {
         return 2 * ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH_INSET) + ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH);
+    }
+
+    /**
+     * A recorder value drawn as a classic field (plan 9b Rulings 10): the input surface, its edge (the error edge while it
+     * reports one), and the focus ring while focused or armed.
+     */
+    private static void recorder(Buttons.KitButton b, Graphics2D g, boolean focused) {
+        var c = b.context();
+        boolean ring = focused || b.armed();
+        ThemePainting.rounded(g, b, c, b.fill(false), ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS) : b.border(),
+            ring, false, DesignMetrics.Role.FIELD_RADIUS);
     }
 }

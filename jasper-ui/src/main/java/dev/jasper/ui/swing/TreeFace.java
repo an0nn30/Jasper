@@ -12,4 +12,8 @@ interface TreeFace extends HeaderFace {
     void styleDisclosure(Buttons.KitButton button, KitContext context, boolean expanded);
     /** A row title's role: {@code declared}, or the category role for a branch. */
     Nodes.TextRole title(boolean leaf, Nodes.TextRole declared);
+    /** Paints the keycap detail of row {@code index} across {@code width}: today's card, or the classic band below the row. */
+    void paintDetail(Trees.TreeControl tree, java.awt.Graphics2D g, int index, int width);
+    /** Whether the edited row keeps its selection fill above its detail (the classic band); today's card covers it. */
+    boolean fillsDetailRow();
 }

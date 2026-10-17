@@ -68,7 +68,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         setOpaque(false);
         this.shape = shape;
         tree = new ShortcutTree(macOs, shape.columns());
-        editor = new ShortcutEditPanel(context, macOs, writer, this::stopSearchRecording);
+        editor = new ShortcutEditPanel(context, macOs, writer, this::stopSearchRecording, shape.recorderField());
         int side = scaled(context, DesignMetrics.Role.KEYMAP_PAGE_PADDING);
         setBorder(BorderFactory.createEmptyBorder(scaled(context, DesignMetrics.Role.KEYMAP_PAGE_TOP_PADDING), side, scaled(context, DesignMetrics.Role.KEYMAP_PAGE_BOTTOM_PADDING), side));
         top = new KitView(context, topSpec(), this::event);
@@ -190,7 +190,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
     }
 
     /** Enter or a click: a section opens or closes; an editable shortcut starts editing. */
-    private void activate(String id) {
+    void activate(String id) {
         if (id == null) return;
         if (tree.isGroup(id)) {
             tree.expanded(id, !tree.isOpenItem(id));
@@ -215,7 +215,7 @@ final class ShortcutPanel extends JPanel implements AutoCloseable {
         render();
     }
 
-    private void render() {
+    void render() {
         if (closed) return;
         top.update(topSpec());
         top.setFieldTrailing(SEARCH, shape.textTools() ? Optional.empty()

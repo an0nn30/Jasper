@@ -26,6 +26,8 @@ import javax.swing.SwingUtilities;
 final class ShortcutEditPanel extends JPanel {
     private final boolean macOs;
     private final Runnable recordingStarted;
+    /** The classic band (spec 12.2): the recorder is a field a click arms, and the hint line has no Record action. */
+    private final boolean recorderField;
     private final Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer;
     private dev.jasper.ui.swing.TreeDetailHandle detail;
     private KitView host;
@@ -40,7 +42,13 @@ final class ShortcutEditPanel extends JPanel {
 
     ShortcutEditPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer,
                       Runnable recordingStarted) {
+        this(context, macOs, writer, recordingStarted, false);
+    }
+
+    ShortcutEditPanel(KitContext context, boolean macOs, Function<Map<String, Optional<String>>, CompletableFuture<Void>> writer,
+                      Runnable recordingStarted, boolean recorderField) {
         super(new BorderLayout());
+        this.recorderField = recorderField;
         setOpaque(false);
         this.macOs = macOs; this.writer = writer; this.recordingStarted = recordingStarted;
         setVisible(false);
@@ -156,6 +164,9 @@ final class ShortcutEditPanel extends JPanel {
             : "Set stages this shortcut; Apply or OK in Settings saves it.";
     }
 
+    /** The band's descriptor now; for tests. */
+    ViewSpec specForTests() { return spec(); }
+
     private ViewSpec spec() {
         String value = recording && binding == null ? "Press a key combination…" : ShortcutText.format(candidate);
         var idle = new ControlState(true, !saving, false, "");
@@ -169,10 +180,11 @@ final class ShortcutEditPanel extends JPanel {
             new Nodes.Button("editor.cancel", idle, "Cancel", "", Nodes.ButtonKind.SECONDARY, "editor.cancel", ""),
             new Nodes.Button("editor.set", new ControlState(true, settable(), false, ""), "Set", "", Nodes.ButtonKind.PRIMARY, "editor.set", "")));
         // Recording and the shortcut actions stay at hand as compact text actions on the hint line.
-        var note = new Nodes.Stack("editor.note", ControlState.READY, Nodes.LayoutRole.NAVIGATION,List.of(
-            new Nodes.Text("editor.message", ControlState.READY, message(), Nodes.TextRole.CAPTION),
+        var message = new Nodes.Text("editor.message", ControlState.READY, message(), Nodes.TextRole.CAPTION);
+        var more = new Nodes.MenuButton("editor.options",idle,"","more",Nodes.ButtonKind.GHOST,"",options,"Shortcut actions",Nodes.ButtonPresentation.EMBEDDED);
+        var note = new Nodes.Stack("editor.note", ControlState.READY, Nodes.LayoutRole.NAVIGATION, recorderField ? List.of(message, more) : List.of(message,
             new Nodes.Button("editor.record", idle, recording ? "Stop" : "Record", "", Nodes.ButtonKind.GHOST, "editor.record", "Start or stop recording", Nodes.ButtonPresentation.EMBEDDED),
-            new Nodes.MenuButton("editor.options",idle,"","more",Nodes.ButtonKind.GHOST,"",options,"Shortcut actions",Nodes.ButtonPresentation.EMBEDDED)));
+            more));
         return new ViewSpec(new Nodes.Stack("editor", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(capture,note,
             new Nodes.SettingRow("editor.reassign.row", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", "",
                 new Nodes.Toggle("editor.reassign", new ControlState(!conflicts.isEmpty(), !saving, false, ""), "Reassign from conflicting action", reassign, "editor.reassign", false), false))));

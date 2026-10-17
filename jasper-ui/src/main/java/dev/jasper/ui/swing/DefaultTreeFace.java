@@ -28,4 +28,6 @@ final class DefaultTreeFace implements TreeFace {
     @Override public Nodes.ButtonPresentation disclosure() { return Nodes.ButtonPresentation.STANDARD; }
     @Override public void styleDisclosure(Buttons.KitButton button, KitContext context, boolean expanded) { }
     @Override public Nodes.TextRole title(boolean leaf, Nodes.TextRole declared) { return declared; }
+    @Override public void paintDetail(Trees.TreeControl tree, java.awt.Graphics2D g, int index, int width) { tree.paintDetailCard(g, index, width); }
+    @Override public boolean fillsDetailRow() { return false; }
 }

@@ -32,4 +32,10 @@ public final class ShortcutTestSupport {
 
     /** Sends the action {@code id} to the panel, as its tools' buttons do. */
     static void action(ShortcutPanel panel, String id) { panel.event(new dev.jasper.ui.model.UiEvent.Action(id)); }
+
+    /** Calls the panel's activation of {@code itemId}, as a click on its row does. */
+    static void activate(ShortcutPanel panel, String itemId) { panel.activate(itemId); }
+
+    /** Renders the panel's views again. */
+    static void render(ShortcutPanel panel) { panel.render(); }
 }

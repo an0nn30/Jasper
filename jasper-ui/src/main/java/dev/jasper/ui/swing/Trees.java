@@ -154,6 +154,16 @@ final class Trees {
             body.inheritedEnabled(interactive());canvas.add(body);detailChanged();return detail;
         }
         void detailChanged(){measureRows();canvas.revalidate();sync();canvas.repaint();}
+        /** Today's keycap detail: a rounded card from the row's top, in the control surface, edged in the focus colour. */
+        void paintDetailCard(java.awt.Graphics2D g, int index, int width) {
+            ThemePainting.antialias(g);
+            int inset=ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.CONTROL_RADIUS)*2;
+            g.setColor(ThemePainting.color(context(),dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL));
+            int card=Math.max(0,heightAt(index)-detailAfter());
+            g.fillRoundRect(inset,top(index),Math.max(0,width-2*inset),card,radius,radius);
+            g.setColor(ThemePainting.color(context(),dev.jasper.ui.theme.SemanticColor.BORDER_FOCUS));
+            g.drawRoundRect(inset,top(index),Math.max(0,width-2*inset-1),Math.max(0,card-1),radius,radius);
+        }
         void detach(TreeDetailHandle handle) {
             if(!handle.attached)return;
             handle.attached=false;

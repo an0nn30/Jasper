@@ -80,6 +80,12 @@ class SettingsPagesMockTest {
             probe("Scope separator", 779, 94), probe("Shortcut separator", 886, 94), probe("Copy keycap edge", 911, 180)));
         tight("keymap", "header band");
         face("keymap", "header rule", "Copy keycap edge");
+        // Mock 07b: the band's edges #C9D7F2 and fill #EEF2FA, the field's ring #2F65CA, the dot #D03A3A, Set's disabled fill #E1E3E6.
+        PROBES.put("keymap-recording", List.of(probe("edited row selected", 600, 183), probe("band top edge", 600, 195),
+            probe("band fill", 300, 240), probe("band at the tree's left", 250, 240), probe("band bottom edge", 600, 254),
+            probe("recorder field", 500, 213), probe("recorder ring", 600, 202), probe("armed dot", 295, 213), probe("Set disabled", 1000, 213)));
+        face("keymap-recording", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
+            "recorder field", "recorder ring", "armed dot", "Set disabled");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -194,6 +200,26 @@ class SettingsPagesMockTest {
         try (var settings = EnterpriseSettings.open(false)) {
             SwingUtilities.invokeAndWait(() -> dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.expand(keymap(settings), "Clipboard"));
             assertThat(compare(settings, List.of("keymap"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void keymapRecordingMatchesItsMock() throws Exception {
+        var recording = new SettingsChromeMockTest.Page("Settings 07b - Keymap - Recording shortcut.png", "keymap", 713, 7);
+        try (var settings = EnterpriseSettings.open(false)) {
+            var render = new BufferedImage[1];
+            SwingUtilities.invokeAndWait(() -> {
+                var keymap = keymap(settings);
+                dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.expand(keymap, "Clipboard");
+                dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.edit(keymap, "Copy");
+                render[0] = settings.render("keymap", 1040, recording.height());
+            });
+            ImageIO.write(render[0], "png", Files.createDirectories(EnterpriseSettings.OUT.resolve("pages")).resolve("07b.png").toFile());
+            var mock = SettingsChromeMockTest.content(recording);
+            var failures = new ArrayList<>(probes("keymap-recording", render[0], mock));
+            var shares = new StringBuilder();
+            failures.addAll(share("keymap-recording", "07b", recording, render[0], mock, shares));
+            Files.writeString(EnterpriseSettings.OUT.resolve("pages-keymap-recording.txt"), shares);
+            assertThat(failures).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
     }
 }
