@@ -24,14 +24,10 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.JToggleButton;
 import javax.swing.UIManager;
@@ -50,11 +46,18 @@ import javax.swing.UIManager;
  * existing button in place via {@link #updateBadge}, and an action's title change renames its button in place via
  * {@link #refreshActions} (the button follows the action's enabled state itself). EDT only.
  */
-final class ToolStripe extends JPanel {
-    /** One tool window's button, with its unread badge if it has one. */
-    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
+final class ToolStripe extends DockStripe {
+    /**
+     * One tool window's button, with its unread badge if it has one and the digit its toggle's shortcut ends in, if any;
+     * a rail shows no digit, a labelled stripe starts its label with it.
+     */
+    record Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge, java.util.OptionalInt number) {
         Button(String id, String title, Icon icon, Slot slot, boolean selected) {
-            this(id, title, icon, slot, selected, Optional.empty());
+            this(id, title, icon, slot, selected, Optional.empty(), java.util.OptionalInt.empty());
+        }
+
+        Button(String id, String title, Icon icon, Slot slot, boolean selected, Optional<PanelBadge> badge) {
+            this(id, title, icon, slot, selected, badge, java.util.OptionalInt.empty());
         }
     }
 
@@ -66,11 +69,6 @@ final class ToolStripe extends JPanel {
         Rectangle gap;
     }
 
-    Consumer<String> onToggle = id -> { };
-    BiConsumer<String, Slot> onMove = (id, slot) -> { };
-    Consumer<String> onHide = id -> { };
-    /** Hears of each window button a render creates, so that a drag can start from it. */
-    BiConsumer<JComponent, String> dragSource = (component, id) -> { };
     private final Side side;
     private final List<AbstractButton> buttons = new ArrayList<>();
     private final EnumMap<Slot.Group, List<AbstractButton>> groups = new EnumMap<>(Slot.Group.class);
@@ -179,7 +177,7 @@ final class ToolStripe extends JPanel {
         AbstractButton button = byId.get(id);
         Button window = windows.get(id);
         if (button == null || window == null) return;
-        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge);
+        Button updated = new Button(window.id(), window.title(), window.icon(), window.slot(), window.selected(), badge, window.number());
         windows.put(id, updated);
         decorate(button, updated);
         button.repaint();
@@ -244,6 +242,9 @@ final class ToolStripe extends JPanel {
         if (actionsSeparator == null && !actions.isEmpty()) actionsSeparator = dragSeparator();
         doLayout(); repaint();
     }
+
+    /** A rail's gap is one button's step whatever the label. */
+    @Override void beginDrag(String id, String label) { beginDrag(id); }
 
     private JSeparator dragSeparator() {
         var separator = new JSeparator();

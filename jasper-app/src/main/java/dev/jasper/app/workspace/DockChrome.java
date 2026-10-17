@@ -11,4 +11,7 @@ package dev.jasper.app.workspace;
 record DockChrome(boolean labelledStripes, boolean flushFrames) {
     /** The default look's dock: icon rails and today's frames. */
     static final DockChrome STANDARD = new DockChrome(false, false);
+
+    /** A new set of stripes for one window over its kit: today's icon rails. */
+    StripeSet stripes(dev.jasper.ui.kit.Kit kit) { return new StripeSet.IconRails(); }
 }

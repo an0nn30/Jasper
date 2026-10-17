@@ -48,7 +48,7 @@ class WindowPanelsTest {
         model.requestPanel(new Contributions.PanelRequest(owner.id(), id, Contributions.PanelRequest.Op.TOGGLE));
     }
 
-    private static List<String> tips(ToolStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
+    private static List<String> tips(DockStripe stripe) { return stripe.buttons().stream().map(AbstractButton::getToolTipText).toList(); }
 
     private static Rectangle in(JComponent root, Component component) {
         return SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), root);

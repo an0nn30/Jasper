@@ -76,7 +76,7 @@ final class WindowContributions implements AutoCloseable {
         owner.chrome().connect(this);
         renderStatus();
         restoreSizes();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+        for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = this::togglePanel;
             stripe.onMove = this::movePanel;
             stripe.onHide = this::hidePanel;
@@ -85,6 +85,7 @@ final class WindowContributions implements AutoCloseable {
         owner.area().onHide = this::hidePanel;
         owner.dockDrag().onDrop = this::dropped;
         owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+        owner.dockDrag().labels = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
         dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
@@ -328,19 +329,20 @@ final class WindowContributions implements AutoCloseable {
 
     private void renderStripes() {
         owner.dockDrag().cancel();
-        List<ToolStripe.Button> left = new ArrayList<>(), right = new ArrayList<>();
+        List<ToolStripe.Button> windows = new ArrayList<>();
         for (Slot slot : Slot.values())
             for (String id : dock.ids(slot)) {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
-                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge());
-                (slot.stripe() == Side.LEFT ? left : right).add(button);
+                windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
+                    panel.entry.badge()));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
-        owner.leftStripe().render(left, railActions);
-        owner.rightStripe().render(right, List.of());
+        // Every stripe keeps the windows of the slots it shows.
+        owner.leftStripe().render(windows, railActions);
+        owner.rightStripe().render(windows, List.of());
+        owner.bottomStrip().ifPresent(strip -> strip.render(windows, List.of()));
         owner.syncRailVisibility();
     }
 
@@ -351,8 +353,7 @@ final class WindowContributions implements AutoCloseable {
      */
     private void updateBadges() {
         for (PanelInstance panel : panels.values()) {
-            owner.leftStripe().updateBadge(panel.entry.id(), panel.entry.badge());
-            owner.rightStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+            for (DockStripe stripe : owner.stripes().all()) stripe.updateBadge(panel.entry.id(), panel.entry.badge());
         }
     }
 
@@ -374,7 +375,7 @@ final class WindowContributions implements AutoCloseable {
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
                 if (structural) renderStripes();
-                else for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) stripe.refreshActions();
+                else for (DockStripe stripe : owner.stripes().all()) stripe.refreshActions();
             }
             case PANELS -> { syncPanels(); renderStripes(); }
             case RAIL -> renderStripes();
@@ -437,6 +438,7 @@ final class WindowContributions implements AutoCloseable {
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;
+        owner.dockDrag().labels = id -> "";
         dock.removeListener(docked);
         commands.values().forEach(Subscription::close);
         commands.clear();
@@ -447,7 +449,7 @@ final class WindowContributions implements AutoCloseable {
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
         for (PanelInstance panel : panels.values()) if (panel.site != null) panel.site.notifyClosed();
         panels.clear();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+        for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = id -> { };
             stripe.onMove = (id, slot) -> { };
             stripe.onHide = id -> { };
