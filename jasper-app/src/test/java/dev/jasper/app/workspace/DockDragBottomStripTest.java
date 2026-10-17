@@ -1,0 +1,166 @@
+package dev.jasper.app.workspace;
+
+import static dev.jasper.app.workspace.DesktopTestSupport.edt;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.app.dock.DockState;
+import dev.jasper.app.dock.Side;
+import dev.jasper.app.dock.Slot;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.LayoutTestSupport;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.KeyboardFocusManager;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.InputEvent;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.AbstractButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRootPane;
+import javax.swing.LookAndFeel;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/** Review Focus 3: dragging a tool window onto the bottom strip, a window built like WindowContent's under labelled stripes. */
+class DockDragBottomStripTest {
+    private CommandPaletteShortcutsTest.RecordingFocusManager keys;
+    private KeyboardFocusManager previousKeys;
+    private final List<Window> windows = new ArrayList<>();
+
+    @BeforeEach void setUp() throws Exception {
+        edt(() -> {
+            EnterpriseLook.install(false);
+            previousKeys = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+        });
+    }
+
+    @AfterEach void tearDown() throws Exception {
+        edt(() -> {
+            try {
+                for (Window window : windows) window.drag.cancel();
+                assertThat(keys.dispatchers).isEmpty();
+            } finally {
+                KeyboardFocusManager.setCurrentKeyboardFocusManager(previousKeys);
+                EnterpriseLook.restoreDefault();
+            }
+        });
+    }
+
+    /** a and b on the left stripe's top group, c and e in Bottom Left (or none), d on the right stripe. */
+    private final class Window {
+        final DockState state = new DockState();
+        final StripeSet.LabelledStripes stripes = new StripeSet.LabelledStripes(EnterpriseLook.kit());
+        final ToolWindowArea area = new ToolWindowArea(new JPanel(), state, EnterpriseLook.kit(), true);
+        final JPanel content = new JPanel(new BorderLayout());
+        final JRootPane rootPane = new JRootPane();
+        final DockDrag drag = new DockDrag(content, state, area, stripes);
+
+        Window(boolean bottomWindows) {
+            var header = new JPanel(); header.setPreferredSize(new Dimension(10, 30));
+            var body = new JPanel(new BorderLayout());
+            body.add(stripes.left(), BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(stripes.right(), BorderLayout.EAST);
+            body.add(stripes.bottomStrip(), BorderLayout.SOUTH);
+            content.add(header, BorderLayout.NORTH); content.add(body, BorderLayout.CENTER);
+            rootPane.setContentPane(content);
+            for (DockStripe stripe : stripes.all()) stripe.dragSource = drag::install;
+            area.dragSource = drag::install;
+            drag.railsEnabled = () -> true;
+            drag.labels = id -> id.toUpperCase();
+            drag.onDrop = (id, target) -> {
+                if (target.onStripe()) state.move(id, target.slot(), target.index().getAsInt());
+                else state.moveAndShow(id, target.slot(), state.dropIndex(id, target.slot()));
+            };
+            for (String id : List.of("a", "b")) { state.add(id, Slot.LEFT_TOP); area.setContent(id, id.toUpperCase(), new JLabel(id)); }
+            if (bottomWindows) for (String id : List.of("c", "e")) { state.add(id, Slot.BOTTOM_LEFT); area.setContent(id, id.toUpperCase(), new JLabel(id)); }
+            state.add("d", Slot.RIGHT_TOP); area.setContent("d", "D", new JLabel("d"));
+            state.addListener(change -> { drag.cancel(); area.sync(); render(); layout(); });
+            render();
+            rootPane.setSize(1200, 800);
+            layout();
+            windows.add(this);
+        }
+
+        void render() {
+            var buttons = new ArrayList<ToolStripe.Button>();
+            for (Slot slot : Slot.values())
+                for (String id : state.ids(slot)) buttons.add(new ToolStripe.Button(id, id.toUpperCase(), null, slot, state.visible(id)));
+            for (DockStripe stripe : stripes.all()) {
+                stripe.render(buttons, List.of());
+                stripe.setVisible(!stripe.empty());
+            }
+        }
+
+        void layout() { LayoutTestSupport.layoutTree(rootPane); }
+
+        AbstractButton label(DockStripe stripe, String id) {
+            return stripe.buttons().stream().filter(button -> id.toUpperCase().equals(button.getToolTipText())).findFirst().orElseThrow();
+        }
+
+        Point center(Component component) {
+            Rectangle bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), content);
+            return new Point((int) bounds.getCenterX(), (int) bounds.getCenterY());
+        }
+
+        void mouse(JComponent source, int id, Point inContent) {
+            Point at = SwingUtilities.convertPoint(content, inContent, source);
+            int modifiers = id == MouseEvent.MOUSE_RELEASED ? 0 : InputEvent.BUTTON1_DOWN_MASK;
+            int button = id == MouseEvent.MOUSE_DRAGGED ? MouseEvent.NOBUTTON : MouseEvent.BUTTON1;
+            source.dispatchEvent(new MouseEvent(source, id, System.currentTimeMillis(), modifiers, at.x, at.y, 1, false, button));
+        }
+
+        /** Presses on the label, moves past the threshold, then to {@code to}, and releases there. */
+        void drop(AbstractButton source, Point to) {
+            Point from = center(source);
+            mouse(source, MouseEvent.MOUSE_PRESSED, from);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(from.x + 20, from.y + 20));
+            mouse(source, MouseEvent.MOUSE_DRAGGED, to);
+            mouse(source, MouseEvent.MOUSE_RELEASED, to);
+        }
+    }
+
+    @Test void aDropBetweenTwoBottomLabelsLandsBetweenThem() throws Exception {
+        edt(() -> {
+            var window = new Window(true);
+            var strip = window.stripes.bottomStrip();
+            Rectangle c = SwingUtilities.convertRectangle(strip, window.label(strip, "c").getBounds(), window.content);
+            Rectangle e = SwingUtilities.convertRectangle(strip, window.label(strip, "e").getBounds(), window.content);
+            window.drop(window.label(window.stripes.left(), "a"), new Point((c.x + c.width + e.x + e.width / 2) / 2 + 1, c.y + c.height / 2));
+            assertThat(window.state.ids(Slot.BOTTOM_LEFT)).containsExactly("c", "a", "e");
+            assertThat(window.state.ids(Slot.LEFT_TOP)).containsExactly("b");
+        });
+    }
+
+    @Test void aDropOnTheEmptyRightHalfLandsInBottomRight() throws Exception {
+        edt(() -> {
+            var window = new Window(true);
+            var strip = window.stripes.bottomStrip();
+            Rectangle bounds = SwingUtilities.convertRectangle(strip.getParent(), strip.getBounds(), window.content);
+            window.drop(window.label(window.stripes.left(), "b"), new Point(bounds.x + bounds.width - 120, bounds.y + bounds.height / 2));
+            assertThat(window.state.ids(Slot.BOTTOM_RIGHT)).containsExactly("b");
+        });
+    }
+
+    @Test void aHiddenStripTakesADropAtTheWorkspacesBottomEdgeAndShows() throws Exception {
+        edt(() -> {
+            var window = new Window(false);
+            var strip = window.stripes.bottomStrip();
+            assertThat(strip.isVisible()).as("no bottom window: the strip hides").isFalse();
+            Rectangle area = SwingUtilities.convertRectangle(window.area.getParent(), window.area.getBounds(), window.content);
+            int edge = area.y + area.height - strip.thickness() / 2;
+            window.drop(window.label(window.stripes.left(), "a"), new Point(area.x + 200, edge));
+            assertThat(window.state.ids(Slot.BOTTOM_LEFT)).containsExactly("a");
+            assertThat(strip.isVisible()).as("the drop gives the strip a window").isTrue();
+        });
+    }
+}

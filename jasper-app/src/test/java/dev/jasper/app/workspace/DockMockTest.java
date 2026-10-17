@@ -124,5 +124,76 @@ class DockMockTest {
             MockCrops.agreement(MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), mock, 24), STRIPE_FLOOR);
     }
 
+    /**
+     * The bottom strip's three closed labels, "Event Log", "Transfers" and "Problems" with a count pill (a fixture: the
+     * mock's amber pill is the deferred Problems panel; this one is the error tone), against the mocks' bottom strip: the
+     * strip is 28 thick against the mock's 24 and its labels start at the side stripes' 28 against 23 (Rulings 4 and 8),
+     * so the render is cropped on its fill's middle rows and its ink is compared 10 px (2x) to the right of the mock's.
+     * Asserted: the surface, three dividers in the mock's colour, the first label's leading ink and the pill's width;
+     * the later edges, the pill's start and the agreeing share follow the labels' advance widths and glyphs and are
+     * printed until plan 5b's Plex (Execution notes R5). The render is 330 wide, past the mock's 270, so the platform
+     * face's wider labels still show their third divider.
+     */
+    @Test void theBottomStripMatchesTheMocks() throws Exception {
+        for (Variant variant : VARIANTS) {
+            try {
+                EnterpriseLook.install(variant.dark());
+                var strip = new BottomStrip(EnterpriseLook.kit());
+                var problems = new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
+                    java.util.Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ERROR, "1 problem")),
+                    java.util.OptionalInt.empty());
+                strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false),
+                    new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
+                int thickness = strip.getPreferredSize().height, shift = 2 * (thickness - 23);
+                var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
+                var mock = variant.crop(2, 1708, 520, 48);
+                // The render's fill (below its 2 px rule at 2x), its middle 48 rows; the mock crop is the mock's fill.
+                int fill = 2 * thickness - 2, top = 2 + (fill - 48) / 2;
+                var rows = MockCrops.crop(render, shift, top, 600, 48);
+                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(rows, 0, 0, 520, 48), mock);
+                String where = variant.name() + " bottom strip";
+                Color surface = MockCrops.at(mock, 10, 4), divider = MockCrops.at(mock, 188, 24);
+                assertThat(MockCrops.near(MockCrops.at(rows, 10, 4), surface, variant.fillTolerance())).as(where + ": its surface").isTrue();
+                // The dividers, found as runs in the fill's top 6 rows (2x), where no text or pill has ink (adjacent
+                // columns join: gap 1): the mock's are 2 px wide at 188, 332 and 518 of this crop. border.divider is the
+                // fixture theme's #D3D6DA and #4A4D53 (6b's override), the mock's.
+                var theirDividers = MockCrops.runs(variant.crop(2, 1708, 525, 6), false, 20, 1, surface);
+                var myDividers = MockCrops.runs(MockCrops.crop(rows, 0, 0, 600, 6), false, 20, 1, surface);
+                assertThat(theirDividers).as(where + ": the mock's dividers").hasSize(3);
+                assertThat(myDividers).as(where + ": a divider after each label").hasSize(3);
+                for (int i = 0; i < 3; i++) {
+                    MockProfile.fonts(where + " divider " + i, myDividers.get(i).start(), theirDividers.get(i).start(), 2);
+                    assertThat(myDividers.get(i).length()).as(where + ": divider " + i + " is 1 px").isEqualTo(theirDividers.get(i).length());
+                    assertThat(MockCrops.near(myDividers.get(i).ink(), divider, 8)).as(where + ": divider " + i + "'s colour").isTrue();
+                }
+                // The pill: the columns holding its painted ground (the error tone's danger.ground, under the variant's
+                // scrim), its round ends' antialiased columns aside; the mock's amber pill is found against the surface.
+                var ground = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+                ground.setRGB(0, 0, dev.jasper.ui.theme.DerivedColor.DANGER_GROUND.color(EnterpriseLook.theme(variant.dark())).getRGB());
+                int painted = variant.seen(ground).getRGB(0, 0), pillStart = -1, pillEnd = -1;
+                for (int x = 0; x < rows.getWidth(); x++)
+                    for (int y = 0; y < rows.getHeight(); y++)
+                        if (rows.getRGB(x, y) == painted) { if (pillStart < 0) pillStart = x; pillEnd = x; break; }
+                assertThat(pillStart).as(where + ": the pill is painted").isNotNegative();
+                assertThat(pillEnd - pillStart + 1).as(where + ": the pill is 16 wide").isBetween(28, 34);
+                var theirPill = MockCrops.runs(MockCrops.crop(mock, 462, 0, 40, 48), false, 30, 2, surface);
+                assertThat(theirPill).as(where + ": the mock's pill").hasSize(1);
+                MockProfile.fonts(where + " pill start", pillStart, 462 + theirPill.getFirst().start(), 3);
+                var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, 465, 48), false, 120, 20, surface, divider);
+                var mine = MockCrops.runs(MockCrops.crop(rows, 0, 0, pillStart - 2, 48), false, 120, 20, surface, divider);
+                assertThat(theirs).as(where + ": the mock's labels").hasSize(3);
+                assertThat(mine).as(where + ": one ink run per label").hasSize(3);
+                assertThat(mine.getFirst().start()).as(where + " label 0 starts")
+                    .isBetween(theirs.getFirst().start() - 2, theirs.getFirst().start() + 2);
+                for (int i = 0; i < 3; i++) {
+                    if (i > 0) MockProfile.fonts(where + " label " + i + " start", mine.get(i).start(), theirs.get(i).start(), 2);
+                    MockProfile.fonts(where + " label " + i + " end", mine.get(i).end(), theirs.get(i).end(), 2);
+                }
+                MockCrops.fontsFloor(where + ": agreeing pixels",
+                    MockCrops.agreement(MockCrops.crop(rows, 0, 0, 460, 48), MockCrops.crop(mock, 0, 0, 460, 48), 24), STRIPE_FLOOR);
+            } finally { EnterpriseLook.restoreDefault(); }
+        }
+    }
+
     // Later tasks add their surfaces above this line.
 }

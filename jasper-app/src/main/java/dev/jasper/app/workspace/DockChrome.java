@@ -12,6 +12,6 @@ record DockChrome(boolean labelledStripes, boolean flushFrames) {
     /** The default look's dock: icon rails and today's frames. */
     static final DockChrome STANDARD = new DockChrome(false, false);
 
-    /** A new set of stripes for one window over its kit: today's icon rails. */
-    StripeSet stripes(dev.jasper.ui.kit.Kit kit) { return new StripeSet.IconRails(); }
+    /** A new set of stripes for one window over its kit: the labelled stripes and the bottom strip, or the icon rails. */
+    StripeSet stripes(dev.jasper.ui.kit.Kit kit) { return labelledStripes ? new StripeSet.LabelledStripes(kit) : new StripeSet.IconRails(); }
 }
