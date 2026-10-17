@@ -1,5 +1,7 @@
 # Enterprise presentation 8a: the Run window view Implementation Plan
 
+> **Status:** executed 2026-10-17 on `claude/enterprise-run-window` (`b6baeeab3..720b22d27`, then the documentation commit); deviations: (a) Task 3's review round (`c16f1a8dd`): a SWATCH glyph takes a row's glyph size only under `runWindow`, so a compact panel row's swatch keeps its caption size (spec 8.2); `RunWindowPresentation.releaseHelpChildren` returns the help glyph's colours when the flag turns off; `NewRolesTest`'s Run window names sit on their own lines; three more tests (`RunWindowPresentationTest` 2, `SwatchesTest` 1), so the plan adds 36 tests, not 33; (b) the type roles' sizes above are the classic scale's (the default scale's are 12/600 and 11.5/400).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The palette gets its second view: `PaletteView` is extracted from today's card (renamed `CardView`), headings

@@ -1,5 +1,38 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 8a: the Run window view — 2026-10-17** (`claude/enterprise-run-window`, worktree
+`.claude/worktrees/enterprise-8`, `b6baeeab3..720b22d27`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-8a-run-window-view.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The palette has two views behind
+`PaletteView` (spec 11.1): today's card, renamed `CardView`, and `RunWindowView`, built by `PaletteViews.of` from the
+look's `PaletteLook`; the step form and the prefix-to-chip edit are shared (`StepForm`, `QueryEdits`). Headings are typed
+(`PaletteEntry.Header.Kind`: RECENT, USED, SUGGESTED, SECTION, MATCHES) and `RunCopy` words them for the Run window
+("Recent", "Most used", "Suggested", one "Matches" with "i of n"). The Run window is kit views laid out by the app:
+jasper-ui's `KitView.runWindow(true)` gives a view the Run window's rows (21), heading bands (18 and a `border.row` rule)
+and counts, 7 px hue squares that keep their hue on the selection, the 32 px help tile with the filled ▶, a data-face
+query with no ring of its own and the mocks' text colours, from thirty `RUN_WINDOW_*` roles (equal in both catalogs),
+`RUN_HEADING` (11/600) and `RUN_DETAIL` (data face, 10.5/400) in the classic scale; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds
+paint the frame and bands, the field box and the list box. Enter runs the view's primary verb: the card's verb 0, the Run
+window's verb 0 or its SPLIT verb while "Open in a split pane" is ticked (`PaletteViewContractTest`). Compared with the 06
+Run Dialog mocks at 2× under the Enterprise fixture kit and the Enterprise Light fixture theme (`RunWindowRenderTest`):
+the Run window's own geometry probes within a device pixel for edges and three for text, its fills within 3 ΔE76, edge
+agreement 0.878 / 0.823 ("Just opened", top / bottom) and 0.895 / 0.830 ("Typing auth"); the classic checkbox's and buttons' (plan 4b) and IBM Plex's (plan 5b) probes are measured and
+printed until those plans are here (`RunWindowRenderTest.CHECKED`); tuned in the comparison: none. Rulings (plan, "Rulings"): (1) two plans, 8b lands the window; (2) the card renamed `CardView`;
+(3) the step form and prefix edit shared; (4) the Run window's roles, two type roles and two filled icons; (5) the list is
+8 × 21 + 2 × 19 = 206 inside its box, 6 px taller than the mock's cut box, so the window is 427 tall; (6) the title
+shortcut and row tags are plain CAPTION text, as drawn; (7) the help tile is a PROMPT_HEADER `play.filled` icon at the
+Run mock's 32; (8) the Run window's text colours as declared pairs (`RunWindowPresentation.pairs(Kit)`, TEXT-guarded,
+painted over every palette by `PaintedContrastTest`), its list details, tags and count in `text.placeholder` and a
+selected row's detail in the card's supporting ink unguarded, the empty line guarded against the dialog surface (a
+residual); (9) no placeholder in the Open field, the query in the data face; (10) the copy; (11) the second and third
+verbs in each row's context menu; (12) the JUnit comparison with its floors, run on the EDT while each context is open;
+(13) the matches count is the heading's second title node (a heading has a title only); (14) the title row's labels hand
+their presses to the view, so the title text drags; execution notes R1 to R16 (no 4b, 4c or 5b code: the Run window's
+own help tile, 4c's fixture theme, the fixture kit's comparison with owners, the checkbox row from roles, details cut
+at their end). Deviations: (a) Task 3's review round (`c16f1a8dd`): a SWATCH glyph takes a row's glyph size only under `runWindow`, so a compact panel row's swatch keeps its caption size (spec 8.2); `RunWindowPresentation.releaseHelpChildren` returns the help glyph's colours when the flag turns off; `NewRolesTest`'s Run window names sit on their own lines; three more tests (`RunWindowPresentationTest` 2, `SwatchesTest` 1), so the plan adds 36 tests, not 33; (b) the type roles' sizes above are the classic scale's (the default scale's are 12/600 and 11.5/400). Default look byte-identical: the
+headless gallery's files for Slate Cobalt Dark and Light match the base (Task 4). `./gradlew check --continue`:
+**10,807 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `b9178db45`, had 10,771). GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not merged, not pushed.
+
 **Enterprise presentation, plan 5a: the presentation provider — 2026-10-16** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `d65dc99f8..934c33f1e`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-5a-provider.md),
