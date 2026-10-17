@@ -70,13 +70,13 @@ classic search field's tip and name, a larger tab × target, and the search plac
 (spec 7.3, as 8a). Task 9 Step 4's default-look proof: the headless gallery for Slate Cobalt Dark and Light is
 byte-identical to `50b593f3c` (161 files a side), before and after the final review fixes, and the calibration and
 reference suites pass.
-`./gradlew check --continue` after the final review fixes: **10,970 tests, 0 failures, 0 errors, 25 skipped**.
+`./gradlew check --continue` after the final review fixes: **10,970 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plan 4c) as `5e8f48dbe`: **11,052 tests, 0 failures, 0 errors, 25 skipped**; with 4c's `check_pairs.py` all fourteen chrome pairs pass (the dark menu row 0.988 now that `border.divider` is overridable).
 GUI checks for the user (spec 16.2):
 with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell, "▶ Run…"
 opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog
 over the first, the window closing under them, full screen under them, and either requested over a minimised window,
 which opens it natively; a known residual: an in-window classic modal dialog blocks only its window, so a modeless
-plugin dialog owned by the same frame stays usable, unlike a native document-modal sheet). Not merged, not pushed.
+plugin dialog owned by the same frame stays usable, unlike a native document-modal sheet). Not pushed.
 
 **Enterprise presentation, plan 4c: the classic data faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `dedf877dc..9d11af9b3`, then this documentation commit and the final review's fixes;
