@@ -72,7 +72,7 @@ class StartupTraceTest {
         trace.mark(StartupTrace.Milestone.OUTPUT_PAINTED);
         trace.settle();
         assertThat(fixture.log).containsExactly(
-            "Startup (cold, AOT cache used, CDS on): main entered 101 ms, output painted 600 ms, plugins bound 400 ms"
+            "Startup (cold, AOT cache used, CDS on, look=default): main entered 101 ms, output painted 600 ms, plugins bound 400 ms"
                 + " | plugins 3 ms");
     }
 
@@ -84,7 +84,7 @@ class StartupTraceTest {
         fixture.at(250);
         trace.mark(StartupTrace.Milestone.WARMED_UP);
         assertThat(fixture.log).containsExactly(
-            "Startup (background, AOT cache used, CDS on): plugins bound 300 ms, warmed up 350 ms");
+            "Startup (background, AOT cache used, CDS on, look=default): plugins bound 300 ms, warmed up 350 ms");
     }
 
     @Test void theCapSettlesTenSecondsAfterTheProcessStartWithWhateverWasMarked() {
@@ -94,7 +94,7 @@ class StartupTraceTest {
         fixture.at(20);
         trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
         fixture.timers.getFirst().run();
-        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on): main entered 120 ms");
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on, look=default): main entered 120 ms");
     }
 
     @Test void aWindowReportsItsMilestonesFromTheRequestAndCompletesOnce() {
@@ -214,7 +214,7 @@ class StartupTraceTest {
         fixture.at(20);
         trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
         trace.settle();
-        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache skipped: launch-failed, CDS on): main entered 120 ms");
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache skipped: launch-failed, CDS on, look=default): main entered 120 ms");
         assertThat(trace.document(trace.status()).get("jvm")).isEqualTo(java.util.Map.of("aotCache", "skipped: launch-failed", "cds", "on"));
     }
 
@@ -246,5 +246,15 @@ class StartupTraceTest {
         assertThat(StartupTrace.traceFile("  ")).isNull();
         assertThat(StartupTrace.traceFile(null)).isNull();
         assertThat(StartupTrace.traceFile("/tmp/trace.json")).isEqualTo(Path.of("/tmp/trace.json"));
+    }
+
+    @Test void theLineNamesTheLook() {
+        var fixture = new Fixture();
+        StartupTrace trace = fixture.trace();
+        trace.look("dev.jasper.enterprise");
+        fixture.at(20);
+        trace.mark(StartupTrace.Milestone.MAIN_ENTERED);
+        trace.settle();
+        assertThat(fixture.log).containsExactly("Startup (cold, AOT cache used, CDS on, look=dev.jasper.enterprise): main entered 120 ms");
     }
 }

@@ -57,10 +57,10 @@ class StaticDefaultTest {
     static final Set<String> PAINTERS = Set.of("dev/jasper/ui/swing/NativeStyles", "dev/jasper/ui/swing/ChromePainter");
     /**
      * The classes that read Kit.DEFAULT: the kit parser's default base, the default presentation and its fallback, the
-     * installed-kit fallback, the controllers made without a kit, start-up.
+     * installed-kit fallback and the controllers made without a kit.
      */
     static final Set<String> DEFAULT_KIT_READERS = Set.of("dev/jasper/app/presentation/KitParser", "dev/jasper/app/presentation/Presentation",
-        "dev/jasper/ui/swing/FlatLafInstaller", "dev/jasper/app/appearance/ThemeController", "dev/jasper/app/application/JasperApplication");
+        "dev/jasper/ui/swing/FlatLafInstaller", "dev/jasper/app/appearance/ThemeController");
 
     static boolean owner(String type) { return type.startsWith("dev/jasper/ui/metrics/") || type.startsWith("dev/jasper/ui/kit/"); }
 

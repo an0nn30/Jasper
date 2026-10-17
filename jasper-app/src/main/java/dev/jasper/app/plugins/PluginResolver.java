@@ -66,6 +66,16 @@ final class PluginResolver {
         return new Resolution(order(chosen), rejected, presentation);
     }
 
+    /** {@code resolution} without {@code dropped}, skipped for {@code reason}; its hard dependents are skipped as unmet. */
+    static Resolution without(Resolution resolution, PluginCandidate dropped, String reason) {
+        Map<String, PluginCandidate> chosen = new TreeMap<>();
+        for (PluginCandidate candidate : resolution.load()) if (!candidate.id().equals(dropped.id())) chosen.put(candidate.id(), candidate);
+        List<PluginStatus> rejected = new ArrayList<>(resolution.rejected());
+        rejected.add(PluginStatus.of(dropped, PluginStatus.State.SKIPPED, reason));
+        dropUnmet(chosen, rejected);
+        return new Resolution(order(chosen), rejected, java.util.Optional.empty());
+    }
+
     private static void dropUnmet(Map<String, PluginCandidate> chosen, List<PluginStatus> rejected) {
         boolean changed = true;
         while (changed) {

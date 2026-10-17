@@ -199,6 +199,14 @@ public final class JasperApplication {
 
     TerminalRegistry terminals() { return terminals; }
 
+    /** The plugin selection this process starts, fixed at construction. */
+    private dev.jasper.app.plugins.PluginSelection selection;
+    /** The presentation every surface of this process receives (spec 4.9). */
+    private dev.jasper.app.presentation.Presentation presentation;
+
+    /** The presentation this process runs. EDT. */
+    public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
+
 
     public JasperApplication() { this(null); }
 
@@ -235,6 +243,19 @@ public final class JasperApplication {
     /** As above; {@code themesFolder} holds the imported themes, or is null for the built-in theme alone. */
     public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
                       Runnable terminate, Path shellIntegrationDir, Path themesFolder) {
+        this(service, suppliedLauncher, history, buddyStateFile, terminate, shellIntegrationDir, themesFolder,
+            dev.jasper.app.plugins.PluginSelection.none());
+    }
+
+    /**
+     * As above, under {@code bootstrapSelection}: the bootstrap's plugin selection, whose presentation every surface of
+     * this process receives (spec 4.9) and whose plugins {@link #startPlugins(AppDirs)} starts.
+     */
+    public JasperApplication(ConfigService service, ShellLauncher suppliedLauncher, CommandHistory history, Path buddyStateFile,
+                      Runnable terminate, Path shellIntegrationDir, Path themesFolder, dev.jasper.app.plugins.PluginSelection bootstrapSelection) {
+        // Not named selection: the field changes during construction when the kit is blamed (spec 4.7), the parameter never.
+        this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
+        presentation = this.selection.presentation();
         dev.jasper.app.platform.BundledFonts.register();
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
@@ -246,9 +267,9 @@ public final class JasperApplication {
         var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.bundledOnly()
             : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
         // The configuration reports unusable picks; start-up only replaces them.
-        var selection = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
+        var picks = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
-        themes = ThemeController.startup(dark, selection, dev.jasper.ui.kit.Kit.DEFAULT,
+        themes = ThemeController.startup(dark, picks, presentation.kit(),
             failure -> LOG.log(System.Logger.Level.WARNING, "Starting in Slate Cobalt Dark: " + failure.getMessage(), failure));
         // App-native menus show each item's action binding from the live keymap.
         themes.appearance().shortcuts(this::shortcutLabel);
@@ -836,12 +857,25 @@ public final class JasperApplication {
     }
 
     /**
-     * Starts plugins once, before the first window, so their contributions are in place when windows
-     * appear. {@code codeLocation} locates bundled plugins beside the application jar and may be null;
+     * Scans for plugins here and starts them: for an application made without the bootstrap's selection. A scan that
+     * chooses a presentation is refused, because the look must be chosen before the application is made.
+     * {@code codeLocation} locates bundled plugins beside the application jar and may be null;
      * {@code developmentDirectory} is the {@code --plugin-dir} value or null.
      */
     public void startPlugins(Path codeLocation, Path developmentDirectory, boolean safeMode, AppDirs dirs) {
         if (plugins != null || quitting || stopped) return;
+        if (!selection.isNone()) throw new IllegalStateException("This application starts the bootstrap's plugin selection");
+        var scanned = dev.jasper.app.plugins.PluginSelection.of(dirs, codeLocation, "", developmentDirectory, safeMode);
+        if (scanned.presentation().provider().isPresent())
+            throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
+        selection = scanned;
+        startPlugins(dirs);
+    }
+
+    /** Starts the selection's plugins once, before the first window, so their contributions are in place when windows appear. */
+    public void startPlugins(AppDirs dirs) {
+        if (plugins != null || quitting || stopped) return;
+        if (selection.isNone()) selection = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "", null, false);
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
@@ -860,8 +894,7 @@ public final class JasperApplication {
         aboutWindows = new AboutWindows(contributions, auxiliary, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
             new AboutWindows.Hooks(dev.jasper.app.platform.BuildInfo.current(), IncidentReport.Environment.current(),
                 notificationCenter.clock().getZone(), this::copyBuildInformation, this::browse, JasperApplication::afterDelay));
-        plugins = new PluginRuntime(new PluginRuntime.Options(PluginRuntime.bundledDirectory(codeLocation), dirs.plugins(),
-            developmentDirectory, safeMode, dirs.pluginState(), dirs.pluginLock()), activityNotifier,
+        plugins = new PluginRuntime(selection.options(), activityNotifier,
             new PluginRuntime.SettingsReports(
                 diagnostic -> { if (configuration != null) configuration.report(diagnostic); },
                 file -> { if (configuration != null) configuration.clearReports(file); }), contributions, auxiliary, terminals,
@@ -903,7 +936,7 @@ public final class JasperApplication {
             return created.content().id();
         });
         if (subcommandList != null) plugins.subcommandList(subcommandList);
-        plugins.start(configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
+        plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();

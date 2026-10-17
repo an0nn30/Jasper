@@ -350,4 +350,29 @@ class ApplicationBootstrapTest {
         DesktopTestSupport.edt(() -> ApplicationBootstrap.serveWithoutWindow(application, null));
         assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
     }
+
+    /** Spec 4.8: the pre-pass runs before the configuration is read, and its selection reaches the launch. */
+    @Test void thePrePassFeedsTheConfigurationsDefaultsAndTheLaunch() throws Exception {
+        Path config = directory.resolve("config.toml");
+        Files.writeString(config, "");
+        var selection = dev.jasper.app.plugins.PluginSelection.of(new AppDirs(directory, config, directory.resolve("logs")), null, "",
+            dev.jasper.app.testsupport.LookFixtures.plugin(directory.resolve("dev"), "dev.example.look",
+                dev.jasper.app.testsupport.LookFixtures.descriptor("dev.example.look", "Example")
+                    + dev.jasper.app.testsupport.LookFixtures.provider("look.kit.toml"),
+                java.util.Map.of("look.kit.toml", "kit = 1\nbase = \"default\"\n[defaults]\n\"palette.visible_rows\" = 7\n")), false);
+        var received = new AtomicReference<ApplicationBootstrap.Startup>();
+        try {
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err,
+                (dirs, options) -> new ApplicationBootstrap.Prepared(null, selection), received::set)).isZero();
+            assertThat(received.get().selection()).isSameAs(selection);
+            assertThat(received.get().service().initialState().snapshot().visibleRows()).isEqualTo(7);
+            assertThat(received.get().service().defaults()).isSameAs(selection.presentation().defaults());
+        } finally { if (received.get() != null) received.get().service().close(); }
+        var plain = new AtomicReference<ApplicationBootstrap.Startup>();
+        try {
+            assertThat(ApplicationBootstrap.start(new String[]{"--config", config.toString()}, System.out, System.err, plain::set)).isZero();
+            assertThat(plain.get().selection().isNone()).as("the test entry scans no home").isTrue();
+            assertThat(plain.get().log()).isNull();
+        } finally { if (plain.get() != null) plain.get().service().close(); }
+    }
 }

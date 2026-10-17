@@ -12,6 +12,8 @@ record PluginStatus(String id, String name, String version, PluginCandidate.Orig
     static final String INVALID = "Presentation invalid: ";
     /** Why the attempt record skips a look. */
     static final String ATTEMPT_SKIP = "did not finish starting with this look last time";
+    /** Why a provider whose kit was blamed at start is skipped (spec 4.7). */
+    static final String LOOK_FAILED = "its look could not be installed; Jasper uses its standard look";
     /** Why a provider that needs another provider is skipped: only one of them can load. */
     static final String NEEDS_LOOK = "requires another look's plugin; one look can be active at a time";
     private static final String LOOK_ACTIVE = " look is active";

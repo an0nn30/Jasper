@@ -410,6 +410,7 @@ public final class PluginRuntime {
     private volatile Map<String, PluginCandidate> launched = Map.of();
     private volatile Consumer<Failure> failureSink = failure -> { };
     private volatile PluginHost host;
+    private PluginSelection selection = PluginSelection.none();
     private Subscription bridge, connectionBridge;
     private volatile PluginCatalog.Launch launch;
     private PluginAdmin admin;
@@ -622,15 +623,24 @@ public final class PluginRuntime {
     }
 
     public void start(Map<String, Map<String, Object>> pluginTables, boolean dark) {
+        start(PluginSelection.scan(options, "", Version.parse(JasperSdk.VERSION), PluginSelection.host()), pluginTables, dark);
+    }
+
+    /**
+     * Loads and starts, in dependency order, the plugins {@code selection} chose; nothing is discovered again. Call once,
+     * before the first window.
+     *
+     * @param selection the bootstrap's selection, made with this runtime's options
+     * @param pluginTables the {@code [plugins."<id>"]} tables of the configuration, used only to seed a missing settings file
+     * @param dark whether the current look is dark
+     */
+    public void start(PluginSelection selection, Map<String, Map<String, Object>> pluginTables, boolean dark) {
         if (host != null) throw new IllegalStateException("Plugins already started");
+        this.selection = Objects.requireNonNull(selection, "selection");
         this.dark = dark;
         long began = System.nanoTime();
-        List<String> problems = new ArrayList<>();
-        List<PluginCandidate> candidates = new ArrayList<>(
-            PluginDiscovery.scan(options.bundledDirectory(), PluginCandidate.Origin.BUNDLED, problems));
-        candidates.addAll(PluginDiscovery.scan(options.userDirectory(), PluginCandidate.Origin.USER, problems));
-        if (options.developmentDirectory() != null)
-            PluginDiscovery.single(options.developmentDirectory(), PluginCandidate.Origin.DEV, problems).ifPresent(candidates::add);
+        List<String> problems = new ArrayList<>(selection.problems());
+        List<PluginCandidate> candidates = new ArrayList<>(selection.candidates());
                 for (PluginCandidate candidate : candidates) {
                     try { PluginSettingsFiles.prepare(options.userDirectory(), candidate, pluginTables.get(candidate.id())); }
                     catch (IOException failure) { LOG.log(System.Logger.Level.WARNING, "Could not prepare the settings of " + candidate.id(), failure); }
@@ -638,18 +648,9 @@ public final class PluginRuntime {
         var byId = new LinkedHashMap<String, PluginCandidate>();
         for (PluginCandidate candidate : candidates) byId.putIfAbsent(candidate.id(), candidate);
         launched = Map.copyOf(byId);
-        Map<String, PluginStateStore.Entry> state;
-        try { state = new PluginStateStore(options.stateFile(), options.lockFile(), LOCK_WAIT).read(); }
-        catch (IOException unreadable) {
-            // Without readable consent, user plugins stay inert rather than running unreviewed.
-            LOG.log(System.Logger.Level.WARNING, "Plugin state is unreadable; user plugins will need consent", unreadable);
-            state = Map.of();
-        }
         for (String problem : problems)
             startupProblems.add(new Problem(Problem.Kind.UNREADABLE, Optional.empty(), Optional.empty(), problem, Optional.empty()));
-        var presentations = Presentations.read(candidates,
-            new dev.jasper.app.presentation.AttemptStore(options.stateFile().toAbsolutePath().getParent()).read(), "");
-        var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode(), presentations);
+        var resolution = selection.resolution();
         statuses.addAll(resolution.rejected());
         for (PluginStatus rejected : resolution.rejected())
             if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.quiet())
@@ -700,7 +701,7 @@ public final class PluginRuntime {
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
                     outcome.reason(), Optional.empty()));
         }
-        launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode());
+        launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode(), selection.build());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
         adminWorker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-plugin-admin").factory());
         // Startup already discovers plugins before the first window. Perform catalog artwork I/O
