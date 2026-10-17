@@ -119,8 +119,7 @@ the list and the details); ink boxes are asserted on macOS only; a heading's tit
 column; the unused overloads and `ShortcutEditPanel.specForTests()` are gone (`spec()` is package-private);
 `AppearanceSelection` takes `Editors.menuIcon` and leaves `ProjectionReadTest.COMPOSITION_ROOTS`; and
 `tools/visual/pairs.json` gains `enterprise-settings-07b` (0.933 against its 0.4 floor). `./gradlew check --continue`:
-**11,215 tests, 0 failures, 0 errors, 25 skipped** before the final review fixes, which
-add six tests (their targeted runs pass). GUI
+**11,221 tests, 0 failures, 0 errors, 25 skipped**. GUI
 checks for the user: under Enterprise, the Keymap's recording band and Find by Shortcut, the Plugins page's checkboxes and
 ⋯, Add Variable… and its sheet with a variable or two in the table, a right-click on a Notifications row and on a plugin
 page's
