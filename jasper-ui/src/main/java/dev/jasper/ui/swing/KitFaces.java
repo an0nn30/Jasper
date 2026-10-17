@@ -19,6 +19,7 @@ public final class KitFaces {
     final ChoiceFace exclusive, tabs;
     final GroupFace group;
     final LabelPolicy labels;
+    final StepperFace stepper;
 
     private KitFaces(ControlVariants controls, ColorSlots colors) {
         toggle = switch (controls.toggle()) {
@@ -47,6 +48,10 @@ public final class KitFaces {
             case PLAIN -> new DefaultLabelPolicy();
             case COLON -> new ClassicLabelPolicy(colors.dialogSurface());
         };
+        stepper = switch (controls.stepper()) {
+            case STEPPER -> new DefaultStepperFace();
+            case SPINNER -> new ClassicStepperFace();
+        };
     }
 
     /** The faces {@code kit} draws with. */
@@ -56,7 +61,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, buttons, fields); }
+    List<Face> all() { return List.of(toggle, exclusive, tabs, group, labels, stepper, buttons, fields); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.
