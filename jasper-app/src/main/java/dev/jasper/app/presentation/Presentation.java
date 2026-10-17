@@ -17,9 +17,10 @@ import java.util.Set;
  * @param faces the face files the kit names
  * @param defaults the kit's setting defaults
  * @param projections every consumer's projection
+ * @param droppedDefaults the {@code [defaults]} keys left out because the theme they name did not load
  */
 public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chrome, boolean classicBase, KitParser.Faces faces,
-                           DefaultSource defaults, Projections projections) {
+                           DefaultSource defaults, Projections projections, java.util.List<String> droppedDefaults) {
     /**
      * The plugin that provides a look.
      *
@@ -47,6 +48,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
     public Presentation {
         Objects.requireNonNull(provider); Objects.requireNonNull(kit); Objects.requireNonNull(chrome); Objects.requireNonNull(faces);
         Objects.requireNonNull(defaults); Objects.requireNonNull(projections);
+        droppedDefaults = java.util.List.copyOf(droppedDefaults);
     }
 
     /**
@@ -57,7 +59,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      */
     public static Presentation standard(Projections.Host host) {
         return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, DefaultSource.CORE,
-            Projections.of(ChromeSpec.DEFAULT, false, false, "", host, LANDED));
+            Projections.of(ChromeSpec.DEFAULT, false, false, "", host, LANDED), java.util.List.of());
     }
 
     /**
@@ -70,7 +72,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      */
     public static Presentation of(Provider provider, KitParser.Parsed parsed, Projections.Host host) {
         return new Presentation(Optional.of(provider), parsed.kit(), parsed.chrome(), parsed.classicBase(), parsed.faces(), parsed.defaults(),
-            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED));
+            Projections.of(parsed.chrome(), parsed.classicBase(), parsed.faces().ui().isPresent(), provider.id(), host, LANDED), parsed.dropped());
     }
 
     /**
@@ -81,7 +83,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
      */
     public Presentation fallback(Projections.Host host) {
         return new Presentation(Optional.empty(), Kit.DEFAULT, ChromeSpec.DEFAULT, false, KitParser.Faces.NONE, defaults,
-            Projections.fallback(committedDesktop(), host));
+            Projections.fallback(committedDesktop(), host), java.util.List.of());
     }
 
     /**

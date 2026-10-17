@@ -44,6 +44,8 @@ public final class ThemeController implements AutoCloseable {
     private ResolvedTheme current;
     private UiFontConfig uiFont = UiFontConfig.defaults();
     private final Font platformFont;
+    /** The look's standard UI font, or null for the platform's. */
+    private final FontUIResource lookFont;
     private final float platformLabelSize;
     private static final List<String> FORM_FONTS = List.of("Label.font", "List.font", "TextField.font",
         "PasswordField.font", "FormattedTextField.font", "TextArea.font", "ComboBox.font", "Button.font");
@@ -160,7 +162,9 @@ public final class ThemeController implements AutoCloseable {
         // Only UI delegate lookup belongs to the app; plugin class visibility stays isolated.
         UIManager.put("ClassLoader", ThemeController.class.getClassLoader());
         FORM_FONTS.forEach(key -> UIManager.put(key, null));
-        UIManager.put("defaultFont", null);
+        // Under a kit with a registered UI face of its own, FlatLaf's text uses it too (spec 5.6); otherwise the platform's.
+        lookFont = lookFont(kit);
+        UIManager.put("defaultFont", lookFont);
         UIManager.put("Jasper.uiFontFamilyOverride", false);
         current = ResolvedTheme.of(shown.dark(), shown.selection());
         appearance = new AppearanceBindings(current.pair(), kit, ThemeController::reportFailure, () -> animationsEnabled);
@@ -231,6 +235,14 @@ public final class ThemeController implements AutoCloseable {
         try { listener.accept(value, chrome); } catch (Throwable failure) { reportFailure(failure); }
     }
 
+    /** {@code kit}'s regular UI face at its body size when the kit names one and it is registered; else null. */
+    private static FontUIResource lookFont(Kit kit) {
+        String face = kit.faces().uiFace(400);
+        if (face.isEmpty()) return null;
+        Font font = new Font(face, Font.PLAIN, 1);
+        return font.getFontName(java.util.Locale.ROOT).equals(face) ? new FontUIResource(font.deriveFont(kit.type().body())) : null;
+    }
+
     private FontUIResource resolveFont(UiFontConfig choice) {
         Font family = choice.family().equalsIgnoreCase("system") ? platformFont : new Font(choice.family(), Font.PLAIN, 13);
         if (family.getFamily().equals(Font.DIALOG) && !choice.family().equalsIgnoreCase(Font.DIALOG)) family = platformFont;
@@ -243,7 +255,7 @@ public final class ThemeController implements AutoCloseable {
     private void installFontDefaults(UiFontConfig choice) {
         boolean defaults = choice.equals(UiFontConfig.defaults());
         Font family = resolveFont(choice);
-        UIManager.put("defaultFont", defaults ? null : family);
+        UIManager.put("defaultFont", defaults ? lookFont : family);
         // FlatLaf scales relative offsets with the UI scale. Explicit base-control fonts preserve
         // exact configured point sizes, including fractions, without changing unset defaults.
         FontUIResource form = new FontUIResource(family.deriveFont(choice.size() == 0 ? platformLabelSize : choice.size()));

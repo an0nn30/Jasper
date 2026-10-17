@@ -201,6 +201,8 @@ public final class JasperApplication {
 
     /** The plugin selection this process starts, fixed at construction. */
     private volatile dev.jasper.app.plugins.PluginSelection selection;
+    /** The look's font files that could not be registered, for its notice. */
+    private List<String> lookFontProblems = List.of();
     /** The presentation every surface of this process receives (spec 4.9). */
     private volatile dev.jasper.app.presentation.Presentation presentation;
 
@@ -287,6 +289,8 @@ public final class JasperApplication {
         this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
         presentation = this.selection.presentation();
         dev.jasper.app.platform.BundledFonts.register();
+        // The look's own faces, before any font list is cached (spec 4.9).
+        lookFontProblems = LookFonts.register(presentation.faces());
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
         systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
@@ -1007,6 +1011,12 @@ public final class JasperApplication {
                             .withContent("Jasper could not work out how it was started. Quit and reopen it to start with the " + skipped.name() + " look."));
                 });
             }), false))));
+        // Spec 5.8 and 5.9: a look that starts without some of its files says so once.
+        var missing = new ArrayList<String>(lookFontProblems);
+        presentation.droppedDefaults().forEach(key -> missing.add("[defaults].\"" + key + "\": its theme did not load, so the setting keeps its core default"));
+        presentation.provider().filter(provider -> !missing.isEmpty()).ifPresent(provider -> notificationCenter.post(NotificationRequest.of(
+            IncidentNotices.PLUGINS.id(), Severity.WARNING, "The " + provider.name() + " look is missing some of its files")
+            .withContent(String.join("\n", missing))));
         // Spec 4.6: the first window's first paint proves the look, off the EDT.
         trace.when(StartupTrace.Milestone.FIRST_PAINT, task -> Thread.ofVirtual().name("jasper-presentation-proven").start(task),
             () -> presentationAttempt().proven());

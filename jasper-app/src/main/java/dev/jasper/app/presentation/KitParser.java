@@ -196,7 +196,7 @@ public final class KitParser {
         TypeAndFaces type = type(table(toml, "type"), start.type(), context);
         ColorSlots colors = colors(table(toml, "colors"), start.colors());
         Defaults defaults = defaults(table(toml, "defaults"), context);
-        Kit kit = new Kit(context.id(), metrics, type.scale(), start.faces(), controls, colors, start.uiKeys());
+        Kit kit = new Kit(context.id(), metrics, type.scale(), faces(type.faces(), start.faces()), controls, colors, start.uiKeys());
         return new Parsed(kit, chrome, classic, new DefaultSource(defaults.values()), defaults.dropped(), type.faces());
     }
 
@@ -378,6 +378,16 @@ public final class KitParser {
                 font(face, "type.data", "medium", context)));
         }
         return new TypeAndFaces(scale, new Faces(ui, data));
+    }
+
+    /** The declared faces by their files' full names over {@code base}'s; a file with unreadable names keeps the platform face. */
+    private static dev.jasper.ui.metrics.FaceSet faces(Faces declared, dev.jasper.ui.metrics.FaceSet base) {
+        if (declared.ui().isEmpty() && declared.data().isEmpty()) return base;
+        var ui = declared.ui();
+        var data = declared.data();
+        return dev.jasper.ui.metrics.FaceSet.of(ui.map(face -> face.regular().fullName()).orElse(base.uiFace(400)),
+            ui.map(face -> face.medium().fullName()).orElse(base.uiFace(500)), ui.map(face -> face.semibold().fullName()).orElse(base.uiFace(600)),
+            data.map(face -> face.regular().fullName()).orElse(base.dataRegular()), data.map(face -> face.medium().fullName()).orElse(base.dataMedium()));
     }
 
     private static String family(TomlTable table, String name) throws Invalid {

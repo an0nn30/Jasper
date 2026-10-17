@@ -164,6 +164,8 @@ class KitParserTest {
         assertThat(parsed.kit().type()).isEqualTo(Kit.CLASSIC.type().withBody(12));
         assertThat(parsed.kit().colors().dialogSurface()).isEqualTo(SemanticColor.SURFACE_APP);
         assertThat(parsed.kit().colors().navigationSurface()).isEqualTo(SemanticColor.SURFACE_CARD);
+        assertThat(parsed.kit().faces()).isEqualTo(dev.jasper.ui.metrics.FaceSet.of(PLEX_SANS, "IBM Plex Sans Medm", "IBM Plex Sans SmBld",
+            PLEX_MONO, "IBM Plex Mono Medm"));
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("look");
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("look");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);

@@ -176,6 +176,15 @@ public final class KitGallery {
         }));
     }
 
+    /**
+     * The gallery's default font: the platform family, or a kit's own regular UI face, at the kit's body size (24 points
+     * when {@code large}) at the gallery's scale.
+     */
+    static Font font(dev.jasper.ui.kit.Kit kit, boolean large) {
+        String face = kit.faces().uiFace(400).isEmpty() ? KitFixtures.platformFamily() : kit.faces().uiFace(400);
+        return new Font(face, Font.PLAIN, bodySize(large ? 24 : kit.type().body()));
+    }
+
     /** The developer font size for a body of {@code points} at the gallery's scale. */
     private static int bodySize(float points) { return Math.round(UIScale.scale(points)); }
 
@@ -184,21 +193,23 @@ public final class KitGallery {
 
     /**
      * Runs {@code action} with {@code theme} and {@code kit} installed as the gallery renders them: real FlatLaf, the
-     * platform family at the kit's body size (13 points for the default kit, 12 for Enterprise) at the gallery's scale,
-     * no caps-lock query and the gallery's focus manager, all restored afterwards. EDT.
+     * kit's own UI face, else the platform family, at the kit's body size (13 points for the default kit, 12 for
+     * Enterprise) at the gallery's scale, no caps-lock query and the gallery's focus manager, all restored afterwards. EDT.
      */
     public static void installed(GeneratedTheme theme, dev.jasper.ui.kit.Kit kit, java.util.function.BiConsumer<KitContext, GalleryFocus> action) {
         var priorLaf = UIManager.getLookAndFeel();
         Object priorFont = UIManager.get("defaultFont");
         Object priorCaps = UIManager.get("PasswordField.showCapsLock");
-        String family = KitFixtures.platformFamily();
+        Object priorOverride = UIManager.get("Jasper.uiFontFamilyOverride");
         var priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager();
         var focus = new GalleryFocus();
         try {
             // Install before creating any gallery widget, including transition controllers.
             FlatLafInstaller.install(theme, kit);
             UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
-            UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(kit.type().body())));
+            UIManager.put("defaultFont", font(kit, false));
+            // A kit with faces of its own draws them: the gallery's default font then sets only the size.
+            if (kit.faces().namesUiFaces()) UIManager.put("Jasper.uiFontFamilyOverride", false);
             if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");
             KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
             var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
@@ -209,17 +220,17 @@ public final class KitGallery {
             KeyboardFocusManager.setCurrentKeyboardFocusManager(priorFocus);
             UIManager.put("defaultFont", priorFont);
             UIManager.put("PasswordField.showCapsLock", priorCaps);
+            UIManager.put("Jasper.uiFontFamilyOverride", priorOverride);
             try { UIManager.setLookAndFeel(priorLaf); } catch (UnsupportedLookAndFeelException failure) { throw new AssertionError(failure); }
         }
     }
 
     /** {@code fixture} rendered as {@link #main} writes it, in {@code context} with {@code focus} from {@link #installed}. EDT. */
     public static Capture capture(Fixture fixture, KitContext context, GalleryFocus focus) {
-        String family = KitFixtures.platformFamily();
         float scale = UIScale.getUserScaleFactor();
         // The form font at the kit's body size and the gallery's scale, so a 2x render carries 2x text as the 2x mocks do
         // and the Enterprise kit draws its own 12-point scale (plan 4c).
-        UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(fixture.name().contains("font24") ? 24 : context.kit().type().body())));
+        UIManager.put("defaultFont", font(context.kit(), fixture.name().contains("font24")));
         try (var view = new KitView(context, fixture.spec(), e -> {})) {
             registerCustom(view, fixture.spec().root(), context);
             int width = UIScale.scale(fixture.width()), height = UIScale.scale(fixture.height());
