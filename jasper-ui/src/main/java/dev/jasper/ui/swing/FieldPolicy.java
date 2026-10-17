@@ -1,0 +1,15 @@
+package dev.jasper.ui.swing;
+
+import dev.jasper.ui.model.Nodes;
+import java.awt.Color;
+import java.awt.Graphics2D;
+
+/** The text-field policy built with the buttons point (spec 6.4): leading glyphs and the field's surface. */
+interface FieldPolicy extends Face {
+    /** Whether a {@code kind} field shows its leading glyph (a SEARCH or PATH icon, a PORT's colon). */
+    boolean glyph(Nodes.FieldKind kind);
+    /** Paints a field's surface and outline, read-only or not. */
+    void paintField(TextFields.FieldSurface surface, Graphics2D g);
+    /** A read-only field's text colour. */
+    Color readOnlyText(KitContext context);
+}

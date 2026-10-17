@@ -21,6 +21,10 @@ final class PickerMenus {
     }
     /** The rich face on any control: a PICKER's button, or a DROPDOWN whose closed face describes its selected option. */
     static void paintFace(JComponent button,Graphics graphics,KitContext c,Nodes.PickerFace face,boolean empty,boolean focus,boolean hover,boolean expanded){
+        c.faces().buttons.paintPicker(button,graphics,c,face,empty,focus,hover,expanded);
+    }
+    /** The default look's rich face: a tile, the primary text and caption, and the chevron. */
+    static void paintRichFace(JComponent button,Graphics graphics,KitContext c,Nodes.PickerFace face,boolean empty,boolean focus,boolean hover,boolean expanded){
         var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);
             if(!button.isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT)/100f));
@@ -52,7 +56,7 @@ final class PickerMenus {
     static Typography.Role captionRole(boolean compact,boolean technical){
         return technical?Typography.Role.MONO_CAPTION:compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION;
     }
-    private static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link,boolean technical){
+    static void line(Graphics2D g,KitContext c,String label,String caption,int x,int y,int width,int height,boolean active,boolean empty,boolean compact,boolean link,boolean technical){
         g.setFont(ThemePainting.font(c,compact?Typography.Role.PICKER_COMPACT:Typography.Role.BODY));var fm=g.getFontMetrics();int baseline=y+(height-fm.getHeight())/2+fm.getAscent();
         g.setColor(ThemePainting.color(c,active?SemanticColor.TEXT_ONSELECTION:link?SemanticColor.TEXT_LINK:empty?SemanticColor.TEXT_PLACEHOLDER:SemanticColor.TEXT_PRIMARY));
         String primary=clipped(fm,label,width);g.drawString(primary,x,baseline);int used=fm.stringWidth(primary)+metric(c,DesignMetrics.Role.PICKER_GAP);
@@ -71,7 +75,7 @@ final class PickerMenus {
             int y=SwingUtilities.convertPoint(list,0,cell.y,this).y;
             // The footer divider is one full-width hairline in the menu border role, just above the footer gap.
             int stroke=metric(context(),DesignMetrics.Role.HAIRLINE);
-            if(y>=stroke&&y<=getHeight()){graphics.setColor(ThemePainting.color(context(),SemanticColor.BORDER_MENU));graphics.fillRect(0,y-stroke,getWidth(),stroke);}
+            if(y>=stroke&&y<=getHeight()){graphics.setColor(context().faces().buttons.menuDivider(context()));graphics.fillRect(0,y-stroke,getWidth(),stroke);}
         }};
         final JLabel empty=Labels.literal();
         final JPanel body=new JPanel(new BorderLayout());
@@ -109,6 +113,7 @@ final class PickerMenus {
             search.setEnabled(interactive());search.setFont(ThemePainting.font(context(),Typography.Role.BODY));search.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_PRIMARY));search.setCaretColor(search.getForeground());search.setBackground(ThemePainting.color(context(),SemanticColor.SURFACE_INPUT));
             searchSurface.hint=n.placeholder();searchIcon.setIcon(context().icons().icon("search",context().theme().semantic(),SemanticColor.TEXT_TERTIARY,metric(context(),DesignMetrics.Role.PICKER_SEARCH_GLYPH)));
             searchIcon.setBorder(new EmptyBorder(0,0,0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_GAP)));
+            searchIcon.setVisible(context().faces().fields.glyph(Nodes.FieldKind.SEARCH));
             search.getAccessibleContext().setAccessibleName(n.placeholder());
             int pad=metric(context(),DesignMetrics.Role.PICKER_PADDING);searchBox.setBorder(new EmptyBorder(metric(context(),DesignMetrics.Role.PICKER_SEARCH_TOP),metric(context(),DesignMetrics.Role.PICKER_SEARCH_SIDE),pad,metric(context(),DesignMetrics.Role.PICKER_SEARCH_SIDE)));
             searchSurface.setBorder(new EmptyBorder(0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_PADDING),0,metric(context(),DesignMetrics.Role.PICKER_SEARCH_PADDING)));
@@ -138,16 +143,18 @@ final class PickerMenus {
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
             int text=getFontMetrics(ThemePainting.font(c,Typography.Role.BODY)).stringWidth(item.label());
             if(!item.caption().isEmpty())text+=metric(c,DesignMetrics.Role.PICKER_GAP)+getFontMetrics(ThemePainting.font(c,Typography.Role.CAPTION)).stringWidth(item.caption());
-            return new Dimension(pad+tile+gap+text+gap+tile+pad,rowHeight(owner,item));
+            int lead=c.faces().buttons.tiles()?tile+gap:gap;
+            return new Dimension(pad+lead+text+gap+tile+pad,rowHeight(owner,item));
         }
         @Override protected void paintComponent(Graphics graphics){var c=owner.context();var n=(Nodes.PickerMenu)owner.node;var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);boolean footer=item.id().equals(n.footerAction());
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
             int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;
             if(active){g.setColor(ThemePainting.color(c,SemanticColor.SELECTION_BG));g.fillRect(0,top,getWidth(),rowHeight);}
-            if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
+            if(!c.faces().buttons.tiles()){}
+            else if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
             else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
-            int x=pad+tile+gap;line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer,false);
+            int x=pad+(c.faces().buttons.tiles()?tile+gap:gap);line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer,false);
             if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
         }finally{g.dispose();}}
     }

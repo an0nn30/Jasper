@@ -14,12 +14,20 @@ import java.util.Objects;
  */
 public final class KitFaces {
     final ToggleFace toggle;
+    final ButtonFace buttons;
+    final FieldPolicy fields;
 
     private KitFaces(ControlVariants controls, ColorSlots colors) {
         toggle = switch (controls.toggle()) {
             case SWITCH -> new DefaultToggleFace();
             case CHECKBOX -> new ClassicToggleFace(colors.dialogSurface());
         };
+        // The text-field policy is built with the buttons point (spec 6.4).
+        switch (controls.buttons()) {
+            case RAISED -> { buttons = new DefaultButtonFace(); fields = new DefaultFieldPolicy(); }
+            case CLASSIC -> { buttons = new ClassicButtonFace(colors.dialogSurface()); fields = new ClassicFieldPolicy(colors.dialogSurface()); }
+            default -> throw new IllegalStateException("Unknown buttons variant " + controls.buttons());
+        }
     }
 
     /** The faces {@code kit} draws with. */
@@ -29,7 +37,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle); }
+    List<Face> all() { return List.of(toggle, buttons, fields); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.

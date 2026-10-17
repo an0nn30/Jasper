@@ -273,7 +273,7 @@ final class TextFields {
         @Override void refresh() {
             var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
             listKeys(!field.listId().isBlank() && field.kind() != Nodes.FieldKind.TEXTAREA && field.kind() != Nodes.FieldKind.NUMBER);
-            input.setEditable(component.isEnabled() && !field.readOnly()); surface.setEnabled(component.isEnabled());
+            input.setEditable(component.isEnabled() && !field.readOnly()); surface.setEnabled(component.isEnabled()); surface.readOnly = field.readOnly();
             input.setCursor(Cursor.getPredefinedCursor(component.isEnabled() ? Cursor.TEXT_CURSOR : Cursor.DEFAULT_CURSOR));
             if (scroll != null) {
                 scroll.setEnabled(component.isEnabled());
@@ -284,7 +284,7 @@ final class TextFields {
             var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
             surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
-            input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
+            input.setForeground(field.readOnly() ? context().faces().fields.readOnlyText(context()) : ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
             input.setDisabledTextColor(input.getForeground()); input.setCaretColor(input.getForeground());
             input.setSelectionColor(ThemePainting.color(context(), SemanticColor.SELECTION_BG));
             input.setSelectedTextColor(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
@@ -313,7 +313,7 @@ final class TextFields {
             }
             int gap = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_GAP : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_GAP : field.kind() == Nodes.FieldKind.PORT ? DesignMetrics.Role.PORT_PREFIX_GAP
                 : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_ICON_GAP : settings && field.kind() == Nodes.FieldKind.SEARCH ? DesignMetrics.Role.SETTINGS_SEARCH_ICON_GAP : DesignMetrics.Role.ICON_GAP);
-            leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH);
+            leading.setVisible(field.presentation() != Nodes.FieldPresentation.PLAIN_PATH && context().faces().fields.glyph(field.kind()));
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
@@ -395,6 +395,8 @@ final class TextFields {
         boolean transparent;
         /** A PORT field rests at the shared port width; an enlarged font still grows it past that. */
         boolean port;
+        /** Shows a value as a fact (Field.readOnly): the field policy may give it its own surface. */
+        boolean readOnly;
         ThemePainting.Focus focus;
         FieldSurface(KitContext context, JTextComponent input, boolean multiline) {
             super(new BorderLayout()); this.context = context; this.input = input; this.multiline = multiline; setOpaque(false);
@@ -448,12 +450,14 @@ final class TextFields {
         }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
-            try {
-                if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(g, this, context, DesignMetrics.Role.TRANSPARENT_FIELD_FOCUS_RADIUS);
-                else ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
-                    ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
-                    focus.visible(), error,radiusRole);
-            } finally { g.dispose(); }
+            try { context.faces().fields.paintField(this, g); } finally { g.dispose(); }
+        }
+        /** The field's surface and outline (the default policy, and every field the classic one does not grey). */
+        void paintDefault(Graphics2D g) {
+            if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(g, this, context, DesignMetrics.Role.TRANSPARENT_FIELD_FOCUS_RADIUS);
+            else ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
+                ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
+                focus.visible(), error,radiusRole);
         }
         @Override protected void paintChildren(Graphics graphics) {
             super.paintChildren(graphics);

@@ -18,7 +18,10 @@ final class Stacks {
     private Stacks() {}
 
     static final class StackSurface extends JPanel {
-        final KitContext context;boolean joined,route;StackSurface(KitContext context){this.context=context;}
+        final KitContext context;boolean joined,route;
+        /** The stack's layout role, which a classic ghost button reads to know a toolbar row from an actions row. */
+        Nodes.LayoutRole role;
+        StackSurface(KitContext context){this.context=context;}
         /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
         int[] arrows=new int[0];
         @Override protected void paintComponent(Graphics graphics){
@@ -93,6 +96,7 @@ final class Stacks {
             var stack = (Nodes.Stack) node;
             ((StackSurface)component).joined=stack.role()==Nodes.LayoutRole.JOINED_ACTIONS;
             ((StackSurface)component).route=stack.role()==Nodes.LayoutRole.ROUTE;
+            ((StackSurface)component).role=stack.role();
             int detailPadding = stack.role() == Nodes.LayoutRole.DETAIL ? ThemePainting.metric(context(), panelDetail ? DesignMetrics.Role.PANEL_DETAIL_PADDING : DesignMetrics.Role.DETAIL_PADDING) : 0;
             component.setBorder(new javax.swing.border.EmptyBorder(detailPadding, detailPadding, panelDetail && stack.role()==Nodes.LayoutRole.DETAIL ? Math.max(0,detailPadding-ThemePainting.metric(context(),DesignMetrics.Role.FOCUS_RING)) : detailPadding, detailPadding));
             component.setLayout(

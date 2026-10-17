@@ -251,11 +251,27 @@ final class Choices {
             var g = (Graphics2D)graphics.create();
             try {
                 if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
-                var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                    com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CAPTION)));
-                icon.paintIcon(this, g, getWidth()-ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)-icon.getIconWidth(), (getHeight()-icon.getIconHeight())/2);
+                context.faces().buttons.paintPickerArrow(this, g);
             } finally { g.dispose(); }
         }
+        /** The default look's chevron at the button's trailing padding. */
+        void paintChevron(Graphics2D g) {
+            var icon = context.icons().icon("chevron.down", context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
+                com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CAPTION)));
+            icon.paintIcon(this, g, getWidth()-ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)-icon.getIconWidth(), (getHeight()-icon.getIconHeight())/2);
+        }
+    }
+    /**
+     * The default look's dropdown chevron in {@code role} in {@code arrow}, whose trailing edge lies {@code beyond} inside
+     * the combo's: the picker face's measured glyph and trailing inset; a Settings dropdown sets it at a fixed distance
+     * from its own arrow lane's trailing edge.
+     */
+    static void paintChevron(JComponent arrow, Graphics2D graphics, KitContext context, int beyond, boolean settings, SemanticColor role) {
+        var icon = context.icons().icon("chevron.down", context.theme().semantic(), role,
+            ThemePainting.metric(context, settings ? DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON : DesignMetrics.Role.CHOICE_CHEVRON));
+        int x = settings ? arrow.getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth()
+            : arrow.getWidth() + beyond - ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET) - icon.getIconWidth();
+        icon.paintIcon(arrow, graphics, Math.max(0, x), (arrow.getHeight()-icon.getIconHeight())/2);
     }
     /** A dropdown's menu: as wide as its field, wider only when its widest row needs it (spec 3). */
     static final class KitComboPopup extends BasicComboPopup {
@@ -319,6 +335,8 @@ final class Choices {
         InteractiveRows.Ink cellInk;
         /** A cell dropdown shows only its value and chevron until it is hovered, focused or open. */
         boolean bare() { return cell && !hover && !(focus != null && focus.visible()) && !isPopupVisible(); }
+        /** The chevron's role: the selected row's supporting ink while this cell dropdown is bare (plan 3c), else text.secondary. */
+        SemanticColor arrowRole() { return bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY; }
         /** The closed value is painted in the combo's foreground (BasicComboBoxUI), so a bare value on a selected row takes the row's ink here. */
         @Override public Color getForeground() { return bare() && cellInk != null ? ThemePainting.color(context, cellInk.text) : super.getForeground(); }
         /** A rich value's trailing chevron lane; a Settings dropdown's lane also holds the gap before its chevron. */
@@ -362,15 +380,7 @@ final class Choices {
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); addMouseListener(ChoiceCombo.this.rollover); }
                     @Override protected void paintComponent(Graphics graphics) {
-                        // The dropdown chevron shares the picker face's measured glyph and trailing inset; a Settings dropdown
-                        // sets it at a fixed distance from its own arrow lane's trailing edge.
-                        boolean settings = settingsWidth > 0;
-                        var icon = context.icons().icon("chevron.down", context.theme().semantic(), bare() && cellInk != null ? cellInk.supporting : SemanticColor.TEXT_SECONDARY,
-                            ThemePainting.metric(context, settings ? DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON : DesignMetrics.Role.CHOICE_CHEVRON));
-                        int beyond = comboBox.getWidth() - getX() - getWidth();
-                        int x = settings ? getWidth() - ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_CHOICE_CHEVRON_INSET) - icon.getIconWidth()
-                            : getWidth() + beyond - ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET) - icon.getIconWidth();
-                        icon.paintIcon(this, graphics, Math.max(0, x), (getHeight()-icon.getIconHeight())/2);
+                        context.faces().buttons.paintArrow(ChoiceCombo.this, this, (Graphics2D) graphics, comboBox.getWidth() - getX() - getWidth(), settingsWidth > 0);
                     }
                 }; }
                 @Override public void paintCurrentValueBackground(Graphics graphics, Rectangle bounds, boolean hasFocus) {}
@@ -438,7 +448,7 @@ final class Choices {
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (bare()) { super.paintComponent(graphics); return; }
-            var g = (Graphics2D)graphics.create(); try { ThemePainting.rounded(g, this, context, ThemePainting.color(context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL), ThemePainting.color(context, SemanticColor.BORDER_CONTROL), focus != null && focus.visible(), false); super.paintComponent(g); } finally { g.dispose(); }
+            var g = (Graphics2D)graphics.create(); try { context.faces().buttons.paintCombo(this, g, hover, focus != null && focus.visible()); super.paintComponent(g); } finally { g.dispose(); }
         }
     }
     /** Propagates the segmented track's width-dependent height through its labelled control wrapper. */
