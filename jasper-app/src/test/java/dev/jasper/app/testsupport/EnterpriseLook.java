@@ -54,6 +54,12 @@ public final class EnterpriseLook {
             failure -> { throw new AssertionError("the Enterprise fixture must install", failure); });
     }
 
+    /** The fixture theme's Light or Dark variant. */
+    public static dev.jasper.ui.theme.GeneratedTheme theme(boolean dark) { return theme().generated(dark); }
+
+    /** Installs the theme's variant under the kit for a component render, without a controller. EDT. */
+    public static void install(boolean dark) { dev.jasper.ui.swing.FlatLafInstaller.install(theme(dark), kit()); }
+
     /** Installs Slate Cobalt under the default kit again, with today's fonts, for the tests that follow. EDT. */
     public static void restoreDefault() { ThemeTestSupport.controller(true).close(); }
 }
