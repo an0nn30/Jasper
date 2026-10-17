@@ -41,7 +41,10 @@ final class PluginAdmin {
         Map<String, PluginCandidate> pending = new TreeMap<>();
         for (PluginCandidate staged : PluginDiscovery.scan(options.userDirectory().resolve(PluginMaintenance.PENDING),
                 PluginCandidate.Origin.USER, problems)) pending.put(staged.id(), staged);
-        return new PluginCatalog.Disk(candidates, pending, store.read());
+        var everything = new ArrayList<>(candidates);
+        everything.addAll(pending.values());
+        var attempts = new dev.jasper.app.presentation.AttemptStore(options.stateFile().toAbsolutePath().getParent()).read();
+        return new PluginCatalog.Disk(candidates, pending, store.read(), Presentations.read(everything, attempts, launch.get().build()));
     }
 
     PluginRuntime.Snapshot snapshot() throws IOException {
@@ -55,6 +58,11 @@ final class PluginAdmin {
         if (subject.origin() == PluginCandidate.Origin.USER && (entry == null || entry.optIn()))
             throw new IOException("Review " + subject.descriptor().name() + " before enabling or disabling it");
         boolean optIn = enabled && subject.origin() == PluginCandidate.Origin.BUNDLED && !subject.descriptor().enabledByDefault();
+        if (enabled && subject.descriptor().declaresPresentation()) {
+            var others = otherProviders(disk, id);
+            store.transact(PluginStateStore.enablingPresentation(id, optIn, others.keySet()));
+            return snapshot().withTurnedOff(others.values());
+        }
         store.transact(PluginStateStore.enabling(id, enabled, optIn));
         return snapshot();
     }
@@ -64,8 +72,30 @@ final class PluginAdmin {
         PluginCandidate subject = PluginCatalog.subject(disk(), id).orElseThrow(() -> new IOException("No such plugin: " + id));
         if (subject.origin() != PluginCandidate.Origin.USER) throw new IOException(subject.descriptor().name() + " needs no consent");
         requireReviewed(subject, reviewed);
+        if (subject.descriptor().declaresPresentation()) {
+            var others = otherProviders(disk(), id);
+            store.transact(PluginStateStore.consentingPresentation(id, subject.descriptor().capabilities(), others.keySet()));
+            return snapshot().withTurnedOff(others.values());
+        }
         store.transact(PluginStateStore.consenting(id, subject.descriptor().capabilities()));
         return snapshot();
+    }
+
+    /**
+     * The other presentation providers the next start would treat as enabled, by id with their names: effectively enabled
+     * and, for a user copy, reviewed.
+     */
+    private static Map<String, String> otherProviders(PluginCatalog.Disk disk, String id) {
+        var others = new TreeMap<String, String>();
+        var all = new ArrayList<>(disk.candidates());
+        all.addAll(disk.pending().values());
+        for (PluginCandidate candidate : all) {
+            if (candidate.id().equals(id) || !candidate.descriptor().declaresPresentation()) continue;
+            PluginStateStore.Entry entry = disk.state().get(candidate.id());
+            boolean unreviewed = candidate.origin() == PluginCandidate.Origin.USER && (entry == null || entry.optIn());
+            if (PluginStateStore.effective(entry, candidate) && !unreviewed) others.putIfAbsent(candidate.id(), candidate.descriptor().name());
+        }
+        return others;
     }
 
     private static void requireReviewed(PluginCandidate subject, List<String> reviewed) throws IOException {

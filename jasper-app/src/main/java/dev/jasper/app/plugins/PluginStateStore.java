@@ -108,6 +108,24 @@ final class PluginStateStore {
         };
     }
 
+    /** Enables the presentation provider {@code id} and disables every provider in {@code others}, in one transaction (spec 4.4). */
+    static UnaryOperator<Map<String, Entry>> enablingPresentation(String id, boolean optIn, Set<String> others) {
+        return state -> {
+            enabling(id, true, optIn).apply(state);
+            for (String other : others) enabling(other, false).apply(state);
+            return state;
+        };
+    }
+
+    /** Records consent to the presentation provider {@code id} and disables every provider in {@code others}, in one transaction. */
+    static UnaryOperator<Map<String, Entry>> consentingPresentation(String id, Set<String> capabilities, Set<String> others) {
+        return state -> {
+            consenting(id, capabilities).apply(state);
+            for (String other : others) enabling(other, false).apply(state);
+            return state;
+        };
+    }
+
     /** The user reviewed exactly these capabilities: that enables the plugin and cancels a pending removal. */
     static UnaryOperator<Map<String, Entry>> consenting(String id, Set<String> capabilities) {
         return state -> { state.put(id, new Entry(true, capabilities, false)); return state; };

@@ -14,14 +14,27 @@ import java.util.function.ToIntFunction;
  * disk as it is now, after pending removals and installs. No I/O, no class loading.
  */
 final class PluginCatalog {
-    /** What this process found and chose; {@code selected} maps id to the version chosen to load. */
-    record Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode) {
-        Launch { candidates = List.copyOf(candidates); statuses = List.copyOf(statuses); selected = Map.copyOf(selected); }
+    /**
+     * What this process found and chose; {@code selected} maps id to the version chosen to load, and {@code build} is the
+     * launch's build identity, which the attempt record is compared with.
+     */
+    record Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode, String build) {
+        Launch { candidates = List.copyOf(candidates); statuses = List.copyOf(statuses); selected = Map.copyOf(selected); java.util.Objects.requireNonNull(build); }
+        Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode) {
+            this(candidates, statuses, selected, safeMode, "");
+        }
     }
 
-    /** The disk now: installed candidates of every origin, staged installs by id, and the saved state. */
-    record Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state) {
-        Disk { candidates = List.copyOf(candidates); pending = Map.copyOf(pending); state = Map.copyOf(state); }
+    /**
+     * The disk now: installed candidates of every origin, staged installs by id, and the saved state; {@code presentations}
+     * are the facts and attempt record the next launch would resolve with.
+     */
+    record Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state,
+                Presentations presentations) {
+        Disk { candidates = List.copyOf(candidates); pending = Map.copyOf(pending); state = Map.copyOf(state); java.util.Objects.requireNonNull(presentations); }
+        Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state) {
+            this(candidates, pending, state, Presentations.NONE);
+        }
     }
 
     private PluginCatalog() { }
@@ -59,7 +72,7 @@ final class PluginCatalog {
         List<PluginCandidate> next = afterMaintenance(disk);
         Map<String, PluginStateStore.Entry> nextState = new TreeMap<>(disk.state());
         nextState.values().removeIf(PluginStateStore.Entry::remove);
-        PluginResolver.Resolution resolution = PluginResolver.resolve(next, nextState, sdk, launch.safeMode());
+        PluginResolver.Resolution resolution = PluginResolver.resolve(next, nextState, sdk, launch.safeMode(), disk.presentations());
         Map<String, String> willRun = versions(resolution.load());
 
         Set<String> ids = new TreeSet<>();

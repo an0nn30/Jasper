@@ -150,11 +150,17 @@ public final class PluginManager {
             case IDLE -> {
                 if (snapshot.safeMode()) panel.banner("Safe mode: installed plugins are not loaded.",
                     List.of(new PluginManagerPanel.BannerAction("Restart Normally", flow::restartNormally)));
-                else if (snapshot.restartNeeded()) panel.banner("Restart Jasper to apply your changes.",
+                else if (snapshot.restartNeeded()) panel.banner(restartText(snapshot),
                     List.of(new PluginManagerPanel.BannerAction("Restart Now", flow::restartNow)));
                 else panel.banner("", List.of());
             }
         }
+    }
+
+    /** The restart banner's text, naming the looks an enable turned off (spec 4.4). */
+    static String restartText(PluginRuntime.Snapshot snapshot) {
+        return "Restart Jasper to apply your changes." + snapshot.turnedOff()
+            .map(names -> " " + names + (names.contains(" and ") ? " were" : " was") + " turned off: one look can be active at a time.").orElse("");
     }
 
     private void toggle(PluginRuntime.Row row) {

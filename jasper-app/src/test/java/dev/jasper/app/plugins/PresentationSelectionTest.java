@@ -153,4 +153,54 @@ class PresentationSelectionTest {
             .containsExactlyInAnyOrder("a.cycle", "b.cycle", "c.missing", "d.version", "e.sdk", "f.look", "g.look");
         assertThat(resolution.rejected()).allSatisfy(status -> assertThat(status.quiet()).as(status.formatted()).isFalse());
     }
+
+    @org.junit.jupiter.api.io.TempDir Path home;
+
+    private PluginAdmin admin(PluginCatalog.Launch launch) {
+        var options = new PluginRuntime.Options(home.resolve("bundled"), home.resolve("plugins"), null, false,
+            home.resolve("plugins.toml"), home.resolve("plugins.lock"));
+        return new PluginAdmin(options, SDK, () -> launch, id -> 0, java.time.Duration.ofSeconds(2));
+    }
+
+    private static String look(String id, String name, boolean onByDefault) {
+        return dev.jasper.app.testsupport.LookFixtures.descriptor(id, name) + dev.jasper.app.testsupport.LookFixtures.provider("look.kit.toml")
+            + (onByDefault ? "" : "enabled_by_default = false\n");
+    }
+
+    @Test void enablingAProviderTurnsTheOtherEnabledProviderOffInOneTransaction() throws Exception {
+        dev.jasper.app.testsupport.LookFixtures.plugin(home.resolve("bundled"), "a.look", look("a.look", "Alpha", true),
+            Map.of("look.kit.toml", dev.jasper.app.testsupport.LookFixtures.KIT));
+        dev.jasper.app.testsupport.LookFixtures.plugin(home.resolve("bundled"), "b.look", look("b.look", "Beta", false),
+            Map.of("look.kit.toml", dev.jasper.app.testsupport.LookFixtures.KIT));
+        var snapshot = admin(new PluginCatalog.Launch(List.of(), List.of(), Map.of(), false)).setEnabled("b.look", true);
+        var state = new PluginStateStore(home.resolve("plugins.toml"), home.resolve("plugins.lock"), java.time.Duration.ofSeconds(2)).read();
+        assertThat(state).containsEntry("b.look", new PluginStateStore.Entry(true, Set.of(), false, true))
+            .containsEntry("a.look", new PluginStateStore.Entry(false, Set.of(), false, false));
+        assertThat(snapshot.turnedOff()).contains("Alpha");
+        assertThat(snapshot.restartNeeded()).isTrue();
+        assertThat(dev.jasper.app.pluginmanager.PluginManagerAccess.restartText(snapshot))
+            .isEqualTo("Restart Jasper to apply your changes. Alpha was turned off: one look can be active at a time.");
+        var plain = PluginStateStore.consentingPresentation("u.look", Set.of("presentation.provide"), Set.of("a.look", "b.look"))
+            .apply(new java.util.TreeMap<>(state));
+        assertThat(plain).containsEntry("u.look", new PluginStateStore.Entry(true, Set.of("presentation.provide"), false, false))
+            .containsEntry("b.look", new PluginStateStore.Entry(false, Set.of(), false, false));
+    }
+
+    @Test void theCatalogPredictsTheLaunchIncludingAnAttemptSkip() throws Exception {
+        dev.jasper.app.testsupport.LookFixtures.plugin(home.resolve("bundled"), "a.look", look("a.look", "Alpha", true),
+            Map.of("look.kit.toml", dev.jasper.app.testsupport.LookFixtures.KIT));
+        List<String> problems = new java.util.ArrayList<>();
+        var candidates = PluginDiscovery.scan(home.resolve("bundled"), PluginCandidate.Origin.BUNDLED, problems);
+        String digest = Presentations.read(candidates, AttemptStore.Record.EMPTY, BUILD).of(candidates.getFirst()).orElseThrow().digest();
+        for (boolean skipped : new boolean[] {false, true}) {
+            var store = new AttemptStore(home);
+            store.update("a.look", attempt -> skipped ? attempt.tried("0.1.0", digest, BUILD, AttemptStore.State.PENDING) : AttemptStore.Attempt.NONE,
+                AttemptStore.WAIT);
+            var launched = PluginResolver.resolve(candidates, Map.of(), SDK, false, Presentations.read(candidates, store.read(), BUILD));
+            var launch = new PluginCatalog.Launch(candidates, launched.rejected(), PluginCatalog.versions(launched.load()), false, BUILD);
+            var snapshot = admin(launch).snapshot();
+            assertThat(snapshot.restartNeeded()).as("skipped: " + skipped).isFalse();
+            assertThat(launched.presentation().isPresent()).isEqualTo(!skipped);
+        }
+    }
 }

@@ -184,10 +184,19 @@ public final class PluginRuntime {
      * @param rows the plugins
      * @param restartNeeded whether the next launch would run a different plugin set than this process
      * @param safeMode whether this process runs without user plugins
+     * @param turnedOff the presentation providers the change just made turned off, for the banner; empty for none
      */
-    public record Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode) {
+    public record Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode, Optional<String> turnedOff) {
         /** Copies the rows. */
-        public Snapshot { rows = List.copyOf(rows); }
+        public Snapshot { rows = List.copyOf(rows); Objects.requireNonNull(turnedOff, "turnedOff"); }
+
+        /** A snapshot that turned no look off. */
+        public Snapshot(List<Row> rows, boolean restartNeeded, boolean safeMode) { this(rows, restartNeeded, safeMode, Optional.empty()); }
+
+        /** This snapshot naming the providers an enable turned off, joined with " and "; none leaves it unchanged. */
+        public Snapshot withTurnedOff(java.util.Collection<String> names) {
+            return names.isEmpty() ? this : new Snapshot(rows, restartNeeded, safeMode, Optional.of(String.join(" and ", names)));
+        }
     }
 
     /**
