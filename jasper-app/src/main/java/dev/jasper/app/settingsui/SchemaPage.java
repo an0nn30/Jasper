@@ -222,7 +222,7 @@ public final class SchemaPage implements SettingsPage {
         var terms = new ArrayList<String>();
         terms.add(spec.title);
         for (Item item : spec.items) {
-            if (item instanceof RowItem row && row.shown()) {
+            if (item instanceof RowItem row && built(row)) {
                 terms.add(row.setting().label());
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
@@ -245,12 +245,15 @@ public final class SchemaPage implements SettingsPage {
             if (!after) { after = item == section; continue; }
             if (item instanceof SectionItem) break;
             if (item instanceof ActionItem || item instanceof ExternalItem || item instanceof NoticeItem) return true;
-            if (item instanceof RowItem row) { if (row.shown()) return true; anyRow = true; }
+            if (item instanceof RowItem row) { if (built(row)) return true; anyRow = true; }
         }
         return !anyRow;
     }
 
     List<Row<?>> rows() { return rows; }
+
+    /** Whether a row is built: shown on this platform, and not a setting the look implies (spec 12.1's hidden keys). */
+    private boolean built(RowItem row) { return row.shown() && !context.chrome().hiddenKeys().contains(row.setting().name()); }
     /** The action buttons' node ids, in page order; for tests. */
     List<String> actionButtons() {
         var ids = new ArrayList<String>();
@@ -268,7 +271,7 @@ public final class SchemaPage implements SettingsPage {
         if (body != null) return body;
         int actionIndex = 0;
         for (Item item : spec.items) {
-            if (item instanceof RowItem row && row.shown()) addRow(row);
+            if (item instanceof RowItem row && built(row)) addRow(row);
             else if (item instanceof ActionItem action) actions.add(new ActionRow(action, actionIndex++));
             else if (item instanceof ExternalItem external) externals.add(new ExternalRow(external.value()));
         }
@@ -304,7 +307,7 @@ public final class SchemaPage implements SettingsPage {
                     title = section.title();
                 }
                 case RowItem row -> {
-                    if(row.shown()) {
+                    if(built(row)) {
                         var owner=rows.get(rowIndex++);
                         if(owner.editor.cardRows())group.addAll(((Nodes.Stack)row(owner)).children());
                         else if(owner.editor.fullSpan()) {
