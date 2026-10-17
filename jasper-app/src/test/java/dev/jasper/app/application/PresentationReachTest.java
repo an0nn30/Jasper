@@ -49,6 +49,12 @@ class PresentationReachTest {
                     assertThat(FlatLafInstaller.installedKit()).as("every install of the controller uses its kit").isSameAs(kit);
                     var icons = new dev.jasper.app.platform.PresentationIcons();
                     assertThat(icons.context(controller.appearance().context(ThemeRoute.CHROME)).kit()).isSameAs(kit);
+                    // Another kit installed under the controller: its contexts still carry the presentation's kit.
+                    FlatLafInstaller.install(controller.current().chrome(), Kit.DEFAULT);
+                    try {
+                        assertThat(controller.appearance().context(ThemeRoute.CHROME).kit()).as("not the installed kit").isSameAs(kit);
+                        assertThat(icons.context(controller.appearance().context(ThemeRoute.WORKSPACE)).kit()).as("not the installed kit").isSameAs(kit);
+                    } finally { FlatLafInstaller.install(controller.current().chrome(), kit); }
                     icons.close();
                 }
             });

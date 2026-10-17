@@ -266,6 +266,10 @@ this plan's status banner.
 19. **Host facts.** `Projections` take `Host(boolean mac, boolean unifiedTitleSupported)`, computed by `PluginSelection` from
     `os.name` and FlatLaf's `SystemInfo.isMacFullWindowContentSupported` (no AWT), because `presentation` has no
     `platform` edge. Cost if wrong: none.
+20. **The runtime's pre-start setter takes only the kit.** Spec 4.9 names `PluginRuntime.presentation(Kit kit,
+    DialogMapping dialogs)`; in this plan it is `presentation(Kit kit)`, because nothing in the runtime consumes the
+    dialog mapping yet (Rulings 2). The `DialogMapping` parameter is added beside the kit when the dialog consumer lands.
+    Cost if wrong: one parameter.
 
 ## File structure
 
@@ -6444,7 +6448,8 @@ presentation check comes first and dependents of a skipped provider are unmet; (
 (12) faces are named by the name table and registered in 5b; (13) deep nesting is invalid TOML; (14) colour-literal,
 title and face rules; (15) the classic base's chrome is the Enterprise column; (16) a blamed kit posts the ordinary
 problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
-host facts without AWT. Deviations from the plan's text: <deviations>. Plan-5b entry conditions: register the fonts and
+host facts without AWT; (20) `PluginRuntime.presentation` takes only the `Kit` (spec 4.9's `DialogMapping` parameter is
+added beside it when the dialog consumer lands). Deviations from the plan's text: <deviations>. Plan-5b entry conditions: register the fonts and
 name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
 --continue`: **<counts>**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
 ```
@@ -6452,7 +6457,7 @@ name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterp
 Replace this plan's first heading line with the same heading followed by a status banner:
 
 ```markdown
-> **Status (2026-10-16): executed on `claude/enterprise-provider` (`<range>`).** Deviations from this plan's text: <deviations>.
+> **Status (2026-10-16): executed on `claude/enterprise-provider` (`<range>`).** Deviations from this plan's text: <deviations>. From the spec: `PluginRuntime.presentation` takes only the `Kit`; spec 4.9's `DialogMapping` parameter is added beside it when the dialog consumer lands (Rulings 20).
 ```
 
 - [ ] **Step 5: Commit**

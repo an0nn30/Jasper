@@ -52,7 +52,7 @@ class HostedKitTest {
    receiver.close();assertThatIllegalStateException().isThrownBy(() -> context.icons().names());
   }
  });}
- /** Enterprise presentation plan 1: the app's three context sites take the kit installed when they make a context. */
+ /** Enterprise presentation plan 1 and plan 5a Task 10: the three-argument AppearanceBindings and seven-argument HostedKit read the kit installed when they make a context; PresentationIcons keeps its source context's kit. */
  @Test void appContextsAreMadeOverTheInstalledKitAndIconContextsKeepTheirSources() throws Exception {SwingUtilities.invokeAndWait(() -> {
   var base=dev.jasper.ui.kit.Kit.DEFAULT;
   var tall=new dev.jasper.ui.kit.Kit("tall-buttons",base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT,40),base.type(),base.faces(),base.controls(),base.colors(),base.uiKeys());

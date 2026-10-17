@@ -625,6 +625,53 @@ class PluginRuntimeTest {
         stopAndWait(runtime);
     }
 
+    static final String KIT_PAGE = """
+        package fix.page;
+        public final class Main implements dev.jasper.sdk.plugin.Plugin {
+            @Override public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                context.settings().page(rows -> context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Button("go",
+                    dev.jasper.sdk.ui.ControlState.READY, "Go", "", dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, "go", "")), event -> { }));
+            }
+        }
+        """;
+
+    /**
+     * Enterprise presentation plan 5a Task 10: the kit given before start reaches a plugin's views through the host and
+     * the plugin's context (spec 4.9), and the setter refuses once plugins have started.
+     */
+    @Test void pluginsViewsAreMadeWithThePresentationGivenBeforeTheyStart() throws Exception {
+        Path devPlugins = root.resolve("dev").resolve("dev.example.page");
+        PluginJars.build(devPlugins, "page.jar", PluginJars.descriptor("dev.example.page", "1.0.0", "fix.page.Main"),
+            Map.of("fix.page.Main", KIT_PAGE), List.of());
+        var base = dev.jasper.ui.kit.Kit.DEFAULT;
+        var tall = new dev.jasper.ui.kit.Kit("tall-buttons", base.metrics().with(dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT, 40),
+            base.type(), base.faces(), base.controls(), base.colors(), base.uiKeys());
+        PluginRuntime runtime = runtime(null, root.resolve("absent"), devPlugins, false, new ArrayList<>());
+        onEdt(() -> runtime.presentation(tall));
+        onEdt(() -> runtime.start(Map.of(), true));
+        settle();
+        var context = new dev.jasper.app.settingsui.PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(),
+            () -> { }, () -> null, dev.jasper.app.testsupport.KitTestSupport::context);
+        try {
+            onEdt(() -> {
+                var page = runtime.settingsPages(context).getFirst();
+                var pair = dev.jasper.app.appearance.ThemeTestSupport.pair(false);
+                var reference = new HostedKit("reference", () -> true, () -> pair, null, new Containment(java.awt.EventQueue::isDispatchThread),
+                    () -> false, action -> "", () -> base);
+                var spec = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Button("go", dev.jasper.sdk.ui.ControlState.READY, "Go", "",
+                    dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY, "go", ""));
+                var view = reference.create(spec, event -> { });
+                try {
+                    var made = dev.jasper.app.testsupport.KitTestSupport.require(page.component(), "go", javax.swing.JComponent.class);
+                    var standard = dev.jasper.app.testsupport.KitTestSupport.require(view.component(), "go", javax.swing.JComponent.class);
+                    assertThat(made.getPreferredSize().height).as("the plugin's button measures with the presentation's kit")
+                        .isGreaterThan(standard.getPreferredSize().height);
+                } finally { view.close(); reference.close(); page.dispose(); }
+                assertThatIllegalStateException().isThrownBy(() -> runtime.presentation(base)).withMessage("Plugins have already started");
+            });
+        } finally { stopAndWait(runtime); }
+    }
+
     static final String LINE_EDITOR = """
         package fix.lines;
         import java.nio.file.Files;
