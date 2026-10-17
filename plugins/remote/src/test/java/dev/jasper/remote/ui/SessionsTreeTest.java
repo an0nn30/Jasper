@@ -97,10 +97,26 @@ class SessionsTreeTest {
     @Test void theHeaderDetailIsTheCountUnderClassicOnly() throws Exception {
         edt(() -> {
             var classic = new ArrayList<PanelHeader>(); var rows = new ArrayList<PanelHeader>();
-            panel(Layout.CLASSIC).onHeaderChanged(classic::add);
+            var classicPanel = panel(Layout.CLASSIC);
+            classicPanel.onHeaderChanged(classic::add);
             panel(Layout.ROWS).onHeaderChanged(rows::add);
             assertThat(classic.getLast().detail()).isEqualTo("2");
             assertThat(rows.getLast().detail()).isEmpty();
+            // The dock's strip draws the detail as "(2)": a kit count too would read "Sessions (2) (2)".
+            assertThat(node(classicPanel.view(), HostsPanel.HEADER, Nodes.Header.class).count()).as("no second count").isEmpty();
+        });
+    }
+
+    @Test void aFilterThatHidesTheSelectedRowReportsTheRowItSelects() throws Exception {
+        edt(() -> {
+            var panel = panel(Layout.CLASSIC);
+            var selections = new ArrayList<Optional<String>>();
+            panel.onSelectionChanged(selections::add);
+            panel.select(minecraft.id());
+            type(panel.view(), HostsPanel.SEARCH, "192.168.1.119");
+            assertThat(selections).containsExactly(Optional.of("host:" + mac.id()));
+            type(panel.view(), HostsPanel.SEARCH, "192.168.1.11");
+            assertThat(selections).as("a filter that keeps the row reports nothing").hasSize(1);
         });
     }
 

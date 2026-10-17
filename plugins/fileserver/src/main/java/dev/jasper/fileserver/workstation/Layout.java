@@ -11,7 +11,7 @@ import dev.jasper.sdk.services.Services;
 public enum Layout {
     /** Today's rows, cards and switches. */
     ROWS,
-    /** The Workstation mocks' trees, tables, Properties and toolbar view. */
+    /** The Workstation mocks' File Servers table and Properties, and New File Server's keys table. */
     CLASSIC;
 
     /**

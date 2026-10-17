@@ -27,9 +27,10 @@ public final class TransfersPanels {
 
     private UiView create(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new TransfersPanel(context.kit(), transfers.strip(window));
+        var strip = transfers.strip(window);
+        var panel = new TransfersPanel(context.kit(), strip);
         hosts.put(window.id(), host);
-        host.onClosed(() -> { panel.close(); transfers.release(window); if (hosts.get(window.id()) == host) hosts.remove(window.id()); });
+        host.onClosed(() -> { panel.close(); transfers.release(window, strip); if (hosts.get(window.id()) == host) hosts.remove(window.id()); });
         return panel.view();
     }
 

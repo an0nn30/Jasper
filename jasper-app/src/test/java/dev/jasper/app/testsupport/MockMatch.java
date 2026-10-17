@@ -156,7 +156,11 @@ public final class MockMatch {
 
     private static double f(double t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16.0 / 116; }
 
-    /** Whether a 2x2 block of {@code image} lies within ΔE76 6 of {@code colour}, as {@code check_pairs.py} asks. */
+    /**
+     * Whether a 2x2 block of {@code image} lies within ΔE76 6 of {@code colour}: {@code check_pairs.py}'s mock tolerance,
+     * used here for the render too, where {@code check_pairs.py} asks 1.5, so neighbouring Enterprise neutrals can pass
+     * for each other.
+     */
     public static boolean present(BufferedImage image, Color colour) {
         int w = image.getWidth(), h = image.getHeight();
         var close = new boolean[w * h];

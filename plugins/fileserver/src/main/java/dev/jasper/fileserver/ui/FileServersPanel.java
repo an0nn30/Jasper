@@ -37,6 +37,9 @@ import java.util.function.Function;
  * The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. The row the
  * details and activity follow is the user's selection, or the first server while nothing is selected; only a selection
  * the user (or {@link #select}) made is shown as selected.
+ *
+ * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.5) the rows are a Folder, Address and Status table;
+ * the chosen server's Properties and status line follow it, the row menu reads Copy URI and Show Activity.
  */
 public final class FileServersPanel implements AutoCloseable {
     public record Actions(Consumer<UUID> toggle, Consumer<Optional<UUID>> edit, Consumer<UUID> duplicate, Consumer<UUID> delete,
@@ -376,12 +379,19 @@ public final class FileServersPanel implements AutoCloseable {
         };
     }
 
-    /** The row menu of the default look, with Copy URI for Copy Address and Show Activity for Show Details (Rulings 10). */
+    /**
+     * The row menu of the default look, with Copy URI for Copy Address and Show Activity for Show Details (Rulings 10); a
+     * server with more than one address adds "Copy" and the address for each later one, as the details card's Copy buttons do.
+     */
     private List<MenuItem> classicMenu(ServerRegistry.View server) {
         UUID id = server.definition().id();
         var items = new ArrayList<MenuItem>();
         for (MenuItem item : menu(server)) {
-            if (item.action().equals("menu:copy:" + id)) items.add(menuItem("copy", id, "Copy URI", item.enabled()));
+            if (item.action().equals("menu:copy:" + id)) {
+                items.add(menuItem("copy", id, "Copy URI", item.enabled()));
+                for (int i = 1; i < server.addresses().size(); i++)
+                    items.add(new MenuItem("menu.uri." + i + ":" + id, "Copy " + server.addresses().get(i), "", "uri:" + id + ":" + i, true, false));
+            }
             else if (item.action().equals("menu:details:" + id)) items.add(menuItem("details", id, detailsOpen ? "Hide Activity" : "Show Activity", true));
             else items.add(item);
         }

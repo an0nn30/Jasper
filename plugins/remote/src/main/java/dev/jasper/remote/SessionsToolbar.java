@@ -33,8 +33,10 @@ import java.util.function.Supplier;
 
 /**
  * Keeps the Sessions dropdown in sync with the WSL distributions and the saved hosts. Distributions come first, titled
- * with their WSL version because toolbar menus have no separators; hosts follow alphabetically. Owned by RemotePlugin on
- * the UI thread.
+ * with their WSL version because toolbar menus have no separators; hosts follow alphabetically. Every host and
+ * distribution is an action in both looks (the palette lists them and Keymap binds them). Under {@link Layout#CLASSIC}
+ * the toolbar holds one "Session: [combo] [Connect]" view per window in place of the dropdown (Enterprise presentation
+ * spec 14.4). Owned by RemotePlugin on the UI thread.
  */
 final class SessionsToolbar implements AutoCloseable {
     private static final String MANAGE = "dev.jasper.remote.sessions.manage";
@@ -49,7 +51,11 @@ final class SessionsToolbar implements AutoCloseable {
     private final Map<UUID, PluginAction> actions = new HashMap<>();
     private final Map<String, PluginAction> distroActions = new HashMap<>();
     private List<String> placed = List.of();
+    /** The ROWS dropdown's placement; null under CLASSIC. */
     private Subscription placement;
+    /** The CLASSIC view's placement; null under ROWS. */
+    private Subscription viewPlacement;
+    private boolean closed;
     /** Which composition the toolbar takes (spec 14.4): the dropdown under ROWS, one view per window under CLASSIC. */
     private final Layout layout;
     private final SessionSelection selection;
@@ -80,14 +86,15 @@ final class SessionsToolbar implements AutoCloseable {
         manage = context.actions().register(ActionSpec.of(MANAGE, "Manage Sessions...").withIcon(icon),
             invoked -> showHosts.accept(invoked.window()));
         if (layout == Layout.CLASSIC) {
-            placement = context.toolbar().add(ToolbarItem.view(this::create));
+            viewPlacement = context.toolbar().add(ToolbarItem.view(this::create));
             selection.onChanged((window, row) -> renderViews());
         }
         refresh();
     }
 
+    /** Registers, retitles and drops the host and distribution actions; places the dropdown (ROWS) or renders the views (CLASSIC). */
     void refresh() {
-        if (layout == Layout.CLASSIC) { renderViews(); return; }
+        if (closed) return;
         var ids = new ArrayList<String>();
         Set<String> listed = new HashSet<>();
         for (ShellProfileInfo profile : distros.get()) {
@@ -117,7 +124,7 @@ final class SessionsToolbar implements AutoCloseable {
             ids.add(actionId(id));
         }
         ids.add(MANAGE);
-        if (!placed.equals(ids)) {
+        if (layout == Layout.ROWS && !placed.equals(ids)) {
             if (placement != null) placement.close();
             placement = context.toolbar().add(ToolbarItem.menu(icon, "Sessions", ids));
             placed = List.copyOf(ids);
@@ -128,6 +135,7 @@ final class SessionsToolbar implements AutoCloseable {
         for (UUID id : List.copyOf(actions.keySet())) {
             if (store.host(id).isEmpty()) actions.remove(id).close();
         }
+        if (layout == Layout.CLASSIC) renderViews();
     }
 
     // ---- the classic toolbar view (spec 14.4)
@@ -138,13 +146,17 @@ final class SessionsToolbar implements AutoCloseable {
         return view;
     }
 
-    /** Every open window's view shows the current hosts, distributions and choice; a closed window's view is dropped. */
-    private void renderViews() {
+    /**
+     * Every open window's view shows the current hosts, distributions and choice (the choice, else the active SSH pane's
+     * host, which RemotePlugin re-renders on pane and tab changes); a closed window's view is dropped.
+     */
+    void renderViews() {
+        if (closed) return;
         for (var entry : List.copyOf(views.entrySet())) {
             var window = context.terminals().window(entry.getKey()).filter(WindowHandle::isOpen);
             if (window.isEmpty()) { views.remove(entry.getKey()); selection.forget(entry.getKey()); continue; }
             try { entry.getValue().update(new ViewSpec(classic(window.get()))); }
-            catch (IllegalStateException closed) { views.remove(entry.getKey()); }
+            catch (IllegalStateException disposed) { views.remove(entry.getKey()); }
         }
     }
 
@@ -177,6 +189,7 @@ final class SessionsToolbar implements AutoCloseable {
     }
 
     private void classicEvent(WindowHandle window, UiEvent event) {
+        if (closed) return;
         switch (event) {
             case UiEvent.Selected chosen when chosen.id().equals(CHOICE) -> {
                 String id = chosen.ids().stream().findFirst().orElse(NONE_OPTION);
@@ -206,7 +219,11 @@ final class SessionsToolbar implements AutoCloseable {
     private static String actionId(UUID id) { return "dev.jasper.remote.session.h" + id; }
 
     @Override public void close() {
+        if (closed) return;
+        closed = true;
         if (placement != null) placement.close();
+        if (viewPlacement != null) viewPlacement.close();
+        views.clear();
         actions.values().forEach(PluginAction::close);
         actions.clear();
         distroActions.values().forEach(PluginAction::close);

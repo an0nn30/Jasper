@@ -259,17 +259,18 @@ public class RemotePlugin implements Plugin {
             scope.changed(); sessionsToolbar.refresh(); refreshPanels();
         });
         context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, event -> {
-            event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit();
+            event.paneId().ifPresent(id->{rememberPane(id);sftpFocused(id);}); refreshSplit(); syncSessions();
         });
-        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); });
-        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); });
+        context.events().subscribe(TerminalEvents.PANE_FOCUSED, event -> { rememberPane(event.paneId());sftpFocused(event.paneId()); syncSessions(); });
+        context.events().subscribe(TerminalEvents.PANE_CLOSED, event -> { attachedPanes.remove(event.paneId()); panes.remove(event.paneId()); paneIdentities.remove(event.paneId());follower.forget(event.paneId());sftpUi.ended(event.paneId()); recentPanes.remove(event.paneId()); distroPanes.remove(event.paneId()); refreshPanels(); syncSessions(); });
         context.events().subscribe(TerminalEvents.SESSION_STATE_CHANGED, event -> { if (distroPanes.containsKey(event.paneId())) refreshPanels(); });
         context.events().subscribe(TerminalEvents.WINDOW_CLOSED, event -> {
             for (var attempt : Set.copyOf(attempts)) if (attempt.window.id().equals(event.windowId())) attempt.close();
+            sessionSelection.forget(event.windowId());
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
         context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->{follower.reported(event.paneId());sftpUi.directory(event.paneId(),directory.path());}));
-        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())));
+        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->{context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())); syncSessions();});
     }
 
     /** Remote's navigation actions with their default bindings; Keymap rebinds them. */
@@ -465,12 +466,12 @@ public class RemotePlugin implements Plugin {
         UUID paneId = pending.pane().id();
         attachedPanes.put(paneId, pending);
         follower.forget(paneId);
-        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId);
+        panes.put(paneId, shell.hostId()); paneIdentities.put(paneId, shell.identity()); rememberPane(paneId);sftpFocused(paneId); syncSessions();
         shell.connection().exited().whenComplete((ignored, exit) -> ui.execute(() -> {
             if (attachedPanes.get(paneId) != pending) return;
             attachedPanes.remove(paneId);
             panes.remove(paneId); paneIdentities.remove(paneId); follower.forget(paneId); recentPanes.remove(paneId); refreshSplit();
-            if (!stopped) { sftpUi.ended(paneId); refreshPanels(); }
+            if (!stopped) { sftpUi.ended(paneId); refreshPanels(); syncSessions(); }
         }));
         pending.attach(shell.connection());
         RemoteHost authenticatedHost = shell.host();
@@ -638,7 +639,7 @@ public class RemotePlugin implements Plugin {
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
             (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), layout);
         panel.onHeaderChanged(host::setHeader);
-        panel.onSelectionChanged(row -> sessionSelection.set(window.id(), row));
+        if (layout == dev.jasper.remote.workstation.Layout.CLASSIC) panel.onSelectionChanged(row -> sessionSelection.set(window.id(), row));
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
@@ -653,9 +654,11 @@ public class RemotePlugin implements Plugin {
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
         panels.put(window.id(), panel); panelHosts.put(window.id(), host);
-        // Shown again, the first host is selected as when the old list was shown; focus follows an explicit opening only
-        // (a restored panel's window is not showing yet, so the kit's focus request does nothing).
-        host.onVisibility(visible -> { if (visible) { panel.shown(); panel.focusWhenOpened(); } });
+        seedSessions(window.id(), panel);
+        // Shown again, the first host is selected as when the old list was shown (under CLASSIC the window's row, which the
+        // toolbar view shares); focus follows an explicit opening only (a restored panel's window is not showing yet, so
+        // the kit's focus request does nothing).
+        host.onVisibility(visible -> { if (visible) { panel.shown(); seedSessions(window.id(), panel); panel.focusWhenOpened(); } });
         // The host disposed the view; the panel goes inert so no later refresh touches it.
         host.onClosed(() -> { panel.close(); if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); } });
         return panel.view();
@@ -689,6 +692,34 @@ public class RemotePlugin implements Plugin {
             panel.setDistros(distros, this::distroSessions);
             panel.setHosts(store.hosts(), store.error());
         }
+        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+    }
+
+    /**
+     * Under CLASSIC, after the window's active pane or its SSH panes changed: each toolbar view and Sessions tree shows the
+     * window's row again (its choice, else the active SSH pane's host, else the first), as Connect would act on it.
+     */
+    private void syncSessions() {
+        if (stopped || layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
+        sessionsToolbar.renderViews();
+        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+    }
+
+    /**
+     * Under CLASSIC the Sessions tree selects the window's row as its toolbar view shows it (spec 14.4). A row the tree
+     * does not list (filtered out) leaves the tree's own selection, which then becomes the window's choice.
+     */
+    private void seedSessions(UUID windowId, HostsPanel panel) {
+        if (layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
+        var window = context.terminals().window(windowId).filter(WindowHandle::isOpen);
+        if (window.isEmpty()) return;
+        var selected = panel.selectedRow().map(HostsPanel::rowId);
+        // The user's own choice of a row the toolbar does not list (a group) stays selected in the tree.
+        if (sessionSelection.get(windowId).isPresent() && sessionSelection.get(windowId).equals(selected)) return;
+        var row = sessionsToolbar.current(window.get());
+        row.ifPresent(panel::selectRow);
+        var shown = panel.selectedRow().map(HostsPanel::rowId);
+        if (row.isPresent() && !row.equals(shown)) sessionSelection.set(windowId, shown);
     }
 
     /** The host of the window's active pane, when Remote opened that pane. */

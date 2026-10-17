@@ -43,6 +43,10 @@ import java.util.function.Supplier;
  * and Backspace delete a saved one. Each row has its own context menu, whose actions name that row. The count and New
  * Tunnel action are the window's: {@link #onHeaderChanged} feeds {@code PanelHost.setHeader}. UI thread only; after
  * {@link #close()} nothing touches the view.
+ *
+ * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Type, Local, Remote and Via
+ * table over the selected (else the first) tunnel's status line; Enter or a double click starts or stops a row, in
+ * place of the switch, and the row menu holds the other gestures.
  */
 public final class TunnelsPanel implements AutoCloseable {
     /** What the panel asks for; the plugin decides how. */

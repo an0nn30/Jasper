@@ -193,7 +193,7 @@ confirms (set `pending` while a start or stop is in flight).
   kept headers, and an `ItemList` with no items shows its `emptyText`.
 - **Toolbar views.** An INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, at most one PRIMARY
   `Button`, `MenuButton`s and `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
-  [actions](plugin-authoring.md#actions-and-where-they-appear)).
+  [actions](plugin-authoring.md#actions-and-where-they-appear)). A choice's label is its accessible name, not a caption.
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
   title (the macOS window title row); `Hue.NONE`, the default, draws none.
 - **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a

@@ -1,6 +1,6 @@
 # Enterprise presentation 10a: Workstation, Remote and File Server compositions Implementation Plan
 
-> **Status: executed on 2026-10-17** (`4a266828f..490e4dca9`, then the documentation commit); see `docs/STATUS.md`. Deviations from the plan's text: Execution notes R1 to R21 and Execution deviations D1 to D21 below (D1, D2, D4, D5, D7, D8, D10 to D12, D15, D18, D20 and D21 change what the tasks wrote; D3, D6, D9, D13, D14, D16, D17 and D19 are measured residuals; New Tunnel's floor is 0.53).
+> **Status: executed on 2026-10-17** (`4a266828f..490e4dca9`, then the documentation commit and the final review's fixes); see `docs/STATUS.md`. Deviations from the plan's text: Execution notes R1 to R21 and Execution deviations D1 to D22 below (D1, D2, D4, D5, D7, D8, D10 to D12, D15, D18, D20 and D21 change what the tasks wrote; D3, D6, D9, D13, D14, D16, D17, D19 and D22 are measured residuals; New Tunnel's floor is 0.53).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -272,7 +272,7 @@ Positions and sizes inside the surfaces (logical px; ±1 unless noted):
 | Sessions | filter field 334 wide at x 8, 24 tall (border #B4B8BF); column titles at x 9 (Name), 176 (Host), 303 (Port), `#4A4F57`; separators after Name at 166 and after Host at 293 (`#D3D6DA`); rows 22; the dot 6 wide at x 26; names at x 32; the selected row `#2F65CA` with `#FFFFFF` text; group title "Local Network" medium `#3A3D42` at x 9 after a 6 px ▼ |
 | Sessions Properties | title band 22, "Properties — <host>" medium `#4A4F57` at x 9; label column 89 (x 0 to 88) + 1 px `#E6E8EB` rule at x 89, the value cell from x 90 (Light and Dark, `#3F4247` in Dark); labels `#5C6370` at x 9; values `#1E1F22` (data face) at x 98; rows 22 + 1 px `#E6E8EB`; WARNING value "Vault locked" `#8A5A00`; actions row 40 tall: Edit… 78×24 and Connect 75×24 (primary `#2F65CA`, edge `#2655AE`), right-aligned 6 from the edge |
 | Tunnels | filter 36 tall area; separators `#D3D6DA` at 76, 163 and 273, each title 9 after its separator (Type at 8); the Type cell's idle dot 7 wide `#A3A8B0` at x 8, the word at 21; Local and Remote in the data face; footer "test — inactive. Click to toggle." CAPTION `#5C6370` at x 8, y 91 |
-| SFTP | navigation row 28 tall: ← → ⟳ glyphs at x 15, 40 and 65; separators `#C4C7CC` 1×18 at x 86 and before "Upload ▾"; "Hidden files" at x 100, "Upload ▾" at x 189; breadcrumbs field 284×24 at x 8; column separators at 136 and 213, titles Name 9, Size 146, Modified 223; zebra `#F7F8FA` on odd rows; Modified values `MMM dd` in the data face `#5C6370`; Follow terminal folder row 28 tall, checkbox 13 at x 8 |
+| SFTP | navigation row 28 tall: ← → ⟳ glyphs at x 15, 40 and 65; separators `#C4C7CC` 1×18 at x 86 and before "Upload ▾"; "Hidden files" at x 100, "Upload ▾" at x 189; breadcrumbs field 284×24 at x 8; column separators at 136 and 213, titles Name 9, Size 146, Modified 223; zebra `#F7F8FA` on odd rows; Modified values `MMM dd` in the data face `#7A808A` (corrected by D22); Follow terminal folder row 28 tall, checkbox 13 at x 8 |
 | SFTP disconnected | Choose Session… dropdown 168×24 at x 8, gradient `#FFFFFF`→`#F1F2F4`; the breadcrumbs field disabled `#F0F1F3` with "/" `#9AA0A8`; "Not Connected" BODY_STRONG `#1E1F22` centred at y 177; its sentence `#5C6370` 21 below |
 | File Servers | titles Folder 9, Address 120, Status 237; separators at 110 and 226; "test" at x 8, the HTTP tag 35×14 at x 35 (`#2655AE` on `#E1E8F7`, box `#B9C8EA`); the address right-aligned in the data face ending at 225; "Stopped" `#3A3D42`; Empty "No File Servers" with "Share Folder…" 102×24 |
 | Session toolbar view | "Session:" LABEL `#5C6370` at x 6 (the S's first ink at 6.5 on its bowls' rows, 9.5 on its middle row; the toolbar separator at -7); combo 22 tall at x 59; Connect 24 tall, 75 wide, 3 after the combo |
@@ -5350,7 +5350,7 @@ Light; the mock's are `#C4C7CC` and 16 tall; Task 7's triage assumed `border.win
 the classic GHOST face's secondary ink, and Upload's chevron is the classic menu face's, not ▼ (4b). The column
 separators stand at 132 and 203 (mock 136 and 213) because the classic table's scroll bar takes its width beside the rows
 where the mock overlays it; Size is a numeric column, right-aligned with its title; Modified values draw in MONO_SMALL's
-primary ink (mock `#5C6370`) (4c's table face). Disconnected: the dropdown is its natural 140 wide (mock 168), and the
+primary ink (mock `#7A808A`) (4c's table face). Disconnected: the dropdown is its natural 140 wide (mock 168), and the
 disabled breadcrumbs keep a white field (mock `#F0F1F3`, 4b's breadcrumbs face).
 
 D10 (Task 9). **A native dialog's classic footer band pads its buttons 10** — what: the new role
@@ -5432,3 +5432,15 @@ D21 (Task 13). **The documents and the STATUS entry** — what: `docs/remote.md`
 does ("Cmd+Alt+3, Alt+3 elsewhere"); the STATUS entry adds the 20 pairs' `check_pairs.py` agreements (0.535 to 0.962)
 and a clause naming the execution deviations; `pairs.json` takes the floors the tasks set (0.50 for both session-toolbar
 pairs, 0.53 for new-tunnel); why: the guide's voice and Task 13's own instruction; cost if wrong: none.
+
+D22 (final review). **Residuals: text inks that neither the bands nor the colour lists see** — measured at 2x with
+Pillow on the committed renders against the mocks: (a) New File Server's "Authorized keys" label is `#5C6370` (mock and
+the measurements table `#3A3D42`; 4b's LABEL text face); (b) "No keys added" and Add Host's "No keys" are `#5C6370`
+(mock `#7A808A`; 3c's empty line in 4c's face); (c) the Session combo draws "minecraft-local (192.168.1.124)" all in
+`#1E1F22` where the mock mutes "(192.168.1.124)" in `#5C6370`: the address as an `Option` description was tried and
+reverted, because `RichOptions` draws a description right-aligned at the value's end and widens the combo, which broke
+`TOOLBAR_LIGHT`'s band (`7+8 #FEFEFE, 16+5 #1E1F22` at x 130) and elided Connect (owner: 3d's strip and jasper-ui's
+closed-value face); (d) the SFTP breadcrumbs are `#3A3D42` (mock `#1E1F22`; 4b's breadcrumbs face); (e) the SFTP
+Modified values are `#1E1F22` (mock `#7A808A`, which D9 and the measurements table first gave as `#5C6370`; 4c's table
+face); (f) the classic tree's selected row keeps the idle dot `#9FA2A9` on the selection blue (mock `#B9C8EA`; 4c's
+tree face). `MockMatch.present` holds the render to ΔE 6, where `check_pairs.py` asks 1.5 (its javadoc now says so).

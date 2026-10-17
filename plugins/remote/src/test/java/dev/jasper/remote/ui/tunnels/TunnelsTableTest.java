@@ -64,19 +64,27 @@ class TunnelsTableTest {
             var type = (Nodes.Stack) table().rows().getFirst().cellNodes().get("type");
             assertThat(((Nodes.StatusDot) type.children().getFirst()).kind()).isEqualTo(Nodes.StatusKind.DANGER);
             assertThat(node(panel.view(), TunnelsPanel.FOOTER, Nodes.Text.class).text()).isEqualTo("test — failed: Connection refused. Click to toggle.");
+            assertThat(firstMenuLabel()).as("a failed tunnel's menu starts it").isEqualTo("Start");
             states.put(test.id(), new TunnelState.Starting("Connecting"));
             panel.refresh();
+            assertThat(firstMenuLabel()).as("a starting tunnel's menu stops it").isEqualTo("Stop");
             emit(panel.view(), new UiEvent.Selected(TunnelsPanel.ROWS, Set.of(TunnelsPanel.rowId(test.id()))));
             press(panel.view(), table().activateAction());
             states.put(test.id(), new TunnelState.Up(Instant.now(), 8080, new Counters()));
             panel.refresh();
+            assertThat(firstMenuLabel()).as("an up tunnel's menu stops it").isEqualTo("Stop");
             press(panel.view(), table().activateAction());
             assertThat(events).as("activation stops a starting or up tunnel").containsExactly("stop test", "stop test");
             assertThat(node(panel.view(), TunnelsPanel.FOOTER, Nodes.Text.class).text()).isEqualTo("test — active. Click to toggle.");
             press(panel.view(), menuAction(table().rows().getFirst(), "Edit…"));
             assertThat(events).last().isEqualTo("edit test");
+            states.put(test.id(), new TunnelState.Stopped());
+            panel.refresh();
+            assertThat(firstMenuLabel()).as("a stopped tunnel's menu starts it").isEqualTo("Start");
         });
     }
+
+    String firstMenuLabel() { return table().rows().getFirst().contextActions().orElseThrow().getFirst().label(); }
 
     @Test void noTunnelsIsTheEmptyStateUnderTheHeadersAndABrokenFileIsANotice() throws Exception {
         edt(() -> {

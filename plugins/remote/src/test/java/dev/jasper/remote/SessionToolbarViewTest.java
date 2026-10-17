@@ -105,6 +105,21 @@ class SessionToolbarViewTest {
         }
     }
 
+    /** Spec 3.5: the host and distribution actions, which the palette lists and Keymap binds, exist in both looks. */
+    @Test void underClassicTheHostAndDistributionActionsStillRun() throws Exception {
+        try (var host = new FakePluginHost()) {
+            start(host, Layout.CLASSIC);
+            var window = host.addTerminalWindow();
+            assertThat(value(() -> host.invoke("dev.jasper.remote.session.h" + minecraft.id(), window, null))).isTrue();
+            assertThat(value(() -> host.invoke(SessionsToolbar.distroActionId(ubuntu.id()), window, null))).isTrue();
+            assertThat(events).containsExactly("activate minecraft-local", "open Ubuntu");
+            store.remove(minecraft.id()).join();
+            edt(toolbar::refresh);
+            assertThat(host.actionSpec("dev.jasper.remote.session.h" + minecraft.id())).as("a deleted host's action goes").isEmpty();
+            assertThat(host.toolbar()).as("still no Sessions dropdown").noneMatch(item -> item.contains("Sessions"));
+        }
+    }
+
     @Test void theRowsLayoutKeepsTheSessionsDropdown() throws Exception {
         try (var host = new FakePluginHost()) {
             start(host, Layout.ROWS);

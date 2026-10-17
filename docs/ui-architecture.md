@@ -36,7 +36,7 @@ Install appearance on EDT before widget creation. `AppearanceTransaction` instal
 and publishes a complete chrome/workspace `ThemePair`, restoring prior global defaults on failure.
 Each `KitContext`, made with `KitContext.of(kit, …)`, carries its kit and selects a route.
 A structurally different control draws through a face (`KitFaces`, one per control point, chosen once from the kit's
-`ControlVariants`); faces declare the pairs they paint and never read the kit. The default faces call the controls' own code.
+`ControlVariants`; the table point chooses both the table and the Properties faces); faces declare the pairs they paint and never read the kit. The default faces call the controls' own code.
 Binding subscriptions replay and close independently; views retain
 stable control/document identity on updates. Font-only default changes refresh central typography.
 

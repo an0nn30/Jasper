@@ -1,15 +1,15 @@
 # Jasper — Status and Handoff
 
-**Enterprise presentation, plan 10a: Workstation, Remote and File Server compositions — 2026-10-16**
+**Enterprise presentation, plan 10a: Workstation, Remote and File Server compositions — 2026-10-17**
 (`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `4a266828f..490e4dca9`, then this
-documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10a-plugin-compositions.md),
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-16-enterprise-10a-plugin-compositions.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Remote, File Server and Vault optionally
 require Enterprise and read `dev.jasper.<plugin>.workstation.Layout` once in `start` (CLASSIC while `Workstation` is
 published, ROWS otherwise, including when Enterprise is not installed); `verifyPluginArchitecture` confines
 `dev.jasper.enterprise.api` to those packages. Under the Enterprise look Remote contributes the "Session: [combo]
 [Connect]" toolbar view, the Sessions panel is a Name/Host/Port tree over Properties, Tunnels a Type/Local/Remote/Via
 table, SFTP's tools read Hidden files and Upload over a Modified column (disconnected: Choose Session… over "Not
-Connected"), Transfers a bottom panel toggled by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
+Connected"), Transfers a bottom panel shown by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
 Servers left; File Server's panel is a Folder/Address/Status table over Properties and New File Server lists keys as a
 table; Add Host's keys read "No keys". Classic Properties (jasper-ui) follow the table point: the Workstation grid when
 titled, label-colon lines when untitled. `ClassicCompositionRenderTest` renders every surface from the staged plugins
@@ -47,8 +47,15 @@ SETTING_DESCRIPTION against the mock's 12, D13); D3 the Sessions tree's separato
 with right-aligned Host and Port; D6 the Tunnels cell positions; D9 the SFTP row, table and chooser details; D14 Add
 Host's 106 px keys box (R11), its "No keys" line, placeholders and disabled buttons; D16 the HTTP tag's ink (#2F65CA
 against #2655AE); D17 the File Servers status dot, ink and Address alignment; D19 the keys table's 22 px empty body and
-its 7 px title inset. The default look is byte-identical (gallery digests unchanged; no default render changed).
-`./gradlew check --continue`: **11,303 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the
+its 7 px title inset; D22 text inks no check sees (New File Server's "Authorized keys" label and both empty key lines
+#5C6370, the combo's address unmuted, the SFTP breadcrumbs #3A3D42 and Modified values #1E1F22, the selected tree row's
+idle dot). Final review fixes: the classic Sessions header shows its count once; each window's toolbar view and Sessions
+tree follow the active pane and seed each other (hide and show, filter, delete); the host and distribution actions stay
+registered under CLASSIC; a multi-address server's classic menu copies every address. After merging with 8b and 9b,
+re-run their mock and Plugins-page suites and `ClassicCompositionRenderTest`: the deviations above change the classic
+catalog for every classic surface, and Remote, File Server and Vault list Enterprise as optional; 10b's refresh
+re-measures `FORM_TOP` and `MIXED_ROW_GAP` against the 07 in-window sheets. The default look is byte-identical (gallery digests unchanged; no default render changed).
+`./gradlew check --continue` (after the final review's fixes): **11,308 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the
 Enterprise Workstation window against the Workstation and Dark Mode mocks (the toolbar view's combo and Connect, the
 Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the SFTP row,
 the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,

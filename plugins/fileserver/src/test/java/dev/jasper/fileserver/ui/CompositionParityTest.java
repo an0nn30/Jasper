@@ -33,14 +33,15 @@ class CompositionParityTest {
     final class Composition {
         final List<String> events = new ArrayList<>();
         final FileServersPanel panel;
-        Composition(Layout layout) {
+        Composition(Layout layout) { this(layout, test); }
+        Composition(Layout layout, ServerRegistry.View server) {
             var holder = new java.util.concurrent.atomic.AtomicReference<FileServersPanel>();
             UiTestAccess.edt(() -> {
                 holder.set(new FileServersPanel(new FakeKit("dev.jasper.fileserver"), new FileServersPanel.Actions(
                     id -> events.add("toggle"), id -> events.add("edit " + id.map(any -> "test").orElse("new")), id -> events.add("duplicate"),
                     id -> events.add("delete"), id -> events.add("reveal"), text -> events.add("copy " + text), id -> events.add("password"),
                     id -> events.add("clear"), id -> events.add("fingerprints")), id -> List.of(), HOME, "", ZoneOffset.UTC, "add", layout));
-                holder.get().setServers(List.of(test), Optional.empty());
+                holder.get().setServers(List.of(server), Optional.empty());
             });
             panel = holder.get();
         }
@@ -99,6 +100,20 @@ class CompositionParityTest {
             assertThat(rows.events).as(gesture.name() + ": the default look's path does something").isNotEmpty();
             assertThat(classic.events).as(gesture.name() + ": the classic path does the same").isEqualTo(rows.events);
         }
+    }
+
+    /** A server reachable from all networks lists several addresses: each later one has its own classic Copy. */
+    @Test void aSecondAddressIsCopiedInBothLooks() {
+        var two = new ServerRegistry.View(test.definition(), false, ServerState.STOPPED,
+            List.of(URI.create("http://127.0.0.1:8080"), URI.create("http://192.168.1.20:8080")), Optional.empty(), false);
+        var rows = new Composition(Layout.ROWS, two);
+        rows.select(); rows.press(FileServersPanel.ACTIVATE); rows.press("uri:" + test.definition().id() + ":1");
+        var classic = new Composition(Layout.CLASSIC, two);
+        classic.menu("Copy http://192.168.1.20:8080");
+        assertThat(rows.events).containsExactly("copy http://192.168.1.20:8080");
+        assertThat(classic.events).isEqualTo(rows.events);
+        classic.menu("Copy URI");
+        assertThat(classic.events).last().isEqualTo("copy http://127.0.0.1:8080");
     }
 
     @Test void theEmptyStatesShareFolderIsTheSameInBothLooks() {

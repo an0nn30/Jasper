@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.*;
 
-/** The aggregate status item and every window's transfer rows (shown by its SFTP sidebar) over the plugin-owned queue. */
+/**
+ * The aggregate status item and every window's transfer rows over the plugin-owned queue: its SFTP sidebar shows them,
+ * or under the classic composition its Transfers panel ({@link TransfersPanels}).
+ */
 public final class TransferUi implements AutoCloseable {
     public static final String SHOW = "dev.jasper.remote.transfers", CANCEL = SHOW + ".cancel";
     private static final int PAGE = 50;
@@ -51,7 +54,7 @@ public final class TransferUi implements AutoCloseable {
         refresh();
     }
 
-    /** The transfer rows for {@code window}'s SFTP sidebar, which renders them; the same queue in every window. */
+    /** The transfer rows for {@code window}'s SFTP sidebar or Transfers panel, which renders them; the same queue in every window. */
     public TransferStrip strip(WindowHandle window) {
         var strip = new TransferStrip(new TransferStrip.Actions((id, action) -> act(window, id, action), coordinator::cancel, id -> dismiss(window, id)));
         strips.put(window.id(), strip);
@@ -60,6 +63,9 @@ public final class TransferUi implements AutoCloseable {
     }
 
     public void release(WindowHandle window) { strips.remove(window.id()); }
+
+    /** Drops {@code strip}, the window's rows from {@link #strip}, unless a newer strip has taken its place. */
+    public void release(WindowHandle window, TransferStrip strip) { strips.remove(window.id(), strip); }
 
     void refresh() {
         if (closed || pending) return;

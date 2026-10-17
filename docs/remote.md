@@ -233,7 +233,7 @@ first and closed when none are left. When the connection has closed, the next op
 appear in the terminal window the file was opened from, or else in the active one. With no terminal window open it
 fails with "Reconnecting to prod-web needs an open terminal window for the sign-in prompt."
 
-Transfers appear at the bottom of the SFTP sidebar, in every window: what is copying and where,
+Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in every window: what is copying and where,
 a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
 button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
 A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until

@@ -11,7 +11,7 @@ import dev.jasper.sdk.services.Services;
 public enum Layout {
     /** Today's rows, cards and switches. */
     ROWS,
-    /** The Workstation mocks' trees, tables, Properties and toolbar view. */
+    /** The 07 Credential Vault mocks' classic manager, editors and Unlock form. */
     CLASSIC;
 
     /**

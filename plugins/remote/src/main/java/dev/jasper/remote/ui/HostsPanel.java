@@ -195,7 +195,12 @@ public final class HostsPanel implements AutoCloseable {
     private void handle(UiEvent event) {
         if (closed) return;
         switch (event) {
-            case UiEvent.Edited edited when edited.id().equals(SEARCH) -> { query = edited.text(); rebuild(); }
+            case UiEvent.Edited edited when edited.id().equals(SEARCH) -> {
+                String before = selectedRow;
+                query = edited.text(); rebuild();
+                // A filter that hides the selected row selects another: that is the user's selection too.
+                if (!Objects.equals(before, selectedRow)) selectionChanged.accept(Optional.ofNullable(selectedRow));
+            }
             case UiEvent.Selected selected when selected.id().equals(ROWS) -> {
                 selectedRow = selected.ids().stream().findFirst().filter(id -> rows.stream().anyMatch(row -> rowId(row).equals(id))).orElse(null);
                 render();
@@ -467,13 +472,14 @@ public final class HostsPanel implements AutoCloseable {
         selectedRow = rowId; render();
     }
 
-    /** Hears every selection the user makes in the panel, as the row id, or empty for none. */
+    /** Hears every selection the user makes in the panel, including one a filter makes, as the row id, or empty for none. */
     public void onSelectionChanged(Consumer<Optional<String>> listener) { selectionChanged = Objects.requireNonNull(listener); }
 
     private boolean collapsedGroup(HostRows.Group group) { return group.wsl() ? wslCollapsed : collapsed.contains(group.name()); }
 
     private Nodes.Panel classicNode() {
-        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
+        // The count is the window header's detail (refreshHeader), which the strip draws as "(n)": not a second count here.
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         var filter = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter sessions", "Filter sessions", "");
         boolean searching = !query.strip().isEmpty();
         var roots = new ArrayList<TreeItem>();
