@@ -1,5 +1,7 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.Nodes;
 import java.awt.Graphics2D;
 import javax.swing.JLabel;
 
@@ -17,6 +19,11 @@ interface TableFace extends HeaderFace {
     void styleCount(JLabel count, KitContext context);
     /** Whether a heading row's count stands under the last column's title (the classic table); otherwise at the row's end. */
     boolean countUnderLastColumn();
-    /** Whether a table on a Settings page shows every row, the page scrolling instead of the table; otherwise eight. */
+    /**
+     * Whether a table on a Settings page shows every row (up to {@code Tables.TableControl.PAGE_ROWS} data rows), the page
+     * scrolling instead of the table; otherwise eight.
+     */
     boolean everyRowOnPage();
+    /** The type a {@code role} column's text cells take in place of the role's own, {@code settings} on a Settings page; null keeps it. */
+    Typography.Role cellType(Nodes.TextRole role, boolean settings);
 }

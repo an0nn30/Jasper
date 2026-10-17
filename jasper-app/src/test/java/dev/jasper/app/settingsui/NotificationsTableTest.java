@@ -3,7 +3,6 @@ package dev.jasper.app.settingsui;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.app.presentation.Composition;
 import dev.jasper.ui.model.ControlState;
 import dev.jasper.ui.model.MenuItem;
 import dev.jasper.ui.model.Nodes;
@@ -28,6 +27,7 @@ class NotificationsTableTest {
             editor.show(Map.of("jasper.config", "card"));
             var table = table(editor);
             assertThat(table.columns()).extracting(dev.jasper.ui.model.Column::title).containsExactly("Group", "Display", "Source");
+            assertThat(table.columns().getLast().role()).as("Source reads muted, as the mock's \"Default\"").isEqualTo(Nodes.TextRole.DESCRIPTION);
             var headings = table.rows().stream().filter(row -> row.heading().isPresent()).map(row -> row.heading().orElseThrow()).toList();
             assertThat(headings).extracting(TableRow.Heading::title).containsExactly("Jasper", "THD Sourcing Crypto", "Editor", "Credential Vault", "File Server", "Snippets");
             assertThat(headings.getFirst().count()).hasValue(6);

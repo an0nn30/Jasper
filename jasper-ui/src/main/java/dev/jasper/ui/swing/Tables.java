@@ -107,6 +107,11 @@ final class Tables {
         final JPanel header = new HeaderBand(this);
         /** On a Settings page, where a face may show every row ({@link TableFace#everyRowOnPage}). */
         boolean settings;
+        /**
+         * The data rows a Settings page table shows at most under {@link TableFace#everyRowOnPage}; a longer table scrolls
+         * in its own viewport, so the page stays bounded and only the visible rows are mounted.
+         */
+        static final int PAGE_ROWS = 40;
         /** Which rows are data rows below a heading row (plan 4c), measured with the data. */
         private boolean[] underHeading = new boolean[0];
         /** The row of every cell node and its descendants, so focus and reveal reach row-mounted nodes. */
@@ -338,16 +343,37 @@ final class Tables {
             return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray(),minimums);
         }
 
-        /** Every row on a Settings page whose face shows them all; otherwise the rows' default eight. */
+        /**
+         * On a Settings page whose face shows every row, up to {@link #PAGE_ROWS} data rows and the headings among them,
+         * the table scrolling in its own viewport beyond that; otherwise the rows' default eight.
+         */
         @Override int viewportRowsHeight() {
-            return settings && context().faces().table.everyRowOnPage() ? rowsHeight() : super.viewportRowsHeight();
+            if (!settings || !context().faces().table.everyRowOnPage()) return super.viewportRowsHeight();
+            int height = 0, rows = 0;
+            for (int i = 0; i < size() && rows < PAGE_ROWS; i++) {
+                height += heightAt(i);
+                if (dataRow(i)) rows++;
+            }
+            return height;
         }
 
-        /** Under a face that puts a heading's count under the last column, that column title's text start; else -1. */
+        /**
+         * Under a face that puts a heading's count under the last column, that column title's text start in a row's
+         * coordinates; else -1. It is the header's own allocation, not its laid-out titles: the scroll pane lays out its
+         * column header after the rows, so in a layout pass after a width change the titles still stand where the old
+         * width put them.
+         */
         @Override int headingCountStart() {
-            if (!context().faces().table.countUnderLastColumn() || header.getComponentCount() == 0) return -1;
-            var last = header.getComponent(header.getComponentCount() - 1);
-            return last.getX() + (last instanceof javax.swing.JComponent title ? title.getInsets().left : 0);
+            int count = header.getComponentCount();
+            if (!context().faces().table.countUnderLastColumn() || count == 0) return -1;
+            var insets = header.getInsets();
+            // The header spans the viewport, as the rows do (or its preferred width, as a viewport sizes a plain view).
+            int width = Math.max(scroll.getViewport().getExtentSize().width, header.getPreferredSize().width);
+            int[] sizes = weights().allocation(Math.max(0, width - insets.left - insets.right));
+            int x = insets.left;
+            for (int i = 0; i < count - 1 && i < sizes.length; i++) x += sizes[i];
+            var last = header.getComponent(count - 1);
+            return x + (last instanceof JComponent title ? title.getInsets().left : 0) - com.formdev.flatlaf.util.UIScale.scale(gutter);
         }
 
         @Override
@@ -419,6 +445,11 @@ final class Tables {
                 // The classic look pads a cell after its column's separator and indents a grouped row's first cell.
                 inset(cell, i == 0 ? underHeading(index) ? context().faces().table.groupIndent(context()) : 0
                         : context().faces().table.cellInset(context()));
+                // A face may set a column's cells in its own type size (the classic Settings table's muted column).
+                if (control instanceof Labels.TextControl text) {
+                    var type = context().faces().table.cellType(value().columns().get(i).role(), settings);
+                    if (text.override != type) { text.override = type; text.refresh(); }
+                }
                 if (control instanceof Labels.TextControl && cell instanceof JLabel label) {
                     label.setHorizontalAlignment(
                             value().columns().get(i).numeric()

@@ -37,7 +37,17 @@
 > row ("System checkbox" at 86 as the mock), a title-only row on its title's x-height middle as Task 1 set. Residuals:
 > the first column's title and cells 2 px nearer the box than the mock's (`ICON_GAP` side), the cells' values 1 to 2 px
 > left of the mock's, the System Notifications box 1 px short (Task 1's 47.5 half pixel), so the Groups box starts 1 px
-> higher.
+> higher. Review round 1: `headingCountStart` takes the header's `WeightLayout` allocation over the viewport's width (the
+> scroll pane lays out its column header after the rows, so the titles' bounds lagged a width change by one pass); the
+> classic count is `BODY_STRONG` (the mock's semibold "6 groups") and Source is a `DESCRIPTION` column that
+> `TableFace.cellType` (default null; classic `BODY` on a Settings page) sets at the cells' size in text.secondary;
+> `SettingsPagesMockTest` gains ink boxes (darkest pixel and ink amount within 20 %) on "6 groups" and "Default", as the
+> 1 px residual keeps a point probe off their strokes; a cell dropdown's value rectangle is never narrower than Swing's
+> and reaches the chevron lane plus the renderer's trailing padding and the fractional-paint pixel (a value narrower than
+> its column ends in an ellipsis before the ▼; the default look is unchanged); `everyRowOnPage` shows up to
+> `Tables.TableControl.PAGE_ROWS` (40) data rows, a longer table scrolling in its own viewport (Task 7 checks Project
+> Index against mock 15). The classic table shows no settings-search highlight: only `SettingRow` and `FormRow` carry one,
+> and the search still reveals the table.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

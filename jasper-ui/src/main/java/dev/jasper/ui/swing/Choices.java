@@ -393,8 +393,11 @@ final class Choices {
                     var bounds=super.rectangleForCurrentValue();var i=comboBox.getInsets();
                     if(rich())bounds.width=comboBox.getWidth()-i.left-i.right-arrowWidth();
                     // A cell's chevron lane may be narrower than Swing's square arrow button: its value may run under the
-                    // button, whose chevron the lane keeps clear of the value's text.
-                    else if(cell)bounds.width=comboBox.getWidth()-i.left-i.right;
+                    // button, its text up to the lane (the renderer's trailing padding inside it, and the pixel fractional
+                    // painting may need beyond the width cellWidth measures), which keeps the chevron clear of it (a longer
+                    // value ends in an ellipsis there); never narrower than Swing's own rectangle.
+                    else if(cell)bounds.width=Math.max(bounds.width,comboBox.getWidth()-i.left-i.right-context.faces().buttons.cellChevronLane(context)
+                        +ThemePainting.metric(context,DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)+paintedExcess());
                     return bounds;
                 }
                 @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=arrowWidth();var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
@@ -454,6 +457,12 @@ final class Choices {
             var insets = getInsets();
             return insets.left + insets.right + metrics.stringWidth(value) + ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
                 + context.faces().buttons.cellChevronLane(context);
+        }
+        /** How much wider the value paints in fractional metrics than {@link #cellWidth} measures it, as a literal label allows. */
+        int paintedExcess() {
+            var font = ThemePainting.font(context, Typography.Role.BODY);
+            String value = getSelectedItem() instanceof Option selected ? selected.label() : "Choose…";
+            return Math.max(0, ThemePainting.measureText(font, value) - getFontMetrics(font).stringWidth(value));
         }
         /** Where the closed value's text starts inside the combo: its border inset, then the renderer's padding. */
         int textLead() {

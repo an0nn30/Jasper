@@ -1,6 +1,7 @@
 package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.theme.*;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -46,9 +47,20 @@ final class ClassicTableFace implements TableFace {
     @Override public boolean headingRule() { return false; }
     @Override public int cellInset(KitContext context) { return ClassicHeaders.inset(context); }
     @Override public int groupIndent(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.GROUP_ROW_INDENT); }
-    @Override public void styleCount(JLabel label, KitContext context) { label.setForeground(ThemePainting.painted(context, count)); }
+    /** The count in text.secondary at the heading's own weight and size (the Notifications mock's semibold "6 groups"). */
+    @Override public void styleCount(JLabel label, KitContext context) {
+        label.setFont(ThemePainting.font(context, Typography.Role.BODY_STRONG, label.getText()));
+        label.setForeground(ThemePainting.painted(context, count));
+    }
     /** Plan 9b Rulings 5: the Notifications mock's "6 groups" starts where the Source column's title does. */
     @Override public boolean countUnderLastColumn() { return true; }
-    /** Plan 9b Task 2: the Notifications mock's groups table shows its twenty-three rows in the page. */
+    /** Plan 9b Task 2: the Notifications mock's groups table shows its twenty-three rows in the page, up to {@code PAGE_ROWS}. */
     @Override public boolean everyRowOnPage() { return true; }
+    /**
+     * On a Settings page a DESCRIPTION column keeps its text.secondary ink at the cells' body size (the Notifications mock's
+     * Source "Default", plan 9b Task 2).
+     */
+    @Override public Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) {
+        return settings && role == dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION ? Typography.Role.BODY : null;
+    }
 }

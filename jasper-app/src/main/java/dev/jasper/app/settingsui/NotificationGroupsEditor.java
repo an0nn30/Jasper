@@ -109,7 +109,8 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         // The mock's separators at 755 and 902 over the classic table's column span (267 to 1004 in a 751-wide box).
         var columns = List.of(new dev.jasper.ui.model.Column("group", "Group", Nodes.TextRole.BODY, false, 488, Optional.empty()),
             new dev.jasper.ui.model.Column("display", "Display", Nodes.TextRole.BODY, false, 147, Optional.empty()),
-            new dev.jasper.ui.model.Column("source", "Source", Nodes.TextRole.BODY, false, 102, Optional.empty()));
+            // Source reads muted, as the mock's "Default" (the classic table sets it at the cells' size on a Settings page).
+            new dev.jasper.ui.model.Column("source", "Source", Nodes.TextRole.DESCRIPTION, false, 102, Optional.empty()));
         Map<String, String> value = value();
         var owners = new LinkedHashMap<String, List<Integer>>();
         for (int i = 0; i < groups.size(); i++) owners.computeIfAbsent(groups.get(i).ownerId(), ignored -> new ArrayList<>()).add(i);

@@ -30,4 +30,5 @@ final class DefaultTableFace implements TableFace {
     @Override public void styleCount(JLabel count, KitContext context) { }
     @Override public boolean countUnderLastColumn() { return false; }
     @Override public boolean everyRowOnPage() { return false; }
+    @Override public dev.jasper.ui.metrics.Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) { return null; }
 }

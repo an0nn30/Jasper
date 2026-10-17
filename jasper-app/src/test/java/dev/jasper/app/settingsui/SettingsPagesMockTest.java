@@ -30,12 +30,22 @@ class SettingsPagesMockTest {
     static final Set<String> TIGHT = new java.util.HashSet<>();
     /** The probes whose place follows the UI face's lines (below a titled box's title), by "id/name"; asserted when PLEX. */
     static final Set<String> FACE = new java.util.HashSet<>();
+    /**
+     * Per page, the ink boxes: a logical rectangle around a text whose darkest pixel (its ink) and amount of ink (its weight)
+     * are the mock's there, where a one-pixel residual of the text's place keeps a point probe off its thin strokes.
+     */
+    static final Map<String, List<Ink>> INKS = new LinkedHashMap<>();
+    /** How far a text's ink amount may stray from the mock's, as a share of it: a regular face against a semibold one is 0.4 off. */
+    static final double INK_AMOUNT = 0.2;
     /** Per page, a floor lowered under Rulings 16, with its cause in the banner. */
     static final Map<String, Double> FLOORS = new LinkedHashMap<>();
 
     static SettingsChromeMockTest.Probe probe(String name, int x, int y) { return new SettingsChromeMockTest.Probe(name, x, y); }
     static void tight(String id, String... names) { for (String name : names) TIGHT.add(id + "/" + name); }
     static void face(String id, String... names) { for (String name : names) FACE.add(id + "/" + name); }
+
+    /** An ink box: a text's name and its logical rectangle in the content, wide enough for both the mock's and ours. */
+    record Ink(String name, int x, int y, int width, int height) { }
 
     static {
         PROBES.put("appearance", List.of(probe("Light preview ring", 430, 111), probe("Light radio dot", 437, 164),
@@ -59,6 +69,10 @@ class SettingsPagesMockTest {
         tight("notifications", "header band", "heading band");
         face("notifications", "table box left", "table box right", "header band", "Display separator", "Source separator",
             "header rule", "heading band", "data row", "Display arrow");
+        // The heading count is semibold in text.secondary and the Source cells read text.secondary (2x: "6 groups" 1825 to
+        // 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561, #5C6370).
+        INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14), new Ink("Default", 908, 270, 48, 14)));
+        face("notifications", "6 groups", "Default");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -78,6 +92,39 @@ class SettingsPagesMockTest {
             if (distance <= (TIGHT.contains(name) ? TIGHT_PROBE : SettingsChromeMockTest.PROBE)) continue;
             String failure = String.format("%s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", name, probe.x(), probe.y(),
                 render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
+            if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
+            else failures.add(failure);
+        }
+        return failures;
+    }
+
+    /** {@code image}'s ink in {@code box} (2x pixels): its darkest pixel and how many pixels lie nearer it than the paper. */
+    static int[] ink(BufferedImage image, Rectangle box) {
+        int darkest = 0xFFFFFF, dark = 766, paper = -1;
+        for (int y = box.y; y < box.y + box.height; y++) for (int x = box.x; x < box.x + box.width; x++) {
+            int rgb = image.getRGB(x, y), sum = (rgb >> 16 & 0xFF) + (rgb >> 8 & 0xFF) + (rgb & 0xFF);
+            if (sum < dark) { dark = sum; darkest = rgb; }
+            paper = Math.max(paper, sum);
+        }
+        int amount = 0;
+        for (int y = box.y; y < box.y + box.height; y++) for (int x = box.x; x < box.x + box.width; x++) {
+            int rgb = image.getRGB(x, y);
+            if (2 * ((rgb >> 16 & 0xFF) + (rgb >> 8 & 0xFF) + (rgb & 0xFF)) <= dark + paper) amount++;
+        }
+        return new int[] {darkest, amount};
+    }
+
+    /** {@code render}'s ink boxes of {@code key} against {@code mock}; the failures, the face's printed when not PLEX. */
+    static List<String> inks(String key, BufferedImage render, BufferedImage mock) {
+        var failures = new ArrayList<String>();
+        for (var box : INKS.getOrDefault(key, List.of())) {
+            var pixels = new Rectangle(2 * box.x(), 2 * box.y(), 2 * box.width(), 2 * box.height());
+            int[] ours = ink(render, pixels), theirs = ink(mock, pixels);
+            double distance = SettingsMockMatch.deltaE(ours[0], theirs[0]), amount = Math.abs(ours[1] - theirs[1]) / (double) Math.max(1, theirs[1]);
+            if (distance <= SettingsChromeMockTest.PROBE && amount <= INK_AMOUNT) continue;
+            String name = key + "/" + box.name();
+            String failure = String.format("%s ink: render #%06X, mock #%06X, ΔE %.1f; amount %d against %d", name, ours[0] & 0xFFFFFF,
+                theirs[0] & 0xFFFFFF, distance, ours[1], theirs[1]);
             if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
             else failures.add(failure);
         }
@@ -111,6 +158,7 @@ class SettingsPagesMockTest {
             ImageIO.write(render[0], "png", out.resolve(number + ".png").toFile());
             var mock = SettingsChromeMockTest.content(page);
             failures.addAll(probes(id, render[0], mock));
+            failures.addAll(inks(id, render[0], mock));
             failures.addAll(share(id, number, page, render[0], mock, shares));
         }
         Files.writeString(EnterpriseSettings.OUT.resolve("pages-" + ids.getFirst() + ".txt"), shares);
