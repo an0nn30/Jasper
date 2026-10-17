@@ -28,6 +28,16 @@ class FakeKitTest { @Test void kitOwnsCreatedViews() throws Exception {
   assertThatIllegalArgumentException().isThrownBy(() -> view.type("root","typed"));
   kit.close();
  });}
+ /** Plan 3c: rows unmount a table's empty state, so the fake drops focus inside it and refuses its nodes, as the host does. */
+ @Test void rowsReplacingAFocusedEmptyStateClearFocusInTheFake() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
+  var kit=new FakeKit("sample");var view=(FakeKitView)kit.create(KitContractTest.tables("card",false),e -> {});
+  view.focus("tunnels.new");assertThat(view.focused()).contains("tunnels.new");
+  view.update(KitContractTest.tables("sticky",true));
+  assertThat(view.focused()).as("the focused state is gone").isEmpty();
+  assertThatIllegalArgumentException().isThrownBy(() -> view.focus("tunnels.new"));
+  view.update(KitContractTest.tables("card",false));view.focus("tunnels.new");assertThat(view.focused()).contains("tunnels.new");
+  kit.close();
+ });}
  @Test void contextFailedStartAndStopOwnKitAndSemanticRefresh() throws Exception {javax.swing.SwingUtilities.invokeAndWait(() -> {
   try(var host=new FakePluginHost()) {
    var info=new dev.jasper.sdk.PluginInfo("owner","Owner","1.0.0",java.util.Set.of());var retained=new java.util.ArrayList<FakeKit>();

@@ -421,6 +421,8 @@ class KitValuesTest {
             new Nodes.Stack("deep", ControlState.READY, LayoutRole.INLINE, List.of(new Nodes.Stack("inner", ControlState.READY, LayoutRole.INLINE, List.of(text("y"))))),
             new Nodes.Stack("act", ControlState.READY, LayoutRole.INLINE, List.of(new Button("b2", ControlState.READY, "Go", "", ButtonKind.SECONDARY, "go", ""))),
             new Choice("picker", ControlState.READY, ChoiceKind.PICKER, List.of(), "", "Pick", "pick"),
+            new Choice("rich", ControlState.READY, ChoiceKind.DROPDOWN, options, "card", "Display", "", "", Optional.empty(),
+                Optional.of(new PickerFace("Card", "", "", Hue.NONE, PickerDensity.DEFAULT))),
             new Toggle("on", ControlState.READY, "On", true, "on", true));
         for (var node : refused) assertThatIllegalArgumentException().as(node.id()).isThrownBy(() -> cellRow(node));
         assertThatIllegalArgumentException().as("one column, two contents").isThrownBy(() ->

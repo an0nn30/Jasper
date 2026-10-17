@@ -327,12 +327,18 @@ final class Choices {
             this.context = context; setOpaque(false);
             setBorder(new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0, ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING), 0));
             setUI(kitUi());
-            var rollover = new java.awt.event.MouseAdapter() {
-                @Override public void mouseEntered(java.awt.event.MouseEvent e) { hover = true; repaint(); }
-                @Override public void mouseExited(java.awt.event.MouseEvent e) { hover = false; repaint(); }
-            };
             addMouseListener(rollover);
         }
+        /**
+         * Hover over the combo and its chevron button, a mouse target of its own: crossing between them keeps the hover,
+         * and only an exit to a point outside the combo ends it.
+         */
+        final java.awt.event.MouseAdapter rollover = new java.awt.event.MouseAdapter() {
+            @Override public void mouseEntered(java.awt.event.MouseEvent e) { hover = true; repaint(); }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) {
+                hover = contains(SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), ChoiceCombo.this)); repaint();
+            }
+        };
         /** Swing reinstalls delegates on theme changes; ordinary choices retain kit painting and popup roles. */
         @Override public void updateUI() {
             if (context == null) { super.updateUI(); return; }
@@ -354,7 +360,7 @@ final class Choices {
                 @Override protected Rectangle rectangleForCurrentValue() { var bounds=super.rectangleForCurrentValue();if(rich())bounds.width=comboBox.getWidth()-comboBox.getInsets().left-comboBox.getInsets().right-arrowWidth();return bounds; }
                 @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=arrowWidth();var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
                 @Override protected JButton createArrowButton() { return new JButton() {
-                    { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); }
+                    { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); addMouseListener(ChoiceCombo.this.rollover); }
                     @Override protected void paintComponent(Graphics graphics) {
                         // The dropdown chevron shares the picker face's measured glyph and trailing inset; a Settings dropdown
                         // sets it at a fixed distance from its own arrow lane's trailing edge.

@@ -1,7 +1,9 @@
 # Enterprise presentation 3c: SDK 0.18 tables Implementation Plan
 
 > **Status (2026-10-16): executed on `claude/enterprise-sdk-0-18-tables` (`d858e8f57..7ea713687`).** Deviations from this
-> plan's text: none beyond its "Planned deviations and rulings".
+> plan's text: none beyond its "Planned deviations and rulings". The final review's fixes (`Plan 3c: final review fixes`)
+> revised rulings 5, 7, 9 and 10 as they now read; ruling 9's dropdown takes the pointer at its leading pixels because the
+> cell before it gives way, since a z-order change would reorder the weight layout's index-ordered columns.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -201,13 +203,14 @@ Record each of these in `docs/STATUS.md` (Task 7) and in this plan's status bann
    mock's indent is the classic look's, plans 4 and 9).
 5. **The table's `empty` is mounted only while the table has no rows** (`ControlRegistry.children`); the descriptor
    walks (`FakeKitView.children`, `KitContent.children`) always include it, so ids and icons are checked either way.
-   While the table has rows, `focus` and `reveal` refuse the state's nodes on the host and the fake alike.
+   While the table has rows, `focus` and `reveal` refuse the state's nodes on the host and the fake alike, and the
+   fake's anchors, field, secret and content lookups walk only the mounted nodes, as the host's do.
 6. **The empty line** (`emptyText`) shows only while the collection has no items at all (a heading is an item); it is
    one row-height band, centred, in DESCRIPTION type and tertiary ink, above an ItemList's `addAction`. A list that
    keeps its visible-rows height lays the line inside the rows it reserves, so emptying it does not grow it.
 7. **Tree columns in the default look:** the first title starts at the rows' content inset, the others are
    right-aligned over right-aligned values; each column is as wide as its widest value or title; rows are padded
-   with blank values; when any item has a count, a count column is reserved on every row. Trees with the app's keycap
+   with blank values and drawn in their column's role; when any item has a count, a count column is reserved on every row. Trees with the app's keycap
    presentation keep their own layout (the Keymap page is plan 9's).
 8. **Muted rows and cell nodes:** a muted row dims its plain cells and its Text cell nodes; other cell nodes keep their
    colours; the row's glyph leads the first column only when that column is a plain cell.
@@ -215,9 +218,10 @@ Record each of these in `docs/STATUS.md` (Task 7) and in this plan's status bann
    natural width) and vertically centred in its cell; its value starts under the column's title, as the Notifications
    mock's "Card" starts under "Display": the cell reaches back into the column gap by the combo's text inset (its
    border inset and `FIELD_HORIZONTAL_PADDING`), so the hover face overhangs the gap (in the first column, which has
-   no gap, it starts at the cell's edge). The selection ink applies only while it is bare.
-10. **No README edit.** Spec 17 names `docs/plugin-ui.md` for the vocabulary; `jasper-sdk/README.md`'s version list is
-    3a's and 3d's.
+   no gap, it starts at the cell's edge), and the cell before it ends where that reach begins. The selection ink applies
+   only while it is bare. A DROPDOWN with a rich `PickerFace` is refused as a cell node.
+10. **The SDK README's 0.18.0 sentence names the additions** and their refusals, as plan 3b's did its own; spec 17 names
+    `docs/plugin-ui.md` for the vocabulary.
 
 ---
 

@@ -166,7 +166,7 @@ public abstract class PluginContractTest {
         });
     }
 
-    /** Spec 16.1.9 (plan 3c): a plugin's kit admits SDK 0.18's table vocabulary and refuses misplaced cell nodes, selected headings, doubled empty states and extra tree values. */
+    /** Spec 16.1.9 (plan 3c): a plugin's kit admits SDK 0.18's table vocabulary and refuses misplaced cell nodes, a rich-faced cell dropdown, selected headings, doubled empty states and extra tree values. */
     @Test void aPluginsKitAdmitsZeroEighteenTablesAndRefusesMisplacedOnes() {
         var context = started("test.tables", Set.of());
         h.ui(() -> {
@@ -183,12 +183,16 @@ public abstract class PluginContractTest {
             var text = new Nodes.Text("t", ready, "T", Nodes.TextRole.BODY);
             var heading = TableRow.heading("h", "Group", java.util.OptionalInt.of(1), "group");
             var icon = new Nodes.Icon("e.icon", ready, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Servers");
+            var rich = new Nodes.Choice("rich", ready, Nodes.ChoiceKind.DROPDOWN, List.of(new dev.jasper.sdk.ui.Option("card", "Card", Optional.empty())), "card", "Display", "", "",
+                Optional.empty(), Optional.of(new Nodes.PickerFace("Card", "", "", Nodes.Hue.NONE, Nodes.PickerDensity.DEFAULT)));
             var three = new TreeItem("x", "X", Optional.empty(), true, List.of(), java.util.OptionalInt.empty(), false, "", Optional.empty(), List.of("1", "2", "3"), Optional.empty());
             List<java.util.function.Supplier<ViewSpec>> refused = List.of(
                 () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
                     Map.of("c", go), Optional.empty())), Set.of(), "", List.of())),
                 () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "",
                     Map.of("c", text), Optional.empty())), Set.of(), "", List.of())),
+                () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+                    Map.of("c", rich), Optional.empty())), Set.of(), "", List.of())),
                 () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(heading), Set.of("h"), "", List.of())),
                 () -> new ViewSpec(new Nodes.Table("t", ready, columns, List.of(), Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD,
                     Optional.of(new Nodes.Empty("e", ready, icon, "Nothing", "", List.of())), "Nothing here")),

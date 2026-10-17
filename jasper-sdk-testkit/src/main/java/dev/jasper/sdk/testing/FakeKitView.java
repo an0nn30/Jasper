@@ -37,67 +37,68 @@ public final class FakeKitView implements UiView {
  final class Attachment implements UiAnchor {
   final Object host=owner.anchorHost, mounted=mount;
   final String id;final List<String> ancestry;final Object kind;boolean done;final List<Runnable> listeners=new ArrayList<>();
-  Attachment(String id){this.id=id;kind=kind(index(spec.root()).get(id));ancestry=path(spec.root(),id);}
+  Attachment(String id){this.id=id;kind=kind(mounted(spec.root()).get(id));ancestry=path(spec.root(),id);}
   private Object kind(Nodes.Node node){return node instanceof Nodes.Button ? Nodes.Button.class : node instanceof Nodes.Choice c && c.kind()==Nodes.ChoiceKind.PICKER ? c.kind() : null;}
-  private boolean eligible(Nodes.Node node,boolean parent){boolean live=parent&&node.state().visible()&&node.state().enabled()&&!node.state().busy();if(node.id().equals(id))return live;for(var child:children(node))if(eligible(child,live))return true;return false;}
+  private boolean eligible(Nodes.Node node,boolean parent){boolean live=parent&&node.state().visible()&&node.state().enabled()&&!node.state().busy();if(node.id().equals(id))return live;for(var child:mountedChildren(node))if(eligible(child,live))return true;return false;}
   FakeUi.FakeWindow ownerSurface(){return mounted instanceof FakeUi.SurfaceMount slot ? slot.surface() : mounted instanceof FakeUi.FakeWindow window ? window : null;}
-  @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(index(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||ownerSurface()!=null&&(!ownerSurface().shown||ownerSurface().closed)))close();return !done;}
+  @Override public boolean isOpen(){if(!done&&(closed.get()||mounted==null||mount!=mounted||host==null||kind==null||!kind.equals(kind(mounted(spec.root()).get(id)))||!ancestry.equals(path(spec.root(),id))||!eligible(spec.root(),true)||ownerSurface()!=null&&(!ownerSurface().shown||ownerSurface().closed)))close();return !done;}
   @Override public dev.jasper.sdk.Subscription onClosed(Runnable listener){Objects.requireNonNull(listener);if(!isOpen()){listener.run();return () -> {}; }listeners.add(listener);return () -> listeners.remove(listener);}
   @Override public void close(){if(done)return;done=true;anchors.remove(this);for(var listener:List.copyOf(listeners))listener.run();listeners.clear();}
  }
  @Override public ViewSpec spec(){guard();return spec;}
  /** Host-only original plugin descriptor, before draft/search row projection. */
  ViewSpec sourceSpec(){guard();return sourceSpec;}
- @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var source=next;next=hostSpec.apply(next);if(next!=source)owner.validateIcons(next);var nodes=index(next.root());
-  secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && index(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
-  for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && index(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
+ @Override public void update(ViewSpec next){guard();Objects.requireNonNull(next);if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var source=next;next=hostSpec.apply(next);if(next!=source)owner.validateIcons(next);var nodes=mounted(next.root());
+  secrets.entrySet().removeIf(e -> {if(nodes.get(e.getKey()) instanceof Nodes.Secret nextSecret && mounted(spec.root()).get(e.getKey()) instanceof Nodes.Secret oldSecret && nextSecret.kind()==oldSecret.kind())return false;Arrays.fill(e.getValue(),(char)0);return true;});
+  for(var content:List.copyOf(contents.values()))if(nodes.values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id()) && c.kind()==content.kind() && mounted(spec.root()).get(c.id()) instanceof Nodes.Custom previous && previous.contentId().equals(content.id()) && previous.kind()==content.kind())){dispose(content);}
   fieldText.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
   fieldSelections.keySet().removeIf(id -> !(nodes.get(id) instanceof Nodes.Field));
-  var previous=spec==null ? Map.<String,Nodes.Node>of() : index(spec.root());
+  var previous=spec==null ? Map.<String,Nodes.Node>of() : mounted(spec.root());
   for(var node:nodes.values())if(node instanceof Nodes.Field field) {
    if(!(previous.get(field.id()) instanceof Nodes.Field old) || old.kind()!=field.kind() || !old.value().equals(field.value())) {
     fieldText.put(field.id(),field.value());fieldSelections.remove(field.id());
    }
   }
-  sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&(!nodes.containsKey(focused)||dormant(focused)))focused=null;}finally{updating=false;}
+  sourceSpec=source;spec=next;for(var a:List.copyOf(anchors))a.isOpen();if(focused!=null&&!nodes.containsKey(focused))focused=null;}finally{updating=false;}
  }
- private static List<String> path(Nodes.Node root,String id){if(root.id().equals(id))return List.of(root.id());for(var child:children(root)){var nested=path(child,id);if(!nested.isEmpty()){var result=new ArrayList<String>();result.add(root.id());result.addAll(nested);return result;}}return List.of();}
- private static Map<String,Nodes.Node> index(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();walk(root,result);return result;}
- private static void walk(Nodes.Node node,Map<String,Nodes.Node> result){result.put(node.id(),node);for(var child:children(node))walk(child,result);}
- private void requireSecret(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Secret))throw new IllegalArgumentException("Not a secret node");}
+ private static List<String> path(Nodes.Node root,String id){if(root.id().equals(id))return List.of(root.id());for(var child:mountedChildren(root)){var nested=path(child,id);if(!nested.isEmpty()){var result=new ArrayList<String>();result.add(root.id());result.addAll(nested);return result;}}return List.of();}
+ /** The nodes the host mounts, by id: every node but a table's empty state (and what it holds) while that table has rows; ids and icons are still checked over the whole descriptor. */
+ private static Map<String,Nodes.Node> mounted(Nodes.Node root){var result=new HashMap<String,Nodes.Node>();mountedWalk(root,result);return result;}
+ private static void mountedWalk(Nodes.Node node,Map<String,Nodes.Node> result){result.put(node.id(),node);for(var child:mountedChildren(node))mountedWalk(child,result);}
+ /** A node's mounted children: a table with rows leaves its empty state unmounted, as the host does. */
+ static List<Nodes.Node> mountedChildren(Nodes.Node node){var result=children(node);if(node instanceof Nodes.Table table&&!table.rows().isEmpty()&&table.empty().isPresent())result.remove(table.empty().get());return result;}
+ private void requireSecret(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Secret))throw new IllegalArgumentException("Not a secret node");}
  /** Simulate typing into an INPUT or MULTILINE secret; the fake owns a copy and never includes it in diagnostics. */
- public void setSecret(String id,char[] value){requireSecret(id);if(((Nodes.Secret)index(spec.root()).get(id)).kind()==Nodes.SecretKind.DETAIL)throw new IllegalArgumentException("Secret detail is read-only");replaceSecret(id,value);emit(new UiEvent.SecretChanged(id));}
+ public void setSecret(String id,char[] value){requireSecret(id);if(((Nodes.Secret)mounted(spec.root()).get(id)).kind()==Nodes.SecretKind.DETAIL)throw new IllegalArgumentException("Secret detail is read-only");replaceSecret(id,value);emit(new UiEvent.SecretChanged(id));}
  @Override public void replaceSecret(String id,char[] value){requireSecret(id);Objects.requireNonNull(value);char[] next=value.clone();clearSecret(id);secrets.put(id,next);}
  @Override public void withSecret(String id,Consumer<char[]> use){requireSecret(id);Objects.requireNonNull(use);char[] copy=secrets.getOrDefault(id,new char[0]).clone();try{use.accept(copy);}finally{Arrays.fill(copy,(char)0);}}
  @Override public void clearSecret(String id){requireSecret(id);var old=secrets.remove(id);if(old!=null)Arrays.fill(old,(char)0);}
- @Override public void focus(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");focused=id;}
- /** Whether a node lies in a table's empty state while that table has rows: the host leaves the state unmounted then, though its ids and icons are still checked. */
- private boolean dormant(String id){for(var node:index(spec.root()).values())if(node instanceof Nodes.Table table&&!table.rows().isEmpty()&&table.empty().isPresent()&&index(table.empty().get()).containsKey(id))return true;return false;}
- @Override public void selectAll(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
+ @Override public void focus(String id){guard();if(!mounted(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");focused=id;}
+ @Override public void selectAll(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");fieldSelections.put(id,new int[]{0,fieldText.get(id).length()});}
  /** The fake's logical field selection, independently recorded from focus. */
- public int[] fieldSelection(String id){guard();if(!(index(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
+ public int[] fieldSelection(String id){guard();if(!(mounted(spec.root()).get(id) instanceof Nodes.Field field) || field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return fieldSelections.getOrDefault(id,new int[]{0,0}).clone();}
  private String revealed;
- @Override public void reveal(String id){guard();if(!index(spec.root()).containsKey(id)||dormant(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
+ @Override public void reveal(String id){guard();if(!mounted(spec.root()).containsKey(id))throw new IllegalArgumentException("Unknown node");revealed=id;}
  /** The node last scrolled into view; reveal never moves logical focus.
  * @return node id */
  public Optional<String> revealed(){guard();return Optional.ofNullable(revealed);}
  private final Set<String> composing=new HashSet<>();
- @Override public boolean composing(String fieldId){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return composing.contains(fieldId);}
+ @Override public boolean composing(String fieldId){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");return composing.contains(fieldId);}
  /** Simulate an input method composing (or committing) text in a field.
  * @param fieldId field node
  * @param value whether uncommitted text is pending */
- public void setComposing(String fieldId,boolean value){guard();if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
+ public void setComposing(String fieldId,boolean value){guard();if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(value)composing.add(fieldId);else composing.remove(fieldId);}
  /** Requested logical focus. */
  public Optional<String> focused(){guard();return Optional.ofNullable(focused);}
  /** Deliver a typed event through containment; an edit of a read-only field, which a person cannot make, is dropped. */
- public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && index(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
+ public void emit(UiEvent event){guard();if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field field && field.readOnly())return;if(event instanceof UiEvent.Edited edit && mounted(spec.root()).get(edit.id()) instanceof Nodes.Field){fieldText.put(edit.id(),edit.text());fieldSelections.remove(edit.id());}try{if(hostEvents.test(event))return;events.accept(Objects.requireNonNull(event));}catch(Throwable failure){owner.failed();}}
  /** Simulate a person typing {@code text} into a field, replacing its text: it reports {@link UiEvent.Edited} as the host's field does, while a read-only field, or one that is hidden, disabled or busy (itself or a container above it), takes nothing.
  * @param fieldId field node
  * @param text the text typed */
- public void type(String fieldId,String text){guard();Objects.requireNonNull(text);if(!(index(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(field.readOnly()||!live(fieldId))return;emit(new UiEvent.Edited(fieldId,text));}
- private boolean live(String id){var nodes=index(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
+ public void type(String fieldId,String text){guard();Objects.requireNonNull(text);if(!(mounted(spec.root()).get(fieldId) instanceof Nodes.Field field)||field.presentation()==Nodes.FieldPresentation.SLIDER)throw new IllegalArgumentException("Not a field node");if(field.readOnly()||!live(fieldId))return;emit(new UiEvent.Edited(fieldId,text));}
+ private boolean live(String id){var nodes=mounted(spec.root());for(String step:path(spec.root(),id)){var state=nodes.get(step).state();if(!state.visible()||!state.enabled()||state.busy())return false;}return true;}
  @Override public void registerContent(CustomContent content){guard();Objects.requireNonNull(content);
-  if(index(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
+  if(mounted(spec.root()).values().stream().noneMatch(n -> n instanceof Nodes.Custom c && c.contentId().equals(content.id())&&c.kind()==content.kind()))throw new IllegalArgumentException("No matching Custom content");
   if(contents.containsKey(content.id()))throw new IllegalArgumentException("Content already registered");
   FakeKitContent.validate(content);if(CONTENT_OWNERS.containsKey(content.component())||content.component().getParent()!=null)throw new IllegalArgumentException("Content is already owned or mounted");CONTENT_OWNERS.put(content.component(),this);contents.put(content.id(),content);
  }

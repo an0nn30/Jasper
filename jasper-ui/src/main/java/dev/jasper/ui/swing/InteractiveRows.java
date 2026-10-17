@@ -888,6 +888,20 @@ final class InteractiveRows {
             };
         }
         void hover(boolean value) { if (hover == value) return; hover = value; repaint(); }
+        /** The row's pointer selection: the row, its slots and the content that forwards to it pass presses, releases and clicks to the owner. */
+        final MouseAdapter pointer = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { owner.pressed(Row.this, e); }
+            @Override public void mouseReleased(MouseEvent e) { owner.released(Row.this, e); }
+            @Override public void mouseClicked(MouseEvent e) { owner.clicked(Row.this, e); }
+        };
+
+        /** Passes the pointer over {@code control}'s own component to the row, once however often the row is populated. */
+        void forwardPointer(ControlRegistry.Control control) {
+            var component = control.component;
+            for (var listener : component.getMouseListeners()) if (listener == pointer) return;
+            component.addMouseListener(pointer);
+            control.own(() -> component.removeMouseListener(pointer));
+        }
 
         Row(RowsControl owner) {
             super(null);
@@ -897,29 +911,12 @@ final class InteractiveRows {
             add(title);
             add(subtitle);
             add(trailing);
-            MouseAdapter mouse =
-                    new MouseAdapter() {
-                        @Override
-                        public void mousePressed(MouseEvent e) {
-                            owner.pressed(Row.this, e);
-                        }
-
-                        @Override
-                        public void mouseReleased(MouseEvent e) {
-                            owner.released(Row.this, e);
-                        }
-
-                        @Override
-                        public void mouseClicked(MouseEvent e) {
-                            owner.clicked(Row.this, e);
-                        }
-                    };
-            addMouseListener(mouse);
-            leading.addMouseListener(mouse);
-            title.addMouseListener(mouse);
-            subtitle.addMouseListener(mouse);
+            addMouseListener(pointer);
+            leading.addMouseListener(pointer);
+            title.addMouseListener(pointer);
+            subtitle.addMouseListener(pointer);
             // The trailing slot listens too, so its empty area shows the row tooltip and still reaches the row.
-            trailing.addMouseListener(mouse);
+            trailing.addMouseListener(pointer);
             for (var part : List.of(this, leading, title, subtitle, trailing)) part.addMouseListener(hoverTracker);
         }
 
@@ -989,28 +986,7 @@ final class InteractiveRows {
                 if (node instanceof Nodes.Text
                         || node instanceof Nodes.Icon
                         || node instanceof Nodes.Chip
-                        || node instanceof Nodes.StatusDot) {
-                    MouseAdapter mouse =
-                            new MouseAdapter() {
-                                @Override
-                                public void mouseClicked(MouseEvent e) {
-                                    owner.clicked(Row.this, e);
-                                }
-
-                                @Override
-                                public void mousePressed(MouseEvent e) {
-                                    owner.pressed(Row.this, e);
-                                }
-
-                                @Override
-                                public void mouseReleased(MouseEvent e) {
-                                    owner.released(Row.this, e);
-                                }
-                            };
-                    c.component.addMouseListener(mouse);
-                    var component = c.component;
-                    c.own(() -> component.removeMouseListener(mouse));
-                }
+                        || node instanceof Nodes.StatusDot) forwardPointer(c);
             }
             c.parentEnabled = parentEnabled;
             c.embeddedLabel(true);

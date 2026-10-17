@@ -19,7 +19,8 @@ import javax.swing.*;
 
 /**
  * Column-aligned virtual rows; numeric cells align to the trailing column edge. Columns share the width by weight,
- * the header shows the host's sort and reports clicks as {@link UiEvent.Sorted}, and a muted row dims every cell.
+ * the header shows the host's sort and reports clicks as {@link UiEvent.Sorted}, and a muted row dims its plain cells and
+ * Text cell nodes.
  * A column holds a plain cell or a cell node (a bare dropdown among them), and a heading row shows its title and its
  * muted count across the row.
  */
@@ -134,10 +135,20 @@ final class Tables {
             return columns.isEmpty() ? "" : cellText(value().rows().get(i), columns.getFirst().id());
         }
 
-        /** A column's text for type-ahead: its plain cell, or a Text cell node's text. */
+        /**
+         * A column's text for type-ahead: its plain cell, a Text cell node's text, a Chip's label, an inline stack's first
+         * text, or a cell dropdown's selected label.
+         */
         static String cellText(TableRow row, String column) {
-            if (row.cellNodes().get(column) instanceof Nodes.Text text) return text.text();
-            return row.cells().getOrDefault(column, "");
+            var cell = row.cellNodes().get(column);
+            if (cell == null) return row.cells().getOrDefault(column, "");
+            if (cell instanceof Nodes.Text text) return text.text();
+            if (cell instanceof Nodes.Chip chip) return chip.label();
+            if (cell instanceof Nodes.Stack stack)
+                for (var child : stack.children()) if (child instanceof Nodes.Text text && !text.text().isBlank()) return text.text();
+            if (cell instanceof Nodes.Choice choice)
+                for (var option : choice.options()) if (option.id().equals(choice.selectedId())) return option.label();
+            return "";
         }
 
         /** A heading row groups the rows below it; it is never selected, activated or offered a menu. */
@@ -302,6 +313,10 @@ final class Tables {
             }
             row.slot(row.title, nodes);
             row.title.setLayout(weights());
+            // A stack's or a dropdown's own area (beside its content) selects, activates and opens the menu as a plain cell does.
+            for (var cellNode : nodes)
+                if (row.controls.get(cellNode.id()) instanceof ControlRegistry.Control control
+                        && (control instanceof Stacks.StackControl || control instanceof Choices.ChoiceControl)) row.forwardPointer(control);
             // A selected row's cells and glyph take its fill's ink (row.inked); a muted row keeps its placeholder ink only unselected.
             Color muted = data.muted() && !row.inked ? ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER) : null;
             for (int i = 0; i < nodes.size(); i++) {
@@ -334,8 +349,14 @@ final class Tables {
                 row.cells.add(cell);
             }
             row.tooltip(data.tooltip());
-            // A table row is named by its first column, as its identity (a file's name, an entry's title).
-            row.name(nodes.isEmpty() ? List.of() : List.of(nodes.getFirst()));
+            // A table row is named by its first column, as its identity (a file's name, an entry's title): an inline
+            // stack by its texts and chips, a dropdown by its selected label.
+            var first = nodes.isEmpty() ? null : nodes.getFirst();
+            row.name(first == null ? List.of()
+                    : first instanceof Nodes.Stack stack ? stack.children()
+                    : first instanceof Nodes.Choice ? List.of(new Nodes.Text(first.id() + "/name", ControlState.READY,
+                            cellText(data, value().columns().getFirst().id()), Nodes.TextRole.BODY))
+                    : List.of(first));
         }
 
         /** A heading row: its strong title across the row and its count, muted, at the row's end. */
@@ -409,7 +430,9 @@ final class Tables {
                 int w=i<sizes.length?sizes[i]:0;
                 // A cell dropdown reaches back into the column gap by its text inset, so its value starts under the column's title.
                 int lead=w>0?Math.min(x-insets.left,Choices.cellLead(children[i])):0;
-                children[i].setBounds(x-lead,insets.top,w+lead,height);x+=w;
+                // The cell before it ends where that reach begins, so the dropdown takes the pointer there and no label paints over its face.
+                int ceded=i+1<children.length&&i+1<sizes.length&&sizes[i+1]>0?Math.min(x+w-insets.left,Choices.cellLead(children[i+1])):0;
+                children[i].setBounds(x-lead,insets.top,Math.max(0,w+lead-ceded),height);x+=w;
             }
         }
     }

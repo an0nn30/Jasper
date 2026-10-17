@@ -25,19 +25,39 @@ class TableVocabularyTest {
     }
 
     static Table groups(Set<String> selected) {
+        return groups(selected, SelectionMode.SINGLE);
+    }
+
+    static Table groups(Set<String> selected, SelectionMode mode) {
         return new Table("groups", READY, List.of(new Column("group", "Group", TextRole.BODY, false, 3, Optional.empty()),
                 new Column("display", "Display", TextRole.BODY, false, 1.5, Optional.empty()), new Column("source", "Source", TextRole.DESCRIPTION, false)),
             List.of(TableRow.heading("jasper", "Jasper", OptionalInt.of(2), "group"), group("errors", "Internal errors", "card"),
                 group("config", "Configuration", "sticky"), TableRow.heading("editor", "Editor", OptionalInt.of(1), "group"), group("editor.main", "Editor", "card")),
-            selected, "edit", List.of(), SelectionMode.SINGLE);
+            selected, "edit", List.of(), mode);
     }
 
     static Table tunnels() {
+        return tunnels(List.of());
+    }
+
+    static Table tunnels(List<MenuItem> menu) {
         return new Table("tunnels", READY, List.of(new Column("type", "Type", TextRole.BODY, false), new Column("local", "Local", TextRole.MONO_SMALL, false)),
             List.of(new TableRow("web", Map.of("local", "8080"), Optional.empty(), false, Optional.empty(), "", Map.of("type",
                 new Nodes.Stack("web.type", READY, LayoutRole.INLINE, List.of(new StatusDot("web.dot", READY, StatusKind.SUCCESS),
                     new Text("web.kind", READY, "Local", TextRole.BODY), new Chip("web.chip", READY, "SSH", Hue.GREEN)))), Optional.empty())),
-            Set.of(), "toggle", List.of());
+            Set.of(), "toggle", menu);
+    }
+
+    static java.awt.event.MouseEvent mouse(java.awt.Component on, int id, int x, int y, int count, boolean popup) {
+        return new java.awt.event.MouseEvent(on, id, 0, popup ? java.awt.event.InputEvent.BUTTON3_DOWN_MASK : 0, x, y, count, popup,
+            popup ? java.awt.event.MouseEvent.BUTTON3 : java.awt.event.MouseEvent.BUTTON1);
+    }
+
+    /** A left press, release and click at ({@code x}, {@code y}) on {@code on}, as the toolkit delivers them to their target. */
+    static void click(java.awt.Component on, int x, int y, int count) {
+        on.dispatchEvent(mouse(on, java.awt.event.MouseEvent.MOUSE_PRESSED, x, y, count, false));
+        on.dispatchEvent(mouse(on, java.awt.event.MouseEvent.MOUSE_RELEASED, x, y, count, false));
+        on.dispatchEvent(mouse(on, java.awt.event.MouseEvent.MOUSE_CLICKED, x, y, count, false));
     }
 
     static Choices.ChoiceCombo combo(Tables.TableControl table, String row) {
@@ -86,6 +106,50 @@ class TableVocabularyTest {
         } finally { release(context); }
     }); }
 
+    @Test void aCellsAreaBesideItsContentSelectsActivatesAndOpensTheRowsMenu() { Edt.run(() -> {
+        var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+        var menu = List.of(new MenuItem("stop", "Stop", "", "stop", true, false));
+        try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("root", READY, LayoutRole.VERTICAL, List.of(groups(Set.of()), tunnels(menu)))), events::add)) {
+            view.setSize(640, 480); InteractiveRowsTest.layout(view);
+            var tunnels = (Tables.TableControl) view.control("tunnels");
+            var stack = tunnels.mounted.get("web").controls.get("web.type").component;
+            int x = stack.getWidth() - 2, y = stack.getHeight() / 2;
+            assertThat(stack.getComponentAt(x, y)).as("right of the stack's content is the stack itself").isSameAs(stack);
+            click(stack, x, y, 1);
+            assertThat(events).containsExactly(new UiEvent.Selected("tunnels", Set.of("web")), new UiEvent.Clicked("tunnels", "web"));
+            events.clear();
+            click(stack, x, y, 2);
+            assertThat(events).as("a double click activates").contains(new UiEvent.Action("toggle"));
+            stack.dispatchEvent(mouse(stack, java.awt.event.MouseEvent.MOUSE_PRESSED, x, y, 1, true));
+            assertThat(tunnels.popup.getComponentCount()).as("a context press opens the row's menu").isPositive();
+            assertThat(tunnels.mounted.get("web").controls.get("web.type").component.getMouseListeners())
+                .as("a repopulated row forwards once").filteredOn(l -> l == tunnels.mounted.get("web").pointer).hasSize(1);
+            var groups = (Tables.TableControl) view.control("groups");
+            var cell = groups.mounted.get("errors").controls.get("errors.display").component;
+            var card = combo(groups, "errors");
+            int beside = card.getX() + card.getWidth() + 4;
+            assertThat(beside).isLessThan(cell.getWidth());
+            assertThat(cell.getComponentAt(beside, cell.getHeight() / 2)).as("right of the dropdown is its cell").isSameAs(cell);
+            events.clear();
+            click(cell, beside, cell.getHeight() / 2, 1);
+            assertThat(events).containsExactly(new UiEvent.Selected("groups", Set.of("errors")), new UiEvent.Clicked("groups", "errors"));
+            events.clear();
+            click(cell, beside, cell.getHeight() / 2, 2);
+            assertThat(events).contains(new UiEvent.Action("edit"));
+        } finally { release(context); }
+    }); }
+
+    /** Type-ahead and assistive technology read an inline stack's first column by its texts and chips. */
+    @Test void aStackedFirstColumnNamesItsRow() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        try (var view = new KitView(context, new ViewSpec(tunnels()), e -> {})) {
+            view.setSize(640, 300); InteractiveRowsTest.layout(view);
+            var tunnels = (Tables.TableControl) view.control("tunnels");
+            assertThat(tunnels.itemText(0)).isEqualTo("Local");
+            assertThat(tunnels.mounted.get("web").getAccessibleContext().getAccessibleName()).isEqualTo("Local, SSH");
+        } finally { release(context); }
+    }); }
+
     @Test void aCellDropdownIsItsValueAndChevronUntilHoveredOrFocused() { Edt.run(() -> {
         var context = KitFixtures.context();
         try (var view = new KitView(context, new ViewSpec(groups(Set.of())), e -> {})) {
@@ -106,10 +170,26 @@ class TableVocabularyTest {
                 .isCloseTo(SwingUtilities.convertPoint(title, firstPainted(title), 0, view).x, within(2));
             assertThat(card.getParent().getX() + card.getParent().getWidth()).as("the cell still ends at its column's edge")
                 .isEqualTo(groups.mounted.get("errors").title.getComponent(2).getX());
+            // The cell before it ends where the dropdown's reach begins, so the dropdown is the pointer's target from its first pixel.
+            var title0 = groups.mounted.get("errors").title;
+            var lead = SwingUtilities.convertPoint(card, 0, card.getHeight() / 2, title0);
+            assertThat(title0.getComponent(0).getX() + title0.getComponent(0).getWidth()).isLessThanOrEqualTo(lead.x);
+            assertThat(SwingUtilities.isDescendingFrom(SwingUtilities.getDeepestComponentAt(title0, lead.x, lead.y), card))
+                .as("the dropdown is topmost at its leading pixel").isTrue();
             card.hover = true;
             assertThat(card.bare()).isFalse();
             assertThat(painted(card)).as("the control face shows on hover").isGreaterThan(bare);
             card.hover = false;
+            // The chevron is a mouse target of its own: moving onto it keeps the face; leaving the combo from it ends it.
+            var arrow = (JButton) Arrays.stream(card.getComponents()).filter(JButton.class::isInstance).findFirst().orElseThrow();
+            card.dispatchEvent(mouse(card, java.awt.event.MouseEvent.MOUSE_ENTERED, card.getWidth() / 4, card.getHeight() / 2, 0, false));
+            assertThat(card.bare()).isFalse();
+            card.dispatchEvent(mouse(card, java.awt.event.MouseEvent.MOUSE_EXITED, arrow.getX() + arrow.getWidth() / 2, arrow.getY() + arrow.getHeight() / 2, 0, false));
+            arrow.dispatchEvent(mouse(arrow, java.awt.event.MouseEvent.MOUSE_ENTERED, arrow.getWidth() / 2, arrow.getHeight() / 2, 0, false));
+            assertThat(card.bare()).as("hovering the chevron keeps the face").isFalse();
+            assertThat(painted(card)).isGreaterThan(bare);
+            arrow.dispatchEvent(mouse(arrow, java.awt.event.MouseEvent.MOUSE_EXITED, arrow.getWidth() + card.getWidth(), arrow.getHeight() / 2, 0, false));
+            assertThat(card.bare()).as("leaving the combo from the chevron").isTrue();
             // A dropdown outside a table keeps its face.
             try (var plain = new KitView(context, new ViewSpec(new Choice("plain", READY, ChoiceKind.DROPDOWN, DISPLAYS, "card", "Display", "")), e -> {})) {
                 var face = (Choices.ChoiceCombo) ((Choices.ChoiceControl) plain.control("plain")).input;
@@ -164,6 +244,50 @@ class TableVocabularyTest {
             assertThat(groups.popup.getComponentCount()).as("nor offered a menu").isZero();
             groups.typeAhead('E', 1);
             assertThat(events).as("type-ahead skips the heading Editor").containsExactly(new UiEvent.Selected("groups", Set.of("editor.main")));
+        } finally { release(context); }
+    }); }
+
+    @Test void aRangeAndADoubleClickPassOverHeadings() { Edt.run(() -> {
+        var context = KitFixtures.context(); var events = new ArrayList<UiEvent>();
+        try (var view = new KitView(context, new ViewSpec(groups(Set.of(), SelectionMode.MULTIPLE)), events::add)) {
+            view.setSize(640, 300); InteractiveRowsTest.layout(view);
+            var groups = (Tables.TableControl) view.control("groups");
+            groups.select("config", false);
+            events.clear();
+            groups.extend(1);
+            assertThat(events).as("Shift-Down from config extends over the heading Editor")
+                .containsExactly(new UiEvent.Selected("groups", Set.of("config", "editor.main")));
+            events.clear();
+            var heading = groups.mounted.get("editor").title.getComponent(0);
+            click(heading, 2, 2, 1);
+            click(heading, 2, 2, 2);
+            heading.dispatchEvent(mouse(heading, java.awt.event.MouseEvent.MOUSE_PRESSED, 2, 2, 1, true));
+            assertThat(events).as("a heading's clicks, double click and context press do nothing").isEmpty();
+            assertThat(groups.popup.getComponentCount()).isZero();
+        } finally { release(context); }
+    }); }
+
+    static Table groupsOrState(boolean rows) {
+        var state = new Empty("groups.empty", READY, new Nodes.Icon("groups.empty.icon", READY, "server", Hue.NEUTRAL, IconSize.EMPTY, "Groups"), "No Groups", "", List.of());
+        var all = groups(Set.of());
+        return new Table("groups", READY, all.columns(), rows ? all.rows() : List.of(), rows ? Set.of("errors") : Set.of(), "edit", List.of(), SelectionMode.SINGLE,
+            ScrollPolicy.STANDARD, Optional.of(state), "");
+    }
+
+    @Test void rowsVanishingUnderAFocusedCellDropdownMountTheState() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        try (var view = new KitView(context, new ViewSpec(groupsOrState(true)), e -> {})) {
+            view.setSize(640, 300); InteractiveRowsTest.layout(view);
+            var groups = (Tables.TableControl) view.control("groups");
+            view.focus("errors.display");
+            assertThat(groups.focusItem).isEqualTo("errors");
+            assertThat(groups.selected).containsExactly("errors");
+            view.update(new ViewSpec(groupsOrState(false))); InteractiveRowsTest.layout(view);
+            assertThat(view.controlOrNull("groups.empty")).as("the state mounts").isNotNull();
+            assertThat(groups.selected).isEmpty();
+            assertThat(groups.focusControl).isNull();
+            assertThat(groups.mounted).isEmpty();
+            assertThatIllegalArgumentException().as("no focus into the vanished cell").isThrownBy(() -> view.focus("errors.display"));
         } finally { release(context); }
     }); }
 
@@ -243,6 +367,20 @@ class TableVocabularyTest {
             List.of(), SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(3), "", "", "", "", "", "No matching keys"))));
     }
 
+    @Test void anEmptyLineSitsAboveTheListsAddAction() { Edt.run(() -> {
+        var context = KitFixtures.context();
+        var add = new Nodes.Button("keys.add", READY, "Add Key", "", ButtonKind.SECONDARY, "add-key", "");
+        var keys = new ItemList("keys", READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, Optional.of(add), OptionalInt.empty(),
+            "", "", "", "", "", "No keys");
+        try (var view = new KitView(context, new ViewSpec(keys), e -> {})) {
+            view.setSize(420, 360); InteractiveRowsTest.layout(view);
+            var list = (InteractiveRows.RowsControl) view.control("keys");
+            assertThat(list.footer).isSameAs(view.control("keys.add").component);
+            assertThat(list.emptyLine.isVisible()).isTrue();
+            assertThat(list.footer.getY()).isEqualTo(list.emptyLine.getY() + list.rowHeight);
+        } finally { release(context); }
+    }); }
+
     @Test void aFilteredListLaysItsEmptyLineInsideItsReservedRows() { Edt.run(() -> {
         var context = KitFixtures.context();
         var key = new ListItem("id_ed25519", Optional.empty(), List.of(new Text("key.name", READY, "id_ed25519", TextRole.BODY)), List.of(), List.of());
@@ -291,6 +429,8 @@ class TableVocabularyTest {
                 assertThat(right(row.trailing.getComponent(1), view)).as(item + " under Port").isEqualTo(right(port, view));
             }
             assertThat(((JLabel) tree.mounted.get("mine").trailing.getComponent(1)).getText()).as("a missing value is blank").isEmpty();
+            assertThat(tree.mounted.get("mac").trailing.getComponent(0).getFont()).as("a value takes its column's role")
+                .isEqualTo(ThemePainting.font(context, dev.jasper.ui.metrics.Typography.Role.MONO_SMALL));
             assertThat(tree.mounted.get("mac").trailing.getComponent(1).getWidth()).as("a column is as wide as its title")
                 .isGreaterThanOrEqualTo(ThemePainting.measureText(port.getFont(), "Port number"));
             for (var listener : host.getMouseListeners()) listener.mouseClicked(BrowserKitTest.click(host, 0));

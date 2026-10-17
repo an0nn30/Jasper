@@ -10,16 +10,16 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 
 /**
- * Immutable tablerow descriptor. A {@code muted} row shows every cell in the de-emphasized text color (for example
- * entries that cannot be chosen); a present {@code contextActions} replaces the table's context menu for this row, and
+ * Immutable tablerow descriptor. A {@code muted} row shows its plain cells and Text cell nodes in the de-emphasized
+ * text color (for example entries that cannot be chosen); a present {@code contextActions} replaces the table's context menu for this row, and
  * an empty list means the row has none. {@code tooltip} is the row's literal tooltip and accessible description, shown
  * over every cell; blank shows none.
  * <p>
  * A column's content is a plain cell ({@code cells}) or a cell node ({@code cellNodes}), never both. A cell node is a
  * {@link Nodes.Text}, {@link Nodes.StatusDot}, {@link Nodes.Icon} or {@link Nodes.Chip}, an INLINE {@link Nodes.Stack}
- * of those, or a DROPDOWN {@link Nodes.Choice}, which reports {@link UiEvent.Selected} and is drawn without a border
- * (its value, then its chevron) until it is hovered or focused. A muted row dims its plain cells and its Text cell
- * nodes. Cell nodes are view nodes, so their ids are unique in the view; {@code cellNodes} iterates in column-id order.
+ * of those, or a DROPDOWN {@link Nodes.Choice} without a rich face, which reports {@link UiEvent.Selected} and is drawn without a border
+ * (its value, then its chevron) until it is hovered or focused. Cell nodes are view nodes, so their ids are unique in
+ * the view; {@code cellNodes} iterates in column-id order.
  * <p>
  * A heading row ({@link #heading(String, String, OptionalInt, String)}) has a {@link Heading} and nothing else: it
  * spans the row, groups the rows below it, and is never selected or activated.
@@ -86,7 +86,7 @@ public record TableRow(String id, Map<String,String> cells, Optional<String> ico
     private static void cell(Nodes.Node node) {
         switch (node) {
             case Nodes.Text _, Nodes.StatusDot _, Nodes.Icon _, Nodes.Chip _ -> { }
-            case Nodes.Choice choice when choice.kind() == Nodes.ChoiceKind.DROPDOWN -> { }
+            case Nodes.Choice choice when choice.kind() == Nodes.ChoiceKind.DROPDOWN && choice.face().isEmpty() -> { }
             case Nodes.Stack stack when stack.role() == Nodes.LayoutRole.INLINE -> {
                 for (var child : stack.children()) switch (child) {
                     case Nodes.Text _, Nodes.StatusDot _, Nodes.Icon _, Nodes.Chip _ -> { }

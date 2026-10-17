@@ -299,7 +299,6 @@ final class Trees {
             value().roots().forEach(root -> flatten(root, 0, true));
             if(detail!=null && indexOf(detail.itemId)<0)detach(detail);
             presentation=presentation.entrySet().stream().filter(e->itemIds.contains(e.getKey())).collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue));
-            var metrics = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.CAPTION));
             int columns = value().columns().isEmpty() ? items.values().stream().mapToInt(item -> item.trailing().size()).max().orElse(0)
                 : value().columns().size() - 1;
             trailingWidths = new int[columns];
@@ -308,15 +307,25 @@ final class Trees {
                 trailingWidths[i] = ThemePainting.metric(context(), i == columns - 1
                         ? dev.jasper.ui.metrics.DesignMetrics.Role.TREE_VALUE_COLUMN
                         : dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN);
+            // Each value is measured in the role it is drawn in.
+            var metrics = new java.awt.FontMetrics[columns];
+            for (int i = 0; i < columns; i++)
+                metrics[i] = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.valueOf(valueRole(i).name())));
             for (var item : items.values())
                 for (int i = 0; i < item.trailing().size(); i++)
-                    trailingWidths[i] = Math.max(trailingWidths[i], metrics.stringWidth(item.trailing().get(i)));
+                    trailingWidths[i] = Math.max(trailingWidths[i], metrics[i].stringWidth(item.trailing().get(i)));
             columnHeader();
         }
 
         /** A plain tree row's side inset, as InteractiveRows.Row.doLayout gives it. */
         int rowPad() {
             return ThemePainting.metric(context(), column >= 0 ? dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_LIST_SIDE : dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
+        }
+
+        /** The role trailing value {@code i} is drawn in: its column's in a column tree, else CAPTION. */
+        Nodes.TextRole valueRole(int i) {
+            var columns = value().columns();
+            return i + 1 < columns.size() ? columns.get(i + 1).role() : Nodes.TextRole.CAPTION;
         }
 
         /** How many trailing values a row shows: its own, or in a column tree one per column after the title. */
@@ -443,7 +452,7 @@ final class Trees {
                 row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_SECONDARY));
             for (int i = 0; presented==null && i < trailingColumns(item); i++)
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
-                        ControlState.READY, i < item.trailing().size() ? item.trailing().get(i) : "", Nodes.TextRole.CAPTION));
+                        ControlState.READY, i < item.trailing().size() ? item.trailing().get(i) : "", valueRole(i)));
             if(presented!=null) {
                 if(presented.locked())trailing.add(new Nodes.Icon("@tree/"+node.id()+"/"+item.id()+"/lock",ControlState.READY,"lock",Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,"Read-only contextual key"));
                 trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/context",ControlState.READY,presented.context(),Nodes.TextRole.CAPTION));
