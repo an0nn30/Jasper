@@ -49,7 +49,7 @@ class DerivedColorTest {
         return inputs;
     }
 
-    @Test void theRolesAreSpecSevenOnesAndTheEightStarredOnesAreOverridable() {
+    @Test void theRolesAreSpecSevenOnesAndTheStarredOnesAndTheDividerAreOverridable() {
         assertThat(Arrays.stream(DerivedColor.values()).map(DerivedColor::key)).containsExactly("surface.header",
             "surface.header.active", "surface.stripe", "surface.tableHeader", "surface.zebra", "surface.rowHover", "warning.ground",
             "warning.border", "danger.ground", "danger.border", "info.ground", "info.border", "surface.footer", "border.divider",
@@ -57,7 +57,7 @@ class DerivedColorTest {
             "tag.border.purple", "tag.border.neutral");
         assertThat(Arrays.stream(DerivedColor.values()).filter(DerivedColor::overridable).map(DerivedColor::key)).containsExactly(
             "surface.header", "surface.header.active", "surface.stripe", "surface.tableHeader", "surface.zebra", "surface.rowHover",
-            "warning.ground", "warning.border");
+            "warning.ground", "warning.border", "border.divider");
         for (var role : DerivedColor.values())
             assertThat(SemanticColor.of(role.key())).as("%s is not a semantic role", role.key()).isEmpty();
     }

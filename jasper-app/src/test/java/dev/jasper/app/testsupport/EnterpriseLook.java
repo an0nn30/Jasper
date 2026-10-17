@@ -34,7 +34,10 @@ public final class EnterpriseLook {
     /** The Enterprise kit file's chrome points. */
     public static ChromeSpec chrome() { return CHROME; }
 
-    /** The fixture theme: spec 7.6's named roles and overrides, Light and Dark, over Slate Cobalt's other roles. */
+    /**
+     * The fixture theme: spec 7.6's named roles and overrides, Light and Dark, over Slate Cobalt's other roles, and plan 6b's
+     * chrome targets (the mocks' tab strip, tab indicator, scrim and {@code border.divider}).
+     */
     public static synchronized JasperTheme theme() {
         if (theme != null) return theme;
         try (var in = EnterpriseLook.class.getResourceAsStream("enterprise-fixture.json")) {

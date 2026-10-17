@@ -17,9 +17,9 @@
       "surface.control.selected": "#50545B",
       "surface.menu": "#363B45",
       "surface.terminal": "#2E3135",
-      "surface.tabstrip": "#3F444F",
+      "surface.tabstrip": "#3A3D42",
       "surface.emptyTile": "#3C414B",
-      "surface.scrim": "#0A0C108C",
+      "surface.scrim": "#00000036",
       "border.window": "#2A2C30",
       "border.subtle": "#FFFFFF14",
       "border.input": "#5A5E65",
@@ -53,7 +53,7 @@
       "button.secondary.bg": "#45484D",
       "button.secondary.bg.hover": "#454B56",
       "button.secondary.border": "#5A5E65",
-      "tab.indicator": "#5B9BF5",
+      "tab.indicator": "#3D74D6",
       "tab.indicator.inactive": "#436596",
       "status.success": "#4CB86A",
       "status.warning": "#E3C27A",
@@ -71,7 +71,8 @@
       "surface.tableHeader": "#393C41",
       "surface.zebra": "#313439",
       "warning.ground": "#4A4128",
-      "warning.border": "#6B5A30"
+      "warning.border": "#6B5A30",
+      "border.divider": "#4A4D53"
     },
     "light": {
       "surface.app": "#ECEDEF",
@@ -87,9 +88,9 @@
       "surface.control.selected": "#D3D9E1",
       "surface.menu": "#FFFFFF",
       "surface.terminal": "#FFFFFF",
-      "surface.tabstrip": "#DADFE6",
+      "surface.tabstrip": "#E8E9EB",
       "surface.emptyTile": "#DADFE6",
-      "surface.scrim": "#1B1F2740",
+      "surface.scrim": "#00000036",
       "border.window": "#C4C7CC",
       "border.subtle": "#0000000F",
       "border.input": "#B4B8BF",
@@ -123,7 +124,7 @@
       "button.secondary.bg": "#FFFFFF",
       "button.secondary.bg.hover": "#F0F3F7",
       "button.secondary.border": "#B4B8BF",
-      "tab.indicator": "#2563C9",
+      "tab.indicator": "#2F65CA",
       "tab.indicator.inactive": "#90AFE3",
       "status.success": "#2E9E4F",
       "status.warning": "#8A5A00",
@@ -142,7 +143,8 @@
       "surface.zebra": "#F7F8FA",
       "surface.rowHover": "#EEF2FA",
       "warning.ground": "#FBF1DA",
-      "warning.border": "#E6CF95"
+      "warning.border": "#E6CF95",
+      "border.divider": "#D3D6DA"
     }
   },
   "terminal": {
