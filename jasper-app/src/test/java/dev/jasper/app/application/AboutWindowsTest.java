@@ -107,7 +107,7 @@ class AboutWindowsTest {
         assertThat(AboutWindows.helpEntries(AboutWindows.aboutInApplicationMenu(true, false))).contains(new MenuEntry.Item("app.about"));
     }
 
-    @Test void helpListsTheVmOptionsActionsAfterKeyboardShortcutsAndAboutLastExceptOnMacOs() {
+    @Test void helpListsTheVmOptionsActionsAfterKeyboardShortcutsAndAboutLastUnlessInTheApplicationMenu() {
         assertThat(AboutWindows.helpEntries(false)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),
             new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions"), new MenuEntry.Separator(), new MenuEntry.Item("app.about"));
         assertThat(AboutWindows.helpEntries(true)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),

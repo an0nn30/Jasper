@@ -70,7 +70,7 @@ final class WorkspaceActions {
                 if (index < owner.tabStrip().getTabCount()) owner.tabStrip().setSelectedIndex(index);
             }
             case RENAME_TAB -> {
-                String name = JOptionPane.showInputDialog(owner, "Tab name (leave blank for automatic):", tab.title());
+                String name = owner.askTabName(tab.title());
                 if (name != null) tab.rename(name);
             }
             case FIND -> pane.findBar().open();

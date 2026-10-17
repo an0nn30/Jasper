@@ -1,6 +1,7 @@
 package dev.jasper.app.windows;
 
 import com.formdev.flatlaf.util.SystemInfo;
+import dev.jasper.app.platform.MacAppearance;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.ShellLook;
 import javax.swing.JRootPane;
@@ -37,6 +38,6 @@ public final class ShellChrome {
      */
     void followTheme(JRootPane root, MacTitleBar bar, boolean dark) {
         if (!followTheme || !macOs || bar != null) return;
-        root.putClientProperty("apple.awt.windowAppearance", dark ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        MacAppearance.follow(root, dark);
     }
 }

@@ -246,8 +246,8 @@ this plan's status banner.
    every native-titled frame and dialog follows the theme: terminal frames (`WindowContent.mount`); auxiliary frames and
    dialogs, the file chooser and its replace and new-folder sheets (`NativeShells.sheet`, which takes the appearance when
    it opens, as it lives for one question) through `ShellChrome.followTheme`; and a window's configuration diagnostics
-   option pane through the window's own flag (the default look keeps `JOptionPane.showMessageDialog`) — cost if wrong:
-   none; a later JBR call is one line in `ShellChrome`.
+   and Rename Tab option panes through the window's own flag (the default look keeps `JOptionPane`'s show methods) —
+   cost if wrong: none; a later JBR call is one line in `MacAppearance.follow`.
 9. **The Dark divider.** Recorded as a residual here and fixed by plan 6b's override key (6b Rulings 3) — cost if wrong:
    the Dark menu row's rule is darker than the mock until 6b.
 10. **`{session}` and `{directory}`.** A provider pane's session is its saved identity (`PaneSnapshot.shell()`), a remote
@@ -3336,7 +3336,7 @@ Rulings (plan, "Rulings"): (1) row 6 is plans 6a and 6b; (2) the window-chrome g
 (3) Help is `MenuTarget.HELP`, last in the classic bar; (4) the classic Window menu takes the tool-window toggles from
 View; (5) the menu-row roles are the same in both catalogs and the item margins come from the face's line height;
 (6) an open classic title is the accent, a hovered closed one `surface.control.hover`; (7) About is in Help whenever the
-screen menu bar is off; (8) Windows and Linux captions follow the operating system, and on macOS every native-titled frame and dialog follows the theme (the chooser's sheets and the diagnostics dialog included); (9) Enterprise Dark's menu-row rule is
+screen menu bar is off; (8) Windows and Linux captions follow the operating system, and on macOS every native-titled frame and dialog follows the theme (the chooser's sheets, the diagnostics dialog and Rename Tab included); (9) Enterprise Dark's menu-row rule is
 darker than the mock until plan 6b's `border.divider` override; (10) the title tokens and separators; (11) the one motion
 supplier is the theme controller's flag; (12) mock comparison by profile; Execution notes: (13) Enterprise runs in the
 chrome tests as 4a's fixture kit, spec 5.1's chrome and a fixture theme of spec 7.6's named roles until plan 5b; (16) the
@@ -3501,3 +3501,9 @@ The plan's own Rulings are 1 to 12; these continue the numbering.
     Rulings 20's family assertion and runs `WindowChromeMenusTest`, `ChromeRenderTest` and `EnterpriseMenuRowMockTest`
     again; a title that drifts past 4 px is retuned by Rulings 18's measurement. Why: the fixture stands in for 5b only.
     Cost if wrong: the mock comparison stays on the platform face.
+27. **Rename Tab follows the window's appearance too, and one helper sets NSAppearance** (Task 5 review). Rename Tab's
+    input dialog is a window of its own, like the diagnostics dialog, so under a native-titled look on macOS
+    `WindowContent.askTabName` builds it as `JOptionPane.showInputDialog` does and gives it the window's appearance;
+    `MacAppearance.follow(JRootPane, boolean)` is the one writer of `apple.awt.windowAppearance` (`MacTitleBar`,
+    `ShellChrome`, `WindowContent`), and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`. Why: spec 10.1
+    names every native-titled frame and dialog, and Rulings 8's list missed this one. Cost if wrong: none.

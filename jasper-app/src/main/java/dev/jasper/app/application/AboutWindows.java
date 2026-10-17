@@ -72,13 +72,13 @@ final class AboutWindows {
 
     /**
      * Help's entries: Keyboard Shortcuts; Change Memory Settings… and Edit Custom VM Options… in a section of their own;
-     * then About Jasper unless {@code macOs} says it is in the application menu ({@link #aboutInApplicationMenu}).
+     * then About Jasper unless it is in the application menu ({@link #aboutInApplicationMenu}).
      */
-    static List<MenuEntry> helpEntries(boolean macOs) {
+    static List<MenuEntry> helpEntries(boolean aboutInApplicationMenu) {
         var shortcuts = new MenuEntry.Item("app.shortcuts");
         var memory = new MenuEntry.Item("app.memory");
         var vmOptions = new MenuEntry.Item("app.vmoptions");
-        return macOs ? List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions)
+        return aboutInApplicationMenu ? List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions)
             : List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions, new MenuEntry.Separator(), new MenuEntry.Item(ABOUT));
     }
 

@@ -141,16 +141,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
     private boolean followsThemeAppearance;
     Consumer<JComponent> showConfigDiagnostics = control -> {
-        if (!followsThemeAppearance) {
-            JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
-            return;
-        }
-        // As showMessageDialog does, with the frame's appearance on the option pane's dialog.
-        var dialog = new JOptionPane(control, JOptionPane.PLAIN_MESSAGE).createDialog(this, "Configuration");
-        dialog.getRootPane().putClientProperty("apple.awt.windowAppearance",
-            theme().chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
-        dialog.setVisible(true);
-        dialog.dispose();
+        if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+        else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
     };
     Consumer<String> onTitle = title -> {};
     /** An error to tell the user about, as a title and details; the application posts it as a notification. */
@@ -372,11 +364,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.onThemeChanged = theme -> bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
             bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(content.theme().chrome()).dark());
         }
-        // The window's own dialogs (the configuration diagnostics) follow with it under a native-titled look.
+        // The window's own dialogs (the configuration diagnostics, Rename Tab) follow with it under a native-titled look.
         content.followsThemeAppearance = bar == null && followTheme && content.macOs;
         if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {
-            content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",
-                theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
             content.onThemeChanged.accept(content.theme());
         }
         if (content.bodyLease != null) content.bodyLease.close();
@@ -1204,6 +1195,36 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ResolvedTheme theme() { return themes.current(); }
     boolean followsThemeAppearance() { return followsThemeAppearance; }
+
+    /**
+     * Gives a dialog of this window the window's macOS appearance when the window follows the theme (spec 10.1): an
+     * option pane's dialog is a window of its own, which otherwise takes the system's appearance.
+     */
+    void followAppearance(JRootPane dialogRoot) {
+        if (followsThemeAppearance) dev.jasper.app.platform.MacAppearance.follow(dialogRoot, theme().chrome().dark());
+    }
+
+    /** Shows {@code pane} in a modal dialog over this window, as {@code JOptionPane}'s own show methods do, with its appearance. */
+    private void showOptionDialog(JOptionPane pane, String title) {
+        JDialog dialog = pane.createDialog(this, title);
+        followAppearance(dialog.getRootPane());
+        pane.selectInitialValue();
+        dialog.setVisible(true);
+        dialog.dispose();
+    }
+
+    /** Rename Tab's question: the new name, blank for automatic, or null when cancelled. */
+    String askTabName(String current) {
+        String message = "Tab name (leave blank for automatic):";
+        if (!followsThemeAppearance) return JOptionPane.showInputDialog(this, message, current);
+        // As showInputDialog does, with the window's appearance on its dialog.
+        var pane = new JOptionPane(message, JOptionPane.QUESTION_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+        pane.setWantsInput(true);
+        pane.setInitialSelectionValue(current);
+        showOptionDialog(pane, UIManager.getString("OptionPane.inputDialogTitle", getLocale()));
+        Object value = pane.getInputValue();
+        return value == JOptionPane.UNINITIALIZED_VALUE ? null : (String) value;
+    }
 
     /**
      * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as

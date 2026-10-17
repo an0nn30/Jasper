@@ -67,6 +67,24 @@ class WindowShellTest {
         });
     }
 
+    /** Spec 10.1: the diagnostics and Rename Tab dialogs are windows of their own and take the window's appearance. */
+    @Test void theWindowsOwnDialogsFollowItsAppearance() throws Exception {
+        edt(() -> {
+            var owner = window(true, WindowChromeMenusTest.classic());
+            WindowContent.mount(new JRootPane(), owner, new WindowLook(WindowChromeMenusTest.classic(), false, true), value -> { });
+            var dialog = new JRootPane();
+            owner.followAppearance(dialog);
+            assertThat(dialog.getClientProperty("apple.awt.windowAppearance"))
+                .isEqualTo(owner.theme().chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+            var standard = window(true, WorkspaceChrome.STANDARD);
+            try (var bar = WindowContent.mount(new JRootPane(), standard, new WindowLook(WorkspaceChrome.STANDARD, true, false), value -> { })) {
+                var other = new JRootPane();
+                standard.followAppearance(other);
+                assertThat(other.getClientProperty("apple.awt.windowAppearance")).as("the default look keeps JOptionPane's own dialogs").isNull();
+            }
+        });
+    }
+
     @Test void compactUnderANativeTitleKeepsTheMenuRow() throws Exception {
         edt(() -> {
             var owner = window(true, WindowChromeMenusTest.classic());
