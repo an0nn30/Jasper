@@ -20,6 +20,13 @@ Choose a host to focus its most recently used running session, or connect in a n
 is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
 The list updates when hosts are added, edited, imported or removed.
 
+Under the Enterprise look the toolbar shows **Session:** with a dropdown (saved hosts, then WSL distributions, then
+**Manage Sessions…**) and **Connect**, which focuses a running pane for the chosen host or opens one. The Sessions panel
+is a Name/Host/Port tree over the selected host's Properties, Tunnels is a Type/Local/Remote/Via table whose rows start
+or stop on Enter or a double click, SFTP's tools read **Hidden files** and **Upload** over a Modified column, and
+Transfers (**Cmd+Alt+3**, Alt+3 elsewhere) is a bottom panel. The panels start with Sessions and Tunnels on the right,
+SFTP on the left.
+
 On Windows with WSL installed, the Sessions panel starts with a read-only **WSL** group: the
 distributions Jasper detected for its shell profiles, each with its WSL version (WSL 1 or WSL 2) as a
 badge. Double-click or Enter, **Open** on the card, or **Open in new tab** in the context menu opens

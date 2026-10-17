@@ -15,6 +15,10 @@ Press **+** (or **Transfer › Share Folder…** or **Transfer › New File Serv
 Reveal Folder, Copy Address and Copy Password. The status bar shows "⇅ 2 servers" while servers run; click it to toggle
 the panel.
 
+Under the Enterprise look the File Servers panel is a Folder/Address/Status table beneath SFTP whose rows start or stop
+on Enter or a double click; the chosen server's details are Properties (**Show Activity** in its context menu shows its
+log), and New File Server lists the authorized keys as a Type/Fingerprint/Comment table.
+
 ## Safe by default
 
 - **Read-only.** Turn on *Allow changes (upload, rename, delete)* to let clients write.

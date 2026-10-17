@@ -1,5 +1,7 @@
 # Enterprise presentation 10a: Workstation, Remote and File Server compositions Implementation Plan
 
+> **Status: executed on 2026-10-17** (`4a266828f..490e4dca9`, then the documentation commit); see `docs/STATUS.md`. Deviations from the plan's text: Execution notes R1 to R21 and Execution deviations D1 to D21 below (D1, D2, D4, D5, D7, D8, D10 to D12, D15, D18, D20 and D21 change what the tasks wrote; D3, D6, D9, D13, D14, D16, D17 and D19 are measured residuals; New Tunnel's floor is 0.53).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** With Enterprise turned on, Remote and File Server compose their classic layouts as the Workstation and Dark Mode
@@ -5418,3 +5420,15 @@ wide at x 29), header band, rules and colours match the mock exactly there. The 
 keep their icons (spec 6.4's button face; the mock draws text only). Owners: 3c's empty line and 4c's header insets.
 Measured: light/new-file-server-http 0.657, -ftp 0.614, -sftp 0.567, -tftp 0.626 (floors 0.55); the four body and footer
 bands match.
+
+D20 (Task 5). **A toolbar strip shows no caption above a choice** — what: jasper-ui's `Choices.ChoiceControl.labelShown`
+is false under `KitView.toolbarStrip`, the choice's label staying its accessible name (`KitViewToolbarStripTest
+.aToolbarStripShowsNoCaptionAboveADropdown`); why: the toolbar view's row is one line, named by its LABEL "Session:" (spec
+10.3), and the caption put a second line above the combo against the 01 mock's band; the plan's file list named no
+jasper-ui file for Task 5. Reach: every toolbar view's choice in either look (in the bundled code only Remote's classic
+Session view). Measured: light/session-toolbar 0.962, dark/session-toolbar 0.825 (floor 0.50).
+
+D21 (Task 13). **The documents and the STATUS entry** — what: `docs/remote.md` writes Transfers' shortcut as the guide
+does ("Cmd+Alt+3, Alt+3 elsewhere"); the STATUS entry adds the 20 pairs' `check_pairs.py` agreements (0.535 to 0.962)
+and a clause naming the execution deviations; `pairs.json` takes the floors the tasks set (0.50 for both session-toolbar
+pairs, 0.53 for new-tunnel); why: the guide's voice and Task 13's own instruction; cost if wrong: none.

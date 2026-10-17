@@ -1926,5 +1926,311 @@
       "#18181B",
       "#A7A9AC"
     ]
+  },
+  {
+    "name": "composition-light-sessions",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sessions@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-dark-sessions",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/sessions@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#393C41"
+    ]
+  },
+  {
+    "name": "composition-light-sessions-locked",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      230,
+      700,
+      782
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sessions-locked@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-light-session-toolbar",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      660,
+      110,
+      720,
+      68
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/session-toolbar@2x.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#ECEDEF"
+    ]
+  },
+  {
+    "name": "composition-dark-session-toolbar",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      660,
+      110,
+      720,
+      68
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/session-toolbar@2x.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#3C3F44"
+    ]
+  },
+  {
+    "name": "composition-light-tunnels",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/tunnels@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-dark-tunnels",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/tunnels@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#393C41"
+    ]
+  },
+  {
+    "name": "composition-light-tunnels-none",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      1064,
+      700,
+      642
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/tunnels-none@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-light-sftp",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-dark-sftp",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#393C41"
+    ]
+  },
+  {
+    "name": "composition-light-sftp-disconnected",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      230,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/sftp-disconnected@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-light-file-servers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/file-servers@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-dark-file-servers",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/dark/file-servers@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#393C41"
+    ]
+  },
+  {
+    "name": "composition-light-file-servers-none",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      994,
+      600,
+      712
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/file-servers-none@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "composition-light-add-host",
+    "mock": "docs/design/enterprise/reference/03 Add Host/Add Host - Default.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1042
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/add-host@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "composition-light-new-tunnel",
+    "mock": "docs/design/enterprise/reference/04 New Tunnel/New Tunnel - Local.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      898
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-tunnel@2x.png",
+    "min_agreement": 0.53,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "composition-light-new-file-server-http",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - HTTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      986
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-http@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "composition-light-new-file-server-ftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - FTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1210
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-ftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "composition-light-new-file-server-sftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - SFTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1172
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-sftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "composition-light-new-file-server-tftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - TFTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      862
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/new-file-server-tftp@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA"
+    ]
   }
 ]

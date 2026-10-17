@@ -67,7 +67,8 @@ kit file, IBM Plex fonts and theme its descriptor names, and its code only publi
 declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
 package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
 `try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
-the package is visible only while Enterprise is loaded.
+the package is visible only while Enterprise is loaded. An in-repo plugin names `dev.jasper.enterprise.api` only in its
+own `workstation` package, which `verifyPluginArchitecture` checks.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with

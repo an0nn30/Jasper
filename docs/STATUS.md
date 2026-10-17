@@ -1,5 +1,59 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 10a: Workstation, Remote and File Server compositions — 2026-10-16**
+(`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `4a266828f..490e4dca9`, then this
+documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10a-plugin-compositions.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Remote, File Server and Vault optionally
+require Enterprise and read `dev.jasper.<plugin>.workstation.Layout` once in `start` (CLASSIC while `Workstation` is
+published, ROWS otherwise, including when Enterprise is not installed); `verifyPluginArchitecture` confines
+`dev.jasper.enterprise.api` to those packages. Under the Enterprise look Remote contributes the "Session: [combo]
+[Connect]" toolbar view, the Sessions panel is a Name/Host/Port tree over Properties, Tunnels a Type/Local/Remote/Via
+table, SFTP's tools read Hidden files and Upload over a Modified column (disconnected: Choose Session… over "Not
+Connected"), Transfers a bottom panel toggled by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
+Servers left; File Server's panel is a Folder/Address/Status table over Properties and New File Server lists keys as a
+table; Add Host's keys read "No keys". Classic Properties (jasper-ui) follow the table point: the Workstation grid when
+titled, label-colon lines when untitled. `ClassicCompositionRenderTest` renders every surface from the staged plugins
+under the shipped kit, Plex and theme, Light and Dark, against the mocks (bands, colours, edge agreement: Sessions 0.862
+Light, 0.824 Dark, 0.874 locked; the Session toolbar 0.962 and 0.825 over the plan's floor 0.50; Tunnels 0.812, 0.812
+and 0.914 with none; SFTP 0.708, 0.708 and 0.736 disconnected; File Servers 0.753, 0.753 and 0.804 with none; Add Host
+0.657; New Tunnel 0.535; New File Server HTTP 0.657, FTP 0.614, SFTP 0.567, TFTP 0.626; every other floor 0.55);
+`tools/visual/pairs.json` gains the 20 `composition-*` pairs, which `check_pairs.py` passes (0.535 to 0.962);
+`CompositionParityTest` checks every default-look gesture's classic path. Rulings (plan, "Rulings"): (1) row 10 is two
+plans, 10a and 10b; (2) `Layout` is a plugin-local enum per consumer, `Layout.of(Services)` the only lookup; (3) a
+composition root keeps its `Layout` for its life and `node()` dispatches on it (`HostEditor` and `ServerEditor` through
+`layout(Layout)`); (4) classic Properties follow the `table` point, the grid when titled, label-colon lines when
+untitled; (5) the Session dropdown lists hosts, then WSL distributions, then Manage Sessions…, with no separator; (6)
+the toolbar choice is per window and shared with the Sessions tree, Connect acting on the chosen row, else the active
+SSH pane's host, else the first host; (7) the classic tunnels context menu is today's row menu, activation is Enter or a
+double click, the footer keeps spec 14.4's copy; (8) a broken `tunnels.toml` or `servers.toml` shows a DANGER `Notice`
+above the table; (9) Transfers is a BOTTOM panel toggled by `TransferUi.SHOW`, "No Transfers" when empty; (10) File
+Server's details are Properties titled "Properties — <name>" and Show Details reads Show Activity; (11) the SFTP row's
+labelled buttons are Hidden files and Upload, and a disconnected panel's dropdown keeps "Choose Session…" selected; (12)
+Add Host's Keys read "No keys" and Authentication sits in an empty-label FormRow, New Tunnel is only rendered; (13)
+`CompositionParityTest` exists once per plugin module; (14) the residuals below; (15) superseded (Execution notes R7):
+6b's `NativeShells.nativeMarks` already bands a classic native dialog, so no host change. Execution deviations (plan,
+"Execution deviations"): D1 the classic Properties' title rule is `border.window` unguarded; D2, D4, D7 classic panel
+chrome in the kit (the search row and its rule, `surface.card` table and tree bodies, flush titled Properties, the
+inline status line under a table, the one-line navigation row); D5 classic panel empty states centre and wrap at 300;
+D8 classic `PANEL_FOOTER_ROW_HEIGHT` 28; D10 a native dialog's classic footer band pads its buttons 10; D11 classic
+`FORM_TOP` 10 and `MIXED_ROW_GAP` 8; D12 the classic route face upper-cases a DESCRIPTION caption; D15 the classic File
+Servers footer belongs to the chosen server, after its Properties; D18 the keys columns' weights are 83, 254 and 125;
+D20 (Task 5) a toolbar strip shows no caption above a choice (`Choices.labelShown`, `KitViewToolbarStripTest`), so the
+toolbar view is one line. Residuals: Rulings 14's four (the Disconnected mock's striped second host, #F7F8FA, renders
+#FFFFFF, as 4c's unstriped trees; the Tunnels row is 22 against the mock's 24, inside the band tolerance 2; the Session
+combo is about 212 wide at 2x against the mock's 219, sized by 3d's strip; Transfers' place after Event Log in the
+BOTTOM_LEFT strip is plan 7's and unchecked); New Tunnel's floor 0.53 (measured 0.535; spec 5.6's 11 px SUPPORTING and
+SETTING_DESCRIPTION against the mock's 12, D13); D3 the Sessions tree's separators at 148 and 248 (mock 166 and 293)
+with right-aligned Host and Port; D6 the Tunnels cell positions; D9 the SFTP row, table and chooser details; D14 Add
+Host's 106 px keys box (R11), its "No keys" line, placeholders and disabled buttons; D16 the HTTP tag's ink (#2F65CA
+against #2655AE); D17 the File Servers status dot, ink and Address alignment; D19 the keys table's 22 px empty body and
+its 7 px title inset. The default look is byte-identical (gallery digests unchanged; no default render changed).
+`./gradlew check --continue`: **11,303 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the
+Enterprise Workstation window against the Workstation and Dark Mode mocks (the toolbar view's combo and Connect, the
+Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the SFTP row,
+the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
+not pushed.
+
 **Enterprise presentation, plan 7: dock chrome — 2026-10-17** (`claude/enterprise-dock-chrome`, worktree
 `.claude/worktrees/enterprise-7`, `947b3d9e1..deb7ea3c1`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-7-dock-chrome.md),
