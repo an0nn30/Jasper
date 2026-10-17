@@ -26,14 +26,17 @@ enforce those columns from bytecode. SDK types appear in the application only in
 
 ## Launch
 
-`JasperApplication.startPlugins` runs once on the EDT before the first window:
+`PluginSelection` discovers and resolves once on the bootstrap thread, before AWT and before the configuration is
+read; `JasperApplication.startPlugins` then loads and starts its plugins once on the EDT before the first window:
 
 1. `PluginDiscovery` reads `plugin.toml` from the bundled directory (`plugins/` beside the
    application jar, or `-Djasper.plugins.bundled`), the user directory (under the home, which
    `-Djasper.home` or `JASPER_HOME` moves for development launches) and `--plugin-dir`.
 2. `PluginResolver` drops user plugins in safe mode, keeps the higher version of a duplicate
-   id, checks the SDK range, applies `plugins.toml` (disabled, marked for removal, consent),
-   removes dependency cycles and unmet hard dependencies, and orders dependencies first.
+   id, checks the SDK range, applies `plugins.toml` (disabled, marked for removal, consent, and the opt-in of a bundled
+   plugin that is off by default), removes dependency cycles and unmet hard dependencies, elects one presentation
+   provider (development, then bundled, then installed, then the lowest id; the others, an invalid kit and a look the
+   attempt record skips are skipped; safe mode disables every provider), and orders dependencies first.
 3. `PluginLoader` refuses jars that define reserved or imported packages and builds a
    `PluginClassLoader`: SDK from the application, exported packages of declared dependencies
    from their loaders, then the platform loader and the plugin's jars. Application classes and

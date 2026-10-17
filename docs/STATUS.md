@@ -1,5 +1,38 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 5a: the presentation provider — 2026-10-16** (`claude/enterprise-provider`, worktree
+`.claude/worktrees/enterprise-5`, `d65dc99f8..934c33f1e`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-5a-provider.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A plugin can provide Jasper's look from a
+declarative kit file. `plugin.toml` gains `presentation`, `themes` and `enabled_by_default`, and `presentation.provide`
+is a host capability (legal only with `presentation`). `PluginStateStore.effective` is the one effective-enabled rule: a
+bundled plugin with `enabled_by_default = false` is off until the user turns it on, which writes `opt_in = true`; the
+three prune paths keep the opt-in. `dev.jasper.app.presentation` holds `KitParser` (strict, one message naming the key;
+`[branding]` stays an unknown table until plan 11), `FontFile` (a face's full name and typographic family without AWT),
+`PresentationFacts` (digest and first problem), the attempt record (`presentation-attempt.toml`: pending, proven, failed,
+announced), every spec 9.1 projection and `Presentation`. `PluginResolver.resolve` elects one provider (DEV, BUNDLED,
+USER, then id; losers and the attempt skip post no problem; safe mode disables every provider), enabling or consenting
+to one turns the others off in one transaction, and the Plugins page predicts with the same facts. `PluginSelection`
+runs on the bootstrap thread before the `ConfigService`, which takes the kit's defaults for four keys (`DefaultSource`;
+Settings shows and resets to the effective default); the application starts the theme under the selection's kit with
+spec 4.7's four-step fallback, every `KitContext` carries the kit, and `PluginRuntime.start(selection, …)` scans
+nothing again. The start-up line reads `look=<id>`. No plugin ships a presentation yet (plan 5b); the default look is
+unchanged. Rulings (plan, "Rulings"): (1) row 5 is plans 5a and 5b; (2) the projections are complete but gated by
+`Presentation.LANDED` (empty: plans 6 to 9 add their groups), and `DesktopFlags` is computed, not applied; (3) plan 1's
+installed-kit chrome readers stay (the process installs one kit), the `KitContext` sites take the presentation's;
+(4) `PresentationFacts.read` takes a `Source`; (5) descriptor path rule, existence checked when read; (6) safe mode's
+presentation check comes first and dependents of a skipped provider are unmet; (7) attempt fields are optional; (8)
+`enablingPresentation` takes the opt-in; (9) the application takes the selection at construction and
+`startPlugins(AppDirs)` starts it; (10) core-look overloads stay for tests; (11) the bootstrap pre-pass is injectable;
+(12) faces are named by the name table and registered in 5b; (13) deep nesting is invalid TOML; (14) colour-literal,
+title and face rules; (15) the classic base's chrome is the Enterprise column; (16) a blamed kit posts the ordinary
+problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
+host facts without AWT; (20) `PluginRuntime.presentation` takes only the `Kit` (spec 4.9's `DialogMapping` parameter is
+added beside it when the dialog consumer lands); (21) a failed attempt stays failed through a later window and an orderly
+quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from the plan's text: (a) Task 5's review added `PluginStatus.NEEDS_LOOK` and a trial election: a provider that can load only beside another provider (a hard dependency on it, directly or through a library) is skipped with "requires another look's plugin; one look can be active at a time" and the next provider wins, and dependents of an invalid provider are dropped as unmet before the election; (b) Task 12's review made the application's selection and presentation fields volatile; (c) Task 13 puts the new AGENTS.md sentence after "`verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.", so that sentence still refers to the SDK rule. Plan-5b entry conditions: register the fonts and
+name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
+--continue`: **10,719 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
+
 **Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `7d8c189c3..485316ed2`, then this documentation commit
 and the final review fixes;

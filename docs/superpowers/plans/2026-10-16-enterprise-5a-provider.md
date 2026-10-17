@@ -1,5 +1,7 @@
 # Enterprise presentation 5a: the presentation provider Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-provider` (`d65dc99f8..934c33f1e`).** Deviations from this plan's text: (a) Task 5's review added `PluginStatus.NEEDS_LOOK` and a trial election: a provider that can load only beside another provider (a hard dependency on it, directly or through a library) is skipped with "requires another look's plugin; one look can be active at a time" and the next provider wins, and dependents of an invalid provider are dropped as unmet before the election; (b) Task 12's review made the application's selection and presentation fields volatile; (c) Task 13 puts the new AGENTS.md sentence after "`verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.", so that sentence still refers to the SDK rule. From the spec: `PluginRuntime.presentation` takes only the `Kit`; spec 4.9's `DialogMapping` parameter is added beside it when the dialog consumer lands (Rulings 20).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A plugin can provide Jasper's presentation from a declarative kit file: the descriptor keys and the
