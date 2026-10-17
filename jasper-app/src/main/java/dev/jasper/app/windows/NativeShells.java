@@ -60,6 +60,8 @@ public final class NativeShells {
     private final Runnable newWindow;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
+    /** Classic dialogs drawn inside their owner's window (spec 10.8): they have no native window of their own. */
+    private final java.util.Set<AuxiliarySurface> inWindow = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     private final ShellChrome shell;
 
     /**
@@ -110,12 +112,14 @@ public final class NativeShells {
     public AuxiliarySurface.Shell create(AuxiliarySurface surface) {
         if (surface.classic()) {
             Window owner = surface.kind() == AuxiliarySurface.Kind.WINDOW ? null : owner(surface);
-            var placement = classicPlacement(surface, owner instanceof javax.swing.RootPaneContainer && owner.isShowing());
-            if (placement.isPresent()) return inWindow(surface, placement.get());
-            // A classic dialog whose owner has no showing window opens natively (spec 10.8): an overlay as a modal
-            // dialog, an attached sheet as a centred one, since it has no showing window to hang from.
-            if (surface.kind() == AuxiliarySurface.Kind.OVERLAY && surface.modal()) return dialog(surface);
-            nativeFallback(surface);
+            boolean showing = owner instanceof javax.swing.RootPaneContainer && owner.isShowing();
+            switch (classicRoute(surface, showing)) {
+                case IN_WINDOW -> { return inWindow(surface, classicPlacement(surface, showing).orElseThrow()); }
+                // A classic dialog whose owner has no showing window opens natively (spec 10.8): an overlay as a modal
+                // dialog, an attached sheet as a centred one, since it has no showing window to hang from.
+                case MODAL_DIALOG -> { return dialog(surface); }
+                case AS_REQUESTED -> nativeFallback(surface);
+            }
         }
         return switch (surface.kind()) {
             case WINDOW -> frame(surface);
@@ -136,6 +140,23 @@ public final class NativeShells {
         surface.attachedSheet(false);
         for (var child : surface.holder().getComponents())
             if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) view.paintsSurface(true);
+    }
+
+    /** Where {@link #create} puts a surface the look marks classic (spec 10.8). */
+    enum ClassicRoute {
+        /** In its owner's showing window, as a classic dialog. */
+        IN_WINDOW,
+        /** A modal overlay whose owner has no showing window: a native modal dialog. */
+        MODAL_DIALOG,
+        /** Its own presentation, an attached sheet first losing its attachment ({@link #nativeFallback}). */
+        AS_REQUESTED
+    }
+
+    /** The route of a surface whose owner window is showing or not; a surface the look does not mark is as requested. */
+    static ClassicRoute classicRoute(AuxiliarySurface surface, boolean ownerShowing) {
+        if (classicPlacement(surface, ownerShowing).isPresent()) return ClassicRoute.IN_WINDOW;
+        if (surface.classic() && surface.kind() == AuxiliarySurface.Kind.OVERLAY && surface.modal()) return ClassicRoute.MODAL_DIALOG;
+        return ClassicRoute.AS_REQUESTED;
     }
 
     /** Where a marked modal overlay or attached sheet sits in its owner's showing window, or empty when it is not in one. */
@@ -169,6 +190,8 @@ public final class NativeShells {
             @Override public void windowClosed(WindowEvent event) { surface.close(); }
         };
         owner.addWindowListener(close);
+        // Surfaces it owns hang from its owner's window, as an overlay's do.
+        inWindow.add(surface);
         Runnable show = () -> {
             overlay.show();
             if (surface.closed()) return;
@@ -176,7 +199,7 @@ public final class NativeShells {
             var closed = surface.onClosed(loop::exit);
             try { if (!surface.closed()) loop.enter(); } finally { closed.close(); }
         };
-        return new AuxiliarySurface.Shell(show, overlay::focus, () -> { owner.removeWindowListener(close); overlay.close(); },
+        return new AuxiliarySurface.Shell(show, overlay::focus, () -> { inWindow.remove(surface); owner.removeWindowListener(close); overlay.close(); },
             title -> { dialog.setTitle(title); surface.holder().getAccessibleContext().setAccessibleName(title); }, overlay::cardBounds,
             (title, initial) -> chooseFile(TopModal.over(owner), title, initial, Optional.empty()));
     }
@@ -276,12 +299,24 @@ public final class NativeShells {
     }
 
     private Window owner(AuxiliarySurface surface) {
-        if (surface.ownerSurface().isPresent()) {
-            var parent = surface.ownerSurface().orElseThrow();
-            if (parent.kind() == AuxiliarySurface.Kind.OVERLAY) return owner(parent);
-            return natives.get(parent);
+        var placed = windowed(surface, inWindow::contains);
+        if (placed.ownerSurface().isPresent()) return natives.get(placed.ownerSurface().orElseThrow());
+        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(terminalWindows).orElse(null));
+    }
+
+    /**
+     * The surface whose owner holds {@code surface}'s window: the nearest one up the owner chain whose owner surface, if
+     * any, has a native window. An overlay or a classic dialog drawn in its owner's window ({@code drawnInWindow}) has
+     * none, so what it owns hangs from its own owner's window.
+     */
+    static AuxiliarySurface windowed(AuxiliarySurface surface, java.util.function.Predicate<AuxiliarySurface> drawnInWindow) {
+        var at = surface;
+        for (var parent = at.ownerSurface(); parent.isPresent(); parent = at.ownerSurface()) {
+            var owner = parent.orElseThrow();
+            if (owner.kind() != AuxiliarySurface.Kind.OVERLAY && !drawnInWindow.test(owner)) break;
+            at = owner;
         }
-        return surface.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> surface.ownerWindow().map(terminalWindows).orElse(null));
+        return at;
     }
     private boolean liveOwner(AuxiliarySurface surface, Window expected) {
         return !surface.closed() && expected != null && expected.isShowing() && owner(surface) == expected

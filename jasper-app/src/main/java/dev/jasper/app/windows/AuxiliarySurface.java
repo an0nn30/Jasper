@@ -84,8 +84,11 @@ public final class AuxiliarySurface {
     /** Whether a modal overlay or attached sheet of this surface is drawn in its window as a classic dialog (spec 10.8). */
     public boolean classic() { return classic; }
     void classic(boolean value) { classic = value; }
-    /** Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8). */
-    public boolean hostTitled() { return hostTitled; }
+    /**
+     * Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8);
+     * never for an attached sheet, which has no title bar.
+     */
+    public boolean hostTitled() { return hostTitled && !attachedSheet; }
     void hostTitled(boolean value) { hostTitled = value; }
     /** The shell's host flags for a kit view set as content after the shell exists (spec 10.8); none by default. */
     private java.util.function.Consumer<dev.jasper.ui.swing.KitView> laterContent = view -> { };
