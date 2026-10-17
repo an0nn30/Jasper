@@ -45,4 +45,9 @@ interface ButtonFace extends Face {
     int joinedOverlap();
     /** The width a table cell's dropdown keeps after its value's text padding for its chevron. */
     int cellChevronLane(KitContext context);
+    /**
+     * Whether the buttons of a line led by a title over a further line (a detail heading without a tile) stand at the line's
+     * top, on the title's line; otherwise they are centred on the title block.
+     */
+    boolean titleLine();
 }

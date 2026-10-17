@@ -26,4 +26,6 @@ interface TableFace extends HeaderFace {
     boolean everyRowOnPage();
     /** The type a {@code role} column's text cells take in place of the role's own, {@code settings} on a Settings page; null keeps it. */
     Typography.Role cellType(Nodes.TextRole role, boolean settings);
+    /** Paints behind an item list's heading rows across {@code width}: nothing, or the classic heading bands (plan 9b Rulings 12). */
+    void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width);
 }

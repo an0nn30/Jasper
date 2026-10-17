@@ -21,6 +21,8 @@ class SettingsRolesTest {
         ROLES.put("KEYMAP_KEYS_INSET", List.of(25, 25));
         ROLES.put("KEYMAP_SCOPE_GAP", List.of(30, 30));
         ROLES.put("KEYCAP_DETAIL_EDGE_ALPHA", List.of(0, 49));
+        ROLES.put("LIST_HEADING_HEIGHT", List.of(0, 24));
+        ROLES.put("LIST_TWO_LINE_ROW_HEIGHT", List.of(0, 36));
     }
 
     @Test void theSettingsRolesFollowEachOtherWithTheirValuesInBothCatalogs() {

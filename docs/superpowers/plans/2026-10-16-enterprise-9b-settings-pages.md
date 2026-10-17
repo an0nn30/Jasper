@@ -93,6 +93,31 @@
 > paddings), so the field ends 4 px later; the field's focus halo is the kit's graded ring, not the mock's flat
 > #C9D7F2; the hint line's ⋯ (Rulings 11, N19).
 
+> **Status, Task 5 (2026-10-17):** the Plugins page matches mock 08's probes (share 0.974, floor 0.93); the default look
+> is unchanged (`changed: none`: today's render showed no "Plugin information" label, so no `plugins*` file moved).
+> Calibration (classic values): `PLUGIN_MANAGER_PADDING` 16, `PLUGIN_MANAGER_SIDE_PADDING` 16, `PLUGIN_LIST_WIDTH` 292,
+> `PLUGIN_DETAILS_LEADING_PADDING` 12, `PLUGIN_DETAILS_TRAILING_PADDING` 0, `PLUGIN_DETAILS_EDGE_PADDING` 2 (the box's top
+> line and Disable at 53, the box's bottom line 16 above the footer, the details 12 right of the box, Disable ending at
+> 1023), `PLUGIN_DETAILS_GAP` 4 and `PLUGIN_TEXT_LINE_SPACING` 3 (the overview 14 below the tabs, lines 17.5 apart).
+> Deviations, each because the code differs from the plan's model: the list's heading height and two-line row height are
+> two new roles, `LIST_HEADING_HEIGHT` (0, 24) and `LIST_TWO_LINE_ROW_HEIGHT` (0, 36), appended after
+> `KEYCAP_DETAIL_EDGE_ALPHA` with `SettingsRolesTest` entries (headings were as tall as the rows, and the role two-line rows
+> read, `ROW_VERTICAL_PADDING`, pads every one-line row, menu and navigation row); the bands, the heading height and the row
+> role apply to a plain list only (`ItemLists.ListControl.plainRows`: not results, identity rows, compact panel or manager
+> column rows), so the palette and the dock panels keep theirs; the lane's box is a compound border (the margins outside the
+> line) with the list view opaque on `surface.card`, not an opaque lane (which would fill its margins); the strip rule is
+> `HAIRLINE` thick; the classic details drop the section card (its 8 px padding put the tabs 15 below the mock's) and put
+> the plugin's ⋯ before Disable (`[identity, more, primary]`), so Disable ends at the body's right as the mock's does; a
+> menu button no longer takes a navigation line's spare width (`Navigation.InlineLayout.flexible`), and under the classic
+> button face (`ButtonFace.titleLine`, default false) the buttons of a line led by a title over its metadata without a tile
+> stand at the line's top, on the title's line (Disable at 53, not centred at 60.5); the "active tab" and "inactive tab"
+> probes moved from (600, 113) and (650, 113), which fall between the labels' glyphs, to (558, 113) and (638, 113) inside
+> the tabs; `ClassicListHeadingsTest` gains a test of the two roles. Residuals: the search row's ⋯ and the ⋯ beside Disable
+> (N19), the folder tabs' baseline rule across the details (the mock's rule at 126), tabs 1 px high, the name 1 px and the
+> metadata 2.5 px low, the state dot before "Enabled", a row's name and metadata 4 px further apart than the mock's (the
+> list's title and subtitle split), the checkbox on the selection (plan 4b's face), Disable 63 wide against 66, and the
+> fixture's Enterprise plugin ("8 of 9 enabled").
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

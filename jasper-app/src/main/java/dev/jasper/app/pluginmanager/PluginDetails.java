@@ -49,8 +49,12 @@ final class PluginDetails {
     private PluginRuntime.Row row;
     private boolean busy;
     private String section = OVERVIEW;
+    private final PluginShape shape;
 
-    PluginDetails(KitContext kit, Consumer<UiEvent> events) {
+    PluginDetails(KitContext kit, Consumer<UiEvent> events) { this(kit, events, PluginShape.ROWS); }
+
+    PluginDetails(KitContext kit, Consumer<UiEvent> events, PluginShape shape) {
+        this.shape = shape;
         this.kit = kit;
         artwork=new dev.jasper.ui.icons.ReceivingArtwork(kit.icons());
         header = new KitView(kit, headerSpec(), event -> {
@@ -142,7 +146,7 @@ final class PluginDetails {
         artwork.reconcile(()->{
             artName=row==null?"plugin":PluginIcons.name(artwork,row);
             header.update(headerSpec());
-            header.setArtworkPresentation("icon",dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_HEADER);
+            if(!shape.checkboxRows())header.setArtworkPresentation("icon",dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_HEADER);
         });
     }
 
@@ -176,7 +180,8 @@ final class PluginDetails {
         List<MenuItem> items = present ? PluginCard.menu(shown, busy) : List.of(new MenuItem("none", "None", "", "none", false, false));
         var primary = new Nodes.Button(PRIMARY, present && PluginCard.toggleable(shown) ? actionsState : hidden,
             present && shown.needsConsent() ? "Review…" : present && shown.enabled() ? "Disable" : "Enable", "", Nodes.ButtonKind.SECONDARY, PRIMARY, "");
-        var more = new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "chevron.down", Nodes.ButtonKind.SECONDARY, "", items, "More actions");
+        var more = shape.ellipsisActions() ? new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "more", Nodes.ButtonKind.GHOST, "", items, "Plugin actions")
+            : new Nodes.MenuButton(MORE, present ? actionsState : hidden, "", "chevron.down", Nodes.ButtonKind.SECONDARY, "", items, "More actions");
         String status=!present?"":!PluginCard.badge(shown).isEmpty()?PluginCard.badge(shown):shown.state().equals("ACTIVE") && shown.enabled()?"Enabled":stateLabel(shown.state());
         var metadata=new Nodes.Stack("metadata",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(
             new Nodes.Text("vendor",ControlState.READY,present?(shown.vendor().isBlank()?shown.origin():shown.vendor()):" ",Nodes.TextRole.CAPTION),
@@ -185,16 +190,26 @@ final class PluginDetails {
             new Nodes.Stack("state-line",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
                 new Nodes.StatusDot("state-dot",new ControlState(present,true,false,""),present && shown.enabled() && shown.state().equals("ACTIVE") ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.WARNING),
                 new Nodes.Text("state",ControlState.READY,status,Nodes.TextRole.CAPTION)))));
-        var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE),metadata));
-        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
-            new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.PROMPT,present?shown.name():"Plugin"),identity,primary));
-        var ancillary=new Nodes.Stack("ancillary",new ControlState(section.equals(DETAILS),true,false,""),Nodes.LayoutRole.NAVIGATION,List.of(
-            new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, ""),more));
-        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.EXCLUSIVE,
+        var name = new Nodes.Text("name", ControlState.READY, present ? shown.name() : " ", Nodes.TextRole.DETAIL_TITLE);
+        var homepage = new Nodes.Button(HOMEPAGE, present && homepage(shown).isPresent() ? ControlState.READY : hidden, "Plugin homepage ↗", "", Nodes.ButtonKind.LINK, HOMEPAGE, "");
+        var choice = new Nodes.Choice(SECTION, ControlState.READY, Nodes.ChoiceKind.TABS,
             List.of(new Option(OVERVIEW, "Overview", Optional.empty()), new Option(DETAILS, "Details", Optional.empty())), section,
             "Plugin information", "");
-        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, new Nodes.Stack("section-lane",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Card("section-card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(choice)))), ancillary)));
+        var identity = new Nodes.Stack("identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(name, metadata));
+        if (shape.checkboxRows()) {
+            // Spec 12.2 and mock 08: no identity icon, the plugin's ⋯ beside Disable, and the tabs without the section card.
+            var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION,
+                shape.ellipsisActions() ? List.of(identity, more, primary) : List.of(identity, primary));
+            var ancillary = new Nodes.Stack("ancillary", new ControlState(section.equals(DETAILS), true, false, ""), Nodes.LayoutRole.NAVIGATION,
+                shape.ellipsisActions() ? List.of(homepage) : List.of(homepage, more));
+            var tabs = new Nodes.Stack("section-lane", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(choice));
+            return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, tabs, ancillary)));
+        }
+        var sections = new Nodes.Stack("section-lane",ControlState.READY,Nodes.LayoutRole.INLINE,List.of(new Nodes.Card("section-card",ControlState.READY,Nodes.CardKind.SETTINGS,List.of(choice))));
+        var icon = new Nodes.Icon("icon",new ControlState(true,!present || !PluginCard.greyed(shown),false,""),artName,Nodes.Hue.NEUTRAL,Nodes.IconSize.PROMPT,present?shown.name():"Plugin");
+        var head = new Nodes.Stack("head", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(icon, identity, primary));
+        var ancillary=new Nodes.Stack("ancillary",new ControlState(section.equals(DETAILS),true,false,""),Nodes.LayoutRole.NAVIGATION,List.of(homepage,more));
+        return new ViewSpec(new Nodes.Stack("details-header", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(head, sections, ancillary)));
     }
 
     /** Everything the pane shows as text, for tests and search: the header, the overview and the details. */

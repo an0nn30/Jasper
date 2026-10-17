@@ -158,7 +158,10 @@ public final class DesignMetrics {
         // Plan 9b: the lanes of a keycap tree with columns (the classic Keymap mock), read only there; equal in both catalogs.
         KEYMAP_SCOPE_COLUMN(107), KEYMAP_SHORTCUT_COLUMN(137), KEYMAP_KEYS_INSET(25), KEYMAP_SCOPE_GAP(30),
         // Plan 9b: the alpha of the classic recording band's edges over its fill; 0 draws none (today's card has its own edge).
-        KEYCAP_DETAIL_EDGE_ALPHA(0);
+        KEYCAP_DETAIL_EDGE_ALPHA(0),
+        // Plan 9b: an item list's heading row with its two rules where the table face bands list headings, and a two-line
+        // item list's row; 0 keeps a heading as tall as the rows and measures a row from its lines (the classic Plugins list).
+        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -299,6 +302,20 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_ROW_HEIGHT, 39);
         values.put(Role.SETTINGS_DESCRIPTION_HEIGHT, 47);
         values.put(Role.SETTINGS_TRAILING_EMPTY_GAP, 0);
+        // Plan 9b Task 5: the classic Plugins list as mock 08 draws it (headings 24 with their rules, rows 36).
+        values.put(Role.LIST_HEADING_HEIGHT, 24);
+        values.put(Role.LIST_TWO_LINE_ROW_HEIGHT, 36);
+        // Plan 9b Task 5: mock 08's list box 292 wide, 16 from the body's sides and bottom and level with the details' top
+        // (18 below the header rule), the details 12 right of it and Disable ending 16 from the body's right.
+        values.put(Role.PLUGIN_MANAGER_PADDING, 16);
+        values.put(Role.PLUGIN_MANAGER_SIDE_PADDING, 16);
+        values.put(Role.PLUGIN_LIST_WIDTH, 292);
+        values.put(Role.PLUGIN_DETAILS_LEADING_PADDING, 12);
+        values.put(Role.PLUGIN_DETAILS_TRAILING_PADDING, 0);
+        values.put(Role.PLUGIN_DETAILS_EDGE_PADDING, 2);
+        // The overview 14 below the folder tabs, its lines 17.5 apart.
+        values.put(Role.PLUGIN_DETAILS_GAP, 4);
+        values.put(Role.PLUGIN_TEXT_LINE_SPACING, 3);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

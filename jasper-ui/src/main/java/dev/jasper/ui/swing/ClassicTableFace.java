@@ -63,4 +63,17 @@ final class ClassicTableFace implements TableFace {
     @Override public Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) {
         return settings && role == dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION ? Typography.Role.BODY : null;
     }
+    /** Plan 9b Rulings 12: a list heading is a {@code surface.tableHeader} band between faint {@code border.row} rules, its own first and last lines. */
+    @Override public void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width) {
+        var context = rows.context();
+        int line = ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE);
+        for (var row : rows.mounted.values()) {
+            if (rows.dataRow(row.index)) continue;
+            g.setColor(ThemePainting.role(context, dev.jasper.ui.theme.DerivedColor.SURFACE_TABLE_HEADER));
+            g.fillRect(0, row.getY(), width, row.getHeight());
+            g.setColor(ThemePainting.role(context, dev.jasper.ui.theme.DerivedColor.BORDER_ROW));
+            g.fillRect(0, row.getY(), width, line);
+            g.fillRect(0, row.getY() + row.getHeight() - line, width, line);
+        }
+    }
 }

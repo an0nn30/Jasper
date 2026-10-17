@@ -233,4 +233,6 @@ final class ClassicButtonFace implements ButtonFace {
         ThemePainting.rounded(g, b, c, b.fill(false), ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS) : b.border(),
             ring, false, DesignMetrics.Role.FIELD_RADIUS);
     }
+    /** Plan 9b Task 5: the Plugins mock's Disable stands on the plugin name's line, above its metadata. */
+    @Override public boolean titleLine() { return true; }
 }

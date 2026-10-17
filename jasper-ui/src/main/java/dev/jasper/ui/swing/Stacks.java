@@ -136,10 +136,19 @@ final class Stacks {
                                     return super.verticalGap(previous, child);
                                 }
                             });
+            if (component.getLayout() instanceof Navigation.InlineLayout inline) inline.titleLine = titleLine(stack);
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
             component.revalidate();
             component.repaint();
+        }
+
+        /** Whether {@code stack} is a line led by a title over a further line, without a tile, whose buttons the face stands on the title's line. */
+        private boolean titleLine(Nodes.Stack stack) {
+            return context().faces().buttons.titleLine() && stack.role() == Nodes.LayoutRole.NAVIGATION
+                && !stack.children().isEmpty() && stack.children().stream().noneMatch(Nodes.Icon.class::isInstance)
+                && stack.children().getFirst() instanceof Nodes.Stack first && first.role() == Nodes.LayoutRole.VERTICAL && first.children().size() > 1
+                && first.children().getFirst() instanceof Nodes.Text title && title.role() == Nodes.TextRole.DETAIL_TITLE;
         }
 
         @Override

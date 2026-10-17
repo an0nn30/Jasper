@@ -39,4 +39,5 @@ final class DefaultButtonFace implements ButtonFace {
         return ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH)
             + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
     }
+    @Override public boolean titleLine() { return false; }
 }

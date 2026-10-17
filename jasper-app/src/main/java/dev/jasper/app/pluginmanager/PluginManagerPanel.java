@@ -49,9 +49,13 @@ final class PluginManagerPanel extends JPanel {
     private List<BannerAction> bannerActions = List.of();
     private String notice = "", message = "";
     private boolean error, busy, closed;
+    private final PluginShape shape;
 
-    PluginManagerPanel(KitContext kit, Handlers handlers) {
+    PluginManagerPanel(KitContext kit, Handlers handlers) { this(kit, handlers, PluginShape.ROWS); }
+
+    PluginManagerPanel(KitContext kit, Handlers handlers, PluginShape shape) {
         super(new BorderLayout());
+        this.shape = shape;
         this.kit = kit;
         this.handlers = handlers;
         setOpaque(false);
@@ -61,9 +65,9 @@ final class PluginManagerPanel extends JPanel {
         gearView = new KitView(kit, gearSpec(), this::event);
         headerView = new KitView(kit, headerSpec(), this::event);
         messageView = new KitView(kit, messageSpec(), this::event);
-        details = new PluginDetails(kit, this::event);
+        details = new PluginDetails(kit, this::event, shape);
         // The list reports its first selection while it is being built, before this field is set.
-        list = new PluginCardList(kit, this::event, () -> { if (cardList() != null) details.show(cardList().selectedRow(), busy); });
+        list = new PluginCardList(kit, this::event, () -> { if (cardList() != null) details.show(cardList().selectedRow(), busy); }, shape);
         bar.setOpaque(false);
         bar.add(searchView, BorderLayout.CENTER);
         bar.add(gearView, BorderLayout.EAST);
@@ -114,6 +118,24 @@ final class PluginManagerPanel extends JPanel {
         // The gear sits a little in from the rows' trailing edge, close to the search it qualifies.
         bar.setBorder(BorderFactory.createEmptyBorder(0,side,0,metric(DesignMetrics.Role.PLUGIN_SEARCH_TRAILING)));
         list.view().setBorder(BorderFactory.createEmptyBorder(0,0,0,side));
+        if (shape.checkboxRows()) {
+            // Spec 12.2 and plan 9b Rulings 12: one boxed lane on the card surface holding the search row and the rows.
+            var palette = kit.theme().semantic();
+            int inset = metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP) + 1;
+            // The box's top line is level with the details' top (the mock's Disable), its bottom a page padding above the footer.
+            listLane.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEmptyBorder(pad + metric(DesignMetrics.Role.PLUGIN_DETAILS_EDGE_PADDING), 0, pad, 0),
+                BorderFactory.createLineBorder(palette.color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL))));
+            // The search row is a strip on surface.sidebar ruled in border.row above the rows, as 9a's Settings search strip.
+            bar.setOpaque(true);
+            bar.setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR));
+            bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, metric(DesignMetrics.Role.HAIRLINE), 0, dev.jasper.ui.theme.DerivedColor.BORDER_ROW.color(kit.theme())),
+                BorderFactory.createEmptyBorder(inset, inset, inset, inset)));
+            list.view().setBorder(BorderFactory.createEmptyBorder());
+            list.view().setOpaque(true);
+            list.view().setBackground(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
+        }
         ((BorderLayout) getLayout()).setVgap(gap);
         ((BorderLayout) bar.getLayout()).setHgap(metric(DesignMetrics.Role.PLUGIN_SEARCH_GAP));
         top.setVisible(!bannerText.isEmpty() || !notice.isEmpty());

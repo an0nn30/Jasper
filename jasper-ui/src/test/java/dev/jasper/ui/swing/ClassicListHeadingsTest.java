@@ -161,4 +161,52 @@ class ClassicListHeadingsTest {
             }
         });
     }
+
+    static ViewSpec plugins() {
+        return new ViewSpec(new Nodes.ItemList("plugins", ControlState.READY, Nodes.ListKind.DOUBLE, List.of(
+            new dev.jasper.ui.model.ListItem("group:Installed", Optional.empty(), List.of(new Nodes.Text("title", ControlState.READY, "User-installed", Nodes.TextRole.SECTION_LABEL)), List.of(), List.of(), true),
+            new dev.jasper.ui.model.ListItem("thd", Optional.of(new Nodes.Toggle("toggle:thd", ControlState.READY, "Enable THD Sourcing Crypto", true, "toggle:thd", true)),
+                List.of(new Nodes.Text("name:thd", ControlState.READY, "THD Sourcing Crypto", Nodes.TextRole.BODY)), List.of(), List.of())),
+            Set.of("thd"), "", List.of()));
+    }
+
+    @Test void aClassicListsHeadingIsABandBetweenRules() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var view = new KitView(context, plugins(), event -> { })) {
+                view.setSize(290, 200);
+                for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                var list = (ItemLists.ListControl) view.control("plugins");
+                var heading = list.mounted.get("group:Installed");
+                var image = new java.awt.image.BufferedImage(290, 200, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics(); try { view.printAll(g); } finally { g.dispose(); }
+                var at = javax.swing.SwingUtilities.convertPoint(heading, 200, heading.getHeight() / 2, view);
+                assertThat(image.getRGB(at.x, at.y) & 0xFFFFFF).isEqualTo(dev.jasper.ui.theme.DerivedColor.SURFACE_TABLE_HEADER.color(context.theme()).getRGB() & 0xFFFFFF);
+                // The mock's heading rules are the heading's own first and last lines (08: rule 91, band 92 to 113, rule 114).
+                var below = javax.swing.SwingUtilities.convertPoint(heading, 200, heading.getHeight() - 1, view);
+                assertThat(image.getRGB(below.x, below.y) & 0xFFFFFF).isEqualTo(dev.jasper.ui.theme.DerivedColor.BORDER_ROW.color(context.theme()).getRGB() & 0xFFFFFF);
+            } finally { release(context); }
+        });
+    }
+
+    /** Plan 9b Task 5: a classic plain list's headings and two-line rows take their roles; the default list keeps one height. */
+    @Test void aClassicListsHeadingsAndTwoLineRowsTakeTheirRoles() {
+        Edt.run(() -> {
+            for (boolean classic : new boolean[] {false, true}) {
+                var context = classic ? KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise()) : KitFixtures.context();
+                try (var view = new KitView(context, plugins(), event -> { })) {
+                    view.setSize(290, 200);
+                    for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+                    var list = (ItemLists.ListControl) view.control("plugins");
+                    var heading = list.mounted.get("group:Installed");
+                    var row = list.mounted.get("thd");
+                    if (classic) {
+                        assertThat(heading.getHeight()).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.LIST_HEADING_HEIGHT));
+                        assertThat(row.getHeight()).isEqualTo(ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.LIST_TWO_LINE_ROW_HEIGHT));
+                        assertThat(row.getY()).as("the row starts below the heading's last rule").isEqualTo(heading.getY() + heading.getHeight());
+                    } else assertThat(heading.getHeight()).as("headings as tall as the rows").isEqualTo(row.getHeight());
+                } finally { release(context); }
+            }
+        });
+    }
 }

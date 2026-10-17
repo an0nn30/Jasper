@@ -40,8 +40,12 @@ final class PluginCardList {
     private String query = "";
     private String selected;
     private boolean busy;
+    private final PluginShape shape;
 
-    PluginCardList(KitContext kit, Consumer<UiEvent> events, Runnable selectionChanged) {
+    PluginCardList(KitContext kit, Consumer<UiEvent> events, Runnable selectionChanged) { this(kit, events, selectionChanged, PluginShape.ROWS); }
+
+    PluginCardList(KitContext kit, Consumer<UiEvent> events, Runnable selectionChanged, PluginShape shape) {
+        this.shape = shape;
         this.selectionChanged = selectionChanged;
         artwork = new dev.jasper.ui.icons.ReceivingArtwork(kit.icons());
         view = new KitView(kit, spec(), event -> {
@@ -125,7 +129,7 @@ final class PluginCardList {
             artNames.clear();
             for(var row:rows) artNames.put(row.id(), PluginIcons.name(artwork,row));
             view.update(spec());
-            for(var row:shown)view.setArtworkPresentation("icon:"+row.id(),dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_ROW);
+            if(!shape.checkboxRows())for(var row:shown)view.setArtworkPresentation("icon:"+row.id(),dev.jasper.ui.swing.ArtworkPresentation.IDENTITY_ROW);
         });
     }
 
@@ -142,7 +146,7 @@ final class PluginCardList {
             var title = new ArrayList<Nodes.Node>(List.of(new Nodes.Text(heading + ":title", ControlState.READY, group.title(), Nodes.TextRole.SECTION_LABEL)));
             if (!group.summary().isEmpty()) title.add(new Nodes.Text(heading + ":summary", ControlState.READY, group.summary(), Nodes.TextRole.COUNT));
             items.add(new ListItem(heading, Optional.empty(), title, List.of(), List.of(), true));
-            for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy, artNames.getOrDefault(row.id(), "plugin")));
+            for (PluginRuntime.Row row : matching) items.add(PluginCard.item(row, busy, artNames.getOrDefault(row.id(), "plugin"), shape));
         }
         return new ViewSpec(new Nodes.ItemList(LIST, ControlState.READY, Nodes.ListKind.DOUBLE, items,
             selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty()));

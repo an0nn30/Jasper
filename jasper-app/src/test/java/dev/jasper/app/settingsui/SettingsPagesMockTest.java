@@ -86,6 +86,12 @@ class SettingsPagesMockTest {
             probe("recorder field", 500, 213), probe("recorder ring", 600, 202), probe("armed dot", 295, 213), probe("Set disabled", 1000, 213)));
         face("keymap-recording", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
             "recorder field", "recorder ring", "armed dot", "Set disabled");
+        PROBES.put("plugins", List.of(probe("list box", 247, 300), probe("list surface", 400, 400), probe("search strip", 400, 56),
+            probe("search strip rule", 400, 90), probe("heading band", 450, 99), probe("selected row", 450, 120),
+            probe("checkbox on the selection", 256, 133), probe("active tab", 558, 113), probe("inactive tab", 638, 113),
+            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53)));
+        tight("plugins", "search strip", "heading band", "inactive tab");
+        face("plugins", "heading band", "selected row", "checkbox on the selection", "active tab", "inactive tab");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -220,6 +226,13 @@ class SettingsPagesMockTest {
             failures.addAll(share("keymap-recording", "07b", recording, render[0], mock, shares));
             Files.writeString(EnterpriseSettings.OUT.resolve("pages-keymap-recording.txt"), shares);
             assertThat(failures).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void pluginsMatchesItsMock() throws Exception {
+        try (var settings = EnterpriseSettings.open(false)) {
+            // The mock's selection, THD Sourcing Crypto, is the first row, which the list selects when it opens (fact 10).
+            assertThat(compare(settings, List.of("plugins"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
     }
 }

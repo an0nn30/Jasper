@@ -338,6 +338,9 @@ final class InteractiveRows {
 
         boolean identityRows() { return false; }
 
+        /** A row height that replaces the measured one's padding (a plain two-line list's role), or 0 to measure the rows. */
+        int fixedRowHeight() { return 0; }
+
         /** Paints bands under the rows' fills (a classic table's zebra and heading bands); none by default. */
         void paintBands(Graphics2D g, int width) { }
 
@@ -391,6 +394,9 @@ final class InteractiveRows {
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 || lines() < 2 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
+            // A fixed row height replaces the measured padding; the row still holds its lines whole.
+            int fixed = fixedRowHeight();
+            if (fixed > 0) rowHeight = Math.max(fixed, line * lines());
             if (documentLines) rowHeight = Math.max(line, canvas.getFontMetrics(ThemePainting.font(context(), Typography.Role.MONO)).getHeight())
                 + ThemePainting.metric(context(), DesignMetrics.Role.DOCUMENT_BAR_LINE_GAP);
             if (panelCompact) rowHeight = Math.max(ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), compactRowHeight());

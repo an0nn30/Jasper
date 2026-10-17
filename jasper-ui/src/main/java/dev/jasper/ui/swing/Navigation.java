@@ -14,6 +14,8 @@ final class Navigation {
         final KitContext context;
         final DesignMetrics.Role gapRole;
         final Stacks.StackLayout wrapped;
+        /** Whether the buttons stand at the line's top, on a leading title block's first line (the button face's title line). */
+        boolean titleLine;
 
         InlineLayout(KitContext context) { this(context, DesignMetrics.Role.ICON_GAP); }
         InlineLayout(KitContext context, DesignMetrics.Role gapRole) {
@@ -112,7 +114,8 @@ final class Navigation {
                 }
                 w = Math.max(0, Math.min(w, parent.getWidth() - x));
                 int h = Math.min(parent.getHeight(), c.getPreferredSize().height);
-                c.setBounds(x, (parent.getHeight() - h) / 2, w, h);
+                boolean button = c instanceof AbstractButton || c instanceof Menus.MenuSurface;
+                c.setBounds(x, titleLine && button ? 0 : (parent.getHeight() - h) / 2, w, h);
                 x += w + gap();
             }
         }
@@ -120,11 +123,12 @@ final class Navigation {
         /** Whether the line's first text keeps its width before the texts after it (a compact row's title line). */
         boolean leadFirst() { return false; }
 
+        /** A text or a panel takes the line's spare width; a menu button keeps its own width, as a button does. */
         boolean flexible(Component c) {
             return c instanceof JLabel label
                             && label.getIcon() == null
                             && label.getClientProperty("Jasper.chip") == null
-                    || c instanceof JPanel;
+                    || c instanceof JPanel && !(c instanceof Menus.MenuSurface);
         }
     }
 
