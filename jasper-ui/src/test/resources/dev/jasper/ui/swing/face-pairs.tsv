@@ -35,6 +35,8 @@ classic	ClassicTreeFace	border.control	surface.app	CONTRAST:1.5
 classic	ClassicTreeFace	text.secondary	surface.card	CONTRAST:3.0
 classic	ClassicStepperFace	text.secondary	button.secondary.bg	CONTRAST:3.0
 classic	ClassicStepperFace	text.placeholder	surface.input	CONTRAST:4.5
+classic	ClassicOrderedFace	border.control	surface.app	CONTRAST:1.5
+classic	ClassicOrderedFace	text.tertiary	surface.input	CONTRAST:4.5
 classic	ClassicButtonFace	text.onAccent	accent	CONTRAST:4.5
 classic	ClassicButtonFace	text.primary	button.secondary.bg	CONTRAST:4.5
 classic	ClassicButtonFace	button.secondary.border	surface.app	CONTRAST:1.5

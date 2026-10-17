@@ -163,6 +163,7 @@ final class Stacks {
             // The classic faces adopt what they draw (plan 4c): a route strip's hues, a route step's captions.
             if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ROUTE) context().faces().route.strip(this, controls);
             if (routeStep) context().faces().route.step(this, controls);
+            context().faces().ordered.span(this, controls);
         }
 
         /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */

@@ -23,8 +23,14 @@ final class ItemLists {
         final EnumMap<DesignMetrics.Role, Integer> measuredInputs =
                 new EnumMap<>(DesignMetrics.Role.class);
 
+        /** A classic ordered list's side column (plan 4c), or null. */
+        SideColumn side;
+        /** The entry row a classic side column spans with the rows (a VERTICAL parent's INLINE row after the list), or null. */
+        JComponent entry;
+
         ListControl(KitView view, Nodes.ItemList node) {
-            super(view, node);
+            super(view, node, new ListPane());
+            ((ListPane) scroll).owner = this;
             rowKey("D", "details", Nodes.ItemList::detailsAction);
             rowKey(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("mac") ? "meta C" : "ctrl C",
                 "copy", Nodes.ItemList::copyAction);
@@ -327,6 +333,8 @@ final class ItemLists {
 
         @Override
         void data() {
+            // The side column's own commands are not the reconciler's; they follow the theme and fonts with the list.
+            if (side != null) side.restyle();
             nodeRows.clear();
             for (int i = 0; i < size(); i++) {
                 var item = value().items().get(i);
@@ -381,6 +389,15 @@ final class ItemLists {
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
+            if (value().kind() == Nodes.ListKind.ORDERED && !context().faces().ordered.rowCommands()) {
+                // The side column holds the add action; nothing sits under the rows.
+                if (footer != null && footer.getParent() == canvas) canvas.remove(footer);
+                footer = null;
+                context().faces().ordered.mount(this, controls.isEmpty() ? null : controls.getFirst());
+                canvas.revalidate();
+                sync();
+                return;
+            }
             JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
             if (footer != next && footer != null) canvas.remove(footer);
             footer = next;
@@ -402,16 +419,19 @@ final class ItemLists {
                                 internalId(row.id, "index"),
                                 ControlState.READY,
                                 Integer.toString(index + 1),
-                                Nodes.TextRole.CAPTION));
-                trailing.add(commandNode(row, "up", "chevron.up", "Move up", index > 0));
-                trailing.add(
-                        commandNode(row, "down", "chevron.down", "Move down", index < size() - 1));
-                trailing.add(commandNode(row, "remove", "close", "Remove", true));
+                                context().faces().ordered.indexRole()));
+                if (context().faces().ordered.rowCommands()) {
+                    trailing.add(commandNode(row, "up", "chevron.up", "Move up", index > 0));
+                    trailing.add(
+                            commandNode(row, "down", "chevron.down", "Move down", index < size() - 1));
+                    trailing.add(commandNode(row, "remove", "close", "Remove", true));
+                }
             }
             row.slot(row.leading, leading);
             if (value().kind() == Nodes.ListKind.ORDERED && row.controls.get(internalId(row.id, "index")) instanceof Labels.TextControl number) {
                 // A fixed index column keeps every key glyph and name on one vertical line.
                 ((Labels.LiteralLabel) number.component).columnWidth = ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_INDEX_WIDTH);
+                context().faces().ordered.styleIndex((JLabel) number.component, context());
             }
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.PROMPT) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));
@@ -449,7 +469,7 @@ final class ItemLists {
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             row.tooltip(item.tooltip());
             row.name(item.title());
-            if (value().kind() == Nodes.ListKind.ORDERED) {
+            if (value().kind() == Nodes.ListKind.ORDERED && context().faces().ordered.rowCommands()) {
                 command(
                         row,
                         "up",
@@ -479,6 +499,21 @@ final class ItemLists {
                 label.setFont(SwingTypography.effective(context().typography().resultFont(
                     Typography.Role.valueOf(text.role().name()), strong)));
             }
+        }
+
+        /** Adopts {@code next} as the entry row the side column spans, or gives up the current one for null. */
+        void entry(JComponent next) {
+            if (entry != null && entry != next && entry.getParent() == scroll) scroll.remove(entry);
+            entry = next;
+            if (entry != null && entry.getParent() != scroll) scroll.add(entry);
+            scroll.revalidate();
+            scroll.repaint();
+        }
+
+        /** The side column's commands follow the selection after every pass over the rows. */
+        @Override
+        void layoutAccessories(int width) {
+            if (side != null) side.sync();
         }
 
         String internalId(String item, String suffix) {
@@ -519,6 +554,132 @@ final class ItemLists {
                 c.own(() -> c.button.removeActionListener(listener));
             }
             c.button.putClientProperty("Jasper.rowCommand", action);
+        }
+    }
+
+    /** An item list's scroll pane: the classic ordered face paints its box here and lays out its side column. */
+    static final class ListPane extends JScrollPane {
+        ListControl owner;
+
+        @Override protected void paintComponent(java.awt.Graphics graphics) {
+            super.paintComponent(graphics);
+            if (owner == null || owner.value().kind() != Nodes.ListKind.ORDERED) return;
+            var g = (java.awt.Graphics2D) graphics.create();
+            try { owner.context().faces().ordered.paintPane(owner, g); } finally { g.dispose(); }
+        }
+    }
+
+    /**
+     * A classic ordered list's side column (spec 6.4): the list's add action, then Remove, Move Up and Move Down, equal
+     * buttons acting on the selected row and emitting the row commands' events (plan 4c Rulings 14).
+     */
+    static final class SideColumn extends JPanel {
+        final ListControl owner;
+        final Buttons.ButtonControl removeCommand, upCommand, downCommand;
+        /** The list's add action, or null. */
+        ControlRegistry.Control addControl;
+
+        SideColumn(ListControl owner) {
+            super(null);
+            this.owner = owner;
+            setOpaque(false);
+            KitOwnership.mark(this, "@ordered/" + owner.node.id() + "/side");
+            removeCommand = command("remove", "Remove");
+            upCommand = command("up", "Move Up");
+            downCommand = command("down", "Move Down");
+            owner.own(() -> { removeCommand.close(); upCommand.close(); downCommand.close(); });
+        }
+
+        private Nodes.Button node(String suffix, String label, boolean possible) {
+            return new Nodes.Button("@ordered/" + owner.node.id() + "/side/" + suffix, new ControlState(true, possible, false, ""), label, "",
+                Nodes.ButtonKind.SECONDARY, suffix, "");
+        }
+
+        private Buttons.ButtonControl command(String suffix, String label) {
+            var control = new Buttons.ButtonControl(owner.view, node(suffix, label, false), event -> run(suffix));
+            control.button.sideColumn = true;
+            add(control.component);
+            return control;
+        }
+
+        /** The add action first, as a standard button without its glyph (spec 6.4); null removes it. */
+        void addAction(ControlRegistry.Control action) {
+            var next = action == null ? null : action.component;
+            if (addControl != null && addControl.component != next && addControl.component.getParent() == this) remove(addControl.component);
+            addControl = action;
+            if (action instanceof Buttons.ButtonControl button) {
+                button.button.sideColumn = true;
+                button.button.orderedAction = false;
+                // The face paints the glyph its client property names, so both go.
+                button.button.setIcon(null);
+                button.button.setDisabledIcon(null);
+                button.button.putClientProperty("Jasper.button.icon", null);
+                button.button.setHorizontalAlignment(SwingConstants.CENTER);
+            }
+            if (next != null && next.getParent() != this) add(next, 0);
+            revalidate();
+            repaint();
+        }
+
+        /** The row the commands act on: the focused row while it is selected, else the first selected row; null for none. */
+        String target() {
+            if (owner.focusItem != null && owner.selected.contains(owner.focusItem) && owner.indexOf(owner.focusItem) >= 0) return owner.focusItem;
+            for (int i = 0; i < owner.size(); i++) if (owner.selected.contains(owner.itemId(i))) return owner.itemId(i);
+            return null;
+        }
+
+        private void run(String suffix) {
+            String row = target();
+            if (row == null || !owner.interactive()) return;
+            int index = owner.indexOf(row);
+            switch (suffix) {
+                case "remove" -> owner.emit(new UiEvent.Removed(owner.node.id(), row));
+                case "up" -> { if (index > 0) owner.emit(new UiEvent.Reordered(owner.node.id(), row, index - 1)); }
+                default -> { if (index < owner.size() - 1) owner.emit(new UiEvent.Reordered(owner.node.id(), row, index + 1)); }
+            }
+        }
+
+        /** Refreshes the column's own commands (their fonts and colours) with the list's refresh. */
+        void restyle() {
+            removeCommand.refresh();
+            upCommand.refresh();
+            downCommand.refresh();
+        }
+
+        /** Enables each command for the current selection. */
+        void sync() {
+            String row = target();
+            int index = row == null ? -1 : owner.indexOf(row);
+            boolean live = owner.interactive();
+            update(removeCommand, "remove", "Remove", live && index >= 0);
+            update(upCommand, "up", "Move Up", live && index > 0);
+            update(downCommand, "down", "Move Down", live && index >= 0 && index < owner.size() - 1);
+        }
+
+        private void update(Buttons.ButtonControl command, String suffix, String label, boolean possible) {
+            if (((Nodes.Button) command.node).state().enabled() != possible) command.update(node(suffix, label, possible));
+        }
+
+        int gap() { return ThemePainting.metric(owner.context(), DesignMetrics.Role.SIDE_BUTTON_GAP); }
+
+        @Override public java.awt.Dimension getPreferredSize() {
+            int width = ThemePainting.metric(owner.context(), DesignMetrics.Role.SIDE_COLUMN_WIDTH), height = 0, shown = 0;
+            for (var child : getComponents()) if (child.isVisible()) {
+                var size = child.getPreferredSize();
+                width = Math.max(width, size.width);
+                height += size.height;
+                shown++;
+            }
+            return new java.awt.Dimension(width, height + Math.max(0, shown - 1) * gap());
+        }
+
+        @Override public void doLayout() {
+            int y = 0;
+            for (var child : getComponents()) if (child.isVisible()) {
+                int height = child.getPreferredSize().height;
+                child.setBounds(0, y, getWidth(), height);
+                y += height + gap();
+            }
         }
     }
 }

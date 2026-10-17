@@ -34,7 +34,9 @@ final class InteractiveRows {
             String id = itemId(index);
             if (!dataRow(index) || passive() || !selected.contains(id)) return false;
             if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return false;
-            return !(node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) || canvas.isFocusOwner();
+            // A classic side column takes focus from the rows to act on them, so its list shows the selection unfocused.
+            return !(node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) || canvas.isFocusOwner()
+                || !context().faces().ordered.rowCommands();
         }
         int column = -1;
         boolean panelSingle;
@@ -798,20 +800,22 @@ final class InteractiveRows {
                     }finally{g.dispose();}
                 }
             }
-            if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) {
-                var g = (Graphics2D)graphics.create();
-                try {
-                    ThemePainting.rounded(g, this, owner.context(), ThemePainting.color(owner.context(), SemanticColor.SURFACE_INPUT),
-                        ThemePainting.color(owner.context(), SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.ORDERED_RADIUS);
-                    g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
-                    int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
-                    for (int i = 1; i <= owner.size(); i++) g.fillRect(stroke, i * owner.rowHeight, Math.max(0, getWidth() - 2 * stroke), stroke);
-                } finally { g.dispose(); }
-            }
+            if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) owner.context().faces().ordered.paintCanvas(this, graphics);
             var bands = (Graphics2D) graphics.create();
             try { owner.paintBands(bands, getWidth()); } finally { bands.dispose(); }
             // Selection and hover fill each row's whole band, edge to edge of the list, under the row's inset content.
             for (var row : owner.mounted.values()) row.paintFill(graphics, getWidth());
+        }
+        /** An ORDERED list's rounded box and row dividers (the default ordered face). */
+        void paintOrdered(Graphics graphics) {
+            var g = (Graphics2D)graphics.create();
+            try {
+                ThemePainting.rounded(g, this, owner.context(), ThemePainting.color(owner.context(), SemanticColor.SURFACE_INPUT),
+                    ThemePainting.color(owner.context(), SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.ORDERED_RADIUS);
+                g.setColor(ThemePainting.color(owner.context(), SemanticColor.BORDER_SUBTLE));
+                int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
+                for (int i = 1; i <= owner.size(); i++) g.fillRect(stroke, i * owner.rowHeight, Math.max(0, getWidth() - 2 * stroke), stroke);
+            } finally { g.dispose(); }
         }
         @Override
         public Dimension getPreferredSize() {

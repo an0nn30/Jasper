@@ -103,6 +103,7 @@ final class ViewReconciler implements AutoCloseable {
             button.button.fullFooter = false;
             button.button.windowFooter = false;
             button.button.orderedAction = false;
+            button.button.sideColumn = false;
             button.button.panelEmpty = false;
             button.button.noticeGround = null;
         }

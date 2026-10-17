@@ -56,7 +56,7 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     @Override public void paintFace(Buttons.KitButton b, Graphics2D g, boolean hover, boolean focused) {
-        if (b.embedded || b.recorder() || b.circular || b.kind == Nodes.ButtonKind.LINK) { b.paintRaised(g, hover, focused); return; }
+        if (b.embedded || b.recorder() || b.circular || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
         var c = b.context();
         boolean flat = ghost(b) && flat(b), selected = b.toggle && b.isSelected(), pressed = b.isEnabled() && b.getModel().isPressed();
         if (flat && !hover && !selected) { ThemePainting.rounded(g, b, c, null, null, focused, false); return; }
@@ -86,7 +86,8 @@ final class ClassicButtonFace implements ButtonFace {
 
     @Override public Color text(Buttons.KitButton b, boolean hover) {
         var c = b.context();
-        if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK) return ThemePainting.color(c, b.textRole(hover));
+        if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
+        if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);
         if (!b.isEnabled()) return ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_PRIMARY), DISABLED);
         if (ghost(b) && flat(b)) return ThemePainting.color(c, b.textRole(hover));
         // A hovered or pressed primary fills accent.hover (paintFace), so its label is guarded there.
@@ -103,7 +104,7 @@ final class ClassicButtonFace implements ButtonFace {
      * row draws that flat face and is faded with it as well.
      */
     @Override public boolean fades(Buttons.KitButton b) {
-        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;
+        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;
     }
 
     @Override public Typography.Role label(Nodes.ButtonKind kind, Typography.Role role) {

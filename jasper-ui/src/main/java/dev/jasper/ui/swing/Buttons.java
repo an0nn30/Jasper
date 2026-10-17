@@ -97,6 +97,10 @@ final class Buttons {
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
             button.setCursor(Cursor.getPredefinedCursor(button.isEnabled() ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+            if (button.sideColumn) {
+                button.setIcon(null); button.setDisabledIcon(null); button.putClientProperty("Jasper.button.icon", null);
+                button.setHorizontalAlignment(SwingConstants.CENTER);
+            }
             button.revalidate(); button.repaint();
         }
     }
@@ -123,6 +127,8 @@ final class Buttons {
         boolean prompt, panel, fullFooter, orderedAction, panelDetail, circular, hint;
         /** An ORDERED row's compact up/down/remove command. */
         boolean orderedCommand;
+        /** A classic ordered list's side-column button: a standard button without its glyph, whatever its kind (plan 4c). */
+        boolean sideColumn;
         /** A classic tree's expand button: its drawn triangle alone, as wide as the glyph and its gap to the title (plan 4c). */
         boolean disclosure;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
