@@ -34,9 +34,13 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
     /** The user's choices since then, by group id; a null choice means "back to the default". */
     private final Map<String, String> chosen = new HashMap<>();
 
+    /** Whether each group's row keeps its Reset button; otherwise Reset to Default is in the row's menu (spec 12.1). */
+    private final boolean inlineReset;
     NotificationGroupsEditor(NotificationGroupChoices choices) {this(choices,null);}
-    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {this(choices,kit,true);}
+    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit, boolean inlineReset) {
         this.kit=kit;
+        this.inlineReset=inlineReset;
         this.choices = Objects.requireNonNull(choices, "choices");
         groups = List.copyOf(choices.groups().get());
     }
@@ -83,8 +87,9 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
                 for(var mode:MODES.entrySet())options.add(new Option(mode.getKey(),mode.getValue(),modeIcon(mode.getKey()),mode.getKey().equals(group.defaultMode())?"Default":""));
                 var choice=new Nodes.Choice(modeId(id,i),plain,Nodes.ChoiceKind.DROPDOWN,options,mode(group.id()),group.name()+": how its notifications appear; "+group.owner()+" · "+group.id(),"");
                 var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","reset",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
-                var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,List.of(choice,reset));
-                lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,highlighted));
+                var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,inlineReset?List.of(choice,reset):List.of(choice));
+                var menu=inlineReset?List.<dev.jasper.ui.model.MenuItem>of():List.of(new dev.jasper.ui.model.MenuItem(resetId(id,i),"Reset to Default","",resetId(id,i),plain.enabled()&&value.containsKey(group.id()),false));
+                lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,highlighted,"",menu));
             }
             sections.add(new Nodes.Card(id+":owner-card-"+section++,plain,Nodes.CardKind.SETTINGS,lines));
         }

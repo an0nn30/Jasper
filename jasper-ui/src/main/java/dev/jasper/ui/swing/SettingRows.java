@@ -27,6 +27,14 @@ final class SettingRows {
          */
         int formInset;
         SecretFields.SecretControl secret;
+        /** The row's own menu (Enterprise presentation spec 12.1), filled each time it opens. */
+        final Menus.Popup popup;
+        private final List<Runnable> popupCleanup = new java.util.ArrayList<>();
+        private final java.awt.event.MouseAdapter menuTrigger = new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent event) { if (event.isPopupTrigger()) context(event.getComponent(), event.getX(), event.getY()); }
+            @Override public void mouseReleased(java.awt.event.MouseEvent event) { if (event.isPopupTrigger()) context(event.getComponent(), event.getX(), event.getY()); }
+        };
+        private boolean menuShown;
         @Override void prompt(boolean value) { prompt=value; }
 
         RowControl(KitView view, Nodes.SettingRow node) {
@@ -36,7 +44,51 @@ final class SettingRows {
             component.setOpaque(false);
             component.add(title);
             component.add(description);
+            popup = new Menus.Popup(context());
+            component.putClientProperty(KitOwnership.CONTEXT_MENU, popup);
+            component.getActionMap().put("settingRowMenu", new AbstractAction() {
+                @Override public void actionPerformed(java.awt.event.ActionEvent event) { context(component, 0, component.getHeight()); }
+            });
+            own(() -> { menu(false); popup.setVisible(false); clearPopup(); });
             refresh();
+        }
+
+        /** Takes the popup trigger and the menu keys only while the row has a menu, so a plain row passes its mouse events on. */
+        private void menu(boolean shown) {
+            if (menuShown == shown) return;
+            menuShown = shown;
+            var keys = component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+            for (var stroke : List.of(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F10, java.awt.event.InputEvent.SHIFT_DOWN_MASK),
+                    KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_CONTEXT_MENU, 0))) {
+                if (shown) keys.put(stroke, "settingRowMenu"); else keys.remove(stroke);
+            }
+            for (JComponent target : List.<JComponent>of(component, title, description)) {
+                if (shown) target.addMouseListener(menuTrigger); else target.removeMouseListener(menuTrigger);
+            }
+        }
+
+        /** Fills the row's menu from its descriptor; shows it at {@code (x, y)} over {@code invoker} when there is one to show. */
+        void context(Component invoker, int x, int y) {
+            if (!interactive()) return;
+            clearPopup();
+            for (var item : ((Nodes.SettingRow) node).contextActions()) {
+                if (item.separator()) { popup.add(new Menus.Separator(context())); continue; }
+                var entry = new Menus.Item(context());
+                entry.describe(item);
+                java.awt.event.ActionListener chosen = event -> {
+                    if (((Nodes.SettingRow) node).contextActions().contains(item)) emit(new dev.jasper.ui.model.UiEvent.Action(item.action()));
+                };
+                entry.addActionListener(chosen);
+                popupCleanup.add(() -> entry.removeActionListener(chosen));
+                popup.add(entry);
+            }
+            if (popup.getComponentCount() > 0 && invoker.isShowing()) popup.show(invoker, x, y);
+        }
+
+        void clearPopup() {
+            popupCleanup.forEach(Runnable::run);
+            popupCleanup.clear();
+            popup.removeAll();
         }
 
         @Override
@@ -71,6 +123,7 @@ final class SettingRows {
                 : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
             ((SearchHighlight) component).highlight(row.highlighted());
+            menu(!row.contextActions().isEmpty());
         }
 
         @Override

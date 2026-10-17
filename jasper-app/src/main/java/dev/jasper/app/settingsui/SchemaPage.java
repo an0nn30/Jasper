@@ -345,11 +345,23 @@ public final class SchemaPage implements SettingsPage {
     private Nodes.Node row(Row<?> row) {
         boolean enabled = row.enabled.test(context.draft());
         var state = new ControlState(true, enabled, false, row.error);
-        var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "reset",
-            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
         if (row.editor.fullSpan()) return row.editor.node(row.id(), state, row.highlighted);
-        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(row.editor.node(row.id(), state), reset));
-        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control, row.editor.dependent(), row.highlighted);
+        var controls = new ArrayList<Nodes.Node>(List.of(row.editor.node(row.id(), state)));
+        if (context.chrome().inlineReset())
+            controls.add(new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "reset",
+                Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default"));
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, controls);
+        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control,
+            row.editor.dependent(), row.highlighted, "", resetMenu(context, row.resetId(), row.resettable));
+    }
+
+    /**
+     * Spec 12.1: a look without an inline Reset offers "Reset to Default" in the row's own menu, enabled while the value
+     * differs from its effective default; {@code action} is what the row's Reset button would report.
+     */
+    static List<dev.jasper.ui.model.MenuItem> resetMenu(PageContext context, String action, boolean resettable) {
+        return context.chrome().inlineReset() ? List.of()
+            : List.of(new dev.jasper.ui.model.MenuItem(action, "Reset to Default", "", action, resettable, false));
     }
 
     private Nodes.Node actionNode(ActionRow action) {
@@ -368,12 +380,13 @@ public final class SchemaPage implements SettingsPage {
         boolean enabled = row.value.enabled().getAsBoolean();
         var state = new ControlState(true, enabled, false, row.error);
         boolean resettable = enabled && row.shown() != row.value.defaultValue().getAsInt();
-        var reset = new Nodes.Button(row.resetId(), new ControlState(resettable, true, false, ""), "", "reset",
-            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.value.label() + " to default");
-        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING,
-            List.of(row.editor.node(row.id(), state), reset));
+        var controls = new ArrayList<Nodes.Node>(List.of(row.editor.node(row.id(), state)));
+        if (context.chrome().inlineReset())
+            controls.add(new Nodes.Button(row.resetId(), new ControlState(resettable, true, false, ""), "", "reset",
+                Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.value.label() + " to default"));
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, controls);
         return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.value.label(), row.value.comment().apply(row.shown()),
-            control, false, row.highlighted);
+            control, false, row.highlighted, "", resetMenu(context, row.resetId(), resettable));
     }
 
     /** A notice row: hidden, with its buttons, while its supplier has nothing to say. */

@@ -521,13 +521,14 @@ final class Stacks {
     /** The final action owns a stable slot even when no override currently makes it visible. */
     static final class SettingsTrailingLayout implements Composition.WidthLayout {
         final KitContext context;SettingsTrailingLayout(KitContext context){this.context=context;}
-        int gap(){return ThemePainting.metric(context,DesignMetrics.Role.COLUMN_GAP);}
+        /** The gap before the row's action; a control without one (Reset in the row's menu, spec 12.1) reserves none. */
+        int gap(Container p){return p.getComponentCount()>1?ThemePainting.metric(context,DesignMetrics.Role.COLUMN_GAP):0;}
         int action(Container p){return p.getComponentCount()>1?p.getComponent(1).getPreferredSize().width:0;}
-        @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap()+action(p),c.height);}
-        @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap()-action(p)));}
+        @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap(p)+action(p),c.height);}
+        @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap(p)-action(p)));}
         /** A switch's track aligns with the column's other controls; its focus halo lies in the gap before the action. */
         int halo(Container p){return p.getComponent(0) instanceof Switches.SwitchButton?ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING):0;}
-        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap()-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(),0,a,p.getHeight());}
+        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap(p)-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(p),0,a,p.getHeight());}
         @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
     }
     /** A Settings group card's heading row: owner tile and name at the leading edge, its count at the trailing edge. */

@@ -22,6 +22,7 @@ final class PlatformFontSize implements ValueEditor<Float> {
     private final SettingsDraft draft;
     private final String copy;
     private final Supplier<Float> standard;
+    private final PageContext context;
     private boolean inherited = true, chosen;
 
     static Editors.Factory<Float> factory() {
@@ -40,6 +41,7 @@ final class PlatformFontSize implements ValueEditor<Float> {
     }
 
     PlatformFontSize(PageContext context) {
+        this.context = context;
         this.draft = context.draft();
         this.copy = context.chrome().fontRowCopy();
         this.standard = () -> standardSize(context);
@@ -55,10 +57,11 @@ final class PlatformFontSize implements ValueEditor<Float> {
         var toggle = new Nodes.Toggle(id + ":default", state, copy.replace(" font size", " size"), inherited, id + ":default", false);
         var reset = new Nodes.Button(id + ":reset", new ControlState(!inherited, state.enabled(), false, ""), "", "reset", Nodes.ButtonKind.GHOST,
             id + ":reset", "Reset interface font size to platform default");
-        var control = new Nodes.Stack(id + ":toggle-controls", state, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(toggle, reset));
+        var control = new Nodes.Stack(id + ":toggle-controls", state, Nodes.LayoutRole.SETTINGS_TRAILING,
+            context.chrome().inlineReset() ? List.of(toggle, reset) : List.of(toggle));
         var manual = new ControlState(!inherited, state.enabled(), state.busy(), state.error());
         return new Nodes.Stack(id + ":optional", state, Nodes.LayoutRole.VERTICAL, List.of(
-            new Nodes.SettingRow("row:" + id, state, copy, "", control, false, highlighted),
+            new Nodes.SettingRow("row:" + id, state, copy, "", control, false, highlighted, "", SchemaPage.resetMenu(context, id + ":reset", !inherited)),
             new Nodes.SettingRow(id + ":manual-row", manual, "Font size", "", number.node(id, manual), true, highlighted)));
     }
     @Override public Float value() { return inherited ? Editors.effectiveDefault(draft,UI_FONT_SIZE) : number.value(); }

@@ -194,7 +194,7 @@ public final class Editors {
 
     /** The {@code notifications.groups} editor: one line per group {@code choices} lists. */
     public static Factory<Map<String, String>> notificationGroups(NotificationGroupChoices choices) {
-        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit()),
+        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit(), context.chrome().inlineReset()),
             List.of("group", "card", "sticky", "history only", "off", "mute"));
     }
 
