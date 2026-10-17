@@ -79,7 +79,8 @@ Project Index composition and the platform face, and the others keep 0.40. At th
 shares into assertions (re-check the calibrated page roles), and `PlatformFontSize.standardSize` may read
 `FaceSet.namesUiFaces()` (E5). `./gradlew check --continue` before the final review: **11,085 tests, 0 failures, 0 errors, 25
 skipped**; the final review adds five tests and ran the touched classes (jasper-ui's metrics, Settings shell, Settings
-controls, classic buttons, setting row menu and kit view tests; jasper-app's `settingsui` package) and the pixel proof. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
+controls, classic buttons, setting row menu and kit view tests; jasper-app's `settingsui` package) and the pixel proof.
+`./gradlew check --continue` after the final review fixes: **11,090 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
 triangles, a right-click on a modified row) and on Windows or Linux (no title-bar or animations rows). Hand-off to plan
 10a: the mock helpers are 6a's `testsupport.MockProfile`, plan 7's `testsupport.MockCrops` (arriving at its merge) and 9a's package-private
 `settingsui.SettingsMockMatch`; 10a's `testsupport.MockMatch` takes a path none of them uses and reads mocks and ΔE through
