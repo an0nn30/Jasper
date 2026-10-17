@@ -94,6 +94,49 @@ class ClassicButtonsTest {
         });
     }
 
+    /** A LINK button keeps the default treatment (Rulings 8), so a disabled one still fades as one layer. */
+    @Test void aDisabledLinkFadesAsOneLayer() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.ACTIONS, button("on", Nodes.ButtonKind.LINK, ControlState.READY),
+                    button("off", Nodes.ButtonKind.LINK, DISABLED)), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var on = find(view, "on", Buttons.KitButton.class);
+                var off = find(view, "off", Buttons.KitButton.class);
+                assertThat(off.fadesDisabled()).isTrue();
+                assertThat(off.getSize()).isEqualTo(on.getSize());
+                var enabled = paint(on); var disabled = paint(off);
+                int w = enabled.getWidth(), h = enabled.getHeight();
+                assertThat(disabled.getRGB(0, 0, w, h, null, 0, w)).isNotEqualTo(enabled.getRGB(0, 0, w, h, null, 0, w));
+                assertThat(maxAlpha(disabled)).isLessThanOrEqualTo(Math.round(.42f * 255) + 1);
+            } finally { release(context); }
+        });
+    }
+
+    /** Review Focus 2: a disabled flat ghost's glyph takes the label's 0.42 alpha, as its label does. */
+    @Test void aDisabledIconOnlyGhostPaintsItsGlyphFaded() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.INLINE,
+                    new Nodes.Button("on", ControlState.READY, "", "search", Nodes.ButtonKind.GHOST, "on", "Search"),
+                    new Nodes.Button("off", DISABLED, "", "search", Nodes.ButtonKind.GHOST, "off", "Search")), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var on = find(view, "on", Buttons.KitButton.class);
+                var off = find(view, "off", Buttons.KitButton.class);
+                assertThat(off.fadesDisabled()).isFalse();
+                int enabled = maxAlpha(paint(on)), disabled = maxAlpha(paint(off));
+                assertThat(enabled).as("precondition: an inked glyph").isGreaterThan(200);
+                assertThat(disabled).isBetween(1, Math.round(enabled * .42f) + 1);
+            } finally { release(context); }
+        });
+    }
+
+    static int maxAlpha(BufferedImage image) {
+        int max = 0;
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) max = Math.max(max, image.getRGB(x, y) >>> 24);
+        return max;
+    }
+
     /** Rulings 7: a ghost in a toolbar row is flat until hovered; among actions it draws as a standard button. */
     @Test void aGhostIsFlatInARowAndStandardAmongActions() {
         Edt.run(() -> {
@@ -127,6 +170,48 @@ class ClassicButtonsTest {
                 for (int y = 0; y < image.getHeight(); y++) for (int x = image.getWidth() - 20; x < image.getWidth(); x++)
                     found |= at(image, x, y).equals(arrow);
                 assertThat(found).as("the ▼ in text.secondary").isTrue();
+            } finally { release(context); }
+        });
+    }
+
+    /**
+     * Rulings 6 for dropdowns: a disabled one is a flat fill inside the lighter edge, as a disabled button is; the combo
+     * still fades its whole closed face to 0.42 (its own disabled treatment), so both read through that layer.
+     */
+    @Test void aDisabledDropdownIsFlatWithTheLighterEdge() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var choice = new Nodes.Choice("reachable", DISABLED, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("local", "This computer only",
+                Optional.empty()), new Option("lan", "Local network", Optional.empty())), "local", "Reachable from", "reachable");
+            try (var view = new KitView(context, new ViewSpec(choice), e -> {})) {
+                KitFixtures.render(view, 300, 40, 1);
+                var combo = find(view, "reachable.input", Choices.ChoiceCombo.class);
+                var image = paint(combo);
+                Color fill = ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER), divider = ThemePainting.role(context, DerivedColor.BORDER_DIVIDER);
+                var inside = at(image, 3, combo.getHeight() / 2);
+                assertThat(near(inside, fill)).as("flat fill " + inside).isTrue();
+                assertThat(inside.getAlpha()).isEqualTo(Math.round(.42f * 255));
+                // The edge over the fill, each at 0.42: source-over of the divider on the faded fill.
+                float a = .42f, out = a + a * (1 - a);
+                var edge = new Color(Math.round((divider.getRed() * a + fill.getRed() * a * (1 - a)) / out),
+                    Math.round((divider.getGreen() * a + fill.getGreen() * a * (1 - a)) / out), Math.round((divider.getBlue() * a + fill.getBlue() * a * (1 - a)) / out));
+                assertThat(near(at(image, 0, combo.getHeight() / 2), edge)).as("divider edge " + at(image, 0, combo.getHeight() / 2) + " vs " + edge).isTrue();
+            } finally { release(context); }
+        });
+    }
+
+    /** A read-only field with an error keeps the error edge under the classic policy. */
+    @Test void aReadOnlyFieldWithAnErrorKeepsTheErrorEdge() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var folder = new Nodes.Field("folder", new ControlState(true, true, false, "Choose a folder"), Nodes.FieldKind.TEXT, "No folder selected", "",
+                "Folder", "", Optional.empty(), Nodes.FieldPresentation.STANDARD, "", "", "", true);
+            try (var view = new KitView(context, new ViewSpec(folder), e -> {})) {
+                KitFixtures.render(view, 300, 80, 1);
+                var control = (TextFields.FieldControl) view.control("folder");
+                assertThat(control.surface.error).as("precondition").isTrue();
+                assertThat(at(paint(control.surface), 0, control.surface.getHeight() / 2)).isEqualTo(ThemePainting.color(context, SemanticColor.BORDER_ERROR));
+                assertThat(at(paint(control.surface), 3, control.surface.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER));
             } finally { release(context); }
         });
     }

@@ -88,7 +88,13 @@ final class ClassicButtonFace implements ButtonFace {
         return role == SemanticColor.TEXT_STRONG_SECONDARY || ghost(b) ? ThemePainting.painted(c, label) : ThemePainting.color(c, role);
     }
 
-    @Override public boolean fades() { return false; }
+    /**
+     * The buttons this face leaves to the default treatment (embedded, recorder, circular, LINK, and labels on a selected
+     * row) fade as one layer; every other button draws its own flat disabled face (Rulings 6).
+     */
+    @Override public boolean fades(Buttons.KitButton b) {
+        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;
+    }
 
     @Override public Typography.Role label(Nodes.ButtonKind kind, Typography.Role role) {
         return kind == Nodes.ButtonKind.PRIMARY && role == Typography.Role.LABEL ? Typography.Role.BODY_STRONG : role;
@@ -102,7 +108,7 @@ final class ClassicButtonFace implements ButtonFace {
         if (combo.isEnabled()) gradient(g, c, face, false);
         else { g.setColor(ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER)); g.fill(face); }
         ThemePainting.rounded(g, combo, c, null, focused ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
-            : ThemePainting.painted(c, hover ? hoverEdge : edge), focused, false);
+            : !combo.isEnabled() ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, hover ? hoverEdge : edge), focused, false);
     }
 
     /** The guarded ▼ in text.secondary; a bare cell dropdown on a selected row takes the row's supporting ink, as by default. */
@@ -127,11 +133,15 @@ final class ClassicButtonFace implements ButtonFace {
         var g = (Graphics2D) graphics.create();
         try {
             ThemePainting.antialias(g);
-            if (!owner.isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(c.metrics().value(DesignMetrics.Role.PICKER_DISABLED_PERCENT) / 100f));
             double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
-            gradient(g, c, new RoundRectangle2D.Double(0, 0, owner.getWidth(), owner.getHeight(), 2 * radius, 2 * radius), false);
+            var shape = new RoundRectangle2D.Double(0, 0, owner.getWidth(), owner.getHeight(), 2 * radius, 2 * radius);
+            boolean enabled = owner.isEnabled();
+            // Disabled, like a disabled dropdown and button (Rulings 6): a flat fill, the lighter edge, then the line and arrow faded.
+            if (enabled) gradient(g, c, shape, false);
+            else { g.setColor(ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER)); g.fill(shape); }
             ThemePainting.rounded(g, owner, c, null, focus || expanded ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
-                : ThemePainting.painted(c, hover ? hoverEdge : edge), focus || expanded, false);
+                : !enabled ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, hover ? hoverEdge : edge), focus || expanded, false);
+            if (!enabled) g.setComposite(AlphaComposite.SrcOver.derive(DISABLED));
             int pad = ThemePainting.metric(c, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING), glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
             int right = owner.getWidth() - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET) - glyph;
             ClassicGlyphs.down(g, right + glyph / 2.0, (owner.getHeight() - glyph * .8) / 2, glyph, ThemePainting.painted(c, arrow));

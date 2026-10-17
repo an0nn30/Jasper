@@ -337,7 +337,7 @@ final class Buttons {
             paintContent(g, hover);
         }
         /** Whether a disabled button fades as one layer: the buttons face's choice; an option control keeps its own. */
-        boolean fadesDisabled() { return context.faces().buttons.fades(); }
+        boolean fadesDisabled() { return context.faces().buttons.fades(this); }
         /** The face behind the glyph and label: the buttons face's; an option control paints its own. */
         void paintKitFace(Graphics2D g, boolean hover, boolean focused) { context.faces().buttons.paintFace(this, g, hover, focused); }
         /** The raised face: fill, border, the primary's inset line and drop (the default buttons face). */
@@ -393,7 +393,11 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                     ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
                     : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());
                 int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
-                artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
+                // A disabled button whose face draws its own disabled state shows its glyph at the label's disabled alpha.
+                var glyph = isEnabled() || fadesDisabled() ? g : (Graphics2D) g.create();
+                if (glyph != g) glyph.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
+                try { artwork.paintIcon(this, glyph, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2); }
+                finally { if (glyph != g) glyph.dispose(); }
             }
             if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - (panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0));
             if (embedded && isEnabled() && focus != null && focus.visible()) {

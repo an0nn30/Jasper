@@ -14,7 +14,7 @@ import javax.swing.JComponent;
 final class DefaultButtonFace implements ButtonFace {
     @Override public void paintFace(Buttons.KitButton button, Graphics2D g, boolean hover, boolean focused) { button.paintRaised(g, hover, focused); }
     @Override public Color text(Buttons.KitButton button, boolean hover) { return ThemePainting.color(button.context(), button.textRole(hover)); }
-    @Override public boolean fades() { return true; }
+    @Override public boolean fades(Buttons.KitButton button) { return true; }
     @Override public Typography.Role label(Nodes.ButtonKind kind, Typography.Role role) { return role; }
     @Override public void paintCombo(Choices.ChoiceCombo combo, Graphics2D g, boolean hover, boolean focused) {
         ThemePainting.rounded(g, combo, combo.context, ThemePainting.color(combo.context, hover ? SemanticColor.SURFACE_CONTROL_HOVER : SemanticColor.SURFACE_CONTROL),

@@ -13,8 +13,8 @@ interface ButtonFace extends Face {
     void paintFace(Buttons.KitButton button, Graphics2D g, boolean hover, boolean focused);
     /** The button's label colour. */
     Color text(Buttons.KitButton button, boolean hover);
-    /** Whether a disabled button is its whole face faded as one layer; otherwise the face draws its own disabled state. */
-    boolean fades();
+    /** Whether disabled {@code button} is its whole face faded as one layer; otherwise the face draws its own disabled state. */
+    boolean fades(Buttons.KitButton button);
     /** The label's type role for a {@code kind} button whose label would take {@code role}. */
     Typography.Role label(Nodes.ButtonKind kind, Typography.Role role);
     /** Paints a dropdown's closed face behind its value. */

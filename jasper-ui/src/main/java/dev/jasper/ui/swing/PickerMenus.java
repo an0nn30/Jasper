@@ -149,12 +149,13 @@ final class PickerMenus {
         @Override protected void paintComponent(Graphics graphics){var c=owner.context();var n=(Nodes.PickerMenu)owner.node;var g=(Graphics2D)graphics.create();try{
             ThemePainting.antialias(g);boolean footer=item.id().equals(n.footerAction());
             int pad=metric(c,DesignMetrics.Role.PICKER_PADDING),tile=metric(c,DesignMetrics.Role.PICKER_TILE),gap=metric(c,DesignMetrics.Role.PICKER_ROW_GAP);
-            int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;
+            int top=footer?metric(c,DesignMetrics.Role.PICKER_FOOTER_TOP):0,rowHeight=getHeight()-top;boolean tiles=c.faces().buttons.tiles();
             if(active){g.setColor(ThemePainting.color(c,SemanticColor.SELECTION_BG));g.fillRect(0,top,getWidth(),rowHeight);}
-            if(!c.faces().buttons.tiles()){}
-            else if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
-            else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
-            int x=pad+(c.faces().buttons.tiles()?tile+gap:gap);line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer,false);
+            if(tiles){
+                if(item.kind()==Nodes.PickerItemKind.UTILITY){int glyph=metric(c,DesignMetrics.Role.PICKER_GLYPH);c.icons().icon(item.icon(),c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:footer?SemanticColor.TEXT_LINK:SemanticColor.TEXT_TERTIARY,glyph).paintIcon(this,g,pad+(tile-glyph)/2,top+(rowHeight-glyph)/2);}
+                else tile(g,this,c,item.icon(),item.hue(),pad,(getHeight()-tile)/2,tile,active);
+            }
+            int x=pad+(tiles?tile+gap:gap);line(g,c,item.label(),item.caption(),x,top,getWidth()-x-pad-tile,rowHeight,active,false,false,footer,false);
             if(item.id().equals(n.checkedId()))c.icons().icon("check",c.theme().semantic(),active?SemanticColor.TEXT_ONSELECTION:SemanticColor.TEXT_LINK,metric(c,DesignMetrics.Role.ICON_CAPTION)).paintIcon(this,g,getWidth()-pad-tile,(getHeight()-tile)/2);
         }finally{g.dispose();}}
     }

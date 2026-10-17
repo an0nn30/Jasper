@@ -25,7 +25,8 @@ final class ClassicFieldPolicy implements FieldPolicy {
         if (s.transparent || !s.readOnly) { s.paintDefault(g); return; }
         var c = s.context;
         ThemePainting.rounded(g, s, c, ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER),
-            s.focus.visible() ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS) : ThemePainting.painted(c, readOnlyEdge),
+            s.error ? ThemePainting.color(c, SemanticColor.BORDER_ERROR) : s.focus.visible() ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
+                : ThemePainting.painted(c, readOnlyEdge),
             s.focus.visible(), s.error, s.radiusRole);
     }
 
