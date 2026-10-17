@@ -24,4 +24,5 @@ final class DefaultGroupFace implements GroupFace {
     @Override public int rowRule(KitContext context) { return 0; }
     @Override public List<PaintPair> pairs() { return List.of(); }
     @Override public int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard) { return standard; }
+    @Override public boolean listUnderTitle(KitContext context) { return false; }
 }

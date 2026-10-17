@@ -350,10 +350,38 @@ final class SettingRows {
             control.setBounds(i.left + col + gap(), i.top, cw, ch);
         }
 
+        /**
+         * A Settings page row whose face lays its list across the row ({@link GroupFace#listUnderTitle}): the title and
+         * description at the top, the list below them at the content's width (plan 9b Task 6).
+         */
+        boolean underTitle(Container p) {
+            return owner.settings && p.getComponentCount() > 2 && fixedControl() && owner.context().faces().group.listUnderTitle(owner.context());
+        }
+
+        /** The gap between an under-title row's text and its list (the Shell and Font &amp; Colors mocks' 7). */
+        int underGap() { return ThemePainting.metric(owner.context(), DesignMetrics.Role.INLINE_GAP); }
+
+        /** An under-title row's height: below its list, the row's padding and room for the list's controls' focus rings (the mocks' 8). */
+        int underHeight(Container p, int width) {
+            Insets i = p.getInsets(); int content = Math.max(0, width - i.left - i.right);
+            return i.top + i.bottom + settingsTextHeight(content) + underGap() + Composition.height(p.getComponent(2), content)
+                + ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING);
+        }
+
+        void layoutUnder(Container p) {
+            Insets i = p.getInsets(); int content = Math.max(0, p.getWidth() - i.left - i.right), title = owner.title.height(content);
+            owner.title.setBounds(i.left, i.top, content, title);
+            int gap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
+            owner.description.setBounds(i.left, i.top + title + gap, content, owner.description.isVisible() ? owner.description.height(content) : 0);
+            var control = p.getComponent(2);
+            control.setBounds(i.left, i.top + settingsTextHeight(content) + underGap(), content, Composition.height(control, content));
+        }
+
         @Override
         public int height(Container p, int width) {
             if (leading(p)) return leadingHeight(p, width);
             if (formRow(p)) return formHeight(p, width);
+            if (underTitle(p)) return underHeight(p, width);
             Insets i = p.getInsets();
             if(stackedSettings(p,width)){int content=Math.max(0,width-i.left-i.right);return i.top+i.bottom+settingsTextHeight(content)+gap()+Composition.height(p.getComponent(2),Math.min(content,p.getComponent(2).getPreferredSize().width));}
             if (owner.detail) {
@@ -383,6 +411,11 @@ final class SettingRows {
                 int w = p.getInsets().left + p.getInsets().right + column() + gap() + p.getComponent(2).getPreferredSize().width;
                 return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
             }
+            if (underTitle(p)) {
+                int w = p.getInsets().left + p.getInsets().right + Math.max(Math.max(owner.title.getPreferredSize().width,
+                    owner.description.isVisible() ? owner.description.getPreferredSize().width : 0), p.getComponent(2).getPreferredSize().width);
+                return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+            }
             int control = p.getComponentCount() > 2 ? p.getComponent(2).getPreferredSize().width : 0;
             // The trailing control takes at most half the row, so a wide control (a list) needs twice its width.
             int w =
@@ -396,6 +429,7 @@ final class SettingRows {
         public void layoutContainer(Container p) {
             if (leading(p)) { layoutLeading(p); return; }
             if (formRow(p)) { layoutForm(p); return; }
+            if (underTitle(p)) { layoutUnder(p); return; }
             Insets i = p.getInsets();
             if(stackedSettings(p,p.getWidth())){
                 int content=Math.max(0,p.getWidth()-i.left-i.right),title=owner.title.height(content),text=settingsTextHeight(content);

@@ -93,6 +93,12 @@ final class ClassicGroupFace implements GroupFace {
         return page && kind == Nodes.CardKind.FORM ? ThemePainting.metric(context, DesignMetrics.Role.SETTING_VERTICAL_PADDING) : standard;
     }
 
+    /**
+     * A Settings page's list (an ordered list with its side column and entry row) spans the row below its title and
+     * description, as the Shell, Font &amp; Colors and Project Index mocks draw it (plan 9b Task 6).
+     */
+    @Override public boolean listUnderTitle(KitContext context) { return true; }
+
     /** A Settings page's rows keep their first line clear for the rule {@link #paintCard} draws there. */
     @Override public int rowRule(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE); }
 

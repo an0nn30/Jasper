@@ -94,6 +94,11 @@ class SettingsPagesMockTest {
         // rule (the band is ΔE 6 away); ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule pins its colour.
         tight("plugins", "search strip", "heading band", "inactive tab");
         face("plugins", "heading band", "second heading rule", "selected row", "checkbox on the selection", "active tab", "inactive tab");
+        PROBES.put("terminal.shell", List.of(probe("arguments box top", 400, 205), probe("arguments box bottom", 400, 248),
+            probe("arguments box interior", 400, 230), probe("Remove left edge", 919, 217), probe("Add Variable… right edge", 1010, 317),
+            probe("Add Variable… top edge", 960, 305)));
+        face("terminal.shell", "arguments box top", "arguments box bottom", "arguments box interior", "Remove left edge",
+            "Add Variable… right edge", "Add Variable… top edge");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -235,6 +240,12 @@ class SettingsPagesMockTest {
         try (var settings = EnterpriseSettings.open(false)) {
             // The mock's selection, THD Sourcing Crypto, is the first row, which the list selects when it opens (fact 10).
             assertThat(compare(settings, List.of("plugins"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void shellMatchesItsMock() throws Exception {
+        try (var settings = EnterpriseSettings.open(false)) {
+            assertThat(compare(settings, List.of("terminal.shell"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
     }
 }

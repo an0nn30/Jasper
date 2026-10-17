@@ -73,6 +73,8 @@ final class Stacks {
          * the reconciler does not clear it, so its next detach pass leaves an adopted row where it is.
          */
         java.util.Map<String, Container> adopted = java.util.Map.of();
+        /** The classic ordered list that last adopted this INLINE row as its entry row ({@link ClassicOrderedFace#span}), or null. */
+        ItemLists.ListControl entryOf;
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -139,6 +141,8 @@ final class Stacks {
             if (component.getLayout() instanceof Navigation.InlineLayout inline) inline.titleLine = titleLine(stack);
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
+            // An entry row a classic ordered list holds keeps the face's layout across refreshes (plan 9b Task 6).
+            if (entryOf != null && entryOf.entry == component) component.setLayout(new ClassicOrderedFace.EntryLayout(entryOf));
             component.revalidate();
             component.repaint();
         }

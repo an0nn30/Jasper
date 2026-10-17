@@ -207,17 +207,20 @@ public final class Editors {
 
     /** An ordered list of strings; a field below adds one. */
     public static Factory<List<String>> textList() {
-        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.empty()), List.of());
+        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.empty(), classic(context)), List.of());
     }
+
+    /** The composition root's reading: whether the page is composed classically (spec 12.2). */
+    private static boolean classic(PageContext context) { return context.composition() == dev.jasper.app.presentation.Composition.CLASSIC; }
 
     /** An ordered list of font families; the entry below suggests the installed ones. */
     public static Factory<List<String>> fontList(boolean monospaced) {
-        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.of(() -> Fonts.families(monospaced))), List.of());
+        return new Factory<>((setting, context) -> new Items(setting.label(), Optional.of(() -> Fonts.families(monospaced)), classic(context)), List.of());
     }
 
     /** Name/Value rows. */
     public static Factory<Map<String, String>> table() {
-        return new Factory<>((setting, context) -> new Table(), List.of());
+        return new Factory<>((setting, context) -> new Table(setting, context, classic(context)), List.of());
     }
 
     /** The {@code notifications.groups} editor: one line per group {@code choices} lists. */
@@ -437,14 +440,20 @@ public final class Editors {
         String pending = "";
         /** The selected row's index, or -1. */
         int selected = -1;
-        Items(String label, Optional<Supplier<List<String>>> suggestions) { this.label = label; this.suggestions = suggestions; }
+        private final boolean classic;
+        Items(String label, Optional<Supplier<List<String>>> suggestions) { this(label, suggestions, false); }
+        /** {@code classic}: the list shows "Empty" while it holds nothing (plan 9b Rulings 15) and its Add has no glyph. */
+        Items(String label, Optional<Supplier<List<String>>> suggestions, boolean classic) { this.label = label; this.suggestions = suggestions; this.classic = classic; }
 
         @Override public Nodes.Node node(String id, ControlState state) {
             var rows = new ArrayList<ListItem>();
             for (int i = 0; i < items.size(); i++)
                 rows.add(new ListItem("item-" + i, Optional.empty(),
                     List.of(new Nodes.Text(id + ":item-" + i, ControlState.READY, items.get(i), Nodes.TextRole.BODY)), List.of(), List.of()));
-            var list = new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of());
+            var list = classic
+                ? new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of(), Nodes.SelectionMode.SINGLE,
+                    Optional.empty(), java.util.OptionalInt.empty(), "", "", "", "", "", "Empty")
+                : new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, selectedIds(selected, items.size()), "", List.of());
             // Enter in the entry adds it (the entry's own action); an empty entry leaves Enter to the dialog's OK.
             String submit = pending.isBlank() ? "" : id + ":add";
             Nodes.Node entry = suggestions.isPresent()
@@ -452,7 +461,7 @@ public final class Editors {
                     Optional.of(new Nodes.ChoiceSearch(0, NO_FONT_MATCHES, Optional.of(pending))))
                 : new Nodes.Field(id + ":new", plain(state), Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, submit);
             var addState = new ControlState(state.visible(), state.enabled() && !pending.isBlank(), state.busy(), "");
-            var add = new Nodes.Button(id + ":add", addState, "Add", "add", Nodes.ButtonKind.SECONDARY, id + ":add", "");
+            var add = new Nodes.Button(id + ":add", addState, "Add", classic ? "" : "add", Nodes.ButtonKind.SECONDARY, id + ":add", "");
             return new Nodes.Stack(id + ":editor", plain(state), Nodes.LayoutRole.VERTICAL,
                 List.of(list, new Nodes.Stack(id + ":entry", plain(state), Nodes.LayoutRole.INLINE, List.of(entry, add))));
         }
@@ -513,11 +522,32 @@ public final class Editors {
         return selected;
     }
 
-    /** Name/Value rows; a blank name is left out of the value. */
+    /**
+     * Name/Value rows; a blank name is left out of the value. {@code classic} (spec 12.2): a Name / Value table under the
+     * setting's row with Add Variable… at its end, Edit… and Remove in each row's menu, a sheet for Add and Edit; with no
+     * variables, the row alone.
+     */
     static final class Table implements ValueEditor<Map<String, String>> {
         private final List<String[]> rows = new ArrayList<>();
+        private final boolean classic;
+        private final Setting<Map<String, String>> setting;
+        private final PageContext context;
+        /** The classic table's selected variable, or -1; a double-click or Enter edits it. */
+        private int selectedRow = -1;
 
-        @Override public Nodes.Node node(String id, ControlState state) {
+        Table() { this(null, null, false); }
+
+        Table(Setting<Map<String, String>> setting, PageContext context, boolean classic) {
+            this.setting = setting; this.context = context; this.classic = classic && setting != null && context != null;
+        }
+
+        @Override public boolean fullSpan() { return classic; }
+        @Override public boolean cardRows() { return classic; }
+
+        @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
+
+        @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
+            if (classic) return classicNode(id, state, highlighted);
             var lines = new ArrayList<Nodes.Node>();
             for (int i = 0; i < rows.size(); i++) {
                 var row = rows.get(i);
@@ -528,6 +558,42 @@ public final class Editors {
             }
             lines.add(new Nodes.Button(id + ":add", plain(state), "Add variable", "add", Nodes.ButtonKind.SECONDARY, id + ":add", ""));
             return new Nodes.Stack(id, plain(state), Nodes.LayoutRole.VERTICAL, lines);
+        }
+
+        /**
+         * The classic composition's own row (a full-span editor builds it): the search highlight, and Reset to Default in
+         * its menu while the variables differ from the setting's effective default (spec 12.1 and 14.7).
+         */
+        private Nodes.Node classicNode(String id, ControlState state, boolean highlighted) {
+            String applies = switch (setting.applies()) {
+                case LIVE -> ""; case NEW_PANES -> "Applies to new panes"; case NEW_WINDOWS -> "Applies to new windows"; case RESTART -> "Takes effect after restart";
+            };
+            var add = new Nodes.Button(id + ":add", plain(state), "Add Variable…", "", Nodes.ButtonKind.SECONDARY, id + ":add", "");
+            var row = new Nodes.SettingRow("row:" + id, ControlState.READY, setting.label(), applies, add, false, highlighted, "",
+                SchemaPage.resetMenu(context, id + ":reset", !value().equals(Editors.effectiveDefault(context.draft(), setting))));
+            if (rows.isEmpty()) return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL, List.of(row));
+            var columns = List.of(new dev.jasper.ui.model.Column("name", "Name", Nodes.TextRole.MONO, false),
+                new dev.jasper.ui.model.Column("value", "Value", Nodes.TextRole.MONO, false, 2, Optional.empty()));
+            var tableRows = new ArrayList<dev.jasper.ui.model.TableRow>();
+            for (int i = 0; i < rows.size(); i++)
+                tableRows.add(new dev.jasper.ui.model.TableRow("variable-" + i, Map.of("name", rows.get(i)[0], "value", rows.get(i)[1]), Optional.empty(), false,
+                    Optional.of(List.of(new MenuItem("edit-" + i, "Edit…", "", id + ":edit-" + i, state.enabled(), false),
+                        new MenuItem("remove-" + i, "Remove", "", id + ":remove-" + i, state.enabled(), false)))));
+            var selection = selectedRow >= 0 && selectedRow < rows.size() ? Set.of("variable-" + selectedRow) : Set.<String>of();
+            var table = new Nodes.Table(id + ":table", plain(state), columns, tableRows, selection, id + ":activate", List.of(), Nodes.SelectionMode.SINGLE);
+            return new Nodes.Stack(id + ":environment", plain(state), Nodes.LayoutRole.VERTICAL, List.of(row, table));
+        }
+
+        /** Asks the variable sheet with {@code name} and {@code value}; the answer as a name and value, or empty. */
+        private Optional<String[]> ask(String title, String confirm, String name, String value) {
+            return context.sheets().ask(new Sheets.Request(title, title, List.of(new Sheets.Field("name", "Name", name), new Sheets.Field("value", "Value", value)), confirm))
+                .filter(answer -> answer.size() == 2 && !answer.get(0).isBlank()).map(answer -> new String[]{answer.get(0).strip(), answer.get(1)});
+        }
+
+        /** Puts {@code entry} at {@code index} (or at the end), dropping another entry with the same name (the file holds one key). */
+        private void put(int index, String[] entry) {
+            for (int i = rows.size() - 1; i >= 0; i--) if (i != index && rows.get(i)[0].equals(entry[0])) { rows.remove(i); if (i < index) index--; }
+            if (index < 0) rows.add(entry); else rows.set(index, entry);
         }
 
         void addRow(String name, String value) { rows.add(new String[]{name, value}); }
@@ -544,11 +610,29 @@ public final class Editors {
         }
 
         @Override public boolean event(String id, UiEvent event) {
+            if (classic && event instanceof UiEvent.Action action) {
+                if (action.id().equals(id + ":add")) { var answer = ask("Add Variable", "Add", "", ""); answer.ifPresent(entry -> put(-1, entry)); return answer.isPresent(); }
+                // A row's activation (double-click or Enter) selects it, then reports the table's activate action (fact 11).
+                boolean activated = action.id().equals(id + ":activate");
+                if (activated || action.id().startsWith(id + ":edit-")) {
+                    int index = activated ? selectedRow : Integer.parseInt(action.id().substring((id + ":edit-").length()));
+                    if (index < 0 || index >= rows.size()) return false;
+                    var answer = ask("Edit Variable", "Save", rows.get(index)[0], rows.get(index)[1]);
+                    answer.ifPresent(entry -> put(index, entry));
+                    return answer.isPresent();
+                }
+            }
+            if (classic && event instanceof UiEvent.Selected selected && selected.id().equals(id + ":table")) {
+                selectedRow = selected.ids().stream().filter(row -> row.startsWith("variable-")).mapToInt(row -> Integer.parseInt(row.substring("variable-".length())))
+                    .findFirst().orElse(-1);
+                return false;
+            }
             if (event instanceof UiEvent.Action action && action.id().equals(id + ":add")) { addRow("", ""); return true; }
             if (event instanceof UiEvent.Action action && action.id().startsWith(id + ":remove-")) {
                 int index = Integer.parseInt(action.id().substring((id + ":remove-").length()));
                 if (index >= rows.size()) return false;
                 rows.remove(index);
+                selectedRow = afterRemoval(selectedRow, index);
                 return true;
             }
             if (event instanceof UiEvent.Edited edited) {

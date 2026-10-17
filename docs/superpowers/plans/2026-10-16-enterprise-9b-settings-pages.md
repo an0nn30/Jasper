@@ -129,6 +129,32 @@
 > details' trailing padding 0, `PLUGIN_TEXT_LINE_SPACING` 3) assume the CLASSIC composition: a kit with base "classic"
 > under another composition lays the ROWS Plugins page with the Enterprise mock's paddings and line spacing.
 
+> **Status, Task 6 (2026-10-17):** the Shell page matches mock 11's probes (share 0.978, floor 0.93); the default look is
+> unchanged (`changed: none`). The environment table, its sheet and the ordered lists' "Empty" landed as written.
+> Deviations, each because the merged code put the arguments list beside its title where mocks 09, 11 and 15 draw it
+> below (all six probes but Add Variable…'s right edge failed): `GroupFace.listUnderTitle` (default false, classic true)
+> makes a Settings row whose control holds a list or table (`SettingRows.RowLayout.underTitle`) lay its title and
+> description at the top and the control across the row below them, `INLINE_GAP` (7) under the text and the row's
+> padding plus `FOCUS_RING` (2) under the control (11: box top 47 below the row's rule, the next rule 8 below the side
+> column; 09: 31 and 8); with an adopted entry row `ClassicOrderedFace` keeps the box at its preferred height (its rows,
+> at least `ENTRY_LIST_ROWS` 2, plus `FOCUS_RING`: 11's empty box 44 tall, 15's three rows 64) with the entry row
+> `SIDE_COLUMN_GAP` (6, was `ROW_GAP` 8) below it, so a taller side column no longer stretches the box, and lays the
+> entry row with its add button as wide as the side column at its end and the field filling the rest
+> (`ClassicOrderedFace.EntryLayout`, which `Stacks.StackControl.entryOf` re-applies on the row's refresh); a side-column
+> list's rows are `ORDERED_ROW_HEIGHT` (20, the mocks') through `ItemLists.ListControl.fixedRowHeight`, not `ROW_HEIGHT`
+> (22); `SIDE_COLUMN_WIDTH` is 92 in both catalogs, not 90 (Remove at 919 as the mocks; Task 3's 11 px button sides
+> had left Move Down narrower than the role; the side column exists only under the classic face, and
+> `ClassicCatalogTest` holds plan 4's roles equal in both catalogs); the classic `Editors.Items` entry's Add has no glyph
+> (the mocks' "Add"); the classic `Editors.Table` also moves its selection when a variable is removed
+> (`afterRemoval`). `ClassicOrderedTest.anEntryRowSitsUnderItsBoxWithItsAddAsWideAsTheSideColumn` and
+> `ClassicSettingRowsTest.aClassicSettingsListSpansItsRowBelowItsText` pin the two jasper-ui behaviours; Font & Colors'
+> fallback list and the plugin pages' ordered lists take the same layout (Task 7 measures them). Residuals: "Empty"
+> centred in the box's first row (the shared ordered face; the Add Host mock centres "No keys") where mock 11 sets it at
+> the box's left in #7A808A (ours `text.tertiary`); the fixture's Shell profile reads "Custom" with the detect-again button
+> (`ShellChoices.NONE`) for the mock's "Login shell (zsh)"; the disabled entry field's grey face (the mock draws it
+> white); the entry row 1 px low (256 against 255); Task 1's half pixel above (the program row's rule at 157 against 158)
+> and below (the environment row's rule 340 against 341, the box's bottom 393 against 394).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

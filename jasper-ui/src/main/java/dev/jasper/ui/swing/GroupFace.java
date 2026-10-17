@@ -23,4 +23,6 @@ interface GroupFace extends Face {
     int rowRule(KitContext context);
     /** The gap between a {@code kind} card's children, {@code standard} being the default look's. */
     int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard);
+    /** Whether a Settings page row lays its list or table control across the row below its title and description, not beside them. */
+    boolean listUnderTitle(KitContext context);
 }

@@ -183,7 +183,11 @@ final class ItemLists {
 
         /** A plain two-line list's {@code LIST_TWO_LINE_ROW_HEIGHT}, or 0 to measure its rows. */
         @Override
-        int fixedRowHeight() { return lines() == 2 && plainRows() ? ThemePainting.metric(context(), DesignMetrics.Role.LIST_TWO_LINE_ROW_HEIGHT) : 0; }
+        int fixedRowHeight() {
+            // A classic ordered list's rows are ORDERED_ROW_HEIGHT tall (the Shell, Font & Colors and Project Index mocks' 20, plan 9b Task 6).
+            if (sideColumn()) return ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_ROW_HEIGHT);
+            return lines() == 2 && plainRows() ? ThemePainting.metric(context(), DesignMetrics.Role.LIST_TWO_LINE_ROW_HEIGHT) : 0;
+        }
 
         @Override
         boolean dataRow(int index) {
