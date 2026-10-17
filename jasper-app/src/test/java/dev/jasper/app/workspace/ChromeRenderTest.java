@@ -148,6 +148,24 @@ class ChromeRenderTest {
         }
     }
 
+    /** Plan 9a (spec 12.1 and 16.1.4): the real Settings dialog under each look's kit and projections, its frame checked and printed. */
+    @Test void everyLookBuildsItsSettingsFrame() throws Exception {
+        for (Case look : cases()) {
+            edt(() -> {
+                ThemeController themes = look.themes().get();
+                try {
+                    var image = dev.jasper.app.settingsui.SettingsFrameRenders.check(look.name(),
+                        () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.projections());
+                    MockProfile.write(image, "settings-" + look.name());
+                } finally {
+                    DesktopTestSupport.closeOwnersNow();
+                    themes.close();
+                    EnterpriseLook.restoreDefault();
+                }
+            });
+        }
+    }
+
     @Test void theCoveringArrayHasStrengthTwoOverTheChromePoints() {
         var rows = covering();
         assertThat(rows).hasSize(8);
