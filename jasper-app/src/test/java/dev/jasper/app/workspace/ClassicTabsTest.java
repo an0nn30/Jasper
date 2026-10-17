@@ -12,6 +12,10 @@ import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
+import javax.accessibility.AccessibleState;
+import javax.swing.JMenuItem;
+import javax.swing.JToolTip;
+import javax.swing.plaf.basic.BasicHTML;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -88,13 +92,54 @@ class ClassicTabsTest {
                 var strip = tabs(owner, 600);
                 var last = strip.entries().getLast();
                 assertThat(last.getX() + last.getWidth()).as("every tab fits").isLessThanOrEqualTo(600 - strip.add().getWidth());
-                assertThat(strip.add().isVisible()).isTrue();
-                for (var entry : strip.entries()) assertThat(entry.closeBounds().width).as("the x stays").isPositive();
+                assertThat(strip.add().getX() + strip.add().getWidth()).as("the + stays inside the strip").isLessThanOrEqualTo(600);
+                for (var entry : strip.entries()) {
+                    var close = entry.closeBounds();
+                    assertThat(close.x).as("the x stays past the dot (12, dot 7, 9)").isGreaterThanOrEqualTo(12 + 7 + 9);
+                    assertThat(close.x + close.width).as("the x stays inside its tab").isLessThanOrEqualTo(entry.getWidth());
+                }
+                assertThat(last.getWidth()).as("a long label is drawn shortened").isLessThan(last.chromeWidth() + last.labelWidth());
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 300, 24)).as("the long labels shorten first").isEqualTo(130);
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 30, 24)).as("never below the minimum").isEqualTo(24);
                 int before = owner.tabStrip().getTabCount();
                 strip.entries().get(0).closeClicked();
                 assertThat(owner.tabStrip().getTabCount()).isEqualTo(before - 1);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    @Test void tooltipsTheTabListAndAccessibilityStayLiteralAndBounded() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
+                owner.currentTab().rename(title);
+                owner.update();
+                var strip = tabs(owner, 800);
+                var entry = strip.entries().get(0);
+                JToolTip tip = entry.createToolTip();
+                tip.setTipText(entry.getToolTipText());
+                assertThat(tip.getClientProperty(BasicHTML.propertyKey)).as("the tip renders the title literally").isNull();
+                assertThat(entry.getToolTipText()).hasSizeLessThanOrEqualTo(210).startsWith("<html><img").contains("\u2026");
+                assertThat(entry.labelWidth()).as("the measured label is bounded")
+                    .isEqualTo(entry.getFontMetrics(entry.getFont()).stringWidth(WindowTabs.capped(title)));
+                var item = (JMenuItem) strip.tabList().getComponent(0);
+                assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
+                owner.currentTab().rename("short");
+                owner.update();
+                String shortcut = owner.tabShortcut(0);
+                assertThat(entry.getToolTipText()).as("the tip carries the shortcut")
+                    .isEqualTo(shortcut.isEmpty() ? "short" : "short (" + shortcut + ")");
+                assertThat(((JMenuItem) strip.tabList().getComponent(0)).getText()).isEqualTo("short");
+                var context = entry.getAccessibleContext();
+                assertThat(context.getAccessibleName()).isEqualTo("short");
+                assertThat(context.getAccessibleStateSet().contains(AccessibleState.SELECTED)).as("the selected tab says so").isTrue();
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                assertThat(strip.entries().get(0).getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED))
+                    .as("an unselected tab does not").isFalse();
+                assertThat(strip.entries().get(1).getAccessibleContext().getAccessibleStateSet().contains(AccessibleState.SELECTED)).isTrue();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

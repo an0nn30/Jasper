@@ -27,6 +27,7 @@ import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JToolTip;
 import javax.swing.SwingUtilities;
 
 /**
@@ -75,7 +76,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Entry entry : entries) {
-            var item = new JCheckBoxMenuItem(owner.tabTitle(entry.tab), owner.tabIcon(entry.tab), entry.tab == selected);
+            var item = new JCheckBoxMenuItem(WindowTabs.capped(owner.tabTitle(entry.tab)), owner.tabIcon(entry.tab), entry.tab == selected);
             item.putClientProperty("html.disable", true);
             item.addActionListener(event -> { if (!disposed) owner.selectTab(entry.tab); });
             menu.add(item);
@@ -152,6 +153,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
 
         Entry(Component tab) {
             this.tab = tab;
+            putClientProperty("html.disable", true);
             setFont(ThemeZone.font(Typography.Role.BODY));
             var mouse = new MouseAdapter() {
                 private void popup(MouseEvent event) { owner.tabMenu(tab).show(Entry.this, event.getX(), event.getY()); }
@@ -187,28 +189,40 @@ final class ClassicTabs extends JPanel implements TabStrip {
         @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
                 @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.PAGE_TAB; }
+                @Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet() {
+                    var states = super.getAccessibleStateSet();
+                    if (tab == selected) states.add(javax.accessibility.AccessibleState.SELECTED);
+                    return states;
+                }
             };
             return accessibleContext;
         }
 
+        // A tab title comes from the terminal (OSC 0/2), so its tip never renders HTML.
+        @Override public JToolTip createToolTip() {
+            var tip = new JToolTip(); tip.putClientProperty("html.disable", true); tip.setComponent(this); return tip;
+        }
+
         void refresh() {
-            String title = owner.tabTitle(tab);
-            setToolTipText(owner.tabTooltip(tab));
+            String title = owner.tabTitle(tab), shortcut = owner.tabShortcut(entries.indexOf(this));
+            String tip = WindowTabs.capped(owner.tabTooltip(tab));
+            setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             getAccessibleContext().setAccessibleName(title);
+            getAccessibleContext().setAccessibleDescription(running() ? "Session running" : null);
             setFont(ThemeZone.font(Typography.Role.BODY));
             repaint();
         }
 
         private boolean dotted() { return tab instanceof TerminalTab; }
         private boolean running() { return tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running(); }
-        int labelWidth() { return getFontMetrics(getFont()).stringWidth(owner.tabTitle(tab)); }
+        private String label() { return WindowTabs.capped(owner.tabTitle(tab)); }
+        int labelWidth() { return getFontMetrics(getFont()).stringWidth(label()); }
         /** Everything but the label: the leading inset, the dot and its gap, the gap, the ×, the trailing inset. */
         int chromeWidth() {
             int dot = dotted() ? metric(DesignMetrics.Role.STATUS_DOT) + metric(DesignMetrics.Role.CLASSIC_TAB_GAP) : 0;
             return metric(DesignMetrics.Role.CLASSIC_TAB_LEADING) + dot + metric(DesignMetrics.Role.CLASSIC_TAB_GAP)
                 + metric(DesignMetrics.Role.CHROME_GLYPH) + metric(DesignMetrics.Role.CLASSIC_TAB_TRAILING);
         }
-        int naturalWidth() { return chromeWidth() + labelWidth(); }
 
         /** Where the × is, in this tab. */
         Rectangle closeBounds() {
@@ -237,7 +251,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
                 int room = Math.max(0, close.x - metric(DesignMetrics.Role.CLASSIC_TAB_GAP) - x);
                 Color ink = SurfaceContrast.on(palette, active ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY, ground, SurfaceContrast.TEXT);
                 g.setColor(ink);
-                FlatUIUtils.drawString(this, g, TitleSearchField.clip(owner.tabTitle(tab), metrics, room), x, (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+                FlatUIUtils.drawString(this, g, TitleSearchField.clip(label(), metrics, room), x, (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
                 g.setColor(closeHover ? ink : palette.color(SemanticColor.TEXT_PLACEHOLDER));
                 g.setStroke(new java.awt.BasicStroke(Math.max(1f, UIScale.scale(1.2f))));
                 g.drawLine(close.x, close.y, close.x + close.width - 1, close.y + close.height - 1);

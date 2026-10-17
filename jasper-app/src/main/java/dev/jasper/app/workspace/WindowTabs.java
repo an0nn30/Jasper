@@ -20,7 +20,7 @@ import javax.swing.*;
 
 /** Equal-width, centered workspace tabs over the retained Swing selection model. EDT only. */
 final class WindowTabs extends JPanel implements TabStrip {
-    private static final int TITLE_LIMIT = 200;
+    static final int TITLE_LIMIT = 200;
     private final WindowContent owner;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
@@ -154,7 +154,8 @@ final class WindowTabs extends JPanel implements TabStrip {
         return ChromePainter.installed().tabSurface(owner.theme().workspace(), owner.workspaceSurface(), selected);
     }
 
-    private static String capped(String title) {
+    /** {@code title}, or past {@code TITLE_LIMIT} characters its start and an ellipsis within that limit, for tips and menus. */
+    static String capped(String title) {
         if (title.length() <= TITLE_LIMIT) return title;
         int end = TITLE_LIMIT - 1;
         if (Character.isHighSurrogate(title.charAt(end - 1))) end--; // never split an emoji

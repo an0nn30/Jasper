@@ -17,7 +17,7 @@ sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs 
     void setActive(boolean active);
     /** The configured animations; classic tabs never move. */
     void setAnimations(AnimationSettings settings);
-    /** Every tab, as a menu. */
+    /** Every tab, as a menu of literal titles of at most {@code WindowTabs.TITLE_LIMIT} characters. */
     JPopupMenu tabList();
     /** Releases the tabs. */
     @Override void close();
