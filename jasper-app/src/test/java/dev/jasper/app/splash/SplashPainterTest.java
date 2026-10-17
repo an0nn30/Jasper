@@ -92,14 +92,14 @@ class SplashPainterTest {
     @Test void theSplashIgnoresTheTheme() {
         var painter = SplashPainter.of(content(), 1);
         int[] plain = pixels(render(painter, StartupSteps.WORKSPACE, 0.9, 1));
-        Object foreground = UIManager.get("Label.foreground"), font = UIManager.get("defaultFont");
         try {
             UIManager.put("Label.foreground", Color.MAGENTA);
             UIManager.put("defaultFont", new FontUIResource(Font.SERIF, Font.ITALIC, 30));
             assertThat(pixels(render(painter, StartupSteps.WORKSPACE, 0.9, 1))).isEqualTo(plain);
         } finally {
-            UIManager.put("Label.foreground", foreground);
-            UIManager.put("defaultFont", font);
+            // A null removes the override, so the look and feel's own values show again (and follow a later install).
+            UIManager.put("Label.foreground", null);
+            UIManager.put("defaultFont", null);
         }
     }
 
