@@ -200,7 +200,12 @@ public final class Editors {
 
     /** A switch meaning "use the default", and a number field enabled while it is off; the default removes the key. */
     public static Factory<Float> optionalNumber(String label, double step, String unit) {
-        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit), List.of());
+        return new Factory<>((setting, context) -> new OptionalNumber(setting, label, step, unit, context.draft()), List.of());
+    }
+
+    /** {@code setting}'s effective default under {@code draft} (spec 5.8); the core default for a page made without a draft. */
+    static <T> T effectiveDefault(SettingsDraft draft, Setting<T> setting) {
+        return draft == null ? setting.defaultValue() : draft.defaultValue(setting);
     }
 
     /** The detected shell profiles and a button that detects them again; an empty value shows the effective profile. */
@@ -506,10 +511,10 @@ public final class Editors {
         private final float unset;
         private final float fallback;
         private boolean useDefault;
-        OptionalNumber(Setting<Float> setting, String label, double step, String unit) {
+        OptionalNumber(Setting<Float> setting, String label, double step, String unit, SettingsDraft draft) {
             var kind = (SettingKind.NumberRange) setting.kind();
             this.label = label;
-            unset = setting.defaultValue();
+            unset = effectiveDefault(draft, setting);
             fallback = setting.example().orElse((float) kind.min());
             number = new NumberField<>(setting.label(), new Nodes.Numeric(kind.min(), kind.max(), step, DECIMALS), unit, Float::valueOf, Nodes.FieldPresentation.STEPPER);
             number.show(fallback);

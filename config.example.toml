@@ -12,6 +12,7 @@ rail_width = 28
 toolbar = "icons_and_labels"
 # Live across open windows, including the unified macOS title bar.
 # Range: 28-64 logical pixels; out-of-range values use the nearest limit.
+# The default depends on the active look.
 toolbar_height = 30
 # Live across open windows.
 status_bar = true
@@ -60,6 +61,7 @@ system = true
 
 [palette]
 # Live. Result rows the palette list shows before it scrolls. Range: 1-20.
+# The default depends on the active look.
 visible_rows = 5
 
 [terminal.font]
@@ -133,6 +135,7 @@ appearance = "system"
 [ui.theme]
 # The themes the Dark and Light appearances show, live: "slate-cobalt", a built-in Catppuccin flavour such as
 # "catppuccin-mocha", or an imported theme's id (its file name in the themes folder without .json). A theme without that variant is reported and Slate Cobalt is used.
+# The default depends on the active look.
 dark = "slate-cobalt"
 light = "slate-cobalt"
 

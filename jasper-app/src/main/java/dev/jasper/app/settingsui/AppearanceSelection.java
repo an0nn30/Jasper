@@ -55,8 +55,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
             tile("system", "Match System", system.map(isDark -> "System appearance: " + (isDark ? "Dark" : "Light"))
                 .orElse("System appearance unavailable; using Dark"), new Option.Preview(darkPreview, Optional.of(lightPreview)))),
             token(value), "Appearance", "");
-        boolean modified = value != UI_APPEARANCE.defaultValue() || !dark.equals(UI_THEME_DARK.defaultValue())
-            || !light.equals(UI_THEME_LIGHT.defaultValue());
+        boolean modified = value != draft.defaultValue(UI_APPEARANCE) || !dark.equals(draft.defaultValue(UI_THEME_DARK))
+            || !light.equals(draft.defaultValue(UI_THEME_LIGHT));
         var reset = new Nodes.Button(id + ":reset", new ControlState(modified, true, false, ""), "",
             "reset", Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + UI_APPEARANCE.label() + " and its themes to their defaults");
         var darkPick = new Nodes.Choice(id + ":dark-theme", plain, Nodes.ChoiceKind.DROPDOWN, options(true, dark), dark,
@@ -154,8 +154,10 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     /** The saved value when the pick is what the file already means, so an untouched pick never becomes an edit. */
     private Optional<String> staged(Setting<String> setting, String pick) {
         var saved = draft.saved(setting);
-        if (saved.map(pick::equals).orElse(pick.equals(setting.defaultValue()))) return saved;
-        return pick.equals(setting.defaultValue()) ? Optional.empty() : Optional.of(pick);
+        String effective = draft.defaultValue(setting);
+        if (saved.map(pick::equals).orElse(pick.equals(effective))) return saved;
+        // Picking the core default while the look overrides it is a choice of its own, so it is saved.
+        return pick.equals(effective) ? Optional.empty() : Optional.of(pick);
     }
 
     @Override public void showRelated() { dark = draft.value(UI_THEME_DARK); light = draft.value(UI_THEME_LIGHT); }

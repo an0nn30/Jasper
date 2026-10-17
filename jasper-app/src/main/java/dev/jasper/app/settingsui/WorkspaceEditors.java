@@ -12,13 +12,13 @@ final class WorkspaceEditors {
     static Editors.Factory<WorkspaceBlur> blur(AppearanceChoices choices) { return new Editors.Factory<>((setting,context)->new Blur(choices,context.draft()),List.of("Use theme's value","blur")); }
     static final class Opacity implements ValueEditor<Float> {
         final AppearanceChoices choices;final SettingsDraft draft;float value;
-        Opacity(AppearanceChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;value=UI_WORKSPACE_OPACITY.defaultValue();}
-        private float effective(){return value==UI_WORKSPACE_OPACITY.defaultValue()?choices.opacity():value;}
+        Opacity(AppearanceChoices choices,SettingsDraft draft){this.choices=choices;this.draft=draft;value=Editors.effectiveDefault(draft,UI_WORKSPACE_OPACITY);}
+        private float effective(){return value==Editors.effectiveDefault(draft,UI_WORKSPACE_OPACITY)?choices.opacity():value;}
         @Override public boolean fullSpan(){return true;}
         @Override public boolean cardRows(){return true;}
         @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
         @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
-            boolean inherited=value==UI_WORKSPACE_OPACITY.defaultValue();
+            boolean inherited=value==Editors.effectiveDefault(draft,UI_WORKSPACE_OPACITY);
             // Turning "Enable opacity" off is the way back to the theme's value, so neither row adds a Reset of its own;
             // both keep the page's reserved action slot so their controls align with the other rows.
             var toggle=new Nodes.Toggle(id+":default",state,"Enable opacity",!inherited,id+":default",false);
@@ -31,7 +31,7 @@ final class WorkspaceEditors {
         @Override public Float value(){return value;}
         @Override public void show(Float value){this.value=value;}
         @Override public boolean event(String id,UiEvent event){
-            if(event instanceof UiEvent.Toggled toggle&&toggle.id().equals(id+":default")){value=toggle.checked()?effective():UI_WORKSPACE_OPACITY.defaultValue();return true;}
+            if(event instanceof UiEvent.Toggled toggle&&toggle.id().equals(id+":default")){value=toggle.checked()?effective():Editors.effectiveDefault(draft,UI_WORKSPACE_OPACITY);return true;}
             if(event instanceof UiEvent.Edited edit&&edit.id().equals(id)){value=Float.parseFloat(edit.text());return true;}return false;
         }
         @Override public boolean removesAtDefault(){return true;}

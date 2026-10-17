@@ -59,7 +59,7 @@ final class ConfigurationController implements AutoCloseable {
         var removable = state.deadTables().stream()
             .filter(table -> !table.getFirst().equals("plugins") || pluginSettingsExist.test(table.get(1))).toList();
         return new ConfigService.State(state.snapshot(), merged, state.file(), state.present(), state.legacyKeys(), removable,
-            state.values(), state.rejected());
+            state.values(), state.rejected(), state.defaults());
     }
 
     /** A plugin's problem with its own settings file; shown until that file is reloaded. */

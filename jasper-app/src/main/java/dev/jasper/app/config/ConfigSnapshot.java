@@ -83,6 +83,23 @@ public record ConfigSnapshot(int tabHeight, ToolbarMode toolbar, boolean statusB
             CoreSettings.UI_THEME_DARK.defaultValue(), CoreSettings.UI_THEME_LIGHT.defaultValue());
     }
 
+    /** The defaults under {@code source}: the core defaults with the look's defaults of its allowlisted keys (spec 5.8). */
+    public static ConfigSnapshot defaults(DefaultSource source) {
+        return defaults().toBuilder().darkTheme(source.value(CoreSettings.UI_THEME_DARK)).lightTheme(source.value(CoreSettings.UI_THEME_LIGHT))
+            .visibleRows(source.value(CoreSettings.PALETTE_VISIBLE_ROWS)).toolbarHeight(source.value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).build();
+    }
+
+    /** As {@link #from(SettingValues, Map, Map)}, an allowlisted key the file does not set reading as {@code defaults} gives it. */
+    public static ConfigSnapshot from(SettingValues values, DefaultSource defaults, Map<String, String> keybindings,
+                                      Map<String, Map<String, Object>> plugins) {
+        return from(values, keybindings, plugins).toBuilder()
+            .darkTheme(values.saved(CoreSettings.UI_THEME_DARK).orElseGet(() -> defaults.value(CoreSettings.UI_THEME_DARK)))
+            .lightTheme(values.saved(CoreSettings.UI_THEME_LIGHT).orElseGet(() -> defaults.value(CoreSettings.UI_THEME_LIGHT)))
+            .visibleRows(values.saved(CoreSettings.PALETTE_VISIBLE_ROWS).orElseGet(() -> defaults.value(CoreSettings.PALETTE_VISIBLE_ROWS)))
+            .toolbarHeight(values.saved(CoreSettings.WINDOW_TOOLBAR_HEIGHT).orElseGet(() -> defaults.value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)))
+            .build();
+    }
+
     /** The snapshot for loaded settings plus the keybindings and legacy plugin tables their own readers produced. */
     public static ConfigSnapshot from(SettingValues values, Map<String, String> keybindings, Map<String, Map<String, Object>> plugins) {
         return new ConfigSnapshot(values.get(CoreSettings.WINDOW_TAB_HEIGHT), values.get(CoreSettings.WINDOW_TOOLBAR),

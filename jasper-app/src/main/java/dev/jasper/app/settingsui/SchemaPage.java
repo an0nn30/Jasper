@@ -462,7 +462,7 @@ public final class SchemaPage implements SettingsPage {
             invalid(row, "Not a valid value.");
             return;
         }
-        if (row.editor.removesAtDefault() && Objects.equals(value, row.setting.defaultValue())) {
+        if (row.editor.removesAtDefault() && Objects.equals(value, context.draft().defaultValue(row.setting))) {
             valid(row);
             var defaults = new java.util.LinkedHashMap<Setting<?>, Optional<?>>();
         defaults.put(row.setting, Optional.empty());
@@ -508,8 +508,8 @@ public final class SchemaPage implements SettingsPage {
             try { current = row.editor.value(); } catch (RuntimeException unreadable) { current = null; }
             if (!Objects.equals(current, value)) row.editor.show(value);
         }
-        row.resettable = !Objects.equals(value, row.setting.defaultValue()) || row.editor.relatedSettings().stream()
-            .anyMatch(setting -> !Objects.equals(context.draft().value(setting), setting.defaultValue()));
+        row.resettable = !Objects.equals(value, context.draft().defaultValue(row.setting)) || row.editor.relatedSettings().stream()
+            .anyMatch(setting -> !Objects.equals(context.draft().value(setting), context.draft().defaultValue(setting)));
     }
 
     @Override public boolean modified() {
