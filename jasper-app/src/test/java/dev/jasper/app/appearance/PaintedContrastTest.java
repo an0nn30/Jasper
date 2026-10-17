@@ -56,10 +56,8 @@ class PaintedContrastTest {
             (theme, expected) -> badge(theme, expected, true)),
         new Declared("connected dot", new PaintPair(STATUS_SUCCESS, SURFACE_PANEL, SurfaceContrast.Guard.INDICATOR),
             PaintedContrastTest::connectedDot),
-        new Declared("selected segment label", new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedSegment),
-        new Declared("selected preview caption", new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
-            PaintedContrastTest::selectedPreview),
+        new Declared("selected segment label", faces().get(0), PaintedContrastTest::selectedSegment),
+        new Declared("selected preview caption", faces().get(1), PaintedContrastTest::selectedPreview),
         // Plan 3b: a Notice's text on its severity's ground, and its border held apart from that ground.
         new Declared("information notice text", new PaintPair(TEXT_PRIMARY, DerivedColor.INFO_GROUND, SurfaceContrast.Guard.TEXT),
             (theme, expected) -> noticeText(theme, expected, Nodes.Severity.INFO)),
@@ -86,6 +84,14 @@ class PaintedContrastTest {
             (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.WARNING)),
         new Declared("error property value", new PaintPair(STATUS_DANGER, SURFACE_CARD, SurfaceContrast.Guard.TEXT),
             (theme, expected) -> propertyValue(theme, expected, Nodes.Severity.DANGER)));
+
+    /** The default look's face declarations (plan 4b): the selected segment label, then the selected preview caption. */
+    private static List<PaintPair> faces() { return KitFaces.declared(Kit.DEFAULT).stream().distinct().toList(); }
+
+    @Test void theDefaultFacesDeclareExactlyTheTwoRepairsTheDefaultLookMakes() {
+        assertThat(faces()).containsExactly(new PaintPair(TEXT_PRIMARY, SEGMENT_SELECTED_BG, SurfaceContrast.Guard.TEXT),
+            new PaintPair(TEXT_PRIMARY, SURFACE_CARD, SurfaceContrast.Guard.TEXT));
+    }
 
     /** The theme set, then the degenerate palettes. */
     private static List<GeneratedTheme> palettes() {

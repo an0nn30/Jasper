@@ -52,7 +52,7 @@ final class Switches {
             double next = position(toggle);
             if (next != target) {
                 from = button.position; target = next;
-                if (view.motion().enabled()) {
+                if (view.motion().enabled() && button.face.moves()) {
                     if (effect != null) try { effect.close(); } catch (Exception failure) { view.report(failure); }
                     effect = view.motion().register(this::settle); start = System.nanoTime(); animation.start();
                 } else settle();
@@ -70,16 +70,24 @@ final class Switches {
         boolean onSelection;
         /** The selected row's fill and ink, while {@link #onSelection}. */
         InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
-        SwitchButton(KitContext context) { this.context = context; }
+        /** The kit's toggle face, fixed for the button's life. */
+        final ToggleFace face;
+        SwitchButton(KitContext context) { this.context = context; face = context.faces().toggle; }
         @Override public JToolTip createToolTip() { var tip = super.createToolTip(); tip.putClientProperty("html.disable", true); return tip; }
-        @Override public Dimension getPreferredSize() {
+        @Override public Dimension getPreferredSize() { return face.preferredSize(this); }
+        /** The switch's size, its focus reservation included (the default face). */
+        Dimension switchSize() {
             int ring = ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING);
             return new Dimension(2*ring + ThemePainting.metric(context, compact ? DesignMetrics.Role.COMPACT_SWITCH_WIDTH : DesignMetrics.Role.SWITCH_WIDTH),
                 2*ring + ThemePainting.metric(context, compact ? DesignMetrics.Role.COMPACT_SWITCH_HEIGHT : DesignMetrics.Role.SWITCH_HEIGHT));
         }
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
-            try {
+            try { face.paint(this, g); } finally { g.dispose(); }
+        }
+        /** Paints the switch: its track, knob and halo (the default face). */
+        void paintSwitch(Graphics2D g) {
+            {
                 ThemePainting.antialias(g); if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int ring = ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING);
                 int w = ThemePainting.metric(context, compact ? DesignMetrics.Role.COMPACT_SWITCH_WIDTH : DesignMetrics.Role.SWITCH_WIDTH);
@@ -104,7 +112,7 @@ final class Switches {
                 int inset = (h-knob)/2, knobX = x+inset+(int)Math.round((w-knob-2*inset)*position);
                 g.setColor(ColorMath.opacity(Color.BLACK, context.metrics().value(DesignMetrics.Role.SWITCH_KNOB_SHADOW_PERCENT) / 100.0)); g.fillOval(knobX, y+inset+com.formdev.flatlaf.util.UIScale.scale(1), knob, knob);
                 g.setColor(ColorMath.mix(knobOn, knobOff, position)); g.fillOval(knobX, y+inset, knob, knob);
-            } finally { g.dispose(); }
+            }
         }
     }
 }

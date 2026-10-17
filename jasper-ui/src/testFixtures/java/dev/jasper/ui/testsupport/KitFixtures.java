@@ -270,6 +270,20 @@ public final class KitFixtures {
         return dev.jasper.ui.gallery.PanelFixtures.create(name);
     }
 
+    /**
+     * {@code spec} rendered at 1x in {@code context} and written to {@code build/classic-faces/<name>.png} (relative to the
+     * test's working directory) for inspection; the view is closed, the context stays the caller's. EDT.
+     */
+    public static java.awt.image.BufferedImage capture(KitContext context, dev.jasper.ui.model.ViewSpec spec, int width, int height, String name) {
+        try (var view = new dev.jasper.ui.swing.KitView(context, spec, event -> {})) {
+            var image = render(view, width, height, 1);
+            var out = java.nio.file.Path.of("build", "classic-faces", name + ".png");
+            java.nio.file.Files.createDirectories(out.getParent());
+            javax.imageio.ImageIO.write(image, "png", out.toFile());
+            return image;
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
+
     /** Headless paint with layout settling; the view and context remain owned by the caller. */
     public static java.awt.image.BufferedImage render(dev.jasper.ui.swing.KitView view, int width, int height, double deviceScale) {
         if (width <= 0 || height <= 0 || !Double.isFinite(deviceScale) || deviceScale <= 0) throw new IllegalArgumentException("Invalid render size/scale");

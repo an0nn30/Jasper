@@ -70,7 +70,7 @@ final class Buttons {
         @Override void refresh() {
             var value = (Nodes.Button)node; state(); button.kind = value.kind(); button.iconSeverity = value.iconSeverity().orElse(null);
             button.toggle = value.selected().isPresent(); button.getModel().setSelected(value.selected().orElse(false));
-            button.setText(value.label()); button.setFont(ThemePainting.font(context(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL));
+            button.setText(value.label()); button.setFont(ThemePainting.font(context(), context().faces().buttons.label(value.kind(), button.hint ? Typography.Role.PALETTE_HINT : button.panelDetail || button.panel || button.panelEmpty ? Typography.Role.PANEL_DETAIL_LABEL : button.orderedAction ? Typography.Role.ORDERED_ACTION : Typography.Role.LABEL)));
             button.setForeground(button.textColor(false));
             boolean embedded = value.presentation() == Nodes.ButtonPresentation.EMBEDDED || value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.circular=value.presentation()==Nodes.ButtonPresentation.HELP;
@@ -127,6 +127,11 @@ final class Buttons {
         boolean windowFooter;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
         boolean borderless;
+        /**
+         * An inner part of a composite control (a secret's reveal and copy, a crumb), not an action standing in a layout:
+         * the classic face keeps it flat until hovered, as spec 6.4's toolbar ghosts, wherever its control stands.
+         */
+        boolean inner;
         /** An action of a panel body's empty state: the panel references' smaller label and height. */
         boolean panelEmpty;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
@@ -206,8 +211,12 @@ final class Buttons {
             // A Notice's link sits on the severity's ground: its link colour is held to the text floor there.
             if (noticeGround != null && kind == Nodes.ButtonKind.LINK && !onSelection)
                 return SurfaceContrast.painted(context.theme(), Notices.link(noticeGround, hover));
-            return ThemePainting.color(context, textRole(hover));
+            return context.faces().buttons.text(this, hover);
         }
+        /** The context this button paints in. */
+        KitContext context() { return context; }
+        /** The component standing in its parent's layout for this button: itself, or a menu button's surface for its parts and face. */
+        Component placement() { return this; }
         /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
         SemanticColor iconRole(boolean hover) {
             if (onSelection) return ink.text;
@@ -321,14 +330,25 @@ final class Buttons {
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (kind == null || !contextualVisible()) return;
-            // Disabled is the whole button at disabledOpacity, faded as one layer.
-            if (!isEnabled()) { ThemePainting.faded(graphics, this, disabledOpacity, this::paintFace); return; }
+            // Disabled is the whole button at disabledOpacity, faded as one layer, unless the face draws its own disabled state.
+            if (!isEnabled() && fadesDisabled()) { ThemePainting.faded(graphics, this, disabledOpacity, this::paintFace); return; }
             var g = (Graphics2D)graphics.create();
             try { paintFace(g); } finally { g.dispose(); }
         }
         /** The button's face, text and glyph at full opacity. */
         private void paintFace(Graphics2D g) {
             boolean hover = isEnabled() && getModel().isRollover();
+            boolean focused = !embedded && focus != null && focus.visible();
+            paintKitFace(g, hover, focused);
+            g.setFont(getFont()); g.setColor(textColor(hover));
+            paintContent(g, hover);
+        }
+        /** Whether a disabled button fades as one layer: the buttons face's choice; an option control keeps its own. */
+        boolean fadesDisabled() { return context.faces().buttons.fades(this); }
+        /** The face behind the glyph and label: the buttons face's; an option control paints its own. */
+        void paintKitFace(Graphics2D g, boolean hover, boolean focused) { context.faces().buttons.paintFace(this, g, hover, focused); }
+        /** The raised face: fill, border, the primary's inset line and drop (the default buttons face). */
+        void paintRaised(Graphics2D g, boolean hover, boolean focused) {
             // A selected toggle shows the segmented control's selected fill, embedded or not.
             Color fill = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG) : embedded ? null : fill(hover);
             if (isEnabled() && getModel().isPressed() && fill != null) {
@@ -336,7 +356,6 @@ final class Buttons {
                 fill = new Color(darkened.getRed(), darkened.getGreen(), darkened.getBlue(), fill.getAlpha());
             }
             Color border = toggle && isSelected() ? ThemePainting.color(context, SemanticColor.BORDER_CONTROL) : embedded ? null : border();
-            boolean focused = !embedded && focus != null && focus.visible();
             // The outlined circle fills its bounds; like other buttons its focus halo lies outside them.
 if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(context,SemanticColor.BORDER_CONTROL),focused,false,Math.min(getWidth(),getHeight())/2.0,0,0);
             else if (panelDetail) ThemePainting.rounded(g, this, context, fill, border, focused, false,
@@ -345,7 +364,9 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                 UIScale.scale((float)context.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)));
             else ThemePainting.rounded(g, this, context, fill, border, focused, false);
             primaryShadows(g, fill);
-            g.setFont(getFont()); g.setColor(textColor(hover));
+        }
+        /** The glyph and label (and a recorder's dot and keycaps) over the face, in the graphics' font and colour. */
+        private void paintContent(Graphics2D g, boolean hover) {
             Insets insets = getInsets();
             if (recorder()) {
                 int x=insets.left;
@@ -379,7 +400,11 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                     ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
                     : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());
                 int opticalOffset=panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_ACTION_OPTICAL_OFFSET) : panelRow ? -ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_OPTICAL_OFFSET) : 0;
-                artwork.paintIcon(this, g, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2);
+                // A disabled button whose face draws its own disabled state shows its glyph at the label's disabled alpha.
+                var glyph = isEnabled() || fadesDisabled() ? g : (Graphics2D) g.create();
+                if (glyph != g) glyph.setComposite(AlphaComposite.SrcOver.derive(disabledOpacity));
+                try { artwork.paintIcon(this, glyph, icon.x-opticalOffset+(getIcon().getIconWidth()-artwork.getIconWidth())/2, icon.y-opticalOffset+(getIcon().getIconHeight()-artwork.getIconHeight())/2); }
+                finally { if (glyph != g) glyph.dispose(); }
             }
             if (clipped != null) g.drawString(clipped, text.x, text.y + g.getFontMetrics().getAscent() - (panelDetail ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0));
             if (embedded && isEnabled() && focus != null && focus.visible()) {

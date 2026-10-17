@@ -30,7 +30,9 @@ final class ControlRegistry {
             case Nodes.Text text -> new Labels.TextControl(view, text);
             case Nodes.Icon icon -> new Labels.IconControl(view, icon);
             case Nodes.Button button -> new Buttons.ButtonControl(view, button);
-            case Nodes.Field field -> field.presentation() == Nodes.FieldPresentation.STEPPER ? new NumericControls.Stepper(view, field) : field.presentation() == Nodes.FieldPresentation.SLIDER ? new NumericControls.Slider(view, field) : new TextFields.FieldControl(view, field);
+            case Nodes.Field field -> field.presentation() == Nodes.FieldPresentation.SLIDER && view.context().faces().stepper.slider() ? new NumericControls.Slider(view, field)
+                : field.presentation() == Nodes.FieldPresentation.STEPPER || field.presentation() == Nodes.FieldPresentation.SLIDER ? new NumericControls.Stepper(view, field)
+                : new TextFields.FieldControl(view, field);
             case Nodes.Secret secret -> new SecretFields.SecretControl(view, secret);
             case Nodes.Choice choice -> choice.kind() == Nodes.ChoiceKind.PREVIEWS ? new PreviewChoices(view, choice) : new Choices.ChoiceControl(view, choice);
             case Nodes.PickerMenu menu -> new PickerMenus.MenuControl(view,menu);

@@ -321,12 +321,7 @@ final class ItemLists {
                         com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), icon.size()));
                 case Nodes.Button _, Nodes.MenuButton _ ->
                         inputHeight(DesignMetrics.Role.BUTTON_HEIGHT, Typography.Role.LABEL);
-                case Nodes.Toggle toggle ->
-                        ThemePainting.metric(
-                                context(),
-                                toggle.compact()
-                                        ? DesignMetrics.Role.COMPACT_SWITCH_HEIGHT
-                                        : DesignMetrics.Role.SWITCH_HEIGHT);
+                case Nodes.Toggle toggle -> context().faces().toggle.rowHeight(context(), toggle.compact());
                 default -> fontHeight(Typography.Role.BODY);
             };
         }
