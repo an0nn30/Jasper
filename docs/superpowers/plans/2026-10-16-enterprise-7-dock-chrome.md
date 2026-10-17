@@ -32,48 +32,50 @@ layout, [DESIGN_LANGUAGE.md](../../design/enterprise/reference/DESIGN_LANGUAGE.m
 Workstation).png`.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-7`, branch
-`claude/enterprise-dock-chrome`, cut from `main` at `deafed424`. Run every command from the worktree root, never in
-`~/projects/moray`. Line numbers below are from `deafed424` and move after the earlier plans; every edit script quotes
-the exact text it replaces and stops with a message when that text is not found the stated number of times. If a script
-stops, re-find the quoted text (it moves, it does not change), adjust the anchor and re-run; never edit around a missing
-anchor.
+`claude/enterprise-dock-chrome`, cut from `main` at `759b2b7d9` (the plan's commits sit on it). Run every command from
+the worktree root, never in `~/projects/moray`. Line numbers below were re-anchored at `759b2b7d9` (Execution notes);
+every edit script quotes the exact text it replaces and stops with a message when that text is not found the stated
+number of times. If a script stops, re-find the quoted text (it moves, it does not change), adjust the anchor and re-run;
+never edit around a missing anchor.
 
 ## Before you start
 
-Plans 3b, 3c, 3d, 3e, 4a, 4b, 4c, 5a, 5b and 6 execute before this plan, in that order. Bring the branch up to `main` and
-check that they are in it:
+Plans 3a to 3e, 4a to 4c, 5a, 6a, 6b and 8a are on `main` at `759b2b7d9`, the branch's base. Plans 5b (the Enterprise
+plugin, IBM Plex and the shipped theme) and 9a (Settings chrome) run in parallel in other worktrees: this plan depends on
+neither, measures with 6a's Enterprise fixtures until 5b merges, and prints the probes that follow the UI face's glyphs
+rather than asserting them (Execution notes R4, R5). Do not rebase, merge or push. Check that the base is what the plan
+was refreshed against:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 759b2b7d9 HEAD && echo base-ok                                                 # base-ok
 grep -c 'record Separator(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java                         # 3b: 1
 grep -c 'Kit CLASSIC' jasper-ui/src/main/java/dev/jasper/ui/kit/Kit.java                                  # 4a: 1
 grep -c 'DOCK_RULE_HIT(6)' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java               # 4a: 1
+grep -c 'DIALOG_FOOTER_VERTICAL(8);' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java     # 6b, the enum's last role: 1
 ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTableFace.java  # 4b, 4c
-grep -c 'DOCK_CHROME' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java             # 5a: at least 1
 grep -c 'public Kit kit()' jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java        # 5a Task 10: 1
-ls jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseResources.java plugins/enterprise/src/main/resources/presentation/fonts  # 5b
-grep -c 'WINDOW_CHROME' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java           # 6: at least 2 (the enum and LANDED)
-ls jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java                               # 6
+grep -c 'LANDED = Set.of(Landed.WINDOW_CHROME, Landed.WINDOW_CONTENT);' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java  # 6a, 6b: 1
+ls jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java \
+  jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json  # 6a
 ```
 
-If any check prints 0 or a file is missing, stop: this plan needs those plans on `main`.
+If a check prints 0 or a file is missing, stop and re-refresh the plan against the new base.
 
-**Plan 6's names.** Plan 6 is delivered as 6a (`2026-10-16-enterprise-6a-window-chrome-shell.md`) and 6b
-(`2026-10-16-enterprise-6b-window-chrome-content.md`), written at the same time as this plan; the names below are theirs
-as written (6a Tasks 4, 5 and 8; 6b Tasks 3 to 5 and 8). Before Task 1, read plan 6's merged code and, where a name or a
-shape differs, change it in this plan's code blocks before executing (a renamed member is one search and replace; a
-different shape means adapting the code that uses it without changing behaviour), and record the change in this plan's
-status banner and in `docs/STATUS.md` (Task 14).
+**Plan 6's names.** Plan 6 was delivered as 6a (`2026-10-16-enterprise-6a-window-chrome-shell.md`) and 6b
+(`2026-10-16-enterprise-6b-window-chrome-content.md`); the names this plan uses were checked against their merged code
+at `759b2b7d9` and its code blocks use them as they are (Execution notes R2):
 
 | This plan uses | From |
 |---|---|
-| `public final class WorkspaceChrome` with `STANDARD`, `static WorkspaceChrome of(WorkspaceLook look, TitleFormat title)` and the private constructor `WorkspaceChrome(MenuBarLayout, TitleFormat, Supplier<HeaderComposition>, Function<WindowContent, TabStrip>, Supplier<StatusCells>, boolean runItem)`, which `STANDARD` calls with `…, WindowTabs::new, SlashSegments::new, false)` and `of` with `…, tabs, status, look.runItem())` | 6a Task 4, 6b Tasks 3 to 5 |
-| `WindowContent(…, boolean macOs, WorkspaceChrome look)`, its field `look` assigned right after `super(new BorderLayout())`, and `WorkspaceChrome look()` | 6a Task 4 |
-| `DesktopTestSupport.content(ShellLauncher, ThemeController, WorkspaceChrome look)` (the host's keymap) | 6a Task 4 |
-| `dev.jasper.app.testsupport.EnterpriseLook` with `kit()`, `chrome()`, `registerFonts()`, `controller(boolean dark)` and `restoreDefault()` | 6a Task 4 |
-| `dev.jasper.app.testsupport.MockProfile` with `REFERENCE`, `RENDERS`, `mock(String)`, `at(BufferedImage, int, int)`, `print`, `write` | 6a Task 8 |
-| `ChromeRenderTest` with `check(Case, WindowContent, JRootPane, MacTitleBar)`, where "plans 6b to 9 add their surfaces' checks" | 6a Task 8 |
+| `public final class WorkspaceChrome` with `STANDARD`, `static WorkspaceChrome of(WorkspaceLook look, TitleFormat title)` and the private constructor `WorkspaceChrome(MenuBarLayout, TitleFormat, WorkspaceLook.Header, WorkspaceLook.Tabs, WorkspaceLook.Status, boolean runItem)`, which keeps the look's choices and makes each window's strategy from them (`header()`, `tabs(WindowContent)`, `statusBar(Action, BooleanSupplier)`), with `equals`/`hashCode` over them (6b Execution notes R29) | 6a Task 4, 6b Tasks 3 to 5 |
+| `WindowContent(…, boolean macOs, WorkspaceChrome look)` and `WorkspaceChrome look()` | 6a Task 4 |
+| `DesktopTestSupport.content(ShellLauncher, ThemeController, WorkspaceChrome look)`, `closeOwnersNow()` | 6a Task 4 |
+| `dev.jasper.app.testsupport.EnterpriseLook` with `CHROME`, `kit()` (4a's fixture kit), `chrome()`, `theme()` (the fixture `JasperTheme`), `controller(boolean dark)` and `restoreDefault()`; no `registerFonts()` until 5b | 6a Task 4, 6a Execution notes R13 |
+| `dev.jasper.app.testsupport.MockProfile` with `ROOT`, `REFERENCE`, `RENDERS`, `mock(String)`, `at(BufferedImage, int, int)`, `print`, `write`, `fonts(String, int, int, int)` | 6a Task 8, 6b Execution notes R36 |
+| `ChromeRenderTest` with `record Case(String name, Supplier<ThemeController> themes, Projections projections)` and `check(Case, WindowContent, JRootPane, MacTitleBar)`, where "plans 6b to 9 add their surfaces' checks"; its cases use every landed group (`ALL`) | 6a Task 8, 6b Task 8 |
+| `ProjectionReadTest.PROJECTION_READERS`, which already allows only `WorkspaceChrome` (and the presentation package) to read `WorkspaceLook.Stripes` and `FrameStyle` | 6a Execution notes R16 |
 | `Presentation.LANDED` holding `Landed.WINDOW_CHROME` and `Landed.WINDOW_CONTENT` | 6a Task 1, 6b Task 8 |
+| `WindowStatusBar()` (slash segments, no run item) and `WindowStatusBar(StatusCells, RunItem)`; 6b's `WindowPairs` and `WindowPairsTest` | 6b Task 5, Task 8 |
 
 ## Global Constraints
 
@@ -81,7 +83,7 @@ status banner and in `docs/STATUS.md` (Task 14).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md); no task here runs `packageDist`, `trainAotCache` or `-Pjasper.aot=true`. `:jasper-ui:gallery` is headless (`java.awt.headless=true`) and may be run; the headless JUnit renders of this plan write PNGs under `jasper-app/build/` and open no window.
 - Work only in the worktree above on `claude/enterprise-dock-chrome`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Pixel rule: the default look does not change. Every file the headless gallery writes for Slate Cobalt Dark and Light is byte-identical to the base captured in Task 1 Step 1 (`jasper-ui/build/plan7-base/`), and so are the two default-look dock renders `DefaultDockPixelsTest` writes (`jasper-app/build/plan7-base/default-{dark,light}.png`); no `tools/visual/` pair of the default look changes. Tasks 3, 4, 8, 10 and 13 prove it. The only derived role that changes is Slate Cobalt Dark's `surface.header.active` (#232b3c to #2d3546, Rulings 16), which no default-look painter reads.
-- Mock matching is a hard requirement: every surface this plan builds has a headless JUnit render under the Enterprise kit and theme compared with a crop of its mock (Light, Dark and the Unlock Vault mock's scrimmed window), with the tolerances stated in its task. A task is done only when its comparison passes; when it does not, adjust only the knobs the task names, re-run, and look at the images under `jasper-app/build/dock-renders/`. A floor may be lowered only when the ink positions already pass and the remaining difference is glyph rasterisation; then lower it to the measured value minus 0.01 and record the residual in the status banner and in `docs/STATUS.md`.
+- Mock matching is a hard requirement: every surface this plan builds has a headless JUnit render under the Enterprise kit and theme compared with a crop of its mock (Light, Dark and the Unlock Vault mock's scrimmed window), with the tolerances stated in its task. A task is done only when its comparison passes; when it does not, adjust only the knobs the task names, re-run, and look at the images under `jasper-app/build/dock-renders/`. A floor may be lowered only when the ink positions already pass and the remaining difference is glyph rasterisation; then lower it to the measured value minus 0.01 and record the residual in the status banner and in `docs/STATUS.md`. Until plan 5b merges, the Enterprise kit and theme are plan 6a's fixtures (`EnterpriseLook`: 4a's fixture kit in the platform faces, `enterprise-fixture.json`), and every probe that follows the UI face's advance widths or glyphs (a text run's far edge, any position after a label, an agreeing share) is printed through `MockProfile.fonts` or `MockCrops.fontsFloor` instead of asserted, as 6a and 6b did (Execution notes R5); fills, rules, run counts, ink colours, thicknesses, the first ink a padding sets and the icons' centres stay asserted. The merge with plan 5b turns the printed probes into assertions within their stated tolerances and floors.
 - Spec 3.3 and 16.1.7: `WorkspaceChrome.of` is the only class that reads `WorkspaceLook.Stripes` and `WorkspaceLook.FrameStyle`; every other class receives `DockChrome`'s booleans or a `StripeSet`. Faces and strategies never reference `Kit` or `ChromeSpec` beyond the `Kit` value they are built with.
 - Spec 6.6: dock geometry reads the window's kit. `ToolWindowArea`, `ToolWindowHeader` and `DockDrag` keep no static metric reader; their constructors that take no kit (tests only) read the installed kit as before.
 - `dev.jasper.app.dock` stays JDK-only: no Swing, and from `java.awt` only `Rectangle` and `Point` (`verifyApplicationArchitecture`).
@@ -119,7 +121,9 @@ status banner and in `docs/STATUS.md` (Task 14).
 
 ## Verified facts
 
-At `deafed424` unless marked; facts about the earlier plans cite the plan.
+At `deafed424` unless marked; facts about the earlier plans cite the plan. Re-anchored at `759b2b7d9` on 2026-10-17
+(Execution notes): the line numbers below that moved are given at `759b2b7d9`; facts 1, 2, 5, 7, 11, 12 (but `KitView`),
+13 and 17 had not moved.
 
 1. `ToolStripe` is `final class ToolStripe extends JPanel` (`ToolStripe.java:53`); its `Button` record is
    `(id, title, icon, slot, selected, badge)` with a five-argument convenience (`:55-59`); the callbacks `onToggle`,
@@ -144,10 +148,12 @@ At `deafed424` unless marked; facts about the earlier plans cite the plan.
 5. `DockGeometry.Metrics.at(scale)` fixes 6 px dividers (`DockGeometry.java:39-40`); `DockDropResolver.Group(slot,
    bounds, buttons)` (`DockDropResolver.java:24-34`); `resolve` counts the buttons whose vertical middle is above the
    cursor (`:83`).
-6. `WindowContent` makes the stripes in field initializers (`WindowContent.java:92`), the area, the body and the drag in
-   its constructor (`:253-263`); `leftStripe()` and `rightStripe()` return `ToolStripe` (`:848-849`);
-   `syncRailVisibility` (`:868-877`); `applyTheme` refreshes the stripes (`:1222-1223`); `setRailWidth` (`:1353-1361`);
-   `rebind` re-applies accelerators through `contributed.applyAccelerators()` (`:573-582`); `setBindings` (`:567-570`).
+6. `WindowContent` makes the stripes in field initializers (`WindowContent.java:93`), the area, the body and the drag in
+   its constructor (`:272-282`); `leftStripe()` and `rightStripe()` return `ToolStripe` (`:908-909`);
+   `syncRailVisibility` (`:928-937`); `applyTheme` refreshes the stripes (`:1315-1316`); `setRailWidth` (`:1446-1454`);
+   `rebind` re-applies accelerators through `contributed.applyAccelerators()` (`:623-632`); `setBindings` (`:617-620`).
+   The window's chrome is `look()` (6a), whose `WorkspaceChrome` keeps the look's choices and makes each window's
+   strategy from them, equal by those choices (6b Execution notes R29).
 7. `WindowContributions` wires the stripes' callbacks (`WindowContributions.java:79-83`), restores sizes from
    `state.dock()` (`:189-197`), docks panels from `state.panel` (`:217`), saves through `state.panels`, `putPanel` and
    `setDock` (`:307-327`), renders the stripes from left and right lists (`:329-345`), updates badges (`:352-357`),
@@ -156,12 +162,13 @@ At `deafed424` unless marked; facts about the earlier plans cite the plan.
 8. `PanelEntry.toggleActionId()` names the action View › Tool Windows lists (`PanelEntry.java:36-37`);
    `KeyBindings.strokeFor(String)` (`KeyBindings.java:223-225`); `KeyBindings.withOverrides(macOs, overrides)` accepts
    extension ids (`:119-148`). Remote toggles Sessions with `HOSTS` (`cmd+alt+1`/`alt+1`) and SFTP with its `TOGGLE`
-   (`cmd+alt+2`/`alt+2`) (`RemotePlugin.java:228`, `:263-269`; `SftpUi.java:57`).
-9. `UiState` keeps one `panels` map and one `dock` (`UiState.java:105-109`); `parse` (`:136-158`) and `readDock`
-   (`:161-176`); `panel`, `panels`, `putPanel`, `dock`, `setDock` (`:261-266`); `save` writes version 2 (`:280-301`), and
+   (`cmd+alt+2`/`alt+2`) (`RemotePlugin.java:266`, `:270`; `SftpUi.java:57`).
+9. `UiState` keeps one `panels` map and one `dock` (`UiState.java:105-109`); `parse` (`:133-158`) and `readDock`
+   (`:161-176`); `panel`, `panels`, `putPanel`, `dock`, `setDock` (`:242-247`); `save` writes version 2 (`:264-285`), and
    `UiStateTest.roundTripsTheDockPanelsWindowsAndTheRail` pins its exact text (`UiStateTest.java:15-50`).
-10. `JasperApplication` builds `NotificationsFeature` (`JasperApplication.java:256-257`) after `ThemeController.startup`
-    (`:251-252`) and loads `UiState.load(dirs.uiState())` in `startPlugins` (`:846`).
+10. `JasperApplication` builds `NotificationsFeature` (`JasperApplication.java:321-322`) after `ThemeController.start`
+    (`:304`) and loads `UiState.load(dirs.uiState())` in `startPlugins` (`:936`, the one call); `presentation()` (`:208`)
+    is the presentation after start-up's fallback.
 11. `NotificationsFeature` registers the panel as `addPanel(PANEL_ID, "Notifications", icon, Slot.RIGHT_TOP,
     Optional.of(SHOW_HISTORY), …)` (`NotificationsFeature.java:64-65`); `HistoryPanel`'s accessible name is
     "Notifications" (`HistoryPanel.java:81`); `NotificationsFeatureTest` builds the three-argument constructor
@@ -171,48 +178,58 @@ At `deafed424` unless marked; facts about the earlier plans cite the plan.
     `PANEL_HEADER_TRAILING_PADDING` (`:199-200`) and the inline layouts (`:202-203`); its dot is `status.success` held to
     3:1 on `surface.panel` (`:160-176`); `HeaderLayout.height` (`:294-308`) and `layoutContainer` (`:319-348`).
     `PanelHostHeader(detail, active, actions)` (`PanelHostHeader.java:18-26`); `KitView.setPanelHostActions` and
-    `setPanelHostHeader` (`KitView.java:253`, `:259`). The header's component is a plain non-opaque `JPanel` (`:32-33`),
+    `setPanelHostHeader` (`KitView.java:255`, `:261`). The header's component is a plain non-opaque `JPanel` (`:32-33`),
     so a border that fills its bounds paints behind its labels.
 13. `ChromePainter` is constructible for any kit (`ChromePainter.java:22-25`); `connectedDot` holds the dot on
     `surface.panel` (`:233-240`); `measureText` and `prepareText` are public (`:44-46`).
 14. `DerivedPalette.recipe` uses `SurfaceContrast.apart` for `surface.header`, `surface.header.active`,
     `surface.stripe`, `surface.tableHeader`, `surface.zebra` and `surface.footer` (`DerivedPalette.java:84-89`, `:98`);
     `apart` keeps a colour that is far enough on either side, else moves it toward black whenever `from`'s L* is at
-    least the distance (`SurfaceContrast.java:109-122`). `derived-roles.tsv` freezes Slate Cobalt Dark's header as
+    least the distance (`SurfaceContrast.java:123`). `DerivedColorTest.INPUTS` pins each recipe's inputs
+    (`DerivedColorTest.java:27` for `surface.header.active`). `derived-roles.tsv` freezes Slate Cobalt Dark's header as
     `#2d3036` and its active header as `#232b3c`, darker than the inactive one (plan 2's STATUS hand-off); plan 5b left
     the direction rule to this plan (5b Rulings 8).
-15. `IconRegistry` draws "remove" as `M 3 8 H 13` (`IconRegistry.java:347`), "more" (`:366`), "collapse" (`:368`).
+15. `IconRegistry` draws "remove" as `M 3 8 H 13` (`IconRegistry.java:352`), "more" (`:371`), "collapse" (`:373`).
 16. `WorkspaceMetricsTest.formerStaticMetricsFollowTheInstalledKit` calls the three statics of facts 2 to 4
-    (`WorkspaceMetricsTest.java:73-99`); `nativeAdaptersDoNotBorrowGenericKitRoles` forbids `ToolStripe.java` and
+    (`WorkspaceMetricsTest.java:75-101`); `nativeAdaptersDoNotBorrowGenericKitRoles` forbids `ToolStripe.java` and
     `ToolWindowHeader.java` the generic roles `ICON_GAP`, `STATUS_DOT`, `FIELD_HORIZONTAL_PADDING` and others, and
-    requires `ToolWindowHeader.java` to name its `TOOL_HEADER_*` roles (`:46-68`).
+    requires `ToolWindowHeader.java` to name its `TOOL_HEADER_*` roles (`:45-73`).
 17. `ConfigSnapshot.MIN_RAIL_WIDTH` and `DEFAULT_RAIL_WIDTH` are 28 (`ConfigSnapshot.java:22`).
 18. `ThemeMigrationCoverageTest` requires numeric task columns for `standard-ui` rows (`ThemeMigrationCoverageTest.java:53-56`).
 19. `PaintedContrastTest.DEFAULT_PAIRS` declares the default look's eight pairs with samplers
-    (`PaintedContrastTest.java:46-62`) over `KitFixtures.themes()` and `degenerate()` (`:65-70`).
+    (`PaintedContrastTest.java:46-62`) over `KitFixtures.themes()` and `degenerate()` (`palettes()`, `:97-101`); its
+    `hasColor(image, color)` scans only an image's right half (`:479-483`), where the off switch's knob sits.
 20. Two tests type `owner.leftStripe()` and `owner.rightStripe()` as `ToolStripe`: `WindowPanelsTest.tips(ToolStripe)`
     (`WindowPanelsTest.java:51`) and the loop in `WindowDragTest.Fixture.button` (`WindowDragTest.java:73`).
 21. Plan 4a Task 2 appends `STRIPE_LABEL_PADDING(8)`, `STRIPE_LABEL_GAP(1)`, `DOCK_RULE(1)`, `DOCK_RULE_HIT(6)` with
-    the same value in both catalogs, and 4c appends `GROUP_ROW_INDENT(14)` last; 4a Task 3 writes the classic delta as
-    `values.put(Role.X, v);` lines in `DesignMetrics.classic()` before `int[] table = declared();` and freezes
-    `classic-roles.tsv`; `NewRolesTest.ADDED` lists the appended roles in order. 4a's classic delta sets
+    the same value in both catalogs, then 4c's `GROUP_ROW_INDENT(14)`, 8a's thirty `RUN_WINDOW_*` roles and 6a/6b's
+    thirty chrome roles, the enum ending `DIALOG_FOOTER_VERTICAL(8);` (re-anchored); 4a Task 3 writes the classic delta
+    as `values.put(Role.X, v);` lines in `DesignMetrics.classic()` before `int[] table = declared();` and freezes
+    `classic-roles.tsv`; `NewRolesTest.ADDED` lists the appended roles in order and finds them as one run anywhere
+    (`indexOfSubList`), while `RunWindowRolesTest` and `ChromeRolesTest` check their own runs after `DOCK_RULE_HIT`. 4a's classic delta sets
     `NATIVE_TOOL_HEADER_HEIGHT` and `PANEL_HEADER` to 24, `WORKSPACE_GUTTER`, `WORKSPACE_SURFACE_ARC`, `DOCK_DROP_ARC` and
     `RAIL_BUTTON_ARC` to 0, `STATUS_DOT` and `TOOL_HEADER_ACTIVE_DOT` to 7 (4a Task 3). 4a Rulings 16 hands its
     three package-test repairs to plans 6 and 7: the `PanelHeaders` connected dot, `NotificationCardTest`'s count and
-    the status bar's configuration text (`ConfigurationStatusTest`); plans 6a and 6b take none of them.
+    the status bar's configuration text (`ConfigurationStatusTest`); plans 6a and 6b take none of them (6b's
+    `WindowPairsTest` samples the classic ruled cells' warning and error text over every palette, not the default
+    look's slash segments, which `ConfigurationStatusTest` checks in Slate Cobalt only).
 22. Plan 5a Task 8: `Projections.of` takes the dock group (`stripes`, `FrameStyle`, `DockLayoutKey`, `AppPanels`) from
     the file only when `Presentation.LANDED` holds `DOCK_CHROME`; `WorkspaceLook(Menus, Header, Stripes, Tabs, Status,
     boolean runItem, FrameStyle)`; `AppPanels("Event Log", Slot.BOTTOM_LEFT)` under stripes; `DockLayoutKey(String)`.
     5a Task 9: `JasperApplication.presentation()`. 5a Task 10: `ThemeController.kit()`. 5a Rulings 3: converting the
     workspace's installed-kit readers belongs to plans 6 and 7.
-23. Plan 5b Task 4: `dev.jasper.app.testsupport.EnterpriseResources` with `ROOT`, `RESOURCES`, `facts()` (whose
-    `parsed()` is the shipped kit's `KitParser.Parsed`) and `theme()`; the shipped kit names the five Plex files under
-    `fonts/` (beside it, in `plugins/enterprise/src/main/resources/presentation/fonts`); `KitFixtures.themes()`
-    includes Enterprise Light and Dark. 5b's theme gives Enterprise Light
-    `surface.control.selected` #D7D9DC and `surface.panel` #F7F7F8, and authors `surface.header` #E1E3E6,
-    `surface.header.active` #D9DFEA and `surface.stripe` #E4E6E9; Dark #50545B, #35383D, #36393E, #3D4658, #383B40.
-24. `KitFixtures.context(theme, kit)` builds a `KitContext` over a fixture binding (`KitFixtures.java:224-228`);
-    `KitFixtures.enterprise()` and `complement()` are plan 4a's fixture kits; `LayoutTestSupport.layoutTree` lays out a
+23. Plan 5b (the Enterprise plugin, Plex, the shipped theme, `EnterpriseResources`) runs in parallel and is not on
+    `main` (re-anchored). Plan 6a's `dev.jasper.app.testsupport.EnterpriseLook` stands in (6a Execution notes R13):
+    `kit()` is 4a's `KitFixtures.enterprise()` (the classic base, a 12 px body, the platform faces), `chrome()` spec
+    5.1's table, `theme()` the `JasperTheme` parsed from `testsupport/enterprise-fixture.json` (spec 7.6's named roles
+    and 6b's chrome targets), `controller(boolean dark)` and `restoreDefault()`; there is no `registerFonts()`. Plan 6a's
+    `MockProfile` gives `ROOT` (from `jasper.repoRoot`), `REFERENCE`, `RENDERS`, `mock`, `print`, `write` and
+    `fonts(what, actual, expected, tolerance)`, which prints a probe that follows the UI face's advance widths until
+    5b. The fixture theme gives Light `surface.control.selected` #D3D9E1, `surface.panel` #F7F7F8, `surface.header`
+    #E1E3E6, `surface.header.active` #D9DFEA, `surface.stripe` #E4E6E9, `border.window` #C4C7CC and `border.divider`
+    #D3D6DA; Dark #50545B, #35383D, #36393E, #3D4658, #383B40, #2A2C30 and #4A4D53.
+24. `KitFixtures.context(theme, kit)` builds a `KitContext` over a fixture binding (`KitFixtures.java:329-333`);
+    `KitFixtures.enterprise()` and `complement()` are plan 4a's fixture kits (`:94`, `:101`); `LayoutTestSupport.layoutTree` lays out a
     tree (`LayoutTestSupport.java:8-11`); jasper-app's test task sets `jasper.repoRoot` (`jasper-app/build.gradle.kts:86`).
 
 ## Mock measurements
@@ -375,15 +392,16 @@ is "what — why — cost if wrong". Record them in `docs/STATUS.md` (Task 14) a
   `presentation/Presentation.java` (landing).
 - jasper-ui: `swing/ChromePainter.java` (dock painters and pairs), `swing/PanelHostHeader.java` (the frame flag),
   `swing/PanelHeaders.java` (the header strip), `theme/SurfaceContrast.java` and `theme/DerivedPalette.java` (the side
-  rule), `metrics/DesignMetrics.java` (five roles, the classic delta).
+  rule), `metrics/DesignMetrics.java` (seven roles, the classic delta).
 - Tests: `jasper-app/src/test/java/dev/jasper/app/testsupport/MockCrops.java` (beside plan 6a's `MockProfile`), two methods on 6a's `EnterpriseLook`;
   `workspace/DefaultDockPixelsTest`, `DockMockTest`, `DockFixture`, `StripeSetTest`, `LabelledStripeTest`,
   `BottomStripTest`, `DockDragBottomStripTest`, `StripeNumbersTest`, `StripeNumbersWindowTest`, `FlushFramesTest`,
   `HeaderStripTest`, `DockChromeMatrixTest`, `EnterpriseDockWindowTest`; `dock/HorizontalDropTest`;
   `persistence/UiStateLookTest`; `application/EventLogTest`; jasper-ui `theme/HeaderSideTest`,
-  `swing/PanelHeaderStripTest`; edits to `WorkspaceMetricsTest`, `WindowPanelsTest`, `PaintedContrastTest`,
-  `NotificationCardTest`, `ProjectionsTest`, `NewRolesTest` and the frozen `compact-roles.tsv`, `classic-roles.tsv`,
-  `derived-roles.tsv`.
+  `metrics/DockRolesTest`, `swing/PanelHeaderStripTest`; edits to `WorkspaceMetricsTest`, `DockDragTest`,
+  `ToolWindowHeaderTest`, `ToolWindowAreaTest`, `WindowPanelsTest`, `WindowDragTest`, `PaintedContrastTest`,
+  `NotificationCardTest`, `ConfigurationStatusTest`, `ChromeRenderTest`, `ProjectionsTest`, jasper-ui's
+  `DerivedColorTest` and the frozen `compact-roles.tsv`, `classic-roles.tsv`, `derived-roles.tsv`.
 - `tools/visual/pairs.json` (the dock pairs), documentation (Task 14).
 
 ---
@@ -399,7 +417,7 @@ window's kit, and `WorkspaceChrome.of` gains the dock's one look value, `DockChr
   `jasper-app/src/test/java/dev/jasper/app/workspace/DefaultDockPixelsTest.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/DockChromeTest.java`,
   `jasper-app/src/main/java/dev/jasper/app/workspace/DockChrome.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ToolWindowArea.java:53-56,59,230,254-260,460-464,560`,
-  `ToolWindowHeader.java:31-33,56-63,80,88,116-120`, `DockDrag.java:3,53-56,178,241,278,311`, `WindowContent.java:253`,
+  `ToolWindowHeader.java:31-33,56-63,80,88,116-120`, `DockDrag.java:3,53-56,178,241,278,311`, `WindowContent.java:272`,
   plan 6's `WorkspaceChrome.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceMetricsTest.java:85-96`, `DockDragTest.java:181,391,466`,
   `ToolWindowHeaderTest.java:130`, `ToolWindowAreaTest.java:72`, `docs/design/theme-engine/migration.csv`
@@ -409,8 +427,8 @@ window's kit, and `WorkspaceChrome.of` gains the dock's one look value, `DockChr
 - Produces: `record DockChrome(boolean labelledStripes, boolean flushFrames)` with `DockChrome.STANDARD`;
   `WorkspaceChrome.dock()`; `ToolWindowArea(JComponent, DockState, Kit kit, boolean flush)` with instance
   `surfaceArc()`, `dragThreshold()`, `metrics()`, `kit()`, `flush()`; `ToolWindowHeader(String, Supplier<JPopupMenu>,
-  Runnable, Kit kit, boolean flush)` with instance `logicalHeight()`; the test support `MockCrops` (below), used by every
-  later task.
+  Runnable, Kit kit, boolean flush)` with instance `logicalHeight()`; the test support `MockCrops` (below, with
+  `fontsFloor`, the printed agreeing share of Execution notes R5), used by every later task.
 
 - [ ] **Step 1: Capture the pixel base**
 
@@ -441,7 +459,7 @@ import javax.swing.JComponent;
  */
 public final class MockCrops {
     /** Where the dock tests write their renders, mock crops and differences. */
-    public static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/dock-renders");
+    public static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/dock-renders");
     public static final String CONNECTED = "01 Workstation/Workstation - Connected (plugins in use).png";
     public static final String DISCONNECTED = "01 Workstation/Workstation - Disconnected.png";
     public static final String DARK = "08 Dark Mode/Workstation Dark - Connected (plugins in use).png";
@@ -488,6 +506,15 @@ public final class MockCrops {
     }
 
     public static Color at(BufferedImage image, int x, int y) { return new Color(image.getRGB(x, y)); }
+
+    /**
+     * An agreeing share that follows the UI face's glyphs: until plan 5b ships IBM Plex the fixture kit draws the platform
+     * face, so it is printed as a residual, as {@link MockProfile#fonts} prints a face-width probe; the merge with plan 5b
+     * asserts it at least {@code floor}.
+     */
+    public static void fontsFloor(String what, double actual, double floor) {
+        System.out.printf("FONTS residual until plan 5b: %s %.3f, floor %.2f%n", what, actual, floor);
+    }
 
     /** Whether every channel of {@code a} is within {@code tolerance} of {@code b}'s. */
     public static boolean near(Color a, Color b, int tolerance) {
@@ -855,7 +882,8 @@ record DockChrome(boolean labelledStripes, boolean flushFrames) {
 }
 ```
 
-Plan 6's `WorkspaceChrome` gains the value, built in `of` and given as `DockChrome.STANDARD` to `STANDARD`:
+Plan 6's `WorkspaceChrome` gains the value, built in `of` and given as `DockChrome.STANDARD` to `STANDARD`; its
+equality, which plan 6a's `PresentationReachTest` compares `windowLook()` through (6b Execution notes R29), covers it:
 
 ```bash
 python3 -I - <<'PY'
@@ -863,14 +891,19 @@ python3 -I - <<'PY'
 import pathlib
 path = pathlib.Path("jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceChrome.java"); text = path.read_text(encoding="utf-8")
 edits = [
-    ("WindowTabs::new, SlashSegments::new, false);", "WindowTabs::new, SlashSegments::new, false, DockChrome.STANDARD);"),
-    ("java.util.function.Supplier<StatusCells> status, boolean runItem) {",
-     "java.util.function.Supplier<StatusCells> status, boolean runItem,\n                            DockChrome dock) {\n        this.dock = Objects.requireNonNull(dock);"),
-    ("return new WorkspaceChrome(menus, title, header, tabs, status, look.runItem());",
-     "return new WorkspaceChrome(menus, title, header, tabs, status, look.runItem(),\n            new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH));"),
+    ("WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false);",
+     "WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, DockChrome.STANDARD);"),
+    ("                            WorkspaceLook.Status status, boolean runItem) {",
+     "                            WorkspaceLook.Status status, boolean runItem, DockChrome dock) {\n        this.dock = Objects.requireNonNull(dock);"),
+    ("return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem());",
+     "return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem(),\n            new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH));"),
     ("    private final boolean runItem;", "    private final boolean runItem;\n    /** The dock's look: read here once from the look's stripes and frames (spec 3.3). */\n    private final DockChrome dock;"),
-    ("    TabStrip tabs(WindowContent owner) { return tabs.apply(owner); }",
-     "    TabStrip tabs(WindowContent owner) { return tabs.apply(owner); }\n    /** How this window docks its tool windows. */\n    DockChrome dock() { return dock; }")]
+    ("    TitleFormat title() { return title; }",
+     "    TitleFormat title() { return title; }\n    /** How this window docks its tool windows. */\n    DockChrome dock() { return dock; }"),
+    ("&& tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && title.equals(chrome.title);",
+     "&& tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && dock.equals(chrome.dock)\n            && title.equals(chrome.title);"),
+    ("return Objects.hash(menus.getClass(), header, tabs, status, runItem, title); }",
+     "return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title); }")]
 for old, new in edits:
     if text.count(old) != 1: raise SystemExit(f"WorkspaceChrome: expected 1 of {old!r}; re-find plan 6's text")
     text = text.replace(old, new)
@@ -1021,7 +1054,7 @@ PY
 ```
 
 The class comment of `DockDrag` mentions no `threshold()` method by name; `grep -n 'threshold()' jasper-app/src/main/java/dev/jasper/app/workspace/*.java`
-must print only the two `area.dragThreshold()` reads. Then run Step 2's `grep` for the removed statics again: it must print nothing.
+must print nothing (the two reads are now `area.dragThreshold()`, which the case-sensitive pattern does not match). Then run Step 2's `grep` for the removed statics again: it must print nothing.
 
 - [ ] **Step 5: Run the tests and the pixel check**
 
@@ -1261,7 +1294,7 @@ the same pixels. Until Task 6, `DockChrome.stripes` always gives the rails.
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/DockStripe.java`, `jasper-app/src/main/java/dev/jasper/app/workspace/StripeSet.java`,
   `jasper-app/src/test/java/dev/jasper/app/workspace/StripeSetTest.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/ToolStripe.java:53-73,182,248`, `DockChrome.java`,
-  `WindowContent.java:92,253-263,848-849,868-877,1222-1223,1357-1358`, `WindowContributions.java:79,87,329-357,377,439,450`,
+  `WindowContent.java:93,272-282,908-909,928-937,1315-1316,1450-1451`, `WindowContributions.java:79,87,329-357,377,439,450`,
   `DockDrag.java:61-63,72,92-96,207-295,326-345`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/workspace/WindowPanelsTest.java:51`, `WindowDragTest.java:73`,
   `docs/design/theme-engine/migration.csv`
@@ -1784,9 +1817,9 @@ lighter than its other headers. The classic catalog gains the stripe, pill and h
   `jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles.tsv` (one row)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (the `Role` enum's end, 4a's
   `STRIPE_LABEL_*` values, `classic()`), `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`,
-  `classic-roles.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java` (`ADDED`)
+  `classic-roles.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedColorTest.java` (`SURFACE_HEADER_ACTIVE`'s inputs)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/ChromePainter.java` (dock painters before `clip`)
-- Create: `jasper-ui/src/test/java/dev/jasper/ui/theme/HeaderSideTest.java`
+- Create: `jasper-ui/src/test/java/dev/jasper/ui/theme/HeaderSideTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/DockRolesTest.java`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java` (one test and two helpers)
 
 **Interfaces:**
@@ -1906,7 +1939,14 @@ block = '''    /** Spec 10.7 and 16.1.2: the classic dock chrome paints each dec
         var image = new BufferedImage(160, 80, BufferedImage.TYPE_INT_ARGB);
         var graphics = image.createGraphics();
         try { graphics.scale(4, 4); painter.countPill(graphics, 2, 2, "8", theme, error); } finally { graphics.dispose(); }
-        return hasColor(image, expected);
+        return anywhere(image, expected);
+    }
+
+    /** Whether any pixel of {@code image} is exactly {@code color}; {@code hasColor} scans only the right half, the off switch's. */
+    private static boolean anywhere(BufferedImage image, Color color) {
+        for (int y = 0; y < image.getHeight(); y++)
+            for (int x = 0; x < image.getWidth(); x++) if (image.getRGB(x, y) == color.getRGB()) return true;
+        return false;
     }
 
     /** A 14 px connected dot at (2, 2). */
@@ -1995,21 +2035,8 @@ start = text.index("enum Role")
 last = re.search(r"(\w+\(\d+\));", text[start:])
 if last is None: raise SystemExit("DesignMetrics: the Role enum's last constant was not found")
 end = start + last.end()
-# NewRolesTest.ADDED must end where the enum ends before this plan appends to both (plan 6 appends roles too).
-body = re.sub(r"//[^\n]*|/\*.*?\*/", "", text[start:end], flags=re.S)
-enum_names = re.findall(r"\b([A-Z][A-Z0-9_]*)\(\d+\)", body)
-roles_path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java"); roles_text = roles_path.read_text(encoding="utf-8")
-listed = re.search(r"static final List<String> ADDED = List\.of\(([^;]*)\);", roles_text)
-if listed is None: raise SystemExit("NewRolesTest: ADDED moved")
-added_names = re.findall(r'"(\w+)"', listed.group(1))
-if not added_names or added_names[-1] not in enum_names: raise SystemExit(f"NewRolesTest: ADDED's last name {added_names[-1:]} is not a Role")
-tail_check = "roles.size() - ADDED.size()" in roles_text
-between = enum_names[enum_names.index(added_names[-1]) + 1:]
-if between and tail_check:
-    print(f"NewRolesTest: ADDED ends at {added_names[-1]} but the enum goes on with {between}; adding them to ADDED"
-          " before this plan's names (record this as a deviation)")
-if not tail_check:
-    print("NewRolesTest no longer checks ADDED as the enum's tail: ADDED is left alone; write DockRolesTest (below)")
+if last.group(1) != "DIALOG_FOOTER_VERTICAL(8)":
+    raise SystemExit("DesignMetrics: the enum no longer ends with plan 6b's DIALOG_FOOTER_VERTICAL(8); re-find its last role")
 text = text[:end - 1] + ''',
         // Enterprise plan 7: the count pill, the native header's actions and the header strips' gaps (Workstation mock);
         // only the classic dock chrome reads them.
@@ -2038,20 +2065,19 @@ for table, extra in (("compact-roles.tsv", {}), ("classic-roles.tsv", CLASSIC)):
         text, count = re.subn(rf"(?m)^{role}\t\d+$", f"{role}\t{value}", text)
         if count != 1: raise SystemExit(f"{table}: expected one {role} row, found {count}")
     path.write_text(text + "".join(f"{role}\t{value}\n" for role, value in ADDED), encoding="utf-8")
-if tail_check:
-    names = ", ".join(f'"{role}"' for role in between + [role for role, _ in ADDED])
-    roles_path.write_text(roles_text[:listed.end(1)] + ", " + names + roles_text[listed.end(1):], encoding="utf-8")
+# Plan 2's recipe-input pin: surface.header.active now also reads text.primary (the side rule's text).
+path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedColorTest.java"); text = path.read_text(encoding="utf-8")
+old = "inputs.put(SURFACE_HEADER_ACTIVE, Set.of(SemanticColor.ACCENT, SemanticColor.SURFACE_APP, SURFACE_HEADER));"
+if text.count(old) != 1: raise SystemExit("DerivedColorTest: SURFACE_HEADER_ACTIVE's inputs moved")
+path.write_text(text.replace(old, "inputs.put(SURFACE_HEADER_ACTIVE, Set.of(SemanticColor.ACCENT, SemanticColor.SURFACE_APP, SURFACE_HEADER,\n            SemanticColor.TEXT_PRIMARY));"), encoding="utf-8")
 PY
 ```
 
-The script reads `NewRolesTest` and the enum's names before it appends to the enum. `ADDED` lists the appended
-roles in enum order, and its tail check (`roles.subList(roles.size() - ADDED.size(), roles.size())`, 4a Task 2) needs its last name to be the enum's last
-constant. Plan 6a appends thirty chrome roles and asserts them with its own `ChromeRolesTest`, so 6's executor may have
-listed them in `ADDED` (then `between` is empty) or not. When the script prints that the enum goes on past `ADDED`, it
-lists plan 6's names in `ADDED` before this plan's seven, in enum order; record that in the status banner and in
-`docs/STATUS.md` (Task 14). When it prints that `NewRolesTest` no longer checks the tail, plan 6 changed that test: the
-script leaves it alone, and the seven roles get their own check instead. Create
-`jasper-ui/src/test/java/dev/jasper/ui/metrics/DockRolesTest.java` only in that case:
+The enum ends with plan 6b's `DIALOG_FOOTER_VERTICAL(8)` (the script stops if it does not). `NewRolesTest` finds
+`ADDED` as one run anywhere in the enum (`indexOfSubList`, since the 6a/8a/4c merges), so it is not edited; the seven
+roles get their own check in the style of plan 6a's `ChromeRolesTest`, which follows the chrome roles rather than
+closing the enum, so plan 9a's roles (appended in parallel) merge after them without editing it. Create
+`jasper-ui/src/test/java/dev/jasper/ui/metrics/DockRolesTest.java`:
 
 ```java
 package dev.jasper.ui.metrics;
@@ -2059,28 +2085,36 @@ package dev.jasper.ui.metrics;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** Enterprise plan 7: the dock chrome's roles close the enum in order, the same in both catalogs. */
+/** Enterprise plan 7: the dock chrome's roles, measured on the Workstation mock, the same in both catalogs. */
 class DockRolesTest {
-    static final List<String> ROLES = List.of("STRIPE_PILL_HEIGHT", "STRIPE_PILL_WIDTH", "STRIPE_PILL_PADDING",
-        "STRIPE_PILL_GAP", "TOOL_HEADER_ACTION", "HEADER_STRIP_TITLE_GAP", "HEADER_STRIP_DOT_GAP");
+    static final Map<String, Integer> ROLES = new LinkedHashMap<>();
+    static {
+        Object[][] rows = {{"STRIPE_PILL_HEIGHT", 14}, {"STRIPE_PILL_WIDTH", 16}, {"STRIPE_PILL_PADDING", 5}, {"STRIPE_PILL_GAP", 5},
+            {"TOOL_HEADER_ACTION", 16}, {"HEADER_STRIP_TITLE_GAP", 8}, {"HEADER_STRIP_DOT_GAP", 6}};
+        for (Object[] row : rows) ROLES.put((String) row[0], (Integer) row[1]);
+    }
 
-    @Test void theDockRolesCloseTheEnumInOrderTheSameInBothCatalogs() {
+    @Test void theDockRolesFollowTheChromeRolesInOrderWithTheirMeasuredValuesInBothCatalogs() {
         var names = Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        assertThat(names.subList(names.size() - ROLES.size(), names.size())).containsExactlyElementsOf(ROLES);
-        for (String name : ROLES) {
+        int first = names.indexOf("STRIPE_PILL_HEIGHT");
+        assertThat(first).as("appended after plan 6b's chrome roles").isGreaterThan(names.indexOf("DIALOG_FOOTER_VERTICAL"));
+        assertThat(names.subList(first, first + ROLES.size())).containsExactlyElementsOf(ROLES.keySet());
+        ROLES.forEach((name, value) -> {
             var role = DesignMetrics.Role.valueOf(name);
-            assertThat(DesignMetrics.CLASSIC.value(role)).as(name).isEqualTo(DesignMetrics.DEFAULT.value(role));
-        }
+            assertThat(DesignMetrics.DEFAULT.value(role)).as("default " + name).isEqualTo(value);
+            assertThat(DesignMetrics.CLASSIC.value(role)).as("classic " + name).isEqualTo(value);
+        });
     }
 }
 ```
 
-If `DerivedColorTest` (plan 2) pins each recipe's exact input list, `surface.header.active` now also reads
-`text.primary`: add it to that role's expected inputs. If a plan 4b or 4c test pins a classic panel header action's size
-or padding, update it to the new catalog value and record the change in the status banner.
+The script also adds `text.primary` to `DerivedColorTest`'s pinned inputs of `surface.header.active` (plan 2's
+recipe-input check). No plan 4b or 4c test pins the classic panel header's action size or paddings (checked at
+`759b2b7d9`: jasper-ui's tests pass with the new catalog values).
 
 - [ ] **Step 4: Write the dock painters**
 
@@ -2193,16 +2227,16 @@ FontMetrics metrics, int width) {`:
 
 ```
 
-`ChromePainter` imports `java.awt.*` and `dev.jasper.ui.theme.*`, which cover `Dimension`, `Font`, `FontMetrics`,
-`RenderingHints`, `PaintPair`, `DerivedColor` and `SurfaceContrast`; `java.util.List` is written in full because
-`java.awt.List` is also imported.
+`ChromePainter` imports `java.awt.*`, `javax.swing.*`, `dev.jasper.ui.metrics.*` and `dev.jasper.ui.theme.*`, which
+cover `Dimension`, `Font`, `FontMetrics`, `RenderingHints`, `Typography`, `PaintPair`, `DerivedColor` and
+`SurfaceContrast`; `java.util.List` is written in full because `java.awt.List` is also imported.
 
 - [ ] **Step 5: Run the tests and the pixel check**
 
 Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --tests 'dev.jasper.app.workspace.WorkspaceMetricsTest' --continue`
 Expected: PASS: `HeaderSideTest` 3 tests; `DerivedRolesTableTest` with the one changed row; `DesignMetricsTest`,
-`ClassicCatalogTest` and `NewRolesTest` (or `DockRolesTest`, Step 3) with the new rows; `PaintedContrastTest` with the
-new test over every palette.
+`ClassicCatalogTest`, `NewRolesTest` (unchanged) and `DockRolesTest` with the new rows; `DerivedColorTest` with its
+edited inputs; `PaintedContrastTest` with the new test over every palette.
 If the derived-roles table test reports any row other than Slate Cobalt Dark's `surface.header.active`, stop: Rulings 16
 said only that one moves; recompute with the rule and record the difference before going on. Then the pixel check
 (Task 1 Step 1's gallery commands, `DefaultDockPixelsTest`, the `diff`/`cmp` line) prints `PIXELS-UNCHANGED`.
@@ -2233,8 +2267,9 @@ EOF
 
 Spec 10.7: "rotated text labels on `surface.stripe`, an open panel's label on `surface.control.selected` … Left-stripe
 labels read bottom to top, right-stripe labels top to bottom". `StripeLabels` holds what the side stripes and the bottom
-strip share; `LabelledStripe` lays out and paints a side stripe. The headless render under the shipped Enterprise kit,
-theme and Plex fonts is compared with the left and right stripes of the Workstation, Dark Mode and Unlock Vault mocks.
+strip share; `LabelledStripe` lays out and paints a side stripe. The headless render under the Enterprise kit and theme
+(6a's fixtures until plan 5b) is compared with the left and right stripes of the Workstation, Dark Mode and Unlock Vault
+mocks.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/workspace/StripeLabels.java`, `jasper-app/src/main/java/dev/jasper/app/workspace/LabelledStripe.java`
@@ -2243,8 +2278,8 @@ theme and Plex fonts is compared with the left and right stripes of the Workstat
 - Modify: `docs/design/theme-engine/migration.csv`
 
 **Interfaces:**
-- Consumes: Task 3's `DockStripe`, `ToolStripe.Button`; Task 4's `ChromePainter` dock painters and roles; plan 5b's
-  `EnterpriseResources`.
+- Consumes: Task 3's `DockStripe`, `ToolStripe.Button`; Task 4's `ChromePainter` dock painters and roles; plan 6a's
+  `EnterpriseLook` (`kit()`, `theme()`, `restoreDefault()`) and `MockProfile.fonts`; Task 1's `MockCrops`.
 - Produces: `StripeLabels(Kit)` with `static String text(ToolStripe.Button)`, `font()`, `length(String,
   Optional<PanelBadge>)`, `thickness(int railWidth, Component)`, `paint(Graphics2D, String, Optional<PanelBadge>, int
   across, GeneratedTheme, boolean open)`, `painter()`, `styles()` and the nested `StripeLabels.Label` (a `JToggleButton`
@@ -2254,22 +2289,23 @@ theme and Plex fonts is compared with the left and right stripes of the Workstat
 
 - [ ] **Step 1: Write the failing tests**
 
-Add the theme and its installation to plan 6a's `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java`
-(it registers the Plex files and parses the shipped kit already):
+Add the theme's variants and their installation to plan 6a's
+`jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java` (until plan 5b: 4a's Enterprise fixture kit in
+the platform faces and 6a's fixture theme, `enterprise-fixture.json`; Execution notes R4):
 
 ```bash
 python3 -I - <<'PY'
 import pathlib
 path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java"); text = path.read_text(encoding="utf-8")
-old = "    /** Registers the plugin's Plex files with AWT, once per JVM. */"
-new = """    /** The shipped Enterprise theme's Light or Dark variant. */
-    public static dev.jasper.ui.theme.GeneratedTheme theme(boolean dark) { return EnterpriseResources.theme().generated(dark); }
+old = "    /** Installs Slate Cobalt under the default kit again, with today's fonts, for the tests that follow. EDT. */"
+new = """    /** The fixture theme's Light or Dark variant. */
+    public static dev.jasper.ui.theme.GeneratedTheme theme(boolean dark) { return theme().generated(dark); }
 
-    /** Installs the theme's variant under the shipped kit for a component render, without a controller. EDT. */
+    /** Installs the theme's variant under the kit for a component render, without a controller. EDT. */
     public static void install(boolean dark) { dev.jasper.ui.swing.FlatLafInstaller.install(theme(dark), kit()); }
 
-    /** Registers the plugin's Plex files with AWT, once per JVM. */"""
-if text.count(old) != 1: raise SystemExit("EnterpriseLook: registerFonts moved")
+""" + old
+if text.count(old) != 1: raise SystemExit("EnterpriseLook: restoreDefault moved")
 path.write_text(text.replace(old, new), encoding="utf-8")
 PY
 ```
@@ -2492,6 +2528,7 @@ import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.app.testsupport.MockProfile;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -2500,9 +2537,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Spec 16.1.4 for the dock chrome: each surface plan 7 builds, rendered at 2x under the shipped Enterprise kit, theme and
- * Plex fonts, against its crop of the Workstation (Light), Dark Mode and Unlock Vault mocks. Renders, crops and their
- * differences are written under {@code jasper-app/build/dock-renders/}. Mock data (titles, numbers, counts) are fixtures.
+ * Spec 16.1.4 for the dock chrome: each surface plan 7 builds, rendered at 2x under the Enterprise kit and theme (plan
+ * 6a's {@link EnterpriseLook} fixtures until plan 5b ships the plugin, Plex and the theme), against its crop of the
+ * Workstation (Light), Dark Mode and Unlock Vault mocks. Probes that follow the UI face's glyphs are printed until then
+ * ({@link MockProfile#fonts}). Renders, crops and their differences are written under
+ * {@code jasper-app/build/dock-renders/}. Mock data (titles, numbers, counts) are fixtures.
  */
 @ExtendWith(EdtTestExtension.class)
 class DockMockTest {
@@ -2523,8 +2562,14 @@ class DockMockTest {
         /** A render as this mock shows it: under its scrim. */
         BufferedImage seen(BufferedImage render) { return scrim > 0 ? MockCrops.scrim(render, scrim) : render; }
 
-        /** The open tile is Enterprise Light's #D7D9DC against the mock's #CFD4DC (Rulings 6); Dark's is exact. */
+        /** The open tile is Enterprise Light's #D3D9E1 (6a's fixture theme) against the mock's #CFD4DC (Rulings 6); Dark's is exact. */
         int tileTolerance() { return dark ? 3 : 10; }
+
+        /**
+         * How near a fill or rule must be: 3, or 5 under the Unlock Vault mock's scrim, which has a cool cast (white reads
+         * #C9CACC, 2 to 3 bluer than black at 21 % gives; Execution notes R6).
+         */
+        int fillTolerance() { return scrim > 0 ? 5 : 3; }
     }
 
     static final Variant LIGHT = new Variant("light", MockCrops.CONNECTED, false, 0, 0);
@@ -2564,9 +2609,10 @@ class DockMockTest {
     }
 
     /**
-     * A side stripe against its mock crop (the mock's 22 px fill at 2x): the stripe and open-tile fills, the labels' ink
-     * runs along the stripe within 2 px each, their ink, and the share of agreeing pixels over the render's middle 44
-     * columns of its fill, where the centred labels line up with the mock's.
+     * A side stripe against its mock crop (the mock's 22 px fill at 2x): the stripe and open-tile fills, one ink run per
+     * label with the mock's ink, the first label's leading ink within 2 px, and (printed until plan 5b) the other run
+     * edges and the share of agreeing pixels over the render's middle 44 columns of its fill, where the centred labels
+     * line up with the mock's.
      */
     static void compareStripe(Variant variant, String name, BufferedImage render, BufferedImage mock, int thickness, Side side,
                               List<Integer> expectedRuns) {
@@ -2575,7 +2621,7 @@ class DockMockTest {
         MockCrops.write(variant.name() + "-" + name, MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), mock);
         String where = variant.name() + " " + name;
         Color stripeFill = MockCrops.at(mock, 2, 4), tile = MockCrops.at(mock, 2, 40);
-        assertThat(MockCrops.near(MockCrops.at(window, 2, 4), stripeFill, 3)).as(where + ": the stripe's surface").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(window, 2, 4), stripeFill, variant.fillTolerance())).as(where + ": the stripe's surface").isTrue();
         assertThat(MockCrops.near(MockCrops.at(window, 2, 40), tile, variant.tileTolerance())).as(where + ": the open tile").isTrue();
         var theirs = MockCrops.runs(mock, true, 120, 20, stripeFill, tile);
         var mine = MockCrops.runs(window, true, 120, 20, stripeFill, tile);
@@ -2585,13 +2631,18 @@ class DockMockTest {
             assertThat(theirs.get(i).end()).as(where + " mock run " + i).isBetween(expectedRuns.get(2 * i + 1) - 2, expectedRuns.get(2 * i + 1) + 2);
         }
         assertThat(mine).as(where + ": one ink run per label").hasSameSizeAs(theirs);
+        // The first label's leading ink lies RAIL_GAP and STRIPE_LABEL_PADDING below the stripe's top whatever the face;
+        // every later edge follows the labels' advance widths, and the agreeing share their glyphs: printed until plan
+        // 5b's Plex (Execution notes R5), then asserted within 2 px and against STRIPE_FLOOR.
+        assertThat(mine.getFirst().start()).as(where + " label 0 starts")
+            .isBetween(theirs.getFirst().start() - 2, theirs.getFirst().start() + 2);
         for (int i = 0; i < theirs.size(); i++) {
-            assertThat(mine.get(i).start()).as(where + " label " + i + " starts").isBetween(theirs.get(i).start() - 2, theirs.get(i).start() + 2);
-            assertThat(mine.get(i).end()).as(where + " label " + i + " ends").isBetween(theirs.get(i).end() - 2, theirs.get(i).end() + 2);
+            if (i > 0) MockProfile.fonts(where + " label " + i + " start", mine.get(i).start(), theirs.get(i).start(), 2);
+            MockProfile.fonts(where + " label " + i + " end", mine.get(i).end(), theirs.get(i).end(), 2);
             assertThat(MockCrops.near(mine.get(i).ink(), theirs.get(i).ink(), 24)).as(where + " label " + i + " ink").isTrue();
         }
-        assertThat(MockCrops.agreement(MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), mock, 24))
-            .as(where + ": agreeing pixels").isGreaterThanOrEqualTo(STRIPE_FLOOR);
+        MockCrops.fontsFloor(where + ": agreeing pixels",
+            MockCrops.agreement(MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), mock, 24), STRIPE_FLOOR);
     }
 
     // Later tasks add their surfaces above this line.
@@ -3072,8 +3123,8 @@ LabelledStripe shows a side's tool windows as labels ("N: " first when the
 toggle ends in a digit), bottom to top on the left and top to bottom on the
 right, open ones on their tile, badges as count pills, rail actions after
 the second group, and a drag view with drop space and a gap. Its 2x render
-under the shipped Enterprise kit, theme and fonts matches the Workstation,
-Dark Mode and Unlock Vault mocks' stripes.
+under the Enterprise fixtures is compared with the Workstation, Dark Mode
+and Unlock Vault mocks' stripes; the face-dependent probes print until 5b.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -3382,6 +3433,10 @@ In `DockMockTest`, insert before `    // Later tasks add their surfaces above th
      * mock's amber pill is the deferred Problems panel; this one is the error tone), against the mocks' bottom strip: the
      * strip is 28 thick against the mock's 24 and its labels start at the side stripes' 28 against 23 (Rulings 4 and 8),
      * so the render is cropped on its fill's middle rows and its ink is compared 10 px (2x) to the right of the mock's.
+     * Asserted: the surface, three dividers in the mock's colour, the first label's leading ink and the pill's width;
+     * the later edges, the pill's start and the agreeing share follow the labels' advance widths and glyphs and are
+     * printed until plan 5b's Plex (Execution notes R5). The render is 330 wide, past the mock's 270, so the platform
+     * face's wider labels still show their third divider.
      */
     @Test void theBottomStripMatchesTheMocks() throws Exception {
         for (Variant variant : VARIANTS) {
@@ -3394,43 +3449,52 @@ In `DockMockTest`, insert before `    // Later tasks add their surfaces above th
                 strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false),
                     new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
                 int thickness = strip.getPreferredSize().height, shift = 2 * (thickness - 23);
-                var render = variant.seen(MockCrops.render(strip, 270, thickness, 2));
+                var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
                 var mock = variant.crop(2, 1708, 520, 48);
                 // The render's fill (below its 2 px rule at 2x), its middle 48 rows; the mock crop is the mock's fill.
                 int fill = 2 * thickness - 2, top = 2 + (fill - 48) / 2;
-                var rows = MockCrops.crop(render, shift, top, 520, 48);
-                MockCrops.write(variant.name() + "-bottom-strip", rows, mock);
+                var rows = MockCrops.crop(render, shift, top, 600, 48);
+                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(rows, 0, 0, 520, 48), mock);
                 String where = variant.name() + " bottom strip";
                 Color surface = MockCrops.at(mock, 10, 4), divider = MockCrops.at(mock, 188, 24);
-                assertThat(MockCrops.near(MockCrops.at(rows, 10, 4), surface, 3)).as(where + ": its surface").isTrue();
-                // The dividers, found as runs in the fill's top 6 rows (2x), where no text or pill has ink: the mock's are
-                // at 188, 332 and 518 of this crop, and each label's margins differ there by a pixel or two, so they are
-                // located, not sampled at a fixed column. border.divider is derived from the guarded border.window
-                // (spec 7.1): Light computes the mock's #D3D6DA within 1, Dark lands near #4A4D53.
-                var theirDividers = MockCrops.runs(variant.crop(2, 1708, 525, 6), false, 20, 0, surface);
-                var myDividers = MockCrops.runs(MockCrops.crop(render, shift, top, 525, 6), false, 20, 0, surface);
+                assertThat(MockCrops.near(MockCrops.at(rows, 10, 4), surface, variant.fillTolerance())).as(where + ": its surface").isTrue();
+                // The dividers, found as runs in the fill's top 6 rows (2x), where no text or pill has ink (adjacent
+                // columns join: gap 1): the mock's are 2 px wide at 188, 332 and 518 of this crop. border.divider is the
+                // fixture theme's #D3D6DA and #4A4D53 (6b's override), the mock's.
+                var theirDividers = MockCrops.runs(variant.crop(2, 1708, 525, 6), false, 20, 1, surface);
+                var myDividers = MockCrops.runs(MockCrops.crop(rows, 0, 0, 600, 6), false, 20, 1, surface);
                 assertThat(theirDividers).as(where + ": the mock's dividers").hasSize(3);
                 assertThat(myDividers).as(where + ": a divider after each label").hasSize(3);
                 for (int i = 0; i < 3; i++) {
-                    assertThat(myDividers.get(i).start()).as(where + " divider " + i + " (the mock's at " + theirDividers.get(i).start() + ")")
-                        .isBetween(theirDividers.get(i).start() - 2, theirDividers.get(i).start() + 2);
+                    MockProfile.fonts(where + " divider " + i, myDividers.get(i).start(), theirDividers.get(i).start(), 2);
+                    assertThat(myDividers.get(i).length()).as(where + ": divider " + i + " is 1 px").isEqualTo(theirDividers.get(i).length());
                     assertThat(MockCrops.near(myDividers.get(i).ink(), divider, 8)).as(where + ": divider " + i + "'s colour").isTrue();
                 }
+                // The pill: the columns holding its painted ground (the error tone's danger.ground, under the variant's
+                // scrim), its round ends' antialiased columns aside; the mock's amber pill is found against the surface.
+                var ground = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+                ground.setRGB(0, 0, dev.jasper.ui.theme.DerivedColor.DANGER_GROUND.color(EnterpriseLook.theme(variant.dark())).getRGB());
+                int painted = variant.seen(ground).getRGB(0, 0), pillStart = -1, pillEnd = -1;
+                for (int x = 0; x < rows.getWidth(); x++)
+                    for (int y = 0; y < rows.getHeight(); y++)
+                        if (rows.getRGB(x, y) == painted) { if (pillStart < 0) pillStart = x; pillEnd = x; break; }
+                assertThat(pillStart).as(where + ": the pill is painted").isNotNegative();
+                assertThat(pillEnd - pillStart + 1).as(where + ": the pill is 16 wide").isBetween(28, 34);
+                var theirPill = MockCrops.runs(MockCrops.crop(mock, 462, 0, 40, 48), false, 30, 2, surface);
+                assertThat(theirPill).as(where + ": the mock's pill").hasSize(1);
+                MockProfile.fonts(where + " pill start", pillStart, 462 + theirPill.getFirst().start(), 3);
                 var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, 465, 48), false, 120, 20, surface, divider);
-                var mine = MockCrops.runs(MockCrops.crop(rows, 0, 0, 465, 48), false, 120, 20, surface, divider);
+                var mine = MockCrops.runs(MockCrops.crop(rows, 0, 0, pillStart - 2, 48), false, 120, 20, surface, divider);
                 assertThat(theirs).as(where + ": the mock's labels").hasSize(3);
                 assertThat(mine).as(where + ": one ink run per label").hasSize(3);
+                assertThat(mine.getFirst().start()).as(where + " label 0 starts")
+                    .isBetween(theirs.getFirst().start() - 2, theirs.getFirst().start() + 2);
                 for (int i = 0; i < 3; i++) {
-                    assertThat(mine.get(i).start()).as(where + " label " + i + " starts").isBetween(theirs.get(i).start() - 2, theirs.get(i).start() + 2);
-                    assertThat(mine.get(i).end()).as(where + " label " + i + " ends").isBetween(theirs.get(i).end() - 2, theirs.get(i).end() + 2);
+                    if (i > 0) MockProfile.fonts(where + " label " + i + " start", mine.get(i).start(), theirs.get(i).start(), 2);
+                    MockProfile.fonts(where + " label " + i + " end", mine.get(i).end(), theirs.get(i).end(), 2);
                 }
-                var pill = MockCrops.runs(MockCrops.crop(rows, 462, 0, 40, 48), false, 30, 2, surface);
-                assertThat(pill).as(where + ": one pill").hasSize(1);
-                assertThat(462 + pill.getFirst().start()).as(where + ": the pill starts").isBetween(464, 470);
-                assertThat(pill.getFirst().length()).as(where + ": the pill is 16 wide").isBetween(30, 34);
-                var labelsOnly = MockCrops.crop(rows, 0, 0, 460, 48);
-                assertThat(MockCrops.agreement(labelsOnly, MockCrops.crop(mock, 0, 0, 460, 48), 24)).as(where + ": agreeing pixels")
-                    .isGreaterThanOrEqualTo(STRIPE_FLOOR);
+                MockCrops.fontsFloor(where + ": agreeing pixels",
+                    MockCrops.agreement(MockCrops.crop(rows, 0, 0, 460, 48), MockCrops.crop(mock, 0, 0, 460, 48), 24), STRIPE_FLOOR);
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -3757,16 +3821,16 @@ PY
 - [ ] **Step 4: Run the tests; calibrate against the mocks**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.BottomStripTest' --tests 'dev.jasper.app.workspace.DockDragBottomStripTest' --tests 'dev.jasper.app.workspace.DockDragTest' --tests 'dev.jasper.app.workspace.StripeSetTest' --tests 'dev.jasper.app.workspace.DockMockTest'`
-Expected: PASS (`BottomStripTest` 3, `DockDragBottomStripTest` 3, `DockMockTest` 3 over three variants). For a
-`DockMockTest` failure open `jasper-app/build/dock-renders/<variant>-bottom-strip-{render,mock,diff}.png`; the knobs are
-`STRIPE_LABEL_PADDING` (all three labels off by the same amount at both ends: change it only together with Task 5's
-stripes, which share it), the pill's `STRIPE_PILL_GAP` (text to pill only), `STRIPE_PILL_WIDTH` and
-`STRIPE_PILL_PADDING`, and the baseline in `StripeLabels.paint` (text off vertically). The gap after a pill, before its
-divider, is the label's trailing `STRIPE_LABEL_PADDING`, as after text (`StripeLabels.length`); it has no knob of its
-own (the mock's 20 at 2x against 18 is inside the ±2 bound). The dividers are located as ink runs and compared within
-±2 px at 2x, like the labels. When the label runs and the agreement pass and only a divider misses, by a drift that
-the per-label text widths explain (glyph rasterisation, not a knob), widen that divider's bound to the measured offset
-and record the residual in the status banner and in `docs/STATUS.md`, as the Global Constraints' floor rule says.
+Expected: PASS (`BottomStripTest` 3, `DockDragBottomStripTest` 3, `DockMockTest` 3 over three variants), with the
+bottom strip's `FONTS residual until plan 5b` lines printed (Execution notes R5; measured at `759b2b7d9` in the platform
+face: the dividers at 196, 344 and 532 for the mock's 188, 332 and 518, the pill from 483 for 466, agreeing pixels 0.856,
+0.859 and 0.860). For an assertion failure open
+`jasper-app/build/dock-renders/<variant>-bottom-strip-{render,mock,diff}.png`; the knobs are `STRIPE_LABEL_PADDING`
+(the first label's leading ink: change it only together with Task 5's stripes, which share it), the pill's
+`STRIPE_PILL_WIDTH` and `STRIPE_PILL_PADDING` (its width), and the baseline in `StripeLabels.paint` (text off
+vertically). The printed edges become assertions at the merge with plan 5b, where `STRIPE_PILL_GAP` (text to pill) and
+the label widths are the knobs; the gap after a pill, before its divider, is the label's trailing
+`STRIPE_LABEL_PADDING`, as after text (`StripeLabels.length`), with no knob of its own.
 
 - [ ] **Step 5: Add the ledger rows and commit**
 
@@ -4225,12 +4289,12 @@ In `DockMockTest`, insert before `    // Later tasks add their surfaces above th
                 Color theirs = MockCrops.at(mock, 648, 1000);
                 assertThat(MockCrops.near(MockCrops.at(mock, 649, 1000), theirs, 0)).isTrue();
                 assertThat(MockCrops.near(MockCrops.at(mock, 500, 942), theirs, 3)).isTrue();
-                Rectangle top = area.content(Slot.LEFT_TOP).getParent().getBounds();
+                java.awt.Rectangle top = area.content(Slot.LEFT_TOP).getParent().getBounds();
                 int x = 2 * (top.x + top.width), y = 2 * (top.y + top.height);
-                assertThat(MockCrops.near(MockCrops.at(render, x, 600), theirs, 3)).as(where + ": the colour").isTrue();
-                assertThat(MockCrops.near(MockCrops.at(render, x + 1, 600), theirs, 3)).as(where + ": two pixels at 2x").isTrue();
-                assertThat(MockCrops.near(MockCrops.at(render, x + 2, 600), theirs, 3)).as(where + ": not three").isFalse();
-                assertThat(MockCrops.near(MockCrops.at(render, 200, y), theirs, 3)).as(where + ": between the left frames").isTrue();
+                assertThat(MockCrops.near(MockCrops.at(render, x, 600), theirs, variant.fillTolerance())).as(where + ": the colour").isTrue();
+                assertThat(MockCrops.near(MockCrops.at(render, x + 1, 600), theirs, variant.fillTolerance())).as(where + ": two pixels at 2x").isTrue();
+                assertThat(MockCrops.near(MockCrops.at(render, x + 2, 600), theirs, variant.fillTolerance())).as(where + ": not three").isFalse();
+                assertThat(MockCrops.near(MockCrops.at(render, 200, y), theirs, variant.fillTolerance())).as(where + ": between the left frames").isTrue();
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -4726,21 +4790,23 @@ final class DockFixture implements AutoCloseable {
         for (DockStripe stripe : stripes.all()) stripe.render(buttons, List.of());
     }
 
-    /** A panel's borrowed kit header: the title, the count, and its own actions after them. */
+    /**
+     * A panel's borrowed kit header: the title and the count, as Remote's and File Server's panels build theirs (their own
+     * actions reach the header through the host header, {@link #header(Panel)}).
+     */
     private static ViewSpec spec(Panel panel) {
-        Optional<Nodes.Node> actions = panel.actions().isEmpty() ? Optional.empty() : Optional.of(new Nodes.Stack(panel.id() + ".actions",
-            ControlState.READY, Nodes.LayoutRole.INLINE, panel.actions().stream().<Nodes.Node>map(icon -> new Nodes.Button(panel.id() + "." + icon,
-                ControlState.READY, "", icon, Nodes.ButtonKind.GHOST, icon, icon)).toList(), ""));
         var header = new Nodes.Header(panel.id() + ".header", ControlState.READY, panel.title(),
-            panel.count() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.count()), actions, Optional.empty(), List.of());
+            panel.count() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.count()), Optional.empty(), Optional.empty(), List.of());
         return new ViewSpec(new Nodes.Panel(panel.id(), ControlState.READY, header, Optional.empty(),
             new Nodes.Text(panel.id() + ".body", ControlState.READY, panel.title(), Nodes.TextRole.BODY), Optional.empty()));
     }
 
-    /** A panel's host header metadata: the detail and dot, and, for a native header, the count and its own actions. */
+    /**
+     * A panel's host header metadata: the detail, the dot and its own actions (as Remote's panels publish theirs through
+     * {@code PanelHost.setHeader}), and, for a native header, the count as a digits-only detail.
+     */
     private PanelHeaderState header(Panel panel) {
-        if (kitHeaders) return new PanelHeaderState(panel.detail(), panel.connected(), List.of());
-        String detail = panel.count() > 0 ? Integer.toString(panel.count()) : panel.detail();
+        String detail = !kitHeaders && panel.count() > 0 ? Integer.toString(panel.count()) : panel.detail();
         return new PanelHeaderState(detail, panel.connected(), panel.actions().stream()
             .map(icon -> new PanelHeaderState.Action(icon, AppIcons.semantic(icon), () -> { })).toList());
     }
@@ -4817,8 +4883,10 @@ block = '''    /** The four native header strips (flush frames) against the mock
 
     /**
      * A header strip against its mock crop (2x, its 24 px strip and its rule): the surface and the rule; the ink runs
-     * along it, a text run's start within 2 px and its end within 3, an icon's centre within 2; and the agreeing pixels
-     * of the text, left of the icons.
+     * along it, one per title, dot, detail and icon, the title's start within 2 px, each icon's centre within 2 (the icons
+     * stand from the trailing edge, whatever the face) and each text run's ink; the other text edges (a text run's end
+     * within 3, a later run's start within 2) and the agreeing pixels of the text, left of the icons, follow the title's
+     * advance width and glyphs and are printed until plan 5b's Plex (Execution notes R5).
      */
     static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth) {
         String where = variant.name() + " " + name;
@@ -4828,9 +4896,9 @@ block = '''    /** The four native header strips (flush frames) against the mock
         var mine = MockCrops.crop(render, 2 * header.x, 2 * header.y, mockWidth, 50);
         MockCrops.write(variant.name() + "-" + name, mine, mock);
         Color surface = MockCrops.at(mock, 4, 4), rule = MockCrops.at(mock, 4, 49);
-        assertThat(MockCrops.near(MockCrops.at(mine, 4, 4), surface, 3)).as(where + ": the strip").isTrue();
-        assertThat(MockCrops.near(MockCrops.at(mine, 4, 48), rule, 3)).as(where + ": the rule").isTrue();
-        assertThat(MockCrops.near(MockCrops.at(mine, 4, 49), rule, 3)).as(where + ": the rule, 1 px").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 4), surface, variant.fillTolerance())).as(where + ": the strip").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 48), rule, variant.fillTolerance())).as(where + ": the rule").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 49), rule, variant.fillTolerance())).as(where + ": the rule, 1 px").isTrue();
         var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, mockWidth, 48), false, 60, 10, surface);
         var ours = MockCrops.runs(MockCrops.crop(mine, 0, 0, mockWidth, 48), false, 60, 10, surface);
         assertThat(ours).as(where + ": one run per title, dot, detail and icon").hasSameSizeAs(theirs);
@@ -4844,14 +4912,15 @@ block = '''    /** The four native header strips (flush frames) against the mock
                 assertThat((run.start() + run.end()) / 2.0).as(where + " icon " + i + " centre")
                     .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
             } else {
-                assertThat(run.start()).as(where + " run " + i + " starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
-                assertThat(run.end()).as(where + " run " + i + " ends").isBetween(mockRun.end() - 3, mockRun.end() + 3);
+                if (i == 0) assertThat(run.start()).as(where + " title starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
+                else MockProfile.fonts(where + " run " + i + " start", run.start(), mockRun.start(), 2);
+                MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
                 assertThat(MockCrops.near(run.ink(), mockRun.ink(), 24)).as(where + " run " + i + " ink").isTrue();
             }
         }
         int text = Math.max(8, firstIcon - 8);
-        assertThat(MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24))
-            .as(where + ": agreeing pixels").isGreaterThanOrEqualTo(HEADER_FLOOR);
+        MockCrops.fontsFloor(where + ": agreeing pixels",
+            MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24), HEADER_FLOOR);
     }
 
 '''
@@ -4863,9 +4932,9 @@ PY
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.HeaderStripTest' --tests 'dev.jasper.app.workspace.DockMockTest'`
-Expected: FAIL: `HeaderStripTest` reports the header 32 tall without a rule, the detail "2" for "(2)" and the "collapse"
-icon; `DockMockTest.nativeHeaderStripsMatchTheMocks` fails on the strip's colour (`surface.panel` for
-`surface.header`).
+Expected: FAIL: `HeaderStripTest` reports the header 24 tall without its rule ("24 and its rule"), the detail "2" for
+"(2)", the actions' size and the detail's colour; `DockMockTest.nativeHeaderStripsMatchTheMocks` fails on the strip's
+height ("24 and the rule").
 
 - [ ] **Step 3: Paint the native header strip**
 
@@ -4973,7 +5042,9 @@ the script write `"\\d+"` into the Java source, the regular expression for digit
 - [ ] **Step 4: Run the tests; calibrate against the mocks**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.HeaderStripTest' --tests 'dev.jasper.app.workspace.DockMockTest' --tests 'dev.jasper.app.workspace.ToolWindowHeaderTest' --tests 'dev.jasper.app.workspace.WorkspaceMetricsTest'`
-Expected: PASS (`HeaderStripTest` 5, `DockMockTest` 5). For a header failure open
+Expected: PASS (`HeaderStripTest` 5, `DockMockTest` 5), with the native headers' `FONTS residual until plan 5b` lines
+printed (measured at `759b2b7d9` in the platform face: the titles' ends 2 to 6 px past the mock's at 2x, the text's
+agreeing pixels 0.931 to 0.976 against the 0.94 floor). For an assertion failure open
 `jasper-app/build/dock-renders/<variant>-native-<panel>-header-{render,mock,diff}.png`; the knobs: the title's start is
 `TOOL_HEADER_LEADING_PADDING` (classic, Task 4), the detail's start `HEADER_STRIP_TITLE_GAP`, the text after the dot
 `HEADER_STRIP_DOT_GAP`, the icons' centres `TOOL_HEADER_TRAILING_PADDING` (all shift together) and `TOOL_HEADER_ACTION`
@@ -5189,7 +5260,7 @@ insert before `    private static boolean searchHint(GeneratedTheme theme, Color
                                 case FLUSH_FOCUSED -> ChromePainter.DOCK_PAIRS.get(12);
                             };
                             Color expected = SurfaceContrast.painted(theme, pair);
-                            assertThat(hasColor(paint(header), expected)).as(name(theme) + " " + kit.id() + " " + frame + " dot " + ColorMath.hex(expected)).isTrue();
+                            assertThat(anywhere(paint(header), expected)).as(name(theme) + " " + kit.id() + " " + frame + " dot " + ColorMath.hex(expected)).isTrue();
                         }
                     }
                 }
@@ -5199,8 +5270,9 @@ insert before `    private static boolean searchHint(GeneratedTheme theme, Color
 
 ```
 
-`paint(JComponent)` and `hasColor(BufferedImage, Color)` are `PaintedContrastTest`'s helpers (the off-switch test uses
-them); `KitTestSupport.layout(Component)` lays a tree out. In `DockMockTest`, insert before
+`paint(JComponent)` is `PaintedContrastTest`'s helper (the off-switch test uses it) and `anywhere(BufferedImage, Color)`
+Task 4's (the existing `hasColor` scans only an image's right half, and the dot sits after the title, on the left);
+`KitTestSupport.layout(Component)` lays a tree out. In `DockMockTest`, insert before
 `    // Later tasks add their surfaces above this line.`:
 
 ```java
@@ -5423,8 +5495,9 @@ field is read by the area's `frame(Host)`, which sits in the same outer class.
 - [ ] **Step 4: Run the tests, calibrate, and run the pixel check**
 
 Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.workspace.FlushFramesTest' --tests 'dev.jasper.app.workspace.DockMockTest' --tests 'dev.jasper.app.workspace.ToolWindowKitPanelTest' --tests 'dev.jasper.app.appearance.PaintedContrastTest' --continue`
-Expected: PASS (`PanelHeaderStripTest` 2, `PanelHostHeaderTest` unchanged, `FlushFramesTest` 5, `DockMockTest` 6). For a
-kit header failure open `jasper-app/build/dock-renders/<variant>-kit-<panel>-header-{render,mock,diff}.png`; the knobs:
+Expected: PASS (`PanelHeaderStripTest` 2, `PanelHostHeaderTest` unchanged, `FlushFramesTest` 5, `DockMockTest` 6), the
+kit headers' `FONTS residual until plan 5b` lines printed (at `759b2b7d9` the titles end 3 to 6 px past the mock's at 2x
+and the text agrees 0.933 to 0.975 against 0.94). For an assertion failure on a kit header open `jasper-app/build/dock-renders/<variant>-kit-<panel>-header-{render,mock,diff}.png`; the knobs:
 the title's start is `FIELD_HORIZONTAL_PADDING`'s read in `refresh` (classic 8), the count's and detail's start
 `HEADER_STRIP_TITLE_GAP`, the text after the dot `HEADER_STRIP_DOT_GAP`, the icons' centres
 `PANEL_HEADER_TRAILING_PADDING` (all together) and `PANEL_HEADER_ACTION` with `PANEL_HEADER_ACTION_GAP` (their pitch).
@@ -5464,8 +5537,8 @@ layout." `UiState` holds each look's dock (`dock` and `panels`) by key and reads
 reads and writes only through `panel`, `panels`, `putPanel`, `dock` and `setDock`.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/persistence/UiState.java:105-118,120-131,136-138,160-176,183-204,261-266,280-286`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:846` (`startPlugins`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/persistence/UiState.java:105-131,133-158,160-204,242-247,264-285`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:936` (`startPlugins`)
 - Create: `jasper-app/src/test/java/dev/jasper/app/persistence/UiStateLookTest.java`
 
 **Interfaces:**
@@ -5757,13 +5830,14 @@ BOTTOM_LEFT; the default look keeps "Notifications" at RIGHT_TOP." `Notification
 `HistoryPanel` takes the title for screen readers (Rulings 19). With every consumer in place, `Presentation.LANDED` gains
 `DOCK_CHROME` (Rulings 20), so a look whose kit says `tool_windows = "stripes"` gets labelled stripes, flush frames, its
 own ui-state tables and Event Log. Two tests extend the chrome renders of spec 16.1.4 to the dock: a real window under
-the shipped look, and every kit under both dock styles. `NotificationCardTest`'s count repair and `ConfigurationStatusTest`'s
+the Enterprise kit file's projection (`ChromeSpec.CLASSIC`, with 6a's fixture kit and theme until plan 5b), and every kit
+under both dock styles. `NotificationCardTest`'s count repair and `ConfigurationStatusTest`'s
 configuration text run over every palette (4a's hand-offs, Rulings 23).
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/NotificationsFeature.java:46-65`,
   `jasper-app/src/main/java/dev/jasper/app/notificationui/HistoryPanel.java:74-81`,
-  `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:256-257`,
+  `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:321-322`,
   `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (`LANDED`)
 - Create: `jasper-app/src/test/java/dev/jasper/app/application/EventLogTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseDockWindowTest.java`, `jasper-app/src/test/java/dev/jasper/app/workspace/DockChromeMatrixTest.java`
@@ -5792,6 +5866,7 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.PanelEntry;
 import dev.jasper.app.contributions.PanelSite;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.presentation.AppPanels;
 import dev.jasper.app.testsupport.EdtTestExtension;
@@ -5810,7 +5885,7 @@ class EventLogTest {
 
     @Test void underLabelledStripesTheNotificationsPanelIsTheEventLogAtBottomLeft() {
         var contributions = new Contributions();
-        var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> true);
+        var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.FOCUSED);
         try (var feature = new NotificationsFeature(center, contributions, KitTestSupport::context, new AppPanels("Event Log", Slot.BOTTOM_LEFT))) {
             var entry = panel(contributions);
             assertThat(entry.title()).isEqualTo("Event Log");
@@ -5825,7 +5900,7 @@ class EventLogTest {
 
     @Test void theDefaultLookKeepsNotificationsAtRightTop() {
         var contributions = new Contributions();
-        var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> true);
+        var center = new NotificationCenter(Runnable::run, Clock.systemUTC(), () -> Delivery.Presence.FOCUSED);
         try (var feature = new NotificationsFeature(center, contributions, KitTestSupport::context)) {
             assertThat(panel(contributions).title()).isEqualTo("Notifications");
             assertThat(panel(contributions).defaultSlot()).isEqualTo(Slot.RIGHT_TOP);
@@ -5834,8 +5909,8 @@ class EventLogTest {
 }
 ```
 
-If `NotificationCenter`'s constructor or `PanelSite`'s four-argument constructor differ from what
-`NotificationsFeatureTest` builds them with, copy that test's construction instead (it is the established form).
+`NotificationCenter` takes a `Delivery.Presence` supplier and `PanelSite` its four-argument form, as
+`NotificationsFeatureTest` builds them (checked at `759b2b7d9`).
 
 Create `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseDockWindowTest.java`:
 
@@ -5867,8 +5942,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Spec 10.7 and 16.1.4: a real window under the shipped look's projection (the classic kit, the Enterprise theme and
- * the workspace look the shipped kit file gives once the dock group has landed) docks the classic way.
+ * Spec 10.7 and 16.1.4: a real window under the Enterprise kit file's projection ({@code ChromeSpec.CLASSIC} with the
+ * dock group landed), its kit and its theme (plan 6a's {@link EnterpriseLook} fixtures until plan 5b ships them) docks
+ * the classic way.
  */
 @ExtendWith(EdtTestExtension.class)
 class EnterpriseDockWindowTest {
@@ -6011,12 +6087,10 @@ Add to `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.jav
     }
 ```
 
-Then update the landing assertions plan 6 left in `ProjectionsTest` (`untilItsPlanLandsAChromeValueMapsToTheDefaultProjection`):
-its check of `Presentation.LANDED`'s contents also allows `Presentation.Landed.DOCK_CHROME` (6a's test reads
-`.contains(WINDOW_CHROME)`; if 6b made it exact, add `DOCK_CHROME` to the exact set), and any assertion there that the shipped kit's `workspace().stripes()`, `frames()`,
-`dockLayout()` or `panels()` under `Presentation.LANDED` equal the default projection's moves into
-`theDockGroupHasLanded` above, where they read the landed values. The `EnumSet.of(WINDOW_CHROME)` case keeps
-`Stripes.RAILS`: it lands only the window group.
+The landing assertions plan 6 left in `ProjectionsTest` (`untilItsPlanLandsAChromeValueMapsToTheDefaultProjection`) need
+no edit (checked at `759b2b7d9`): its check of `Presentation.LANDED` reads `.contains(WINDOW_CHROME, WINDOW_CONTENT)`,
+which still holds, none of its assertions reads the dock group under `Presentation.LANDED`, and its
+`EnumSet.of(WINDOW_CHROME)` case keeps `Stripes.RAILS` (it lands only the window group).
 
 Plan 6a's `ChromeRenderTest.check` is where "plans 6b to 9 add their surfaces' checks"; it renders spec 16.1.4's cases
 (the default, Enterprise, complement and fallback looks and the covering array's rows) with every group landed, so its
@@ -6174,10 +6248,12 @@ presentation; that value's `AppPanels` is "Notifications" at Right Top, which is
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.notificationui.*' --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.architecture.*' :jasper-app:verifyApplicationArchitecture --continue`
 Expected: PASS: `EventLogTest` 2, `ProjectionsTest` with the new test, `ChromeRenderTest` with the dock checks,
 `EnterpriseDockWindowTest` 1,
-`DockChromeMatrixTest` 1, `NotificationCardTest` and `ConfigurationStatusTest` over every palette; plan 5b's `EnterpriseHomeTest` and
-`EnterpriseFirstWindowTest` still pass (a first window under the shipped look now docks with labelled stripes). If a
-variant-read architecture test (plan 6, spec 16.1.7) lists the readers of `WorkspaceLook.Stripes` or `FrameStyle`, the
-only reader is `WorkspaceChrome.of`.
+`DockChromeMatrixTest` 1, `NotificationCardTest` and `ConfigurationStatusTest` over every palette, `PresentationReachTest`
+unchanged (`windowLook()` still equals `WindowLook.of(projections)`, `WorkspaceChrome`'s equality now covering
+`DockChrome`). Plan 6a's `ProjectionReadTest` (spec 16.1.7) already lets only `WorkspaceChrome` read
+`WorkspaceLook.Stripes` and `FrameStyle`, and still passes: `DockChrome` and every dock class receive booleans. Plan 5b's
+`EnterpriseHomeTest` and `EnterpriseFirstWindowTest` are not on the branch; at the merge with 5b they run again (a first
+window under the shipped look then docks with labelled stripes).
 
 - [ ] **Step 5: Add the ledger rows and commit**
 
@@ -6202,8 +6278,8 @@ The Notifications panel takes its title and default slot from the look's
 AppPanels: Event Log at Bottom Left under labelled stripes, Notifications
 at Right Top otherwise. Presentation.LANDED gains DOCK_CHROME, so a look
 whose kit asks for stripes docks with labelled stripes, flush frames and
-its own ui-state tables. A real window under the shipped look and every kit
-under both dock styles are rendered and checked; the notification count's
+its own ui-state tables. A real window under the Enterprise projection and
+every kit under both dock styles are rendered and checked; the notification count's
 and the status bar's configuration text's repairs run over every palette.
 
 🤖 Generated with Claude Code at The Home Depot
@@ -6259,9 +6335,9 @@ In `DockMockTest`, insert before `    // Later tasks add their surfaces above th
                     assertThat(2 * strip.getY()).as(where + ": the bottom strip's rule").isEqualTo(1706 - 180);
                     assertThat(strip.getWidth()).as(where + ": the bottom strip spans the window").isEqualTo(DockFixture.WIDTH);
                     var rule = MockCrops.at(variant.crop(648, 1000, 1, 1), 0, 0);
-                    assertThat(MockCrops.near(MockCrops.at(render, 648 - 2 + left, 1000 - 180), rule, 3)).as(where + ": the left rule").isTrue();
-                    assertThat(MockCrops.near(MockCrops.at(render, 2134 - 2 + right, 1000 - 180), rule, 3)).as(where + ": the right rule").isTrue();
-                    assertThat(MockCrops.near(MockCrops.at(render, 500 - 2 + left, 942 - 180), rule, 3)).as(where + ": the rule between the left frames").isTrue();
+                    assertThat(MockCrops.near(MockCrops.at(render, 648 - 2 + left, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the left rule").isTrue();
+                    assertThat(MockCrops.near(MockCrops.at(render, 2134 - 2 + right, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the right rule").isTrue();
+                    assertThat(MockCrops.near(MockCrops.at(render, 500 - 2 + left, 942 - 180), rule, variant.fillTolerance())).as(where + ": the rule between the left frames").isTrue();
                 }
             } finally { EnterpriseLook.restoreDefault(); }
         }
@@ -6285,9 +6361,13 @@ fixed there, never by moving a mock coordinate.
 
 - [ ] **Step 3: Add the visual pairs**
 
+Each pair carries plan 4c's `min_agreement` and `colours`, so `check_pairs.py` checks it (Execution notes R17): the floor
+is the edge agreement `compare_all.py` measured at `759b2b7d9` under 6a's fixtures, less 0.05, rounded down to 0.05, and
+the colours are the theme roles each crop paints that the mock holds (the Unlock Vault mock's under the scrim).
+
 ```bash
 python3 -I - <<'PY'
-"""Plan 7 Task 13 step 3: the opt-in dock pairs (spec 16.1.4)."""
+"""Plan 7 Task 13 step 3: the opt-in dock pairs (spec 16.1.4), checked by check_pairs.py."""
 import json, pathlib
 path = pathlib.Path("tools/visual/pairs.json")
 pairs = json.loads(path.read_text(encoding="utf-8"))
@@ -6301,19 +6381,46 @@ offset = {"light": 0, "light-disconnected": 0, "dark": 0, "vault": 64}
 headers = {"sftp-header": (48, 180, 600, 50), "servers-header": (48, 944, 600, 50),
            "sessions-header": (2136, 180, 700, 50), "tunnels-header": (2136, 1014, 700, 50)}
 surfaces = {"left-stripe": (2, 180, 44, 330), "right-stripe": (2838, 180, 44, 270), "bottom-strip": (2, 1708, 520, 48)}
+# Measured edge agreement less 0.05, rounded down to 0.05 (Execution notes R17).
+floors = {"kit-sftp-header": 0.85, "kit-servers-header": 0.85, "kit-sessions-header": 0.85, "kit-tunnels-header": 0.85,
+          "left-stripe": 0.85, "right-stripe": 0.90, "bottom-strip": 0.80}
+disconnected = {"kit-sftp-header": 0.90, "kit-servers-header": 0.90, "kit-sessions-header": 0.85, "kit-tunnels-header": 0.90}
+# The roles each crop paints: a header's surface (focused SFTP and Sessions), its rule and title; a stripe's open tile,
+# label and surface; the strip's surface, label and divider. Under the Unlock Vault scrim the scrimmed values.
+light = {"focused": "#D9DFEA", "header": "#E1E3E6", "rule": "#C4C7CC", "text": "#1E1F22", "tile": "#D3D9E1",
+         "stripe": "#E4E6E9", "divider": "#D3D6DA"}
+dark = {"focused": "#3D4658", "header": "#36393E", "rule": "#2A2C30", "text": "#DFE1E5", "tile": "#50545B",
+        "stripe": "#383B40", "divider": "#4A4D53"}
+vault = {"focused": "#ABB0B9", "header": "#B2B3B6", "rule": "#9B9DA1", "text": "#18181B", "tile": "#A7ABB2",
+         "stripe": "#B4B6B8", "divider": "#A7A9AC"}
+roles = {"light": light, "light-disconnected": light, "dark": dark, "vault": vault}
+def colours(variant, name):
+    c = roles[variant]
+    if name.endswith("-header"):
+        return [c["focused" if name in ("kit-sftp-header", "kit-sessions-header") else "header"], c["rule"], c["text"]]
+    if name == "bottom-strip": return [c["stripe"], c["text"], c["divider"]]
+    # The Unlock Vault right stripe's label ink is lighter than its 2x2 blocks: tile and surface only.
+    return [c["tile"], c["stripe"]] if (variant, name) == ("vault", "right-stripe") else [c["tile"], c["text"], c["stripe"]]
 for variant, mock in mocks.items():
     o = offset[variant]
     entries = [(f"kit-{name}", crop) for name, crop in headers.items()]
     if variant != "light-disconnected": entries += list(surfaces.items())
     for name, (x, y, w, h) in entries:
+        floor = (disconnected if variant in ("light-disconnected", "vault") and name in disconnected else floors)[name]
         pairs.append({"name": f"dock-{variant}-{name}", "mock": R + mock, "crop": [x + o, y + o, w, h],
-                      "render": f"jasper-app/build/dock-renders/{variant}-{name}-render.png"})
-path.write_text(json.dumps(pairs, indent=2) + "\n", encoding="utf-8")
+                      "render": f"jasper-app/build/dock-renders/{variant}-{name}-render.png",
+                      "min_agreement": floor, "colours": colours(variant, name)})
+# ensure_ascii=False keeps the other pairs' "…" and the mocks' narrow no-break spaces as they are written.
+path.write_text(json.dumps(pairs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(sum(1 for p in pairs if p["name"].startswith("dock-")), "dock pairs")
 PY
 python3 -I - <<'PY'
 import pathlib
 path = pathlib.Path("tools/visual/README.md"); text = path.read_text(encoding="utf-8")
+old = "(the classic look's `classic-*`, the `run-window-*` and the `chrome-*` pairs)"
+new = "(the classic look's `classic-*`, the `run-window-*`, the `chrome-*` and the `dock-*` pairs)"
+if text.count(old) != 1: raise SystemExit("tools/visual/README.md: check_pairs' line moved")
+text = text.replace(old, new)
 old = "Run with `python3 -I`; the tools need Pillow and NumPy."
 new = ("The `dock-*` pairs compare the Enterprise dock chrome's crops that `DockMockTest` writes under\n"
        "`jasper-app/build/dock-renders/` (run `./gradlew :jasper-app:test --tests '*DockMockTest'` first).\n\n" + old)
@@ -6323,7 +6430,8 @@ PY
 ```
 
 Expected: the first script prints `25 dock pairs` (four header pairs for each of the four mocks, and the three stripe
-and strip pairs for the three mocks whose stripes the tests compare). Then check that every render path exists:
+and strip pairs for the three mocks whose stripes the tests compare). Then check that every render path exists and run
+the check:
 
 ```bash
 python3 -I - <<'PY'
@@ -6331,11 +6439,12 @@ import json, pathlib
 missing = [p["render"] for p in json.load(open("tools/visual/pairs.json")) if p["name"].startswith("dock-") and not pathlib.Path(p["render"]).is_file()]
 print("missing:", missing)
 PY
-python3 -I tools/visual/compare_all.py jasper-app/build/dock-pairs dock-
+python3 -I tools/visual/check_pairs.py jasper-app/build/dock-pairs dock-
 ```
 
-Expected: `missing: []`, and `compare_all.py` writes one side-by-side, blend and report per dock pair under
-`jasper-app/build/dock-pairs/`. Look at each side-by-side once; the JUnit comparisons are the gate.
+Expected: `missing: []`; the dock run prints 25 `PASS` lines (measured at `759b2b7d9`: the kit headers 0.900 to 0.975,
+the stripes 0.923 and 0.964, the strip 0.852 and 0.853) and writes one side-by-side, blend and report per dock pair
+under `jasper-app/build/dock-pairs/`. Look at each side-by-side once; the JUnit comparisons are the gate.
 
 - [ ] **Step 4: The pixel proof**
 
@@ -6368,9 +6477,9 @@ Spec 17's documents that describe what this plan changed get the smallest accura
 at the top, in the style of the plan 1 and plan 2 entries; and the whole build runs.
 
 **Files:**
-- Modify: `docs/app-architecture.md:238`, `docs/ui-architecture.md:231-233,247-254`, `docs/themes.md:134-136`,
-  `docs/configuration.md:188,658-659`, `docs/notifications.md:34-35`
-- Modify: `docs/superpowers/specs/2026-10-01-jasper-dock-layout-design.md:3-4`, `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md` (its status banner)
+- Modify: `docs/app-architecture.md:250`, `docs/ui-architecture.md:247-248,269`, `docs/themes.md:135-137`,
+  `docs/configuration.md:188,659`, `docs/notifications.md:34-35`
+- Modify: `docs/superpowers/specs/2026-10-01-jasper-dock-layout-design.md:3-4`, `docs/superpowers/specs/2026-10-02-jasper-notifications-design.md:3-11` (their status banners)
 - Modify: `docs/STATUS.md` (a new entry at the top), this plan's file (its status banner)
 
 **Interfaces:**
@@ -6410,8 +6519,8 @@ through the pairs `ChromePainter.DOCK_PAIRS` declares) over named roles;'''),
 header strip: the strip's surface over a 1 px rule, a parenthesised count, a muted detail and actions 2 px apart. Host
 integration only, not part of the plugin SDK (plugins reach it through `PanelHost.setHeader`).''')])
 edit("docs/themes.md", [
-    ('''`warning.border`. Jasper otherwise computes them from the variant's roles; a listed one is used as given.''',
-     '''`warning.border`. Jasper otherwise computes them from the variant's roles, the surfaces leaning toward the variant's
+    ('''`border.divider`. Jasper otherwise computes them from the variant's roles; a listed one is used as given.''',
+     '''`border.divider`. Jasper otherwise computes them from the variant's roles, the surfaces leaning toward the variant's
   text (lighter than the window in a dark variant, darker in a light one); a listed one is used as given.''')])
 edit("docs/configuration.md", [
     ('''Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it; out-of-range values use the nearest limit with a warning''',
@@ -6425,18 +6534,25 @@ side;''',
 side (under the Enterprise look the panel is titled Event Log and starts in the bottom strip, on its left);''')])
 banner = ("Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): "
           "{what}; everything else in this document stands.")
+# Each banner is its own paragraph after the status paragraph, as the Snippets and Remote designs carry theirs.
 edit("docs/superpowers/specs/2026-10-01-jasper-dock-layout-design.md", [
-    ('''plan 2 (drag and drop) were both implemented on branch `claude/dock-layout` on 2026-10-02.''',
+    ('''plan 2 (drag and drop) were both implemented on branch `claude/dock-layout` on 2026-10-02.
+''',
      '''plan 2 (drag and drop) were both implemented on branch `claude/dock-layout` on 2026-10-02.
-''' + banner.format(what="stripe, frame and bottom-strip presentation and saved layouts are per look; the model and the six slots are unchanged"))])
+
+''' + banner.format(what="stripe, frame and bottom-strip presentation and saved layouts are per look; the model and the six slots are unchanged") + "\n")])
+edit("docs/superpowers/specs/2026-10-02-jasper-notifications-design.md", [
+    ('''(Settings)](../plans/2026-10-04-notifications-6-settings.md) is implemented on branch `claude/notifications-6`.
+''',
+     '''(Settings)](../plans/2026-10-04-notifications-6-settings.md) is implemented on branch `claude/notifications-6`.
+
+''' + banner.format(what="under the Enterprise look the panel is titled Event Log, with default slot BOTTOM_LEFT") + "\n")])
 PY
-sed -n 1,8p docs/superpowers/specs/2026-10-02-jasper-notifications-design.md
 ```
 
-Add the Notifications design's banner line by hand after its status line (its first lines vary), with this text:
-"Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md):
-under the Enterprise look the panel is titled Event Log, with default slot BOTTOM_LEFT; everything else in this document
-stands." Both lines are spec 19.2's, word for word.
+Both lines are spec 19.2's, word for word (its table's `<what>` column). The plan writes the banner's link only inside
+this code block: `AppDocumentationTest` resolves every Markdown link outside code fences in `docs/`, this plan
+included, against the plan's own folder (Execution notes R16).
 
 - [ ] **Step 2: Run the whole build**
 
@@ -6464,7 +6580,7 @@ Insert at the top of `docs/STATUS.md`, after `# Jasper — Status and Handoff` a
 the plan 1 and plan 2 entries (one paragraph; the numbers and the commit range filled in from this branch):
 
 ```text
-**Enterprise presentation, plan 7: dock chrome — 2026-10-16** (`claude/enterprise-dock-chrome`, worktree
+**Enterprise presentation, plan 7: dock chrome — <date>** (`claude/enterprise-dock-chrome`, worktree
 `.claude/worktrees/enterprise-7`, `<first>..<last>`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-7-dock-chrome.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look whose kit says
@@ -6483,23 +6599,27 @@ the Notifications panel is Event Log at Bottom Left under the look (`AppPanels`)
 `DOCK_CHROME`. Derived surfaces lean toward the variant's text (`SurfaceContrast.beyond`): Slate Cobalt Dark's
 `surface.header.active` is #2d3546, lighter than its other headers (plan 2's and 5b's hand-off); no default painter
 reads it. The classic catalog gains the pill, header-action and header-gap values, `STRIPE_LABEL_PADDING` 9 and
-`STRIPE_LABEL_GAP` 0. Mock matching: `DockMockTest` renders every surface at 2x under the shipped kit, theme and Plex
-fonts and compares it with its crop of the Workstation (Connected, Disconnected), Dark Mode and Unlock Vault mocks
-(fills within 3, ink runs within 2 px at 2x, agreeing pixels at least 0.92 for the stripes and the strip and 0.94 for the
-headers), and checks the whole dock's arrangement; `tools/visual/pairs.json` gains 25 opt-in `dock-*` pairs. Residuals:
+`STRIPE_LABEL_GAP` 0. Mock matching: `DockMockTest` renders every surface at 2x under the Enterprise kit and theme
+(plan 6a's `EnterpriseLook` fixtures until plan 5b) and compares it with its crop of the Workstation (Connected,
+Disconnected), Dark Mode and Unlock Vault mocks (fills within 3, 5 under the Unlock Vault scrim, run counts and inks, the
+first ink a padding sets and the icons' centres within 2 px at 2x), prints the probes that follow the UI face's glyphs
+until plan 5b's Plex (`MockProfile.fonts`, `MockCrops.fontsFloor`: <the measured residuals>), and checks the whole
+dock's arrangement; `tools/visual/pairs.json` gains 25 `dock-*` pairs that `check_pairs.py` passes (<agreements>). Residuals:
 <the residuals the comparisons recorded, or "none beyond the plan's Rulings 6, 9, 14 and 15">. Zero pixel change for the
 default look: the headless gallery's files for Slate Cobalt Dark and Light and `DefaultDockPixelsTest`'s two renders are
-byte-identical to the base. Rulings (plan, "Rulings"): <one line each for 1 to 26, the substance in a few words>.
+byte-identical to the base. Rulings (plan, "Rulings"): <one line each for 1 to 26, the substance in a few words>;
+Execution notes (2026-10-17) R1 to R23 <one line each>.
 Deviations from the plan's text: <each one, or none>. Hand-offs: plan 8 may read `DockStripe` for the Run window's corner
 home; plan 10 sets Remote's and File Server's Enterprise anchors (Rulings 18); 4a Rulings 16's three package-test
 repairs are all taken here (the kit header's connected dot as a declared pair, `NotificationCardTest`'s count and
-`ConfigurationStatusTest`'s configuration text over every palette), so none is left open. `./gradlew check --continue`:
+`ConfigurationStatusTest`'s configuration text over every palette), so none is left open; at the merge with plan 5b,
+Execution notes R19's items. `./gradlew check --continue`:
 **N tests, 0 failures, 0 errors, M skipped**. GUI checks for the user (spec 16.2): stripe drag and drop including the
 bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip, and Enterprise Dark's dock
 against the Dark Mode mock. Not merged, not pushed.
 ```
 
-Replace every `<…>` with the branch's facts before committing; none may remain (`grep -n '<first>\|<the residuals\|<one line\|<each one' docs/STATUS.md`
+Replace every `<…>` with the branch's facts before committing; none may remain (`grep -n '<first>\|<date>\|<the residuals\|<the measured\|<agreements>\|<one line\|<each one' docs/STATUS.md`
 prints nothing). Add this plan's status banner under its title, in the style of the earlier plans' banners: "Status:
 executed on 2026-10-…; <deviations from the plan's text, with the plan 6 name changes of 'Plan 6's names'>".
 
@@ -6539,3 +6659,224 @@ EOF
 - **Types:** `DockStripe`, `StripeSet`, `StripeLabels`, `DockChrome`, `ToolStripe.Button`'s seven components,
   `DockDropResolver.Axis`, `PanelHostHeader.Frame`, `UiState.load(Path, String)` and `NotificationsFeature`'s four
   arguments are used with the same names in every task that produces or consumes them.
+
+## Execution notes (2026-10-17)
+
+**Refresh.** Every anchor, quoted text, path, signature and line number this plan relies on was re-checked against the
+worktree at `759b2b7d9` (`main`: plans 3a to 3e, 4a to 4c, 5a, 6a, 6b and 8a; not 5b or 9a, which run in parallel), on
+which the plan's two commits sit. Method, without Gradle: a dry run in a scratch copy of the tree applied every step in
+task order (each edit script with its stated counts, each created file, each insertion, each ledger row), compiled
+jasper-terminal, the SDK, Buddy, the testkit, jasper-ui (main, test fixtures, tests) and jasper-app (main, tests) with
+`javac` (JBR 25, the Gradle cache's jars) after each task, and ran the tests through the JUnit 6.1.3 launcher headless.
+The plan as written failed in Tasks 1 (6a's planned `WorkspaceChrome` shape, 5b's `EnterpriseResources`), 4 (a
+`NewRolesTest` probe, `DerivedColorTest`'s pinned inputs, a half-image sampler), 5, 6, 9 and 10 (the mock comparisons
+under the platform face, a divider-run bug, the kit headers' actions), 8 (a missing import), 12 (`EventLogTest`'s
+presence supplier) and 14 (an anchor 6b moved, and a link `AppDocumentationTest` refuses); after the edits below, the
+blocks re-extracted from this file, replayed from `759b2b7d9` into a fresh tree, give the verified tree and every new
+test passes: `MockCropsTest` 3, `DefaultDockPixelsTest` 1, `DockChromeTest` 1, `HorizontalDropTest` 3, `StripeSetTest`
+3, `HeaderSideTest` 3, `DockRolesTest` 1, `LabelledStripeTest` 8, `BottomStripTest` 3, `DockDragBottomStripTest` 3,
+`StripeNumbersTest` 2, `StripeNumbersWindowTest` 3, `FlushFramesTest` 5, `HeaderStripTest` 5, `PanelHeaderStripTest` 2,
+`UiStateLookTest` 3, `EventLogTest` 2, `EnterpriseDockWindowTest` 1, `DockChromeMatrixTest` 1 and `DockMockTest` 7, with
+`WorkspaceMetricsTest`, `PaintedContrastTest`, `ProjectionsTest` and `ConfigurationStatusTest` one test more each
+(65 tests: 59 in jasper-app, 6 in jasper-ui). The whole jasper-app and jasper-ui suites fail, class by class, exactly
+the tests the unchanged tree fails in that harness (pty sessions, staged plugins, packaged jars and build info, slf4j,
+which need Gradle's task inputs): 3,326 jasper-app tests at Task 12 against the base's 3,268, the same 208 failing in
+both. `DefaultDockPixelsTest`'s two renders are byte-identical to the base after Tasks 1, 3, 4, 8, 9, 10 and 13, and the
+headless gallery (`KitGallery`, Slate Cobalt Dark and Light at 1×, 161 files a side) after Tasks 4, 10 and 13, the
+tasks that touch jasper-ui; `javadoc -Xdoclint:all,-missing` over jasper-ui
+main and `-Xdoclint:all` over jasper-app main report no error; the source-hygiene scan of the 62 touched Java files is
+clean; the 23 new ledger rows have eight fields each and `ThemeMigrationCoverageTest` passes after every task;
+`check_pairs.py` passes the 25 dock pairs; `AppDocumentationTest` passes with this file. The dry run did not run Gradle
+(`check`, the architecture tasks, the packaged-jar tests such as `ProjectionReadTest`): the tasks still run their stated
+commands.
+
+Changes made to this plan's text: the Workspace paragraph, "Before you start" (no rebase; checks at `759b2b7d9`) and the
+names table; the Global Constraints' mock-matching rule; facts 6, 8 to 10, 12, 14 to 16, 19 and 21 to 24 and the
+facts' heading; the file structure; Task 1 (the `WorkspaceChrome` script, `MockCrops.OUT`, `MockCrops.fontsFloor`, the
+`threshold()` grep); Task 4 (the Files lines, the enum-tail guard, `DockRolesTest`, `DerivedColorTest`, the pill
+sampler, the imports sentence, the expected results); Task 5 (`EnterpriseLook`'s two methods, the Interfaces,
+`DockMockTest`'s javadoc, imports and `compareStripe`, the commit message); Task 6 (the bottom-strip comparison and its
+calibration text); Task 8 (`java.awt.Rectangle`); Task 9 (`compareHeader`, the expected results); Task 10 (the dot
+sampler, `DockFixture`'s kit headers, the expected results); Task 12 (`EventLogTest`, `EnterpriseDockWindowTest`'s
+javadoc, the `ProjectionsTest` and verification text, the commit message); Task 13 (the pairs' floors and colours,
+`ensure_ascii`, `check_pairs.py`); Task 14 (the Files lines, the themes.md anchor, both spec banners scripted, the
+STATUS template); `DockMockTest.Variant` (`fillTolerance`, the tile tolerance's comment) and the Files lines of Tasks 1,
+3, 11 and 12.
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface:
+
+| Tasks | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| 1 → 3 → 6 | `DockChrome.java`: created (1), `stripes(Kit)` (3), the labelled branch (6) | Each later anchor is the earlier task's output | R21 |
+| 1 → 3, 12 | `WorkspaceChrome` (6a/6b's merged shape): `dock()`, its equality; `PresentationReachTest`'s `windowLook()` comparison (12) | Disagreed (6a's planned constructor); rewritten to the merged one, equality covering `DockChrome` | R2 |
+| 1 → 3 → 8 → 9 → 10 | `ToolWindowArea.java`: the kit and flush constructor, `Host` an inner class (1); focus, rules, hit areas, `metrics()` (8); the borrowed header's frame (10) | Agree in task order; counts hold | R21 |
+| 1 → 8 → 9 | `ToolWindowHeader.java`: kit, styles, painter, flush (1); `setFocused` (8); the strip (9) | Agree | R21 |
+| 1 → 3 | `WindowContent.java`: Task 3's anchor is Task 1's `new ToolWindowArea(…, themes.kit(), look().dock().flushFrames())` | Agree | none |
+| 1 → 3 → 6 | `DockDrag.java`: the threshold read (1), the stripe contract and `labels` (3), drops onto the strip (6) | Agree; seven `for (ToolStripe stripe` loops | none |
+| 1 → 5 to 13 | `MockCrops` (`OUT`, `render`, `runs`, `write`, `fontsFloor`) | `OUT` read 5b's `EnterpriseResources.ROOT`; now 6a's `MockProfile.ROOT` | R4, R5 |
+| 1 → 6, 7, 12 | `DockChromeTest.CLASSIC_DOCK`, `classicDock()` | Agree | none |
+| 2 → 3, 5, 6, 8 | `DockDropResolver.Group.axis`, `Axis`, `DockGeometry.Metrics.at(scale, divider)` | Agree | none |
+| 3 → 5, 6, 7, 9 | `DockStripe`, `StripeSet`, the seven-component `ToolStripe.Button`, `DockDrag.labels` | Agree | none |
+| 3 → 7 | `WindowContributions.java`: Task 7's anchors (`labels`, the `windows` list, the bottom strip's render) are Task 3's output | Agree | none |
+| 4 → 5, 6, 8, 9, 10 | `ChromePainter` dock painters, `DOCK_PAIRS` indices (1 and 2 in 5; 5 to 10 in 9; 11 and 12 in 10), the seven roles | Agree | none |
+| 4 → 10 | `PaintedContrastTest`: Task 4's helpers before `searchHint`; Task 10 inserts at the same anchor and uses `anywhere` | `hasColor` scans an image's right half only; both samplers missed | R9 |
+| 4 ↔ 9a (parallel) | `DesignMetrics`' enum tail, `compact-roles.tsv`, `classic-roles.tsv` | `DockRolesTest` follows the chrome roles rather than closing the enum | R8, R18 |
+| 5 → 6, 8, 9, 10, 13 | `DockMockTest` (`Variant`, `VARIANTS`, the closing marker, `STRIPE_FLOOR`, `compareHeaders`) | Task 8 used `Rectangle` before Task 9 imports it; the Unlock Vault fills missed by 1 | R6, R10 |
+| 5 → 6, 8, 9, 10, 12, 13 | `EnterpriseLook.theme(boolean)`, `install(boolean)` beside 6a's `kit()` | Task 5 anchored on 5b's `registerFonts()`, absent | R4 |
+| 5 → 6, 9 | `StripeLabels`, `LabelledStripe.describe`, `LabelledStripeTest.window`, `inks` | Agree | none |
+| 8 → 10 | `Host.focused`, `focusedHeader`, `ToolWindowArea.focusMoved` | Agree | none |
+| 9 → 10, 13 | `DockFixture` (kit headers, `header(id)`, `focus`), `DockMockTest.compareHeaders` | The kit headers' actions as a header context stack made the strip 29 tall | R11 |
+| 11 → 12 | `UiState.inMemory(String)`, `look()` | Agree | none |
+| 12 ↔ 6b | `ConfigurationStatusTest` and 6b's `WindowPairsTest` | 6b samples the classic ruled cells only | R13 |
+| 12 ↔ 6a | `ProjectionsTest`'s landing test, `ProjectionReadTest`, `ChromeRenderTest.check` | Agree; no edit to the landing test | R14 |
+| 12 ↔ 9a (parallel) | `Presentation.LANDED` (9a adds `SETTINGS`), `ProjectionsTest`'s end, `ChromeRenderTest.check`'s top | Reconciled at merge | R18 |
+| 13 ↔ 4c, 6a, 6b, 8a | `tools/visual/pairs.json`, `README.md`, `check_pairs.py` | The plan's pairs had no floors (`check_pairs.py` skips them) and its dump escaped the others' "…" | R17 |
+| 14 → this file | `AppDocumentationTest` resolves links in `docs/`, this plan included | The plan as committed failed it (also at the base) | R16 |
+| 1 to 13 | `docs/design/theme-engine/migration.csv`, append-only | Eight fields per row; every candidate has its row at its task's end | R18 |
+| all ↔ 5b (later) | `EnterpriseLook`, the fixture theme, the printed probes, `derived-roles-enterprise.tsv` | 5b's merge items | R19 |
+
+Each task against itself:
+
+| Task | Agreement of its own text | Ruling |
+|---|---|---|
+| 1 | The `WorkspaceChrome` script quoted 6a's planned supplier constructor; `MockCrops.OUT` read 5b's `EnterpriseResources`; the `threshold()` grep promised two lines it cannot print | R2, R4, R15 |
+| 2 | Agree; `HorizontalDropTest` 3 | none |
+| 3 | Agree; `StripeSetTest` 3; the default look's pixels unchanged | none |
+| 4 | The script probed `NewRolesTest`'s tail check, which checks a run since 6a (it then wrote nothing and `DockRolesTest` would close the enum); `DerivedColorTest` pins `surface.header.active`'s inputs; the accent pill was never sampled | R8, R9 |
+| 5 | Anchored on 5b's `registerFonts()`; the second label's edges and the agreeing share follow the platform face's widths (0.821 to 0.847 against 0.92) | R4, R5 |
+| 6 | The dividers' runs split each 2 px divider in two (gap 0); the third divider and the pill fell outside the 270 px render in the platform face; the error pill's ground is too near the stripe's surface for the 30 threshold | R5, R7 |
+| 7 | Agree; `StripeNumbersTest` 2, `StripeNumbersWindowTest` 3 | none |
+| 8 | `DockMockTest` had no `Rectangle` import yet; the Unlock Vault rule missed by 1 in blue | R6, R10 |
+| 9 | The red step expected a colour failure (the strip's height fails first); the title ends and the agreeing share follow the face | R5, R15 |
+| 10 | The kit headers grew to 29 px with a header context stack; the dot sampler scanned the right half | R9, R11 |
+| 11 | Agree; `UiStateLookTest` 3; one `UiState.load` call | none |
+| 12 | `NotificationCenter` takes a `Delivery.Presence` supplier; 5b's tests are absent; the landing test needs no edit | R12, R13, R14 |
+| 13 | The pairs had no floors or colours for `check_pairs.py`; `json.dumps` rewrote ten unrelated lines | R17 |
+| 14 | themes.md's anchor line now ends with `border.divider` (6b); the Notifications banner was a manual step whose prose link breaks `AppDocumentationTest`; the STATUS template named the shipped kit and Plex | R16, R19 |
+
+### Rulings
+
+The plan's own Rulings are 1 to 26; these are numbered R1 to R23 (Execution notes).
+
+R1. **Refreshed at `759b2b7d9` by a dry run, not Gradle** — the orchestrator's instruction; the method above — cost if
+wrong: none; each task still runs its stated commands.
+
+R2. **Plan 6's names are the merged ones** (refines Rulings 2): `WorkspaceChrome` keeps the look's choices
+(`Header`, `Tabs`, `Status`, `runItem`) and its private constructor takes them, so Task 1's script adds `DockChrome
+dock` after `runItem`, `DockChrome.STANDARD` to `STANDARD`, `dock()` after `title()`, and `dock` to `equals` and
+`hashCode` — 6a's `PresentationReachTest` compares `windowLook()` through that equality (6b R29) — cost if wrong: none.
+
+R3. **No rebase; the base is checked** — the branch sits on `759b2b7d9` and the orchestrator forbids rebase and merge;
+"Before you start" checks the merged plans' marks instead — cost if wrong: one re-refresh if `main` moves first.
+
+R4. **Enterprise is plan 6a's fixture until plan 5b** (6a R13, 6b R19): `EnterpriseLook.theme(boolean)` is
+`theme().generated(dark)` over `enterprise-fixture.json` and `install(boolean)` installs it under 4a's fixture kit, both
+added before `restoreDefault()`; `MockCrops.OUT` resolves from `MockProfile.ROOT`; the fixture's Light open tile is
+#D3D9E1 (5b's #D7D9DC; the mock's #CFD4DC), inside `tileTolerance` 10 — plan 5b is not merged — cost if wrong: at 5b's
+merge three method bodies change (R19).
+
+R5. **Probes that follow the UI face's glyphs are printed until plan 5b** (6a R26 and R29, 6b R36): through
+`MockProfile.fonts` (a run edge after the first, a divider, the pill's start) and `MockCrops.fontsFloor` (an agreeing
+share); asserted are the fills and rules, the run counts and inks, the thickness, the first ink a padding and the rail
+gap set, the icons' centres, the pill's width and the divider colours. Measured at `759b2b7d9` in the platform face:
+the stripes' second labels 1 to 6 px off at 2x and agreement 0.821 to 0.847 (floor 0.92); the bottom strip's dividers
+8 to 14 px right of the mock's, the pill 17, agreement 0.856 to 0.860 (0.92); the native headers' titles end 2 to 6 px
+past the mock's, agreement 0.931 to 0.976 (0.94); the kit headers 3 to 6 px, 0.933 to 0.975 — the fixture kit draws
+the platform face where the mocks draw IBM Plex, and every failing probe was a text advance; asserting them now would
+force knobs to fit the wrong face — cost if wrong: these go unchecked until 5b's merge turns them into assertions.
+
+R6. **Under the Unlock Vault scrim a fill or rule compares within 5, else 3** (`Variant.fillTolerance()`): the mock's
+scrim has a cool cast (white reads #C9CACC; its rule reads #9DA0A5 where black at 21 % gives #9B9DA1) — measured; the
+render's scrim is the app's black — cost if wrong: a 2 ΔRGB looser check on four Vault fills.
+
+R7. **The bottom strip's comparison**: dividers are runs with gap 1 (gap 0 split each 2 px divider in two); the render
+is 330 px wide so the platform face's third divider and pill stay inside; the pill is found by its painted ground (the
+error tone's `danger.ground`, under the variant's scrim), 28 to 34 px wide at 2x (30 measured, its round ends'
+antialiased columns aside); the label runs end before the pill — measured; the 30 threshold missed the pale ground —
+cost if wrong: none.
+
+R8. **`DockRolesTest` is unconditional and follows the chrome roles** (6a R15's style): the seven roles are one run
+after `DIALOG_FOOTER_VERTICAL` with the same values in both catalogs; `NewRolesTest` is not edited (it finds `ADDED` as
+a run anywhere since the 6a, 8a and 4c merges); the script stops unless the enum ends with `DIALOG_FOOTER_VERTICAL(8)`;
+`DerivedColorTest`'s `surface.header.active` inputs gain `text.primary` — a test that closes the enum would break when
+plan 9a appends its roles; the side rule reads the text — cost if wrong: none.
+
+R9. **`PaintedContrastTest` gains `anywhere(image, color)`** for the accent and error pills (Task 4) and the borrowed
+header's dot (Task 10): `hasColor` scans only an image's right half, where the off switch's knob sits, and both lie on
+the left (the pill test failed "Slate Cobalt Dark, accent count pill", the dot test "STANDARD dot") — cost if wrong:
+none.
+
+R10. **Task 8's rule comparison writes `java.awt.Rectangle`**: `DockMockTest` imports `Rectangle` only from Task 9 —
+cost if wrong: none.
+
+R11. **`DockFixture`'s kit headers take their actions through the host header** (`PanelHeaderState.Action`), as
+Remote's Sessions and Tunnels and File Server's panels publish theirs through `PanelHost.setHeader`, not as a header
+context stack: a context stack's kit buttons are `BUTTON_HEIGHT` tall, which made the strip 29 px ("24 and the rule":
+58 for 50 at 2x); with host actions every kit header is 25 and its icons' centres land within 2 px of the mocks' — no
+plugin puts actions in a header context — cost if wrong: a plugin header with context actions draws taller than the
+strip (a candidate follow-up: clamp the strip, or size context buttons as header actions).
+
+R12. **`EventLogTest` builds `NotificationCenter` with `() -> Delivery.Presence.FOCUSED`**, as `NotificationsFeatureTest`
+does — the constructor takes a presence supplier — cost if wrong: none.
+
+R13. **Task 12's `ConfigurationStatusTest` addition stays**: 6b's `WindowPairsTest` samples the classic ruled cells'
+warning and error text over every palette, but the default look's slash segments' configuration text (4a Rulings 16's
+third hand-off) is checked only in Slate Cobalt — cost if wrong: two loops overlap on no palette.
+
+R14. **`ProjectionsTest`'s landing test is not edited, and `ProjectionReadTest` already covers the dock**: its
+`.contains(WINDOW_CHROME, WINDOW_CONTENT)` still holds, none of its assertions reads the dock group under `LANDED`, and
+6a's `PROJECTION_READERS` lets only `WorkspaceChrome` read `Stripes` and `FrameStyle` — checked — cost if wrong: none.
+
+R15. **Text that described the wrong result is corrected**: the `threshold()` grep prints nothing (`dragThreshold()`
+does not match it); Task 9's red step fails on the strip's height; `ChromePainter`'s imports include `javax.swing.*` and
+`dev.jasper.ui.metrics.*`; the facts' and Files' line numbers are `759b2b7d9`'s — the scripts anchor on text — cost if
+wrong: none.
+
+R16. **The plan writes the amendment banners' link only inside code**: `AppDocumentationTest` resolves every Markdown
+link outside code fences in `docs/`, this file included, against its folder, and the Notifications banner's prose link
+failed it (at the base too: the plan as committed broke `check`); Task 14 now scripts both banners, each its own
+paragraph after the status paragraph as the Snippets and Remote designs carry theirs (3e had the same failure) — cost
+if wrong: none.
+
+R17. **The dock pairs are checked with `check_pairs.py`** (4c's tool; 6b R42 used `compare_all.py` only because it was
+absent): each pair carries `min_agreement`, the edge agreement measured at `759b2b7d9` less 0.05 rounded down to 0.05
+(headers 0.85 or 0.90, stripes 0.85 and 0.90, the strip 0.80), and `colours`, the roles it paints that the mock holds;
+`json.dumps(…, ensure_ascii=False)` keeps the other pairs' "…" and the mocks' narrow no-break spaces — measured: all 25
+pass (0.852 to 0.975) — cost if wrong: under Plex a floor may be raised at 5b's merge.
+
+R18. **Shared files with parallel plans are reconciled at merge, not here**: 5b (`EnterpriseLook`, whose bodies it
+replaces while this plan's two methods stay appended before `restoreDefault()`; `migration.csv`; `docs/STATUS.md`;
+`pairs.json`; `KitFixtures`, not edited here); 9a (`DesignMetrics`' enum tail and both role tables, where its roles
+follow this plan's seven; `Presentation.LANDED`, which must hold `DOCK_CHROME` and `SETTINGS`; `ProjectionsTest`'s end;
+`ChromeRenderTest.check`'s top; `migration.csv`; `docs/STATUS.md`). Keep every side's rows, roles, tests and paragraphs
+— the orchestrator's instruction — cost if wrong: merge work only.
+
+R19. **Plan 5b's merge with this branch**: `EnterpriseLook.theme(boolean)` reads the shipped theme and `install` the
+shipped kit with Plex registered; R5's printed probes become assertions within their stated tolerances and floors
+(retune `STRIPE_LABEL_PADDING`, `STRIPE_PILL_GAP` and the header gaps by the tasks' knobs if one misses); the open tile's
+tolerance is re-measured against 5b's #D7D9DC; `SurfaceContrast.beyond` replaces `apart`, so every Enterprise derived
+role 5b's theme does not author (`surface.tableHeader`, `surface.zebra`, `surface.footer` where not listed) is
+recomputed and `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` are checked against it; `HeaderSideTest` and the
+every-palette loops then include Enterprise if `KitFixtures.themes()` does; 5b's `EnterpriseHomeTest` and
+`EnterpriseFirstWindowTest` run under the landed dock — the fixtures stand in for 5b only — cost if wrong: the dock is
+compared in the platform face until then.
+
+R20. **The pixel rule held in the dry run**: the two default renders and the gallery's 161 files a side are
+byte-identical to the base after every task that can move them; only Slate Cobalt Dark's `surface.header.active`
+moves in `derived-roles.tsv` (Rulings 16 confirmed) — cost if wrong: none.
+
+R21. **Order is binding; timing-sensitive tests may flake once**: the shared files are edited in task order and each
+later anchor is an earlier task's output; the window tests and renders wait on the EDT while other plans' builds run,
+so re-run such a test alone before treating it as a failure, and never run `./gradlew --stop` — cost if wrong: one
+rerun.
+
+R22. **The counts the tasks state are the dry run's**: Task 4's `HeaderSideTest` 3 and `DockRolesTest` 1; Task 5's
+`LabelledStripeTest` 8 and `DockMockTest` 2; Task 6's 3, 3 and 3; Task 8's `FlushFramesTest` 4 and `DockMockTest` 4;
+Task 9's 5 and 5; Task 10's `PanelHeaderStripTest` 2, `FlushFramesTest` 5 and `DockMockTest` 6; Task 13's 7 — cost if
+wrong: none.
+
+R23. **A plugin's kit header with context actions, and the label clipping past a stripe's end, are follow-ups, not
+this plan's**: R11's taller strip and Rulings 24's clipped labels are recorded for the STATUS hand-offs — cost if
+wrong: none.
