@@ -22,6 +22,7 @@ exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
 presentation = "presentation/look.kit.toml"  # optional, SDK 0.18.0: a kit file in your jars; needs presentation.provide
+themes = ["themes/look.json"]      # optional, SDK 0.18.0: Jasper theme files in your jars, offered in Settings › Appearance
 enabled_by_default = true          # optional, SDK 0.18.0: false keeps a bundled plugin off until the user turns it on
 
 [[requires]]
@@ -46,6 +47,19 @@ Jasper reads it before the first window, so a change applies after a restart, an
 invalid skips the plugin with one message naming the key, a look that did not finish starting is skipped at the next
 start until the user tries again, and `--safe-mode` uses the standard look. `enabled_by_default = false` keeps a bundled
 plugin off until the user turns it on in Settings › Plugins; development and installed plugins ignore it.
+
+`themes` lists [Jasper theme files](themes.md#the-jasper-theme-format) in your jars; a file's name is its theme's id
+(`themes/look.json` is `look`). While the plugin is enabled, its themes are listed in Settings › Appearance after the
+built-in ones, captioned "From the <name> plugin", and cannot be removed or replaced there; while it is off, a setting
+that names one uses Slate Cobalt without a warning and keeps the name. A built-in id is ignored with a configuration
+warning, and when two plugins ship the same id the development copy wins, then the bundled one, then the installed one,
+then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
+
+The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked presentation provider: its look is the
+kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
+`dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
+declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
+package and checks `context.services().find(Workstation.class)` in `start`.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
