@@ -33,6 +33,7 @@ class ColourLiteralScanTest {
     }
 
     @Test void everyInRepoPluginThemeLoadsWithTheProductionLoader() throws IOException {
+        assertThat(PLUGIN_THEMES).contains(ROOT.resolve("plugins/enterprise/src/main/resources/themes/enterprise.json"));
         for (Path file : PLUGIN_THEMES) {
             String name = file.getFileName().toString();
             var theme = dev.jasper.ui.theme.JasperTheme.parse(Files.readString(file), name.substring(0, name.length() - ".json".length()));

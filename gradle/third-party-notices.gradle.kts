@@ -9,6 +9,7 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
     description = "Checks that every shipped third-party jar has a license entry and that every named license file exists."
     val index = noticesApp.file("src/main/resources/dev/jasper/app/about/licenses/notices.toml")
     inputs.file(index)
+    inputs.files(rootProject.fileTree("plugins") { include("*/src/main/resources/plugin.toml", "*/src/main/resources/**/*.ttf", "*/src/main/resources/**/*.otf") })
     doLast {
         val modules = listOf(noticesApp) + rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }
         val shipped = modules.flatMap { module ->
@@ -20,10 +21,14 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
         fun field(block: String, key: String) = Regex("(?m)^\\s*$key\\s*=\\s*\"([^\"]*)\"").find(block)?.groupValues?.get(1)
         val problems = mutableListOf<String>()
         val listed = mutableListOf<String>()
+        val listedFiles = mutableListOf<String>()
         for (block in index.readText().split(Regex("(?m)^\\[\\[component]]")).drop(1)) {
             val name = field(block, "name") ?: "(unnamed component)"
             Regex("(?s)modules\\s*=\\s*\\[(.*?)]").find(block)?.groupValues?.get(1)?.let { list ->
                 Regex("\"([^\"]+)\"").findAll(list).forEach { listed.add(it.groupValues[1]) }
+            }
+            Regex("(?s)files\\s*=\\s*\\[(.*?)]").find(block)?.groupValues?.get(1)?.let { list ->
+                Regex("\"([^\"]+)\"").findAll(list).forEach { listedFiles.add(it.groupValues[1]) }
             }
             for (key in listOf("text", "notice")) {
                 val path = field(block, key)
@@ -37,6 +42,16 @@ val verifyThirdPartyNotices = tasks.register("verifyThirdPartyNotices") {
             }
         }
         listed.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { problems.add("$it is listed twice") }
+        // Font files ship inside plugin jars, not as Maven modules: each must be listed in a component's files (spec 14.1).
+        val fonts = rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }.flatMap { plugin ->
+            val pluginResources = plugin.file("src/main/resources")
+            val descriptor = pluginResources.resolve("plugin.toml")
+            val id = if (descriptor.isFile) Regex("(?m)^id\\s*=\\s*\"([^\"]+)\"").find(descriptor.readText())?.groupValues?.get(1) else null
+            if (id == null) emptyList<String>() else pluginResources.walkTopDown().filter { it.isFile && (it.extension == "ttf" || it.extension == "otf") }
+                .map { "$id/" + it.relativeTo(pluginResources).invariantSeparatorsPath }.toList()
+        }.toSortedSet()
+        (fonts - listedFiles.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it in files") }
+        (listedFiles.toSet() - fonts).forEach { problems.add("$it is listed in notices.toml files but no bundled plugin ships it") }
         (shipped - listed.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it") }
         (listed.toSet() - shipped).forEach { problems.add("$it is listed in notices.toml but no longer ships") }
         check(problems.isEmpty()) { "Third-party notices are incomplete:\n" + problems.joinToString("\n") }

@@ -75,7 +75,8 @@ class BundledSamplePluginTest {
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));
         });
-        assertThat(runtime.get().statusLines()).as("the sample and the seven bundled feature plugins").hasSize(8)
+        assertThat(runtime.get().statusLines()).as("the sample, the seven bundled feature plugins and Enterprise, off by default").hasSize(9)
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.enterprise", "BUNDLED", "DISABLED", "off by default"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
@@ -113,7 +114,7 @@ class BundledSamplePluginTest {
             var outcome = new CompletableFuture<PluginRuntime.Outcome>();
             onEdt(() -> runtime.get().snapshot(outcome::complete));
             var rows = outcome.get(10, TimeUnit.SECONDS).snapshot().rows();
-            assertThat(rows).hasSize(8).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
+            assertThat(rows).hasSize(9).allSatisfy(row -> assertThat(row.icon()).as(row.id()).isPresent());
             assertThat(rows).filteredOn(row -> row.id().equals("dev.jasper.remote")).singleElement()
                 .satisfies(row -> assertThat(row.homepage()).isEqualTo("https://github.com/an0nn30/Jasper"));
         } finally {

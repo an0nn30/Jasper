@@ -1,7 +1,8 @@
 # Third-party software Jasper ships, for the Licenses window (ThirdPartyNotices) and verifyThirdPartyNotices.
 # One [[component]] per project. modules are the exact group:artifact:version coordinates it covers; the check fails
 # when a shipped jar is in no component or a listed one no longer ships. text and notice are paths relative to this
-# folder, or absolute classpath resources. license is an SPDX id ThirdPartyNotices knows.
+# folder, or absolute classpath resources. license is an SPDX id ThirdPartyNotices knows. files are the font files a
+# bundled plugin ships, as <plugin id>/<path in its jar>; the check fails when one is in no component.
 
 [[component]]
 name = "ANTLR 4 Runtime"
@@ -76,6 +77,16 @@ license = "Apache-2.0"
 homepage = "https://www.formdev.com/flatlaf/"
 modules = ["com.formdev:flatlaf:3.7", "com.formdev:flatlaf-extras:3.7"]
 text = "apache-2.0.txt"
+
+[[component]]
+name = "IBM Plex"
+version = "1.1.0"
+license = "OFL-1.1"
+homepage = "https://github.com/IBM/plex"
+text = "ibm-plex.OFL.txt"
+files = ["dev.jasper.enterprise/presentation/fonts/ibm-plex-mono-medium.ttf", "dev.jasper.enterprise/presentation/fonts/ibm-plex-mono-regular.ttf",
+  "dev.jasper.enterprise/presentation/fonts/ibm-plex-sans-medium.ttf", "dev.jasper.enterprise/presentation/fonts/ibm-plex-sans-regular.ttf",
+  "dev.jasper.enterprise/presentation/fonts/ibm-plex-sans-semibold.ttf"]
 
 [[component]]
 name = "IntelliJ Platform icons"
