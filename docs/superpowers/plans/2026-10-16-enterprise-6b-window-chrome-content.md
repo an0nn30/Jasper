@@ -4646,7 +4646,8 @@ edit(T + "workspace/ChromeRenderTest.java", [
         // Spec 16.1.4: the run item and the ruled cells paint their declared pairs as this look renders them.
         var installed = dev.jasper.ui.swing.FlatLafInstaller.installedTheme();
         if (owner.status().runItem() != null)
-            assertThat(WindowPairsTest.paints(owner.status().runItem(), dev.jasper.ui.theme.SurfaceContrast.painted(installed, WindowPairs.RUN)))
+            assertThat(WindowPairsTest.paints(owner.status().runItem(), dev.jasper.ui.theme.SurfaceContrast.painted(installed,
+                WindowPairs.run(false, owner.status().cells() instanceof RuledCells))))
                 .as(look.name() + ": the run item's declared pair").isTrue();
         if (owner.status().cells() instanceof RuledCells)
             assertThat(WindowPairsTest.paints(owner.status(), dev.jasper.ui.theme.SurfaceContrast.painted(installed, WindowPairs.RULE)))
@@ -5150,7 +5151,7 @@ class WindowPairsTest {
             @Override public void actionPerformed(ActionEvent event) { } }, "Go", ClassicToolbarButton.Glyph.PLUS, true, null);
         final ClassicHeader header = new ClassicHeader();
         final TitleSearchField field;
-        final RunItem run, activeRun;
+        final RunItem run, activeRun, slashRun;
         final WindowStatusBar warning, danger, idle;
 
         Fixture(ThemeController themes) {
@@ -5166,6 +5167,7 @@ class WindowPairsTest {
             var open = new AbstractAction("Command Palette") { @Override public void actionPerformed(ActionEvent event) { } };
             run = new RunItem(open, () -> false);
             activeRun = new RunItem(open, () -> true);
+            slashRun = new WindowStatusBar(new SlashSegments(), new RunItem(open, () -> false)).runItem();
             warning = bar(ConfigDiagnostic.Severity.WARNING, true);
             danger = bar(ConfigDiagnostic.Severity.ERROR, true);
             idle = bar(null, false);
@@ -5184,7 +5186,7 @@ class WindowPairsTest {
             new ClassicMenuBar().style(menus);
             tabs.refresh(); LayoutTestSupport.layoutTree(tabs);
             for (var bar : List.of(warning, danger, idle)) { bar.refreshTheme(); bar.setSize(600, 24); LayoutTestSupport.layoutTree(bar); }
-            for (JComponent each : List.of(button, run, activeRun)) { Dimension size = each.getPreferredSize(); each.setSize(size); }
+            for (JComponent each : List.of(button, run, activeRun, slashRun)) { Dimension size = each.getPreferredSize(); each.setSize(size); }
         }
 
         BufferedImage search(boolean hover) {
@@ -5239,6 +5241,7 @@ class WindowPairsTest {
             new Declared("configuration error", WindowPairs.DANGER_CELL, (theme, expected) -> f.danger.configButton().getForeground().equals(expected)
                 && paints(f.danger, expected)),
             new Declared("run item", WindowPairs.RUN, (theme, expected) -> paints(f.run, expected)),
+            new Declared("run item on slash segments", WindowPairs.SLASH_RUN, (theme, expected) -> paints(f.slashRun, expected)),
             new Declared("active run item", WindowPairs.ACTIVE_RUN, (theme, expected) -> paints(f.activeRun, expected)));
     }
 
@@ -5381,15 +5384,16 @@ final class WindowPairs {
     /** The configuration cell's text on its ground. */
     static final PaintPair WARNING_CELL = pair(SemanticColor.STATUS_WARNING, DerivedColor.WARNING_GROUND, Guard.TEXT),
         DANGER_CELL = pair(SemanticColor.STATUS_DANGER, DerivedColor.DANGER_GROUND, Guard.TEXT);
-    /** "▶ Run…", and while the palette is open (spec 16.1.1's active run item). */
+    /** "▶ Run…" on ruled cells and on slash segments, and while the palette is open (spec 16.1.1's active run item). */
     static final PaintPair RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_APP, Guard.TEXT),
+        SLASH_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_STATUS, Guard.TEXT),
         ACTIVE_RUN = pair(DerivedColor.ACCENT_EDGE, SemanticColor.SURFACE_CONTROL_SELECTED, Guard.TEXT);
 
     /** Every window pair, the declared table of spec 16.1.1. */
     static final List<PaintPair> ALL = List.of(OPEN_MENU, RULE, BUTTON_LABEL, BUTTON_FRAME, SEARCH_EDGE, SEARCH_HOVER_EDGE,
         PLACEHOLDER, KEYCAP_TEXT, TAB_LABEL, SELECTED_TAB_LABEL, INACTIVE_TAB_LABEL, INACTIVE_SELECTED_TAB_LABEL,
         RUNNING_TAB_DOT, RUNNING_SELECTED_TAB_DOT, IDLE_TAB_DOT, IDLE_SELECTED_TAB_DOT, TAB_CLOSE, SELECTED_TAB_CLOSE,
-        TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, ACTIVE_RUN);
+        TAB_INDICATOR, TAB_PLUS, CELL_TEXT, RUNNING_SESSION_DOT, IDLE_SESSION_DOT, WARNING_CELL, DANGER_CELL, RUN, SLASH_RUN, ACTIVE_RUN);
 
     static PaintPair tabLabel(boolean activeWindow, boolean selected) {
         return activeWindow ? (selected ? SELECTED_TAB_LABEL : TAB_LABEL) : (selected ? INACTIVE_SELECTED_TAB_LABEL : INACTIVE_TAB_LABEL);
@@ -5400,7 +5404,7 @@ final class WindowPairs {
     static PaintPair tabClose(boolean selected) { return selected ? SELECTED_TAB_CLOSE : TAB_CLOSE; }
     static PaintPair sessionDot(boolean running) { return running ? RUNNING_SESSION_DOT : IDLE_SESSION_DOT; }
     static PaintPair configuration(SemanticColor problem) { return problem == SemanticColor.STATUS_DANGER ? DANGER_CELL : WARNING_CELL; }
-    static PaintPair run(boolean active) { return active ? ACTIVE_RUN : RUN; }
+    static PaintPair run(boolean active, boolean ruled) { return active ? ACTIVE_RUN : ruled ? RUN : SLASH_RUN; }
 }
 ```
 
@@ -5478,7 +5482,7 @@ edit(W + "RuledCells.java", [
      """            graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.sessionDot(bar.running())));""", 1)])
 edit(W + "RunItem.java", [
     ("""            g.setColor(SurfaceContrast.painted(theme, new PaintPair(DerivedColor.ACCENT_EDGE, ground, SurfaceContrast.Guard.TEXT)));""",
-     """            g.setColor(SurfaceContrast.painted(theme, WindowPairs.run(shown)));""", 1)])
+     """            g.setColor(SurfaceContrast.painted(theme, WindowPairs.run(shown, ruled)));""", 1)])
 edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicDialog.java", [
     ("""    /** Where the card sits in the window. */
     public enum Placement { CENTERED, SHEET }""",
@@ -6122,3 +6126,7 @@ The plan's own Rulings are 1 to 17; these continue the numbering.
 52. **`GeneratedThemeTest`'s role without an override key is `border.row`**, as `JasperThemeTest`'s is (Task 1 Step 1).
     Why: with `border.divider` overridable, `aGeneratedThemeTakesOnlyOpaqueOverridesOfTheOverridableRoles` no longer
     threw. Cost if wrong: none.
+53. **The idle run item lies on its bar's surface** (Task 5 review): `surface.app` under ruled cells (and alone, as
+    `WindowPairsTest`'s fixture paints it), `surface.status` on slash segments, so Task 8 declares `SLASH_RUN` beside
+    `RUN` and routes `RunItem` through `WindowPairs.run(shown, ruled)`. Why: spec 10.6 allows the run item with either
+    layout, and the text guard held it against a surface it was not on. Cost if wrong: none.

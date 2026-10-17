@@ -6,20 +6,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
+import com.formdev.flatlaf.util.UIScale;
+import dev.jasper.app.contributions.ContentHost;
+import dev.jasper.app.contributions.ContentRegistry;
+import dev.jasper.app.contributions.ContentStatus;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.terminals.PaneSnapshot;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.MouseEvent;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.accessibility.AccessibleState;
 import javax.swing.AbstractAction;
+import javax.swing.JButton;
+import javax.swing.JPanel;
 import org.junit.jupiter.api.Test;
 
 /** Spec 10.6 and the Workstation and Run Dialog mocks: ruled status cells and the run item. */
@@ -76,6 +88,8 @@ class RuledCellsTest {
                 bar.setConfiguration(state(ConfigDiagnostic.Severity.ERROR));
                 assertThat(bar.configButton().isVisible()).isTrue();
                 assertThat(bar.configButton().getText()).startsWith("▲ Config error");
+                assertThat(MockProfile.at(MockProfile.print(bar, 1440, 24), 2860, 30)).as("the error cell is on danger.ground")
+                    .isEqualTo(DerivedColor.DANGER_GROUND.color(themes.current().chrome()));
                 bar.configButton().doClick();
                 assertThat(details).hasValue(1);
                 bar.setConfiguration(state(ConfigDiagnostic.Severity.WARNING));
@@ -104,6 +118,99 @@ class RuledCellsTest {
                 assertThat(run.getX()).as("it leads the bar").isZero();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
+    }
+
+    @Test void aContentTabsItemsAreCellsRuledBetweenTheirLabels() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var registry = new ContentRegistry();
+                var window = UUID.randomUUID();
+                registry.addHost(new ContentHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                var entry = registry.open("dev.x.editor", "notes", "notes.txt", window, new JPanel());
+                entry.presentation("notes.txt", "", null, false, "/work/notes.txt", "");
+                entry.status(List.of(new ContentStatus("Ln 12, Col 4", null, null), new ContentStatus("Plain Text", null, null),
+                    new ContentStatus("ISO-8859-1", null, null), new ContentStatus("Spaces: 4", null, null)));
+                var bar = new WindowStatusBar(new RuledCells(), null);
+                bar.setMetadata(local("zsh"), "130 × 69", true);
+                bar.setContent(entry);
+                var image = MockProfile.print(bar, 1440, 24);
+                var theme = themes.current().chrome();
+                var rules = MockProfile.solid(MockProfile.row(image, 30, 0, 2880), 1).stream()
+                    .filter(run -> run.length() == 2 && run.color().equals(DerivedColor.BORDER_DIVIDER.color(theme))).map(MockProfile.Run::start).toList();
+                var items = bar.contentItems;
+                int between = 0;
+                for (var child : items.getComponents()) {
+                    var button = (JButton) child;
+                    int from = 2 * (items.getX() + button.getX() + button.getInsets().left), to = 2 * (items.getX() + button.getX() + button.getWidth() - button.getInsets().right);
+                    assertThat(rules).as(button.getText() + "'s text has no rule through it").noneMatch(rule -> rule >= from && rule < to);
+                }
+                for (int rule : rules) if (rule > 2 * items.getX() && rule < 2 * (items.getX() + items.getWidth())) between++;
+                assertThat(between).as("a rule between each two content items").isEqualTo(3);
+                assertThat(child(bar, "statusEncoding").getWidth()).as("the session's UTF-8 is not the document's").isZero();
+                int pad = UIScale.scale(FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.STATUS_CELL_PADDING));
+                assertThat(child(bar, "statusSession").getX()).as("a content tab's title has no dot before it").isEqualTo(pad);
+                assertThat(child(bar, "statusFolder").getToolTipText()).isEqualTo("/work/notes.txt");
+                assertThat(child(bar, "statusSession").getToolTipText()).isNull();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    @Test void aNarrowBarKeepsEveryCellInsideItAndApart() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var open = new AbstractAction("Command Palette") { @Override public void actionPerformed(ActionEvent event) { } };
+                var bar = new WindowStatusBar(new RuledCells(), new RunItem(open, () -> false));
+                bar.setMetadata(local("a-shell-with-a-long-name"), "130 × 69", true);
+                bar.setConfiguration(state(ConfigDiagnostic.Severity.WARNING));
+                for (int width : new int[] {120, 200, 320}) {
+                    MockProfile.print(bar, width, 24);
+                    var shown = java.util.Arrays.stream(bar.getComponents()).filter(c -> c.getWidth() > 0)
+                        .sorted(java.util.Comparator.comparingInt(java.awt.Component::getX)).toList();
+                    for (int i = 0; i < shown.size(); i++) {
+                        var cell = shown.get(i);
+                        assertThat(cell.getX() + cell.getWidth()).as(width + ": " + cell.getName() + " stays inside the bar").isLessThanOrEqualTo(width);
+                        if (i > 0) assertThat(cell.getX()).as(width + ": " + cell.getName() + " starts after " + shown.get(i - 1).getName())
+                            .isGreaterThanOrEqualTo(shown.get(i - 1).getX() + shown.get(i - 1).getWidth());
+                    }
+                }
+                bar.setMetadata(local("zsh"), "130 × 69", true);
+                MockProfile.print(bar, 1440, 24);
+                assertThat(child(bar, "statusSession").getToolTipText()).isEqualTo("Shell integration active");
+                assertThat(child(bar, "statusFolder").getToolTipText()).as("the folder's full path").isEqualTo(DesktopTestSupport.HOME.toString());
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    @Test void theRunItemIsAnAccessibleToggleThatRunsOnRelease() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var open = new AtomicBoolean();
+                var opened = new AtomicInteger();
+                var run = new RunItem(new AbstractAction("Command Palette") { @Override public void actionPerformed(ActionEvent event) { opened.incrementAndGet(); } }, open::get);
+                run.setSize(run.getPreferredSize());
+                var context = run.getAccessibleContext();
+                assertThat(context.getAccessibleStateSet().contains(AccessibleState.CHECKED)).isFalse();
+                open.set(true);
+                assertThat(context.getAccessibleStateSet().contains(AccessibleState.CHECKED)).as("checked while the palette is open").isTrue();
+                assertThat(context.getAccessibleAction().getAccessibleActionCount()).isEqualTo(1);
+                assertThat(context.getAccessibleAction().doAccessibleAction(0)).isTrue();
+                assertThat(opened).hasValue(1);
+                long when = System.currentTimeMillis();
+                run.dispatchEvent(new MouseEvent(run, MouseEvent.MOUSE_PRESSED, when, InputEvent.BUTTON1_DOWN_MASK, 4, 4, 1, false, MouseEvent.BUTTON1));
+                run.dispatchEvent(new MouseEvent(run, MouseEvent.MOUSE_RELEASED, when, 0, 9, 6, 1, false, MouseEvent.BUTTON1));
+                assertThat(opened).as("a release over the item after the pointer moved").hasValue(2);
+                run.dispatchEvent(new MouseEvent(run, MouseEvent.MOUSE_PRESSED, when, InputEvent.BUTTON1_DOWN_MASK, 4, 4, 1, false, MouseEvent.BUTTON1));
+                run.dispatchEvent(new MouseEvent(run, MouseEvent.MOUSE_RELEASED, when, 0, run.getWidth() + 5, 4, 1, false, MouseEvent.BUTTON1));
+                assertThat(opened).as("a release off the item cancels").hasValue(2);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    private static javax.swing.JComponent child(WindowStatusBar bar, String name) {
+        return (javax.swing.JComponent) java.util.Arrays.stream(bar.getComponents()).filter(c -> name.equals(c.getName())).findFirst().orElseThrow();
     }
 
     @Test void aLocalPaneIsNamedByItsShellAndARemoteOneByItsHost() {

@@ -69,6 +69,10 @@ final class WindowStatusBar extends JPanel {
     boolean running() { return running; }
     String session() { return session; }
     String folder() { return folder; }
+    /** The pane's full directory, as the slash layout's tip gives it. */
+    String directory() { return directory; }
+    /** Whether the shell has marked a prompt, as a tip; null without a shell. */
+    String integrationToolTip() { return shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected"; }
     String dimensions() { return dimensions; }
     String configurationText() { return configText; }
     /** The status role of a configuration problem, or null when there is none. */
@@ -92,7 +96,7 @@ final class WindowStatusBar extends JPanel {
         // The remote breadcrumb already names the provider's host.
         left.setParts(pane != null && pane.providerId().isPresent() ? "" : shellLabel(), directory);
         left.setToolTipText(directory);
-        left.setFirstToolTip(shell.isEmpty() ? null : integration ? "Shell integration active" : "Shell integration not detected");
+        left.setFirstToolTip(integrationToolTip());
         updateText();
     }
 

@@ -761,7 +761,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Whether the palette is open; the run item shows it (spec 10.6). Null-safe while the window is being built. */
     boolean paletteOpen() { return commandPalette != null && commandPalette.isOpen(); }
     /** The palette opened or closed: the run item repaints. */
-    void paletteChanged() { var run = chrome.status().runItem(); if (run != null) run.repaint(); }
+    void paletteChanged() { var run = chrome.status().runItem(); if (run != null) run.paletteChanged(); }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
