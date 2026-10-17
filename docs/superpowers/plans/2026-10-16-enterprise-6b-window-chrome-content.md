@@ -12,6 +12,20 @@
 > a candidate follow-up). The "+" is a flat, unfocusable `JButton` (Execution notes R24 no longer covers it), and a
 > tab's × closes on a release over it; the close is also the tab's second accessible action, "Close tab".
 
+> **Task 7 review (2026-10-17):** round 1: a surface owned by a classic dialog drawn in its window hangs from that window,
+> as one owned by an overlay does (`NativeShells.windowed` over the in-window set, now `drawnInWindow`);
+> `AuxiliarySurface.hostTitled()` is false for an attached sheet, which has no title bar (Step 4 returns `hostTitled`);
+> `create`'s classic decision is `NativeShells.ClassicRoute` (`IN_WINDOW`, `MODAL_DIALOG`, `AS_REQUESTED`); Step 5 runs
+> the root project's `verifyApplicationArchitecture` (jasper-app has no task of that name). Round 2:
+> `ClassicDialog`'s strip takes no focus, so a dialog's focus lands in its content's first control and Escape reaches its
+> Cancel; Step 4's `NativeShells.IN_WINDOW` is `CLASSIC_FLAGS`; a classic modal overlay that opens natively passes
+> through `nativeFallback`, which makes it a native dialog: `AuxiliaryWindows.track` marks overlays with `windowTitled`
+> too, `hostTitled()` holds for an overlay only once it is a native dialog (a FULL form then does not repeat the system
+> bar's title), and what it owns hangs from its own window; an owner window is showing only while neither it nor a
+> window it hangs from is minimised (Review Focus 5); a centred dialog re-reads its window's title bar on every resize
+> (`NativeShells.followTitleBar`: macOS full screen hides the bar). GUI checks: a dialog requested over a minimised
+> window, and full screen under an open dialog.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look the window's content takes the Workstation and Credential Vault mocks: the classic
@@ -5843,7 +5857,8 @@ Insert at the top of `docs/STATUS.md`, right after the `# Jasper — Status and 
 plan 6a's entry), one paragraph (fill `<range>` with the first and last commit of this plan, `<counts>` with Step 5's
 line, `<agreements>` with Task 8's `compare_all.py` lines, `<swatches>` with Task 8's two swatch lines, `<fonts>` with
 Task 8's `FONTS residual` lines, and
-`<deviations>` with every deviation from this plan's text, or "none beyond the plan's Rulings"):
+`<deviations>` with every deviation from this plan's text, the opening banner's task review notes included, or "none
+beyond the plan's Rulings"):
 
 ```markdown
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
@@ -5887,7 +5902,8 @@ band's trailing actions, the tab strip's dividers painted as the role, the face-
 Deviations from the plan's text: <deviations>. `./gradlew check --continue`: **<counts>**. GUI checks for the user (spec
 16.2): with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell,
 "▶ Run…" opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second
-dialog over the first, the window closing under them). Not merged, not pushed.
+dialog over the first, the window closing under them, full screen under them, and either requested over a minimised
+window, which opens it natively). Not merged, not pushed.
 ```
 
 Replace this plan's first heading line with the same heading followed by a status banner:

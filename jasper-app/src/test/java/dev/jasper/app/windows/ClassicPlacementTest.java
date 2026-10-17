@@ -93,13 +93,15 @@ class ClassicPlacementTest {
         assertThat(NativeShells.windowed(confirm, surface -> false)).as("an overlay hangs from its owner's window").isSameAs(grant);
         var nested = windows.modalOverlay("Approve", unlock);
         assertThat(NativeShells.windowed(nested, surface -> surface == add)).as("a native dialog under the sheet has its own window").isSameAs(nested);
+        NativeShells.nativeFallback(grant);
+        assertThat(NativeShells.windowed(confirm, surface -> false)).as("an overlay opened as a native dialog has its own window").isSameAs(confirm);
     }
 
     /** A classic dialog's content replaced after its shell exists takes the same host flags (spec 10.8). */
     @Test void contentSetAfterTheShellTakesItsFlags() {
         var windows = windows(DialogMapping.Kind.CLASSIC, true);
         var unlock = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
-        unlock.laterContent(NativeShells.IN_WINDOW);
+        unlock.laterContent(NativeShells.CLASSIC_FLAGS);
         var context = KitTestSupport.context();
         var spec = new ViewSpec(new Nodes.Text("locked", ControlState.READY, "Locked", Nodes.TextRole.LABEL));
         try (var later = new KitView(context, spec, event -> { })) {
@@ -130,6 +132,15 @@ class ClassicPlacementTest {
         var windows = windows(DialogMapping.Kind.CLASSIC, true);
         assertThat(windows.dialog("Settings", true, UUID.randomUUID()).hostTitled()).isTrue();
         assertThat(windows.modalOverlay("Unlock Vault", UUID.randomUUID()).hostTitled()).as("an overlay's title is its strip").isFalse();
+        var unlock = windows.modalOverlay("Unlock Vault", UUID.randomUUID());
+        NativeShells.nativeFallback(unlock);
+        assertThat(unlock.hostTitled()).as("opened as a native modal dialog, its system bar titles it").isTrue();
+        var progress = windows.overlay("Connecting", UUID.randomUUID());
+        NativeShells.nativeFallback(progress);
+        assertThat(progress.hostTitled()).as("a progress overlay stays in its window").isFalse();
+        var untitled = windows(DialogMapping.Kind.CLASSIC, false).modalOverlay("Unlock Vault", UUID.randomUUID());
+        NativeShells.nativeFallback(untitled);
+        assertThat(untitled.hostTitled()).as("no native title: the form keeps its own").isFalse();
         var sheet = windows.dialog("Add Login", true, UUID.randomUUID());
         sheet.attachedSheet(true);
         assertThat(sheet.hostTitled()).as("an attached sheet has no title bar to title it").isFalse();

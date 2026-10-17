@@ -205,8 +205,13 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
         }
     }
 
-    /** The header strip: the swatch and the title above a {@code border.window} rule. */
+    /**
+     * The header strip: the swatch and the title above a {@code border.window} rule. It takes no focus, so the host's
+     * focus lands in the content, where typing and Escape belong.
+     */
     private final class Strip extends JComponent {
+        Strip() { setFocusable(false); }
+
         // A bare JComponent has no accessible context; this one names its role.
         @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {

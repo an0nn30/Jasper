@@ -80,16 +80,19 @@ public final class AuxiliarySurface {
         if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
         attachedSheet = value;
     }
-    private boolean classic, hostTitled;
+    private boolean classic, hostTitled, nativeDialog;
     /** Whether a modal overlay or attached sheet of this surface is drawn in its window as a classic dialog (spec 10.8). */
     public boolean classic() { return classic; }
     void classic(boolean value) { classic = value; }
     /**
-     * Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8);
-     * never for an attached sheet, which has no title bar.
+     * Whether a title bar the system draws already shows this dialog's title, so its FULL form draws none (spec 10.8): a
+     * dialog's, or a modal overlay's that opens as a native dialog; never an attached sheet's, which has no title bar.
      */
-    public boolean hostTitled() { return hostTitled && !attachedSheet; }
+    public boolean hostTitled() { return hostTitled && !attachedSheet && (kind != Kind.OVERLAY || nativeDialog); }
     void hostTitled(boolean value) { hostTitled = value; }
+    /** Whether this modal overlay opens as a native modal dialog, its owner having no showing window (spec 10.8). */
+    boolean nativeDialog() { return nativeDialog; }
+    void nativeDialog(boolean value) { nativeDialog = value; }
     /** The shell's host flags for a kit view set as content after the shell exists (spec 10.8); none by default. */
     private java.util.function.Consumer<dev.jasper.ui.swing.KitView> laterContent = view -> { };
     /** The shell marks content set from now on with {@code marks}, as it marked the content it found. */

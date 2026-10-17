@@ -144,7 +144,8 @@ public final class AuxiliaryWindows implements AutoCloseable {
 
     private AuxiliarySurface track(AuxiliarySurface surface) {
         surface.classic(classic);
-        if (surface.kind() == AuxiliarySurface.Kind.DIALOG) surface.hostTitled(windowTitled);
+        // A dialog under a title bar the system draws, and an overlay should it open as one (spec 10.8).
+        if (surface.kind() != AuxiliarySurface.Kind.WINDOW) surface.hostTitled(windowTitled);
         boolean first = open.isEmpty();
         open.add(surface);
         emptyReported = false;
