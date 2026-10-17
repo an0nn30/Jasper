@@ -1,6 +1,12 @@
 # Enterprise presentation 9a: the Settings chrome Implementation Plan
 
-> **Status (2026-10-17):** executing; deviations so far: Execution notes E28 and E29. Task 6 (platform faces, `PLEX`
+> **Executed on 2026-10-17:** `87e894a99..82633dd6c`, then the documentation commit; calibrated classic
+> `SETTINGS_PAGE_TOP` 11, `SETTINGS_SECTION_GAP` 13, `SETTINGS_CRUMB_GAP` 6 and `JOINED_ACTION_WIDTH` 26; deviations
+> E28, E29 and Task 6's review round (the joined pair's overlapping halves, the fixture's Back history), and the
+> execution date 2026-10-17 in this line and the STATUS entry. `./gradlew check --continue`: 11,085 tests, 0
+> failures, 0 errors, 25 skipped; the pixel proof prints `changed: none`.
+
+> **Status (2026-10-17):** executed; deviations: Execution notes E28 and E29. Task 6 (platform faces, `PLEX`
 > false): classic `SETTINGS_PAGE_TOP` calibrated 10 to 11 (Command Palette's first box top 52, now 53 as the mock);
 > `SETTINGS_SECTION_GAP` 13 and `SETTINGS_CRUMB_GAP` 6 kept (Appearance's boxes 307 and 328, 21 apart as the mock's 313
 > and 334); all three re-checked when the 5b merge turns `PLEX` on. Review round 1: the joined history pair drew 50 wide
