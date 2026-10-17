@@ -1,11 +1,8 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.ChromePainter;
 
-import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.platform.AppIcons;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
@@ -41,7 +38,13 @@ final class TitleSearchField extends JComponent {
     private Icon contextIcon;
     private boolean collapsed, hover, pressed;
 
-    TitleSearchField(Runnable open, Supplier<String> shortcut) {
+    private final HeaderComposition composition;
+
+    TitleSearchField(Runnable open, Supplier<String> shortcut) { this(open, shortcut, new UnifiedHeader()); }
+
+    /** A field drawn and sized by {@code composition}. */
+    TitleSearchField(Runnable open, Supplier<String> shortcut, HeaderComposition composition) {
+        this.composition = Objects.requireNonNull(composition);
         this.open = Objects.requireNonNull(open);
         this.shortcut = Objects.requireNonNull(shortcut);
         setName("titleSearch");
@@ -75,13 +78,14 @@ final class TitleSearchField extends JComponent {
     }
 
     String contextText() { return context; }
+    Icon contextIcon() { return contextIcon; }
     String shortcutText() { String text = shortcut.get(); return text == null ? "" : text; }
     boolean collapsed() { return collapsed; }
     void setCollapsed(boolean value) { if (collapsed != value) { collapsed = value; repaint(); } }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(UIScale.scale(preferredWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMinimumSize() { return new Dimension(UIScale.scale(minimumWidth()), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
-    @Override public Dimension getMaximumSize() { return new Dimension(UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_MAX_WIDTH)), UIScale.scale(metric(DesignMetrics.Role.TITLE_SEARCH_HEIGHT))); }
+    @Override public Dimension getPreferredSize() { return composition.searchPreferred(); }
+    @Override public Dimension getMinimumSize() { return composition.searchMinimum(); }
+    @Override public Dimension getMaximumSize() { return composition.searchMaximum(); }
 
     @Override public JToolTip createToolTip() {
         var tip = new JToolTip();
@@ -99,8 +103,7 @@ final class TitleSearchField extends JComponent {
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        ChromePainter.installed().search(this, graphics, ThemeZone.theme(this), hover || pressed, collapsed,
-            context, shortcutText(), AppIcons.icon("search"), contextIcon);
+        composition.paintSearch(this, graphics, hover || pressed, collapsed);
     }
 
     /** {@code text}, cut at a code point boundary with an ellipsis when it is wider than {@code width}. */

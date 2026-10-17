@@ -25,11 +25,16 @@ final class WindowHeader extends JPanel {
     private static int headerGap() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.NATIVE_HEADER_GAP); }
     private final TitleSearchField field;
     private final WindowToolbar toolbar;
+    private final HeaderComposition composition;
 
-    WindowHeader(TitleSearchField field, WindowToolbar toolbar) {
+    WindowHeader(TitleSearchField field, WindowToolbar toolbar) { this(field, toolbar, new UnifiedHeader()); }
+
+    /** A header composed by {@code composition} (Enterprise presentation spec 10.3). */
+    WindowHeader(TitleSearchField field, WindowToolbar toolbar, HeaderComposition composition) {
         super(null);
         this.field = field;
         this.toolbar = toolbar;
+        this.composition = composition;
         setName("windowHeader");
         // The title bar is a native chrome receiver: its toolbar and command centre show the original chrome artwork.
         dev.jasper.app.platform.AppIcons.chromeReceiver(this);
@@ -69,13 +74,19 @@ final class WindowHeader extends JPanel {
     /** The header adapts to the window's width, so it never asks for more than its minimum; the terminal sizes new windows. */
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
-    @Override public Dimension getMinimumSize() {
+    @Override public Dimension getMinimumSize() { return composition.minimumSize(this); }
+
+    @Override public void doLayout() { composition.layout(this); }
+
+    /** Today's minimum: the toolbar's or the leading content's side twice around the field. */
+    Dimension unifiedMinimumSize() {
         Insets insets = getInsets();
         int side = Math.max(insets.left + leadingMinimum.getAsInt(), insets.right + (toolbar.isVisible() ? toolbar.minimumWidth() : 0));
         return new Dimension(2 * (side + UIScale.scale(headerGap())) + fieldHeight(height()), height());
     }
 
-    @Override public void doLayout() {
+    /** Today's layout: the field centred on the window, the toolbar to its right, the leading content to its left. */
+    void unifiedLayout() {
         Insets insets = getInsets();
         int width = getWidth(), height = getHeight(), gap = UIScale.scale(headerGap());
         int left = Math.min(insets.left, width), right = Math.max(left, width - insets.right);

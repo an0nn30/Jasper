@@ -322,6 +322,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
         if (bar == null) installCustomTitleBar(root, content);
+        // Under a native-titled look the header is a row of window chrome, whichever composition draws it (spec 10.1,
+        // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
+        if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
         return bar;
     }

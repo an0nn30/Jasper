@@ -11,14 +11,18 @@ import java.util.Objects;
  */
 public final class WorkspaceChrome {
     /** The default look's chrome. */
-    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"));
+    public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
+        WorkspaceLook.Header.UNIFIED);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
+    /** The header's composition, made for each window by {@link #header()}. */
+    private final WorkspaceLook.Header header;
 
-    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title) {
+    private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header) {
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
+        this.header = Objects.requireNonNull(header);
     }
 
     /**
@@ -34,16 +38,24 @@ public final class WorkspaceChrome {
             case STANDARD -> new StandardMenuBar();
             case CLASSIC -> new ClassicMenuBar();
         };
-        return new WorkspaceChrome(menus, title);
+        return new WorkspaceChrome(menus, title, look.header());
     }
 
     MenuBarLayout menus() { return menus; }
     TitleFormat title() { return title; }
+    /** A new header composition for one window (spec 10.3). */
+    HeaderComposition header() {
+        return switch (header) {
+            case UNIFIED -> new UnifiedHeader();
+            case CLASSIC -> new ClassicHeader();
+        };
+    }
 
     /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
     @Override public boolean equals(Object other) {
-        return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && title.equals(chrome.title);
+        return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
+            && title.equals(chrome.title);
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), title); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, title); }
 }
