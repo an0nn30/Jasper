@@ -1,6 +1,6 @@
 # Every built-in variant's derived roles (DerivedPalette), frozen: theme id, variant, role, colour.
 slate-cobalt	dark	surface.header	#2d3036
-slate-cobalt	dark	surface.header.active	#232b3c
+slate-cobalt	dark	surface.header.active	#2d3546
 slate-cobalt	dark	surface.stripe	#2a2d33
 slate-cobalt	dark	surface.tableHeader	#3a3e45
 slate-cobalt	dark	surface.zebra	#33373f

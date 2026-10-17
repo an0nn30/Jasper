@@ -24,7 +24,8 @@ class DerivedColorTest {
         Set<ColorRole> onApp = Set.of(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_APP);
         Set<ColorRole> onCard = Set.of(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CARD);
         inputs.put(SURFACE_HEADER, onApp);
-        inputs.put(SURFACE_HEADER_ACTIVE, Set.of(SemanticColor.ACCENT, SemanticColor.SURFACE_APP, SURFACE_HEADER));
+        inputs.put(SURFACE_HEADER_ACTIVE, Set.of(SemanticColor.ACCENT, SemanticColor.SURFACE_APP, SURFACE_HEADER,
+            SemanticColor.TEXT_PRIMARY));
         inputs.put(SURFACE_STRIPE, onApp);
         inputs.put(SURFACE_TABLE_HEADER, onCard);
         inputs.put(SURFACE_ZEBRA, Set.of(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CARD, SURFACE_TABLE_HEADER));

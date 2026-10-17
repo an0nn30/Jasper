@@ -131,6 +131,26 @@ public final class SurfaceContrast {
         return toward;
     }
 
+    /**
+     * {@code surface} kept at least {@code minimum} CIE L* beyond {@code from} on the side of {@code text}'s lightness
+     * (lighter when the text is lighter than {@code from}, darker otherwise): unchanged when it already is; otherwise
+     * moved toward white or black in 1% steps just until it is, or toward the other end when that side has no room. The
+     * derived surfaces use it, so a dark variant's header strips stand lighter than its window surface.
+     */
+    public static Color beyond(Color surface, Color from, double minimum, Color text) {
+        double target = ColorMath.lightness(from);
+        boolean lighter = ColorMath.lightness(text) > target;
+        if ((lighter ? ColorMath.lightness(surface) - target : target - ColorMath.lightness(surface)) >= minimum) return surface;
+        for (Color end : lighter ? java.util.List.of(Color.WHITE, Color.BLACK) : java.util.List.of(Color.BLACK, Color.WHITE)) {
+            boolean up = end.equals(Color.WHITE);
+            for (int step = 1; step <= 100; step++) {
+                Color candidate = ColorMath.mix(end, surface, step / 100.0);
+                if ((up ? ColorMath.lightness(candidate) - target : target - ColorMath.lightness(candidate)) >= minimum) return candidate;
+            }
+        }
+        return lighter ? Color.WHITE : Color.BLACK;
+    }
+
     /** White or black, whichever contrasts more with {@code fill}. */
     public static Color blackOrWhite(Color fill) {
         return ColorMath.contrast(Color.WHITE, fill) >= ColorMath.contrast(Color.BLACK, fill) ? Color.WHITE : Color.BLACK;

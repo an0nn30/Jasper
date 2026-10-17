@@ -296,6 +296,68 @@ class PaintedContrastTest {
         return image;
     }
 
+    /** Spec 10.7 and 16.1.2: the classic dock chrome paints each declared pair as its guard makes it, over every palette. */
+    @Test void theClassicDockPaintsEachPairAsItsGuardMakesItOverEveryPalette() {
+        var painter = new ChromePainter(Kit.CLASSIC);
+        var pairs = ChromePainter.DOCK_PAIRS;
+        var declared = List.of(
+            new Declared("dock rule", pairs.get(0), (theme, expected) -> painter.dockRule(theme).equals(expected)
+                && strip(painter, theme, false).getRGB(5, 24) == expected.getRGB() && strip(painter, theme, true).getRGB(5, 24) == expected.getRGB()),
+            new Declared("stripe label", pairs.get(1), (theme, expected) -> painter.stripeLabel(theme, false).equals(expected)),
+            new Declared("open stripe label", pairs.get(2), (theme, expected) -> painter.stripeLabel(theme, true).equals(expected)),
+            new Declared("accent count pill", pairs.get(3), (theme, expected) -> pill(painter, theme, expected, false)),
+            new Declared("error count pill", pairs.get(4), (theme, expected) -> pill(painter, theme, expected, true)),
+            new Declared("header title", pairs.get(5), (theme, expected) -> painter.headerTitle(theme, false).equals(expected)),
+            new Declared("focused header title", pairs.get(6), (theme, expected) -> painter.headerTitle(theme, true).equals(expected)),
+            new Declared("header detail", pairs.get(7), (theme, expected) -> painter.headerDetail(theme, false, false).equals(expected)),
+            new Declared("focused header detail", pairs.get(8), (theme, expected) -> painter.headerDetail(theme, true, false).equals(expected)),
+            new Declared("header count", pairs.get(9), (theme, expected) -> painter.headerDetail(theme, false, true).equals(expected)),
+            new Declared("focused header count", pairs.get(10), (theme, expected) -> painter.headerDetail(theme, true, true).equals(expected)),
+            new Declared("header connected dot", pairs.get(11), (theme, expected) -> dot(painter, theme, false).getRGB(9, 9) == expected.getRGB()),
+            new Declared("focused header connected dot", pairs.get(12), (theme, expected) -> dot(painter, theme, true).getRGB(9, 9) == expected.getRGB()));
+        assertThat(declared).extracting(Declared::pair).as("every declared dock pair is sampled").containsExactlyElementsOf(pairs);
+        for (var theme : palettes()) {
+            assertThat(strip(painter, theme, true).getRGB(5, 5)).as(name(theme) + " focused strip").isEqualTo(painter.headerSurface(theme, true).getRGB());
+            for (var each : declared) {
+                String where = name(theme) + ", " + each.name();
+                Color expected = SurfaceContrast.painted(theme, each.pair());
+                assertThat(each.pair().guard().holds(expected, each.pair().against().color(theme))).as(where + " meets its guard").isTrue();
+                assertThat(each.painter().paints(theme, expected)).as(where + " is painted " + ColorMath.hex(expected)).isTrue();
+            }
+        }
+    }
+
+    /** A 40 x 25 header strip: 24 px of surface over its 1 px rule. */
+    private static BufferedImage strip(ChromePainter painter, GeneratedTheme theme, boolean focused) {
+        var image = new BufferedImage(40, 25, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { painter.headerStrip(graphics, 40, 25, theme, focused); } finally { graphics.dispose(); }
+        return image;
+    }
+
+    /** A count pill at four times its size, so its text has fully covered pixels. */
+    private static boolean pill(ChromePainter painter, GeneratedTheme theme, Color expected, boolean error) {
+        var image = new BufferedImage(160, 80, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.scale(4, 4); painter.countPill(graphics, 2, 2, "8", theme, error); } finally { graphics.dispose(); }
+        return anywhere(image, expected);
+    }
+
+    /** Whether any pixel of {@code image} is exactly {@code color}; {@code hasColor} scans only the right half, the off switch's. */
+    private static boolean anywhere(BufferedImage image, Color color) {
+        for (int y = 0; y < image.getHeight(); y++)
+            for (int x = 0; x < image.getWidth(); x++) if (image.getRGB(x, y) == color.getRGB()) return true;
+        return false;
+    }
+
+    /** A 14 px connected dot at (2, 2). */
+    private static BufferedImage dot(ChromePainter painter, GeneratedTheme theme, boolean focused) {
+        var image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { painter.headerDot(graphics, 2, 2, 14, theme, focused); } finally { graphics.dispose(); }
+        return image;
+    }
+
     private static boolean searchHint(GeneratedTheme theme, Color expected) {
         var blank = new Icon() {
             public int getIconWidth() { return 16; } public int getIconHeight() { return 16; }

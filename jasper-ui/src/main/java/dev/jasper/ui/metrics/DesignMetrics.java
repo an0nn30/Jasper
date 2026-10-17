@@ -133,7 +133,7 @@ public final class DesignMetrics {
         // (CONTROL_RADIUS before), then roles only the classic faces and chrome read, measured on the Enterprise mocks.
         ROW_HEIGHT(24), FIELD_RADIUS(4),
         RUN_WINDOW_WIDTH(460), CHECKBOX_BOX(13), CHECKBOX_RADIUS(2), CHECKBOX_LABEL_GAP(7), RADIO_RING(14), RADIO_DOT(6), RADIO_LABEL_GAP(6), RADIO_GAP(18), OPTION_SWATCH(7), GROUP_TITLE_INSET(9), GROUP_TITLE_PADDING(4), GROUP_TITLE_GAP(4), SPINNER_WIDTH(82), SPINNER_ARROW_WIDTH(16), SPINNER_GLYPH(7), DROPDOWN_GLYPH(6), DROPDOWN_GLYPH_INSET(7),
-        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(8), STRIPE_LABEL_GAP(1), DOCK_RULE(1), DOCK_RULE_HIT(6),
+        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(9), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
         // Plan 4c: a grouped table's data rows under their heading (Settings, Notifications mock); classic faces only.
         GROUP_ROW_INDENT(14),
         // The Run window (Enterprise presentation plan 8a), measured on the 06 Run Dialog mocks; read only by the Run window.
@@ -144,7 +144,11 @@ public final class DesignMetrics {
         CHROME_SEPARATOR_INSET(8), CHROME_GLYPH(7), CHROME_GLYPH_GAP(6), CHROME_CARET(5), CHROME_CARET_GAP(7), CHROME_TRAILING_GAP(6),
         TOOLBAR_SEARCH_WIDTH(300), TOOLBAR_SEARCH_PADDING(8), HINT_KEYCAP_HEIGHT(16), HINT_KEYCAP_PADDING(4), CLASSIC_TAB_LEADING(12), CLASSIC_TAB_GAP(9),
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
-        DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8);
+        DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
+        // Enterprise plan 7: the count pill, the native header's actions and the header strips' gaps (Workstation mock);
+        // only the classic dock chrome reads them.
+        STRIPE_PILL_HEIGHT(14), STRIPE_PILL_WIDTH(16), STRIPE_PILL_PADDING(5), STRIPE_PILL_GAP(5), TOOL_HEADER_ACTION(16),
+        HEADER_STRIP_TITLE_GAP(8), HEADER_STRIP_DOT_GAP(6);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -225,6 +229,12 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_HEIGHT, 78);
         values.put(Role.THEME_PREVIEW_GAP, 20);
         values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
+        // Enterprise plan 7: the header strips' paddings and 16 px actions, 18 apart (Workstation mock).
+        values.put(Role.TOOL_HEADER_LEADING_PADDING, 8);
+        values.put(Role.TOOL_HEADER_TRAILING_PADDING, 7);
+        values.put(Role.PANEL_HEADER_ACTION, 16);
+        values.put(Role.PANEL_HEADER_ACTION_VERTICAL, 0);
+        values.put(Role.PANEL_HEADER_TRAILING_PADDING, 7);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);
