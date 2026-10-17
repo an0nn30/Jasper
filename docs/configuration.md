@@ -326,7 +326,8 @@ line; the lines are never drawn, only felt. Releasing saves the place, as fracti
 560-pixel activated width in both view modes. In Normal mode, dragging the palette back to the title-bar field
 (near its usual place across, at or above its usual height) snaps it home, and releasing there re-attaches it.
 Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
-again and Compact mode centres it.
+again and Compact mode centres it. Under the Enterprise look the palette is the Run window, which keeps its own place in
+`[palette.run_window]` (`left`, `bottom`: its left and bottom edges as fractions of the window).
 
 ### Finished-command notifications
 

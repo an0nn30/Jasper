@@ -158,7 +158,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT argument/handoff flow and EDT composition. StartupResources owns rollback until explicit transfer. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions. WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
 | `palette` | EDT scope/query/step state, keyboard routing, the palette's two views behind `PaletteView` (the card, `CardView`, and the Run window, `RunWindowView`, built by `PaletteViews.of` from the look's `PaletteLook`) and the built-in Commands scope. Controller owns scope listeners and invalidates asynchronous completions on close. History and Snippets are bundled plugins. |
@@ -231,7 +231,7 @@ trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`), `Statu
 `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
 it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
 `ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`
-anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized to content with a 3 px selection underline,
+places through its `PaletteHome` (the field's bounds for the card). `WindowTabs` are IntelliJ editor tabs sized to content with a 3 px selection underline,
 wheel scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row. App icons resolve
 from bundled assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured to the chrome
 foreground (see [SDK architecture](sdk-architecture.md)).

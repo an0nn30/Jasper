@@ -1,5 +1,39 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 8b: the Run window in the workspace — 2026-10-17** (`claude/enterprise-run-window`, worktree
+`.claude/worktrees/enterprise-8`, `3ce462b60..52978884f`, then this documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-8b-run-window.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Turning Enterprise on makes the palette
+the Run window: `Presentation.LANDED` gains `RUN_WINDOW`, so the kit's `palette = "run_window"` gives every window
+`PaletteLook(RUN_WINDOW, CORNER)`. `PaletteHome` places the view: `TitleFieldHome` is the card's (today's arithmetic and
+`[palette] center_x/top`), `CornerHome` the Run window's at the bottom-left of the dock work area, inset by
+the mocks' 6 across and 5 up (`RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM`), attaching a drag that ends at or below
+it, with no guides, `[palette.run_window] left/bottom` and a list that drops rows to fit a short window;
+`WorkspaceChrome.of` reads `PaletteLook.home()` and keeps the palette look and its home (both in `equals`), which plan
+6a's `WindowLook` carries to every window (no new window constructor). The footer buttons are the mocks' 70 px
+(`RUN_WINDOW_BUTTON_PADDING` 8 under the Run window; a longer label grows its button) and `RunWindowRenderTest` checks
+every owner, FOOTER included: the primary's and Cancel's left edges at the mock's 454 and 606 within a device pixel at
+2x in both states, edge agreement 0.965 / 0.972 ("Just opened", top / bottom) and 0.980 / 0.981 ("Typing auth"). The Run
+window is modeless: a tab switch, focus leaving the window and presses outside it leave it open, the window's actions
+run, a clicked pane gets its keys, an opener focuses it, a row runs in the current pane, and it closes on Escape inside
+it, ×, Cancel or running a row; it has no reveal. Browse… runs File › Open File… and the window stays open.
+Plan 6b's `WindowContent.paletteOpen()` and `paletteChanged()` serve "▶ Run…"'s active look. The in-workspace render, an
+Enterprise window built through `WindowLook.of` over the shipped kit's chrome and mounted as `TerminalWindow` mounts it,
+passes 8a's comparison: "Just opened" edge agreement 0.965 / 0.972 in place, every probe and fill as for the window
+alone, the window 6 right of the left stripe and 5 above the bottom strip; `ChromeRenderTest` opens every look's palette. `ProjectionReadTest` holds
+`PaletteLook.view()` to `PaletteViews` and `home()` to `WorkspaceChrome`. Rulings (plan, "Rulings"): (1) the homes are
+the workspace's; (2) the Run window's place is fractions of the workspace; (3) `PALETTE_WINDOW_MARGIN` stays 8 for the
+card and clamping, the Run window's home takes the mocks' 6 and 5; (4) the target follows the window; (5) modeless means
+no capture; (6) an opener focuses; (7) "▶ Run…"'s look is plan 6's; (8) the list fits the home; (9) the rehearsal takes
+the look; (10) the footer buttons are the mocks' 70 px; Execution notes R1 to R16. `[palette.run_window]` is in `docs/configuration.md`; the command palette and
+palette scopes specifications carry spec 19.2's banners. Deviations: (a) Task 2: `WindowCommandPalette`'s drag names the home's rectangle `homeAt`, since `at` already names the drag point in `mouseDragged`; (b) Task 2: `CornerHomeTest.aShortWindowShrinksTheListToFitTheHome` sets eight visible rows before its first layout, as Review Focus 3 states; (c) Task 7: `RunWindowWorkspaceRenderTest` registers the mocks' tool windows (SFTP and File Servers left, Sessions and Tunnels right, Event Log and Transfers in the bottom strip) so the stripes and the bottom strip the home measures from show, and asserts the home in place: 6 right of the left stripe, 5 above the bottom strip, at 2x the strip's rule at the mock's y 1706, the frame's bottom at 1696 and its left edge at the mock's x 60 less its 2 px border plus plan 7's extra stripe thickness (28 against the mock's 23); (d) Task 7: `ChromeRenderTest.check` turns animations off before opening the palette, so the card's print shows it settled; (e) Task 8: the base count is plan 7's merged count at `9c6351e07` (11,240 tests, 25 skipped), and the gallery base was rendered from an export of `9c6351e07`. Default look unchanged: every card test passes as
+before, and the headless gallery's files for Slate Cobalt Dark and Light (322) are byte-identical to the base. `./gradlew check --continue`: **11,260 tests, 0 failures, 0 errors, 25 skipped**
+(the base's 11,240 and this plan's 20). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
+window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
+re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
+and type (the pane takes the keys, the window stays); switch tabs and focus another application (it stays); Escape in
+it, ×, Cancel and running a row close it; Browse… opens a file and the window stays; "▶ Run…" shows active while it is
+open. Not merged, not pushed.
+
 **Enterprise presentation, plan 7: dock chrome — 2026-10-17** (`claude/enterprise-dock-chrome`, worktree
 `.claude/worktrees/enterprise-7`, `947b3d9e1..deb7ea3c1`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-7-dock-chrome.md),
