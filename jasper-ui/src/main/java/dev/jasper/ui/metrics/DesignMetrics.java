@@ -144,7 +144,9 @@ public final class DesignMetrics {
         CHROME_SEPARATOR_INSET(8), CHROME_GLYPH(7), CHROME_GLYPH_GAP(6), CHROME_CARET(5), CHROME_CARET_GAP(7), CHROME_TRAILING_GAP(6),
         TOOLBAR_SEARCH_WIDTH(300), TOOLBAR_SEARCH_PADDING(8), HINT_KEYCAP_HEIGHT(16), HINT_KEYCAP_PADDING(4), CLASSIC_TAB_LEADING(12), CLASSIC_TAB_GAP(9),
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
-        DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8);
+        DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
+        // Plan 9a: the Settings header's inset from the body (today the page inset); its classic value is the mocks' 14.
+        SETTINGS_HEADER_INSET(20);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -225,6 +227,23 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_HEIGHT, 78);
         values.put(Role.THEME_PREVIEW_GAP, 20);
         values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
+        // Plan 9a: the classic Settings frame (Mock measurements).
+        values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
+        values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);
+        values.put(Role.SETTINGS_FOOTER_SIDE, 14);
+        values.put(Role.SETTINGS_ACTION_MIN_WIDTH, 98);
+        values.put(Role.CIRCULAR_ACTION_SIZE, 22);
+        values.put(Role.SETTINGS_HEADER_GAP, 10);
+        values.put(Role.SETTINGS_HEADER_TITLE_GAP, 31);
+        values.put(Role.SETTINGS_CRUMB_GAP, 6);
+        values.put(Role.SETTINGS_PAGE_INSET, 16);
+        values.put(Role.SETTINGS_PAGE_TOP, 10);
+        values.put(Role.SETTINGS_CARD_WIDTH, 4000);
+        values.put(Role.SETTINGS_SECTION_GAP, 13);
+        values.put(Role.SETTINGS_CHOICE_WIDTH, 220);
+        values.put(Role.SETTINGS_RICH_CHOICE_WIDTH, 220);
+        values.put(Role.SETTING_CHOICE_WIDTH, 220);
+        values.put(Role.SETTINGS_HEADER_INSET, 14);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

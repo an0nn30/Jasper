@@ -41,6 +41,11 @@ final class SettingsView extends JPanel implements AutoCloseable {
     private boolean back, forward, apply, ok;
 
     SettingsView(KitContext context, Consumer<UiEvent> events, Runnable cancelled) {
+        this(context, dev.jasper.ui.swing.SettingsShell.Frame.INTEGRATED, events, cancelled);
+    }
+
+    /** The panel in {@code frame}: the look's title and navigation (spec 12.1). */
+    SettingsView(KitContext context, dev.jasper.ui.swing.SettingsShell.Frame frame, Consumer<UiEvent> events, Runnable cancelled) {
         super(new BorderLayout());
         setOpaque(false);
         search = new KitView(context, searchSpec(), events::accept);
@@ -54,7 +59,7 @@ final class SettingsView extends JPanel implements AutoCloseable {
         body.setBorder(BorderFactory.createEmptyBorder());
         body.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         body.setOpaque(false); body.getViewport().setOpaque(false);
-        shell = new dev.jasper.ui.swing.SettingsShell(context, search, navigation, header, banner, body, footer);
+        shell = new dev.jasper.ui.swing.SettingsShell(context, frame, search, navigation, header, banner, body, footer);
         add(shell, BorderLayout.CENTER);
 
         bind(KeyEvent.VK_ESCAPE, "cancelSettings", cancelled);

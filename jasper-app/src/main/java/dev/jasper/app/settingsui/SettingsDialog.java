@@ -177,7 +177,8 @@ public final class SettingsDialog {
         ConfigService.State state = hooks.state().get();
         draft = new SettingsDraft(state.values(), state.defaults());
         kit = hooks.kit().get();
-        view = new SettingsView(kit, this::event, this::cancel);
+        view = new SettingsView(kit, new dev.jasper.ui.swing.SettingsShell.Frame(hooks.chrome().integratedTitle(), hooks.chrome().collapsibleNav()),
+            this::event, this::cancel);
         view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
             () -> isOpen() ? surface : null, this::kit, hooks.chrome(), hooks.composition())));
@@ -187,8 +188,9 @@ public final class SettingsDialog {
         query = "";
         surface = windows.modalDialog("app.settings", "Settings", new Dimension(1000, 700), ownerOrNull);
         surface.setContent(view);
-        // The shell's sidebar and header reach the window's top: they are its title row, as in the Settings mocks.
-        surface.integratedTitle(view::titleRowHeight);
+        // The shell's sidebar and header reach the window's top and are its title row; a look with a native title (spec
+        // 12.1) keeps the window's "Settings" title above the shell.
+        if (hooks.chrome().integratedTitle()) surface.integratedTitle(view::titleRowHeight);
         surface.onClosing(this::mayClose);
         surface.onClosed(this::closed);
         draftListening = draft.onChanged(this::refreshNow);
