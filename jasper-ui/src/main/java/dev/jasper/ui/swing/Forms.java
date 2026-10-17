@@ -193,12 +193,14 @@ final class Forms {
             title.setText(form.title());
             footnote.setText(form.footnote());
             Composition.style(footnote, context(), Typography.Role.CAPTION, SemanticColor.TEXT_TERTIARY);
-            title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty());
+            title.setVisible(form.kind() == Nodes.FormKind.SHEET && form.hero().isEmpty() && !view.hostTitled());
             Composition.style(
                     title, context(), Typography.Role.PROMPT_TITLE, SemanticColor.TEXT_PRIMARY);
-            ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET;
+            boolean hosted = view.dialogBand();
+            ((Surface) component).hosted = hosted;
+            ((Surface) component).sheet = form.kind() == Nodes.FormKind.SHEET && !hosted;
             int stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
-            component.setBorder(form.kind()==Nodes.FormKind.SHEET ? new EmptyBorder(0,stroke,stroke,stroke) : new EmptyBorder(0,0,0,0));
+            component.setBorder(form.kind()==Nodes.FormKind.SHEET && !hosted ? new EmptyBorder(0,stroke,stroke,stroke) : new EmptyBorder(0,0,0,0));
             boolean prompt = form.kind() == Nodes.FormKind.PROMPT || form.kind() == Nodes.FormKind.PROMPT_COMPACT;
             boolean compact = form.kind() == Nodes.FormKind.PROMPT_COMPACT;
             boolean window = form.kind() == Nodes.FormKind.WINDOW;
@@ -229,9 +231,17 @@ final class Forms {
                     ? DesignMetrics.Role.PROMPT_COMPACT_FOOTER_TOP : DesignMetrics.Role.PROMPT_FOOTER_TOP) - focusClearance : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FULL_FOOTER_TOP) : pad;
             footer.setBorder(new EmptyBorder(footerTop, side,
                     window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
+            // A classic dialog's band (spec 10.8): 8 above and below the buttons' faces, the form's sides, under its rule.
+            footer.band = view.dialogBand();
+            if (footer.band) {
+                int vertical = ThemePainting.metric(context(), DesignMetrics.Role.DIALOG_FOOTER_VERTICAL);
+                int sides = ThemePainting.metric(context(), DesignMetrics.Role.FORM_SIDES);
+                footer.setBorder(new EmptyBorder(vertical + stroke, sides, vertical, sides));
+            }
             footer.setLayout(new FooterLayout(this));
+            // In a classic dialog's band a prompt's actions keep their size at the trailing edge (spec 10.8).
             actions.setLayout(
-                    prompt
+                    prompt && !footer.band
                             ? new GridLayout(
                                     1,
                                     0,
@@ -326,9 +336,19 @@ final class Forms {
     /** Stable footer ancestry; only its viewport overflows on screens shorter than the fixed actions. */
     static final class Footer extends JPanel implements Scrollable {
         boolean window;
+        /** A classic dialog's band: {@code surface.footer} under a {@code border.window} rule. */
+        boolean band;
         KitContext context;
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
+            if (band && !window) {
+                var theme = context.theme();
+                graphics.setColor(dev.jasper.ui.theme.DerivedColor.SURFACE_FOOTER.color(theme));
+                graphics.fillRect(0, 0, getWidth(), getHeight());
+                graphics.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(theme, new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW,
+                    dev.jasper.ui.theme.DerivedColor.SURFACE_FOOTER, dev.jasper.ui.theme.SurfaceContrast.Guard.STRUCTURAL)));
+                graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
+            }
             if (window) {
                 // The window footer band shares the sidebar surface below one full-width hairline.
                 graphics.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR));
@@ -393,6 +413,8 @@ final class Forms {
     static final class Surface extends JPanel {
         final KitView view;
         boolean sheet;
+        /** The form is a classic dialog's content: the dialog's card paints the fill and the frame (spec 10.8). */
+        boolean hosted;
 
         Surface(KitView view) {
             this.view = view;
@@ -434,6 +456,7 @@ final class Forms {
             var g = (Graphics2D) graphics.create();
             try {
                 ThemePainting.antialias(g);
+                if (hosted) return;
                 int r = ThemePainting.metric(view.context(), DesignMetrics.Role.WINDOW_RADIUS);
                 g.setColor(ThemePainting.color(view.context(), SemanticColor.SURFACE_DIALOG));
                 if (!sheet) g.fillRoundRect(0, 0, getWidth(), getHeight(), r * 2, r * 2);
@@ -473,6 +496,7 @@ final class Forms {
                 int contentWidth,
                 int actionWidth,
                 int actionHeight,
+                int rowHeight,
                 int previewWidth,
                 int previewHeight,
                 boolean stacked) {}
@@ -482,9 +506,13 @@ final class Forms {
             int contentWidth = Math.max(0, width - i.left - i.right);
             int actionWidth =
                     (((Nodes.Form) owner.node).kind() == Nodes.FormKind.PROMPT || ((Nodes.Form) owner.node).kind() == Nodes.FormKind.PROMPT_COMPACT)
+                            && !owner.view.dialogBand()
                             ? contentWidth
                             : Math.min(contentWidth, owner.actions.getPreferredSize().width);
             int actionHeight = Composition.height(owner.actions, actionWidth);
+            // In a classic dialog's band the row is a button face tall: a prompt's buttons, which carry their focus ring
+            // in their bounds, overhang it into the band's padding.
+            int rowHeight = owner.view.dialogBand() ? Math.min(actionHeight, ThemePainting.metric(owner.context(), DesignMetrics.Role.BUTTON_HEIGHT)) : actionHeight;
             int sharedPreviewWidth = Math.max(0, contentWidth - actionWidth - gap());
             // A technical preview (an equivalent command) keeps its one line beside the actions and shortens at its end,
             // as a window footer does; any other preview (a message) takes its own line above them when it does not fit.
@@ -500,7 +528,7 @@ final class Forms {
             int previewHeight =
                     owner.preview.isVisible() ? Composition.height(owner.preview, previewWidth) : 0;
             return new Geometry(
-                    contentWidth, actionWidth, actionHeight, previewWidth, previewHeight, stacked);
+                    contentWidth, actionWidth, actionHeight, rowHeight, previewWidth, previewHeight, stacked);
         }
 
         @Override
@@ -511,7 +539,7 @@ final class Forms {
                     + i.bottom
                     + (geometry.stacked()
                             ? geometry.previewHeight() + gap() + geometry.actionHeight()
-                            : Math.max(geometry.previewHeight(), geometry.actionHeight()));
+                            : Math.max(geometry.previewHeight(), geometry.rowHeight()));
         }
 
         @Override
@@ -548,7 +576,8 @@ final class Forms {
             int actionY =
                     geometry.stacked()
                             ? i.top + geometry.previewHeight() + gap()
-                            : i.top + Math.max(0, (availableHeight - geometry.actionHeight()) / 2);
+                            : i.top + (geometry.rowHeight() < geometry.actionHeight() ? (availableHeight - geometry.actionHeight()) / 2
+                                : Math.max(0, (availableHeight - geometry.actionHeight()) / 2));
             owner.actions.setBounds(
                     p.getWidth() - i.right - geometry.actionWidth(),
                     actionY,
