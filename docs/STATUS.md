@@ -80,8 +80,8 @@ Plex, the printed probes become assertions within their tolerances and floors (r
 `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` are recomputed under `SurfaceContrast.beyond`, and the
 every-palette loops include Enterprise once `KitFixtures.themes()` does; candidate follow-ups (R23): a plugin header with
 context actions draws taller than the strip, and labels past a stripe's end are clipped. `./gradlew check --continue`:
-**11,117 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `759b2b7d9`, had 11,052), before the final
-review's fixes, which add 4 tests (the targeted runs pass: `:jasper-ui:test` and the touched `:jasper-app` packages). GUI checks for the user (spec 16.2): stripe drag and drop including the
+**11,121 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `759b2b7d9`, had 11,052), with the final
+review's fixes. GUI checks for the user (spec 16.2): stripe drag and drop including the
 bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip (Catppuccin included), the header action glyphs, and Enterprise Dark's dock
 against the Dark Mode mock; the user's ruling on Rulings 4 for the bottom strip (28 px with its rule against the
 mock's 24 + 1). Not merged, not pushed.
