@@ -77,7 +77,7 @@ final class Choices {
                 ActionListener listener = event -> { String action = ((Nodes.Choice)this.node).action(); if (!action.isBlank()) emit(new UiEvent.Action(action)); };
                 picker.addActionListener(listener); own(() -> picker.removeActionListener(listener));
                 bind(picker,"ENTER",()->picker.doClick(0));bind(picker,"DOWN",()->picker.doClick(0));
-            } else { input = new SegmentTrack(context()); own(this::closeOptions); }
+            } else { input = new SegmentTrack(context(), optionsFace()); own(this::closeOptions); }
             input.putClientProperty("html.disable", true); KitOwnership.mark(input, node.id() + ".input");
             if (input instanceof ChoiceCombo combo) { combo.focus = new ThemePainting.Focus(combo, combo, view); own(combo.focus); }
             var container = (JPanel)component;
@@ -139,37 +139,30 @@ final class Choices {
                     picker.setBorder(new EmptyBorder(ring, pad, ring, pad + com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CAPTION)) + ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP)));
                 } else {
                     if (!options.equals(choice.options())) {
-                        closeOptions(); input.removeAll(); options = choice.options(); input.setLayout(new SegmentLayout());
+                        closeOptions(); input.removeAll(); options = choice.options(); input.setLayout(optionsFace().layout(context()));
                         for (int i = 0; i < options.size(); i++) {
-                            Option option = options.get(i); var button = new SegmentButton(context()); button.setText(option.label());
+                            Option option = options.get(i); var button = new SegmentButton(context(), optionsFace()); button.setText(option.label());
                             KitOwnership.mark(button, choice.id() + ".option." + option.id()); button.setOpaque(false); button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);
                             button.setRolloverEnabled(true); button.putClientProperty("html.disable", true);
                             button.focus = new ThemePainting.Focus(button, button, view); optionLifetimes.add(button.focus);
                             ActionListener listener = event -> select(option.id()); button.addActionListener(listener); optionLifetimes.add(() -> button.removeActionListener(listener));
                             int index = i;
                             bind(button, "LEFT", () -> navigate(index - 1)); bind(button, "RIGHT", () -> navigate(index + 1));
-                            bind(button, "UP", () -> navigate(index - ((SegmentLayout)input.getLayout()).columns(input, input.getWidth())));
-                            bind(button, "DOWN", () -> navigate(index + ((SegmentLayout)input.getLayout()).columns(input, input.getWidth())));
+                            bind(button, "UP", () -> navigate(index - columns()));
+                            bind(button, "DOWN", () -> navigate(index + columns()));
                             bind(button, "HOME", () -> navigate(0)); bind(button, "END", () -> navigate(options.size() - 1));
                             input.add(button);
                         }
                     }
                     // Form and sheet segments follow the measured form track; settings and identity sections keep theirs.
                     boolean form = !settings && !identitySection;
-                    int track = ThemePainting.metric(context(), form ? DesignMetrics.Role.FORM_SEGMENT_PADDING : DesignMetrics.Role.SETTINGS_SEGMENT_INSET);
+                    int track = optionsFace().trackPadding(context(), form);
                     input.setBorder(new EmptyBorder(track, track, track, track));
                     for (int i = 0; i < input.getComponentCount(); i++) {
                         var button = (SegmentButton)input.getComponent(i); Option option = options.get(i);
                         button.form = form; if (form) button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
                         button.setEnabled(input.isEnabled()); button.setSelected(option.id().equals(choice.selectedId())); button.settings = settings;
-                        var font = context().typography().font(Typography.Role.LABEL, !settings && button.isSelected());
-                        button.setFont(SwingTypography.effective(font));
-                        button.setForeground(button.textColor(false));
-                        button.setIcon(option.hue().map(h -> (javax.swing.Icon)new HueDot(context(), h)).orElse(null)); button.setDisabledIcon(button.getIcon());
-                        // A segment's label keeps its padding from the segment's edge everywhere (spec 4).
-                        int pad = ThemePainting.metric(context(), DesignMetrics.Role.SEGMENT_HORIZONTAL_PADDING);
-                        if(identitySection)pad=Math.max(pad,((ThemePainting.metric(context(),DesignMetrics.Role.IDENTITY_SECTION_WIDTH)-2*track)/Math.max(1,choice.options().size())-button.getFontMetrics(button.getFont()).stringWidth(option.label()))/2);
-                        button.setBorder(new EmptyBorder(0, pad, 0, pad));
+                        optionsFace().style(button, option, settings, identitySection, track, choice.options().size());
                     }
                 }
                 label.setVisible(labelShown());label.setText(choice.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL)); label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(input.isEnabled());
@@ -191,6 +184,10 @@ final class Choices {
             input.getComponent(index).requestFocusInWindow(); select(options.get(index).id());
         }
         private void select(String id) { emit(new UiEvent.Selected(node.id(), Set.of(id))); }
+        /** The face this choice's options draw with: the tabs point's for a TABS choice, the exclusive point's otherwise. */
+        ChoiceFace optionsFace() { return ((Nodes.Choice) node).kind() == Nodes.ChoiceKind.TABS ? context().faces().tabs : context().faces().exclusive; }
+        /** How many options Up and Down move by: a segment line's worth, or every option on a radio row. */
+        private int columns() { return input.getLayout() instanceof SegmentLayout layout ? layout.columns(input, input.getWidth()) : Math.max(1, options.size()); }
         @Override JComponent focusTarget() { return input.getComponentCount() > 0 && input instanceof SegmentTrack ? (JComponent)input.getComponent(0) : input; }
     }
     /** An option row as the kit's dropdowns paint it; {@code role} overrides the text color (for placeholders). */
@@ -228,7 +225,7 @@ final class Choices {
             case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL, NONE -> SemanticColor.HUE_NEUTRAL;
         });
     }
-    private record HueDot(KitContext context, Nodes.Hue hue) implements javax.swing.Icon {
+    record HueDot(KitContext context, Nodes.Hue hue) implements javax.swing.Icon {
         @Override public int getIconWidth() { return ThemePainting.metric(context, DesignMetrics.Role.STATUS_DOT); }
         @Override public int getIconHeight() { return getIconWidth(); }
         @Override public void paintIcon(Component c, Graphics graphics, int x, int y) {
@@ -524,16 +521,21 @@ final class Choices {
 
     static final class SegmentTrack extends JPanel {
         final KitContext context;
-        SegmentTrack(KitContext context) { this.context = context; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
+        final ChoiceFace face;
+        SegmentTrack(KitContext context, ChoiceFace face) { this.context = context; this.face = face; setOpaque(false); int pad = ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_PADDING); setBorder(new EmptyBorder(pad, pad, pad, pad)); }
         @Override protected void paintComponent(Graphics graphics) {
-            var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_TRACK), ThemePainting.color(context, SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS);
+            var g = (Graphics2D)graphics.create(); try { face.paintTrack(this, g); } finally { g.dispose(); }
+        }
+        /** The segment track, and the selected segment's soft shadow in Light (the default face). */
+        void paintSegments(Graphics2D g) {
+            { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_TRACK), ThemePainting.color(context, SemanticColor.BORDER_INPUT), false, false, DesignMetrics.Role.SEGMENT_TRACK_RADIUS);
                 // The selected segment's soft shadow in Light; the track paints it, since the segment's own bounds would clip it.
                 if (!context.theme().dark()) for (var child : getComponents())
                     if (child instanceof SegmentButton segment && segment.isVisible() && segment.isSelected())
                         ThemePainting.softShadow(g, new java.awt.geom.Rectangle2D.Double(segment.getX(), segment.getY(), segment.getWidth(), segment.getHeight()),
                             ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_ITEM_RADIUS), UIScale.scale(1),
                             ThemePainting.metric(context, DesignMetrics.Role.SEGMENT_SHADOW_BLUR), context.metrics().value(DesignMetrics.Role.SEGMENT_SHADOW_PERCENT_LIGHT) / 100.0);
-            } finally { g.dispose(); }
+            }
         }
     }
     static final class SegmentButton extends Buttons.KitButton {
@@ -541,23 +543,31 @@ final class Choices {
         boolean form;
         /** In a Settings row the track is one field high: its inset segments fill the rest. */
         boolean settings;
-        SegmentButton(KitContext context) { super(context); this.context = context; kind = Nodes.ButtonKind.GHOST; }
+        /** The face this option draws with, its choice's. */
+        final ChoiceFace face;
+        SegmentButton(KitContext context, ChoiceFace face) { super(context); this.context = context; this.face = face; kind = Nodes.ButtonKind.GHOST; }
+        // An option's face belongs to its choice face, never to the buttons face.
+        @Override boolean fadesDisabled() { return true; }
+        @Override void paintKitFace(Graphics2D g, boolean hover, boolean focused) { paintRaised(g, hover, focused); }
         @Override SemanticColor textRole(boolean hover) { return isSelected() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY; }
         @Override Color textColor(boolean hover) {
             // The selected segment is not an accent surface: primary text, held to the text floor on its fill.
-            return isSelected() ? dev.jasper.ui.theme.SurfaceContrast.on(context.theme().semantic(), SemanticColor.TEXT_PRIMARY,
-                SemanticColor.SEGMENT_SELECTED_BG, dev.jasper.ui.theme.SurfaceContrast.TEXT) : super.textColor(hover);
+            return isSelected() ? face.selectedText(context) : ThemePainting.color(context, textRole(hover));
         }
-        @Override public Dimension getPreferredSize() {
+        @Override public Dimension getPreferredSize() { return face.optionSize(this); }
+        /** The segment's size (the default face). */
+        Dimension segmentSize() {
             var size = super.getPreferredSize();
             return new Dimension(size.width, settings ? ThemePainting.height(context, DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.LABEL) - 2 * ThemePainting.metric(context, DesignMetrics.Role.SETTINGS_SEGMENT_INSET)
                 : ThemePainting.height(context, form ? DesignMetrics.Role.FORM_SEGMENT_HEIGHT : DesignMetrics.Role.PANEL_ACTION, Typography.Role.LABEL));
         }
-        @Override protected void paintComponent(Graphics graphics) {
+        @Override protected void paintComponent(Graphics graphics) { face.paintOption(this, graphics, () -> super.paintComponent(graphics)); }
+        /** The selected segment's fill, then {@code label}, the button's own glyph and label (the default face). */
+        void paintSegment(Graphics graphics, Runnable label) {
             var g = (Graphics2D)graphics.create();
             try {
                 if (isSelected()) { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); ThemePainting.rounded(g, this, context, ThemePainting.color(context, SemanticColor.SEGMENT_SELECTED_BG), null, false, false, DesignMetrics.Role.SEGMENT_ITEM_RADIUS); }
-                super.paintComponent(graphics);
+                label.run();
             } finally { g.dispose(); }
         }
     }

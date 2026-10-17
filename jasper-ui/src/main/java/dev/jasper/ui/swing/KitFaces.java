@@ -16,6 +16,7 @@ public final class KitFaces {
     final ToggleFace toggle;
     final ButtonFace buttons;
     final FieldPolicy fields;
+    final ChoiceFace exclusive, tabs;
 
     private KitFaces(ControlVariants controls, ColorSlots colors) {
         toggle = switch (controls.toggle()) {
@@ -28,6 +29,11 @@ public final class KitFaces {
             case CLASSIC -> { buttons = new ClassicButtonFace(colors.dialogSurface()); fields = new ClassicFieldPolicy(colors.dialogSurface()); }
             default -> throw new IllegalStateException("Unknown buttons variant " + controls.buttons());
         }
+        exclusive = switch (controls.exclusive()) {
+            case SEGMENTS -> new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL, DefaultChoiceFace.SELECTED_CAPTION));
+            case RADIOS -> new ClassicRadiosFace(colors.dialogSurface());
+        };
+        tabs = new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL));
     }
 
     /** The faces {@code kit} draws with. */
@@ -37,7 +43,7 @@ public final class KitFaces {
     }
 
     /** Every face, in spec 5.2's order of control points. */
-    List<Face> all() { return List.of(toggle, buttons, fields); }
+    List<Face> all() { return List.of(toggle, exclusive, tabs, buttons, fields); }
 
     /**
      * Every pair {@code kit}'s faces paint, in their order, for the painted-contrast suite.

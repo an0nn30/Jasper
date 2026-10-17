@@ -40,7 +40,7 @@ final class PreviewChoices extends ControlRegistry.Control {
         // The tiles sit inside the card's stroke; the line below them belongs to the next row.
         int pad=ThemePainting.metric(context(),DesignMetrics.Role.CARD_PADDING),stroke=ThemePainting.metric(context(),DesignMetrics.Role.HAIRLINE);
         component.setBorder(new javax.swing.border.EmptyBorder(pad+stroke,pad+stroke,pad,pad+stroke));
-        component.setLayout(new GridLayout(1,Math.max(1,tiles.size()),ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_GAP),0));
+        component.setLayout(context().faces().exclusive.previewLayout(context(), tiles.size()));
         for (var option : choice.options()) {
             var tile = tiles.get(option.id());tile.option=option;tile.setSelected(option.id().equals(choice.selectedId()));tile.setEnabled(interactive());
             tile.setFont(ThemePainting.font(context(),Typography.Role.SETTINGS_PREVIEW));tile.getAccessibleContext().setAccessibleName(option.label());
@@ -50,18 +50,27 @@ final class PreviewChoices extends ControlRegistry.Control {
     }
     private void closeTiles(){tiles.values().forEach(tile->{if(tile.focus!=null)tile.focus.close();});tiles.clear();}
     @Override JComponent focusTarget() { return tiles.values().stream().filter(AbstractButton::isSelected).map(JComponent.class::cast).findFirst().orElse(tiles.isEmpty()?component:tiles.values().iterator().next()); }
-    private final class Tile extends JButton {
+    /** One option's tile; its face (the exclusive point's) sizes and paints it. */
+    final class Tile extends JButton {
         Option option; ThemePainting.Focus focus;
         @Override public javax.accessibility.AccessibleContext getAccessibleContext(){if(accessibleContext==null)accessibleContext=new AccessibleJButton(){@Override public javax.accessibility.AccessibleRole getAccessibleRole(){return javax.accessibility.AccessibleRole.TOGGLE_BUTTON;}@Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet(){var states=super.getAccessibleStateSet();if(isSelected())states.add(javax.accessibility.AccessibleState.CHECKED);return states;}};return accessibleContext;}
         Tile() { setOpaque(false);setContentAreaFilled(false);setBorderPainted(false);setFocusPainted(false); }
         /** The selection box, then the caption one line high below a fixed gap, so a larger font grows the tile. */
-        @Override public Dimension getPreferredSize() {
+        @Override public Dimension getPreferredSize() { return context().faces().exclusive.previewSize(this); }
+        /** The context the tile paints in. */
+        KitContext context() { return PreviewChoices.this.context(); }
+        /** The selection box over a caption line (the default face). */
+        Dimension tileSize() {
             return new Dimension(ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_WIDTH),
                 ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT)+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+getFontMetrics(getFont()).getHeight());
         }
         @Override protected void paintComponent(Graphics graphics) {
             var g=(Graphics2D)graphics.create();
-            try {
+            try { context().faces().exclusive.paintPreview(this, g); } finally { g.dispose(); }
+        }
+        /** The miniature, its selection ring and its caption (the default face). */
+        void paintTile(Graphics2D g) {
+            {
                 ThemePainting.antialias(g);if(!isEnabled())g.setComposite(AlphaComposite.SrcOver.derive(.42f));
                 int pad=ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_INSET)/2,ring=ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_RING);
                 int h=Math.min(getHeight(),ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_HEIGHT));int radius=ThemePainting.metric(context(),DesignMetrics.Role.CONTROL_RADIUS);
@@ -78,15 +87,15 @@ final class PreviewChoices extends ControlRegistry.Control {
                     g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.fill(shape);
                 }
                 if(focus!=null&&focus.visible()){g.setColor(ThemePainting.color(context(),SemanticColor.ACCENT));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);}
-                g.setFont(getFont());g.setColor(isSelected()?dev.jasper.ui.theme.SurfaceContrast.on(context().theme().semantic(),SemanticColor.TEXT_PRIMARY,SemanticColor.SURFACE_CARD,dev.jasper.ui.theme.SurfaceContrast.TEXT):ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}
+                g.setFont(getFont());g.setColor(isSelected()?ThemePainting.painted(context(),DefaultChoiceFace.SELECTED_CAPTION):ThemePainting.color(context(),SemanticColor.TEXT_SECONDARY));var fm=g.getFontMetrics();String label=option==null?"":option.label();if(fm.stringWidth(label)>getWidth()){while(!label.isEmpty()&&fm.stringWidth(label+"…")>getWidth())label=label.substring(0,label.offsetByCodePoints(label.length(),-1));label+="…";}
                 g.drawString(label,(getWidth()-fm.stringWidth(label))/2,h+ThemePainting.metric(context(),DesignMetrics.Role.THEME_PREVIEW_CAPTION_GAP)+fm.getAscent());
-            } finally {g.dispose();}
+            }
         }
         /**
          * A miniature window: sidebar with three items (the middle one selected), a raised panel with two lines and an
          * accent button at its lower right. Proportions follow the preview height so every scale draws the same picture.
          */
-        private void miniature(Graphics2D g,Option.Palette p,int x,int y,int w,int h) {
+        void miniature(Graphics2D g,Option.Palette p,int x,int y,int w,int h) {
             if(w<=0||h<=0)return;
             g.setColor(new Color(p.background(),true));g.fillRect(x,y,w,h);
             int side=w*36/100,margin=Math.max(2,Math.round(h/12f)),pad=Math.max(2,Math.round(h/10f)),bar=Math.max(2,Math.round(h/16f));
