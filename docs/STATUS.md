@@ -1,5 +1,38 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
+`.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-6a-window-chrome-shell.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The window shell of spec 10.1, 10.2, 10.4,
+10.9 and 10.10 lands: `Presentation.LANDED` holds `WINDOW_CHROME`, and `WINDOW_CONTENT` (header, tabs, status, run item,
+dialogs) waits for plan 6b. The bootstrap applies `DesktopFlags` (macOS `apple.laf.useScreenMenuBar=false` under in-window
+menus; `TitleBarStyle.NATIVE` on every platform under a native title). `WorkspaceChrome.of` reads the workspace
+projection and picks `StandardMenuBar` (today's) or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus,
+Tools, Window, Help; Window holds Pane, Tab and the tool-window toggles; the mocks' 24 px row over a `border.divider`
+rule). `WindowLook` carries the chrome and the title facts to every terminal window and the rehearsal's, mounted through
+`WindowContent.mount`; `ShellChrome.of` gives auxiliary windows, dialogs and the file chooser the same title bar, and a
+native-titled macOS frame follows the theme's appearance. About Jasper joins Help when the screen menu bar is off.
+`LookMotion` folds `Motion` into `ui.animations.enabled` once; kit contexts, plugins, the tab strip and the palette read
+it. `WindowTitle` fills the title template. Thirty classic chrome roles (Task 3) serve plans 6a and 6b. The chrome renders
+of spec 16.1.4 run as JUnit (`ChromeRenderTest`: default, Enterprise, complement, fallback and an eight-row covering array);
+`EnterpriseMenuRowMockTest` compares the menu row with the Workstation and Dark Mode mocks (opt-in pairs: `chrome-menu-row-light` edge agreement 0.988, `chrome-menu-row-dark` 0.732 (Rulings 9's rule)).
+Rulings (plan, "Rulings"): (1) row 6 is plans 6a and 6b; (2) the window-chrome group splits, `WINDOW_CONTENT` for 6b;
+(3) Help is `MenuTarget.HELP`, last in the classic bar; (4) the classic Window menu takes the tool-window toggles from
+View; (5) the menu-row roles are the same in both catalogs and the item margins come from the face's line height;
+(6) an open classic title is the accent, a hovered closed one `surface.control.hover`; (7) About is in Help whenever the
+screen menu bar is off; (8) Windows and Linux captions follow the operating system, and on macOS every native-titled frame and dialog follows the theme (the chooser's sheets, the diagnostics dialog and Rename Tab included); (9) Enterprise Dark's menu-row rule is
+darker than the mock until plan 6b's `border.divider` override; (10) the title tokens and separators; (11) the one motion
+supplier is the theme controller's flag; (12) mock comparison by profile; Execution notes: (13) Enterprise runs in the
+chrome tests as 4a's fixture kit, spec 5.1's chrome and a fixture theme of spec 7.6's named roles until plan 5b; (16) the
+scan is `ProjectionReadTest`; (17) the pairs are checked with `compare_all.py` until 4c's `check_pairs.py`; (18) the
+menu row is 5 + 9, re-measured on the mocks. Deviations from the plan's text: Execution notes rulings (27) Rename Tab's input dialog follows the window's appearance too, `MacAppearance.follow` is the one writer of NSAppearance and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`; (28) `WindowTitle.format` returns a token-free template as it is, strips an all-empty one and passes `{context}` unstripped; (29) `EnterpriseMenuRowMockTest` compares the titles' positions on macOS only until plan 5b; (30) `ChromeRenderTest.check` asserts structure, and the menu row's painted pairs join it in plan 6b; Task 9's calibration run adds jasper-ui's `KitCalibrationTest` (12 cases), which the plan's jasper-app filter does not reach.
+Plan-6b entry conditions: the `WINDOW_CONTENT` group, `border.divider` overridable, the header, tabs, status cells and
+dialogs; 6b extends `ProjectionReadTest.PROJECTION_READERS` and uses `EnterpriseLook` and `closeOwnersNow`. At the merge
+with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterprise-fixture.json` goes, and
+`EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue`: **10,802 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2): with Enterprise on, the macOS
+in-window menu bar and native title (⌘W in a plugin window, About in Help), Windows and Linux NATIVE with the caption
+following the system setting, Compact keeping the menu row, nothing moving with animations on. Not merged, not pushed.
+
 **Enterprise presentation, plan 5a: the presentation provider — 2026-10-16** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `d65dc99f8..934c33f1e`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-5a-provider.md),

@@ -1,5 +1,7 @@
 # Enterprise presentation 6a: the window shell Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-window-chrome` (`c1999c303..7fb8ee9c3`).** Deviations from this plan's text: Execution notes rulings (27) Rename Tab's input dialog follows the window's appearance too, `MacAppearance.follow` is the one writer of NSAppearance and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`; (28) `WindowTitle.format` returns a token-free template as it is, strips an all-empty one and passes `{context}` unstripped; (29) `EnterpriseMenuRowMockTest` compares the titles' positions on macOS only until plan 5b; (30) `ChromeRenderTest.check` asserts structure, and the menu row's painted pairs join it in plan 6b; Task 9's calibration run adds jasper-ui's `KitCalibrationTest` (12 cases), which the plan's jasper-app filter does not reach.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under a native-titled look every terminal window, auxiliary window and dialog takes the operating system's
