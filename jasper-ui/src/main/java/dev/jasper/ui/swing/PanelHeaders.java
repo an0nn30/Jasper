@@ -156,12 +156,23 @@ final class PanelHeaders {
             Stacks.mount(host, controls);
         }
 
+        /** Whether the host frames this header as a flush frame's strip (spec 10.7). */
+        boolean flush() { return hostHeader.frame() != PanelHostHeader.Frame.STANDARD; }
+
+        /** Whether that strip's frame holds the focus owner. */
+        boolean focusedFrame() { return hostHeader.frame() == PanelHostHeader.Frame.FLUSH_FOCUSED; }
+
         /** The connected dot: the success status held to the indicator floor on the panel surface it sits on. */
         private Icon dot() {
             return new Icon() {
                 @Override public int getIconWidth() { return ThemePainting.metric(context(), DesignMetrics.Role.STATUS_DOT); }
                 @Override public int getIconHeight() { return getIconWidth(); }
                 @Override public void paintIcon(Component c, Graphics graphics, int x, int y) {
+                    if (flush()) {
+                        // On a header strip the dot is held on the strip's own surface (ChromePainter.DOCK_PAIRS).
+                        new ChromePainter(context().kit()).headerDot(graphics, x, y, getIconWidth(), context().theme(), focusedFrame());
+                        return;
+                    }
                     var g = (Graphics2D) graphics.create();
                     try {
                         ThemePainting.antialias(g);
@@ -180,12 +191,17 @@ final class PanelHeaders {
             state();
             var h = (Nodes.Header) node;
             title.setText(h.title());
-            count.setText(h.count().isPresent() ? Integer.toString(h.count().getAsInt()) : "");
+            count.setText(h.count().isPresent() ? (flush() ? "(" + h.count().getAsInt() + ")" : Integer.toString(h.count().getAsInt())) : "");
             count.setVisible(h.count().isPresent() && h.count().getAsInt() > 0);
             Composition.style(
                     title, context(), Typography.Role.PANEL_HEADER_TITLE, SemanticColor.TEXT_PRIMARY);
             Composition.style(
                     count, context(), Typography.Role.PANEL_HEADER_COUNT, SemanticColor.TEXT_TERTIARY);
+            if (flush()) {
+                var painter = new ChromePainter(context().kit());
+                title.setForeground(painter.headerTitle(context().theme(), focusedFrame()));
+                count.setForeground(painter.headerDetail(context().theme(), focusedFrame(), true));
+            }
             title.setEnabled(component.isEnabled());
             count.setEnabled(component.isEnabled());
             detail.setText(hostHeader.detail());
@@ -195,11 +211,22 @@ final class PanelHeaders {
             detail.setVisible(!hostHeader.detail().isEmpty() || hostHeader.active());
             Composition.style(
                     detail, context(), Typography.Role.PANEL_HEADER_COUNT, SemanticColor.TEXT_SECONDARY);
+            if (flush()) {
+                // A strip's word detail ("Mac") is in the label face and muted; a digits-only detail is a count (spec 10.7).
+                boolean digits = hostHeader.detail().matches("\\d+");
+                if (digits) detail.setText("(" + hostHeader.detail() + ")");
+                else Composition.style(detail, context(), Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
+                detail.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.HEADER_STRIP_DOT_GAP));
+                detail.setForeground(new ChromePainter(context().kit()).headerDetail(context().theme(), focusedFrame(), digits));
+            }
             detail.setEnabled(component.isEnabled());
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            component.setBorder(new EmptyBorder(0, pad, 0, ThemePainting.metric(context(),DesignMetrics.Role.PANEL_HEADER_TRAILING_PADDING)));
+            int trailing = ThemePainting.metric(context(), DesignMetrics.Role.PANEL_HEADER_TRAILING_PADDING);
+            component.setBorder(flush() ? new StripBorder(pad, ThemePainting.metric(context(), DesignMetrics.Role.DOCK_RULE), trailing, this)
+                    : new EmptyBorder(0, pad, 0, trailing));
             component.setLayout(new HeaderLayout(this));
-            descriptor.setLayout(new Navigation.InlineLayout(context()));
+            descriptor.setLayout(flush() ? new Navigation.InlineLayout(context(), DesignMetrics.Role.PANEL_HEADER_ACTION_GAP)
+                    : new Navigation.InlineLayout(context()));
             host.setLayout(new Navigation.InlineLayout(context(),DesignMetrics.Role.PANEL_HEADER_ACTION_GAP));
             for (var control : contributed) {
                 control.parentEnabled = interactive();
@@ -271,6 +298,28 @@ final class PanelHeaders {
         }
     }
 
+    /**
+     * A borrowed header's strip under a flush frame (spec 10.7): it fills the header in the strip's surface and draws the
+     * 1 px rule along its bottom, under the header's labels and actions; its insets keep the header's paddings and the
+     * rule.
+     */
+    private static final class StripBorder extends EmptyBorder {
+        private final HeaderControl owner;
+
+        StripBorder(int left, int rule, int right, HeaderControl owner) {
+            super(0, left, rule, right);
+            this.owner = owner;
+        }
+
+        @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            Graphics copy = g.create(x, y, width, height);
+            try { new ChromePainter(owner.context().kit()).headerStrip(copy, width, height, owner.context().theme(), owner.focusedFrame()); }
+            finally { copy.dispose(); }
+        }
+
+        @Override public boolean isBorderOpaque() { return true; }
+    }
+
     static final class HeaderLayout implements Composition.WidthLayout {
         final HeaderControl owner;
 
@@ -280,6 +329,21 @@ final class PanelHeaders {
 
         int gap() {
             return ThemePainting.metric(owner.context(), DesignMetrics.Role.ICON_GAP);
+        }
+
+        /** Between the trailing groups: the icon gap, or on a header strip the actions' 2 px. */
+        int trailingGap() {
+            return owner.flush() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER_ACTION_GAP) : gap();
+        }
+
+        /** After the title and after the count: the icon gap, or on a header strip the title gap. */
+        int textGap() {
+            return owner.flush() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HEADER_STRIP_TITLE_GAP) : gap();
+        }
+
+        /** What lies under the content: the bottom gap, or a header strip's rule. */
+        int bottom() {
+            return ThemePainting.metric(owner.context(), owner.flush() ? DesignMetrics.Role.DOCK_RULE : DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP);
         }
 
         private List<Component> trailing() {
@@ -292,15 +356,16 @@ final class PanelHeaders {
 
         @Override
         public int height(Container p, int width) {
-            int height = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER);
-            int bottom = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP);
+            int bottom = bottom();
+            // A header strip is PANEL_HEADER tall above its rule.
+            int height = ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER) + (owner.flush() ? bottom : 0);
             int available = Math.max(0, width - p.getInsets().left - p.getInsets().right);
             // Use the same allocated widths as placement. A host action strip can wrap at enlarged
             // fonts even though its unconstrained preferred height still describes a single row.
             for (var control : trailing()) {
                 int allocated = Math.min(control.getPreferredSize().width, available);
                 height = Math.max(height, Composition.height(control, allocated) + bottom + 2 * ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING));
-                available = Math.max(0, available - allocated - gap());
+                available = Math.max(0, available - allocated - trailingGap());
             }
             for (var label : List.of(owner.title, owner.count, owner.detail))
                 if (label.isVisible()) height = Math.max(height, label.getPreferredSize().height + bottom);
@@ -318,8 +383,8 @@ final class PanelHeaders {
         @Override
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
-            int left = i.left, right = Math.max(left, p.getWidth() - i.right), g = gap();
-            int contentHeight = Math.max(0, p.getHeight() - ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP));
+            int left = i.left, right = Math.max(left, p.getWidth() - i.right), g = trailingGap(), t = textGap();
+            int contentHeight = Math.max(0, p.getHeight() - bottom());
             // Reserve trailing controls first. Only the title's text lane may compress.
             for (var c : trailing()) {
                 int w = Math.min(c.getPreferredSize().width, Math.max(0, right - left));
@@ -335,12 +400,12 @@ final class PanelHeaders {
             int tw =
                     Math.min(
                             owner.title.getPreferredSize().width,
-                            Math.max(0, right - left - cw - (cw > 0 ? g : 0)));
+                            Math.max(0, right - left - cw - (cw > 0 ? t : 0)));
             place(owner.title, left, tw, contentHeight);
-            left += tw + g;
+            left += tw + t;
             if (cw > 0) {
                 place(owner.count, left, cw, contentHeight);
-                left += cw + g;
+                left += cw + t;
             }
             // Host detail takes what the title and count leave, as the native header's detail does.
             if (owner.detail.isVisible())

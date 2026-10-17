@@ -358,6 +358,40 @@ class PaintedContrastTest {
         return image;
     }
 
+    /** 4a's hand-off: a borrowed kit header's connected dot is held to 3:1 on the surface it sits on, over every palette. */
+    @Test void theBorrowedHeadersConnectedDotIsHeldOnItsSurfaceOverEveryPalette() throws Exception {
+        var initial = ThemeTestSupport.generated(true);
+        var original = UIManager.getLookAndFeel();
+        var spec = new ViewSpec(new Nodes.Panel("panel", ControlState.READY,
+            new Nodes.Header("panel.header", ControlState.READY, "Sessions", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), new Nodes.Text("panel.body", ControlState.READY, "Body", Nodes.TextRole.BODY), Optional.empty()));
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            for (Kit kit : List.of(Kit.DEFAULT, Kit.CLASSIC)) {
+                var context = KitContext.of(kit, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+                try (var view = new KitView(context, spec, event -> { })) {
+                    for (var frame : PanelHostHeader.Frame.values()) {
+                        view.setPanelHostHeader("panel", new PanelHostHeader("Mac", true, List.of(), frame));
+                        var header = view.panelHeader("panel");
+                        for (var theme : palettes()) {
+                            FlatLafInstaller.install(theme, kit); binding.publish(new ThemePair(theme, theme)); SwingUtilities.updateComponentTreeUI(view);
+                            view.setPanelHostHeader("panel", new PanelHostHeader("Mac", true, List.of(), frame));
+                            header.setSize(400, header.getPreferredSize().height);
+                            KitTestSupport.layout(header);
+                            var pair = switch (frame) {
+                                case STANDARD -> new PaintPair(STATUS_SUCCESS, SURFACE_PANEL, SurfaceContrast.Guard.INDICATOR);
+                                case FLUSH -> ChromePainter.DOCK_PAIRS.get(11);
+                                case FLUSH_FOCUSED -> ChromePainter.DOCK_PAIRS.get(12);
+                            };
+                            Color expected = SurfaceContrast.painted(theme, pair);
+                            assertThat(anywhere(paint(header), expected)).as(name(theme) + " " + kit.id() + " " + frame + " dot " + ColorMath.hex(expected)).isTrue();
+                        }
+                    }
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
     private static boolean searchHint(GeneratedTheme theme, Color expected) {
         var blank = new Icon() {
             public int getIconWidth() { return 16; } public int getIconHeight() { return 16; }

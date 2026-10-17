@@ -7,6 +7,7 @@ import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EdtTestExtension;
+import dev.jasper.app.testsupport.KitTestSupport;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.ui.swing.ChromePainter;
@@ -106,6 +107,27 @@ class FlushFramesTest {
             var app = EnterpriseLook.theme(false).semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP);
             assertThat(new Color(image.getRGB(top.x + top.width + 3, 200))).as("the gap shows the window surface").isEqualTo(app);
             assertThat(right.x).as("a 6 px gap before the right frame").isGreaterThanOrEqualTo(top.x + top.width + 6);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** A borrowed kit header follows its frame's focus, and its Hide is the minus. */
+    @Test void aBorrowedHeaderIsAStripThatFollowsFocus() throws Exception {
+        EnterpriseLook.install(false);
+        try (var fixture = new DockFixture(EnterpriseLook.kit(), EnterpriseLook.theme(false), true, true)) {
+            var painter = new ChromePainter(EnterpriseLook.kit());
+            var theme = EnterpriseLook.theme(false);
+            fixture.focus("sessions");
+            var image = fixture.render(1);
+            var sessions = fixture.header("sessions");
+            var sftp = fixture.header("sftp");
+            assertThat(new Color(image.getRGB(sessions.x + 4, sessions.y + 4))).isEqualTo(painter.headerSurface(theme, true));
+            assertThat(new Color(image.getRGB(sftp.x + 4, sftp.y + 4))).isEqualTo(painter.headerSurface(theme, false));
+            fixture.focus("sftp");
+            image = fixture.render(1);
+            assertThat(new Color(image.getRGB(sessions.x + 4, sessions.y + 4))).isEqualTo(painter.headerSurface(theme, false));
+            assertThat(new Color(image.getRGB(sftp.x + 4, sftp.y + 4))).isEqualTo(painter.headerSurface(theme, true));
+            var hide = KitTestSupport.find(fixture.body, "host.hide", javax.swing.AbstractButton.class);
+            assertThat(hide).isNotNull();
         } finally { EnterpriseLook.restoreDefault(); }
     }
 }

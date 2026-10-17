@@ -295,5 +295,10 @@ class DockMockTest {
             MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24), HEADER_FLOOR);
     }
 
+    /** The four borrowed kit header strips against the mocks' (every mock header is a plugin panel's). */
+    @Test void kitHeaderStripsMatchTheMocks() throws Exception {
+        for (var workstation : WORKSTATIONS) compareHeaders(workstation.getKey(), workstation.getValue(), true);
+    }
+
     // Later tasks add their surfaces above this line.
 }

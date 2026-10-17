@@ -14,16 +14,28 @@ import javax.swing.Icon;
  * @param detail text after the title and count; empty to omit
  * @param active whether a connected status dot precedes the detail
  * @param actions icon-only actions, in order
+ * @param frame how the host frames the header: as the view draws it, or as a flush frame's header strip
  */
-public record PanelHostHeader(String detail, boolean active, List<Action> actions) {
+public record PanelHostHeader(String detail, boolean active, List<Action> actions, Frame frame) {
     /** No detail, no dot and no actions. */
     public static final PanelHostHeader EMPTY = new PanelHostHeader("", false, List.of());
+
+    /**
+     * How the host frames a borrowed header. {@code FLUSH} and {@code FLUSH_FOCUSED} make it a header strip (Enterprise
+     * presentation spec 10.7): the strip's surface over a 1 px rule, a parenthesised count and digits-only detail, a muted
+     * detail and actions 2 px apart; focused while the frame holds the focus owner.
+     */
+    public enum Frame { STANDARD, FLUSH, FLUSH_FOCUSED }
 
     /** Creates an immutable description. */
     public PanelHostHeader {
         Objects.requireNonNull(detail, "detail");
+        Objects.requireNonNull(frame, "frame");
         actions = List.copyOf(actions);
     }
+
+    /** A description the view draws as it does without a host frame. */
+    public PanelHostHeader(String detail, boolean active, List<Action> actions) { this(detail, active, actions, Frame.STANDARD); }
 
     /** Immutable monochrome vector identity. A null path selects canonical engine artwork; custom paths retain their authored stroke.
      * @param name canonical or namespaced icon name

@@ -493,7 +493,7 @@ final class ToolWindowArea extends JPanel {
         var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
         view.setPanelHostActions(panel, List.of(
             new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
-            new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", "collapse", ghost, "host.hide", "Hide")), event -> {
+            new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
                 if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
                     if (action.id().equals("host.hide")) onHide.accept(id);
                     else if (action.id().equals("host.options"))
@@ -505,10 +505,14 @@ final class ToolWindowArea extends JPanel {
         java.util.function.BooleanSupplier borrowed = () -> !view.isClosed()
             && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel current
             && current.id().equals(panel) && view.panelHeader(panel) == header;
-        host.header = state -> { if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(state)); };
-        host.header.accept(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
+        // The last metadata is kept, so a focus change can send the header again with its frame.
+        var shown = new java.util.concurrent.atomic.AtomicReference<>(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
+        host.header = state -> { shown.set(state); if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(state, frame(host))); };
+        host.focusedHeader = value -> { if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(shown.get(), frame(host))); };
+        host.header.accept(shown.get());
         return () -> {
             host.header = state -> { };
+            host.focusedHeader = value -> { };
             sources.forEach(releaseDragSource);
             // Plugin disposal can precede removing the dock frame. A closed view has already released its controls.
             if (borrowed.getAsBoolean()) {
@@ -518,11 +522,18 @@ final class ToolWindowArea extends JPanel {
         };
     }
 
-    /** The module's description of the same metadata; callbacks stay the plugin boundary's guarded, contained ones. */
-    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state) {
+    /** How a borrowed header is framed: as the view draws it, or as a flush frame's strip, focused or not. */
+    private dev.jasper.ui.swing.PanelHostHeader.Frame frame(Host host) {
+        if (!flush) return dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
+        return host.focused ? dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH_FOCUSED : dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH;
+    }
+
+    /** The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained ones. */
+    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
+                                                                  dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
             .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
-                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList());
+                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList(), frame);
     }
 
     /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */
