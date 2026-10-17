@@ -86,6 +86,23 @@ bottom strip, the labelled stripes' numbers after a Keymap change, the focused h
 against the Dark Mode mock. Rulings 4 for the bottom strip, approved on 2026-10-17 by the orchestrator under the user's
 overnight authority (the mock wins on layout): the bottom strip is the Workstation mocks' 24 px plus its 1 px rule,
 independent of `window.rail_width` (spec 10.7 amended); the side stripes keep their thickness. Not merged, not pushed.
+Merged with main (plans 5b, 11 and 9a) as `decb7a418`: `EnterpriseLook.theme(boolean)` and `install(boolean)` draw the
+shipped kit, IBM Plex and theme, and the printed probes are asserted under Plex (`MockProfile.fonts`,
+`MockCrops.fontsFloor`) after the labels take the mocks' measure, `STRIPE_LABEL_PADDING` 10 (Rulings 5's ±1), a label's
+length its padding and its kerned fractional advance rounded (`ChromePainter.setAdvance`), the bottom strip's labels from
+the side stripes' fill (their thickness less the rule; Rulings 8's lead was 1 px past the mocks') on a whole-pixel
+baseline, and a header strip's count `HEADER_STRIP_COUNT_GAP` (6, new) after the title's set advance, a dot or word the
+title gap after it (at 2x the stripes' and the strip's edges within 2 px, the header counts' starts within 1 and ends
+within 3; agreement: headers 0.945 to 0.984 for 0.94, the bottom strip 0.932 to 0.935 for 0.92, the side stripes 0.920
+to 0.935 compared on the mocks' label line, which the mocks set at the stripe's outer edge, 7 px at 2x from our centred
+labels (`DockMockTest.LABEL_LINE`, a residual), for a floor lowered explicitly to 0.91 since the Light left stripe
+agrees at 0.9197 over the open tile, #D7D9DC against the mock's #CFD4DC, 8 apart, now `tileTolerance`); the bottom strip
+is 24 + 1 (`BOTTOM_STRIP_HEIGHT`, new, as approved above) and its probes and pairs compare the whole strip with its rule;
+`derived-roles-enterprise.tsv` and `EnterpriseThemeTest` pass unchanged under `SurfaceContrast.beyond` (no Enterprise
+derived role moved); `EnterpriseFirstWindowTest` asserts Event Log at Bottom Left and the look's dock layout key; the
+stripe pairs' tile colours are the shipped theme's; all 75 `check_pairs.py` pairs pass (the 25 dock pairs 0.982 to
+1.000) and the default look is byte-identical (gallery, 322 files, and `DefaultDockPixelsTest`); merged counts
+**11,240 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 9a: the Settings chrome — 2026-10-17** (`claude/enterprise-settings`, worktree
 `.claude/worktrees/enterprise-9`, `87e894a99..82633dd6c`, then this documentation commit;
