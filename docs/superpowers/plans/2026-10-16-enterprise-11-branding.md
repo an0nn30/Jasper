@@ -27,20 +27,21 @@ checks (always `python3 -I`).
 folders `09 App Icon` and `10 Boot Splash` (the frames are 1x, 720 × 440; `extracted/template.html` is the markup).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-11`, branch
-`claude/enterprise-branding`, cut from `main` at `deafed424`. Run every command from the worktree root, never in
-`~/projects/moray`. Plans 3b to 10b execute before this one (5a, 5b, 6a and 6b are required; 7 to 10b touch other
-packages).
-Line numbers below are from `deafed424` and move after those plans; every edit quotes the exact text it replaces, and
+`claude/enterprise-branding`, cut from `main` at `4dba6ae2a` (the plan was written at `deafed424` and refreshed on
+2026-10-17; see "Execution notes (2026-10-17)" at the end). Run every command from the worktree root, never in
+`~/projects/moray`. Plans 3a to 3e, 4a to 4c, 5a, 5b, 6a, 6b and 8a are on `main` (5a, 5b, 6a and 6b are required);
+plans 7 and 9a run in parallel in other worktrees and 8b, 9b, 10a and 10b come later; none of them is required, and
+the files this plan shares with them are reconciled when the orchestrator merges.
+Line numbers below are from `4dba6ae2a`; every edit quotes the exact text it replaces, and
 the edit scripts stop with a message when that text is not found the stated number of times. If a script stops,
 re-find the quoted text (it moves, it does not change), adjust the anchor, and re-run; never edit around a missing
 anchor. Names this plan takes from plans 5a and 5b are cited by task below.
 
 ## Before you start (refresh)
 
-Bring the branch up to `main` and check that every plan this one builds on is in it:
+Do not rebase, merge or push (the orchestrator merges). Check that every plan this one builds on is on the branch:
 
 ```bash
-git rebase main
 grep -cE '^\*\*Enterprise presentation, plan (5a|5b|6a|6b):' docs/STATUS.md                 # 4
 ls jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java \
    jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java \
@@ -55,13 +56,14 @@ grep -c '\[branding\]: unknown table' jasper-app/src/test/java/dev/jasper/app/pr
 grep -c 'Branding' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java          # 0: this plan adds it
 grep -c 'record Startup(ConfigService service, AppArguments options, AppDirs dirs, AppLog log' \
    jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java                    # 5a: 1
-grep -cE '^\*\*Enterprise presentation, plan (7|8a|8b|9a|9b|10a|10b):' docs/STATUS.md      # normally 7
+grep -cE '^\*\*Enterprise presentation, plan (7|8a|8b|9a|9b|10a|10b):' docs/STATUS.md      # 1 (8a) at 4dba6ae2a
 ```
 
-If one of the first eight checks fails, stop: this plan needs plans 5a, 5b, 6a and 6b on `main`. If plans 7 to 10b
-are not all merged yet, go on (they touch the dock, palette, Settings and plugin packages), and rebase again before Task 8.
-Then, for each task, read the code its scripts anchor on (`git log --oneline deafed424..main -- <file>` shows what
-moved) before running them. Record any anchor or name you had to adapt in this plan's status banner (Task 8).
+If one of the first eight checks fails, stop: this plan needs plans 5a, 5b, 6a and 6b on the branch. The last check
+only reports which later plans are in: none of them is needed (plans 7 and 9a run in parallel and touch the dock and
+Settings packages). Then, for each task, read the code its scripts anchor on (`git log --oneline 4dba6ae2a..HEAD --
+<file>` shows what moved) before running them. Record any anchor or name you had to adapt in this plan's status banner
+(Task 8).
 
 **Names from plans 5a and 5b this plan uses** (adapt a code block if the merged code differs, keeping its behaviour):
 
@@ -120,59 +122,76 @@ moved) before running them. Record any anchor or name you had to adapt in this p
 
 ## Verified facts
 
-At `deafed424` unless marked; facts about plans 5a and 5b cite the plan.
+At `4dba6ae2a` (re-checked 2026-10-17) unless marked.
 
 1. `ApplicationIcon.images()` picks the macOS, Windows or Linux set (`ApplicationIcon.java:20-22`);
-   `installTaskbarIcon` returns early for a packaged macOS launch (`usesBundleIcon`, `:34-36`, `:49-51`) and sets
-   `images().getLast()` (`:41`); the sets are loaded lazily (`:69-80`). `platform` has no outgoing Jasper dependency
-   (`platform/package-info.java`).
-2. Every window icon list reads `ApplicationIcon.images()` at construction: `TerminalWindow.java:59`,
-   `NativeShells.java:145,226,426,474`; About draws the largest image (`AboutView.java:190`); the Windows tray reads
+   `installTaskbarIcon` returns early for a packaged macOS launch (`usesBundleIcon`, `:36`, `:48-50`) and sets
+   `images().getLast()` (`:41`); the sets are loaded lazily (`:68-79`). The file is unchanged since `deafed424`.
+   `platform` has no outgoing Jasper dependency (`platform/package-info.java`).
+2. Every window icon list reads `ApplicationIcon.images()` at construction: `TerminalWindow.java:76`,
+   `NativeShells.java:302,412,623,672` (plan 6a's classic dialogs and frames are built there too; no other production
+   `setIconImages` exists); About draws the largest image (`AboutView.java:190`); the Windows tray reads
    `images("windows")` explicitly (`ResidentTray.java:246`). `createApplication` calls `installTaskbarIcon` first
-   (`ApplicationBootstrap.java:167`).
-3. `prepareDesktop` sets the desktop properties (`:68`), commits the title-bar style (`:70-72`) and prepares the
-   built-in icons on the bootstrap thread (`:73-74`) before posting `startDesktop` (`:76`); its catch rolls back and
-   logs (`:80-83`). `startDesktop` exits a non-resident `--background` start (`:114-119`), composes (`:120-153`), serves
-   `--no-window` (`:135-138`), opens the first window (`:139-143`) and catches start-up failures (`:154-159`). The
-   `--background`, `--no-window` and safe-mode flags are `AppArguments.background()`, `noWindow()` and `safeMode()`
-   (`AppArguments.java:7-8`); a handed-off launch returns before anything else (`:311`). Plan 5a moves the log and the
-   selection into `start` and gives `Startup` the dirs, log and selection (5a Task 9); plan 5a Task 12 marks the attempt
-   `pending` just before `application.newWindow()`, and adds `attemptBeforePresenting` with its javadoc ("Whether the launch
-   is about to show a window or rehearse one, …") just above `configureDesktopProperties`. Plan 6a Task 2 replaces the
-   one-line javadoc `/** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */`
-   (it becomes `/** The default look's desktop properties. */` above a no-argument overload, and the sentence moves into
-   the multi-line comment of `configureDesktopProperties(DesktopFlags)`), so no edit here anchors on that line.
+   (`ApplicationBootstrap.java:233`).
+3. Plan 5a moved the pre-pass into `start`: `prepare` opens the log and runs `PluginSelection.of` on the bootstrap
+   thread (`ApplicationBootstrap.java:66-77`), `start` reads the configuration before AWT (`:394-398`) and hands
+   `Startup(service, options, dirs, log, selection)` (`:49-50`) to `prepareDesktop`; a handed-off launch returns before
+   anything else (`:380`). `prepareDesktop` (`:78-111`) commits the desktop properties and the title-bar style through
+   `applyDesktop` (`:100`; plan 6a, `:131-139`), prewarms the built-in icons (`:101-102`, the comment "Off the EDT and
+   before the first window: an optional prewarm of the built-in icons.") and posts `startDesktop` (`:103`); its catch
+   rolls back and logs (`:107-110`). `startDesktop` (`:165-224`) exits a non-resident `--background` start
+   (`:175-180`), composes (`:181-218`), serves `--no-window` (`:196-199`), marks the attempt `pending` and opens the
+   first window (`:200-207`) and catches start-up failures (`:219-224`). The `--background`, `--no-window` and
+   safe-mode flags are `AppArguments.background()`, `noWindow()` and `safeMode()` (`AppArguments.java:7-8`).
+   `attemptBeforePresenting` and its javadoc ("Whether the launch is about to show a window or rehearse one, …") sit at
+   `:113-120`, just above `applyDesktop`.
 4. Tests are headless: the root build sets `java.awt.headless=true` for every test task (`build.gradle.kts:31`); no
-   test can create a `JWindow` or `JFrame`.
-5. `JasperApplication.composeWindow` adds, lays out and shows the window on one line
-   (`JasperApplication.java:446`: `windows.add(window); window.restoreLayout(uiState); window.show();`) and marks
-   `WINDOW_SHOWN` after it (`:458`); `startPlugins` builds the runtime (`:863`) and calls `plugins.start` (`:906`).
-6. `PluginRuntime`'s pre-start setters throw once started (`PluginRuntime.java:356-393`, the `glass` field at `:385`);
-   the start loop over `resolution.load()` loads then starts each candidate (`:671-694`).
-7. `StartupTrace.mark` runs waiting actions on the marking thread (`StartupTrace.java:150-165`); `phase(name, start)`
-   accumulates a named phase (`:168-171`).
+   test can create a `JWindow` or `JFrame`, and no test drives `prepareDesktop` (the bootstrap tests use the test entry
+   `start(args, out, error, launch)`), so no existing test reaches the new splash code. Tests run sequentially in one
+   JVM per module (no JUnit parallel configuration), so `ApplicationIcon`'s static look icons must be reset by every
+   test that sets them.
+5. `JasperApplication.composeWindow` (`JasperApplication.java:467`) adds, lays out and shows the window on one line
+   (`:519`: `windows.add(window); window.restoreLayout(uiState); window.show();`) and marks `WINDOW_SHOWN` after it
+   (`:531`, the only `        trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);`); the constructor sets the presentation
+   from the selection (`:292`) and replaces it with the blamed selection's fallback when the kit is blamed
+   (`:316-317`); `presentation()` is at `:210`; `startPlugins(AppDirs)` builds the runtime (`:957`) and calls
+   `plugins.start(selection, …)` (`:1001`, the only line starting with `plugins.start(selection,`).
+6. `PluginRuntime`'s pre-start setters throw once started (`PluginRuntime.java:368-407`, the `glass` field at `:400`,
+   `host` at `:418`); `Objects` and `Consumer` are imported (`:30`, `:41`); the start loop over `resolution.load()`
+   loads then starts each candidate (`:692-713`), naming a candidate as `candidate.descriptor().name()`.
+   `PluginSelection.isNone()` is at `PluginSelection.java:154` and the `resolution` field at `:43`.
+7. `StartupTrace.mark` (`StartupTrace.java:158`) runs waiting actions on the marking thread; `phase(name, start)`
+   (`:176`) accumulates a named phase. `dev.jasper.app.startup`'s package comment says "Every type is safe from any
+   thread; nothing here blocks the EDT." and allows no other Jasper package.
 8. `BuildInfo.versionLine()` is "1.2.0" or "1.2.0 + 14 commits" (`BuildInfo.java:112-116`) and `shortCommit()` the
-   first eight characters (`:109`); About shows the version line and "branch @ shortCommit" (`AboutView.java:165-168`)
-   and the literal "Copyright 2026 Dustin McKenna-Watts" (`:172`, asserted by `AboutViewTest.java:71`).
-9. `EncodedArtwork` refuses empty or larger than 256 KiB data (`EncodedArtwork.java:16`) and decodes once
-   (`:21-25`); `DecodedArtwork` runs its private XML preflight (`DecodedArtwork.java:42`, `:111-145`: no doctype,
-   processing instruction, script, foreign object or animation, no event or `base` attribute, fragment-only `href` and
-   `url(…)`, no escaped or `@` CSS), then loads with jsvg denying every external resource (`:43-45`); jsvg is
-   jasper-ui's `implementation` dependency (`jasper-ui/build.gradle.kts:8`) and only `compileOnly` in jasper-app
-   (`jasper-app/build.gradle.kts:20`). The Boot Splash's `extracted/art.svg` (15,536 bytes, `viewBox="0 0 718 250"`)
-   passes every preflight rule (checked with Python on 2026-10-16: elements `svg`, `metadata`, `manifest`, `defs`,
-   `linearGradient`, `radialGradient`, `stop`, `rect`, `g`, `line`, `polyline`, `circle`; no `href`; every `url(…)` a
-   fragment).
+   first eight characters (`:109`); `UNKNOWN`'s comment "A build nothing is known about." is at `:45`; About shows the
+   version line (`AboutView.java:165`), the location "branch @ shortCommit" (`:93`) and the literal
+   "Copyright 2026 Dustin McKenna-Watts" (`:172`, asserted by `AboutViewTest.java:71`).
+9. `EncodedArtwork` refuses empty or larger than 256 KiB data (`EncodedArtwork.java:16`), decodes once (`:21-25`) and
+   returns its data at `:27`; `DecodedArtwork` runs its private XML preflight (`DecodedArtwork.java:42`, `:111-144`: no
+   doctype, processing instruction, script, foreign object or animation, no event or `base` attribute, fragment-only
+   `href` and `url(…)`, no escaped or `@` CSS), then loads with jsvg denying every external resource (`:43-45`); neither
+   file changed since `deafed424`. jsvg is jasper-ui's `implementation` dependency (`jasper-ui/build.gradle.kts:8`) and
+   only `compileOnly` in jasper-app (`jasper-app/build.gradle.kts:20`). The Boot Splash's `extracted/art.svg` (15,536
+   bytes, `viewBox="0 0 718 250"`) passes every preflight rule (checked with Python on 2026-10-16: elements `svg`,
+   `metadata`, `manifest`, `defs`, `linearGradient`, `radialGradient`, `stop`, `rect`, `g`, `line`, `polyline`,
+   `circle`; no `href`; every `url(…)` a fragment); its SHA-256 is unchanged (2026-10-17).
 10. `ColourLiteralScanTest` scans every production Java source and text resource (not `.svg` or `.png`) under
-    jasper-ui, jasper-app and plugins, and skips only the built-in theme files (`ColourLiteralScanTest.java:14-16`,
-    `:42`); plan 5b adds the plugin theme exemption.
+    jasper-ui, jasper-app and plugins, and skips only `THEMES`: the built-in theme files and, since plan 5b, every
+    in-repo plugin theme (`ColourLiteralScanTest.java:14-19`); the skip is `if (THEMES.contains(file)) continue;`
+    (`:68`), and `STRING_HEX` is declared once (`:42`).
 11. `ThemeMigrationCoverageTest.CANDIDATE` matches `import java.awt…`, `import javax.swing…`, `import dev.jasper.ui…`,
     `UIManager`, the word appearance in any case, `new J…` and `new …List` among others
-    (`ThemeMigrationCoverageTest.java:17-18`); `BuildInfo.java` and `BuildInfoTest.java` have no row and need none.
-12. `PluginJars.addResource(Path, String, String)` adds one text entry (`PluginJars.java:79-91`); `LookFixtures.plugin`
-    writes text resources only (5a Task 2).
-13. `tools/visual/pairs.json` is a list of `{name, mock, crop, render}` written with two-space indentation;
-    `tools/visual/README.md:13-15` says how `compare_all.py` runs them.
+    (`ThemeMigrationCoverageTest.java:17-18`); `BuildInfo.java`, `BuildInfoTest.java`, `Branding.java`,
+    `BrandingTest.java`, `KitBrandingTest.java`, `StartupSteps.java` and `splash/package-info.java` match nothing and
+    need no row; every modified file that matches (`ApplicationIconTest`, `ApplicationBootstrapTest`,
+    `PresentationConformanceTest`, `ApplicationBootstrap`, `PluginSelection`, `PluginRuntime`, `PluginJars`) has its row.
+12. `PluginJars.addResource(Path, String, String)` adds one text entry (`PluginJars.java:81-91`, indented eight spaces);
+    `LookFixtures.plugin` writes text resources only and returns `<root>/<id>` (`LookFixtures.java:27-32`).
+13. `tools/visual/pairs.json` is a list of 66 `{name, mock, crop, render, …}` entries written with two-space indentation
+    (`json.dumps(…, indent=2, ensure_ascii=False)` plus a newline reproduces it byte for byte); `tools/visual/README.md:13-16`
+    says how `compare_all.py` runs them, its bullet ending "the staged render evidence tests, `EnterpriseKitRenderTest`
+    and the\n  workspace preview)." (plan 5b added `EnterpriseKitRenderTest`).
 14. The reference icon files are byte-identical across the macOS iconset, the hicolor tree and the Windows PNG folder
     for each size they share (SHA-256, 2026-10-16), and every one is RGBA of its stated size (table under "Measured
     targets"). `09 App Icon/README.md` asks for 16 to 256 px in window icon lists and the 1024 px master for the Dock.
@@ -331,7 +350,7 @@ kit parser, which must not touch AWT. The rules move unchanged from `DecodedArtw
 
 **Files:**
 - Create: `jasper-ui/src/main/java/dev/jasper/ui/icons/SvgPreflight.java`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/icons/DecodedArtwork.java:11-16,42,111-145`, `EncodedArtwork.java:27`, `jasper-ui/build.gradle.kts:26`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/icons/DecodedArtwork.java:11-16,20,42,111-144`, `EncodedArtwork.java:27`, `jasper-ui/build.gradle.kts:26`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/icons/EncodedArtworkRasterTest.java`
 
 **Interfaces:**
@@ -618,7 +637,7 @@ covers them; `Presentation` carries the branding, and the default look and the f
 - Create: `jasper-app/src/main/java/dev/jasper/app/presentation/Branding.java`
 - Create: `jasper-app/src/test/java/dev/jasper/app/testsupport/BrandingFixtures.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java`, `PresentationFacts.java`, `Presentation.java`, `package-info.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/testsupport/PluginJars.java:79-91`, `jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/testsupport/PluginJars.java:81-91`, `jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/presentation/BrandingTest.java`, `KitBrandingTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (one row: `BrandingFixtures`)
 
@@ -1201,7 +1220,8 @@ gains spec 5.1's `[branding]` table. The conformance test pins the files to the 
 **Files:**
 - Create: `plugins/enterprise/src/main/resources/presentation/icons/icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png`, `icon-1024.png`; `plugins/enterprise/src/main/resources/presentation/splash/art.svg`
 - Modify: `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java` (`KEYS`, one test), `jasper-app/build.gradle.kts` (`tasks.test` inputs)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java` (`KEYS`, one test). `jasper-app/build.gradle.kts` needs no edit: its
+  `tasks.test` already declares `docs/design/enterprise/reference` (all ten folders) and `plugins/enterprise/src/main/resources` as inputs (`:103`, `:108`).
 
 **Interfaces:**
 - Consumes: Task 2's `Branding`, `KitParser.Parsed.branding()`; plan 5b's `EnterpriseResources`, `PresentationConformanceTest.KEYS`.
@@ -1257,16 +1277,6 @@ for old, new in edits:
     if text.count(old) != 1: raise SystemExit(f"PresentationConformanceTest: expected one {old!r} (plan 5b Task 4's text); re-find it")
     text = text.replace(old, new)
 p.write_text(text, encoding="utf-8")
-
-g = pathlib.Path("jasper-app/build.gradle.kts")
-text = g.read_text(encoding="utf-8")
-old = '''    inputs.dir(rootProject.file("plugins/enterprise/src/main/resources")).withPathSensitivity(PathSensitivity.RELATIVE)\n'''
-if text.count(old) != 1: raise SystemExit("jasper-app/build.gradle.kts: plan 5b's plugin resources input moved")
-text = text.replace(old, old + '''    // The branding conformance and the Boot Splash comparison read the reference artwork and frames (Enterprise plan 11).
-    inputs.dir(rootProject.file("docs/design/enterprise/reference/09 App Icon")).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir(rootProject.file("docs/design/enterprise/reference/10 Boot Splash")).withPathSensitivity(PathSensitivity.RELATIVE)
-''')
-g.write_text(text, encoding="utf-8")
 PY
 ```
 
@@ -1356,7 +1366,7 @@ and has the sources' digest), `EnterpriseFixtureTest` and `EnterpriseKitRenderTe
 - [ ] **Step 6: Commit**
 
 ```bash
-git add plugins/enterprise/src/main/resources/presentation jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java jasper-app/build.gradle.kts
+git add plugins/enterprise/src/main/resources/presentation jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java
 git commit -F - <<'EOF'
 Branding: the Enterprise icons and splash art
 
@@ -1379,7 +1389,7 @@ largest becomes the taskbar and Dock icon, in packaged macOS launches too. `Buil
 and the one copyright constant About and the splash share.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java`, `BuildInfo.java:109-116`, `jasper-app/src/main/java/dev/jasper/app/about/AboutView.java:172`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java`, `BuildInfo.java:45,118`, `jasper-app/src/main/java/dev/jasper/app/about/AboutView.java:172`
 - Test: `jasper-app/src/test/java/dev/jasper/app/platform/ApplicationIconTest.java`, `BuildInfoTest.java`
 
 **Interfaces:**
@@ -1455,9 +1465,10 @@ and `COPYRIGHT`.
 
 - [ ] **Step 3: Give `ApplicationIcon` the look's icons**
 
-Replace `jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java` with the file below (if
-`git log --oneline deafed424..HEAD -- jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java` lists a
-commit, keep that commit's change in the new text):
+Replace `jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java` with the file below (the file is
+unchanged from `deafed424` to `4dba6ae2a`; if `git log --oneline 4dba6ae2a..HEAD --
+jasper-app/src/main/java/dev/jasper/app/platform/ApplicationIcon.java` lists a commit, keep that commit's change in the
+new text):
 
 ```java
 package dev.jasper.app.platform;
@@ -1674,7 +1685,7 @@ without branding ends the steps at once.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/startup/StartupSteps.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/startup/package-info.java:2-4`, `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:385,671`, `PluginSelection.java` (`loading`), `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (field, setter, `startPlugins`, `composeWindow`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/startup/package-info.java:2-4`, `jasper-app/src/main/java/dev/jasper/app/plugins/PluginRuntime.java:400,692`, `PluginSelection.java` (`loading`), `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (field, setter, `startPlugins`, `composeWindow`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/startup/StartupStepsTest.java`, `jasper-app/src/test/java/dev/jasper/app/plugins/PluginStartingStepsTest.java`, `jasper-app/src/test/java/dev/jasper/app/application/StartupStepsApplicationTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (three rows)
 
@@ -2187,7 +2198,7 @@ shipped Enterprise branding and compares it with all ten frames.
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/splash/package-info.java`, `SplashColors.java`, `SplashPainter.java`, `Splash.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/splash/SplashPainterTest.java`, `BootSplashMockTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/ColourLiteralScanTest.java:14-16,42`, `tools/visual/pairs.json`, `tools/visual/README.md:15`, `docs/design/theme-engine/migration.csv` (five rows)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/ColourLiteralScanTest.java:42,68`, `tools/visual/pairs.json`, `tools/visual/README.md:16`, `docs/design/theme-engine/migration.csv` (five rows)
 
 **Interfaces:**
 - Consumes: Task 1's `EncodedArtwork.raster`; Task 2's `Branding`, `BrandingFixtures`; Task 5's `StartupSteps`; plan 5b's
@@ -2197,7 +2208,7 @@ shipped Enterprise branding and compares it with all ten frames.
   Optional<byte[]> textFace, Optional<byte[]> versionFace)`, `static SplashPainter of(Content content, int scale)`
   (throws `IllegalArgumentException` when an icon or the art cannot be drawn), `void paint(Graphics2D g, String step,
   double fraction)`, package-private `fillWidth(double)`, `fit(Font, FontRenderContext, String, float)`,
-  `advance(Font, FontRenderContext, String)`, `GAP`; `public final class Splash` with `Splash(SplashPainter, List<Image> icons)`
+  `advance(Font, FontRenderContext, String)`, `displayable(Font, String, String, int)`, `GAP`; `public final class Splash` with `Splash(SplashPainter, List<Image> icons)`
   (a plain `java.awt.Window`, carrying `icons`),
   `void open(StartupSteps.Step first)`, `void show(StartupSteps.Step step)`, `void close()` (EDT), package-private
   `static Point centred(Rectangle screen)`.
@@ -2321,6 +2332,17 @@ class SplashPainterTest {
             Optional.empty()), 1)).isInstanceOf(IllegalArgumentException.class);
         assertThatCode(() -> SplashPainter.of(content(BrandingFixtures.png(64, 64), BrandingFixtures.svg(), Optional.of(new byte[] {1, 2, 3})), 1))
             .doesNotThrowAnyException();
+    }
+
+    /** Execution notes (2026-10-17) ruling 8: a text the kit's face cannot draw takes the platform face at its size. */
+    @Test void aTextTheFaceCannotDrawTakesThePlatformFace() throws Exception {
+        byte[] plex = java.nio.file.Files.readAllBytes(dev.jasper.app.testsupport.EnterpriseResources.RESOURCES
+            .resolve("presentation/fonts/ibm-plex-sans-regular.ttf"));
+        Font face = Font.createFont(Font.TRUETYPE_FONT, new java.io.ByteArrayInputStream(plex)).deriveFont(12f);
+        assertThat(SplashPainter.displayable(face, StartupSteps.PLUGIN + "Tunnels…", Font.SANS_SERIF, Font.PLAIN)).isSameAs(face);
+        Font fallback = SplashPainter.displayable(face, StartupSteps.PLUGIN + "\u65E5\u672C", Font.SANS_SERIF, Font.PLAIN);
+        assertThat(fallback.getFamily()).isNotEqualTo(face.getFamily());
+        assertThat(fallback.getSize2D()).isEqualTo(12f);
     }
 
     @Test void theSplashIsCentredOnTheMainScreenAndOneThatCannotOpenStaysClosed() {
@@ -2762,12 +2784,13 @@ public final class SplashPainter {
             FontRenderContext frc = g.getFontRenderContext();
             Shape clip = g.getClip();
             g.clipRect(TEXT_X, 0, COPYRIGHT_RIGHT - TEXT_X, HEIGHT);
-            text(g, name, SplashColors.PRODUCT, product, TEXT_X, NAME_BASELINE);
+            text(g, displayable(name, product, Font.SANS_SERIF, Font.BOLD), SplashColors.PRODUCT, product, TEXT_X, NAME_BASELINE);
             text(g, versionFont, SplashColors.TEXT, version, TEXT_X, VERSION_BASELINE);
             g.setClip(clip);
             float copyrightX = COPYRIGHT_RIGHT - advance(copyrightFont, frc, copyright);
             text(g, copyrightFont, SplashColors.COPYRIGHT, copyright, copyrightX, COPYRIGHT_BASELINE);
-            text(g, stepFont, SplashColors.TEXT, fit(stepFont, frc, step, copyrightX - GAP - STEP_X), STEP_X, STEP_BASELINE);
+            Font stepFace = displayable(stepFont, step, Font.SANS_SERIF, Font.PLAIN);
+            text(g, stepFace, SplashColors.TEXT, fit(stepFace, frc, step, copyrightX - GAP - STEP_X), STEP_X, STEP_BASELINE);
             g.setColor(SplashColors.TRACK_RULE);
             g.fillRect(CONTENT_X, BAR_RULE_Y, CONTENT_WIDTH, 1);
             g.setColor(SplashColors.TRACK);
@@ -2802,6 +2825,16 @@ public final class SplashPainter {
             if (advance(font, frc, shortened) <= room) return shortened;
         }
         return "";
+    }
+
+    /**
+     * {@code font}, or the platform's {@code family} at {@code style} and {@code font}'s size when {@code font} lacks a
+     * glyph of {@code text} (a plugin or product name in another script), as the application's own text does under a
+     * kit face (plan 5b).
+     */
+    static Font displayable(Font font, String text, String family, int style) {
+        if (font.canDisplayUpTo(text) == -1) return font;
+        return new Font(family, style, 1).deriveFont(font.getSize2D());
     }
 
     /** {@code text}'s advance in logical pixels. */
@@ -2970,7 +3003,7 @@ text = text.replace(anchor, '''    /** Spec 10.11 fixes the boot splash's colour
     static final Set<Path> FIXED = Set.of(ROOT.resolve("jasper-app/src/main/java/dev/jasper/app/splash/SplashColors.java"));
 ''' + anchor)
 old = "if (THEMES.contains(file)"
-if text.count(old) != 1: raise SystemExit("ColourLiteralScanTest: the theme-file skip moved (plan 5b may have extended it; keep its condition)")
+if text.count(old) != 1: raise SystemExit("ColourLiteralScanTest: the theme-file skip moved (plan 5b's THEMES already holds the plugin themes; keep its condition)")
 text = text.replace(old, "if (FIXED.contains(file) || THEMES.contains(file)")
 p.write_text(text, encoding="utf-8")
 
@@ -2985,7 +3018,7 @@ pairs.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding
 
 readme = pathlib.Path("tools/visual/README.md")
 text = readme.read_text(encoding="utf-8")
-old = "the staged render evidence tests and the workspace preview).\n"
+old = "  workspace preview).\n"
 if text.count(old) != 1: raise SystemExit("tools/visual/README.md: the compare_all bullet moved")
 readme.write_text(text.replace(old, old + "- The Boot Splash frames are 1x (720 × 440), so their pairs (`enterprise-splash-*`) take the 1x renders\n"
     "  `BootSplashMockTest` writes under `jasper-app/build/enterprise-splash/`.\n"), encoding="utf-8")
@@ -2995,7 +3028,7 @@ PY
 - [ ] **Step 5: Run the tests and iterate until the render matches**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.splash.*' --tests 'dev.jasper.app.architecture.ColourLiteralScanTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest'`
-Expected: PASS: `SplashPainterTest` (6) and `BootSplashMockTest` (2: `everyFrameMatchesItsMock` and, on macOS,
+Expected: PASS: `SplashPainterTest` (7) and `BootSplashMockTest` (2: `everyFrameMatchesItsMock` and, on macOS,
 `everyFramesTextMatchesItsMock`; all ten frames, every soft assertion), `ColourLiteralScanTest` with `SplashColors`
 exempt, and the ledger test. Run this step on the Mac: elsewhere the text test is skipped and proves nothing.
 
@@ -3188,10 +3221,10 @@ import dev.jasper.app.presentation.Presentation;\n''', 1),
         var opened = new AtomicReference<StartupSteps>(StartupSteps.NONE);
         try {
             AppDirs dirs = startup.dirs();\n''', 1),
-    ('''            // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.\n''',
+    ('''            // Off the EDT and before the first window: an optional prewarm of the built-in icons.\n''',
      '''            // Spec 10.11, as soon as AWT may start: the look's icons and, on a start that will open a window, its splash.
             opened.set(openSplash(startup, GraphicsEnvironment.isHeadless()));
-            // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.\n''', 1),
+            // Off the EDT and before the first window: an optional prewarm of the built-in icons.\n''', 1),
     ('''            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));\n''',
      '''            StartupSteps steps = opened.get();
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands, steps));\n''', 1),
@@ -3359,9 +3392,10 @@ EOF
 **Files:**
 - Modify: `docs/app-architecture.md` (the `splash` row, the `startup` and `presentation` rows), the guide that documents the kit file (found below), `docs/STATUS.md`, this plan's status banner
 
-- [ ] **Step 1: Rebase, then edit the documentation**
+- [ ] **Step 1: Edit the documentation**
 
-If plans 7 to 10b were not all on `main` when you started, `git rebase main` now and re-run the Task 6 and 7 tests.
+Do not rebase or merge: plans 7 and 9a run in parallel, and the orchestrator reconciles `docs/app-architecture.md`,
+`docs/STATUS.md`, `migration.csv` and `pairs.json` when it merges.
 
 ```bash
 python3 -I - <<'PY'
@@ -3390,9 +3424,10 @@ grep -rln '\[defaults\]' docs/*.md
 grep -rn 'branding\|plan 11' docs/*.md AGENTS.md jasper-app/README.md jasper-sdk/README.md jasper-ui/README.md
 ```
 
-The first `grep` names the guide that documents the kit file's tables (plans 5a and 5b put it in
-`docs/plugin-authoring.md`). In it, replace any sentence that says `[branding]` is refused or comes with plan 11 with
-the paragraph below; if there is none, add the paragraph right after the paragraph that describes `[defaults]`:
+The first `grep` names the guide that documents the kit file's tables: `docs/plugin-authoring.md`. Its provider
+paragraph says the kit file's format is spec section 5 ", except that its `[branding]` table is not accepted yet." (line
+44 at `4dba6ae2a`). Delete that clause, so the sentence ends at the spec link, and add the paragraph below right after
+that provider paragraph (the one ending "development and installed plugins ignore it."):
 
 ```markdown
 `[branding]` (optional) brands the look's start-up and windows: `product` is the name its splash shows (1 to 32
@@ -3404,7 +3439,9 @@ shows a splash on a start that opens a window; a look without it keeps Jasper's 
 ```
 
 Fix every other hit of the second `grep` that says branding is not supported yet (delete the statement, AGENTS.md's
-documentation rules); leave mentions that are already accurate.
+documentation rules); leave mentions that are already accurate (at `4dba6ae2a` the other hits, in `docs/README.md`,
+`docs/app-maintenance.md` and `docs/new-ui-icons-verification.md`, are about Moray's rebranding or the packaged
+application branding and stay).
 
 - [ ] **Step 2: Prove the default look unchanged**
 
@@ -3447,12 +3484,12 @@ over the new and changed sources (`jasper-app/src`, `jasper-ui/src`, `plugins`);
 - [ ] **Step 4: Write the STATUS entry and the banner**
 
 Insert at the top of `docs/STATUS.md`, right after the `# Jasper — Status and Handoff` heading and its blank line, one
-paragraph. Fill `<range>` with `git log --format=%h main..HEAD | tail -1`..`git log -1 --format=%h`, `<counts>` with
+paragraph. Fill `<range>` with Task 1's commit (`git log --format=%h -1 --grep='^Branding: artwork at a caller'`)..`git log -1 --format=%h`, `<counts>` with
 Step 3's line, and `<deviations>` with every deviation from this plan's text (adapted anchors and names, any constant
 Task 6 changed with its measured value), or "none beyond the plan's Rulings":
 
 ```markdown
-**Enterprise presentation, plan 11: branding — 2026-10-16** (`claude/enterprise-branding`, worktree
+**Enterprise presentation, plan 11: branding — 2026-10-17** (`claude/enterprise-branding`, worktree
 `.claude/worktrees/enterprise-11`, `<range>`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-11-branding.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look with `[branding]` brands Jasper's
@@ -3490,7 +3527,7 @@ Jasper's icon. Not merged, not pushed.
 Replace this plan's first heading line with the same heading followed by a status banner:
 
 ```markdown
-> **Status (2026-10-16): executed on `claude/enterprise-branding` (`<range>`).** Deviations from this plan's text: <deviations>.
+> **Status (2026-10-17): executed on `claude/enterprise-branding` (`<range>`).** Deviations from this plan's text: <deviations>.
 ```
 
 - [ ] **Step 5: Commit**
@@ -3510,3 +3547,131 @@ full build's counts.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-17)
+
+**Refresh.** Every anchor, quoted text, path, signature and line number this plan relies on was re-checked against the
+worktree at `4dba6ae2a` (`main`: plans 3a to 3e, 4a to 4c, 5a, 5b, 6a, 6b and 8a; not 7 or 9a, which run in parallel,
+nor 8b, 9b, 10a or 10b). Method, without Gradle: a dry run in a scratch copy of the tree (`git archive HEAD`) applied
+every edit script in order with its stated counts (all twelve held), Task 3's copies (the eight SHA-256 sums and sizes
+held) and every created, replaced and appended Java file; compiled the main sources of jasper-sdk, jasper-terminal,
+jasper-ui, jasper-buddy and jasper-app, and the jasper-app, jasper-ui icon and test-fixture sources, with `javac` (JBR
+25, the Gradle cache's jars); and ran tests headless through the JUnit 6.1.3 launcher on this Mac (`jasper.repoRoot` set
+to the copy). Every new test passes: `EncodedArtworkRasterTest` (3), `BrandingTest` (3), `KitBrandingTest` (5),
+`StartupStepsTest` (5), `PluginStartingStepsTest` (1), `StartupStepsApplicationTest` (2), the two new
+`ApplicationIconTest` cases, the new `BuildInfoTest` case, `SplashPainterTest` (7, with ruling 8's case),
+`BootSplashMockTest` (2: `everyFrameMatchesItsMock` and, on macOS, `everyFramesTextMatchesItsMock`, all ten frames
+within the stated tolerances, so no Task 6 remedy is needed at `4dba6ae2a`), the five new `ApplicationBootstrapTest`
+cases and `PresentationConformanceTest.theBrandingIsTheReferenceArtwork`; `KitParserTest`, `PresentationFactsTest`,
+`ProjectionsTest`, `ReceivingArtworkTest`, `BuiltInArtworkTest`, `IdentityArtworkTest`, `IconRegistryTest`,
+`EnterpriseFixtureTest`, `EnterpriseKitRenderTest`, `PresentationReachTest`, `LookNoticeTest`, `PresentationAttemptTest`,
+`AboutViewTest` and `ColourLiteralScanTest` pass. The only failures are the environment's: `BuildInfoTest
+.theBuildWritesTheResource` (Gradle's build-info resource), `PresentationConformanceTest
+.theStagedPluginIsTheSourcesAndOffByDefault` (Gradle's staged plugins), and `ThemeMigrationCoverageTest`, which named
+exactly the nine files whose ledger rows Tasks 2, 5 and 6 add (the dry run did not write the rows). `javadoc
+-Xdoclint:all` over the changed jasper-app packages and `-Xdoclint:all,-missing` over `dev.jasper.ui.icons` report no
+error; the source-hygiene scan finds nothing. Not checked here (Gradle only): `verifyApplicationArchitecture`, the
+headless gallery's byte comparison (Task 8 step 2), `stagePlugins` and `check`.
+
+Changes made to this plan's text: the Workspace paragraph and "Before you start" (no rebase, the `4dba6ae2a` base, the
+later-plans check); Verified facts 1 to 13; the Files lines of Tasks 1 to 6; Task 3 (no `jasper-app/build.gradle.kts`
+edit, ruling 3); Task 4 (the `ApplicationIcon` history note); Task 6 (the README anchor, ruling 4; `displayable` and its
+test, ruling 8; the count 7); Task 7 (the splash anchor, ruling 2); Task 8 (step 1 without a rebase, the
+plugin-authoring edit, ruling 9; the dates and the range, ruling 10).
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface:
+
+| Tasks | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| 1 → 2 | `EncodedArtwork.checkSvg`, called by `KitParser.branding` on the XML alone | Agree; messages match `KitBrandingTest` | none |
+| 1 → 6 | `EncodedArtwork.raster` (the splash's art); Task 6's remedies may edit `DecodedArtwork.raster`, and its commit stages `jasper-ui/.../icons` with `-u` | Agree | none |
+| 2 → 3 | `Branding`, `Parsed.branding()`, `MAX_ICON_BYTES`, `MAX_ART_BYTES`; Task 2 expects `PresentationConformanceTest` green because the shipped kit has no `[branding]` until Task 3 | Agree | none |
+| 2 → 5, 7 | `BrandingFixtures.plugin`, `Presentation.branding()`, `PluginSelection.presentation()` | Agree | none |
+| 2 → 6 | `BrandingFixtures.png`, `svg`; `Branding.icon`, `splashArt` | Agree | none |
+| 2, 5, 6 | `docs/design/theme-engine/migration.csv`, appended rows (1 + 3 + 5) | Exactly the nine files the coverage test names | 11 |
+| 3 → 6 | The shipped icons, art and IBM Plex faces `BootSplashMockTest` reads through `EnterpriseResources`; the reference folders as test inputs | Agree; Task 3's input edit is redundant | 3 |
+| 4 → 7 | `ApplicationIcon.useLook`, `branded`, `installTaskbarIcon`, `images`; `BuildInfo.buildLine`, `COPYRIGHT` | Agree | 13 |
+| 5 → 6 | `StartupSteps.Step`, `fraction()`, `RUNTIME`, `CONFIGURATION`, `PLUGIN`, `WORKSPACE` | Agree | none |
+| 5 → 7 | `StartupSteps.of`, `NONE`, `current`, `active`, `configuration`, `workspace`, `done`; `PluginSelection.loading()`; `JasperApplication.startupSteps` | Agree: the bootstrap reports configuration and workspace, the application plugins, workstation and done | 14 |
+| 6 → 7 | `SplashPainter.of`, `Content`; `Splash(painter, icons)`, `open`, `show`, `close` (as `Consumer<Step>` and `Runnable`) | Agree | none |
+| 5 ↔ 7 | `JasperApplication.java` (Task 5) and `ApplicationBootstrap.java` (Task 7) | Disjoint files | none |
+| 6 → 8 | `tools/visual/README.md`, `pairs.json` (6); the docs and STATUS (8) | Agree | 4 |
+| 2 → 8 | The plugin guide's "not accepted yet" clause | The sentence is a clause, and no `[defaults]` paragraph exists | 9 |
+| 7 ↔ 5a, 6a (merged) | `prepareDesktop`: the selection moved into `start`; `applyDesktop` commits the desktop properties and the title-bar style | The quoted "Before any plugin is discovered" comment is gone | 2 |
+| 3, 6 ↔ 5b (merged) | `enterprise.kit.toml` (`[colors]` then `[defaults]`), `KEYS`' comment, `EnterpriseResources`, `ColourLiteralScanTest.THEMES`, the README's compare_all bullet | Anchors hold except the README bullet; `jasper-app/build.gradle.kts` already declares the reference folder | 3, 4 |
+| 1 to 8 ↔ 7, 9a (parallel) | `migration.csv`, `docs/STATUS.md`, `pairs.json`, `tools/visual/README.md`, `docs/app-architecture.md`, `JasperApplication.java`, `Presentation.java`, `enterprise.kit.toml`, `KitParserTest` | Textually local, appended edits | 11, 12 |
+
+Each task against itself:
+
+| Task | Agreement of its own text | Ruling |
+|---|---|---|
+| 1 | Agrees; anchors unchanged since `deafed424`; 3 cases and the icon suites pass | none |
+| 2 | Agrees; 3 + 5 cases, `KitParserTest`'s new message and `PresentationFactsTest` pass; no other construction of `Presentation` or `Parsed` exists | none |
+| 3 | The build input edit duplicated an existing input; otherwise agrees; the conformance case passes | 3 |
+| 4 | Agrees; `ApplicationIcon`, `BuildInfo` and `AboutView` unchanged since `deafed424` | 13 |
+| 5 | Agrees; one `@TempDir` deletion race seen once under load | 7 |
+| 6 | The README anchor had moved; a step or product in a script IBM Plex lacks drew boxes; the mock comparison passes all ten frames | 4, 8 |
+| 7 | The `prepareDesktop` anchor had moved | 2 |
+| 8 | Step 1 rebased; the guide's anchor and the STATUS dates and range needed updating | 1, 9, 10 |
+
+### Rulings
+
+1. **No rebase, merge or push.** "Before you start" and Task 8 step 1 no longer run `git rebase main`; the branch sits
+   on `4dba6ae2a`, and plans 7 and 9a, which run in parallel, are merged by the orchestrator. — Why: the orchestrator
+   forbids rebasing, and no later plan is required. — Cost if wrong: none; a newer `main` comes in at the merge.
+2. **The splash opens right after `applyDesktop`.** Plan 5a moved `PluginSelection` into `start`'s pre-pass, so the
+   comment Task 7 anchored on is gone; `openSplash` now goes before the built-in icon prewarm ("Off the EDT and before
+   the first window: an optional prewarm of the built-in icons."), just after `applyDesktop` commits the desktop
+   properties and the title-bar style. — Why: Rulings 9 (after those, as early as possible), and the splash's window is
+   posted before the prewarm runs. — Cost if wrong: the splash appears a few milliseconds later or earlier.
+3. **Task 3 adds no test input.** `jasper-app/build.gradle.kts`' `tasks.test` already declares
+   `docs/design/enterprise/reference` (all ten folders, `:108`) and `plugins/enterprise/src/main/resources` (`:103`).
+   — Why: the two new inputs would only overlap the existing one. — Cost if wrong: if line 108 is ever removed, the
+   conformance and mock tests could stay UP-TO-DATE after a reference file changes.
+4. **The README bullet goes after "  workspace preview).".** Plan 5b rewrote `compare_all.py`'s bullet; that line is
+   unique. — Why: same place, current text. — Cost if wrong: none.
+5. **Line numbers are `4dba6ae2a`'s.** Verified facts and Files lines are refreshed; besides rulings 2 and 4 no quoted
+   text changed, and `ApplicationIcon`, `EncodedArtwork`, `DecodedArtwork`, `BuildInfo` and `AboutView` are unchanged
+   since `deafed424`. — Why: the scripts anchor on text, the numbers only orient. — Cost if wrong: none.
+6. **The dry run stands in for the Gradle red-green steps only as evidence.** Each task still runs its stated Gradle
+   commands. — Why: Gradle-only checks (architecture, gallery, staged plugins) were not run here. — Cost if wrong: none.
+7. **`StartupStepsApplicationTest`'s `@TempDir` race.** Once, under load, its folder could not be deleted after
+   `quitNow` (a late write, the shape `PresentationAttemptTest` shares); alone it passed three runs in a row. Per the
+   machine note, re-run it alone before treating a failure as real; a failure that repeats alone is a defect to debug
+   (superpowers:systematic-debugging), never to skip. — Why: the assertions passed every time. — Cost if wrong: a
+   flaky test reaches `check`.
+8. **The splash's product name and step take the platform face for a glyph the kit's face lacks.**
+   `SplashPainter.displayable(font, text, family, style)` returns the face, or the platform's family at the same size
+   when `canDisplayUpTo` finds a missing glyph; `paint` uses it for the product name (bold fallback) and the step (fit
+   and drawn with the same font). `SplashPainterTest.aTextTheFaceCannotDrawTakesThePlatformFace` covers it. — Why: a
+   plugin name in another script would draw boxes under IBM Plex; plan 5b's ruling 26 gives the application's own text
+   the same fallback. — Cost if wrong: one helper; the frames are unaffected (all their text is in Plex, and the mock
+   test passes with it).
+9. **The plugin guide loses its clause and gains the paragraph.** `docs/plugin-authoring.md:44` says the kit format is
+   spec section 5 ", except that its `[branding]` table is not accepted yet."; Task 8 deletes that clause and adds the
+   plan's `[branding]` paragraph right after the provider paragraph (no paragraph describes `[defaults]`; it is
+   mentioned in the themes paragraph). — Why: AGENTS.md's documentation rules (delete, never negate), and the provider
+   paragraph is where the kit file is introduced. — Cost if wrong: the paragraph's placement.
+10. **The STATUS entry and banner are dated 2026-10-17, and the range starts at Task 1's commit.** The plan's own
+    commits are on the branch, so `main..HEAD | tail -1` would name the plan commit. — Why: the entry records the
+    execution. — Cost if wrong: none.
+11. **Shared files with plans 7 and 9a stay textually local.** Ledger rows and `pairs.json` entries are appended, the
+    STATUS paragraph goes at the top, the README gains one bullet, `docs/app-architecture.md` gains one row and two
+    phrases, `JasperApplication.java` gains four local insertions, `Presentation.java` changes its record header,
+    compact constructor and three factories, `enterprise.kit.toml` gains a table between `[colors]` and `[defaults]`,
+    and `KitParserTest` changes one case and one comment. If plan 7 or 9a lands first and an anchor moved, the script
+    stops: re-find it. — Why: the orchestrator reconciles at the merge. — Cost if wrong: a merge conflict there.
+12. **`Presentation.LANDED` is untouched.** `Branding` is a component, not a projection group (Rulings 6); plans 7 and
+    9a add their groups to `LANDED` independently. — Why: no overlap. — Cost if wrong: none.
+13. **`createApplication` keeps both `installTaskbarIcon` calls.** The existing first call stays; the plan's second
+    one, after `useLook(application.presentation().branding().iconFiles())`, puts Jasper's icon back after a fallback
+    (spec 4.7). On a default look's development launch it sets the same icon twice. — Why: harmless, and the fallback
+    needs it. — Cost if wrong: one redundant native call per development launch.
+14. **The blamed path is covered through the presentation the application holds.** `startupSteps` reads
+    `presentation` after construction, which is the blamed selection's fallback (`JasperApplication.java:316-317`);
+    `StartupStepsApplicationTest.aLookWithoutBrandingEndsTheStepsAtOnce` covers a presentation without branding and
+    `KitBrandingTest` the fallback's `Branding.NONE`, so no test forces a kit to fail installing. — Why: the seam
+    (`installers`) exists but a branded install failure adds nothing those two do not prove. — Cost if wrong: a
+    regression in the blamed path is caught only by review or the GUI check.
