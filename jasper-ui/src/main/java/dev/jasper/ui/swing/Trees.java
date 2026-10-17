@@ -115,13 +115,15 @@ final class Trees {
         /** Each trailing column's width, measured over every item so the columns line up from row to row. */
         int[] trailingWidths = new int[0];
         /** A column tree's header (Tree.columns): the item column's title and one title over each trailing column. */
-        final javax.swing.JPanel header = new javax.swing.JPanel();
+        final javax.swing.JPanel header = new Tables.HeaderBand(this);
         /** A column tree's count column: as wide as its widest count, so every row's values line up; zero without counts. */
         int countWidth;
 
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node, new TreePane(view.context()));
             ((TreePane)scroll).owner=this;
+            var box=context().faces().tree.box(context());
+            if(box!=null)scroll.setBorder(box);
             refresh();
             InteractiveRows.bind(canvas, "RIGHT", () -> expandFocused(true));
             InteractiveRows.bind(canvas, "LEFT", () -> expandFocused(false));
@@ -165,6 +167,7 @@ final class Trees {
         }
         @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
         @Override boolean uniformRows(){return !settingsNavigation && !rail() && detail==null && presentation.isEmpty();}
+        @Override java.awt.Color hoverFill(){return context().faces().tree.hover(context());}
         private int keyWidth(int index,int width) {
             var value=presentation.get(itemId(index));
             if(value==null || value.keycaps().isEmpty())return 0;
@@ -344,6 +347,7 @@ final class Trees {
             }
             for (int i = 0; i < columns.size(); i++) {
                 var label = Tables.headerLabel(this, "@tree/", columns.get(i));
+                context().faces().tree.styleTitle(label, context(), i);
                 // The item column's title reads from the rows' start; the others sit over their right-aligned values.
                 if (i > 0) {
                     label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
@@ -358,7 +362,9 @@ final class Trees {
             header.setLayout(new ColumnHeaderLayout(this));
             int pad = ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP),
                     side = rowPad() + com.formdev.flatlaf.util.UIScale.scale(gutter);
-            header.setBorder(javax.swing.BorderFactory.createEmptyBorder(pad, side, pad, side));
+            var insets = context().faces().tree.headerInsets(context(), side,
+                    header.getComponentCount() == 0 ? 0 : header.getComponent(0).getPreferredSize().height);
+            header.setBorder(javax.swing.BorderFactory.createEmptyBorder(insets.top, insets.left, insets.bottom, insets.right));
             if (scroll.getColumnHeader() == null || scroll.getColumnHeader().getView() != header) {
                 scroll.setColumnHeaderView(header);
                 scroll.getColumnHeader().setOpaque(false);
@@ -395,7 +401,7 @@ final class Trees {
             row.begin();
             var entry = visible.get(index);
             var item = entry.item();
-            row.indent = settingsNavigation || rail()?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):entry.depth() * com.formdev.flatlaf.util.UIScale.scale(16);
+            row.indent = settingsNavigation || rail()?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):context().faces().tree.indent(context(), entry.depth());
             var leading = new ArrayList<Nodes.Node>();
             if (!item.leaf() && !settingsNavigation && !rail())
                 leading.add(
@@ -408,7 +414,7 @@ final class Trees {
                                         : "chevron.right",
                                 Nodes.ButtonKind.GHOST,
                                 "expand",
-                                "Expand or collapse " + item.title(),presentation.isEmpty()?Nodes.ButtonPresentation.STANDARD:Nodes.ButtonPresentation.EMBEDDED));
+                                "Expand or collapse " + item.title(),presentation.isEmpty()?context().faces().tree.disclosure():Nodes.ButtonPresentation.EMBEDDED));
             item.icon()
                     .ifPresent(
                             icon ->
@@ -424,6 +430,8 @@ final class Trees {
             item.status().ifPresent(status -> leading.add(new Nodes.StatusDot(
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
+            if (!item.leaf() && presentation.isEmpty() && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl expand)
+                context().faces().tree.styleDisclosure(expand.button, context(), value().expandedIds().contains(item.id()));
             for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && presentation.isEmpty())icon.tile(0,false);
             if(!presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon")){int tile=context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE);icon.tile(tile,tile,context().icons().size(context().metrics(), Nodes.IconSize.CONTROL),selected.contains(item.id()));}
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
@@ -434,7 +442,7 @@ final class Trees {
                                     titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    (settingsNavigation || rail()) && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY)));
+                                    (settingsNavigation || rail()) && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:context().faces().tree.title(item.leaf(), item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY))));
             // Settings navigation pages use the Settings body face; recycled rows restore the declared role.
             if(row.controls.get(titleId) instanceof Labels.TextControl titleText) {
                 var role=settingsNavigation && item.leaf() ? dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY : null;

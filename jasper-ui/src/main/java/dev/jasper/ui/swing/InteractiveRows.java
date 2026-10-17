@@ -334,6 +334,15 @@ final class InteractiveRows {
 
         boolean identityRows() { return false; }
 
+        /** Paints bands under the rows' fills (a classic table's zebra and heading bands); none by default. */
+        void paintBands(Graphics2D g, int width) { }
+
+        /** A hovered or keyboard-focused row's fill. */
+        Color hoverFill() { return ColorMath.opacity(ThemePainting.color(context(), SemanticColor.HOVER_OVERLAY), .05); }
+
+        /** Whether a heading row after other rows opens with a hairline rule. */
+        boolean headingRule() { return true; }
+
         int minimumRowHeight() {
             return 0;
         }
@@ -799,6 +808,8 @@ final class InteractiveRows {
                     for (int i = 1; i <= owner.size(); i++) g.fillRect(stroke, i * owner.rowHeight, Math.max(0, getWidth() - 2 * stroke), stroke);
                 } finally { g.dispose(); }
             }
+            var bands = (Graphics2D) graphics.create();
+            try { owner.paintBands(bands, getWidth()); } finally { bands.dispose(); }
             // Selection and hover fill each row's whole band, edge to edge of the list, under the row's inset content.
             for (var row : owner.mounted.values()) row.paintFill(graphics, getWidth());
         }
@@ -859,7 +870,7 @@ final class InteractiveRows {
             boolean focusedOnly = Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner() && !owner.selected.contains(id);
             Color fill = owner.selectionShown(index)
                 ? ThemePainting.color(owner.context(), owner.ink().fill)
-                : hover || focusedOnly ? ColorMath.opacity(ThemePainting.color(owner.context(), SemanticColor.HOVER_OVERLAY), .05) : null;
+                : hover || focusedOnly ? owner.hoverFill() : null;
             if (fill == null) return;
             graphics.setColor(fill);
             graphics.fillRect(0, getY(), width, getHeight());
@@ -1237,7 +1248,7 @@ final class InteractiveRows {
             if (!owner.dataRow(index)) {
                 // A heading after other rows opens its section with a hairline rule: a row divider, or the menu's edge in the
                 // palette's results (spec 7).
-                if (index > 0) {
+                if (index > 0 && owner.headingRule()) {
                     g.setColor(ThemePainting.color(owner.context(), owner.resultsLayout() ? SemanticColor.BORDER_MENU : SemanticColor.BORDER_SUBTLE));
                     g.fillRect(0, 0, getWidth(), ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE));
                 }

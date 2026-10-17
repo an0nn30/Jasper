@@ -25,6 +25,12 @@ classic	ClassicGroupFace	text.primary	surface.app	CONTRAST:4.5
 classic	ClassicLabelPolicy	text.strong.secondary	surface.app	CONTRAST:4.5
 classic	ClassicLabelPolicy	text.primary	surface.app	CONTRAST:4.5
 classic	ClassicLabelPolicy	text.secondary	surface.app	CONTRAST:4.5
+classic	ClassicTableFace	text.strong.secondary	surface.tableHeader	CONTRAST:4.5
+classic	ClassicTableFace	border.control	surface.app	CONTRAST:1.5
+classic	ClassicTableFace	text.secondary	surface.tableHeader	CONTRAST:4.5
+classic	ClassicTreeFace	text.strong.secondary	surface.tableHeader	CONTRAST:4.5
+classic	ClassicTreeFace	border.control	surface.app	CONTRAST:1.5
+classic	ClassicTreeFace	text.secondary	surface.card	CONTRAST:3.0
 classic	ClassicStepperFace	text.secondary	button.secondary.bg	CONTRAST:3.0
 classic	ClassicStepperFace	text.placeholder	surface.input	CONTRAST:4.5
 classic	ClassicButtonFace	text.onAccent	accent	CONTRAST:4.5
