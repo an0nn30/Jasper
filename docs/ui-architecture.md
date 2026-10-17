@@ -245,7 +245,8 @@ Run window: its RESULTS rows, heading bands and counts, PROMPT_HEADER tile, tran
 `RUN_WINDOW_*` roles, `RUN_HEADING` and `RUN_DETAIL`; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds paint the
 window's frame and bands, its field box and its list box. `ChromePainter` (one per kit; app chrome paints with `ChromePainter.installed()`) owns the native chrome's painting (tab strip, toolbar
 rules and action widths, status dot, rail badges, connected dot, split dividers, drop guides, find and title-bar rules,
-palette shadow) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
+palette shadow, and the classic dock's rules, stripe labels, count pills and header strips, whose colours it paints
+through the pairs `ChromePainter.DOCK_PAIRS` declares) over named roles; `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT` and `STATUS_PATH` carry the reference
 chrome text sizes. `IconRegistry.chromeIcon` is the native chrome's receiving context: the meanings the workspace chrome
 depicts (add, new window, split, expand, chevron down, folder, server, bell, lock, terminal) use their byte-identical
 original desktop artwork (`assets-chrome.tsv`); descriptor, panel, tile and plugin-registered contexts never receive it.
@@ -266,7 +267,9 @@ status held to the indicator floor on the panel surface), and icon-only actions 
 order mirrors a native tool window header: title, count, detail; the panel's own header actions; the host's
 contributed actions; the host's placement/collapse actions. Metadata controls are kept by position across refreshes
 and descriptor updates; `PanelHostHeader.EMPTY` clears them; a replacement header starts empty; closing the view
-releases them. Host integration only, not part of the plugin SDK (plugins reach it through `PanelHost.setHeader`).
+releases them. A host frame (`PanelHostHeader.Frame` `FLUSH` or `FLUSH_FOCUSED`) makes the header a flush frame's
+header strip: the strip's surface over a 1 px rule, a parenthesised count, a muted detail and actions 2 px apart. Host
+integration only, not part of the plugin SDK (plugins reach it through `PanelHost.setHeader`).
 
 See [maintenance](ui-maintenance.md), [calibration evidence](design/theme-engine/calibration.md),
 [module entry point](../jasper-ui/README.md) and [SDK architecture](sdk-architecture.md).

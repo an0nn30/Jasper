@@ -1,5 +1,7 @@
 # Enterprise presentation 7: dock chrome Implementation Plan
 
+> **Status (2026-10-17): executed on `claude/enterprise-dock-chrome` (`947b3d9e1..deb7ea3c1`, then the documentation commit).** Deviations from this plan's text: plan 6's names are the merged 6a and 6b ones ("Plan 6's names", Execution notes R2), and the Enterprise kit and theme are 6a's fixtures until plan 5b, with the face-dependent probes printed (R4, R5); Task 9: a native header strip lays its actions' row out in a `GridBagLayout`, so every action is centred on the strip as Hide is (a flow layout put the row at the strip's top), and `HeaderStripTest` asserts it. `./gradlew check --continue`: 11,117 tests, 0 failures, 0 errors, 25 skipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under a look whose kit file says `tool_windows = "stripes"` (Enterprise), each window docks its tool windows the

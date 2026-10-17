@@ -248,6 +248,13 @@ The built-in themes are Slate Cobalt and Catppuccin's four flavours; installed t
 split divider border by class name and the centred title. The kit is published with the theme; app chrome reads it
 through `FlatLafInstaller.installedKit()`, `ChromePainter.installed()` and `NativeStyles.installed()`.
 Tool windows paint `surface.panel` (theme.md's tool-window body) through `ToolWindowSurface`, their headers included; the stripes stay chrome.
+Under a look whose kit asks for stripes (`tool_windows = "stripes"`), `WorkspaceChrome.of` gives each window a
+`DockChrome` with labelled stripes and flush frames: `StripeSet.LabelledStripes` puts two `LabelledStripe`s (labels
+"N: Title" when the toggle's shortcut is a digit with a modifier) and a `BottomStrip` for the bottom slots in place of
+the two `ToolStripe` rails, and `ToolWindowArea` divides the frames by painted 1 px rules with 6 px drag areas and gives
+every frame a header strip, focused while it holds the focus owner. Dock geometry reads the window's kit.
+`UiState` keeps such a look's dock under `[look."<provider id>"]`, and its Notifications panel is Event Log in the
+bottom strip (`AppPanels`).
 
 `JasperTheme` (jasper-ui) reads a theme file into one `GeneratedTheme` per variant and its terminal schemes;
 `JasperTheme.bundled()` is Slate Cobalt, `builtIns()` every built-in theme. `appearance.ThemeLibrary` holds the built-in themes and every valid
