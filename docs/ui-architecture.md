@@ -102,6 +102,13 @@ mid-way. While it moves the card paints one snapshot of its content, so it fades
 paints its own disabled alpha ahead of the rest); at rest the content paints live. The host adds the overlay to a
 layered pane and owns keyboard routing and focus; the app's `WindowOverlay` stacks them per window.
 
+`ClassicDialog` is the classic look's in-window dialog: a still scrim, a card framed in `border.hover` with
+`DIALOG_RADIUS` and the popover shadow, a header strip on `surface.header.active` holding the dialog's swatch and title,
+and the host's content; it is centred on the whole window or, as a sheet, joined under the title bar, and it neither
+fades nor moves. Two `KitView` host flags serve it: `hostTitled` (the form draws no title label and hides a hero that
+only repeats the title) and `dialogBand` (the footer is a band on `surface.footer` under a `border.window` rule, the
+footnote leading and the actions trailing).
+
 `JasperTheme` reads a Jasper theme file with the JDK-only `ThemeJson` reader; `JasperTheme.bundled()` is Slate Cobalt,
 the bundled `slate-cobalt.json` (the colour reference `docs/design/theme-engine/slate-cobalt.md`'s machine-readable
 block, kept identical by a test). A theme has the Dark and/or Light semantic palettes (roles the file omits follow

@@ -27,7 +27,9 @@ class ProjectionReadTest {
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/workspace/WorkspaceChrome")
                 || type.startsWith("dev/jasper/app/workspace/WorkspaceChrome$"),
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
-            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/application/LookMotion"));
+            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/application/LookMotion"),
+        Pattern.compile("dev/jasper/app/presentation/DialogMapping\\$Kind(?=[;$.]|$)"),
+            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"));
 
     /**
      * A class's internal name and every string in its constant pool.
@@ -65,13 +67,18 @@ class ProjectionReadTest {
             if (scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/WorkspaceLook$Menus"))) live.add(scanned.name());
         }
         assertThat(live).as("the scan is live").anyMatch(name -> name.startsWith("dev/jasper/app/workspace/WorkspaceChrome"));
+        assertThat(files.stream().map(Scanned::of)
+                .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/DialogMapping$Kind")))
+                .map(Scanned::name))
+            .as("the dialog mapping's scan is live").contains("dev/jasper/app/windows/AuxiliaryWindows");
         assertThat(projectionReaders(files)).isEmpty();
     }
 
     @Test void aLookReadElsewhereIsReported() {
         byte[] probe = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowChromeProbe"), builder -> builder
             .withField("menus", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Menus"), ClassFile.ACC_PRIVATE)
-            .withField("motion", ClassDesc.of("dev.jasper.app.presentation.Motion"), ClassFile.ACC_PRIVATE));
-        assertThat(projectionReaders(List.of(probe))).hasSize(2);
+            .withField("motion", ClassDesc.of("dev.jasper.app.presentation.Motion"), ClassFile.ACC_PRIVATE)
+            .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(probe))).hasSize(3);
     }
 }

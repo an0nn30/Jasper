@@ -634,7 +634,9 @@ In-window overlays are `AuxiliarySurface.Kind.OVERLAY`: a terminal window's prog
 kit's `ModalOverlay` in the window's layered pane and routes input: overlays stack, the newest above the rest takes
 keys and focus, and closing it hands them to the one below (Vault unlock over Remote's Connecting overlay). A modal
 overlay's `show` blocks in a secondary loop until it closes and lets Escape reach its form; a progress overlay returns
-at once and keeps Escape from the window. `GraphiteChromeTest` writes headless full-window
+at once and keeps Escape from the window. Under the classic dialog mapping (the Enterprise presentation) a modal overlay
+or attached sheet whose owner window is showing is a `ClassicDialog` hosted by the same `WindowOverlay`, centred on the
+window or joined under its title bar; without a showing window it opens as a native dialog. `GraphiteChromeTest` writes headless full-window
 previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
 

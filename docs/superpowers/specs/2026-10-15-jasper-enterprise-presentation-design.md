@@ -7,6 +7,7 @@ Amended on 2026-10-16 with plan 3d's two rulings, made under the same authority:
 (toolbar view admission).
 Amended on 2026-10-16 with plan 4a's Rulings 17, made under the same authority: 5.4 (the provisional token ranges stand).
 Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
+Amended on 2026-10-17 with plan 6b's ruling 3: 7.1 and 7.2 (border.divider is overridable).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -882,7 +883,7 @@ role after its boundary guard.
 | `danger.ground`, `danger.border` | as the warning pair from `status.danger` | DANGER Notices and pills |
 | `info.ground`, `info.border` | as the warning pair from `accent` | INFO Notices |
 | `surface.footer` | apart(mix(text.primary, surface.dialog, 3%), surface.dialog, 2 L*) | dialog, Settings and Run footers |
-| `border.divider` | mix(border.window′, surface.card, 73%) | column separators |
+| `border.divider`* | mix(border.window′, surface.card, 73%) | column separators |
 | `border.row` | mix(border.window′, surface.card, 46%) | faint row dividers |
 | `border.hover` | mix(text.primary, border.control′, 24%) | button hover borders, keycap bottom edges |
 | `accent.edge` | accent moved 7 L* away from `surface.card` | the primary button, a checked box, a selected radio ring |
@@ -899,7 +900,7 @@ header #F1F2F2 against #F0F1F3, row hover #EEF3FB against #EEF2FA.
 
 ### 7.2 Override keys
 
-A theme's `ui.light` or `ui.dark` object may list the eight starred keys after its roles. They get their own parse table
+A theme's `ui.light` or `ui.dark` object may list the nine starred keys after its roles. They get their own parse table
 in `JasperTheme` (`DERIVED_OVERRIDES`, a `Map<String, DerivedColor>`), consulted before `SemanticColor.of`, so every
 existing file still loads and an unknown key still fails. The parsed overrides travel on the variant and on
 `GeneratedTheme` (`Map<DerivedColor, Color> derivedOverrides()`), and `TitleBarTheme` copies them.
