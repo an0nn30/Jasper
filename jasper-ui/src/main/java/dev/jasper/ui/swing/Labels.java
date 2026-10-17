@@ -141,6 +141,7 @@ final class Labels {
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
             // Supporting paragraphs sit centred in their measured line box rather than on its top.
             ((LiteralLabel)label).wrapped.centeredLeading = supporting;
+            ((LiteralLabel)label).wrapped.maxLines = 0;
             if (view.runWindow()) RunWindowPresentation.text(context(), text, (LiteralLabel) label, inked);
             label.repaint();
         }
@@ -176,7 +177,9 @@ final class Labels {
                 // Run window's rows (plan 8a) draw it at their own size; a compact panel row's glyph size leaves it alone.
                 int extent = com.formdev.flatlaf.util.UIScale.scale(view.runWindow() && glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
                 ((LiteralLabel)label).iconOffset = 0;
-                label.setIcon(new Swatch(Choices.hue(context(), icon.hue()), extent)); label.setDisabledIcon(label.getIcon());
+                // A Run window square keeps its hue and, where it would vanish into what it is painted on, takes a ring.
+                label.setIcon(view.runWindow() ? RunWindowPresentation.swatchIcon(context(), icon.hue(), inked && ink == InteractiveRows.Ink.ACCENT, extent)
+                    : new Swatch(Choices.hue(context(), icon.hue()), extent)); label.setDisabledIcon(label.getIcon());
                 label.getAccessibleContext().setAccessibleName(icon.accessibleName()); label.setToolTipText(icon.accessibleName());
                 return;
             }
@@ -191,7 +194,11 @@ final class Labels {
                 tileGlyph=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_GLYPH : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_GLYPH);
             }
             // A selected row recolours every vector glyph in its fill's ink; registered identity artwork keeps its pixels.
-            label.setIcon(inked && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT ? context().icons().icon(icon.name(), context().theme().semantic(), ink.text, size)
+            // In the Run window the accent's ink is guarded as an indicator on the accent (RunWindowPresentation.HELP_GLYPH).
+            boolean guardedInk = view.runWindow() && ink == InteractiveRows.Ink.ACCENT;
+            label.setIcon(inked && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT ? (guardedInk
+                    ? context().icons().icon(icon.name(), context().theme().semantic(), dev.jasper.ui.theme.SurfaceContrast.painted(context().theme(), RunWindowPresentation.HELP_GLYPH), size)
+                    : context().icons().icon(icon.name(), context().theme().semantic(), ink.text, size))
                 : receiving==ArtworkPresentation.IDENTITY_HEADER ? context().icons().identityHeader(context().metrics(), icon.name(),context().theme(),icon.hue(),com.formdev.flatlaf.util.UIScale.scale(tileSize),com.formdev.flatlaf.util.UIScale.scale(tileHeight),com.formdev.flatlaf.util.UIScale.scale(tileGlyph))
                 : tileSize > 0 ? context().icons().tile(context().metrics(), icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected || inked ? ink.text : null)
                 : panelDetail ? context().icons().panel(icon.name(), context().theme(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)

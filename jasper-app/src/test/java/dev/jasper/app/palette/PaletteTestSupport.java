@@ -21,6 +21,12 @@ import javax.swing.JTextField;
 public final class PaletteTestSupport {
     private PaletteTestSupport() {}
 
+    /** A default-look controller over {@code scopes} and {@code history} with no-op callbacks, no opener shortcut and no Browse…. */
+    static PaletteController controller(dev.jasper.ui.swing.KitContext kit, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history) {
+        return new PaletteController(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, true, () -> { }, () -> { },
+            () -> false, () -> { }, message -> { }, id -> { }, () -> "", () -> { });
+    }
+
     /** {@code palette} as the card it is in the default look. */
     static CardView card(JComponent palette) { return (CardView) palette; }
 

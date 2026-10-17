@@ -39,14 +39,6 @@ public final class PaletteController implements AutoCloseable {
     private boolean open, closed, completing, dirty = true, rosterChanged;
     private long generation;
 
-    /** The default look's card, with no opener shortcut and no Browse… action. */
-    public PaletteController(dev.jasper.ui.swing.KitContext kit, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history, boolean macOs,
-                      Runnable layout, Runnable dismissed, BooleanSupplier batching, Runnable updateActions,
-                      Consumer<String> reportError, Consumer<String> reopen) {
-        this(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, macOs, layout, dismissed, batching, updateActions,
-            reportError, reopen, () -> "", () -> { });
-    }
-
     /**
      * A controller whose view {@code look} names (spec 11.1); {@code openerShortcut} is the opener's current shortcut text
      * and {@code browse} runs File, Open File… (spec 11.7).

@@ -18,8 +18,6 @@ public sealed interface PaletteEntry {
             /** One scope's matches under a query; the label is the scope's. */ MATCHES
         }
         public Header { Objects.requireNonNull(kind); Objects.requireNonNull(label); }
-        /** A section label. */
-        public Header(String label) { this(Kind.SECTION, label); }
     }
 
     /** A row and the scope it came from; that scope's verbs act on it. */

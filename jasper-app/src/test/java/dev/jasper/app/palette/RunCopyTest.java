@@ -36,7 +36,6 @@ class RunCopyTest {
         assertThat(RunCopy.heading(new PaletteEntry.Header(PaletteEntry.Header.Kind.SUGGESTED, "Suggested"))).isEqualTo("Suggested");
         assertThat(RunCopy.heading(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Pinned"))).isEqualTo("Pinned");
         assertThat(RunCopy.heading(new PaletteEntry.Header(PaletteEntry.Header.Kind.MATCHES, "SSH"))).isEqualTo("Matches");
-        assertThat(new PaletteEntry.Header("Commands").kind()).as("the convenience is a section label").isEqualTo(PaletteEntry.Header.Kind.SECTION);
     }
 
     /** Review Focus 2. */

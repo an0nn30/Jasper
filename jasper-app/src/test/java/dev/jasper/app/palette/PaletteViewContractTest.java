@@ -114,6 +114,11 @@ class PaletteViewContractTest {
         });
     }
 
+    /** The focused field of the step {@code view} shows. */
+    static int stepFocus(PaletteView view) {
+        return view instanceof RunWindowView run ? run.step().focusIndex() : ((CardView) view).stepFocusIndex();
+    }
+
     /** Review Focus 5. */
     @Test void stepsBehaveTheSameInBothViews() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
@@ -122,6 +127,12 @@ class PaletteViewContractTest {
                 h.controller().enterPressed(2);
                 assertThat(h.controller().stepOpen()).as(look.toString()).isTrue();
                 assertThat(h.controller().view().stepShowing()).isTrue();
+                // Tab moves between the step's fields and wraps.
+                int first = stepFocus(h.controller().view());
+                assertThat(h.controller().tabPressed()).as(look + ": Tab is the step's").isTrue();
+                assertThat(stepFocus(h.controller().view())).as(look + ": Tab moves to the next field").isEqualTo(first + 1);
+                h.controller().tabPressed();
+                assertThat(stepFocus(h.controller().view())).as(look + ": and wraps").isEqualTo(first);
                 h.controller().escape();
                 assertThat(h.controller().stepOpen()).as(look + ": Escape leaves the step").isFalse();
                 assertThat(h.controller().isOpen()).isTrue();

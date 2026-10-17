@@ -10,6 +10,7 @@ import dev.jasper.ui.model.UiEvent;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.KitView;
+import dev.jasper.ui.swing.RunWindowPresentation;
 import dev.jasper.ui.swing.SurfacePanel;
 import java.awt.CardLayout;
 import java.awt.Component;
@@ -103,7 +104,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         cards.setOpaque(false);
         cards.add(view(RESULTS), LIST);
         cards.add(empty, NONE);
-        cards.add(step.panel(), STEP);
+        // The fixed list box scrolls a step taller than it; the focused field scrolls into view (StepForm.focusField).
+        cards.add(SurfacePanel.scrolling(kit, step.panel(), width -> step.preferredHeight()), STEP);
         cardLayout.show(cards, listCard);
         listBox = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
         listBox.add(cards);
@@ -229,7 +231,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         var verbs = scope.verbs();
         var menu = new ArrayList<MenuItem>();
         for (int verb = 1; verb < Math.min(3, verbs.size()); verb++) {
-            String action = VERB + index + ":" + verb;
+            // Named by the row's key, not its index, so a menu left open across a rebuild never runs on another row.
+            String action = VERB + verb + ":" + item.key();
             menu.add(new MenuItem(action, verbs.get(verb).label(), "", action, true, false));
         }
         return new ListItem(id, Optional.of(square), List.of(text(id + ".title", row.title(), row.enabled() ? Nodes.TextRole.BODY : Nodes.TextRole.DESCRIPTION)),
@@ -260,9 +263,11 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
                 chosen.ids().stream().findFirst().ifPresent(id -> select(Integer.parseInt(id.substring("entry.".length()))));
             case UiEvent.Action action when action.id().equals(RUN) || action.id().equals(PRIMARY) -> executeSelected(0);
             case UiEvent.Action action when action.id().startsWith(VERB) -> {
-                String[] parts = action.id().substring(VERB.length()).split(":");
-                select(Integer.parseInt(parts[0]));
-                executeSelected(Integer.parseInt(parts[1]));
+                String[] parts = action.id().substring(VERB.length()).split(":", 2);
+                int index = indexOfKey(parts[1]);
+                if (index < 0) return;
+                select(index);
+                if (selected == index) executeSelected(Integer.parseInt(parts[0]));
             }
             case UiEvent.Action action when action.id().equals(CLOSE) || action.id().equals(CANCEL) -> host.cancel().run();
             case UiEvent.Action action when action.id().equals(BROWSE) -> host.browse().run();
@@ -274,6 +279,11 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             case UiEvent.Toggled toggled when toggled.id().equals(SPLIT) -> setSplit(toggled.checked());
             default -> { }
         }
+    }
+
+    private int indexOfKey(String key) {
+        for (int i = 0; i < entries.size(); i++) if (key.equals(entries.get(i).key())) return i;
+        return -1;
     }
 
     private void setSplit(boolean value) { split = value && splitAvailable(); render(SPLIT); }
@@ -309,7 +319,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     @Override public void setChip(PaletteScope scope) {
         chip = scope;
         view(CHIP).setVisible(scope != null);
-        render(CHIP, QUERY, HELP);
+        // The roster path ends here too, so the ▼ menu follows a scope that registers or leaves while the window is open.
+        render(CHIP, QUERY, HELP, SCOPES);
         fieldBox.revalidate();
     }
 
@@ -368,8 +379,9 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     @Override public int visibleRows() { return visibleRows; }
 
     @Override public void showStep(String title, List<PaletteStep.Field> fields) {
-        step.show(title, fields);
+        // The step's card shows first: its first field can take focus only while it is showing.
         cardLayout.show(cards, STEP);
+        step.show(title, fields);
         render(SPLIT, SPLIT_LABEL, PRIMARY);
     }
 
@@ -383,7 +395,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     @Override public void focusStepField(int delta) { step.focusField(delta); }
     @Override public Map<String, String> stepValues() { return step.values(); }
     @Override public void setStepError(String message) { step.setError(message); revalidate(); repaint(); }
-    /** Follows a theme change; the title row's shortcut and the scope menu are read again, as a rebinding may come with it. */
+    /** Follows a theme change; the title row's shortcut and the scope menu are read again with it. */
     @Override public void refreshTheme() { step.applyGeometry(); render(SHORTCUT, SCOPES); }
     /** The Run window has no reveal (spec 11.6). */
     @Override public void setReveal(double fraction) { }
@@ -424,8 +436,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         @Override public void removeLayoutComponent(Component component) { }
         @Override public Dimension minimumLayoutSize(Container parent) { return preferredLayoutSize(parent); }
 
-        private int content() { return s(DesignMetrics.Role.RUN_WINDOW_WIDTH) - 2 * s(DesignMetrics.Role.RUN_WINDOW_SIDE); }
-        private int help() { return SurfacePanel.measuredHeight(view(HELP), content()); }
+        /** The help row's fixed height, whatever its text (RunWindowPresentation.helpHeight). */
+        private int help() { return RunWindowPresentation.helpHeight(kit); }
         private int line() { return Math.max(view(DETAIL_LABEL).getPreferredSize().height, view(DETAIL_VALUE).getPreferredSize().height); }
         /** The checkbox row: the classic box and its focus reserve, whichever face draws the toggle (plan 8a R7). */
         private int check() { return s(DesignMetrics.Role.CHECKBOX_BOX) + 2 * s(DesignMetrics.Role.FOCUS_RING); }
@@ -475,7 +487,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             var box = view(SPLIT).getPreferredSize();
             view(SPLIT).setBounds(x - ring, y + (check - box.height) / 2, box.width, box.height);
             var splitLabel = view(SPLIT_LABEL).getPreferredSize();
-            int labelX = x + s(DesignMetrics.Role.CHECKBOX_BOX) + s(DesignMetrics.Role.CHECKBOX_LABEL_GAP);
+            // After the toggle as drawn, whichever face draws it: its width less its focus reserve on each side.
+            int labelX = x + Math.max(0, box.width - 2 * ring) + s(DesignMetrics.Role.CHECKBOX_LABEL_GAP);
             view(SPLIT_LABEL).setBounds(labelX, y + (check - splitLabel.height) / 2, Math.max(0, Math.min(splitLabel.width, x + content - labelX)), splitLabel.height);
             int foot = s(DesignMetrics.Role.RUN_WINDOW_FOOTER_HEIGHT), height = s(DesignMetrics.Role.BUTTON_HEIGHT);
             int buttonY = getHeight() - hair - foot + (foot - height) / 2, buttonX = right - side;

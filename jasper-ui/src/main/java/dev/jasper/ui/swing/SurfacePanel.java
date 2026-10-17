@@ -4,6 +4,7 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.*;
 import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
@@ -155,12 +156,13 @@ public class SurfacePanel extends JPanel {
                 var inside = new RoundRectangle2D.Double(focusRing + hair, focusRing + hair, w - 2.0 * (focusRing + hair), h - 2.0 * (focusRing + hair),
                     2 * Math.max(0, radius - hair), 2 * Math.max(0, radius - hair));
                 var edge = new Area(box); edge.subtract(new Area(inside));
-                g.setColor(ThemePainting.color(context, focused ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT)); g.fill(edge);
+                g.setColor(focused ? ThemePainting.color(context, SemanticColor.BORDER_FOCUS)
+                    : SurfaceContrast.painted(theme, RunWindowPresentation.FIELD_EDGE)); g.fill(edge);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_INPUT)); g.fill(inside);
                 return true;
             }
             case BOX -> {
-                g.setColor(ThemePainting.color(context, SemanticColor.BORDER_CONTROL)); g.fillRect(0, 0, w, h);
+                g.setColor(SurfaceContrast.painted(theme, RunWindowPresentation.boxEdge(context.kit()))); g.fillRect(0, 0, w, h);
                 g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD)); g.fillRect(hair, hair, Math.max(0, w - 2 * hair), Math.max(0, h - 2 * hair));
                 return true;
             }

@@ -12,6 +12,7 @@ import dev.jasper.ui.testsupport.Edt;
 import dev.jasper.ui.testsupport.KitFixtures;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -85,7 +86,7 @@ class RunWindowPresentationTest {
                     .isEqualTo(theme.semantic().color(SemanticColor.HUE_GREEN));
                 assertThat(new Color(image.getRGB(side + square + 1, 19 + 10))).isEqualTo(theme.semantic().color(SemanticColor.ACCENT));
                 var count = find(view, "h.count", JLabel.class);
-                assertThat(count.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PLACEHOLDER));
+                assertThat(count.getForeground()).as("the muted count, guarded as text").isEqualTo(SurfaceContrast.painted(theme, RunWindowPresentation.COUNT));
                 assertThat(javax.swing.SwingUtilities.convertRectangle(count.getParent(), count.getBounds(), rows.getFirst()).getMaxX())
                     .as("the count ends at the row inset").isEqualTo(436 - side);
                 var heading = find(view, "h.title", JLabel.class);
@@ -93,12 +94,51 @@ class RunWindowPresentationTest {
                 assertThat(heading.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_STRONG_SECONDARY));
                 var detail = find(view, "b.detail", JLabel.class);
                 assertThat(detail.getFont().getSize2D()).isEqualTo(10.5f);
-                assertThat(detail.getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PLACEHOLDER));
+                assertThat(detail.getForeground()).as("the muted detail, guarded as text").isEqualTo(SurfaceContrast.painted(theme, RunWindowPresentation.ROW_DETAIL));
                 assertThat(detail.getClientProperty("Jasper.leadingEllipsis")).as("a long detail is cut at its end, as the mocks cut it").isEqualTo(false);
-                assertThat(find(view, "b.tag", JLabel.class).getForeground()).isEqualTo(theme.semantic().color(SemanticColor.TEXT_PLACEHOLDER));
+                assertThat(find(view, "b.tag", JLabel.class).getForeground()).isEqualTo(SurfaceContrast.painted(theme, RunWindowPresentation.ROW_DETAIL));
                 var title = find(view, "b.title", JLabel.class);
                 assertThat(javax.swing.SwingUtilities.convertPoint(title.getParent(), title.getX(), 0, rows.get(2)).x)
                     .isEqualTo(side + square + m(context, DesignMetrics.Role.RUN_WINDOW_ROW_GAP));
+            }
+        });
+    }
+
+    /**
+     * Spec 7.3: a selected Commands row's BLUE square, which Enterprise Light paints in the accent itself, keeps its fill
+     * and takes a hairline ring in the guarded colour, so it stays visible on the selection; an unselected one has none.
+     */
+    @Test void aSelectedSquareInTheAccentsOwnHueKeepsItsFillInsideAGuardedRing() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var items = List.of(
+                new ListItem("a", Optional.of(new Nodes.Icon("a.swatch", READY, "file", Nodes.Hue.BLUE, Nodes.IconSize.SWATCH, "Command")),
+                    List.of(text("a.title", "New Editor File", Nodes.TextRole.BODY)), List.of(), List.of()),
+                new ListItem("b", Optional.of(new Nodes.Icon("b.swatch", READY, "file", Nodes.Hue.BLUE, Nodes.IconSize.SWATCH, "Command")),
+                    List.of(text("b.title", "Settings", Nodes.TextRole.BODY)), List.of(), List.of()));
+            var spec = new ViewSpec(new Nodes.ItemList("results", READY, Nodes.ListKind.RESULTS, items, Set.of("a"), "run", List.of(),
+                Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(2)));
+            try (var view = new KitView(context, spec, event -> { })) {
+                view.runWindow(true);
+                var image = KitFixtures.render(view, 436, 120, 1);
+                var rows = rows(view);
+                var theme = context.theme();
+                var accent = theme.semantic().color(SemanticColor.ACCENT);
+                var blue = theme.semantic().color(SemanticColor.HUE_BLUE);
+                assertThat(blue).as("the fixture's premise: Enterprise Light's blue is its accent").isEqualTo(accent);
+                int side = m(context, DesignMetrics.Role.RUN_WINDOW_ROW_SIDE), square = m(context, DesignMetrics.Role.RUN_WINDOW_SWATCH), x = side + square / 2;
+                int top = rows.get(0).getY(), end = top + rows.get(0).getHeight();
+                while (top < end && image.getRGB(x, top) == accent.getRGB()) top++;
+                var ring = SurfaceContrast.painted(theme, RunWindowPresentation.swatch(Nodes.Hue.BLUE, true));
+                assertThat(dev.jasper.ui.theme.ColorMath.contrast(ring, accent)).as("the ring meets the indicator guard").isGreaterThanOrEqualTo(3.0);
+                assertThat(new Color(image.getRGB(x, top))).as("the selected square's ring").isEqualTo(ring);
+                assertThat(new Color(image.getRGB(x, top + square / 2))).as("its fill, the mock's hue square").isEqualTo(blue);
+                assertThat(top + square).as("the ring lies inside the square").isLessThanOrEqualTo(end);
+                var card = theme.semantic().color(SemanticColor.SURFACE_CARD);
+                top = rows.get(1).getY(); end = top + rows.get(1).getHeight();
+                // The list is transparent off the selection: the list box under it paints surface.card.
+                while (top < end && (image.getRGB(x, top) == card.getRGB() || image.getRGB(x, top) >>> 24 == 0)) top++;
+                assertThat(new Color(image.getRGB(x, top))).as("an unselected square has no ring").isEqualTo(blue);
             }
         });
     }
@@ -135,7 +175,7 @@ class RunWindowPresentationTest {
                 KitFixtures.render(view, 436, 120, 1);
                 view.update(list());
                 KitFixtures.render(view, 436, 120, 1);
-                var placeholder = context.theme().semantic().color(SemanticColor.TEXT_PLACEHOLDER);
+                var placeholder = SurfaceContrast.painted(context.theme(), RunWindowPresentation.ROW_DETAIL);
                 var detail = find(view, "b.detail", JLabel.class);
                 assertThat(detail.getForeground()).as("the same descriptor").isEqualTo(placeholder);
                 assertThat(detail.getClientProperty("Jasper.leadingEllipsis")).isEqualTo(false);

@@ -148,6 +148,10 @@ public final class IconRegistry implements AutoCloseable {
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return ordinary(name, null, palette, palette.color(tint), logicalSize);
     }
+    /** {@link #icon(String, SemanticPalette, SemanticColor, int)} in {@code foreground}, a tint a contrast guard has painted. */
+    public Icon icon(String name, SemanticPalette palette, Color foreground, int logicalSize) {
+        return ordinary(name, null, palette, Objects.requireNonNull(foreground), logicalSize);
+    }
     /**
      * Artwork on a surface outside the semantic palette (for example an independently coloured terminal surface):
      * the surface's own foreground, moved toward black or white until it reaches the 3:1 non-text contrast floor.

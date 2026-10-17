@@ -70,6 +70,10 @@ class RunWindowViewTest {
                 shortcut[0] = "\u2318K";
                 view.refreshTheme();
                 assertThat(text(view, RunWindowView.SHORTCUT)).as("a rebinding").isEqualTo("\u2318K");
+                scopes.add(RunWindowFixtures.FILES);
+                view.setChip(null);
+                assertThat(scopeLabels(view)).as("the roster path ends in setChip, which reads the scopes again")
+                    .containsExactly("All", "Commands", "Snippets", "Files");
             }
         });
     }
@@ -107,7 +111,8 @@ class RunWindowViewTest {
                 var split = view.viewFor(RunWindowView.SPLIT).getBounds();
                 assertThat(split.x + ring).as("the box at the side padding").isEqualTo(hair + side);
                 var label = view.viewFor(RunWindowView.SPLIT_LABEL).getBounds();
-                assertThat(label.x).isEqualTo(hair + side + m(context, DesignMetrics.Role.CHECKBOX_BOX) + m(context, DesignMetrics.Role.CHECKBOX_LABEL_GAP));
+                assertThat(label.x).as("after the toggle as drawn, whichever face draws it")
+                    .isEqualTo(split.x + split.width - ring + m(context, DesignMetrics.Role.CHECKBOX_LABEL_GAP));
                 assertThat(view.getHeight()).isEqualTo(view.getPreferredSize().height);
             }
         });
@@ -206,11 +211,20 @@ class RunWindowViewTest {
             try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {
                 String path = "/very/long/".repeat(30) + "file.txt";
                 view.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.MATCHES, "Files"),
-                    RunWindowFixtures.item(RunWindowFixtures.FILES, "long", "x".repeat(200), path, "⌘K")), null, "");
+                    RunWindowFixtures.item(RunWindowFixtures.FILES, "long", "x".repeat(200), path, "⌘K"),
+                    RunWindowFixtures.item(RunWindowFixtures.FILES, "deep", "file.txt", path, "⌘K")), null, "");
                 layout(view);
                 assertThat(view.getWidth()).isEqualTo(462);
                 var value = view.viewFor(RunWindowView.DETAIL_VALUE);
                 assertThat(value.getX() + value.getWidth()).as("the detail line ends at the padding").isLessThanOrEqualTo(462 - 1 - 12);
+                assertThat(value.getWidth()).as("the detail line is cut").isLessThan(value.getPreferredSize().width);
+                var results = view.viewFor(RunWindowView.RESULTS);
+                for (int row : List.of(1, 2))
+                    assertThat(CardView.find(results, "entry." + row + ".tag", javax.swing.JLabel.class).getWidth()).as("row " + row + "'s tag drops first").isZero();
+                var title = CardView.find(results, "entry.1.title", javax.swing.JLabel.class);
+                assertThat(title.getWidth()).as("a long title is cut").isPositive().isLessThan(title.getPreferredSize().width);
+                var detail = CardView.find(results, "entry.2.detail", javax.swing.JLabel.class);
+                assertThat(detail.getWidth()).as("a long detail is cut").isPositive().isLessThan(detail.getPreferredSize().width);
             }
         });
     }
@@ -255,6 +269,59 @@ class RunWindowViewTest {
         });
     }
 
+    /** Review Focus 5: a step taller than the fixed list box keeps every row's height and scrolls each field into view. */
+    @Test void aLongStepScrollsInsideTheListBox() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "");
+                int height = view.getPreferredSize().height;
+                var fields = new ArrayList<PaletteStep.Field>();
+                for (int i = 0; i < 6; i++) fields.add(new PaletteStep.Field("v" + i, "Variable " + i, ""));
+                view.showStep("Insert snippet", fields);
+                view.setStepError("Every variable needs a value");
+                layout(view);
+                var step = view.step();
+                assertThat(step.preferredHeight()).as("the premise: taller than the box").isGreaterThan(view.listHeight());
+                assertThat(view.getPreferredSize().height).as("the window keeps its height").isEqualTo(height);
+                var viewport = (javax.swing.JViewport) SwingUtilities.getAncestorOfClass(javax.swing.JViewport.class, step.panel());
+                assertThat(viewport).as("the step scrolls inside the list box").isNotNull();
+                assertThat(SwingUtilities.isDescendingFrom(viewport, view.listBox())).isTrue();
+                for (int i = 0; i < 6; i++)
+                    assertThat(step.row(i).getHeight()).as("row " + i + " keeps its preferred height").isEqualTo(step.row(i).getPreferredSize().height);
+                var error = step.errorRow();
+                assertThat(error.getY() + error.getHeight()).as("the error row lies inside the form").isLessThanOrEqualTo(step.panel().getHeight());
+                for (int i = 1; i < 6; i++) {
+                    view.focusStepField(1);
+                    var row = step.row(step.focusIndex());
+                    var at = SwingUtilities.convertRectangle(row.getParent(), row.getBounds(), viewport.getView());
+                    assertThat(viewport.getViewRect().contains(at)).as("field " + step.focusIndex() + " scrolled into view").isTrue();
+                }
+                assertThat(step.focusIndex()).isEqualTo(5);
+                assertThat(viewport.getViewPosition().y).as("the last field needed a scroll").isPositive();
+            }
+        });
+    }
+
+    /** The help row keeps one height, so a corner-anchored window's top edge never jumps with the chip. */
+    @Test void theWindowKeepsItsHeightWhateverTheHelpRowSays() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "");
+                layout(view);
+                int height = view.getHeight();
+                view.setChip(RunWindowFixtures.SNIPPETS);
+                layout(view);
+                assertThat(view.getHeight()).as("a one-line description").isEqualTo(height);
+                view.setChip(RunWindowFixtures.scope("t.long", "Long", "thing", Nodes.Hue.NEUTRAL,
+                    "A description that runs on and on. ".repeat(12), List.of(new PaletteVerb("open", "Open"))));
+                layout(view);
+                assertThat(view.getHeight()).as("a description longer than two lines").isEqualTo(height);
+                var help = view.viewFor(RunWindowView.HELP);
+                assertThat(dev.jasper.ui.swing.SurfacePanel.measuredHeight(help, help.getWidth())).as("the help text is cut to the row").isLessThanOrEqualTo(help.getHeight());
+            }
+        });
+    }
+
     @Test void theButtonsTheMenuAndAChosenScopeCallTheHost() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var events = new ArrayList<String>();
@@ -266,9 +333,17 @@ class RunWindowViewTest {
                 view.handle(new dev.jasper.ui.model.UiEvent.Action(RunWindowView.PRIMARY));
                 view.handle(new dev.jasper.ui.model.UiEvent.Action(RunWindowView.SCOPE + "dev.jasper.snippets.scope"));
                 view.handle(new dev.jasper.ui.model.UiEvent.Action(RunWindowView.SCOPE + PaletteScope.ALL_ID));
-                view.handle(new dev.jasper.ui.model.UiEvent.Action("verb:5:1"));
+                view.selectRelative(4);
+                var menu = list(view).items().get(1).contextActions().orElseThrow();
+                assertThat(menu.getFirst().action()).as("a row's verbs name it by its key").isEqualTo("verb:1:dev.jasper.remote.scope/mac");
+                view.handle(new dev.jasper.ui.model.UiEvent.Action(menu.getFirst().action()));
                 assertThat(events).containsExactly("cancel", "cancel", "browse", "run:dev.jasper.remote.scope/mac:0",
-                    "scope:dev.jasper.snippets.scope", "scope:all", "run:jasper.commands/new_editor_file:1");
+                    "scope:dev.jasper.snippets.scope", "scope:all", "run:dev.jasper.remote.scope/mac:1");
+                assertThat(view.selectedKey()).as("choosing a row's verb selects it").isEqualTo("dev.jasper.remote.scope/mac");
+                // A menu left open across a rebuild that dropped its row runs nothing, on no other row.
+                view.setEntries(RunWindowFixtures.typingAuth(), null, "");
+                view.handle(new dev.jasper.ui.model.UiEvent.Action(menu.getFirst().action()));
+                assertThat(events).hasSize(7);
                 view.setChip(RunWindowFixtures.SNIPPETS);
                 assertThat(text(view, RunWindowView.HELP)).as("a chosen scope's description").isEqualTo("Insert or run a saved command");
                 assertThat(view.viewFor(RunWindowView.CHIP).isVisible()).isTrue();

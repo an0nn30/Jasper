@@ -166,10 +166,15 @@ final class StepForm implements AutoCloseable {
     String errorText() { return error; }
     int fieldCount() { return fields.size(); }
 
-    /** Moves focus to the next (or previous) field, wrapping, and selects its text for replacement. */
+    /**
+     * Moves focus to the next (or previous) field, wrapping, and selects its text for replacement; a form that scrolls
+     * (the Run window's) brings the field's row into view.
+     */
     void focusField(int delta) {
         if (fields.isEmpty()) return;
         focus = Math.floorMod(focus + delta, fields.size());
+        var row = rows.get(focus).panel;
+        row.scrollRectToVisible(new java.awt.Rectangle(0, 0, row.getWidth(), row.getHeight()));
         var view = rows.get(focus).field;
         if (view.isClosed()) return;
         view.focus(FIELD + focus);

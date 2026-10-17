@@ -10,6 +10,7 @@ import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -20,7 +21,6 @@ import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import javax.swing.JLabel;
 
@@ -28,23 +28,16 @@ import javax.swing.JLabel;
  * The Run window's presentation (Enterprise presentation spec 11.2, the 06 Run Dialog mocks), applied to the controls of
  * a view whose host called {@link KitView#runWindow(boolean)}: its text colours and faces, its RESULTS rows, heading
  * bands and counts, and its help row's accent tile. Every value is a kit role; nothing here is read for a view without
- * the flag. Every text colour is a declared pair (spec 7.3 and 16.1.1): {@link #pairs(Kit)} painted through their
- * guards, and {@link #authored()} painted as authored (plan 8a Rulings 8); the tile's edge is {@link #tileEdge(Kit)}.
- * Public for those tables, which jasper-app's PaintedContrastTest paints.
+ * the flag. Every pair the Run window paints is declared and painted through its guard (spec 7.3 and 16.1.1): the text
+ * pairs {@link #pairs(Kit)}, the help glyph {@link #HELP_GLYPH}, the field and list box edges {@link #edges(Kit)}, the hue
+ * squares {@link #swatches()} and the tile's edge {@link #tileEdge(Kit)}. Public for those tables, which jasper-app's
+ * PaintedContrastTest paints.
  */
 public final class RunWindowPresentation {
     private RunWindowPresentation() { }
 
-    /**
-     * A pair the Run window paints as authored, with no guard (plan 8a Rulings 8).
-     *
-     * @param slot the role painted
-     * @param against the role it is painted on
-     */
-    public record Authored(ColorRole slot, ColorRole against) {
-        /** Both roles are required. */
-        public Authored { Objects.requireNonNull(slot, "slot"); Objects.requireNonNull(against, "against"); }
-    }
+    /** The help row's most lines: the window keeps one height whatever the chosen scope's description. */
+    public static final int HELP_LINES = 2;
 
     /** The title row's "Run" on the title band. */
     public static final PaintPair TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
@@ -56,12 +49,16 @@ public final class RunWindowPresentation {
     public static final PaintPair SELECTED_TITLE = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
     /** A "More in" row's (or a disabled row's) title in the list box. */
     public static final PaintPair LIST_TEXT = new PaintPair(SemanticColor.TEXT_STRONG_SECONDARY, SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.TEXT);
-    /** A row's detail and tag in the list box, as authored. */
-    public static final Authored ROW_DETAIL = new Authored(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_CARD);
-    /** The matches count on a heading band, as authored. */
-    public static final Authored COUNT = new Authored(SemanticColor.TEXT_PLACEHOLDER, DerivedColor.SURFACE_TABLE_HEADER);
+    /** A row's detail and tag in the list box. */
+    public static final PaintPair ROW_DETAIL = new PaintPair(SemanticColor.TEXT_PLACEHOLDER, SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.TEXT);
+    /** The matches count on a heading band. */
+    public static final PaintPair COUNT = new PaintPair(SemanticColor.TEXT_PLACEHOLDER, DerivedColor.SURFACE_TABLE_HEADER, SurfaceContrast.Guard.TEXT);
     /** A selected row's detail and tag in the selection's supporting ink, as the card paints them. */
-    public static final Authored SELECTED_DETAIL = new Authored(SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT);
+    public static final PaintPair SELECTED_DETAIL = new PaintPair(SemanticColor.TEXT_ONACCENT_SECONDARY, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
+    /** The help tile's glyph in the accent's ink. */
+    public static final PaintPair HELP_GLYPH = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.INDICATOR);
+    /** The field box's edge on the field's own surface. */
+    public static final PaintPair FIELD_EDGE = new PaintPair(SemanticColor.BORDER_INPUT, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.CONTROL);
 
     /** "Open:", the checkbox's label, the help text and the detail line's label on {@code kit}'s dialog surface. */
     public static PaintPair labelPair(Kit kit) {
@@ -73,20 +70,73 @@ public final class RunWindowPresentation {
         return new PaintPair(SemanticColor.TEXT_SECONDARY, kit.colors().dialogSurface(), SurfaceContrast.Guard.TEXT);
     }
 
-    /** Every guarded pair the Run window paints under {@code kit}: TITLE, SHORTCUT, the label pair, the value pair, HEADING, SELECTED_TITLE, LIST_TEXT. */
-    public static List<PaintPair> pairs(Kit kit) {
-        return List.of(TITLE, SHORTCUT, labelPair(kit), valuePair(kit), HEADING, SELECTED_TITLE, LIST_TEXT);
+    /** The list box's edge on {@code kit}'s dialog surface. */
+    public static PaintPair boxEdge(Kit kit) {
+        return new PaintPair(SemanticColor.BORDER_CONTROL, kit.colors().dialogSurface(), SurfaceContrast.Guard.CONTROL);
     }
 
-    /** Every pair the Run window paints as authored: ROW_DETAIL, COUNT, SELECTED_DETAIL. */
-    public static List<Authored> authored() { return List.of(ROW_DETAIL, COUNT, SELECTED_DETAIL); }
+    /**
+     * Every text pair the Run window paints under {@code kit}: TITLE, SHORTCUT, the label pair, the value pair, HEADING,
+     * SELECTED_TITLE, LIST_TEXT, ROW_DETAIL, COUNT, SELECTED_DETAIL.
+     */
+    public static List<PaintPair> pairs(Kit kit) {
+        return List.of(TITLE, SHORTCUT, labelPair(kit), valuePair(kit), HEADING, SELECTED_TITLE, LIST_TEXT, ROW_DETAIL, COUNT, SELECTED_DETAIL);
+    }
+
+    /** The field box's and the list box's edges under {@code kit}: FIELD_EDGE, then {@link #boxEdge(Kit)}. */
+    public static List<PaintPair> edges(Kit kit) { return List.of(FIELD_EDGE, boxEdge(kit)); }
+
+    /** The role a hue square of {@code hue} is filled with. */
+    public static SemanticColor hueRole(Nodes.Hue hue) {
+        return switch (hue) {
+            case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
+            case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL, NONE -> SemanticColor.HUE_NEUTRAL;
+        };
+    }
+
+    /** A hue square of {@code hue} on the list box, or on the accent when its row is selected, as an indicator. */
+    public static PaintPair swatch(Nodes.Hue hue, boolean selected) {
+        return new PaintPair(hueRole(hue), selected ? SemanticColor.ACCENT : SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.INDICATOR);
+    }
+
+    /** Every hue square pair: each hue's role on the list box, then on the accent. */
+    public static List<PaintPair> swatches() {
+        var hues = List.of(Nodes.Hue.BLUE, Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE, Nodes.Hue.NEUTRAL);
+        var pairs = new java.util.ArrayList<PaintPair>();
+        for (boolean selected : List.of(false, true)) for (var hue : hues) pairs.add(swatch(hue, selected));
+        return List.copyOf(pairs);
+    }
+
+    /**
+     * A Run window hue square: its hue's fill, as authored, and, when that fill misses {@link #swatch}'s guard on what it
+     * is painted on, a hairline ring in the guarded colour around it (spec 7.3's checked-box repair), so the square never
+     * vanishes into the selection.
+     */
+    static javax.swing.Icon swatchIcon(KitContext context, Nodes.Hue hue, boolean selected, int extent) {
+        var pair = swatch(hue, selected);
+        var theme = context.theme();
+        Color fill = pair.slot().color(theme), painted = SurfaceContrast.painted(theme, pair);
+        int line = Math.max(1, ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
+        return new javax.swing.Icon() {
+            @Override public int getIconWidth() { return extent; }
+            @Override public int getIconHeight() { return extent; }
+            @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+                graphics.setColor(fill); graphics.fillRect(x, y, extent, extent);
+                if (painted.equals(fill)) return;
+                graphics.setColor(painted);
+                graphics.fillRect(x, y, extent, line); graphics.fillRect(x, y + extent - line, extent, line);
+                graphics.fillRect(x, y, line, extent); graphics.fillRect(x + extent - line, y, line, extent);
+            }
+        };
+    }
 
     /**
      * {@code text}'s Run window face and colour, after its control set the role's own: WINDOW_TITLE and the title row's
      * CAPTION through {@link #TITLE} and {@link #SHORTCUT}; LABEL, DESCRIPTION and BODY_STRONG through the label pair,
      * DESCRIPTION at BODY's size on the help's line, BODY_STRONG semibold; MONO in the small data face through the value
      * pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by {@link #row}. A selected row's ink and a
-     * severity keep their colour.
+     * severity keep their colour. A DESCRIPTION's lines sit centred in their line box, as the mocks' CSS centres them, and
+     * it shows at most {@link #HELP_LINES} lines, the last cut with an ellipsis.
      */
     static void text(KitContext context, Nodes.Text text, Labels.LiteralLabel label, boolean inked) {
         if (text.severity().isPresent()) return;
@@ -100,6 +150,8 @@ public final class RunWindowPresentation {
                 var font = ThemePainting.font(context, Typography.Role.BODY);
                 label.setFont(font);
                 label.wrapped.lineHeight = Math.round(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HELP_LINE) * font.getSize2D() / 12f);
+                label.wrapped.centeredLeading = true;
+                label.wrapped.maxLines = HELP_LINES;
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case BODY_STRONG -> {
@@ -122,9 +174,9 @@ public final class RunWindowPresentation {
 
     /**
      * A heading's title semibold through {@link #HEADING} and its count (its second title node: a heading has a title
-     * only) at the band's end as {@link #COUNT}; a row's title through {@link #SELECTED_TITLE} when selected, or
+     * only) at the band's end through {@link #COUNT}; a row's title through {@link #SELECTED_TITLE} when selected, or
      * {@link #LIST_TEXT} for a DESCRIPTION title; its detail in the small data face, cut at its end, and its detail and tag
-     * as {@link #ROW_DETAIL}, or {@link #SELECTED_DETAIL} when selected.
+     * through {@link #ROW_DETAIL}, or {@link #SELECTED_DETAIL} when selected.
      */
     static void row(KitContext context, InteractiveRows.Row row, ListItem item, boolean selected) {
         var theme = context.theme();
@@ -134,7 +186,7 @@ public final class RunWindowPresentation {
                 boolean count = i > 0;
                 label(row, title.get(i)).ifPresent(label -> {
                     label.setFont(ThemePainting.font(context, count ? Typography.Role.CAPTION : Typography.Role.RUN_HEADING));
-                    label.setForeground(count ? COUNT.slot().color(theme) : SurfaceContrast.painted(theme, HEADING));
+                    label.setForeground(SurfaceContrast.painted(theme, count ? COUNT : HEADING));
                 });
             }
             // The row's slot gave the title panel an inline layout this populate; the heading's replaces it until the next.
@@ -145,7 +197,7 @@ public final class RunWindowPresentation {
             if (selected) label.setForeground(SurfaceContrast.painted(theme, SELECTED_TITLE));
             else if (((Nodes.Text) node).role() == Nodes.TextRole.DESCRIPTION) label.setForeground(SurfaceContrast.painted(theme, LIST_TEXT));
         });
-        var faint = (selected ? SELECTED_DETAIL : ROW_DETAIL).slot().color(theme);
+        var faint = SurfaceContrast.painted(theme, selected ? SELECTED_DETAIL : ROW_DETAIL);
         for (var node : item.subtitle()) label(row, node).ifPresent(label -> {
             label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
             label.setForeground(faint);
@@ -221,6 +273,17 @@ public final class RunWindowPresentation {
         return new PaintPair(DerivedColor.ACCENT_EDGE, kit.colors().dialogSurface(), SurfaceContrast.Guard.INDICATOR);
     }
 
+    /**
+     * The help row's fixed height in {@code context}: the tile, or {@link #HELP_LINES} lines of the help text, whichever is
+     * taller, so the window keeps its height whatever the help row says.
+     */
+    public static int helpHeight(KitContext context) {
+        var font = ThemePainting.font(context, Typography.Role.BODY);
+        int line = Math.round(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HELP_LINE) * font.getSize2D() / 12f);
+        int measured = new JLabel().getFontMetrics(font).getHeight();
+        return Math.max(ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_TILE), HELP_LINES * Math.max(line, measured));
+    }
+
     /** The help row's layout: the tile, then its text beside it at the Run window's gap, the shorter centred on the other. */
     static LayoutManager helpLayout(Stacks.StackControl owner) { return new HelpLayout(owner); }
 
@@ -255,7 +318,10 @@ public final class RunWindowPresentation {
         g.setColor(SurfaceContrast.painted(context.theme(), tileEdge(context.kit()))); g.fill(ring);
     }
 
-    /** The help row: the tile, then the text beside it; the text block centred on the tile when shorter, and the reverse. */
+    /**
+     * The help row: the tile, then the text beside it; the text block centred on the tile when shorter, and the reverse,
+     * and the two centred in a taller row.
+     */
     private static final class HelpLayout implements Composition.WidthLayout {
         private final Stacks.StackControl owner;
 
@@ -286,8 +352,10 @@ public final class RunWindowPresentation {
 
         @Override public void layoutContainer(Container parent) {
             var size = owner.tile.getPreferredSize();
-            int textHeight = text(parent, parent.getWidth()), y = Math.max(0, (size.height - textHeight) / 2), width = room(parent.getWidth());
-            owner.tile.setBounds(0, Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
+            // The row's content centred in a taller row (the Run window's fixed help height).
+            int textHeight = text(parent, parent.getWidth()), top = Math.max(0, (parent.getHeight() - height(parent, parent.getWidth())) / 2);
+            int y = top + Math.max(0, (size.height - textHeight) / 2), width = room(parent.getWidth());
+            owner.tile.setBounds(0, top + Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
             for (var line : lines(parent)) {
                 int height = Composition.height(line, width);
                 line.setBounds(size.width + gap(), y, width, height);

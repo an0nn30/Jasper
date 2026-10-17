@@ -13,8 +13,7 @@ class PaletteViewSeamTest {
         SwingUtilities.invokeAndWait(() -> {
             try (var registry = new ScopeRegistry(); var history = new CommandHistory()) {
                 registry.register(PaletteTestSupport.scope("t.one", null));
-                var controller = new PaletteController(KitTestSupport.context(), registry, history, true, () -> { }, () -> { },
-                    () -> false, () -> { }, message -> { }, id -> { });
+                var controller = PaletteTestSupport.controller(KitTestSupport.context(), registry, history);
                 try {
                     PaletteView view = controller.view();
                     assertThat(view).isInstanceOf(CardView.class);

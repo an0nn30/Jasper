@@ -232,8 +232,8 @@ class CommandPaletteTest {
     @Test void allGroupsRowsUnderHeadersAndSelectionSkipsThem() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
-            var entries = List.<PaletteEntry>of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"),
-                new PaletteEntry.Header("History"), item(HISTORY, "ls"), new PaletteEntry.More(HISTORY));
+            var entries = List.<PaletteEntry>of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "new_tab"),
+                new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "History"), item(HISTORY, "ls"), new PaletteEntry.More(HISTORY));
             palette.setEntries(entries, null, "Nothing found");
             assertThat(PaletteTestSupport.describe(palette.selectedEntry())).as("the first row, never a header").isEqualTo("jasper.commands/new_tab");
             var list = PaletteTestSupport.resultsSpec(palette);
@@ -308,7 +308,7 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var events = new ArrayList<String>();
             var palette = palette(events);
-            palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "first"), item(COMMANDS, "second")), null, null);
+            palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "first"), item(COMMANDS, "second")), null, null);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             Component header = row(palette, 0), second = row(palette, 2);
@@ -340,7 +340,7 @@ class CommandPaletteTest {
     @Test void geometryFollowsSearchEverywhere() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
-            palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a"), item(COMMANDS, "b")), null, null);
+            palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "a"), item(COMMANDS, "b")), null, null);
             palette.setSize(palette.getPreferredSize());
             layoutTree(palette);
             Insets insets = palette.getInsets();
@@ -366,8 +366,8 @@ class CommandPaletteTest {
             assertThat(palette.visibleRows()).as("five by default").isEqualTo(5);
             assertThat(PaletteTestSupport.resultsSpec(palette).visibleRows()).hasValue(5);
             assertThat(palette.getPreferredSize().height).isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 5 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
-            palette.setEntries(List.of(new PaletteEntry.Header("History"), item(HISTORY, "a"), item(HISTORY, "b"),
-                new PaletteEntry.Header("Commands"), item(COMMANDS, "c"), item(COMMANDS, "d"), item(COMMANDS, "e"),
+            palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "History"), item(HISTORY, "a"), item(HISTORY, "b"),
+                new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "c"), item(COMMANDS, "d"), item(COMMANDS, "e"),
                 item(COMMANDS, "f")), null, null);
             assertThat(palette.getPreferredSize().height).as("headers above the fifth row add their own height")
                 .isEqualTo(UIScale.scale(m(DesignMetrics.Role.PALETTE_FIELD_HEIGHT) + 2 * m(DesignMetrics.Role.RESULTS_HEADING_HEIGHT) + 5 * m(DesignMetrics.Role.RESULTS_ROW_HEIGHT) + m(DesignMetrics.Role.PALETTE_HINT_HEIGHT)) + insets.top + insets.bottom);
@@ -430,8 +430,8 @@ class CommandPaletteTest {
                     String name = dark ? "dark" : "light";
                     var palette = palette(kit, true, new ArrayList<>());
                     var historyRow = new PaletteRow("c", "Row c", "a detail", null, null, true, null);
-                    palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a"), item(COMMANDS, "b"),
-                        new PaletteEntry.Header("History"), new PaletteEntry.Item(HISTORY, historyRow)), null, null);
+                    palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "a"), item(COMMANDS, "b"),
+                        new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "History"), new PaletteEntry.Item(HISTORY, historyRow)), null, null);
                     palette.setSize(palette.getPreferredSize());
                     layoutTree(palette);
                     var image = paint(palette);
@@ -507,7 +507,7 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var palette = palette(new ArrayList<>());
             var row = new PaletteRow("r", "Rendered command", "a detail", "⌘T", null, true, null);
-            palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS, row), new PaletteEntry.More(HISTORY), new PaletteEntry.Header("History")), null, null);
+            palette.setEntries(List.of(new PaletteEntry.Item(COMMANDS, row), new PaletteEntry.More(HISTORY), new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "History")), null, null);
             palette.setSize(palette.getPreferredSize().width, UIScale.scale(400));
             layoutTree(palette);
             var line = (Container) row(palette, 0);
@@ -717,7 +717,7 @@ class CommandPaletteTest {
     @Test void headingsFooterAndQueryGlyphUseTheirReferenceRoles() throws Exception {
         SwingUtilities.invokeAndWait(()->{
             try(var palette=palette(new ArrayList<>())) {
-                palette.setEntries(List.of(new PaletteEntry.Header("Recently used"),
+                palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Recently used"),
                     new PaletteEntry.Item(HISTORY,new PaletteRow("ls","ls -la","in ~/src",null,null,true,null))),null,null);
                 palette.setSize(palette.getPreferredSize());layoutTree(palette);
                 var hint=new dev.jasper.ui.swing.NativeStyles(dev.jasper.ui.kit.Kit.DEFAULT).font(palette.kit(),dev.jasper.ui.metrics.Typography.Role.PALETTE_HINT);
@@ -789,7 +789,7 @@ class CommandPaletteTest {
             var themes = ThemeTestSupport.controller(true);
             var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
             try {
-                palette.setEntries(List.of(new PaletteEntry.Header("Recently used"), item(COMMANDS, "AgjyÉ")), null, null);
+                palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Recently used"), item(COMMANDS, "AgjyÉ")), null, null);
                 var query = PaletteTestSupport.query(palette);
                 query.setText("AgjyÉ"); query.select(1, 3);
                 var document = query.getDocument();
@@ -816,7 +816,7 @@ class CommandPaletteTest {
         SwingUtilities.invokeAndWait(() -> {
             var themes = ThemeTestSupport.controller(true);
             var palette = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
-            palette.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "a")), null, null);
+            palette.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "a")), null, null);
             try {
                 for (float size : new float[]{18, 32, 12}) {
                     themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH, new UiFontConfig("system", size));
@@ -840,7 +840,7 @@ class CommandPaletteTest {
                 var kit = bindings.context(ThemeRoute.CHROME);
                 var palette = palette(kit, true, new ArrayList<>());
                 var rows = new ArrayList<PaletteEntry>();
-                rows.add(new PaletteEntry.Header("History"));
+                rows.add(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "History"));
                 for (int i = 0; i < 30; i++) rows.add(item(HISTORY, "r" + i));
                 palette.setEntries(rows, null, null);
                 palette.setSize(palette.getPreferredSize());
@@ -883,7 +883,7 @@ class CommandPaletteTest {
                 var themes = ThemeTestSupport.controller(choiceDark);
                 var card = palette(themes.appearance().context(ThemeRoute.CHROME), true, new ArrayList<>());
                 try {
-                    card.setEntries(List.of(new PaletteEntry.Header("Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
+                    card.setEntries(List.of(new PaletteEntry.Header(PaletteEntry.Header.Kind.SECTION, "Commands"), item(COMMANDS, "new_tab"), item(COMMANDS, "settings")), null, null);
                     var host = new javax.swing.JPanel(new java.awt.GridBagLayout()); host.add(card);
                     for (int scale : new int[]{1, 2}) saveRender(host, (choiceDark ? "dark" : "light") + "-palette-" + scale, scale);
                     card.showStep("Connect", List.of(new PaletteStep.Field("host", "Host", "example.org"), new PaletteStep.Field("user", "Username", "dustin")));

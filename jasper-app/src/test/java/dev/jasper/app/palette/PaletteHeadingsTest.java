@@ -42,8 +42,7 @@ class PaletteHeadingsTest {
                 registry.register(scope("t.beta", "Beta", null, "b1"));
                 long now = System.currentTimeMillis();
                 for (int i = 1; i <= 4; i++) history.recordUse("t.alpha", "a" + i, "a" + i, now + i);
-                var controller = new PaletteController(KitTestSupport.context(), registry, history, true, () -> { }, () -> { },
-                    () -> false, () -> { }, message -> { }, id -> { });
+                var controller = PaletteTestSupport.controller(KitTestSupport.context(), registry, history);
                 try {
                     controller.open(PaletteScope.ALL_ID, PaletteTarget.none(), () -> true);
                     assertThat(headings(controller)).as("three recent rows (3e), then the most used one")
@@ -63,8 +62,7 @@ class PaletteHeadingsTest {
         SwingUtilities.invokeAndWait(() -> {
             try (var registry = new ScopeRegistry(); var history = new CommandHistory()) {
                 registry.register(scope("t.alpha", "Alpha", null, "a1", "a2"));
-                var controller = new PaletteController(KitTestSupport.context(), registry, history, true, () -> { }, () -> { },
-                    () -> false, () -> { }, message -> { }, id -> { });
+                var controller = PaletteTestSupport.controller(KitTestSupport.context(), registry, history);
                 try {
                     controller.open(PaletteScope.ALL_ID, PaletteTarget.none(), () -> true);
                     assertThat(headings(controller)).containsExactly("SUGGESTED Suggested");
