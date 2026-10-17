@@ -129,7 +129,9 @@ public final class TunnelsUi implements AutoCloseable {
             invoked -> manager.stopAll());
         stopAll.setEnabled(false);
         context.menus().terminalContext().add(FORWARD);
-        context.panels().register(new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
+        // Enterprise's default slots (spec 14.4): Tunnels under Sessions on the right.
+        context.panels().register(layout == Layout.CLASSIC ? new PanelSpec(PANEL, "Tunnels", icon, Anchor.RIGHT).withToggleActionId(TOGGLE).withSplit()
+            : new PanelSpec(PANEL, "Tunnels", icon, Anchor.LEFT).withToggleActionId(TOGGLE), this::create);
         scope = new TunnelsScope(this::all, store::error, manager::state, this::hostName,
             this::toggle, (window, tunnel) -> current(tunnel.id()).ifPresent(this::browse),
             (window, tunnel) -> current(tunnel.id()).filter(now -> !now.quick()).ifPresent(now -> edit(window, Optional.of(now), Optional.empty())));

@@ -71,6 +71,14 @@ public final class TransferStrip {
         return Optional.of(new Nodes.Stack(ROOT, ControlState.READY, Nodes.LayoutRole.VERTICAL, children));
     }
 
+    /** The rows (or the unavailable line) alone, without the sidebar's heading: the classic Transfers panel's body. */
+    public Optional<Nodes.Node> list() {
+        if (!visible()) return Optional.empty();
+        if (!unavailable.isEmpty()) return Optional.of(new Nodes.Text(UNAVAILABLE, ControlState.READY, unavailable, Nodes.TextRole.DESCRIPTION));
+        return Optional.of(new Nodes.ItemList(ROWS, ControlState.READY, Nodes.ListKind.DOUBLE, rows.stream().map(TransferStrip::item).toList(),
+            selected == null ? Set.of() : Set.of(selected), "", List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty()));
+    }
+
     /** Acts on one of the strip's events and says whether it was one. */
     public boolean handle(UiEvent event) {
         switch (event) {

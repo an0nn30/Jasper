@@ -68,7 +68,9 @@ public final class SftpUi implements AutoCloseable {
                   dev.jasper.remote.workstation.Layout layout) {
         this.layout=layout;
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
-        context.panels().register(new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
+        // Enterprise's default slots (spec 14.4): SFTP leads the left side, File Servers under it.
+        context.panels().register(layout==dev.jasper.remote.workstation.Layout.CLASSIC ? new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE)
+            : new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
         // Ruling G6: the old panel-wide Alt+Left/Alt+Right and the table's Alt+Up, now rebindable panel shortcuts.
         shortcut(BACK,"SFTP: Back","alt+left",SftpPanel::back);
         shortcut(FORWARD,"SFTP: Forward","alt+right",SftpPanel::forward);

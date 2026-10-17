@@ -71,6 +71,28 @@ class RemotePluginTest {
         }
     }
 
+    @Test void underEnterpriseThePanelsTakeTheirSlotsAndTransfersIsABottomPanel(@TempDir Path dir) throws Exception {
+        try (var host = new FakePluginHost()) {
+            dev.jasper.remote.workstation.FakeEnterprise.start(host);
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin(dir.resolve("ssh")));
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(host.panels()).containsExactlyInAnyOrder(
+                "dev.jasper.remote.transfers.panel|Transfers|BOTTOM|dev.jasper.remote.transfers",
+                "dev.jasper.remote.sftp.panel|SFTP|LEFT|dev.jasper.remote.sftp.toggle",
+                "dev.jasper.remote.tunnels.panel|Tunnels|RIGHT+split|dev.jasper.remote.tunnels",
+                "dev.jasper.remote.panel|Sessions|RIGHT|dev.jasper.remote.hosts");
+            UUID window = host.addTerminalWindow();
+            assertThat(Kits.value(() -> host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, window, null))).isTrue();
+            settle(host);
+            assertThat(Kits.value(() -> host.panelView(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, window))).as("Transfers shows its panel").isPresent();
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
+            settle(host);
+            assertThat(Kits.value(() -> dev.jasper.remote.testsupport.Kits.find(host.panelView(SftpUi.PANEL, window).orElseThrow(),
+                dev.jasper.remote.ui.transfers.TransferStrip.ROOT))).as("the SFTP footer holds no transfers under CLASSIC").isEmpty();
+        }
+    }
+
     @Test void navigationActionsCarryTheirDefaultsAndAnOldShortcutsTableIsUnknown(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.remote", "shortcuts.toggle_panel", "cmd+alt+p");

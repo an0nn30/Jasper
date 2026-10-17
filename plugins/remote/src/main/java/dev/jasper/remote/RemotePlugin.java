@@ -75,6 +75,8 @@ public class RemotePlugin implements Plugin {
     private final Function<PluginContext,Executor> transferExecutor;
     private dev.jasper.remote.transfer.TransferCoordinator transfers;
     private dev.jasper.remote.ui.transfers.TransferUi transferUi;
+    /** The classic Transfers bottom panels (spec 14.4); null under ROWS. */
+    private dev.jasper.remote.ui.transfers.TransfersPanels transfersPanels;
     private dev.jasper.remote.ui.sftp.SftpUi sftpUi;
     private dev.jasper.remote.tunnels.TunnelStore tunnelStore;
     private dev.jasper.remote.ui.tunnels.TunnelsUi tunnelsUi;
@@ -175,7 +177,10 @@ public class RemotePlugin implements Plugin {
                 return validateResumeIdentity(expected,connections.resolveIdentity(ref.hostId().orElseThrow(),owner));
             }catch(Exception failure) { return CompletableFuture.failedFuture(failure); }
         });
-        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->sftpUi.reveal(window));
+        transferUi=new dev.jasper.remote.ui.transfers.TransferUi(context,transfers,ui,window->{
+            if(transfersPanels!=null) transfersPanels.show(window); else sftpUi.reveal(window);
+        });
+        if(layout==dev.jasper.remote.workstation.Layout.CLASSIC) transfersPanels=new dev.jasper.remote.ui.transfers.TransfersPanels(context,transferUi);
         sftpUi=new dev.jasper.remote.ui.sftp.SftpUi(context,ui,transferBackground,connections,endpoints,()->transfers,store::hosts,this::sftpPane,transferUi::strip,transferUi::release,layout);
         sftpUi.hiddenItems(panelState.sftpShowHidden(),shown-> { try { panelState.saveSftpShowHidden(shown); }
             catch(IOException failure) { context.log().log(System.Logger.Level.WARNING,"panel state: {0}",failure.getMessage()); } });
@@ -234,7 +239,9 @@ public class RemotePlugin implements Plugin {
         context.palette().register(scope);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 60));
         status.setIcon(icon); status.setAction(HOSTS); status.setVisible(false);
-        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, Anchor.LEFT).withToggleActionId(HOSTS), this::createPanel);
+        // Enterprise's default slots (spec 14.4): Sessions on the right; the default look keeps the left.
+        context.panels().register(new PanelSpec(PANEL, "Sessions", icon, layout == dev.jasper.remote.workstation.Layout.CLASSIC ? Anchor.RIGHT : Anchor.LEFT)
+            .withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
