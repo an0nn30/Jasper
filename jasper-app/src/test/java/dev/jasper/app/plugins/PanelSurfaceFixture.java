@@ -188,6 +188,18 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         });
     }
 
+    /** Delivers {@code event} to the view of the plugin's {@code pluginField} (a form it keeps), as its kit would (plan 10a). */
+    public void dispatch(String pluginField, dev.jasper.sdk.ui.UiEvent event) throws InterruptedException {
+        onEdt(() -> {
+            try {
+                Object form = field(plugin, pluginField);
+                var view = (HostedKitView) form.getClass().getMethod("view").invoke(form);
+                view.dispatch(event);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+        StagedVaultHost.settle();
+    }
+
     /** Runs one of the plugin's actions in the fixture window, as a menu or a shortcut does (plan 10a). */
     public void invoke(String actionId) throws InterruptedException { vault.invoke(actionId); StagedVaultHost.settle(); }
 

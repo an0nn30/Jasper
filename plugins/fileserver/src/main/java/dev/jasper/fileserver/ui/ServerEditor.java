@@ -7,6 +7,9 @@ import dev.jasper.fileserver.definition.PortRange;
 import dev.jasper.fileserver.definition.Protocol;
 import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.engine.ServerAddresses;
+import dev.jasper.fileserver.workstation.Layout;
+import dev.jasper.sdk.ui.Column;
+import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.ui.UiAnchor;
 import dev.jasper.vault.api.CredentialDescriptor;
@@ -56,6 +59,8 @@ public final class ServerEditor implements AutoCloseable {
         SAVE = "server.save", CANCEL = "server.cancel", MESSAGE = "server.message", WARNING = "server.warning";
 
     private final UiView view;
+    /** Which composition the form takes; set once by {@link #layout} before the dialog shows (Rulings 3). */
+    private Layout layout = Layout.ROWS;
     private final List<ServerDefinition> others;
     private final Optional<ServerDefinition> initial;
     private final boolean existing, vaultPresent, linux;
@@ -368,6 +373,32 @@ public final class ServerEditor implements AutoCloseable {
     }
 
     private void render() { if (!closed) view.update(new ViewSpec(form())); }
+
+    /** Composes the form in {@code value}'s layout (Enterprise presentation spec 14.5); call once, right after construction. */
+    public ServerEditor layout(Layout value) { layout = java.util.Objects.requireNonNull(value); render(); return this; }
+
+    /**
+     * The classic keys table's columns, weighted so that the classic table face sets its separators where the New File
+     * Server mock draws them (87 and 334 from the box's edge).
+     */
+    static final List<Column> KEY_COLUMNS = List.of(new Column("type", "Type", Nodes.TextRole.MONO_SMALL, false, 83, Optional.empty()),
+        new Column("fingerprint", "Fingerprint", Nodes.TextRole.MONO_SMALL, false, 254, Optional.empty()),
+        new Column("comment", "Comment", Nodes.TextRole.BODY, false, 125, Optional.empty()));
+
+    /** The authorized keys: today's compact list, or under CLASSIC a table of their type, fingerprint and comment. */
+    private Nodes.Node keysNode(List<ListItem> keys) {
+        if (layout == Layout.ROWS) return new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.COMPACT, keys, selectedKeys, "", List.of(),
+            Nodes.SelectionMode.MULTIPLE, Optional.empty(), OptionalInt.of(3));
+        var rows = new ArrayList<TableRow>();
+        for (int i = 0; i < keyLines.size(); i++) {
+            String type = "", fingerprint = keyLines.get(i), comment = "";
+            try { var key = AuthorizedKeys.parse(keyLines.get(i)); type = key.type(); fingerprint = key.fingerprint(); comment = key.comment(); }
+            catch (IllegalArgumentException unreadable) { /* the stored line shows whole */ }
+            rows.add(new TableRow("key." + i, java.util.Map.of("type", type, "fingerprint", fingerprint, "comment", comment), Optional.empty()));
+        }
+        return new Nodes.Table(KEYS, ControlState.READY, KEY_COLUMNS, rows, selectedKeys, "", List.of(), Nodes.SelectionMode.MULTIPLE,
+            Nodes.ScrollPolicy.STANDARD, Optional.empty(), "No keys added");
+    }
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
     private static Nodes.Text text(String id, String value, Nodes.TextRole role) {
         return new Nodes.Text(id, state(!value.isBlank(), true), value, role);
@@ -439,8 +470,7 @@ public final class ServerEditor implements AutoCloseable {
             List.of(), List.of()));
         access.add(new Nodes.Stack("server.keys.section", state(sftp, true), Nodes.LayoutRole.VERTICAL, List.of(
             new Nodes.Text("server.keys.label", ControlState.READY, "Authorized keys", Nodes.TextRole.LABEL),
-            new Nodes.ItemList(KEYS, ControlState.READY, Nodes.ListKind.COMPACT, keys, selectedKeys, "", List.of(),
-                Nodes.SelectionMode.MULTIPLE, Optional.empty(), OptionalInt.of(3)),
+            keysNode(keys),
             new Nodes.Stack("server.keys.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
                 new Nodes.Button(ADD_KEY, ControlState.READY, "Add from File…", "add", Nodes.ButtonKind.SECONDARY, ADD_KEY, ""),
                 new Nodes.Button(PASTE_KEY, ControlState.READY, "Paste", "paste", Nodes.ButtonKind.SECONDARY, PASTE_KEY, ""),

@@ -258,6 +258,31 @@ class ServerEditorTest {
         assertThat(message(bad)).isEqualTo("SFTP needs a password or authorized keys");
     }
 
+    @Test void underClassicTheAuthorizedKeysAreATable() {
+        var events = new java.util.ArrayList<String>();
+        var holder = new java.util.concurrent.atomic.AtomicReference<ServerEditor>();
+        UiTestAccess.edt(() -> holder.set(new ServerEditor(new dev.jasper.sdk.testing.FakeKit("dev.jasper.fileserver"), java.util.List.of(),
+            java.util.Optional.empty(), false, java.util.Set.of(dev.jasper.fileserver.definition.Protocol.SFTP), java.util.List.of(), false,
+            id -> java.util.Optional.empty(), () -> java.util.concurrent.CompletableFuture.completedFuture(java.util.Optional.empty()),
+            java.util.Optional::empty, new ServerEditor.KeySources(() -> java.util.Optional.of(ED25519), java.util.Optional::empty), false,
+            definition -> events.add("save"), () -> events.add("cancel")).layout(dev.jasper.fileserver.workstation.Layout.CLASSIC)));
+        var editor = holder.get();
+        var view = (dev.jasper.sdk.testing.FakeKitView) editor.view();
+        var keys = (dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS);
+        assertThat(keys.columns()).extracting(column -> column.title()).containsExactly("Type", "Fingerprint", "Comment");
+        assertThat(keys.emptyText()).isEqualTo("No keys added");
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(ServerEditor.ADD_KEY)));
+        keys = (dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS);
+        assertThat(keys.rows()).singleElement().satisfies(row -> {
+            assertThat(row.id()).isEqualTo("key.0");
+            assertThat(row.cells()).containsEntry("type", "ssh-ed25519").containsEntry("comment", "alice@laptop");
+            assertThat(row.cells().get("fingerprint")).startsWith("SHA256:");
+        });
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Selected(ServerEditor.KEYS, java.util.Set.of("key.0"))));
+        UiTestAccess.edt(() -> view.emit(new dev.jasper.sdk.ui.UiEvent.Action(ServerEditor.REMOVE_KEY)));
+        assertThat(((dev.jasper.sdk.ui.Nodes.Table) UiTestAccess.node(view, ServerEditor.KEYS)).rows()).isEmpty();
+    }
+
     @Test void linuxPortHintAndRiskySharingWarningsTrackChoices() {
         var editor = editor(Set.of(Protocol.HTTP), Optional.empty(), true, ServerEditor.KeySources.NONE,
             List.of(), true, List.of());

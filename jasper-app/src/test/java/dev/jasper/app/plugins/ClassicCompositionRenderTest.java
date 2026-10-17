@@ -222,4 +222,40 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    /**
+     * The keys table's empty body: 3c's empty line is one 22 px row holding "No keys added", where the mock centres the line
+     * in a 44 px body; SDK 0.18's Table has no visible-row count, so the 22 is a recorded residual (plan 10a Execution
+     * deviations).
+     */
+    static final int FS_KEYS_BODY = 22;
+    static final String FS_KEYS = "0+2 #ECEDEF, 2+1 #B4B8BF, 3+20 #F0F1F3, 23+1 #D3D6DA, 24+" + FS_KEYS_BODY + " #FFFFFF, "
+        + (24 + FS_KEYS_BODY) + "+1 #B4B8BF, " + (25 + FS_KEYS_BODY) + "+3 #ECEDEF";
+    /**
+     * The keys band's device column: mock x 152, clear of the column titles. The mock's x 100 passes between the T and the y
+     * of "Type", which 4c's classic table face sets 2 px left of the mock's (7 from the box's edge against 9, as in every
+     * classic table), so its T crosses that column (a recorded residual).
+     */
+    static final int FS_KEYS_X = 150;
+
+    @Test @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    void newFileServerMatchesItsFourMocks() throws Exception {
+        under(false, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("new-server"), EnterpriseLook.resolved(false), PanelSurfaceFixture.FILE_SERVERS, true)) {
+                fixture.invoke("dev.jasper.fileserver.new");
+                var editor = fixture.surface("New File Server");
+                record Mock(String protocol, String file, int height, int body) { }
+                for (var mock : java.util.List.of(new Mock("HTTP", "HTTP", 986, 448), new Mock("FTP", "FTP", 1210, 560),
+                        new Mock("SFTP", "SFTP", 1172, 541), new Mock("TFTP", "TFTP", 862, 386))) {
+                    fixture.dispatch("currentEditor", new dev.jasper.sdk.ui.UiEvent.Selected("server.protocol", java.util.Set.of(mock.protocol())));
+                    var crop = new MockMatch.Crop("02 New File Server/New File Server - " + mock.file() + ".png", 2, 60, 1040, mock.height());
+                    var render = fixture.renderSurface(editor, crop.logicalWidth(), crop.logicalHeight());
+                    check("light/new-file-server-" + mock.file().toLowerCase(java.util.Locale.ROOT), crop, render, 18,
+                        "0+" + mock.body() + " #ECEDEF, " + mock.body() + "+1 #C4C7CC, " + (mock.body() + 1) + "+44 #E6E7EA", 1, 0.55, "#ECEDEF", "#E6E7EA", "#B4B8BF");
+                    if (mock.protocol().equals("SFTP"))
+                        assertThat(MockMatch.mismatch(MockMatch.parse(FS_KEYS), MockMatch.bands(render, FS_KEYS_X, 595, 595 + 2 * (FS_KEYS_BODY + 28)), 1)).as("the keys table").isEmpty();
+                }
+            }
+        });
+    }
 }

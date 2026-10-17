@@ -5402,3 +5402,19 @@ D17 (Task 10). **Residual: File Servers cells** — the Status cell leads with s
 not draw; "Stopped" is `text.primary` (mock `#3A3D42`); Address is a numeric column, so its title is right-aligned too
 (the mock left-aligns it at 120) (4c's table face). Measured: light/file-servers 0.753, dark/file-servers 0.753,
 light/file-servers-none 0.804 (floors 0.55); bands match exactly.
+
+D18 (Task 11). **The keys columns' weights are 83, 254 and 125** (the plan's 87, 247 and 128) — what: `ServerEditor.KEY_COLUMNS`;
+why: with the plan's weights the classic table face set the separators at 91 and 331 from the box's edge, against the 02
+SFTP mock's 87 and 334; the new weights put them at exactly 87 and 334 (the face divides the header width after its
+insets, so the mock's pixel widths are not its weights). Cost if wrong: none (the default look keeps the ItemList).
+
+D19 (Task 11). **Residual: the keys table's empty body and its title inset; the keys band reads mock column 152** — what:
+3c's empty line is one 22 px row holding "No keys added" (the mock centres the line in a 44 px body; SDK 0.18's `Table`
+has no visible-row count), so `FS_KEYS` is built from `FS_KEYS_BODY` 22 and its window ends 28 below the body, as Task 9's
+`KEYS_BOX` (R11); and 4c's classic table face starts every column title 7 from the box's edge where the mocks draw 9 (the
+same 2 px in the File Servers, SFTP and Tunnels renders), which puts the T of "Type" across the plan's sample column (mock
+x 100 passes between the T and the y), so the band reads `FS_KEYS_X` 150 (mock x 152), clear of the titles; the box (462
+wide at x 29), header band, rules and colours match the mock exactly there. The Add from File…, Paste and Remove buttons
+keep their icons (spec 6.4's button face; the mock draws text only). Owners: 3c's empty line and 4c's header insets.
+Measured: light/new-file-server-http 0.657, -ftp 0.614, -sftp 0.567, -tftp 0.626 (floors 0.55); the four body and footer
+bands match.

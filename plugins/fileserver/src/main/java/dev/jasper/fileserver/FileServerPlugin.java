@@ -310,6 +310,7 @@ public final class FileServerPlugin implements Plugin {
                 registry.server(saved[0].id()).filter(ServerRegistry.View::restartNeeded).ifPresent(view -> confirmRestart(window, view));
             },
             dialog::close);
+        editor[0].layout(layout);
         currentEditor = editor[0];
         dialog.setContent(editor[0].view());
         dialog.onClosed(() -> { closed[0] = true; editor[0].close(); if (currentEditor == editor[0]) currentEditor = null; });
