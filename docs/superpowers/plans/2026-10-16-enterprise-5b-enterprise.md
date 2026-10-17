@@ -26,9 +26,11 @@ same branch and its interfaces are used here by name. Spec 7.7 (the converter's 
 delivered by plan 2 (`tools/themes/jasper_theme.py:57`, `:966-982`); this plan only relies on it.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-5`, branch
-`claude/enterprise-provider`, after plan 5a's last commit. Run every command from the worktree root. Line numbers are from
-`222969926` and move after the earlier plans; every edit quotes the text it replaces and stops when that text is not
-found the stated number of times; re-find moved text, never edit around it.
+`claude/enterprise-provider`, which holds `main` at `e502e102b` (plans 3a to 3e, 4a to 4c, 5a, 6a and 8a) plus the plan
+commits. Run every command from the worktree root. Line numbers were re-verified at `e502e102b` on 2026-10-17 (Execution
+notes); every edit quotes the text it replaces and stops when that text is not found the stated number of times;
+re-find moved text, never edit around it. Plan 6b runs in parallel in another worktree and may reach `main` first: Task 3
+step 5 and Task 4 step 4 say what changes then.
 
 ## Before you start
 
@@ -37,6 +39,9 @@ grep -c 'Presentation provider: documentation and status' <(git log --format=%s)
 ls jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java
 grep -c 'static .*enterprise()' jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java   # plan 4a's fixture kit: 1
 ls jasper-ui/src/main/java/dev/jasper/ui/swing/KitFaces.java jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTableFace.java   # 4b, 4c
+ls jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json   # 6a
+grep -c 'CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES);' jasper-app/src/test/java/dev/jasper/app/palette/RunWindowRenderTest.java   # 8a merged with 4b: 1
+grep -c 'BORDER_DIVIDER("border.divider", true)' jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java   # 1 once plan 6b's Task 1 is on main
 ```
 
 If 5a is not on the branch, execute it first. Plan 4's Enterprise fixture kit is used under the name
@@ -84,33 +89,35 @@ Task 4. The names of plan 5a's "Plan 4's names" table apply here too.
    `PluginSelection.scan`, `PluginResources.of`, `Presentation.faces()`, `PresentationFacts.MAX_THEME_BYTES`, and its
    fact 19 on JBR font naming.
 2. `FaceSet` holds only data faces (`FaceSet.java:10-23`, plan 1's deviation 4: "the UI faces in plan 5");
-   `Typography.font` picks the data face for the MONO roles and the platform family otherwise (`Typography.java:71-89`).
+   `Typography.font` picks the data face for the MONO roles and plan 8a's `RUN_DETAIL` and the platform family otherwise
+   (`Typography.java:73-91`).
 3. `BundledFonts.register()` registers the Cousine faces once (`BundledFonts.java:16-30`); the application calls it first
-   in its constructor (`JasperApplication.java:238`).
-4. `ThemeController`'s constructor clears `defaultFont` and the form fonts before installing (`ThemeController.java:96-98`);
-   `installFontDefaults` puts `defaultFont` only for a non-default `UiFontConfig` (`:175-183`); `SwingTypography.user`
+   in its constructor (`JasperApplication.java:289`).
+4. `ThemeController`'s constructor clears `defaultFont` and the form fonts before installing (`ThemeController.java:162-164`);
+   `installFontDefaults` puts `defaultFont` only for a non-default `UiFontConfig` (`:243-251`); `SwingTypography.user`
    reads the developer `defaultFont` and `Jasper.uiFontFamilyOverride` (`SwingTypography.java:32-38`).
-5. `KitGallery.installed` and `capture` set `defaultFont` to the platform family at 13 points (24 for `*font24*`)
-   (`KitGallery.java:122-158`); `KitFixtures.themes()` reads the converter goldens from `jasper.repoRoot`
-   (`KitFixtures.java:46-58`), which jasper-ui's test task sets (`jasper-ui/build.gradle.kts:20`).
+5. `KitGallery.installed` and `capture` set `defaultFont` to the platform family at the kit's body size at the gallery's
+   scale, `bodySize(points)` (24 points for `*font24*`; plan 4c) (`KitGallery.java:190-222`); `KitFixtures.themes()` reads
+   the converter goldens from `jasper.repoRoot` (`KitFixtures.java:134-147`), which jasper-ui's test task sets
+   (`jasper-ui/build.gradle.kts:22`).
 6. `ThemeLibrary` holds built-ins then imported themes (`ThemeLibrary.java:51-71`), skips a folder file with a built-in id
    (`:104-108`), and reuses an unchanged library (`:128`); `ThemeSelection.pick` reports an unknown pick and uses Slate
    Cobalt (`ThemeSelection.java:48-56`); `ThemeFolder.prepare` refuses built-in ids (`ThemeFolder.java:66-67`);
    `ThemeMenu.removable` offers removal for any listed non-built-in theme (`ThemeMenu.java:74-77`); the application makes
-   the folder at `JasperApplication.java:963` and reads the library at `:246-247`; `ConfigurationController` rereads the
-   folder with `ThemeLibrary.read(themesFolder, library)` (`ConfigurationController.java:112`).
+   the import folder at `JasperApplication.java:1067` and reads the library at `:297-298`; `ConfigurationController` rereads
+   the folder with `ThemeLibrary.read(themesFolder, library)` (`ConfigurationController.java:122`).
 7. `InstalledThemes.ThemeOption(id, label, preview)` (`InstalledThemes.java:21`); `SettingsAppearance.themeChoices` builds
-   them (`SettingsAppearance.java:52-58`); `AppearanceSelection.options` makes each dropdown option with no description
-   (`AppearanceSelection.java:90-96`); `Option(id, label, hue)` is `Option(id, label, hue, "", "", empty)`
+   them (`SettingsAppearance.java:53-60`); `AppearanceSelection.options` makes each dropdown option with no description
+   (`AppearanceSelection.java:89-95`); `Option(id, label, hue)` is `Option(id, label, hue, "", "", empty)`
    (`jasper-ui/.../model/Option.java:14`).
-8. `ColourLiteralScanTest.THEMES` exempts only the built-in theme files (`ColourLiteralScanTest.java:15-16`, used at `:42`).
+8. `ColourLiteralScanTest.THEMES` exempts only the built-in theme files (`ColourLiteralScanTest.java:15-16`, used at `:42` and `:57`).
 9. `stagePlugins` lists each bundled plugin (`jasper-app/build.gradle.kts:42-58`); `settings.gradle.kts` includes every
-   `plugins/<name>` with a build script; `pluginZips` zips every plugin (`gradle/plugin-packaging.gradle.kts:8-40`).
-   `BundledSamplePluginTest` counts eight bundled plugins (`:63`, `:101`) and `PluginZipsTest` eight zips with their ids
+   `plugins/<name>` with a build script; `pluginZips` zips every plugin (`gradle/plugin-packaging.gradle.kts:18-40`).
+   `BundledSamplePluginTest` counts eight bundled plugins (`:78`, `:116`) and `PluginZipsTest` eight zips with their ids
    (`PluginZipsTest.java:19,42`).
 10. `verifyThirdPartyNotices` reads `notices.toml` components' `modules`, `text` and `notice` with regular expressions
-    (`gradle/third-party-notices.gradle.kts:20-41`); `ThirdPartyNotices.parse` ignores keys it does not read
-    (`ThirdPartyNotices.java:90-101`); `OFL-1.1` is a known licence (`:31`).
+    (`gradle/third-party-notices.gradle.kts:20-39`); `ThirdPartyNotices.parse` ignores keys it does not read
+    (`ThirdPartyNotices.java:87-101`); `OFL-1.1` is a known licence (`:30`).
 11. The IBM Plex 1.1.0 releases (fetched 2026-10-16): `ibm-plex-sans.zip` SHA-256
     `fb365d910566e6d199cc2c15579a7dd9a267128e18431a394ed81f1970c69200` and `ibm-plex-mono.zip`
     `4bfc936d0e1fd19db6327a3786eabdbc3dc0d464500576f6458f6706df68d26c`; the five TTFs are listed in Task 3 with their sums;
@@ -121,7 +128,8 @@ Task 4. The names of plan 5a's "Plan 4's names" table apply here too.
     points #2E3135, #3D74D6, #3C3F44, #3D4658, #393C41, #383B40, #2E3135 (card, selection, toolbar row, focused header,
     table header, bottom strip, terminal).
 13. A theme file built by Task 3's table loads with plan 2's loader (`JasperTheme.parse`, checked on 2026-10-16 against
-    `main`'s jasper-ui jar): both variants, three schemes, eight light and seven dark overrides.
+    `main`'s jasper-ui jar): both variants, three schemes, eight light and seven dark overrides (nine and eight with plan
+    6b's `border.divider`, Task 3 step 5).
 14. `FakePluginHost.start(info, requires, optional, plugin)` starts a plugin and publishes its staged services to
     plugins that require it (`FakePluginHost.java:219-240`); services are published only in `start`
     (`FakePluginContext.java:200-207`).
@@ -131,7 +139,8 @@ Task 4. The names of plan 5a's "Plan 4's names" table apply here too.
     and `Services.publish` (checked with `javap -c`). Task 3's theme file meets every value its test asserts, including
     the 0.6 L* tolerance of the unnamed-role rule (largest gap 0.17) and Dark `status.danger` at 4.50:1 on the card.
 16. `tools/visual/pairs.json` is a list of `{name, mock, crop, render}` with `crop` as `x,y,w,h` in mock pixels
-    (`tools/visual/README.md`); `compare_all.py OUT_DIR [FILTER]` runs them. `ThirdPartyNoticesTest` requires the
+    (`tools/visual/README.md`), with an optional `min_agreement` and `colours` (plan 4c); `compare_all.py OUT_DIR [FILTER]`
+    runs them and `check_pairs.py OUT_DIR [FILTER]` passes or fails the ones with a floor. `ThirdPartyNoticesTest` requires the
     components after Jasper sorted by name ignoring case (`ThirdPartyNoticesTest.java:27`), so "IBM Plex" goes before
     "IntelliJ Platform icons". tomlj's `TomlTable.keyPathSet()` lists every leaf key path, quoted keys whole.
 
@@ -166,7 +175,9 @@ Record each in `docs/STATUS.md` (Task 5) and in this plan's status banner.
    L* ("the chroma of the Enterprise neutrals"); in Dark, the card's L* plus that Light ΔL* (the lighter side) with the
    chroma of the nearest named Dark neutral. Neutral roles are the surfaces, the opaque non-error borders, the
    field-raised text, the segment, toggle and secondary-button roles, `status.idle` and `hue.neutral`. Translucent roles,
-   links, errors, successes, `accent.hover` and the tab indicators keep Slate Cobalt's value for the variant. Dark's
+   links, errors, successes, `accent.hover` and the tab indicators keep Slate Cobalt's value for the variant (with plan 6b
+   on the branch, `surface.tabstrip`, `tab.indicator`, `surface.scrim` and `border.divider` take 6b's ruling 2: Task 3
+   step 5). Dark's
    `status.danger`, `hue.purple` and the `*.secondary` text on the accent keep their Light hue lightened in 0.25 L* steps
    to 4.5:1 on the card (7.6). The `light` scheme is Slate Cobalt Light's with the background #FFFFFF the mock and
    `surface.terminal` show; `dark` and `dark-terminal` take Slate Cobalt Dark's bold foreground, cursor and selection
@@ -176,8 +187,9 @@ Record each in `docs/STATUS.md` (Task 5) and in this plan's status banner.
    `SurfaceContrast.apart`'s direction reaches only `surface.footer` there; the rule is left to plan 7, which owns the
    header strips. Cost if wrong: plan 7 revisits one derived role.
 9. **The mock comparison.** The JUnit part samples the mocks where they paint a theme role (fact 12); the visual part
-   is opt-in `tools/visual/pairs.json` crops pairing 2x renders of the four gallery panels (Sessions, Tunnels, SFTP, File
-   Servers) under the shipped kit with the mocks' panel regions. The classic compositions those regions show (the
+   is `tools/visual/pairs.json` crops pairing 2x renders of the four gallery panels (Sessions, Tunnels, SFTP, File
+   Servers) under the shipped kit with the mocks' panel regions, with floors and colours that plan 4c's `check_pairs.py`
+   holds (Execution notes, ruling 11). The classic compositions those regions show (the
    Sessions tree, Properties, the tunnels table) and the workspace chrome are plans 10, 6 and 7's, so the pairs compare
    controls, metrics and type only, and later plans re-pair them. Cost if wrong: crops move.
 10. **Font registration accepts the typographic family.** A static face's legacy family (ID 1) carries its weight
@@ -197,12 +209,12 @@ face is registered, else in the platform face for that role. Under such a kit th
 standard UI font for FlatLaf. A look whose files are missing posts one Warning. The default kit is unchanged.
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/FaceSet.java` (rewrite), `Typography.java:71-79`
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:122-158`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/FaceSet.java` (rewrite), `Typography.java:73-91`
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java:178-222`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/KitParser.java` (faces), `Presentation.java` (dropped defaults)
 - Create: `jasper-app/src/main/java/dev/jasper/app/application/LookFonts.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (constructor, `startPlugins`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java:96-104,175-183`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeController.java:46,162-164,234-246`
 - Test: `jasper-ui/src/test/java/dev/jasper/ui/metrics/FaceSetTest.java`; `jasper-app/src/test/java/dev/jasper/app/application/LookFontsTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/application/LookNoticeTest.java`; `jasper-app/src/test/java/dev/jasper/app/presentation/KitParserTest.java`
 
@@ -254,7 +266,9 @@ class FaceSetTest {
 }
 ```
 
-Create `jasper-app/src/test/java/dev/jasper/app/application/LookFontsTest.java`:
+Create `jasper-app/src/test/java/dev/jasper/app/application/LookFontsTest.java` (the faces are the bundled Cousine
+files renamed to a family no machine installs, because an installed copy of a font hides the file's full name on macOS:
+Execution notes, ruling 3):
 
 ```java
 package dev.jasper.app.application;
@@ -266,23 +280,44 @@ import dev.jasper.app.presentation.KitParser;
 import dev.jasper.ui.metrics.FaceSet;
 import dev.jasper.ui.metrics.TypeScale;
 import dev.jasper.ui.metrics.Typography;
+import java.awt.Font;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /** Spec 5.6 and 5.9: a kit's font files register under their declared family, and a role draws in its face. */
 class LookFontsTest {
-    static FontFile cousine(String style) throws Exception {
+    static byte[] bundled(String style) throws IOException {
         String path = "/dev/jasper/app/fonts/cousine/CousineNerdFontMono-" + style + ".ttf";
-        try (var in = LookFontsTest.class.getResourceAsStream(path)) { return FontFile.read("fonts/cousine-" + style + ".ttf", in.readAllBytes()); }
+        try (var in = LookFontsTest.class.getResourceAsStream(path)) { return in.readAllBytes(); }
+    }
+
+    /** The bundled Cousine face as it ships; a machine that has Cousine installed may hide it. */
+    static FontFile cousine(String style) throws IOException { return FontFile.read("fonts/cousine-" + style + ".ttf", bundled(style)); }
+
+    /** Cousine with its family renamed in the name table (same length), so it registers on every machine. */
+    static FontFile lookFace(String style) throws IOException {
+        byte[] bytes = bundled(style);
+        for (var charset : List.of(StandardCharsets.UTF_16BE, StandardCharsets.ISO_8859_1)) {
+            byte[] from = "Cousine Nerd Font Mono".getBytes(charset), to = "Jasper Look Face Tests".getBytes(charset);
+            for (int i = 0; i + from.length <= bytes.length; i++)
+                if (Arrays.equals(bytes, i, i + from.length, from, 0, from.length)) System.arraycopy(to, 0, bytes, i, to.length);
+        }
+        return FontFile.read("fonts/look-" + style + ".ttf", bytes);
     }
 
     @Test void filesOfTheDeclaredFamilyRegisterAndTheirRolesDrawInThem() throws Exception {
-        var regular = cousine("Regular"), bold = cousine("Bold");
+        FontFile regular = lookFace("Regular"), bold = lookFace("Bold");
         assertThat(regular.named()).isTrue();
+        assertThat(regular.family()).isEqualTo("Jasper Look Face Tests");
         var faces = new KitParser.Faces(Optional.of(new KitParser.UiFaces(regular.family(), regular, regular, bold)),
             Optional.of(new KitParser.DataFaces(regular.family(), regular, bold)));
         assertThat(LookFonts.register(faces)).isEmpty();
+        assertThat(LookFonts.register(faces)).as("registering again is harmless").isEmpty();
         var typography = Typography.of(TypeScale.DEFAULT, FaceSet.of(regular.fullName(), regular.fullName(), bold.fullName(),
             regular.fullName(), bold.fullName()), Typography.UserFont.NONE);
         assertThat(typography.font(Typography.Role.BODY).getFontName(Locale.ROOT)).isEqualTo(regular.fullName());
@@ -299,6 +334,15 @@ class LookFontsTest {
             "fonts/cousine-Regular.ttf: its family is " + regular.family() + ", not Another Family; that text uses the platform font",
             "fonts/broken.ttf: its names cannot be read; that text uses the platform font",
             "fonts/cousine-Regular.ttf: its family is " + regular.family() + ", not Another Family; that text uses the platform font");
+    }
+
+    /** Spec 5.9: a file whose full name does not resolve once registered (an installed font of its family hides it) is named. */
+    @Test void aFileAnInstalledFontHidesIsNamedWhereItIsHidden() throws Exception {
+        var regular = cousine("Regular");
+        var problems = LookFonts.register(new KitParser.Faces(Optional.empty(), Optional.of(new KitParser.DataFaces(regular.family(), regular, regular))));
+        boolean hidden = !new Font(regular.fullName(), Font.PLAIN, 1).getFontName(Locale.ROOT).equals(regular.fullName());
+        String line = "fonts/cousine-Regular.ttf: an installed font named " + regular.family() + " hides it; that text uses the platform font";
+        assertThat(problems).isEqualTo(hidden ? List.of(line, line) : List.of());
     }
 }
 ```
@@ -329,7 +373,7 @@ class LookNoticeTest {
     @TempDir Path home;
 
     @Test void aLookMissingFilesPostsOneWarning() throws Exception {
-        Path dev = LookFixtures.plugin(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
+        Path dev = LookFixtures.loadable(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
             + LookFixtures.provider("look.kit.toml") + "themes = [\"themes/look.json\"]\n", Map.of(
                 "look.kit.toml", "kit = 1\nbase = \"default\"\n[type.ui]\nfamily = \"Example Sans\"\nregular = \"fonts/a.ttf\"\n"
                     + "medium = \"fonts/a.ttf\"\nsemibold = \"fonts/a.ttf\"\n[defaults]\n\"ui.theme.dark\" = \"look\"\n",
@@ -361,7 +405,8 @@ class LookNoticeTest {
 }
 ```
 
-In `KitParserTest.theShippedShapeParsesIntoEveryValueItNames`, add after the `colors()` assertions:
+In `KitParserTest.theShippedShapeParsesIntoEveryValueItNames`, add after the `colors()` assertions (the line
+`assertThat(parsed.kit().colors().navigationSurface()).isEqualTo(SemanticColor.SURFACE_CARD);`, once in the file):
 
 ```java
         assertThat(parsed.kit().faces()).isEqualTo(dev.jasper.ui.metrics.FaceSet.of(PLEX_SANS, "IBM Plex Sans Medm", "IBM Plex Sans SmBld",
@@ -449,10 +494,11 @@ def edit(name, edits):
     path.write_text(text, encoding="utf-8")
 edit("jasper-ui/src/main/java/dev/jasper/ui/metrics/Typography.java", [
     ('''        int weight = selected && role == Role.LABEL ? 500 : scale.weight(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO
+        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO || role == Role.RUN_DETAIL
             ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : family;''',
      '''        int weight = selected && role == Role.LABEL ? 500 : scale.weight(role);
-        boolean data = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO;
+        boolean data = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO
+            || role == Role.RUN_DETAIL;
         String face = data ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : platformDefault ? faces.uiFace(weight) : "";
         if (!face.isEmpty() && !face.equals(Font.MONOSPACED)) {
             // A kit's own face is a whole weight: drawn as it is, at the role's size. One that is not registered draws in
@@ -462,11 +508,14 @@ edit("jasper-ui/src/main/java/dev/jasper/ui/metrics/Typography.java", [
         }
         String resolved = data ? Font.MONOSPACED : family;''', 1)])
 edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java", [
+    ('''real FlatLaf, the
+     * platform family at the kit's body size''', '''real FlatLaf, the
+     * kit's own UI face, else the platform family, at the kit's body size''', 1),
     ('''        Object priorCaps = UIManager.get("PasswordField.showCapsLock");
         String family = KitFixtures.platformFamily();''',
      '''        Object priorCaps = UIManager.get("PasswordField.showCapsLock");
         Object priorOverride = UIManager.get("Jasper.uiFontFamilyOverride");''', 1),
-    ('''            UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));''',
+    ('''            UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(kit.type().body())));''',
      '''            UIManager.put("defaultFont", font(kit, false));
             // A kit with faces of its own draws them: the gallery's default font then sets only the size.
             if (kit.faces().namesUiFaces()) UIManager.put("Jasper.uiFontFamilyOverride", false);''', 1),
@@ -474,23 +523,27 @@ edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/KitGallery.java", [
      '''            UIManager.put("PasswordField.showCapsLock", priorCaps);
             UIManager.put("Jasper.uiFontFamilyOverride", priorOverride);''', 1),
     ('''        String family = KitFixtures.platformFamily();
-        float scale = UIScale.getUserScaleFactor();
-        UIManager.put("defaultFont", new Font(family, Font.PLAIN, fixture.name().contains("font24") ? 24 : 13));''',
-     '''        float scale = UIScale.getUserScaleFactor();
-        UIManager.put("defaultFont", font(context.kit(), fixture.name().contains("font24")));''', 1),
-    ('''    /** The gallery's focus manager: the focus owner is whatever {@link #applyState} focused. */''',
-     '''    /** The gallery's default font: the platform family at 13 (24 when large), or a kit's own UI face at its body size. */
+        float scale = UIScale.getUserScaleFactor();''',
+     '''        float scale = UIScale.getUserScaleFactor();''', 1),
+    ('''        UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(fixture.name().contains("font24") ? 24 : context.kit().type().body())));''',
+     '''        UIManager.put("defaultFont", font(context.kit(), fixture.name().contains("font24")));''', 1),
+    ('''    /** The developer font size for a body of {@code points} at the gallery's scale. */''',
+     '''    /**
+     * The gallery's default font: the platform family, or a kit's own regular UI face, at the kit's body size (24 points
+     * when {@code large}) at the gallery's scale.
+     */
     static Font font(dev.jasper.ui.kit.Kit kit, boolean large) {
-        if (!kit.faces().namesUiFaces()) return new Font(KitFixtures.platformFamily(), Font.PLAIN, large ? 24 : 13);
-        return new Font(kit.faces().uiFace(400), Font.PLAIN, 1).deriveFont(large ? 24f : kit.type().body());
+        String face = kit.faces().uiFace(400).isEmpty() ? KitFixtures.platformFamily() : kit.faces().uiFace(400);
+        return new Font(face, Font.PLAIN, bodySize(large ? 24 : kit.type().body()));
     }
 
-    /** The gallery's focus manager: the focus owner is whatever {@link #applyState} focused. */''', 1)])
+    /** The developer font size for a body of {@code points} at the gallery's scale. */''', 1)])
 PY
 ```
 
-Plan 4 may have edited `installed` and `capture` for its classic fixtures; the anchors above are plan 1's text. If one
-moved, keep plan 4's change and apply the same substitution (the default font comes from `font(kit, …)`).
+The anchors are the current text: plan 4c made the gallery's font follow its scale and the kit's body size
+(`bodySize`), so under the default kit `font(kit, …)` is exactly the font the gallery set before
+(`new Font(platformFamily, Font.PLAIN, bodySize(points))`).
 
 - [ ] **Step 4: Parse the faces into the kit, register them and post the notice**
 
@@ -513,7 +566,9 @@ import java.util.Locale;
 /**
  * Registers a look's font files in this JVM (spec 4.9 and 5.6), right after the bundled fonts and before any font list
  * is cached. A file whose names cannot be read, that does not decode, or whose family is not the declared one is not
- * registered: its face then draws in the platform face, and it is named for the look's notice. EDT or bootstrap.
+ * registered, and one whose full name does not resolve once registered (an installed font of its family hides it: macOS
+ * finds installed fonts by family or PostScript name, never by full name) cannot be drawn: its face then draws in the
+ * platform face, and it is named for the look's notice. EDT or bootstrap.
  */
 final class LookFonts {
     private LookFonts() { }
@@ -544,8 +599,11 @@ final class LookFonts {
             problems.add(file.path() + ": Java names it " + font.getFontName(Locale.ROOT) + ", not " + file.fullName() + fallback);
             return;
         }
-        // A face already installed under the same name makes this return false; drawing by its name still works.
+        // False when a font of this family or full name is already registered or installed: a copy this JVM registered
+        // still resolves by its full name, an installed one (macOS) does not, and that face would draw in Dialog.
         GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+        if (!new Font(file.fullName(), Font.PLAIN, 1).getFontName(Locale.ROOT).equals(file.fullName()))
+            problems.add(file.path() + ": an installed font named " + file.family() + " hides it" + fallback);
     }
 }
 ```
@@ -651,15 +709,16 @@ top of the private constructor); `kit` there is the constructor's parameter. Add
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.architecture.*' --continue`
-Expected: PASS: `FaceSetTest` (2), `LookFontsTest` (2), `LookNoticeTest` (1), `KitParserTest` with the faces, and every
+Expected: PASS: `FaceSetTest` (2), `LookFontsTest` (3), `LookNoticeTest` (1), `KitParserTest` with the faces, and every
 jasper-ui test (`TypographyTest`, the calibration and gallery suites: the default kit draws exactly as before).
 
 - [ ] **Step 6: Prove the gallery unchanged and commit**
 
 Run `./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark` and `-Pjasper.galleryTheme=light` and compare
-`jasper-ui/build/gallery/dark-1x` and `light-1x` with the copies made from `main` the same way in a scratch worktree
-(`git worktree add /tmp/claude-5b-base main`, run the gallery there, `cmp` each file, then `git worktree remove`):
-every file is byte-identical.
+`jasper-ui/build/gallery/dark-1x` and `light-1x` with the copies made from `HEAD` (this task's uncommitted base) the same
+way in a scratch worktree (`scratch=$(mktemp -d)/base; git worktree add --detach "$scratch" HEAD`, run the gallery there,
+`cmp` each file, then `git worktree remove --force "$scratch"`): every file is byte-identical (the JSON beside each PNG
+too).
 
 ```bash
 git add jasper-ui/src jasper-app/src docs/design/theme-engine/migration.csv
@@ -695,10 +754,10 @@ theme files, each of which must load.
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/appearance/PluginThemes.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeLibrary.java`, `ThemeSelection.java:48-56`, `ThemeFolder.java:31-35,64-67,93-96`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/appearance/ThemeLibrary.java`, `ThemeSelection.java:48-56`, `ThemeFolder.java:30-32,66-67,93-94`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginSelection.java` (`themes()`)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:246-247,963`, `SettingsAppearance.java:52-58`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/InstalledThemes.java:21-23`, `AppearanceSelection.java:90-96`, `ThemeMenu.java:74-77`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:297-298,1066-1067`, `SettingsAppearance.java:53-60`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/InstalledThemes.java:20-23`, `AppearanceSelection.java:92`, `ThemeMenu.java:74-77`
 - Modify: `jasper-app/src/test/java/dev/jasper/app/architecture/ColourLiteralScanTest.java:15-16`
 - Test: `jasper-app/src/test/java/dev/jasper/app/appearance/PluginThemesTest.java`, `AppearanceSelectionTest.java`
 
@@ -1001,7 +1060,7 @@ public record PluginThemes(List<Provided> provided, Map<String, String> reserved
         };
         String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
-        return text.startsWith("﻿") ? text.substring(1) : text;
+        return text.startsWith("\uFEFF") ? text.substring(1) : text;
     }
 
     /** The provided theme with this id. */
@@ -1279,7 +1338,7 @@ and `EnterprisePlugin`, whose `start` only publishes it. `stagePlugins` bundles 
 - Create: `jasper-app/src/main/resources/dev/jasper/app/about/licenses/ibm-plex.OFL.txt`
 - Modify: `jasper-app/build.gradle.kts:42-58` (`stagePlugins`), `jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`,
   `gradle/third-party-notices.gradle.kts`, `docs/design/theme-engine/migration.csv`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/BundledSamplePluginTest.java:63,101`, `PluginZipsTest.java:19,42`,
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/BundledSamplePluginTest.java:78,116`, `PluginZipsTest.java:19,42`,
   `jasper-app/src/test/java/dev/jasper/app/architecture/ColourLiteralScanTest.java` (the loader test names Enterprise)
 - Test: `plugins/enterprise/src/test/java/dev/jasper/enterprise/EnterprisePluginTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/appearance/EnterpriseThemeTest.java`
@@ -1494,9 +1553,8 @@ class EnterpriseThemeTest {
 }
 ```
 
-Check two names before running: `TerminalColors` exposes `background()`, `foreground()` and the ANSI list (read
-`jasper-ui/src/main/java/dev/jasper/ui/theme/TerminalColors.java` and use its accessor names), and `ColorMath.hex`
-returns `#RRGGBB` for an opaque colour (`ColorMath.java:51`).
+`TerminalColors` exposes `background()`, `foreground()` and `ansi()`, and `ColorMath.hex` returns `#RRGGBB` for an opaque
+colour (checked by compiling the class at `e502e102b`).
 
 In `BundledSamplePluginTest`, the bundled set grows by Enterprise (off by default):
 
@@ -1846,11 +1904,11 @@ edit("gradle/third-party-notices.gradle.kts", [
      '''        listed.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { problems.add("$it is listed twice") }
         // Font files ship inside plugin jars, not as Maven modules: each must be listed in a component's files (spec 14.1).
         val fonts = rootProject.subprojects.filter { it.path.startsWith(":jasper-plugin-") }.flatMap { plugin ->
-            val resources = plugin.file("src/main/resources")
-            val descriptor = resources.resolve("plugin.toml")
+            val pluginResources = plugin.file("src/main/resources")
+            val descriptor = pluginResources.resolve("plugin.toml")
             val id = if (descriptor.isFile) Regex("(?m)^id\\\\s*=\\\\s*\\"([^\\"]+)\\"").find(descriptor.readText())?.groupValues?.get(1) else null
-            if (id == null) emptyList() else resources.walkTopDown().filter { it.isFile && (it.extension == "ttf" || it.extension == "otf") }
-                .map { "$id/" + it.relativeTo(resources).invariantSeparatorsPath }.toList()
+            if (id == null) emptyList<String>() else pluginResources.walkTopDown().filter { it.isFile && (it.extension == "ttf" || it.extension == "otf") }
+                .map { "$id/" + it.relativeTo(pluginResources).invariantSeparatorsPath }.toList()
         }.toSortedSet()
         (fonts - listedFiles.toSet()).forEach { problems.add("$it ships but no component in notices.toml lists it in files") }
         (listedFiles.toSet() - fonts).forEach { problems.add("$it is listed in notices.toml files but no bundled plugin ships it") }''', 1)])
@@ -1867,6 +1925,45 @@ plugins/enterprise/src/test/java/dev/jasper/enterprise/EnterprisePluginTest.java
 ```
 
 and `EnterpriseThemeTest.java`'s row (owner `app.appearance`; it imports `java.awt` and `dev.jasper.ui`) in plan 5a's form.
+
+**If plan 6b's Task 1 is on the branch** (the last "Before you start" check prints 1: `border.divider` is the ninth
+overridable derived role, approved on 2026-10-17), the theme takes 6b's chrome targets as 6b's ruling 2 and Execution
+notes R47 give them, over Rulings 7's values for those roles (Light `surface.tabstrip` `#E8E9EB`, `tab.indicator`
+`#2F65CA`, `surface.scrim` `#00000036`, `border.divider` `#D3D6DA`; Dark `#3A3D42`, `#3D74D6`, `#00000036`,
+`#4A4D53`), and the test follows (Execution notes, ruling 8). Otherwise skip this script, leave the eight values to plan
+6b's merge (its R47) and say so in the status banner.
+
+```bash
+grep -c 'BORDER_DIVIDER("border.divider", true)' jasper-ui/src/main/java/dev/jasper/ui/theme/DerivedColor.java   # 1: run the script
+python3 -I - <<'PY'
+"""Plan 5b Task 3 step 5, with plan 6b on the branch: its chrome targets in the shipped theme (6b R47)."""
+import json, pathlib
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+F = "plugins/enterprise/src/main/resources/themes/enterprise.json"
+edit(F, [
+    ('''"surface.tabstrip": "#DDDFE2"''', '''"surface.tabstrip": "#E8E9EB"''', 1),
+    ('''"surface.tabstrip": "#474A4F"''', '''"surface.tabstrip": "#3A3D42"''', 1),
+    ('''"surface.scrim": "#1B1F2740"''', '''"surface.scrim": "#00000036"''', 1),
+    ('''"surface.scrim": "#0A0C108C"''', '''"surface.scrim": "#00000036"''', 1),
+    ('''"tab.indicator": "#2563C9"''', '''"tab.indicator": "#2F65CA"''', 1),
+    ('''"tab.indicator": "#5B9BF5"''', '''"tab.indicator": "#3D74D6"''', 1),
+    ('''      "warning.border": "#E6CF95"''', '''      "warning.border": "#E6CF95", "border.divider": "#D3D6DA"''', 1),
+    ('''"warning.ground": "#4A4128", "warning.border": "#6B5A30"''', '''"warning.ground": "#4A4128", "warning.border": "#6B5A30", "border.divider": "#4A4D53"''', 1)])
+json.loads(pathlib.Path(F).read_text(encoding="utf-8"))
+edit("jasper-app/src/test/java/dev/jasper/app/appearance/EnterpriseThemeTest.java", [
+    ('''"surface.control.selected", "surface.menu", "surface.tabstrip", "surface.emptyTile",''',
+     '''"surface.control.selected", "surface.menu", "surface.emptyTile",''', 1),
+    ('''DerivedColor.WARNING_GROUND, "#FBF1DA", DerivedColor.WARNING_BORDER, "#E6CF95");''',
+     '''DerivedColor.WARNING_GROUND, "#FBF1DA", DerivedColor.WARNING_BORDER, "#E6CF95", DerivedColor.BORDER_DIVIDER, "#D3D6DA");''', 1),
+    ('''DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30");''',
+     '''DerivedColor.WARNING_GROUND, "#4A4128", DerivedColor.WARNING_BORDER, "#6B5A30", DerivedColor.BORDER_DIVIDER, "#4A4D53");''', 1)])
+PY
+```
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
@@ -1906,7 +2003,9 @@ sources and from the staged jar; `EnterpriseFixtureTest` checks that the parsed 
 `EnterpriseKitRenderTest` registers the real Plex files and renders the gallery under the shipped kit in Enterprise Light
 and Dark, writing images under `jasper-app/build/enterprise-kit/`; `tools/visual/pairs.json` gains the opt-in crops
 pairing those renders with the Workstation and Dark Mode mocks (Rulings 9); `KitFixtures.themes()` gains Enterprise
-Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4.
+Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4. Plan 6a's chrome tests and plan 8a's Run window render
+switch from their fixtures to the shipped kit, Plex and the Enterprise theme (plan 6a Rulings 26, plan 8a R8, R9 and
+R16; Execution notes, rulings 9 and 10).
 
 **Files:**
 - Create: `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseResources.java`
@@ -1916,11 +2015,17 @@ Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4.
   `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseKitRenderTest.java`,
   `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseFirstWindowTest.java`,
   `jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-enterprise.tsv` (generated in Step 3)
-- Modify: `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedRolesTableTest.java` (the Enterprise theme's derived roles)
-- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:42-59` (`themes()`),
-  `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java:25-31`, `jasper-ui/build.gradle.kts:20-27`,
+- Modify: `jasper-ui/src/test/java/dev/jasper/ui/theme/DerivedRolesTableTest.java` (the Enterprise theme's derived roles),
+  `jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTagFace.java:13-18,63` (the box against its tint)
+- Modify: `jasper-ui/src/testFixtures/java/dev/jasper/ui/testsupport/KitFixtures.java:130-147` (`themes()`),
+  `jasper-ui/src/test/java/dev/jasper/ui/testsupport/KitFixturesTest.java:25-30`, `jasper-ui/build.gradle.kts:18-27`,
   `jasper-app/build.gradle.kts` (`tasks.test` inputs), `tools/visual/pairs.json`, `tools/visual/README.md`,
   `docs/design/theme-engine/migration.csv`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java`,
+  `jasper-app/src/test/java/dev/jasper/app/workspace/WindowChromeMenusTest.java:133-134`,
+  `jasper-app/src/test/java/dev/jasper/app/workspace/EnterpriseMenuRowMockTest.java:6-8,26-30,91-92`,
+  `jasper-app/src/test/java/dev/jasper/app/palette/RunWindowRenderTest.java:24-44,91-92,127-136`
+- Delete: `jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json`
 
 **Interfaces:**
 - Consumes: Task 1's `LookFonts.register`, `FaceSet.uiFace`; Task 2's `PluginSelection.themes()`, `ThemeLibrary.of(PluginThemes)`,
@@ -1928,7 +2033,8 @@ Light and Dark (16.1.2); `EnterpriseHomeTest` is Review Focus 4.
   `PluginStateStore.enabling(id, enabled, optIn)`, `ConfigService(Path, boolean, DefaultSource)`; plan 4's
   `KitFixtures.enterprise()`, `KitFixtures.enterpriseTokens()`, `Kit.CLASSIC`, `TypeScale.withBody` (5a's "Plan 4's names").
 - Produces: `public final class dev.jasper.app.testsupport.EnterpriseResources` with `ROOT`, `RESOURCES`,
-  `static KitParser.Files files()`, `static PresentationFacts facts()`, `static JasperTheme theme()`; the renders
+  `static KitParser.Files files()`, `static PresentationFacts facts()`, `static Kit kit()` (Plex registered),
+  `static ChromeSpec chrome()`, `static JasperTheme theme()`; the renders
   `jasper-app/build/enterprise-kit/{light,dark}/<fixture>.png` and `<panel>@2x.png`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1938,9 +2044,16 @@ Create `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseResources.
 ```java
 package dev.jasper.app.testsupport;
 
+import dev.jasper.app.presentation.ChromeSpec;
+import dev.jasper.app.presentation.FontFile;
 import dev.jasper.app.presentation.KitParser;
 import dev.jasper.app.presentation.PresentationFacts;
+import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.theme.JasperTheme;
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.awt.GraphicsEnvironment;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -1948,7 +2061,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
-/** The Enterprise plugin's resources as the sources hold them, read the way the host reads a jar (bounded, inside the root). */
+/**
+ * The Enterprise plugin's resources as the sources hold them, read the way the host reads a jar (bounded, inside the
+ * root): its kit (with its IBM Plex files registered in this JVM, as the application registers them), chrome and theme.
+ */
 public final class EnterpriseResources {
     /** The repository, from the test task's {@code jasper.repoRoot}. */
     public static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
@@ -1973,10 +2089,28 @@ public final class EnterpriseResources {
             List.of("themes/enterprise.json")));
     }
 
-    /** The shipped Enterprise theme, parsed by the production loader. */
-    public static JasperTheme theme() {
-        try { return JasperTheme.parse(Files.readString(RESOURCES.resolve("themes/enterprise.json")), "enterprise"); }
+    /** The shipped kit, parsed by the production parser, after its IBM Plex files are registered in this JVM. */
+    public static Kit kit() {
+        var parsed = facts().parsed().orElseThrow();
+        for (FontFile file : parsed.faces().files()) {
+            // A false return means a copy is registered already, which draws by the same name.
+            try { GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(Font.createFont(Font.TRUETYPE_FONT, new ByteArrayInputStream(file.bytes()))); }
+            catch (FontFormatException | IOException failure) { throw new AssertionError(file.path() + " is not a font", failure); }
+        }
+        return parsed.kit();
+    }
+
+    /** The shipped kit file's chrome points. */
+    public static ChromeSpec chrome() { return facts().parsed().orElseThrow().chrome(); }
+
+    private static JasperTheme theme;
+
+    /** The shipped Enterprise theme, parsed once by the production loader. */
+    public static synchronized JasperTheme theme() {
+        if (theme != null) return theme;
+        try { theme = JasperTheme.parse(Files.readString(RESOURCES.resolve("themes/enterprise.json")), "enterprise"); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
+        return theme;
     }
 }
 ```
@@ -2147,6 +2281,8 @@ class EnterpriseFixtureTest {
         assertThat(shipped.faces().uiFace(600)).isEqualTo("IBM Plex Sans SmBld");
         assertThat(shipped.faces().dataRegular()).isEqualTo("IBM Plex Mono");
         assertThat(shipped.faces().dataMedium()).isEqualTo("IBM Plex Mono Medm");
+        assertThat(EnterpriseResources.facts().parsed().orElseThrow().chrome()).as("plan 6a's EnterpriseLook.CHROME is the shipped table")
+            .isEqualTo(dev.jasper.app.testsupport.EnterpriseLook.CHROME);
     }
 }
 ```
@@ -2474,15 +2610,31 @@ edit("jasper-app/build.gradle.kts", [
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
     // The Enterprise conformance, fixture and render tests read the plugin's sources (spec 16.1.5 and 16.1.6).
     inputs.dir(rootProject.file("plugins/enterprise/src/main/resources")).withPathSensitivity(PathSensitivity.RELATIVE)''', 1)])
+edit("jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTagFace.java", [
+    (''' * against {@code surface.card}, the ground the faint tint stands on and the role {@code tag.border} is mixed with; the
+ * opaque hue surface is only painted at the tile share.''',
+     ''' * against {@code surface.card}, the ground the faint tint stands on and the role {@code tag.border} is mixed with; the
+ * opaque hue surface is only painted at the tile share. The box also stands the structural guard apart from that tint as
+ * painted, moving toward {@code text.primary} where it does not (Enterprise Dark's blue tag, plan 5b).''', 1),
+    ('''        label.edge = ThemePainting.painted(chip.context(), edge(node.hue()));''',
+     '''        var edge = ThemePainting.painted(chip.context(), edge(node.hue()));
+        var card = ThemePainting.color(chip.context(), SemanticColor.SURFACE_CARD);
+        var tile = ColorMath.opacity(label.fill == null ? label.getForeground() : label.fill, ThemePainting.tileShare(chip.context()));
+        var tint = ColorMath.mix(tile, card, tile.getAlpha() / 255.0);
+        label.edge = SurfaceContrast.Guard.STRUCTURAL.apply(edge, tint, ThemePainting.color(chip.context(), SemanticColor.TEXT_PRIMARY));''', 1)])
 PY
 ```
 
-`expected` is `<repo>/tools/themes/testdata/expected`, so four `getParent()` calls give the repository root.
+`expected` is `<repo>/tools/themes/testdata/expected`, so four `getParent()` calls give the repository root. The
+`ClassicTagFace` edit is Execution notes, ruling 13: with Enterprise Dark in the theme set, plan 4c's
+`ClassicIndicatorsTest.aClassicTagsLabelAndBoxStandOutAsPainted` measured the blue tag's box at 1.28:1 on its tint (the
+box was guarded against `surface.card` only); a box that already holds keeps its colour, so every other palette, the
+default look and Enterprise Light paint as before.
 
 Freeze the Enterprise theme's derived roles: the failing run above wrote the computed table to
 `jasper-ui/build/derived-roles/derived-roles-enterprise.tsv`. Check it has 46 rows (Light and Dark, 23 roles each) and
-that its values come from spec 7.6's theme (for example Light's `surface.rowHover` is `mix(accent, surface.card, 8%)` of
-its accent and card), then copy it:
+that its values come from spec 7.6's theme (the override keys give their values, Light's `surface.rowHover` `#eef2fa`
+among them, while Dark's `surface.rowHover` keeps its recipe, `#2f3642` in the dry run), then copy it:
 
 ```bash
 python3 -I - <<'PY'
@@ -2495,48 +2647,191 @@ pathlib.Path("jasper-ui/src/test/resources/dev/jasper/ui/theme/derived-roles-ent
 PY
 ```
 
-- [ ] **Step 4: Add the visual pairs**
+- [ ] **Step 4: The chrome tests and the Run window under the shipped look**
 
-Append the opt-in crops (Rulings 9; `crop` is `x,y,w,h` in the mock's 2x pixels) to `tools/visual/pairs.json`:
+Plan 6a Rulings 26: `EnterpriseLook` takes the shipped kit with Plex registered, its chrome and the Enterprise theme;
+`enterprise-fixture.json` goes; the row test asserts IBM Plex again (6a Rulings 20); `EnterpriseMenuRowMockTest` checks
+the titles on every platform (6a Rulings 29). Plan 8a R8, R9 and R16: `RunWindowRenderTest.render` draws the shipped kit
+and theme (Enterprise Dark for Dark) at the gallery's font, which is now the kit's own face at its 12-point body, and
+FONTS joins `CHECKED`; the footer buttons' left edges, which follow the classic label padding where the mocks draw every
+button 70 px wide, move to a FOOTER owner that plan 8b checks (Execution notes, ruling 10).
+
+```bash
+git rm -q jasper-app/src/test/resources/dev/jasper/app/testsupport/enterprise-fixture.json
+python3 -I - <<'PY'
+"""Plan 5b Task 4 step 4: plan 6a's chrome tests and plan 8a's Run window render under the shipped look."""
+import pathlib, re
+def edit(name, edits):
+    path = pathlib.Path(name); text = path.read_text(encoding="utf-8")
+    for old, new, count in edits:
+        if text.count(old) != count: raise SystemExit(f"{name}: expected {count} of {old!r}, found {text.count(old)}")
+        text = text.replace(old, new)
+    path.write_text(text, encoding="utf-8")
+L = "jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java"
+text = pathlib.Path(L).read_text(encoding="utf-8")
+theme = re.compile(r"    /\*\*(?:(?!\*/).)*\*/\n    public static synchronized JasperTheme theme\(\) \{\n.*?\n        return theme;\n    \}\n", re.S)
+if len(theme.findall(text)) != 1: raise SystemExit("EnterpriseLook: theme() moved")
+pathlib.Path(L).write_text(theme.sub("    /** The shipped Enterprise theme, Light and Dark. */\n"
+    "    public static JasperTheme theme() { return EnterpriseResources.theme(); }\n", text), encoding="utf-8")
+edit(L, [
+    ('''import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.testsupport.KitFixtures;
+import dev.jasper.ui.theme.JasperTheme;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+''', '''import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.theme.JasperTheme;
+''', 1),
+    (''' * Enterprise as the chrome tests run it before plan 5b ships the plugin: plan 4a's Enterprise fixture kit (the classic
+ * base with the kit file's tokens and 12 px body, in the platform faces), spec 5.1's chrome table, and a fixture theme
+ * holding spec 7.6's named roles and override keys over Slate Cobalt (the roles the mocks show). Tests restore the
+ * default look when they finish. Plan 5b replaces the kit, faces and theme with the shipped ones.''',
+     ''' * Enterprise as the chrome tests run it: the shipped kit with its IBM Plex files registered, its chrome table and the
+ * shipped Enterprise theme, read from the plugin's sources ({@link EnterpriseResources}). Tests restore the default look
+ * when they finish.''', 1),
+    ('''    /** Spec 5.1's {@code [chrome]} table, as the Enterprise kit file lists it. */''',
+     '''    /** Spec 5.1's {@code [chrome]} table, which the shipped kit file lists ({@code EnterpriseFixtureTest} holds them equal). */''', 1),
+    ('''    private static JasperTheme theme;
+''', '', 1),
+    ('''    /** Plan 4a's Enterprise fixture kit. */
+    public static Kit kit() { return KitFixtures.enterprise(); }
+
+    /** The Enterprise kit file's chrome points. */
+    public static ChromeSpec chrome() { return CHROME; }''',
+     '''    /** The shipped Enterprise kit; its IBM Plex files are registered first. */
+    public static Kit kit() { return EnterpriseResources.kit(); }
+
+    /** The shipped kit file's chrome points. */
+    public static ChromeSpec chrome() { return EnterpriseResources.chrome(); }''', 1),
+    ('''    /** A controller showing the fixture theme's Light or Dark variant under the fixture kit. EDT. */''',
+     '''    /** A controller showing the Enterprise theme's Light or Dark variant under the shipped kit. EDT. */''', 1),
+    ('''"the Enterprise fixture must install"''', '''"the Enterprise look must install"''', 1)])
+W = "jasper-app/src/test/java/dev/jasper/app/workspace/"
+edit(W + "WindowChromeMenusTest.java", [
+    ('''                assertThat(file.getFont().getSize()).as("the Enterprise kit's 12 px body").isEqualTo(12);''',
+     '''                assertThat(file.getFont().getSize()).as("the Enterprise kit's 12 px body").isEqualTo(12);
+                assertThat(file.getFont().getFontName(java.util.Locale.ROOT)).as("plan 6a Rulings 20: the kit's own face").isEqualTo("IBM Plex Sans");''', 1)])
+edit(W + "EnterpriseMenuRowMockTest.java", [
+    ('''import static org.junit.jupiter.api.Assumptions.assumeTrue;
+''', '', 1),
+    ('''import com.formdev.flatlaf.util.SystemInfo;
+''', '', 1),
+    (''' * Spec 16.1.4 against the mocks: the Enterprise menu row, rendered at 2× under the Enterprise fixture kit and theme''',
+     ''' * Spec 16.1.4 against the mocks: the Enterprise menu row, rendered at 2× under the shipped kit, IBM Plex and the theme''', 1),
+    ('''        // Plan 6a Rulings 29: the fixture kit draws the platform face, and the titles' metrics are the macOS face's.
+        assumeTrue(SystemInfo.isMacOS, "the mocks' title metrics hold for the macOS face until plan 5b registers IBM Plex");
+''', '', 1)])
+R = "jasper-app/src/test/java/dev/jasper/app/palette/RunWindowRenderTest.java"
+edit(R, [
+    ('''import dev.jasper.ui.testsupport.KitFixtures;
+''', '', 1),
+    (''' * Plan 8a Rulings 12: the Run window under the Enterprise fixture kit (the classic catalog with the shipped tokens and
+ * its 12-point body) and the Enterprise Light fixture theme against the two 06 Run Dialog mocks, at 2x.''',
+     ''' * Plan 8a Rulings 12: the Run window under the shipped Enterprise kit (its IBM Plex faces and 12-point body) and the
+ * Enterprise theme against the two 06 Run Dialog mocks, at 2x.''', 1),
+    (''' * binding when its action returns). Plan 4b's classic checkbox and buttons are held to the mock; what plan 5b's IBM Plex
+ * draws is measured and printed until that plan is in this branch ({@link #CHECKED}, plan 8a R9).''',
+     ''' * binding when its action returns). Plan 4b's classic checkbox and buttons and plan 5b's IBM Plex text are held to the
+ * mock; the footer buttons' left edges are measured and printed until plan 8b sizes them ({@link #CHECKED}, plan 8a R9).''', 1),
+    ('''    /** Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, or plan 5b's IBM Plex text. */
+    enum Owner { RUN_WINDOW, FACES, FONTS }
+    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b; FONTS joins with plan 5b. */
+    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES);''',
+     '''    /**
+     * Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, plan 5b's IBM
+     * Plex text, or plan 8b's footer buttons (the mocks draw every one 70 px wide).
+     */
+    enum Owner { RUN_WINDOW, FACES, FONTS, FOOTER }
+    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b, FONTS since plan 5b; FOOTER joins with plan 8b. */
+    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES, Owner.FONTS);''', 1),
+    ('''"primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),''',
+     '''"primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),''', 1),
+    ('''"cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),''',
+     '''"cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),''', 1),
+    ('''        var kitValue = KitFixtures.enterprise();
+        var theme = dark ? KitFixtures.dark() : KitFixtures.enterpriseLight();''',
+     '''        var kitValue = dev.jasper.app.testsupport.EnterpriseResources.kit();
+        var theme = dev.jasper.app.testsupport.EnterpriseResources.theme().generated(dark);''', 1),
+    ('''                // The kit's 12-point body as the application's font setting (5a's kit defaults); the gallery installs 13.
+                javax.swing.UIManager.put("defaultFont", new java.awt.Font(KitFixtures.platformFamily(), java.awt.Font.PLAIN, 12));
+''', '', 1),
+    ('''            assertThat(ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT))).as("the selected row").isGreaterThanOrEqualTo(4.5);''',
+     '''            // Spec 7.6 gives Enterprise Dark text.onAccent #FFFFFF on accent #3D74D6, 4.499:1; the row paints its guarded pair.
+            var selected = dev.jasper.ui.theme.SurfaceContrast.painted(c.theme(), dev.jasper.ui.swing.RunWindowPresentation.SELECTED_TITLE);
+            System.out.printf("run-window dark: selected row text %s on %s, %.3f:1 (spec 7.6's #FFFFFF is %.3f:1)%n", ColorMath.hex(selected),
+                ColorMath.hex(palette.color(SemanticColor.ACCENT)), ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT)),
+                ColorMath.contrast(palette.color(SemanticColor.TEXT_ONACCENT), palette.color(SemanticColor.ACCENT)));
+            assertThat(ColorMath.contrast(selected, palette.color(SemanticColor.ACCENT))).as("the selected row, as painted").isGreaterThanOrEqualTo(4.5);''', 1)])
+PY
+grep -c 'KitFixtures' jasper-app/src/test/java/dev/jasper/app/palette/RunWindowRenderTest.java
+```
+
+The last command prints 0. `KitGallery.installed` puts the kit's own face at its body size since Task 1, which is the
+12-point font plan 8a's `render` put by hand.
+
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.WindowChromeMenusTest' --tests 'dev.jasper.app.workspace.ChromeRenderTest' --tests 'dev.jasper.app.workspace.EnterpriseMenuRowMockTest' --tests 'dev.jasper.app.palette.RunWindowRenderTest' --tests 'dev.jasper.app.presentation.EnterpriseFixtureTest' --continue`
+Expected: PASS. Record from the output, for the STATUS entry, the menu-row edge agreements, the titles' largest drift
+(6a Rulings 26: a title past 4 px is retuned by 6a Rulings 18's measurement, side and item padding in Task 3's roles and
+tables) and the Run window's edge agreements and the two FOOTER lines. A Run window probe or fill outside its tolerance
+under Plex is a layout or face defect (8a R9): fix it or stop and report; never widen a tolerance.
+
+If plan 6b is on the branch (Task 3 step 5 ran its script), also do the rest of 6b's Execution notes R47 here, before
+the run above: each `MockProfile.fonts(what, actual, expected, tolerance)` call 6b left in its mock tests (its R36: "New
+Session"'s ink width, the search field's left, "Settings…"'s start, the status rules before UTF-8 and the warning, the
+run item's width, the Vault titles' widths) becomes `assertThat(actual).as(what).isCloseTo(expected, within(tolerance))`
+and `MockProfile.fonts` goes once nothing calls it; 6b's R39 swatch is re-measured under the shipped theme and its value
+updated where 6b's test pins it; add the tests 6b names in R47 to the run above. Record each number in the status
+banner. Without 6b on the branch, these are 6b's to do at its merge.
+
+- [ ] **Step 5: Add the visual pairs**
+
+Append the crops (Rulings 9; `crop` is `x,y,w,h` in the mock's 2x pixels) to `tools/visual/pairs.json` as text before
+its closing `]`, in the file's own two-space style (a `json.dumps` of the whole file would rewrite earlier entries):
 
 ```bash
 python3 -I - <<'PY'
 import json, pathlib
 path = pathlib.Path("tools/visual/pairs.json")
-pairs = json.loads(path.read_text(encoding="utf-8"))
+text = path.read_text(encoding="utf-8")
+pairs = json.loads(text)
 before = len(pairs)
 if any(pair["name"].startswith("enterprise-") for pair in pairs): raise SystemExit("pairs.json already has Enterprise pairs")
+if not text.endswith("\n  }\n]\n"): raise SystemExit("pairs.json does not end with an object and ]")
 mocks = {"light": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
          "dark": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png"}
 crops = {"sessions": [2134, 184, 697, 516], "tunnels": [2134, 1014, 697, 268], "sftp": [49, 184, 598, 759], "fileservers": [49, 945, 598, 150]}
-for variant, mock in mocks.items():
-    for panel, crop in crops.items():
-        pairs.append({"name": f"enterprise-{variant}-{panel}", "mock": mock, "crop": crop,
-                      "render": f"jasper-app/build/enterprise-kit/{variant}/{panel}@2x.png"})
-if len(pairs) != before + 8: raise SystemExit(f"expected {before + 8} pairs, have {len(pairs)}")
-path.write_text(json.dumps(pairs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-print(before, "->", len(pairs), "pairs")
+added = [{"name": f"enterprise-{variant}-{panel}", "mock": mock, "crop": crop,
+          "render": f"jasper-app/build/enterprise-kit/{variant}/{panel}@2x.png"} for variant, mock in mocks.items() for panel, crop in crops.items()]
+block = ",\n".join("  " + json.dumps(pair, indent=2, ensure_ascii=False).replace("\n", "\n  ") for pair in added)
+path.write_text(text[:-len("\n]\n")] + ",\n" + block + "\n]\n", encoding="utf-8")
+if len(json.loads(path.read_text(encoding="utf-8"))) != before + 8: raise SystemExit("expected eight more pairs")
+print(before, "->", before + 8, "pairs")
 PY
 git diff --stat tools/visual/pairs.json
 ```
 
-Expected: `<before> -> <before + 8> pairs` (40 -> 48 when plan 4c's six `classic-*` pairs are the only earlier
-additions to the 34 at `222969926`) and only additions in the diff. If `json.dumps` reformats existing entries (the diff
-shows changed lines that are not additions), restore the file with `git checkout tools/visual/pairs.json` and insert the
-eight objects by hand before the closing `]` in the file's own style. In `tools/visual/README.md`, extend the line that
-names the renders to regenerate:
+Expected: `47 -> 55 pairs` (34 at `222969926`, plus 8a's four `run-window-*`, 6a's two `chrome-*` and 4c's seven
+`classic-*`; more if a later plan added some) and only additions in the diff. Step 6 adds each pair's `min_agreement`
+and `colours` from the measured renders (Execution notes, ruling 11). In `tools/visual/README.md`, name the renders:
 
 ```bash
 python3 -I - <<'PY'
 import pathlib
 path = pathlib.Path("tools/visual/README.md"); text = path.read_text(encoding="utf-8")
-old = "`:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview)."
-if text.count(old) != 1: raise SystemExit("README anchor not found once")
-path.write_text(text.replace(old, "`:jasper-app:settings9bPreview`, the staged render evidence tests, `EnterpriseKitRenderTest` and the\n  workspace preview)."), encoding="utf-8")
+for old, new in [("`:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview).",
+                  "`:jasper-app:settings9bPreview`, the staged render evidence tests, `EnterpriseKitRenderTest` and the\n  workspace preview)."),
+                 ("(the classic look's `classic-*`, the `run-window-*` and the `chrome-*` pairs)",
+                  "(the classic look's `classic-*`, the `run-window-*`, the `chrome-*` and the `enterprise-*` pairs)"),
+                 ("`RunWindowRenderTest` writes the `run-window-*` renders under `jasper-app/build/run-window/`.",
+                  "`RunWindowRenderTest` writes the `run-window-*` renders under `jasper-app/build/run-window/`, and\n  `EnterpriseKitRenderTest` the `enterprise-*` ones under `jasper-app/build/enterprise-kit/`.")]:
+    if text.count(old) != 1: raise SystemExit(f"README anchor not found once: {old}")
+    text = text.replace(old, new)
+path.write_text(text, encoding="utf-8")
 PY
 ```
 
-- [ ] **Step 5: Run the theme-set suites and the new tests**
+- [ ] **Step 6: Run the theme-set suites and the new tests**
 
 Run: `./gradlew :jasper-ui:test :jasper-app:test --tests 'dev.jasper.app.plugins.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.application.EnterpriseKitRenderTest' --tests 'dev.jasper.app.application.EnterpriseFirstWindowTest' --tests 'dev.jasper.app.appearance.*' --tests 'dev.jasper.app.architecture.*' --continue`
 Expected: PASS: `PresentationConformanceTest` (5), `EnterpriseFixtureTest` (1), `EnterpriseKitRenderTest` (1),
@@ -2551,16 +2846,26 @@ python3 -I tools/visual/compare_all.py jasper-app/build/visual-enterprise enterp
 ```
 
 Expected: the two counts are equal (one PNG per gallery fixture plus the four `@2x` panels); `compare_all.py` writes the
-eight comparisons (it needs Pillow and NumPy; if they are missing, skip it, since the comparison is opt-in and not part of
-`check`). Look at the `-side.png` files and note in the status banner what differs because the classic compositions are
-plan 10's.
+eight comparisons (Pillow and NumPy are installed on the dev Mac). Mock matching is required (Execution notes, ruling
+11): give each `enterprise-*` pair in `pairs.json` a `min_agreement` of its measured agreement less 0.05, rounded down
+to two decimals, and `colours` listing the fact-12 colours of its variant that its mock crop shows (Light `#FFFFFF`,
+`#2F65CA`, `#ECEDEF`, `#D9DFEA`, `#F0F1F3`, `#E4E6E9`; Dark `#2E3135`, `#3D74D6`, `#3C3F44`, `#3D4658`, `#393C41`,
+`#383B40`), edited in place in the file's style, then run:
 
-- [ ] **Step 6: Commit**
+```bash
+python3 -I tools/visual/check_pairs.py jasper-app/build/visual-enterprise enterprise-
+```
+
+Expected: eight PASS lines. A colour the render lacks is a theme or face defect: fix it, or stop and report; drop a
+colour only when the mock crop lacks it. Look at the `-side.png` files and note in the status banner what differs
+because the classic compositions are plans 6, 7 and 10's.
+
+- [ ] **Step 7: Commit**
 
 Add the ledger rows of `PresentationConformanceTest.java` (owner `app.plugins`; it imports `java.awt` and
 `dev.jasper.ui` and uses `new ArrayList`), `EnterpriseHomeTest.java` (`app.plugins`; it names `dev.jasper.app.appearance`),
 `EnterpriseFixtureTest.java` (`app.presentation`), `EnterpriseKitRenderTest.java` and `EnterpriseFirstWindowTest.java`
-(`app.application`, if the coverage test names it) and
+(`app.application`; the dry run's coverage test names both) and
 `EnterpriseResources.java` (`app.testsupport`; it imports `dev.jasper.ui`), each
 `<path>,<owner>,<class>,nonvisual-helper,none,none,<its own path>,Test/fixture ownership; New in Enterprise plan 5b Task 4`
 (plan 5a's form: app owners are written `app.<package>`), and run
@@ -2568,6 +2873,7 @@ Add the ledger rows of `PresentationConformanceTest.java` (owner `app.plugins`; 
 
 ```bash
 git add jasper-app/src/test jasper-ui/src jasper-ui/build.gradle.kts jasper-app/build.gradle.kts tools/visual docs/design/theme-engine/migration.csv
+git status --short   # nothing left unstaged; enterprise-fixture.json shows as deleted (D)
 git commit -F - <<'EOF'
 Enterprise: conformance, the fixture, the shipped-kit renders
 
@@ -2579,8 +2885,11 @@ EnterpriseKitRenderTest renders the gallery under the real kit and fonts
 in Enterprise Light and Dark into build/enterprise-kit, with 2x panels
 paired with the Workstation and Dark Mode mocks in tools/visual/pairs.json.
 KitFixtures.themes() gains Enterprise Light and Dark, whose derived roles
-are frozen in derived-roles-enterprise.tsv, and a fresh home with Enterprise
-turned on starts, and opens its first window, with its kit's defaults.
+are frozen in derived-roles-enterprise.tsv (the classic tag's box now
+stands apart from its tint too), and a fresh home with Enterprise turned
+on starts, and opens its first window, with its kit's defaults. Plan 6a's
+chrome tests and plan 8a's Run window render draw the shipped kit, Plex
+and theme; the fixture theme is gone and the FONTS probes are checked.
 
 🤖 Generated with Claude Code at The Home Depot
 
@@ -2599,7 +2908,7 @@ own font, the notices' `files`, and AGENTS.md's module list), the pixel proof, t
 
 **Files:**
 - Modify: `docs/plugin-authoring.md` (the descriptor example and the presentation paragraph plan 5a added),
-  `docs/themes.md:1-9,42-49,61-79,153-163`, `docs/configuration.md:843-860`, `docs/app-maintenance.md:341-347`,
+  `docs/themes.md:8,48-49,73,75,157`, `docs/configuration.md:851`, `docs/app-maintenance.md:345`,
   `AGENTS.md:24`, `docs/STATUS.md:1`
 - Modify: this plan's status banner (first lines of this file)
 
@@ -2722,11 +3031,11 @@ Expected: 0 failures and 0 errors; note the four numbers for the entry below.
 
 Insert at the top of `docs/STATUS.md`, right after the `# Jasper — Status and Handoff` heading and its blank line, one
 paragraph (fill `<range>` with the first and last commit of this plan, `<counts>` with Step 3's line, `<deviations>`
-with every deviation from this plan's text, or "none beyond the plan's Rulings", and `<mock notes>` with Task 4 step 5's
+with every deviation from this plan's text, or "none beyond the plan's Rulings", and `<mock notes>` with Task 4 step 6's
 observation):
 
 ```markdown
-**Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-16** (`claude/enterprise-provider`, worktree
+**Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `<range>`, then this documentation commit;
 [plan](superpowers/plans/2026-10-16-enterprise-5b-enterprise.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Turning Enterprise on gives classic
@@ -2739,23 +3048,31 @@ bundled and off by default: its descriptor (spec 4.1 plus an icon), the kit file
 Sans and Mono 1.1.0 (IBM's release files, checked by SHA-256, with their OFL notice; `verifyThirdPartyNotices` now
 requires every bundled font file in a component's `files`), the Enterprise theme in Light and Dark (7.6) and
 `EnterprisePlugin`, which only publishes `dev.jasper.enterprise.api.Workstation`. `PresentationConformanceTest`,
-`EnterpriseFixtureTest`, `EnterpriseKitRenderTest` (images in `jasper-app/build/enterprise-kit/`, with opt-in
-`tools/visual/pairs.json` crops of the Workstation and Dark Mode mocks: <mock notes>) and `EnterpriseHomeTest` prove it;
-`KitFixtures.themes()` gains Enterprise Light and Dark. The default look is unchanged (gallery byte-identical). Rulings
+`EnterpriseFixtureTest`, `EnterpriseKitRenderTest` (images in `jasper-app/build/enterprise-kit/`, with
+`tools/visual/pairs.json` crops of the Workstation and Dark Mode mocks that `check_pairs.py` holds to measured floors:
+<mock notes>) and `EnterpriseHomeTest` prove it; `KitFixtures.themes()` gains Enterprise Light and Dark. Plan 6a's chrome
+tests (`EnterpriseLook`, whose fixture theme is gone) and plan 8a's Run window render now draw the shipped kit, Plex and
+theme, and the Run window's FONTS probes are checked (<chrome and Run window numbers>). <6b: "Plan 6b's chrome targets
+and `border.divider` are in the theme" or "plan 6b's chrome targets are left to its merge">. Found: spec 7.6 gives
+Enterprise Dark `text.onAccent` #FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard paints selected and accent text
+black there where the Dark Mode mock draws white; awaiting the user's ruling (one red step, #3C74D6, gives 4.505:1).
+The default look is unchanged (gallery byte-identical). Rulings
 (plan, "Rulings"): (1) faces by full name, degrading per face; (2) the look's UI font reaches FlatLaf unless
 `ui.font` is set; (3) one Warning for missing files; (4) the theme tier's order and messages; (5) plugin themes are fixed
 in Settings and captioned; (6) the descriptor has an icon; (7) the theme's unnamed roles; (8) the apart direction is plan
 7's; (9) the mock comparison pairs the four gallery panels; (10) the family is name ID 16; (11) the icons and splash
-art of 14.1 are plan 11's. Deviations from the plan's text: <deviations>. `./gradlew check --continue`: **<counts>**.
+art of 14.1 are plan 11's; Execution notes (2026-10-17) rulings 1 to 17. Deviations from the plan's text:
+<deviations>. `./gradlew check --continue`: **<counts>**.
 GUI checks for the user: turn Enterprise on in Settings › Plugins, restart, and compare Enterprise Light and Dark with
 the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chrome is plans 6 to 9's); turn it off and
-check that Slate Cobalt returns without a warning. Not merged, not pushed.
+check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
+hidden files (Execution notes, ruling 3). Not merged, not pushed.
 ```
 
 Replace this plan's first heading line with the same heading followed by a status banner:
 
 ```markdown
-> **Status (2026-10-16): executed on `claude/enterprise-provider` (`<range>`).** Deviations from this plan's text: <deviations>.
+> **Status (2026-10-17): executed on `claude/enterprise-provider` (`<range>`).** Deviations from this plan's text: <deviations>.
 ```
 
 - [ ] **Step 5: Commit**
@@ -2777,3 +3094,151 @@ build's counts.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-17)
+
+**Refresh.** Every anchor, quoted text, path, signature and line number this plan relies on was re-checked against the
+worktree at `e502e102b` (`main`: plans 3a to 3e, 4a to 4c, 5a, 6a and 8a; not 6b, which runs in parallel, nor 7 to 11).
+Method, without Gradle: a dry run in a scratch copy of the tree (`git archive HEAD`) applied every step in order (each
+edit script with its stated counts, each created file, Task 3's conditional both ways, the 14 ledger rows), compiled
+every module's main, test-fixture and test sources and the new plugin with `javac` (JBR 25, the Gradle cache's jars),
+and ran the tests through the JUnit 6.1.3 launcher headless, with a staged `dev.jasper.enterprise` jar built from the
+plugin's classes and resources. IBM Plex was not downloaded (the pre-flight fetches nothing; Task 3 step 1 does, and
+facts 11 and 15 stand from 2026-10-16), so the dry run used five JBR Droid faces under the Plex file names. Results:
+jasper-ui 827 tests, all passing but `GalleryCoverageTest.shippedJarExcludesGalleryAndTestSupport` (it needs Gradle's
+jar; it fails the same on the unchanged tree); jasper-app's `appearance`, `settingsui`, `application`, `plugins`,
+`architecture`, `presentation`, `workspace`, `palette`, `pluginmanager`, `config` and `about` suites (2,112 tests) fail
+exactly the unchanged tree's 177 environment failures (Gradle's staged plugins, jars, build info and docs inputs) plus
+seven that assert IBM Plex itself (the conformance font case, the face names in `EnterpriseFixtureTest`,
+`EnterpriseHomeTest` and `EnterpriseKitRenderTest`, the row test's Plex name, and the Run window's FONTS probes); with
+the placeholder names put in, `EnterpriseHomeTest` and `EnterpriseFixtureTest` pass whole. `ThemeMigrationCoverageTest`
+passes with the plan's rows; `javadoc` with Task 1 to 4's doclint options exits 0 over jasper-ui and jasper-app; the
+source-hygiene scan finds nothing new. Not checked here (Gradle only): the Kotlin of `verifyThirdPartyNotices`,
+`verifyPluginArchitecture`, `stagePlugins`, `pluginZips` and the headless gallery's byte comparison.
+
+Changes made to this plan's text: the Workspace paragraph and "Before you start" (6a, 8a and 6b checks); facts 2 to 10,
+13 and 16; Rulings 7 and 9; the Files lines of Tasks 1 to 5; Task 1 (the `Typography` anchor with `RUN_DETAIL`, the
+`KitGallery` edits on 4c's `bodySize`, `LookFontsTest` rewritten, `LookFonts`' installed-font check, `LookNoticeTest`'s
+loadable look, the `KitParserTest` anchor, the counts, the gallery base); Task 2 (`"\uFEFF"`); Task 3 (the
+`TerminalColors` note, the Kotlin names, the 6b conditional in step 5); Task 4 (`EnterpriseResources.kit()` and
+`chrome()`, the chrome-equality assertion, the `ClassicTagFace` edit, the corrected derived-table example, a new step 4
+for plans 6a and 8a and 6b's R47, the pairs script, floors and README lines, steps renumbered 5 to 7, the ledger rows,
+the commit); Task 5 (dates, the STATUS template).
+
+### Pre-flight scan
+
+Pairs of tasks that share a file or an interface:
+
+| Tasks | Shared file or interface | Agreement | Ruling |
+|---|---|---|---|
+| 1 → 4 | `FaceSet.of`, `uiFace`, `namesUiFaces`; `LookFonts.register`; `KitGallery.installed`'s `font(kit, …)`; `ThemeController`'s look font | Consumers use the produced shapes; compiles and runs in order | 3, 6, 9, 10 |
+| 1 → 2 | `JasperApplication.java`: `BundledFonts` and the notice (1), the library and the import folder (2) | Disjoint spans; each anchor holds after the other | 15 |
+| 1 → 2 | `Presentation` gains `droppedDefaults` (1); `PluginSelection.blamed()` keeps calling `presentation.fallback` (2) | Agree | none |
+| 1 to 4 | `docs/design/theme-engine/migration.csv`, append-only | 14 rows of eight fields; the coverage test names exactly these | 14 |
+| 2 → 3 | `ColourLiteralScanTest.PLUGIN_THEMES` and its loader test (2); Task 3 adds `enterprise.json` and asserts it is listed | Agree | none |
+| 2 → 4 | `PluginSelection.themes()`, `ThemeLibrary.of`, `provider`, `dormant` in `EnterpriseHomeTest` | Agree | none |
+| 3 → 4 | The plugin's descriptor, kit, fonts and theme read by `EnterpriseResources`; `enterprise.json` (and 6b's values) frozen in `derived-roles-enterprise.tsv` | Agree in order: the table is generated after Task 3 | 8 |
+| 3 → 5 | The plugin and `Workstation` as the documents describe them | Agree | none |
+| 4 → 5 | The STATUS template's renders, mock notes (step 6) and chrome and Run window numbers (step 4) | Agree after the renumbering | 14 |
+| 1 ↔ 8a (merged) | `Typography.font`'s data roles include `RUN_DETAIL` | The anchor had moved | 1 |
+| 1, 4 ↔ 4c (merged) | `KitGallery`'s font at the gallery's scale; `pairs.json` (47 entries, `check_pairs.py`); `ClassicTagFace` under the theme set | Anchors moved; `json.dumps` rewrote the file; the tag's box failed on Enterprise Dark | 6, 7, 11, 13 |
+| 4 ↔ 6a (merged) | `EnterpriseLook`, `enterprise-fixture.json`, `WindowChromeMenusTest`, `EnterpriseMenuRowMockTest`, `ChromeRenderTest` | 6a Rulings 26 named the switch; the plan had no step for it | 9 |
+| 4 ↔ 8a (merged), 8b (later) | `RunWindowRenderTest`: `render`, `CHECKED`, the footer probes, the Dark test | 8a R8, R9, R16 named the switch; the footer's 70 px is 8b's; Dark's selected row fails raw | 10, 12 |
+| 3, 4 ↔ 6b (parallel) | `enterprise.json`'s chrome targets, `EnterpriseThemeTest`, `EnterpriseLook`, `MockProfile.fonts`, 6b's `EnterpriseChromeTargetsTest` | Whichever lands second applies 6b's R47 | 8, 15 |
+| 5 ↔ 6b, 7 to 11 (parallel) | `docs/themes.md`, `AGENTS.md`, `docs/STATUS.md`, `migration.csv`, `pairs.json` | Different sentences and appended rows | 15 |
+
+Each task against itself:
+
+| Task | Agreement of its own text | Ruling |
+|---|---|---|
+| 1 | Did not compile (a compound `var`); `LookFontsTest` failed on the dev Mac (Cousine is installed there); `LookNoticeTest` logged a load failure; the `Typography` and `KitGallery` anchors had moved; Step 5's count; 3 + 2 + 1 cases and `KitParserTest` pass, jasper-ui unchanged otherwise | 1, 2, 3, 4, 6, 14 |
+| 2 | A raw U+FEFF in `PluginThemes`; otherwise agree; 5 + 1 cases and `ColourLiteralScanTest` pass | 5 |
+| 3 | The "check two names" note is settled; the Kotlin shadows a name; 3 + 3 cases pass (fact 15's `javap` claim holds); the 6b case was missing | 5, 8, 17 |
+| 4 | Lacked the 6a and 8a switches, mock floors and a working pairs script; the derived-table example named an override as a recipe; a ledger row was conditional; Enterprise Dark exposed two guard findings | 7, 9, 10, 11, 12, 13, 14 |
+| 5 | Every document anchor holds; dates and the STATUS template updated | 14 |
+
+### Rulings
+
+1. **Anchors and line numbers re-anchored.** `Typography.font`'s data roles now include plan 8a's `RUN_DETAIL` (the
+   script's old and new text carry it, so the Run window's detail draws in the kit's data face too); facts and Files
+   lines give `e502e102b`'s numbers. Why: 8a and 4c changed the text since `222969926`. Cost if wrong: none; the scripts
+   anchor on text.
+2. **Compile fix.** `LookFontsTest`'s `var regular = …, bold = …` becomes `FontFile regular = …, bold = …`. Why: javac
+   refuses `var` in a compound declaration. Cost if wrong: none.
+3. **An installed copy of a font hides the file's full name; it is named in the look's notice.** On macOS JBR finds an
+   installed font by family or PostScript name, never by full name, and `registerFont` returns false for a family that
+   is installed, so a face named by full name resolves to Dialog (checked with the bundled Cousine, which the dev Mac
+   has installed: `new Font("Cousine Nerd Font Mono Regular")` is Dialog). `LookFonts` now checks after registering that
+   the full name resolves and otherwise adds "<file>: an installed font named <family> hides it; that text uses the
+   platform font" (spec 5.9: a font that does not register degrades its face, with a notice); `LookFontsTest` registers
+   Cousine renamed in its name table to "Jasper Look Face Tests" (same length), which no machine installs, and gains a
+   case that expects the line exactly where the name is hidden. Why: the test as written failed on the dev Mac, and a
+   user with IBM Plex installed would get the platform face silently. Cost if wrong: on such a Mac Enterprise draws the
+   platform face with a Warning; resolving by PostScript name (name ID 6) is the follow-up, not this plan's.
+4. **`LookNoticeTest` starts a loadable look** (`LookFixtures.loadable`). Why: with `LookFixtures.plugin` the provider's
+   start failed (`ClassNotFoundException`), so the look's notice shared the run with an unrelated load failure. Cost if
+   wrong: none.
+5. **Source hygiene.** `PluginThemes.text` strips `"\uFEFF"`, as `ThemeLibrary.readText` does (the plan had the raw character);
+   the font-files check names its folder `pluginResources` (it shadowed the outer `resources`) and types its empty list.
+   Cost if wrong: none.
+6. **The gallery's font follows plan 4c.** `KitGallery.font(kit, large)` returns the kit's regular UI face, else the
+   platform family, at `bodySize(points)`, which is exactly the font 4c's gallery sets under the default kit, so the
+   default gallery stays byte-identical; `installed`'s javadoc says so. Cost if wrong: none.
+7. **`pairs.json` is appended as text.** The file does not round-trip through `json.dumps` (earlier entries would be
+   rewritten), so the script inserts the eight objects before the closing `]` in its two-space style: 47 to 55 pairs.
+   Cost if wrong: none.
+8. **Plan 6b's chrome targets enter the theme only when 6b's Task 1 is on this branch** (`BORDER_DIVIDER` overridable in
+   this worktree), in Task 3 step 5: Light `surface.tabstrip` `#E8E9EB`, `tab.indicator` `#2F65CA`, `surface.scrim`
+   `#00000036`, `border.divider` `#D3D6DA`; Dark `#3A3D42`, `#3D74D6`, `#00000036`, `#4A4D53` (6b's ruling 2 and R47,
+   over Rulings 7 for those roles), `surface.tabstrip` leaves `EnterpriseThemeTest.NEUTRAL` and `border.divider` joins
+   both override maps; Task 4 then does the rest of R47 (6b's printed face-width probes become assertions, R39's swatch
+   is re-measured) and the derived table is generated with the override. Otherwise the eight values are 6b's to copy at
+   its merge, and the banner says so. Why: the orchestrator's instruction; 6b's R19 and R47 say the same from its side.
+   Checked both ways in the dry run (`EnterpriseThemeTest` passes with and without 6b's flag). Cost if wrong: eight theme
+   values and three test lines move at the later merge.
+9. **Plan 6a Rulings 26 happens in Task 4 step 4.** `EnterpriseLook` reads `EnterpriseResources` (the shipped kit with
+   Plex registered, its chrome, the Enterprise theme); `enterprise-fixture.json` is deleted; `WindowChromeMenusTest`
+   asserts "IBM Plex Sans" again (6a Rulings 20); `EnterpriseMenuRowMockTest` checks the titles on every platform (6a
+   Rulings 29); `EnterpriseLook.CHROME` stays as the spec 5.1 table and `EnterpriseFixtureTest` holds it equal to the
+   shipped kit's chrome. Why: the fixture stood in for 5b only. Cost if wrong: a title past 4 px is retuned by 6a's
+   Rulings 18 measurement.
+10. **Plan 8a R8, R9 and R16 happen in Task 4 step 4.** `RunWindowRenderTest.render` draws the shipped kit and the
+    Enterprise theme (Enterprise Dark for Dark) at the gallery's font, now the kit's face at its 12-point body (the
+    hand-set 12-point platform font goes); FONTS joins `CHECKED`; "primary button left" and "cancel button left" move to
+    a new `FOOTER` owner that stays printed, because the mocks draw every footer button 70 px wide and that ruling is
+    plan 8b's. A FONTS probe that misses under Plex is a layout or face defect: fixed, or the task stops and reports; no
+    tolerance widens. Cost if wrong: 8b's refresh reads `FOOTER`.
+11. **Mock matching is checked, not opt-in.** Each `enterprise-*` pair gets a `min_agreement` of its measured agreement
+    less 0.05 (rounded down to two decimals) and `colours` from fact 12 that its mock crop shows, and
+    `check_pairs.py … enterprise-` must print eight PASS lines, as plan 4c's `classic-*` pairs do. Why: the orchestrator
+    makes the comparison with the Workstation and Dark Mode mocks a hard requirement. Cost if wrong: a floor tuned once.
+12. **Finding for the user: Enterprise Dark's `text.onAccent` on `accent` is 4.499:1.** Spec 7.6 gives #FFFFFF on
+    #3D74D6 (the Dark Mode mock's), just under the TEXT guard's 4.5, so the guard paints the Run window's selected row,
+    and any TEXT-guarded label on the accent, black (#000000, 4.67:1) where the mock draws white (the `*.secondary` text
+    on the accent, 3.56:1, goes black too). The theme keeps spec 7.6's values exactly (binding; the orchestrator says
+    exactly); 8a's Dark test asserts the pair as painted and prints both contrasts; the STATUS entry asks the user to
+    rule. One red step, `#3C74D6` for `accent`, `selection.bg` and `hue.blue`, gives 4.505:1 and keeps white. Cost if
+    wrong: Enterprise Dark's selected rows and accent labels show black text until the user rules.
+13. **The classic tag's box is held against its tint too** (`ClassicTagFace.style`): with Enterprise Dark in the theme
+    set, 4c's `ClassicIndicatorsTest.aClassicTagsLabelAndBoxStandOutAsPainted` measured the blue tag's box at 1.28:1 on
+    the tint inside it (the box was guarded against `surface.card` only); the box now meets the structural guard against
+    the tint as painted, moving toward `text.primary` where it does not. A box that already holds keeps its colour, so
+    the default look, Enterprise Light and every other palette paint as before; jasper-ui passes whole with it. Why: the
+    plan says such a failure is a guard finding, and this one has a one-line repair in the face. Cost if wrong: Enterprise
+    Dark's blue tag box is slightly lighter than its recipe.
+14. **Text corrections.** `LookFontsTest` has three cases; Task 1's gallery base is `HEAD` in a `mktemp` worktree; the
+    derived-table example (Light's `surface.rowHover` is an override, Dark's keeps the recipe); Task 4's ledger rows are
+    definite (the coverage test names `EnterpriseKitRenderTest` and `EnterpriseFirstWindowTest`); Task 4's commit lists
+    the deletion; the STATUS entry and banner are dated 2026-10-17, name these rulings, the chrome and Run window numbers,
+    the 6b outcome and ruling 12's finding. Cost if wrong: none.
+15. **Order is binding; parallel plans reconcile at merge.** Tasks run in order, one commit each; every later anchor is
+    an earlier task's output, as the dry run shows. Plan 6b (parallel) also edits `EnterpriseLook`, the fixture theme,
+    `EnterpriseThemeTest`'s expectations, `MockProfile`, `pairs.json`, `docs/themes.md`, `migration.csv` and STATUS;
+    plans 7 to 11 append rows, pairs and STATUS paragraphs. Keep every side's rows, pairs and paragraphs; for 6b, ruling
+    8 says which side copies the chrome targets. Do not rebase or merge here. Cost if wrong: merge work only.
+16. **Timing-sensitive tests.** `LookNoticeTest`, `EnterpriseFirstWindowTest`, the chrome renders and the Run window
+    render wait on the EDT; another plan's Gradle build runs at the same time, so one may flake once: re-run it alone
+    before treating it as a failure, and never run `./gradlew --stop`. Cost if wrong: one rerun.
+17. **What the pre-flight did not verify.** The IBM Plex downloads, their SHA-256 sums and zip paths (Task 3 step 1 stops
+    on any mismatch), fact 15's name resolution of the real files, and the Gradle-only checks named in the refresh
+    paragraph; Task 3 step 6 and Task 5 step 3 run them. Cost if wrong: the task that runs them stops and reports.
