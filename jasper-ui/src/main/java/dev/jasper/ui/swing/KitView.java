@@ -139,6 +139,10 @@ public final class KitView extends JPanel implements AutoCloseable {
         settingsSurface = true; settingsHeader = header; update(spec);
     }
     boolean settingsSurface() { return settingsSurface; }
+    private boolean collapsibleNavigation;
+    /** Kit-internal: the Settings navigation's sections collapse behind a disclosure triangle (Enterprise presentation spec 12.1). */
+    void collapsibleNavigation(boolean value) { requireOpen(); if (collapsibleNavigation == value) return; collapsibleNavigation = value; update(spec); }
+    boolean collapsibleNavigation() { return collapsibleNavigation; }
     boolean settingsHeader() { return settingsHeader; }
     private boolean keycapDetail;
     /** Kit-internal: this view is the inline editor of a keycap tree row, whose rows sit closer together. */

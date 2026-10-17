@@ -196,6 +196,7 @@ public final class SettingsDialog {
         draftListening = draft.onChanged(this::refreshNow);
         stateListening = hooks.onState().apply(this::accept);
         accept(state);
+        view.tree.collapsible(hooks.chrome().collapsibleNav());
         view.tree.show(pages, page -> true, Map.of());
         view.tree();
         select(pageOrNull != null ? pageOrNull : lastPage != null ? lastPage : CorePages.DEFAULT_PAGE);
@@ -208,6 +209,7 @@ public final class SettingsDialog {
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(SettingsView.SEARCH) -> search(edited.text());
             case UiEvent.Selected selected when selected.id().equals(PageTree.ID) -> selected.ids().stream().findFirst().ifPresent(this::select);
+            case UiEvent.Expanded expanded when expanded.id().equals(PageTree.ID) -> { view.tree.expanded(expanded.itemId(), expanded.expanded()); view.tree(); }
             case UiEvent.Action action -> {
                 switch (action.id()) {
                     case SettingsView.BACK -> back();
@@ -272,6 +274,7 @@ public final class SettingsDialog {
         lastPage = page.id();
         view.page(page.component());
         view.breadcrumb(breadcrumb(page));
+        view.tree.reveal(page.id());
         view.tree.select(page.id());
         view.tree();
         highlight(page);

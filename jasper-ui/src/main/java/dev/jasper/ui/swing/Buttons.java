@@ -131,6 +131,8 @@ final class Buttons {
         boolean sideColumn;
         /** A classic tree's expand button: its drawn triangle alone, as wide as the glyph and its gap to the title (plan 4c). */
         boolean disclosure;
+        /** A disclosure's width when its owner sets one (the Settings navigation, plan 9a); 0 keeps the glyph and its gap. */
+        int disclosureWidth;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
         boolean windowFooter;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
@@ -234,7 +236,7 @@ final class Buttons {
             Dimension size = super.getPreferredSize();
             if(getText()==null || getText().isEmpty()) {
                 if(disclosure) {int glyph=ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GLYPH);
-                    return new Dimension(Math.max(glyph,glyph+ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GAP)-ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP)),ThemePainting.metric(context,DesignMetrics.Role.ROW_HEIGHT));}
+                    return new Dimension(disclosureWidth>0?disclosureWidth:Math.max(glyph,glyph+ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GAP)-ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP)),ThemePainting.metric(context,DesignMetrics.Role.ROW_HEIGHT));}
                 if(orderedCommand) {int extent=ThemePainting.metric(context,DesignMetrics.Role.ORDERED_ACTION);return new Dimension(extent,extent);}
                 if(circular) {int extent=ThemePainting.metric(context,DesignMetrics.Role.CIRCULAR_ACTION_SIZE);return new Dimension(extent,extent);}
                 if(getParent() instanceof Stacks.StackSurface surface && surface.joined)

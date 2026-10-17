@@ -146,7 +146,10 @@ public final class DesignMetrics {
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
         DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
         // Plan 9a: the Settings header's inset from the body (today the page inset); its classic value is the mocks' 14.
-        SETTINGS_HEADER_INSET(20);
+        SETTINGS_HEADER_INSET(20),
+        // Plan 9a: a page's indent under its section in the Settings navigation (the classic navigation's 15), and the gap
+        // from a navigation row's leading slot (the classic triangle) to its title.
+        SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -244,6 +247,11 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_RICH_CHOICE_WIDTH, 220);
         values.put(Role.SETTING_CHOICE_WIDTH, 220);
         values.put(Role.SETTINGS_HEADER_INSET, 14);
+        values.put(Role.SETTINGS_NAV_INSET, 0);
+        values.put(Role.SETTINGS_NAV_ROW_SIDE, 9);
+        values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
+        values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
+        values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

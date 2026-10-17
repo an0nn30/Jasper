@@ -13,6 +13,8 @@ class SettingsRolesTest {
     static final Map<String, List<Integer>> ROLES = new LinkedHashMap<>();
     static {
         ROLES.put("SETTINGS_HEADER_INSET", List.of(20, 14));
+        ROLES.put("SETTINGS_NAV_CHILD_INDENT", List.of(0, 15));
+        ROLES.put("SETTINGS_NAV_TEXT_GAP", List.of(6, 6));
     }
 
     @Test void theSettingsRolesFollowEachOtherWithTheirValuesInBothCatalogs() {

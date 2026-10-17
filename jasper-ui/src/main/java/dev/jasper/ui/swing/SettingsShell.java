@@ -45,6 +45,7 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
         for (JComponent child : new JComponent[]{search, navigation, header, banner, body, footer}) add(child);
         for (JComponent child : new JComponent[]{search, navigation, header, banner, footer})
             if (child instanceof KitView view) view.settingsChrome(child == header);
+        if (navigation instanceof KitView view) view.collapsibleNavigation(frame.collapsibleNavigation());
         appearance = context.binding().subscribe(pair -> { revalidate(); repaint(); });
     }
     /** Marks a page's own view as part of the Settings surface, so its controls take the Settings geometry. */
