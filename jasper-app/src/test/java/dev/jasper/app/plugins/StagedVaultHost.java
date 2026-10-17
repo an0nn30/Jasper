@@ -42,6 +42,8 @@ final class StagedVaultHost implements AutoCloseable {
     final PluginClassLoader loader;
     final Plugin plugin;
     final List<String> problems = new CopyOnWriteArrayList<>();
+    /** The folders the host's file chooser answers, in order; it cancels when none is queued. */
+    final java.util.Deque<Path> chosenFolders = new java.util.concurrent.ConcurrentLinkedDeque<>();
     final UUID window;
 
     StagedVaultHost(Path data, boolean dark) throws Exception { this(data, dark, null); }
@@ -50,7 +52,10 @@ final class StagedVaultHost implements AutoCloseable {
         Path staged = Path.of(System.getProperty("jasper.stagedPlugins")).resolve(UnboundVault.ID);
         UnboundVault.settings(data);
         contributions = onEdtValue(Contributions::new);
-        auxiliary = onEdtValue(AppContractTest::headlessWindows);
+        auxiliary = onEdtValue(() -> AppContractTest.headlessWindows((choice, cancellation) -> {
+            Path next = chosenFolders.poll();
+            return next == null ? List.of() : List.of(dev.jasper.app.files.Location.local(next));
+        }));
         terminals = onEdtValue(TerminalFixture::new);
         host = AppContractTest.host(data, Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary, terminals.registry,
             new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),
@@ -194,6 +199,10 @@ final class StagedVaultHost implements AutoCloseable {
     static void click(AuxiliarySurface surface, String name) { ((AbstractButton) require(surface, name)).doClick(0); }
 
     static void type(AuxiliarySurface surface, String name, String text) { ((JTextComponent) require(surface, name)).setText(text); }
+    /** Spec 13: a File Server folder is read-only, so tests choose it: queue it, then press Choose…. EDT. */
+    static void chooseFolder(StagedVaultHost host, AuxiliarySurface surface, Path folder) {
+        host.chosenFolders.add(folder); click(surface, "server.folder.choose");
+    }
 
     /** Presses Enter on {@code component} through Swing's real key-binding path (its own, then its ancestors' bindings). */
     static void enter(Component component) {

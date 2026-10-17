@@ -110,6 +110,8 @@ public final class KitGallery {
             List.of(new Nodes.Button("footnote-cancel", ControlState.READY, "Cancel", "", ButtonKind.SECONDARY, "cancel", ""),
                 new Nodes.Button("footnote-unlock", ControlState.READY, "Unlock", "", ButtonKind.PRIMARY, "unlock", "")),
             "cancel", FormSubmission.PRIMARY, "Auto-locks after 15 min idle"))));
+        // Plan 3c (SDK 0.18): tree columns, cell nodes with the bare DROPDOWN, heading rows and the empty states.
+        result.add(new Fixture("tables-0-18", "", "normal", 640, 860, TableFixtures.create()));
         return List.copyOf(result);
     }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {

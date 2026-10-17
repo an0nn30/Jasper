@@ -108,6 +108,8 @@ class HostEditorTest {
             assertThat(value(editor, HostEditor.PORT)).isEqualTo("22");
             assertThat(choice(editor, HostEditor.AUTH).selectedId()).isEqualTo(HostEditor.VAULT);
             assertThat(choice(editor, HostEditor.JUMP).options()).as("none + bastion").hasSize(2);
+            assertThat(choice(editor, HostEditor.JUMP).label()).as("spec 13: sentence case").isEqualTo("Jump host");
+            assertThat(node(editor.view(), "row." + HostEditor.JUMP, Nodes.FormRow.class).label()).isEqualTo("Jump host");
             save(editor);
             assertThat(editor.message()).contains("name");
             assertThat(form(editor.view()).preview()).as("the message sits beside the buttons, as it sat above them at baseline")

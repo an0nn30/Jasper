@@ -177,11 +177,12 @@ public final class CorePages {
     }
 
     /**
-     * System Settings: Run in background, the Java Virtual Machine and Command line sections when supplied, then the
+     * System Settings: General (Run in background), the Java Virtual Machine and Command line sections when supplied, then the
      * configuration file.
      */
     private static SchemaPage.Spec systemPage(SystemActions system) {
         var page = SchemaPage.page("system", "System Settings").parent("appearance-behavior").anchor("background-residency")
+            .section("General")
             .row(SYSTEM_RUN_IN_BACKGROUND);
         system.vm().ifPresent(vm -> page.section("Java Virtual Machine")
             .notice("vm.state", vm.state())

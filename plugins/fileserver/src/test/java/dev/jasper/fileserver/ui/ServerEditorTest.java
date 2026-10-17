@@ -21,6 +21,8 @@ class ServerEditorTest {
     private final List<ServerDefinition> saved = new ArrayList<>();
     private final AtomicReference<CompletableFuture<Optional<ServerEditor.Account>>> pending = new AtomicReference<>();
     private int folderRequests, keyRequests;
+    /** What the next Choose… answers; the temporary folder when null. */
+    private Path nextFolder;
     private static final String ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEgwWITbeAjMHfs63n4fe6AxR8buxH3Wx+IdWdotPF0 alice@laptop";
     private static final String ECDSA = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCKLV4ChGhVzArLw7brgwvIOQAjpwGqDaTifUtUTLxNQCWVdgGVtTjhhZSbIMKVdDUtRyBDkfjMCE3d4mznEAa8=";
 
@@ -33,7 +35,7 @@ class ServerEditorTest {
         var result = new AtomicReference<ServerEditor>();
         onEdt(() -> result.set(new ServerEditor(kit, others, initial, initial.isPresent(), protocols, interfaces, vault,
             id -> Optional.of("Share login"), () -> { var future = new CompletableFuture<Optional<ServerEditor.Account>>(); pending.set(future); return future; },
-            () -> { folderRequests++; return Optional.of(folder); }, keys, linux, saved::add, () -> { })));
+            () -> { folderRequests++; return Optional.of(nextFolder == null ? folder : nextFolder); }, keys, linux, saved::add, () -> { })));
         return result.get();
     }
     private ServerEditor editor(Set<Protocol> protocols) { return editor(protocols, Optional.empty(), false, ServerEditor.KeySources.NONE); }
@@ -50,7 +52,46 @@ class ServerEditorTest {
     private static String field(ServerEditor editor, String id) { return ((Nodes.Field) node(editor, id)).value(); }
     private static String message(ServerEditor editor) { return ((Nodes.Text) node(editor, ServerEditor.MESSAGE)).text(); }
     private static String text(ServerEditor editor, String id) { return ((Nodes.Text) node(editor, id)).text(); }
-    private void basic(ServerEditor editor) { edit(editor, ServerEditor.NAME, "docs"); edit(editor, ServerEditor.FOLDER, folder.toString()); }
+    private static String notice(ServerEditor editor) { return ((Nodes.Notice) node(editor, ServerEditor.WARNING)).text(); }
+    private void basic(ServerEditor editor) { edit(editor, ServerEditor.NAME, "docs"); action(editor, ServerEditor.CHOOSE_FOLDER); }
+
+    /** Spec 13: the folder is a read-only fact that only Choose…, beside it, changes. */
+    @Test void theFolderIsAReadOnlyFieldThatOnlyChooseChanges() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        var folderField = (Nodes.Field) node(editor, ServerEditor.FOLDER);
+        assertThat(folderField.readOnly()).isTrue();
+        assertThat(folderField.value()).isEmpty();
+        assertThat(folderField.hint()).isEqualTo("No folder selected");
+        assertThat(((Nodes.FormRow) node(editor, "server.folder.row")).trailing()).get().isInstanceOfSatisfying(Nodes.Button.class, choose -> {
+            assertThat(choose.id()).isEqualTo(ServerEditor.CHOOSE_FOLDER);
+            assertThat(choose.label()).isEqualTo("Choose…");
+        });
+        edit(editor, ServerEditor.FOLDER, "/typed/elsewhere");
+        assertThat(field(editor, ServerEditor.FOLDER)).as("typing never reaches a read-only field").isEmpty();
+        action(editor, ServerEditor.CHOOSE_FOLDER);
+        assertThat(field(editor, ServerEditor.FOLDER)).isEqualTo(folder.toString());
+    }
+
+    /** Spec 13: the warnings are one WARNING Notice, present only while there is a warning. */
+    @Test void theWarningsAreAWarningNoticeOnlyWhileThereIsOne() {
+        var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP));
+        assertThat(node(editor, ServerEditor.WARNING)).as("anonymous read-only HTTP warns of nothing").isNull();
+        choose(editor, ServerEditor.PROTOCOL, "FTP");
+        assertThat(node(editor, ServerEditor.WARNING)).isInstanceOfSatisfying(Nodes.Notice.class, notice -> {
+            assertThat(notice.severity()).isEqualTo(Nodes.Severity.WARNING);
+            assertThat(notice.text()).as("the presentation adds the word Warning").isEqualTo("Plain FTP sends the password unencrypted");
+            assertThat(notice.actions()).isEmpty();
+        });
+        choose(editor, ServerEditor.PROTOCOL, "HTTP");
+        assertThat(node(editor, ServerEditor.WARNING)).isNull();
+    }
+
+    /** Spec 13: plugin form labels are sentence case. */
+    @Test void theReachableRowIsSentenceCase() {
+        var editor = editor(Set.of(Protocol.HTTP));
+        assertThat(((Nodes.FormRow) node(editor, "server.reachable.row")).label()).isEqualTo("Reachable from");
+        assertThat(((Nodes.Choice) node(editor, ServerEditor.REACHABLE)).label()).isEqualTo("Reachable from");
+    }
 
     @Test void protocolChangesPreserveExplicitPortAndHiddenValues() {
         var editor = editor(Set.of(Protocol.HTTP, Protocol.FTP, Protocol.SFTP, Protocol.TFTP));
@@ -78,10 +119,10 @@ class ServerEditorTest {
         action(editor, ServerEditor.SAVE); assertThat(message(editor)).contains("needs a name");
         edit(editor, ServerEditor.NAME, "docs"); action(editor, ServerEditor.SAVE);
         assertThat(message(editor)).contains("Choose a folder");
-        edit(editor, ServerEditor.FOLDER, folder.resolve("missing").toString()); action(editor, ServerEditor.SAVE);
+        nextFolder = folder.resolve("missing"); action(editor, ServerEditor.CHOOSE_FOLDER); action(editor, ServerEditor.SAVE);
         assertThat(message(editor)).contains("does not exist");
-        action(editor, ServerEditor.CHOOSE_FOLDER);
-        assertThat(folderRequests).isEqualTo(1);
+        nextFolder = folder; action(editor, ServerEditor.CHOOSE_FOLDER);
+        assertThat(folderRequests).isEqualTo(2);
         edit(editor, ServerEditor.PORT, "word"); action(editor, ServerEditor.SAVE);
         assertThat(message(editor)).contains("port");
         edit(editor, ServerEditor.PORT, "8080"); action(editor, ServerEditor.SAVE);
@@ -172,7 +213,7 @@ class ServerEditorTest {
         choose(editor, ServerEditor.PROTOCOL, "FTP");
         assertThat(((Nodes.Field) node(editor, ServerEditor.PASSIVE)).state().enabled()).isTrue();
         assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isFalse();
-        assertThat(text(editor, "server.warning")).contains("Plain FTP sends the password unencrypted");
+        assertThat(notice(editor)).contains("Plain FTP sends the password unencrypted");
         toggle(editor, ServerEditor.TLS, true);
         assertThat(((Nodes.Toggle) node(editor, ServerEditor.REQUIRE_TLS)).state().enabled()).isTrue();
         toggle(editor, ServerEditor.REQUIRE_TLS, true);
@@ -225,9 +266,9 @@ class ServerEditorTest {
         edit(editor, ServerEditor.PORT, "8080");
         assertThat(node(editor, "server.port.hint").state().visible()).isFalse();
         choose(editor, ServerEditor.LOGIN, "vault");
-        assertThat(text(editor, "server.warning")).contains("Plain HTTP sends the password unencrypted");
+        assertThat(notice(editor)).contains("Plain HTTP sends the password unencrypted");
         toggle(editor, ServerEditor.WRITABLE, true);
         choose(editor, ServerEditor.REACHABLE, "bind.1");
-        assertThat(text(editor, "server.warning")).contains("Writable and reachable from other computers");
+        assertThat(notice(editor)).contains("Writable and reachable from other computers");
     }
 }

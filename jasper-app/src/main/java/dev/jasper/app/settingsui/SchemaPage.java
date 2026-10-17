@@ -300,7 +300,7 @@ public final class SchemaPage implements SettingsPage {
             switch (item) {
                 case SectionItem section -> {
                     if (!sectionShown(section)) continue;
-                    close(children, group, title, sections++);
+                    close(children, group, heading(title, !group.isEmpty(), children), sections++);
                     title = section.title();
                 }
                 case RowItem row -> {
@@ -308,9 +308,9 @@ public final class SchemaPage implements SettingsPage {
                         var owner=rows.get(rowIndex++);
                         if(owner.editor.cardRows())group.addAll(((Nodes.Stack)row(owner)).children());
                         else if(owner.editor.fullSpan()) {
-                            if(!group.isEmpty()){close(children,group,title,sections++);title=null;}
-                            Nodes.Node content=row(owner);
-                            children.add(title==null?content:new Nodes.Section("section-"+sections++,ControlState.READY,title,content));title=null;
+                            if(!group.isEmpty()){close(children,group,heading(title,true,children),sections++);title=null;}
+                            Nodes.Node content=row(owner);String shown=heading(title,true,children);
+                            children.add(shown==null?content:new Nodes.Section("section-"+sections++,ControlState.READY,shown,content));title=null;
                         } else group.add(row(owner));
                     }
                 }
@@ -319,8 +319,16 @@ public final class SchemaPage implements SettingsPage {
                 case NoticeItem notice -> group.add(noticeNode(notice));
             }
         }
-        close(children, group, title, sections);
+        close(children, group, heading(title, !group.isEmpty(), children), sections);
         return new ViewSpec(new Nodes.Stack("page:" + spec.id, ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, children));
+    }
+
+    /**
+     * A run's heading: its section's title, or, for the page's first run of shown rows when no section heads it, the
+     * page's own title (spec 12.2, both looks), so no page starts with an untitled card.
+     */
+    private String heading(String title, boolean rows, List<Nodes.Node> children) {
+        return title == null && rows && children.isEmpty() ? spec.title : title;
     }
 
     /** Ends a section: its title over a settings card of its rows; an empty untitled run adds nothing. */

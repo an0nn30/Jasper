@@ -102,7 +102,6 @@ final class FakeSetting<T> implements Setting<T> {
                 String text = edited.text();
                 if (value instanceof Integer) yield Long.valueOf(text);
                 if (value instanceof Double) yield Double.valueOf(text);
-                if (value instanceof List<?>) yield text.isEmpty() ? List.of() : List.of(text.split("\n", -1));
                 yield text;
             }
             default -> throw new IllegalArgumentException("Unsupported setting edit");

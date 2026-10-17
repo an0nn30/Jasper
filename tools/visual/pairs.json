@@ -41,7 +41,8 @@
       1960,
       1362
     ],
-    "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png"
+    "render": "jasper-app/build/theme-surfaces9b/dark-0/keymap-recording.png",
+    "note": "Spec 13 (plan 3e): the Keymap lists File's Open File\u2026 (Unassigned) under Application and File Server's Share Folder\u2026, so the rows below New Window move one row down. Edge agreement 0.294 before, 0.293 after."
   },
   {
     "name": "settings-plugins",
@@ -85,7 +86,8 @@
       1080,
       1464
     ],
-    "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png"
+    "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png",
+    "note": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case. Edge agreement 0.191 before, 0.190 after; the two managed keys' rows also swap run to run (the import returns them in a Map.copyOf's order)."
   },
   {
     "name": "fileserver-add",
@@ -96,7 +98,8 @@
       1080,
       1380
     ],
-    "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png"
+    "render": "jasper-app/build/theme-migration-evidence/fileserver-add/actual/anonymous.png",
+    "note": "Spec 13 (plan 3e): the label \"Reachable from\" is sentence case; the read-only folder field draws as before in this state, which has no warning. Edge agreement 0.228 before, 0.228 after."
   },
   {
     "name": "vault-manager",
@@ -152,7 +155,8 @@
       1582,
       1424
     ],
-    "render": "jasper-app/build/workspace-surfaces/rails/dark-791x712.png"
+    "render": "jasper-app/build/workspace-surfaces/rails/dark-791x712.png",
+    "note": "Spec 13 (plan 3e): the Vault status item reads \"Vault: Locked\". Edge agreement 0.818 before, 0.807 after."
   },
   {
     "name": "workspace-integrated",
@@ -163,7 +167,8 @@
       2684,
       1716
     ],
-    "render": "jasper-app/build/workspace-surfaces/integrated/dark-1342x858.png"
+    "render": "jasper-app/build/workspace-surfaces/integrated/dark-1342x858.png",
+    "note": "Spec 13 (plan 3e): the Vault status item reads \"Vault: Locked\". Edge agreement 0.586 before, 0.583 after."
   },
   {
     "name": "workspace-palette",
@@ -180,7 +185,8 @@
       8,
       1120,
       712
-    ]
+    ],
+    "note": "Spec 13 (plan 3e): the empty query shows three recent rows, so Most used starts one row lower. Edge agreement 0.375 before, 0.349 after."
   },
   {
     "name": "sessions-panel",
@@ -431,6 +437,7 @@
       1080,
       1116
     ],
-    "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png"
+    "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png",
+    "note": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case. Edge agreement 0.340 before, 0.341 after."
   }
 ]

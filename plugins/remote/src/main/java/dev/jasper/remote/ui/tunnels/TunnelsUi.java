@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
 import javax.swing.Timer;
 
 /**
- * Registers the tunnels surface — the Tunnels panel, its actions, the SSH menu group, Forward a Port on the terminal
+ * Registers the tunnels surface — the Tunnels panel, its actions, the Session menu's group, Forward a Port on the terminal
  * menu, the palette scope and the status item — and keeps the manager in step with tunnels.toml: a removed tunnel stops,
  * a tunnel whose forwarding changed restarts. The panel and dialogs are kit views from {@code context.kit()}, closed with
  * their surface. UI thread only.
@@ -127,7 +127,7 @@ public final class TunnelsUi implements AutoCloseable {
         managerSubscription = manager.onChanged(this::refresh);
     }
 
-    /** The SSH menu's tunnels group. */
+    /** The Session menu's tunnels group, after a separator. */
     public void addToMenu(PluginMenu menu) {
         menu.addSeparator();
         menu.add(TOGGLE);

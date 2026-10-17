@@ -7,7 +7,7 @@ least 560 px wide, moving or narrowing to stay clear of the window controls. Whe
 narrow for the field, the palette opens centred near the
 top fifth of the window instead.
 
-The palette opens with no **scope chip**. An empty query shows **Recently used**, the last two rows
+The palette opens with no **scope chip**. An empty query shows **Recently used**, the last three rows
 you ran from the palette, then **Most used**, rows ranked by how often and how recently you ran them,
 topped up with each scope's own suggestions (Commands' starters, …) until there are ten. History's
 shell commands and Vault's entries never appear here unprompted; they show once you type. A row
@@ -36,7 +36,7 @@ digits are search text. Every colour comes from the installed theme.
 |---|---|---|---|
 | Commands | Run | | |
 | History | Paste | Paste and run | Save as snippet… |
-| Snippets | Paste | Paste and run | Edit file |
+| Snippets | Insert | Paste and run | Edit file |
 
 ## Commands
 
@@ -154,7 +154,7 @@ empty query shows.
 
 Placeholders are `{{identifier}}` tokens, where `identifier` matches
 `[A-Za-z_][A-Za-z0-9_]*`; a backslash before the opening braces, `\{{`, produces a literal
-`{{` instead. A snippet with placeholders opens a fill-in step before Paste or
+`{{` instead. A snippet with placeholders opens a fill-in step before Insert or
 Paste-and-run: one labelled field per distinct placeholder, in the order it first appears in
 the command, the first field focused. Tab and Shift+Tab move between fields and wrap; each
 field is prefilled with the value you last typed for that placeholder name in this process.

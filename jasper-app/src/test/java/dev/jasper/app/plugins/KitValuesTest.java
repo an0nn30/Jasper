@@ -215,4 +215,33 @@ class KitValuesTest {
   assertThat(((dev.jasper.ui.model.Nodes.Field)module.children().get(2)).listId()).isEqualTo("languages");
   assertThat(module.kind()).isEqualTo(dev.jasper.ui.model.Nodes.SplitKind.DOCUMENT);
  }
+ /** Plan 3c (spec 8.2): tree columns, cell nodes, heading rows and empty states cross the projection unchanged. */
+ @Test void zeroEighteenTableFieldsProjectWithoutLoss(){
+  var columns=List.of(new Column("name","Name",TextRole.BODY,false),new Column("host","Host",TextRole.MONO_SMALL,false),new Column("port","Port",TextRole.MONO_SMALL,true));
+  var mac=new TreeItem("mac","Mac",Optional.empty(),true,List.of(),OptionalInt.empty(),false,"",Optional.of(StatusKind.SUCCESS),List.of("192.168.1.119","22"),Optional.empty());
+  var tree=new Tree("sessions",READY,List.of(new TreeItem("lan","Local Network",Optional.empty(),false,List.of(mac))),Set.of("lan"),Set.of("mac"),"connect",columns);
+  var cells=new LinkedHashMap<String,Node>();
+  for(int i=11;i>=0;i--)cells.put("c"+i,text("cell"+i));
+  cells.put("display",new Choice("display",READY,ChoiceKind.DROPDOWN,List.of(new Option("card","Card",Optional.empty()),new Option("sticky","Sticky card",Optional.empty())),"card","Display",""));
+  cells.put("type",new Nodes.Stack("type",READY,LayoutRole.INLINE,List.of(new StatusDot("dot",READY,StatusKind.SUCCESS),new Chip("chip",READY,"HTTP",Hue.BLUE),
+   new Icon("glyph",READY,"server",Hue.NONE,IconSize.CAPTION,"Server"))));
+  var tableColumns=new ArrayList<Column>();for(var id:cells.keySet())tableColumns.add(new Column(id,id,TextRole.BODY,false));
+  var groups=new Table("groups",READY,tableColumns,List.of(TableRow.heading("jasper","Jasper",OptionalInt.of(6),"group"),
+   new TableRow("errors",Map.of(),Optional.empty(),false,Optional.empty(),"",cells,Optional.empty())),Set.of("errors"),"",List.of(),SelectionMode.SINGLE,ScrollPolicy.STANDARD,Optional.empty(),"");
+  var tunnels=new Table("tunnels",READY,List.of(new Column("kind","Type",TextRole.BODY,false)),List.of(),Set.of(),"",List.of(),SelectionMode.SINGLE,ScrollPolicy.STANDARD,
+   Optional.of(new Empty("tunnels.empty",READY,new Icon("tunnels.icon",READY,"tunnel",Hue.NEUTRAL,IconSize.EMPTY,"Tunnels"),"No Tunnels","",List.of(button("tunnels.new")))),"");
+  var files=new Table("files",READY,List.of(new Column("name","Name",TextRole.BODY,false)),List.of(),Set.of(),"",List.of(),SelectionMode.SINGLE,ScrollPolicy.STANDARD,Optional.empty(),"Not Connected");
+  var keys=new ItemList("keys",READY,ListKind.ORDERED,List.of(),Set.of(),"",List.of(),SelectionMode.SINGLE,Optional.empty(),OptionalInt.empty(),"","","","","","No keys");
+  var spec=new ViewSpec(new Nodes.Stack("tables",READY,LayoutRole.VERTICAL,List.of(tree,groups,tunnels,files,keys)));
+  assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());
+  var module=(dev.jasper.ui.model.Nodes.Stack)KitValues.toModule(spec).root();
+  assertThat(((dev.jasper.ui.model.Nodes.Tree)module.children().get(0)).columns()).extracting(dev.jasper.ui.model.Column::id).containsExactly("name","host","port");
+  var rows=((dev.jasper.ui.model.Nodes.Table)module.children().get(1)).rows();
+  assertThat(rows.get(0).heading()).hasValue(new dev.jasper.ui.model.TableRow.Heading("Jasper",OptionalInt.of(6),"group"));
+  assertThat(rows.get(1).cellNodes().keySet()).containsExactlyElementsOf(groups.rows().get(1).cellNodes().keySet());
+  assertThat(rows.get(1).cellNodes().get("display")).isInstanceOf(dev.jasper.ui.model.Nodes.Choice.class);
+  assertThat(((dev.jasper.ui.model.Nodes.Table)module.children().get(2)).empty()).hasValueSatisfying(state -> assertThat(state.actions()).hasSize(1));
+  assertThat(((dev.jasper.ui.model.Nodes.Table)module.children().get(3)).emptyText()).isEqualTo("Not Connected");
+  assertThat(((dev.jasper.ui.model.Nodes.ItemList)module.children().get(4)).emptyText()).isEqualTo("No keys");
+ }
 }

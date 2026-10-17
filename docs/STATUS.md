@@ -33,6 +33,79 @@ quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from 
 name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
 --continue` after the final review fixes: **10728 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
 
+**Enterprise presentation, plan 3e: the default-look changes — 2026-10-16** (`claude/enterprise-default-look`, worktree
+`.claude/worktrees/enterprise-3e`, `46b9bca82..7de3ee4ec`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-3e-default-look.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec section 13, in both looks. Remote's
+SSH menu is gone: Connect to SSH Host…, Toggle SSH hosts and Split with Same Host, New Host… and Import from
+~/.ssh/config…, and the tunnels group sit in the Session menu, Open SFTP here and Transfers in the Transfer menu,
+where File Server adds the new Share Folder… (what the empty File Servers panel's button runs) and New File Server….
+File › Open File… (`open_file`, no default binding; also a palette command) asks the plugins' file chooser over the
+window for one local file, starting in the pane's folder, and opens it as a Cmd-click does. Vault's status item reads
+"Vault: Locked" or "Vault: Unlocked" ("Vault" with no vault); the Snippets scope's first verb reads "Insert" (id
+`paste`). A Settings page's leading rows that no section heads take the page's name (Command Palette, Desk Buddy,
+Terminal, Cursor, Shell and every generated plugin page, such as Credential Vault), and System Settings opens with
+"General". New File Server's warnings are one WARNING Notice and its folder a read-only field that only the separate
+Choose… sets. A plugin's `stringList` host row is the generated pages' ordered-list editor, node for node, in the host
+and the testkit's fake. Project Index's Location column uses `MONO_SMALL`. Plugin form labels are sentence case (Via
+host, Jump host, Reachable from, Listen on, Forward to). The palette's empty query shows three recent rows. The
+banners of the Snippets, Palette plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault
+specifications carry spec 19.2's lines. Pixels: no jasper-ui file changed, so the headless gallery is byte-identical;
+measured against renders taken before Task 1, the reference pairs whose renders changed, as section 13 asks, are
+`settings-keymap` 0.294 → 0.293, `host-add` 0.191 → 0.190, `fileserver-add` 0.228 → 0.228, `workspace-rails` 0.818 → 0.807, `workspace-integrated` 0.586 → 0.583, `workspace-palette` 0.375 → 0.349, `tunnel-new` 0.340 → 0.341 (edge agreement before → after), each with a `note` in `tools/visual/pairs.json`; `vault-manager` and
+`vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder);
+every other pair's render is pixel-identical. Rulings (plan, "Rulings"): the reference pairs keep their mocks and gain
+notes; Session keeps the SSH menu's order; Share Folder… runs what New File Server… runs; Open File…
+opens nothing before plugins start; "Vault" with no vault; the verb id stays `paste`;
+one `SchemaPage` rule titles leading groups, plugin-built pages excepted; one Notice joins the warnings; the folder is
+set only through the chooser, in tests too; sentence case covers exactly the five labels, and jasper-ui fixtures keep
+their Title Case copies; the host list is `Editors.textList()`'s node; Location takes `MONO_SMALL`; `SUGGESTED_ROWS`
+stays 10; the banner lines follow each status paragraph. Rulings 4, approved on 2026-10-16 under the user's overnight
+authority: File › Open File… shows Jasper's own file chooser, which every other file pick in the app uses, as IntelliJ
+does by default; spec 11.7 and 13 now say so, with a header amendment line. Deviations from the plan's text:
+Task 9: the plan's Rulings 14 linked the Enterprise design relative to the plans folder, which `AppDocumentationTest` refuses; that link now points into `../specs/`. Task 9: `fileserver-add` changed only in its "Reachable from" label (the read-only folder draws as before and that state has no warning), and its note says so. Task 9: `settings-keymap` (the Keymap lists Open File… and Share Folder…), `workspace-rails` and `workspace-integrated` (the Vault status item reads Vault: Locked) changed by design and carry notes too. Task 9: `vault-manager` and `vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder, shown by two renders of one tree), so they carry no note and Step 5 skips them. Final review: a refused Add's error lasts only while the entry's text is unchanged, and the ordered list's own row selection stages nothing, in the host and the fake (refining Rulings 11 and Review Focus 1: Apply is refused only while the refused text stands). Final review: Ruling 2's Transfer order does not ship; bundled plugins start in `PluginResolver` order (File Server before Remote) and sections compose in start order, so Transfer reads Share Folder…, New File Server…, a separator, Open SFTP here, Transfers, which `BundledSamplePluginTest` pins; putting Remote first needs a host ordering ruling in a later plan. Final review: `host-add`'s renders also swap its two managed keys' rows run to run (`importManagedKeys` returns `SshKeyImportResult.keys()`, a `Map.copyOf`), so part of its change is noise. Hand-offs:
+plan 9's classic Settings compositions draw the new leading headings as titled group boxes; plan 10's classic File
+Servers table reuses Share Folder… for its empty state; plan 8's Browse… runs `ActionId.OPEN_FILE`.
+`./gradlew check --continue`: **10,622 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plans 3c and 4a) as `e9cffab2d`: **10,683 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the menu bar reads File, Edit, View, Pane, Tab,
+Session, Transfer, Tools, … with no SSH menu, and every former SSH entry works from Session or Transfer; Transfer reads Share Folder…, New File Server…, —, Open SFTP
+here, Transfers; File › Open
+File… opens a chosen file in the default editor and Cancel opens nothing; the Vault status item reads Vault: Locked
+and Vault: Unlocked as you lock and unlock; New File Server with FTP shows the Warning notice, and Choose… sets the
+read-only folder; Settings › Command Palette, Terminal and System Settings show their first headings; Settings › Tools
+› Project Index edits its lists as ordered lists; the palette's empty query shows three recent rows. Not merged, not
+pushed.
+
+**Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree
+`.claude/worktrees/enterprise-3c`, `d858e8f57..7ea713687`, then this documentation commit and the final review fixes;
+[plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18 gains spec 8.2's table
+vocabulary, mirrored in the jasper-ui model, projected losslessly by `KitValues`, walked by both runtimes' descriptor
+walks, and carried by the shared kit and plugin contracts: `Tree.columns` (a header over the trailing values, header clicks report
+`Sorted`), `TableRow.cellNodes` (Text, StatusDot, Icon, Chip, an INLINE stack of those, or a DROPDOWN `Choice`; one
+content per column; a DROPDOWN with a rich face is refused), `TableRow.heading` with `Heading` and `countNoun` ("6 groups"), `Table.empty` (one action at
+most) or `Table.emptyText`, and `ItemList.emptyText`. Every former constructor stays with the new components empty.
+The default look draws a cell node in its weighted column, the cell DROPDOWN bare (value then chevron, the face only
+on hover, focus or while open, the selection ink while bare), a heading row as a strong title with its muted count
+that keys, clicks and type-ahead never land on, the empty line, an empty table's state centred below its kept
+headers, and a column tree's header over right-aligned values with a reserved count column. Zero pixel change: the
+headless gallery's files for Slate Cobalt Dark and Light are byte-identical to the base but for `manifest.json`, the
+last contact sheet and the new `tables-0-18` fixture. Planned deviations and rulings (plan, "Planned deviations and
+rulings"): (1) the admission and refusal case is in `PluginContractTest`, the per-view behaviour in
+`KitContractTest`; (2) `cellNodes` iterates in
+column-id order; (3) a `countNoun` needs a count and is lowercase with no surrounding spaces, and a heading row has
+nothing but its heading; (4) a heading row is BODY_STRONG with a CAPTION count and no indent below it; (5) a table's
+`empty` is mounted only while it has no rows, and both runtimes refuse focus, reveal and anchors into it while rows show; (6)
+the empty line shows only with no items, one row tall (inside a filter-driven list's reserved rows), above an
+ItemList's add action; (7) tree columns right-align the values in their column's role, pad missing ones and reserve the count column, and
+keycap-presented trees are plan 9's; (8) a muted row dims plain cells and Text cell nodes; (9) the cell dropdown is as
+wide as its selected plain value, its value starts under the column's title and the cell before it gives way; (10)
+the SDK README's 0.18.0 sentence names the additions. A cell node's own area (an inline stack's or a dropdown's,
+beside its content) selects, activates and opens the row's menu, and hovering the chevron keeps the face. Hand-offs: plan 4's classic faces draw the same descriptors
+(grid lines, the indent under headings, the mocks' header strip); plans 9 and 10 adopt them (Notifications, Keymap,
+Sessions, Tunnels, File Servers, SFTP, Add Host's keys); 3e owns the default-look changes of section 13.
+`./gradlew check --continue` after the final review fixes: **10,637 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plan 4a) as `1a69de6a7`: `./gradlew check --continue` **10,669 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (no plugin or page uses the vocabulary
+yet). Not merged, not pushed.
+
 **Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `7d8c189c3..485316ed2`, then this documentation commit
 and the final review fixes;

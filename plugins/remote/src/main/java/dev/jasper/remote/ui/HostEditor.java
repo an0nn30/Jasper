@@ -355,7 +355,7 @@ public final class HostEditor implements AutoCloseable {
             new Nodes.FormRow("row." + HOSTNAME, ControlState.READY, "Host", "", field(HOSTNAME, Nodes.FieldKind.TEXT, hostname, "hostname or IP address", "Host"),
                 Optional.of(field(PORT, Nodes.FieldKind.PORT, port, "", "Port"))),
             row("row." + USERNAME, "Username", "", field(USERNAME, Nodes.FieldKind.TEXT, username, "root", "Username")),
-            row("row." + JUMP, "Jump Host", "", new Nodes.Choice(JUMP, state(true, editable), Nodes.ChoiceKind.DROPDOWN, jumpOptions, jump, "Jump Host", ""))));
+            row("row." + JUMP, "Jump host", "", new Nodes.Choice(JUMP, state(true, editable), Nodes.ChoiceKind.DROPDOWN, jumpOptions, jump, "Jump host", ""))));
         boolean keysEnabled = vaultAuth && vaultPresent && editable;
         var keys = managedIds.stream().map(this::keyItem).toList();
         // Do not link Vault-only presentation when the optional plugin is absent.

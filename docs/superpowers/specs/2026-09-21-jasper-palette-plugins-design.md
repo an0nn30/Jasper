@@ -3,6 +3,8 @@
 **Status:** Approved 2026-09-21 (user decisions recorded in section 2). Amends section 14 of
 `2026-09-21-jasper-plugin-sdk-design.md`: palette scopes contributed by plugins are now in scope.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): the first verb reads Insert; everything else in this document stands.
+
 **Scope:** A supported palette-contribution surface in `jasper-sdk`, three small SDK additions the
 first contributors need (a pane's shell label, a one-method notice API, open-in-editor), the host
 adapter and testkit fake for all of them, and the move of the History and Snippets palette scopes

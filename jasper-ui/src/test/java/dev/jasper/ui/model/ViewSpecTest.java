@@ -249,4 +249,22 @@ class ViewSpecTest {
         assertThatThrownBy(() -> new Numeric(0, 1, 1, -1)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Numeric(Double.NaN, 1, 1, 0)).isInstanceOf(IllegalArgumentException.class);
     }
+    /** Plan 3c: the model mirrors SDK 0.18's table vocabulary and its validation. */
+    @Test void tableVocabularyOfSdkZeroEighteenIsMirrored() {
+        var columns = List.of(new Column("c", "C", TextRole.BODY, false), new Column("d", "D", TextRole.BODY, false));
+        var dropdown = new Choice("pick", ControlState.READY, ChoiceKind.DROPDOWN, List.of(new Option("a", "A", Optional.empty())), "a", "Pick", "");
+        var row = new TableRow("r", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "", Map.of("d", dropdown), Optional.empty());
+        var heading = TableRow.heading("h", "Group", OptionalInt.of(3), "group");
+        var table = new Table("t", ControlState.READY, columns, List.of(heading, row), Set.of("r"), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD,
+            Optional.empty(), "");
+        assertThat(new ViewSpec(table).root()).isEqualTo(table);
+        assertThatIllegalArgumentException().isThrownBy(() -> new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "",
+            Map.of("d", new Choice("p", ControlState.READY, ChoiceKind.PICKER, List.of(), "", "Pick", "pick")), Optional.empty()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Table("t", ControlState.READY, columns, List.of(heading), Set.of("h"), "", List.of()));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE,
+            ScrollPolicy.STANDARD, Optional.of(new Empty("e", ControlState.READY, text("i"), "None", "", List.of())), "Nothing"));
+        var three = new TreeItem("x", "X", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.empty(), List.of("1", "2", "3"), Optional.empty());
+        assertThatIllegalArgumentException().isThrownBy(() -> new ViewSpec(new Tree("tree", ControlState.READY, List.of(three), Set.of(), Set.of(), "", columns)));
+        assertThat(new ItemList("l", ControlState.READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of()).emptyText()).isEmpty();
+    }
 }

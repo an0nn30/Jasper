@@ -152,6 +152,7 @@ class GalleryCoverageTest {
     static void records(Object value, List<Record> out) {
         if (value instanceof Optional<?> o) { o.ifPresent(v -> records(v, out)); return; }
         if (value instanceof Iterable<?> items) { items.forEach(v -> records(v, out)); return; }
+        if (value instanceof Map<?, ?> map) { map.values().forEach(v -> records(v, out)); return; }
         if (value instanceof Record record && !(value instanceof dev.jasper.ui.model.ControlState)) {
             out.add(record);
             try { for (RecordComponent c : record.getClass().getRecordComponents()) records(c.getAccessor().invoke(record), out); }
@@ -164,9 +165,26 @@ class GalleryCoverageTest {
         if (value instanceof Enum<?> e) { values.add(e.getDeclaringClass().getSimpleName() + "." + e.name()); return; }
         if (value instanceof Optional<?> o) { o.ifPresent(v -> collect(v, values)); return; }
         if (value instanceof Iterable<?> items) { items.forEach(v -> collect(v, values)); return; }
+        if (value instanceof Map<?, ?> map) { map.values().forEach(v -> collect(v, values)); return; }
         if (value instanceof Nodes.Node n) values.add(n.getClass().getSimpleName());
         if (value instanceof Record record) try {
             for (RecordComponent c : record.getClass().getRecordComponents()) collect(c.getAccessor().invoke(record), values);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+    }
+
+    /** Spec 16.1.3 and plan 3c: SDK 0.18's table vocabulary has a real fixture, the in-cell DROPDOWN among it. */
+    @Test void everyTableAdditionOfSdkZeroEighteenHasARealFixture() {
+        var records = new ArrayList<Record>();
+        KitGallery.fixtures().forEach(f -> records(f.spec().root(), records));
+        assertThat(records).as("a tree with columns").anyMatch(r -> r instanceof Nodes.Tree tree && tree.columns().size() > 1);
+        assertThat(records).as("a heading row with a counted noun").anyMatch(r -> r instanceof Nodes.Table table
+            && table.rows().stream().anyMatch(row -> row.heading().filter(h -> h.count().isPresent() && !h.countNoun().isBlank()).isPresent()));
+        assertThat(records).as("an in-cell DROPDOWN").anyMatch(r -> r instanceof Nodes.Table table && table.rows().stream()
+            .anyMatch(row -> row.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN)));
+        assertThat(records).as("an inline cell stack").anyMatch(r -> r instanceof Nodes.Table table && table.rows().stream()
+            .anyMatch(row -> row.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.INLINE)));
+        assertThat(records).as("an empty table's state").anyMatch(r -> r instanceof Nodes.Table table && table.rows().isEmpty() && table.empty().isPresent());
+        assertThat(records).as("an empty table's line").anyMatch(r -> r instanceof Nodes.Table table && table.rows().isEmpty() && !table.emptyText().isBlank());
+        assertThat(records).as("an empty list's line").anyMatch(r -> r instanceof Nodes.ItemList list && list.items().isEmpty() && !list.emptyText().isBlank());
     }
 }

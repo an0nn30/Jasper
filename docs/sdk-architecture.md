@@ -303,8 +303,8 @@ plugin's replacing a non-bundled plugin's. Every editor open in the application 
 Manager's settings files, the VM options file and `Platform.openInEditor`) runs on a worker, which asks the file editor
 on the UI thread through `FileEditors.editFromWorker`, waits up to 30 s, and otherwise runs the desktop fallback itself.
 A Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane (`JasperApplication.openFileAt`)
-asks the same way, with the line and the clicked window; its path is program output, and an OSC 8 link's target can
-differ from the text shown, so the fallback is the desktop's edit or reveal action, never its open action, and a
+asks the same way, with the line and the clicked window, and so does File › Open File…, at no line; a clicked path is
+program output, and an OSC 8 link's target can differ from the text shown, so the fallback is the desktop's edit or reveal action, never its open action, and a
 plugin's editor should edit the file and never run it.
 `LocalSpec.command` becomes `terminals.OpenSpec.Local.program`; the workspace launches it through `ShellLauncher` with
 the default profile's environment and pins close-on-success over `terminal.on_exit`. `CommandLine.client()` comes from

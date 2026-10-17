@@ -10,14 +10,19 @@ import dev.jasper.ui.theme.SemanticColor;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.swing.*;
 
 /**
  * Column-aligned virtual rows; numeric cells align to the trailing column edge. Columns share the width by weight,
- * the header shows the host's sort and reports clicks as {@link UiEvent.Sorted}, and a muted row dims every cell.
+ * the header shows the host's sort and reports clicks as {@link UiEvent.Sorted}, and a muted row dims its plain cells and
+ * Text cell nodes.
+ * A column holds a plain cell or a cell node (a bare dropdown among them), and a heading row shows its title and its
+ * muted count across the row.
  */
 final class Tables {
     private Tables() {}
@@ -26,8 +31,46 @@ final class Tables {
         return node.scroll() == Nodes.ScrollPolicy.OVERLAY ? new OverlayScrollPane(view.context()) : new JScrollPane();
     }
 
+    /**
+     * A column title as a table's or a tree's header shows it: caption type, the host's sort indicator, and left clicks
+     * reported as {@link UiEvent.Sorted} for {@code owner}'s node.
+     */
+    static JLabel headerLabel(ControlRegistry.Control owner, String prefix, Column column) {
+        var context = owner.context();
+        var label = Labels.literal();
+        KitOwnership.mark(label, prefix + owner.node.id() + "/header/" + column.id());
+        label.setText(column.title());
+        label.setFont(ThemePainting.font(context, Typography.Role.CAPTION));
+        label.setForeground(ThemePainting.color(context, SemanticColor.TEXT_TERTIARY));
+        label.setHorizontalAlignment(
+                column.numeric() ? SwingConstants.RIGHT : SwingConstants.LEFT);
+        label.setHorizontalTextPosition(SwingConstants.LEADING);
+        label.setIcon(column.sorted().map(ascending -> context.icons().icon(ascending ? "chevron.up" : "chevron.down",
+                context.theme().semantic(), SemanticColor.TEXT_SECONDARY,
+                com.formdev.flatlaf.util.UIScale.scale(context.icons().size(context.metrics(), Nodes.IconSize.CAPTION)))).orElse(null));
+        label.getAccessibleContext().setAccessibleName(column.title()
+                + column.sorted().map(ascending -> ascending ? ", sorted ascending" : ", sorted descending").orElse(""));
+        String columnId = column.id();
+        label.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                if (SwingUtilities.isLeftMouseButton(event)) owner.emit(new UiEvent.Sorted(owner.node.id(), columnId));
+            }
+        });
+        return label;
+    }
+
+    /** A heading row's count as it reads: "6 groups", "1 group", the bare number without a noun, or nothing. */
+    static String countText(TableRow.Heading heading) {
+        if (heading.count().isEmpty()) return "";
+        int count = heading.count().getAsInt();
+        return heading.countNoun().isBlank() ? Integer.toString(count) : count + " " + heading.countNoun() + (count == 1 ? "" : "s");
+    }
+
     static final class TableControl extends InteractiveRows.RowsControl {
         final JPanel header = new JPanel();
+        /** The row of every cell node and its descendants, so focus and reveal reach row-mounted nodes. */
+        final Map<String, Integer> nodeRows = new HashMap<>();
         private List<Column> measuredColumns=List.of();
         private List<TableRow> measuredRows=List.of();
         private List<Font> measuredFonts=List.of();
@@ -89,7 +132,64 @@ final class Tables {
         @Override
         String itemText(int i) {
             var columns = value().columns();
-            return columns.isEmpty() ? "" : value().rows().get(i).cells().getOrDefault(columns.getFirst().id(), "");
+            return columns.isEmpty() ? "" : cellText(value().rows().get(i), columns.getFirst().id());
+        }
+
+        /**
+         * A column's text for type-ahead: its plain cell, a Text cell node's text, a Chip's label, an inline stack's first
+         * text, or a cell dropdown's selected label.
+         */
+        static String cellText(TableRow row, String column) {
+            var cell = row.cellNodes().get(column);
+            if (cell == null) return row.cells().getOrDefault(column, "");
+            if (cell instanceof Nodes.Text text) return text.text();
+            if (cell instanceof Nodes.Chip chip) return chip.label();
+            if (cell instanceof Nodes.Stack stack)
+                for (var child : stack.children()) if (child instanceof Nodes.Text text && !text.text().isBlank()) return text.text();
+            if (cell instanceof Nodes.Choice choice)
+                for (var option : choice.options()) if (option.id().equals(choice.selectedId())) return option.label();
+            return "";
+        }
+
+        /** A heading row groups the rows below it; it is never selected, activated or offered a menu. */
+        @Override
+        boolean dataRow(int index) {
+            return index < 0 || index >= size() || value().rows().get(index).heading().isEmpty();
+        }
+
+        @Override
+        String emptyText() {
+            return value().emptyText();
+        }
+
+        /** An empty table's state fills the body below the headers; the reconciler mounts it only while there are no rows. */
+        @Override
+        boolean fillsViewport() {
+            return footer != null && value().rows().isEmpty();
+        }
+
+        @Override
+        Container childParent(Nodes.Node child) {
+            return canvas;
+        }
+
+        /** The table's only child is its empty state, which lies on the canvas where the rows would be. */
+        @Override
+        void children(List<ControlRegistry.Control> controls) {
+            JComponent next = controls.isEmpty() ? null : controls.getFirst().component;
+            if (footer != next && footer != null) canvas.remove(footer);
+            footer = next;
+            if (footer != null && footer.getParent() != canvas) canvas.add(footer);
+            canvas.revalidate();
+            sync();
+        }
+
+        /** An empty table's state takes the canvas's whole height, so it centres in the body. */
+        @Override
+        void layoutAccessories(int width) {
+            if (!fillsViewport()) return;
+            int inset = com.formdev.flatlaf.util.UIScale.scale(gutter);
+            footer.setBounds(inset, 0, Math.max(0, width - 2 * inset), Math.max(footerHeight(), canvas.getHeight()));
         }
 
         /** A table keeps Enter with no focused row, as the JTable it replaced did (its Enter moved the selection). */
@@ -141,41 +241,48 @@ final class Tables {
             return value().rows().stream().anyMatch(row -> row.id().equals(id) && row.contextActions().isPresent());
         }
 
+        void index(Nodes.Node cell, int index) {
+            nodeRows.put(cell.id(), index);
+            ControlRegistry.children(cell).forEach(child -> index(child, index));
+        }
+
+        /** Reveal can arrive before layout and never changes the row's logical keyboard focus. */
+        @Override
+        boolean revealInline(String id) {
+            Integer index = nodeRows.get(id);
+            if (index == null) return false;
+            pendingReveal = itemId(index);
+            ensure(index);
+            return true;
+        }
+
+        @Override
+        ControlRegistry.Control inline(String id) {
+            Integer index = nodeRows.get(id);
+            if (index == null) return null;
+            focusItem = itemId(index);
+            focusControl = id;
+            ensure(index);
+            var row = mounted.get(focusItem);
+            return row == null ? null : row.controls.get(id);
+        }
+
         WeightLayout weights() {
             return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray(),minimums);
         }
 
         @Override
         void data() {
+            nodeRows.clear();
+            for (int i = 0; i < size(); i++) for (var cell : value().rows().get(i).cellNodes().values()) index(cell, i);
+            if (focusControl != null && !nodeRows.containsKey(focusControl)) focusControl = null;
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
             // A manager list column's rows start at the rail's top inset below the header, level with a rail beside it.
             scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP), 0, 0, 0) : null);
             header.removeAll();
             header.setLayout(weights());
-            for (var column : value().columns()) {
-                var label = Labels.literal();
-                KitOwnership.mark(label, "@table/" + node.id() + "/header/" + column.id());
-                label.setText(column.title());
-                label.setFont(ThemePainting.font(context(), Typography.Role.CAPTION));
-                label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY));
-                label.setHorizontalAlignment(
-                        column.numeric() ? SwingConstants.RIGHT : SwingConstants.LEFT);
-                label.setHorizontalTextPosition(SwingConstants.LEADING);
-                label.setIcon(column.sorted().map(ascending -> context().icons().icon(ascending ? "chevron.up" : "chevron.down",
-                        context().theme().semantic(), SemanticColor.TEXT_SECONDARY,
-                        com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.CAPTION)))).orElse(null));
-                label.getAccessibleContext().setAccessibleName(column.title()
-                        + column.sorted().map(ascending -> ascending ? ", sorted ascending" : ", sorted descending").orElse(""));
-                String columnId = column.id();
-                label.addMouseListener(new MouseAdapter() {
-                    @Override
-                    public void mouseClicked(MouseEvent event) {
-                        if (SwingUtilities.isLeftMouseButton(event)) emit(new UiEvent.Sorted(node.id(), columnId));
-                    }
-                });
-                header.add(label);
-            }
+            for (var column : value().columns()) header.add(headerLabel(this, "@table/", column));
             // The header's titles start where the cells' text does: the row inset (a manager column's, else the icon gap).
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP),
                     side = (column >= 0 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_LIST_SIDE) : pad) + com.formdev.flatlaf.util.UIScale.scale(gutter);
@@ -189,45 +296,79 @@ final class Tables {
             row.begin();
             row.slot(row.leading, List.of());
             row.slot(row.subtitle, List.of());
-            row.slot(row.trailing, List.of());
             var data = value().rows().get(index);
+            if (data.heading().isPresent()) {
+                heading(row, data, data.heading().get());
+                return;
+            }
+            row.slot(row.trailing, List.of());
             var nodes = new java.util.ArrayList<Nodes.Node>();
-            for (var column : value().columns())
-                nodes.add(
-                        new Nodes.Text(
+            for (var column : value().columns()) {
+                var cell = data.cellNodes().get(column.id());
+                nodes.add(cell != null ? cell : new Nodes.Text(
                                 "@table/" + node.id() + "/" + data.id() + "/" + column.id(),
                                 ControlState.READY,
                                 data.cells().getOrDefault(column.id(), ""),
                                 column.role()));
+            }
             row.slot(row.title, nodes);
             row.title.setLayout(weights());
+            // A stack's or a dropdown's own area (beside its content) selects, activates and opens the menu as a plain cell does.
+            for (var cellNode : nodes)
+                if (row.controls.get(cellNode.id()) instanceof ControlRegistry.Control control
+                        && (control instanceof Stacks.StackControl || control instanceof Choices.ChoiceControl)) row.forwardPointer(control);
             // A selected row's cells and glyph take its fill's ink (row.inked); a muted row keeps its placeholder ink only unselected.
             Color muted = data.muted() && !row.inked ? ThemePainting.color(context(), SemanticColor.TEXT_PLACEHOLDER) : null;
             for (int i = 0; i < nodes.size(); i++) {
-                var label = (JLabel) row.title.getComponent(i);
-                label.setHorizontalAlignment(
-                        value().columns().get(i).numeric()
-                                ? SwingConstants.RIGHT
-                                : SwingConstants.LEFT);
-                label.setIcon(
-                        i == 0 && data.icon().isPresent() && row.inked
-                                ? context().icons().icon(data.icon().get(), context().theme().semantic(), row.owner.ink().text,
-                                        com.formdev.flatlaf.util.UIScale.scale(14))
-                                : i == 0 && data.icon().isPresent()
-                                ? context()
-                                        .icons()
-                                        .icon(
-                                                data.icon().get(),
-                                                context().theme().semantic(),
-                                                Nodes.Hue.NONE,
+                var cell = (JComponent) row.title.getComponent(i);
+                var control = row.controls.get(nodes.get(i).id());
+                // A cell dropdown is bare; on a selected row its bare value takes the fill's ink.
+                if (control instanceof Choices.ChoiceControl choice) choice.inCell(row.inked ? ink() : null);
+                if (control instanceof Labels.TextControl && cell instanceof JLabel label) {
+                    label.setHorizontalAlignment(
+                            value().columns().get(i).numeric()
+                                    ? SwingConstants.RIGHT
+                                    : SwingConstants.LEFT);
+                    // The row's glyph leads the first column when that column is a plain cell.
+                    if (!data.cellNodes().containsKey(value().columns().get(i).id()))
+                        label.setIcon(
+                                i == 0 && data.icon().isPresent() && row.inked
+                                        ? context().icons().icon(data.icon().get(), context().theme().semantic(), row.owner.ink().text,
                                                 com.formdev.flatlaf.util.UIScale.scale(14))
-                                : null);
-                if (muted != null) label.setForeground(muted);
-                row.cells.add(label);
+                                        : i == 0 && data.icon().isPresent()
+                                        ? context()
+                                                .icons()
+                                                .icon(
+                                                        data.icon().get(),
+                                                        context().theme().semantic(),
+                                                        Nodes.Hue.NONE,
+                                                        com.formdev.flatlaf.util.UIScale.scale(14))
+                                        : null);
+                    if (muted != null) label.setForeground(muted);
+                }
+                row.cells.add(cell);
             }
             row.tooltip(data.tooltip());
-            // A table row is named by its first column, as its identity (a file's name, an entry's title).
-            row.name(nodes.isEmpty() ? List.of() : List.of(nodes.getFirst()));
+            // A table row is named by its first column, as its identity (a file's name, an entry's title): an inline
+            // stack by its texts and chips, a dropdown by its selected label.
+            var first = nodes.isEmpty() ? null : nodes.getFirst();
+            row.name(first == null ? List.of()
+                    : first instanceof Nodes.Stack stack ? stack.children()
+                    : first instanceof Nodes.Choice ? List.of(new Nodes.Text(first.id() + "/name", ControlState.READY,
+                            cellText(data, value().columns().getFirst().id()), Nodes.TextRole.BODY))
+                    : List.of(first));
+        }
+
+        /** A heading row: its strong title across the row and its count, muted, at the row's end. */
+        private void heading(InteractiveRows.Row row, TableRow data, TableRow.Heading heading) {
+            String prefix = "@table/" + node.id() + "/" + data.id();
+            String count = countText(heading);
+            row.slot(row.trailing, count.isEmpty() ? List.of()
+                    : List.of(new Nodes.Text(prefix + "/count", ControlState.READY, count, Nodes.TextRole.CAPTION)));
+            var title = new Nodes.Text(prefix + "/heading", ControlState.READY, heading.title(), Nodes.TextRole.BODY_STRONG);
+            row.slot(row.title, List.of(title));
+            row.tooltip("");
+            row.name(List.of(title));
         }
     }
 
@@ -286,7 +427,12 @@ final class Tables {
                     height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
             int[] sizes=allocation(width);int x=insets.left;var children=parent.getComponents();
             for(int i=0;i<children.length;i++){
-                int w=i<sizes.length?sizes[i]:0;children[i].setBounds(x,insets.top,w,height);x+=w;
+                int w=i<sizes.length?sizes[i]:0;
+                // A cell dropdown reaches back into the column gap by its text inset, so its value starts under the column's title.
+                int lead=w>0?Math.min(x-insets.left,Choices.cellLead(children[i])):0;
+                // The cell before it ends where that reach begins, so the dropdown takes the pointer there and no label paints over its face.
+                int ceded=i+1<children.length&&i+1<sizes.length&&sizes[i+1]>0?Math.min(x+w-insets.left,Choices.cellLead(children[i+1])):0;
+                children[i].setBounds(x-lead,insets.top,Math.max(0,w+lead-ceded),height);x+=w;
             }
         }
     }

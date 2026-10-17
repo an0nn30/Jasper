@@ -245,7 +245,7 @@ public final class CommandPalettePreview {
                     owner.commandPalette().refresh();
                     if(PaletteTestSupport.rowCount(owner.commandPalette().component())!=10)throw new AssertionError("Missing source rows");
                     var entries=PaletteTestSupport.entries(owner.commandPalette().component());
-                    if(!entries.get(0).equals("# Recently used")||!entries.get(3).equals("# Most used"))throw new AssertionError(entries);
+                    if(!entries.get(0).equals("# Recently used")||!entries.get(4).equals("# Most used"))throw new AssertionError(entries);
                 });
                 for(boolean dark:new boolean[]{true,false})for(float font:List.of(13f,32f)) {
                     for(var size:List.of(new Dimension(791,712),new Dimension(400,520),new Dimension(791,260))) for(int deviceScale:List.of(1,2)) {

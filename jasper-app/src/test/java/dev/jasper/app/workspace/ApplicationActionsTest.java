@@ -40,6 +40,43 @@ class ApplicationActionsTest {
             ui.close();
         });
     }
+    /** Spec 13: File › Open File… asks the window's chooser from the pane's folder and opens the file as a Cmd-click does. */
+    @Test void openFileAsksTheChooserAndOpensTheChosenFileAsACmdClickDoes() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        WindowContent[] owner = new WindowContent[1];
+        edt(() -> owner[0] = content(launcher(pending)));
+        pending.remove().run();
+        var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();
+        var answers = new ArrayDeque<Optional<java.nio.file.Path>>(List.of(Optional.of(file), Optional.empty()));
+        var asked = new ArrayList<Optional<java.nio.file.Path>>();
+        var opened = new ArrayList<String>();
+        edt(() -> {
+            WindowContent ui = owner[0];
+            ui.fileChooser = folder -> { asked.add(folder); return answers.remove(); };
+            ui.onOpenFile = (chosen, line) -> opened.add(chosen + ":" + line);
+            assertThat(ui.action(ActionId.OPEN_FILE).isEnabled()).isTrue();
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.NAME)).isEqualTo("Open File…");
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.SHORT_DESCRIPTION)).isEqualTo("Open a file with the default editor");
+            assertThat(ui.action(ActionId.OPEN_FILE).getValue(Action.ACCELERATOR_KEY)).as("no default binding").isNull();
+            JMenu fileMenu = null;
+            for (int i = 0; i < ui.menuBar().getMenuCount(); i++) if ("File".equals(ui.menuBar().getMenu(i).getText())) fileMenu = ui.menuBar().getMenu(i);
+            var labels = new ArrayList<String>();
+            for (var child : fileMenu.getMenuComponents()) if (child instanceof JMenuItem item) labels.add(item.getText());
+            assertThat(labels).containsSubsequence("New Window", "Open File…");
+            var command = ui.commands().find("open_file").orElseThrow();
+            assertThat(command.title()).as("spec 14.7: also a palette command").isEqualTo("Open File…");
+            assertThat(command.keywords()).contains("open file", "open", "editor", "browse");
+            assertThat(dev.jasper.app.commands.CommandSearch.find(ui.commands().entries(), "open file", List.of(), 5).stream()
+                .map(dev.jasper.app.commands.Command::id)).as("the palette finds it").contains("open_file");
+            ui.invoke(ActionId.OPEN_FILE);
+            assertThat(asked).singleElement().as("the chooser starts in the pane's folder").isEqualTo(Optional.ofNullable(ui.directory()));
+            assertThat(opened).containsExactly(file + ":0");
+            ui.invoke(ActionId.OPEN_FILE);
+            assertThat(opened).as("cancelling opens nothing").containsExactly(file + ":0");
+            ui.close();
+        });
+    }
+
     @Test void focusingFindFieldRetargetsGlobalPaneActions() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];

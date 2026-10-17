@@ -90,12 +90,14 @@ class StagedFileServerFormTest {
                     }
                 }
                 click(form,"server.protocol.option.HTTP");click(form,"server.writable");
-                type(form,"server.name.input","synthetic-preview-server");type(form,"server.folder.input",root.resolve("home").toString());
+                type(form,"server.name.input","synthetic-preview-server");chooseFolder(vault,form,root.resolve("home"));
+                assertThat(((JTextField)require(form,"server.folder.input")).isEditable()).as("spec 13: the folder is a read-only field").isFalse();
+                assertThat(((JTextField)require(form,"server.folder.input")).getText()).isEqualTo(root.resolve("home").toAbsolutePath().normalize().toString());
                 var field=(JTextField)require(form,"server.name.input");var document=field.getDocument();field.select(2,7);
                 try{owner.theme(SurfaceFixtures.theme("light"));owner.theme(SurfaceFixtures.theme("dark"));}catch(Exception e){throw new AssertionError(e);}
                 assertThat(field.getDocument()).isSameAs(document);assertThat(field.getSelectionStart()).isEqualTo(2);assertThat(field.getSelectionEnd()).isEqualTo(7);
-                type(form,"server.folder.input",root.resolve("home/very-long-synthetic-folder-path/with-many-segments/that-stays-in-the-input").toString());captureServer("long-path",kitView(form),540,690);
-                type(form,"server.folder.input",root.resolve("home").toString());captureServer("short",kitView(form),360,420);
+                chooseFolder(vault,form,root.resolve("home/very-long-synthetic-folder-path/with-many-segments/that-stays-in-the-input"));captureServer("long-path",kitView(form),540,690);
+                chooseFolder(vault,form,root.resolve("home"));captureServer("short",kitView(form),360,420);
                 assertThat(((JScrollPane)require(form,"server.editor.scroll")).getVerticalScrollBar().isVisible()).isTrue();
                 StagedRemoteHost.press(field,java.awt.event.KeyEvent.VK_ENTER,'\n');assertThat(form.closed()).isFalse();
                 captureServer("valid",kitView(form),540,690);click(form,"server.save");assertThat(node(form,"server.save").state().busy()).isTrue();captureServer("busy",kitView(form),540,690);

@@ -474,6 +474,8 @@ public final class JasperApplication {
             window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
             window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
             window.content().onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
+            window.content().fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
             notificationViews.attach(window.content());
             window.content().connectTerminals(terminals, window::toFront);
             if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);

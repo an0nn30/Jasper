@@ -175,11 +175,18 @@ confirms (set `pending` while a start or stop is in flight).
 - **Route strip.** `Stack` with `LayoutRole.ROUTE`: equal columns, each a child stack of an `Icon` beside a description
   and a `MONO_SMALL` line; the host draws the arrows (New Tunnel's "This computer → Via → Target").
 - **Rich dropdown face.** A DROPDOWN or PICKER `Choice` can carry a `PickerFace` (tile, primary text, caption) that
-  describes the selected option, as New Tunnel's Via Host does.
+  describes the selected option, as New Tunnel's Via host does.
 - **Credential pickers.** Use the Vault API's anchored picker rather than building one; it brings search, groups,
   None and the creation footer.
 - **Empty states.** `Empty(icon, title, description, actions)`; actions may be buttons, a `MenuButton` (Choose
   Session) or none.
+- **Tables and trees (SDK 0.18).** A `Tree` with `columns` shows a header: the first column titles the items, each
+  later one titles one of the items' `trailing` values, and header clicks report `Sorted`, as a `Table`'s do. A
+  `TableRow` may give a column a cell node (`cellNodes`) instead of a plain cell: `Text`, `StatusDot`, `Icon`, `Chip`,
+  an INLINE `Stack` of those, or a DROPDOWN `Choice` without a `PickerFace`, which reports `Selected` and draws without a border until
+  hovered or focused. `TableRow.heading(id, title, count, countNoun)` groups the rows below it and reads "6 groups"; it
+  is never selected. With no rows a `Table` shows its `empty` state (at most one action) or its `emptyText` below the
+  kept headers, and an `ItemList` with no items shows its `emptyText`.
 - **Toolbar views.** An INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, at most one PRIMARY
   `Button`, `MenuButton`s and `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
   [actions](plugin-authoring.md#actions-and-where-they-appear)).

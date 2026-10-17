@@ -137,7 +137,7 @@ public final class IndexerSettingsPanel implements SettingsPanel {
         // The right-aligned count is the last column, so no left-aligned heading runs into it.
         var table = new Nodes.Table(TABLE, ControlState.READY, List.of(
             new Column("name", "Name", Nodes.TextRole.BODY, false, 1.2, Optional.empty()),
-            new Column("location", "Location", Nodes.TextRole.BODY, false, 2.2, Optional.empty()),
+            new Column("location", "Location", Nodes.TextRole.MONO_SMALL, false, 2.2, Optional.empty()),  // spec 13: a data value
             new Column("state", "State", Nodes.TextRole.CAPTION, false, 1, Optional.empty()),
             new Column("when", "Last indexed", Nodes.TextRole.CAPTION, false, 1.2, Optional.empty()),
             new Column("files", "Files", Nodes.TextRole.MONO_SMALL, true, .7, Optional.empty())),

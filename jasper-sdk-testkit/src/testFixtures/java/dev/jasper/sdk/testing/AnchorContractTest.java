@@ -35,6 +35,15 @@ public abstract class AnchorContractTest {
     view.update(replacement);assertThat(anchor.isOpen()).isFalse();assertThat(count).hasValue(1);view.update(picker(ControlState.READY));assertThat(anchor.isOpen()).isFalse();assertThatThrownBy(()->producer.windows().dialog(new DialogSpec("Stale",anchor,true))).isInstanceOf(IllegalArgumentException.class);window.close();}
   }
  });}
+ /** Plan 3c: rows unmount a table's empty state, so an anchor in it closes once and none is granted while rows show. */
+ @Test void rowsUnmountingATablesEmptyStateCloseItsAnchors()throws Exception{SwingUtilities.invokeAndWait(()->{
+  try(var f=fixture()){var source=f.endpoint("source");var view=source.kit().create(KitContractTest.tables("card",false),e->{});mount(source,view,"source");
+   var anchor=view.anchor("tunnels.new");var closed=new AtomicInteger();anchor.onClosed(closed::incrementAndGet);assertThat(anchor.isOpen()).isTrue();
+   view.update(KitContractTest.tables("card",true));assertThat(anchor.isOpen()).isFalse();assertThat(closed).hasValue(1);
+   assertThatThrownBy(()->view.anchor("tunnels.new")).as("no anchor into the state while rows show").isInstanceOf(IllegalArgumentException.class);
+   view.update(KitContractTest.tables("card",false));assertThat(closed).hasValue(1);assertThat(view.anchor("tunnels.new").isOpen()).isTrue();
+  }
+ });}
  @Test void movingTheSameControlToAnotherDescriptorParentInvalidates()throws Exception{SwingUtilities.invokeAndWait(()->{
   try(var f=fixture()){var source=f.endpoint("source");var button=picker(ControlState.READY).root();
    var view=source.kit().create(new ViewSpec(new Nodes.Stack("first",ControlState.READY,Nodes.LayoutRole.VERTICAL,List.of(button))),e->{});mount(source,view,"source");var anchor=view.anchor("pick");

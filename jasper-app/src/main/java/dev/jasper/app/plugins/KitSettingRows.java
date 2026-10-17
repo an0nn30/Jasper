@@ -12,7 +12,9 @@ final class KitSettingRows {
     private final java.util.function.Consumer<Setting<?>> unset;
     private final Function<Setting<?>, SettingSpec<?>> specs;
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
-    private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>();
+    private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>(), entries = new HashMap<>();
+    /** An ordered list's entry field and Add button are its control id followed by these. */
+    static final String ENTRY=":new",ADD=":add";
     private String query = "";
     /** A path's Browse action is its row id followed by this. */
     static final String BROWSE=":browse";
@@ -24,7 +26,7 @@ final class KitSettingRows {
     }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
-    void reset(){errors.clear();edits.clear();}
+    void reset(){errors.clear();edits.clear();entries.clear();}
     void highlight(String value){query=Objects.requireNonNull(value);}
     Nodes.Node row(Setting<?> setting){
         var spec=specs.apply(setting);String id="settings:"+setting.key();controls.put(id,setting);
@@ -35,15 +37,17 @@ final class KitSettingRows {
             var options=choices.choices().stream().map(c -> new Option(c.token(),c.displayName(),Optional.empty())).toList();
             String selected=choices.choices().stream().filter(c -> c.value().equals(value)).findFirst().orElseThrow().token();
             control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
+        }else if(spec.kind() instanceof SettingKind.StringList){
+            // As the generated pages (Editors.textList, spec 13): the ordered list, then an entry and Add below it.
+            control=list(id,state,spec.label(),(List<?>)value,entries.getOrDefault(id,""));
         }else if(PluginSettingsPage.Hint.of(spec).font() && spec.kind() instanceof SettingKind.Text){
             // As the generated pages: free text over the installed families, which filter as you type.
             control=font(id,state,spec,edits.getOrDefault(id,value.toString()));
         }else {
             // A decimal is stored as a float: show it at that precision, not its widened double digits.
-            String text=value instanceof List<?> list?String.join("\n",list.stream().map(Object::toString).toList())
-                :spec.kind() instanceof SettingKind.NumberRange && value instanceof Number number?Float.toString(number.floatValue()):value.toString();
+            String text=spec.kind() instanceof SettingKind.NumberRange && value instanceof Number number?Float.toString(number.floatValue()):value.toString();
             var numeric=numeric(spec);
-            var kind=numeric.isPresent()?Nodes.FieldKind.NUMBER:spec.kind() instanceof SettingKind.StringList?Nodes.FieldKind.TEXTAREA:PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.FILE?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
+            var kind=numeric.isPresent()?Nodes.FieldKind.NUMBER:PluginSettingsPage.Hint.of(spec)==PluginSettingsPage.Hint.FILE?Nodes.FieldKind.PATH:Nodes.FieldKind.TEXT;
             // As the generated pages: a bounded integer is the Settings stepper, a bounded decimal a number field;
             // both show the declared unit after the value.
             // As the generated pages: a path ends with Browse.
@@ -53,6 +57,65 @@ final class KitSettingRows {
         }
         boolean resettable=!sameValue(value,spec.defaultValue())||edits.containsKey(id)||errors.containsKey(id);
         return new Nodes.SettingRow(id+":row",state,spec.label(),spec.description(),trailing(id,spec,resettable,control),false);
+    }
+    /**
+     * The generated pages' ordered-list editor ({@code Editors.textList()}) node for node: the rows in order as
+     * {@code item-N}, then an entry field and Add, which is enabled while the entry holds text.
+     */
+    private static Nodes.Stack list(String id,ControlState state,String label,List<?> items,String pending){
+        var plain=new ControlState(state.visible(),state.enabled(),state.busy(),"");
+        var rows=new ArrayList<ListItem>();
+        for(int i=0;i<items.size();i++)rows.add(new ListItem("item-"+i,Optional.empty(),
+            List.of(new Nodes.Text(id+":item-"+i,ControlState.READY,items.get(i).toString(),Nodes.TextRole.BODY)),List.of(),List.of()));
+        var entry=new Nodes.Field(id+ENTRY,plain,Nodes.FieldKind.TEXT,pending,"Add…","Add to "+label,pending.isBlank()?"":id+ADD);
+        var add=new Nodes.Button(id+ADD,new ControlState(state.visible(),state.enabled()&&!pending.isBlank(),state.busy(),""),"Add","add",
+            Nodes.ButtonKind.SECONDARY,id+ADD,"");
+        return new Nodes.Stack(id+":editor",plain,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.ItemList(id,state,Nodes.ListKind.ORDERED,rows,Set.of(),"",List.of()),
+            new Nodes.Stack(id+":entry",plain,Nodes.LayoutRole.INLINE,List.of(entry,add))));
+    }
+    /**
+     * An ordered list's entry, Add, Remove and reorder, as the generated pages' editor: the entry's text is kept until an
+     * Add stages it; a value the kind rejects keeps the entry and shows the row's error until the entry changes; a stale
+     * row or a row selection changes nothing.
+     */
+    @SuppressWarnings({"unchecked","rawtypes"})
+    private boolean listEvent(UiEvent event){
+        String id=event.id().endsWith(ENTRY)?event.id().substring(0,event.id().length()-ENTRY.length())
+            :event.id().endsWith(ADD)?event.id().substring(0,event.id().length()-ADD.length()):event.id();
+        var setting=controls.get(id);
+        if(setting==null||!(specs.apply(setting).kind() instanceof SettingKind.StringList))return false;
+        var items=new ArrayList<Object>((List<?>)host.pending(setting));
+        switch(event){
+            // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
+            case UiEvent.Edited edited when edited.id().equals(id+ENTRY) -> { entries.put(id,edited.text()); if(errors.remove(id)!=null)host.changed(); return true; }
+            // The list's own row selection stages nothing, as the generated pages' editor ignores it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
+            case UiEvent.Action action when action.id().equals(id+ADD) -> {
+                String text=entries.getOrDefault(id,"");
+                if(text.isBlank())return true;
+                items.add(text);
+            }
+            case UiEvent.Removed removed when removed.id().equals(id) -> {
+                int index=itemIndex(removed.itemId(),items.size());
+                if(index<0)return true;
+                items.remove(index);
+            }
+            case UiEvent.Reordered moved when moved.id().equals(id) -> {
+                int index=itemIndex(moved.itemId(),items.size());
+                if(index<0||moved.destination()<0||moved.destination()>=items.size())return true;
+                items.add(moved.destination(),items.remove(index));
+            }
+            default -> { return false; }
+        }
+        try{host.stage((Setting)setting,List.copyOf(items));errors.remove(id);if(event instanceof UiEvent.Action)entries.remove(id);}
+        catch(RuntimeException failure){errors.put(id,failure instanceof IllegalArgumentException && failure.getMessage()!=null?failure.getMessage():"Enter a valid value.");}
+        host.changed();return true;
+    }
+    /** The index an ordered list's {@code item-N} row id names, or -1 for a row that is gone. */
+    private static int itemIndex(String itemId,int size){
+        if(!itemId.startsWith("item-"))return -1;
+        try{int index=Integer.parseInt(itemId.substring("item-".length()));return index<size?index:-1;}
+        catch(NumberFormatException notARow){return -1;}
     }
     /** As the generated pages' font editor: free text over the installed families, which filter as you type. */
     private static Nodes.Choice font(String id,ControlState state,SettingSpec<?> spec,String text){
@@ -91,6 +154,7 @@ final class KitSettingRows {
     private static boolean matches(SettingSpec<?> spec,String query){return SearchText.matches(String.join(" ",spec.label(),spec.description(),String.join(" ",spec.keywords())),query);}
     @SuppressWarnings({"unchecked","rawtypes"})
     boolean event(UiEvent event){
+        if(listEvent(event))return true;
         boolean reset=event instanceof UiEvent.Action && event.id().endsWith(":reset");
         boolean browse=event instanceof UiEvent.Action && event.id().endsWith(BROWSE);
         String id=reset?event.id().substring(0,event.id().length()-6):browse?event.id().substring(0,event.id().length()-BROWSE.length()):event.id();
@@ -114,7 +178,6 @@ final class KitSettingRows {
                 value=switch(spec.kind()){
                     case SettingKind.IntegerRange ignored -> Integer.valueOf(edited.text());
                     case SettingKind.NumberRange ignored -> Double.valueOf(edited.text());
-                    case SettingKind.StringList ignored -> edited.text().isEmpty()?List.of():List.of(edited.text().split("\n",-1));
                     case SettingKind.Text ignored -> edited.text();
                     default -> throw new IllegalArgumentException("Unexpected edit");
                 };

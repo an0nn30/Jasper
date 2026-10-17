@@ -382,6 +382,7 @@ final class InteractiveRows {
                 + ThemePainting.metric(context(), DesignMetrics.Role.DOCUMENT_BAR_LINE_GAP);
             if (panelCompact) rowHeight = Math.max(ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), compactRowHeight());
             measureRows();
+            emptyLine();
             canvas.setFocusable(!externallyDriven() && !passive());
             if (passive()) { focusItem = null; focusControl = null; anchor = null; }
             canvas.setBackground(ThemePainting.color(context(), column == 0 ? SemanticColor.SURFACE_SIDEBAR : SemanticColor.SURFACE_APP));
@@ -400,6 +401,40 @@ final class InteractiveRows {
 
         int footerHeight() {
             return footer == null || !footer.isVisible() ? 0 : footer.getPreferredSize().height;
+        }
+
+        /** The muted line an empty collection shows in its body (ItemList.emptyText, Table.emptyText); null until first set. */
+        JLabel emptyLine;
+
+        /** The text an empty collection shows in its body; blank shows none. */
+        String emptyText() {
+            return "";
+        }
+
+        /** Whether the canvas fills the viewport's height, as an empty table's state does; never by default. */
+        boolean fillsViewport() {
+            return false;
+        }
+
+        /** The empty line's band: one row tall while it shows. */
+        int emptyLineHeight() {
+            return emptyLine != null && emptyLine.isVisible() ? rowHeight : 0;
+        }
+
+        /** Shows the empty line while the collection has no items and a non-blank empty text; created on first use. */
+        void emptyLine() {
+            String text = emptyText();
+            if (emptyLine == null && text.isBlank()) return;
+            if (emptyLine == null) {
+                emptyLine = Labels.literal();
+                emptyLine.setHorizontalAlignment(SwingConstants.CENTER);
+                KitOwnership.mark(emptyLine, "@rows/" + node.id() + "/empty");
+                canvas.add(emptyLine);
+            }
+            emptyLine.setText(text);
+            emptyLine.setFont(ThemePainting.font(context(), Typography.Role.DESCRIPTION));
+            emptyLine.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_TERTIARY));
+            emptyLine.setVisible(size() == 0 && !text.isBlank());
         }
 
         int rowShellHeight(int index) {return heightAt(index);}
@@ -454,8 +489,10 @@ final class InteractiveRows {
                     row.doLayout();
                 }
                 for (var row : spare) canvas.remove(row);
+                if (emptyLine != null)
+                    emptyLine.setBounds(inset, rowsHeight(), Math.max(0, width - 2 * inset), emptyLineHeight());
                 if (footer != null)
-                    footer.setBounds(inset, rowsHeight(), Math.max(0, width - 2 * inset), footerHeight());
+                    footer.setBounds(inset, rowsHeight() + emptyLineHeight(), Math.max(0, width - 2 * inset), footerHeight());
                 layoutAccessories(width);
                 canvas.repaint();
             } finally {
@@ -767,12 +804,12 @@ final class InteractiveRows {
         }
         @Override
         public Dimension getPreferredSize() {
-            return new Dimension(360, owner.rowsHeight() + owner.footerHeight());
+            return new Dimension(360, owner.rowsHeight() + owner.emptyLineHeight() + owner.footerHeight());
         }
 
         @Override
         public Dimension getPreferredScrollableViewportSize() {
-            return new Dimension(360, owner.viewportRowsHeight() + owner.footerHeight());
+            return new Dimension(360, Math.max(owner.viewportRowsHeight(), owner.emptyLineHeight()) + owner.footerHeight());
         }
 
         @Override
@@ -792,7 +829,8 @@ final class InteractiveRows {
 
         @Override
         public boolean getScrollableTracksViewportHeight() {
-            return false;
+            // An empty table's state takes the whole body below the headers; otherwise the rows keep their own height.
+            return owner.fillsViewport() && getParent() instanceof JViewport viewport && viewport.getHeight() > getPreferredSize().height;
         }
 
         @Override
@@ -850,6 +888,20 @@ final class InteractiveRows {
             };
         }
         void hover(boolean value) { if (hover == value) return; hover = value; repaint(); }
+        /** The row's pointer selection: the row, its slots and the content that forwards to it pass presses, releases and clicks to the owner. */
+        final MouseAdapter pointer = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) { owner.pressed(Row.this, e); }
+            @Override public void mouseReleased(MouseEvent e) { owner.released(Row.this, e); }
+            @Override public void mouseClicked(MouseEvent e) { owner.clicked(Row.this, e); }
+        };
+
+        /** Passes the pointer over {@code control}'s own component to the row, once however often the row is populated. */
+        void forwardPointer(ControlRegistry.Control control) {
+            var component = control.component;
+            for (var listener : component.getMouseListeners()) if (listener == pointer) return;
+            component.addMouseListener(pointer);
+            control.own(() -> component.removeMouseListener(pointer));
+        }
 
         Row(RowsControl owner) {
             super(null);
@@ -859,29 +911,12 @@ final class InteractiveRows {
             add(title);
             add(subtitle);
             add(trailing);
-            MouseAdapter mouse =
-                    new MouseAdapter() {
-                        @Override
-                        public void mousePressed(MouseEvent e) {
-                            owner.pressed(Row.this, e);
-                        }
-
-                        @Override
-                        public void mouseReleased(MouseEvent e) {
-                            owner.released(Row.this, e);
-                        }
-
-                        @Override
-                        public void mouseClicked(MouseEvent e) {
-                            owner.clicked(Row.this, e);
-                        }
-                    };
-            addMouseListener(mouse);
-            leading.addMouseListener(mouse);
-            title.addMouseListener(mouse);
-            subtitle.addMouseListener(mouse);
+            addMouseListener(pointer);
+            leading.addMouseListener(pointer);
+            title.addMouseListener(pointer);
+            subtitle.addMouseListener(pointer);
             // The trailing slot listens too, so its empty area shows the row tooltip and still reaches the row.
-            trailing.addMouseListener(mouse);
+            trailing.addMouseListener(pointer);
             for (var part : List.of(this, leading, title, subtitle, trailing)) part.addMouseListener(hoverTracker);
         }
 
@@ -951,28 +986,7 @@ final class InteractiveRows {
                 if (node instanceof Nodes.Text
                         || node instanceof Nodes.Icon
                         || node instanceof Nodes.Chip
-                        || node instanceof Nodes.StatusDot) {
-                    MouseAdapter mouse =
-                            new MouseAdapter() {
-                                @Override
-                                public void mouseClicked(MouseEvent e) {
-                                    owner.clicked(Row.this, e);
-                                }
-
-                                @Override
-                                public void mousePressed(MouseEvent e) {
-                                    owner.pressed(Row.this, e);
-                                }
-
-                                @Override
-                                public void mouseReleased(MouseEvent e) {
-                                    owner.released(Row.this, e);
-                                }
-                            };
-                    c.component.addMouseListener(mouse);
-                    var component = c.component;
-                    c.own(() -> component.removeMouseListener(mouse));
-                }
+                        || node instanceof Nodes.StatusDot) forwardPointer(c);
             }
             c.parentEnabled = parentEnabled;
             c.embeddedLabel(true);
@@ -1172,17 +1186,21 @@ final class InteractiveRows {
             trailing.doLayout();
         }
 
-        /** A heading shows only its title, inset like the rows below it. */
+        /** A heading shows its title, inset like the rows below it, and a table heading's count at the row's end. */
         void headingLayout() {
             int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
-            trailing.setBounds(0, 0, 0, 0);
             // An identity list's heading sits low in its band, close to the rows it introduces.
             int line = owner.identityRows() ? Math.min(getHeight(), title.getPreferredSize().height) : getHeight();
             int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
-            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad), line);
+            // Only a table heading has trailing content (its count); a list heading has a title only.
+            int tw = trailing.getComponentCount() == 0 ? 0 : Math.min(trailing.getPreferredSize().width, Math.max(0, getWidth() - 2 * pad));
+            if (tw == 0) trailing.setBounds(0, 0, 0, 0);
+            else trailing.setBounds(getWidth() - pad - tw, top, tw, line);
+            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad - (tw > 0 ? tw + pad : 0)), line);
             title.doLayout();
+            trailing.doLayout();
         }
 
         /**
