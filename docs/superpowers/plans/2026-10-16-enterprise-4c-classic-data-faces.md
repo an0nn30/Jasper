@@ -1,5 +1,13 @@
 # Enterprise presentation 4c: the classic data faces Implementation Plan
 
+> **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`dedf877dc..9d11af9b3`).** Deviations from this
+> plan's text: no pair floor was lowered (every pair measured its pre-flight value); spec 6.5's classic overlay list
+> gains `Button.focusedBackground`, `hoverBackground` and `pressedBackground` (Execution notes E9); Task 3's reviews
+> added Execution notes E18 (the ordered index's row-aware styling and third pair, the side layout's minimum) and E19
+> (an update moves nothing the classic ordered face placed; a list gives up an entry row no VERTICAL parent adopts
+> again), so `ClassicOrderedTest` has 9 tests; Tasks 6 and 7 were executed in one session, one commit each; Task 7's
+> `docs/ui-maintenance.md` sentence joins its `PaintedContrastTest` clause with a semicolon.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** jasper-ui gains the data half of spec 6.4's face pairs, each with its default and classic implementation: the
