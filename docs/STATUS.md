@@ -13,10 +13,11 @@ collapsibleNavigation)` draws the classic dialog when the header is not the titl
 the structural guard, a `surface.footer` band); `Nodes.SettingRow.contextActions` (model only) is the row's own menu,
 shown by the popup trigger, Shift+F10 or the menu key; the collapsible navigation uses the tree face's triangles with the
 navigation's own measured geometry (rows 22, side 9, triangle 6 + 6, children 15 deeper, the selection across the
-sidebar). Under `inlineReset = false` every Settings row offers Reset to Default in its menu; `hiddenKeys` decides the
+sidebar). Under `inlineReset = false` every schema and editor row with a Reset offers Reset to Default in its menu; `hiddenKeys` decides the
 built rows (the title-bar row's macOS rule is the default look's hidden key now); the interface font row takes
 `fontRowCopy` and starts its stepper at the look's size (12). New roles `SETTINGS_HEADER_INSET` (20; classic 14),
-`SETTINGS_NAV_CHILD_INDENT` (0; 15), `SETTINGS_NAV_TEXT_GAP` (6), held by `SettingsRolesTest`; classic Settings values in
+`SETTINGS_NAV_CHILD_INDENT` (0; 15), `SETTINGS_NAV_TEXT_GAP` (6), `SETTINGS_TRAILING_EMPTY_GAP` (10; 0), held by
+`SettingsRolesTest`; classic Settings values in
 `DesignMetrics.CLASSIC` (header 34, footer 45, buttons 98, "?" 22, page inset 16, dropdowns 220, page top 11, section gap
 13, crumb gap 6; the joined history pair's halves 26, overlapping one border through `ButtonFace.joinedOverlap`).
 `EnterpriseSettings` opens the real dialog under plan 6a's `EnterpriseLook` (the fixture kit and theme
@@ -25,12 +26,14 @@ header and footer with its mock: frame probes on every OS; the three page-geomet
 follow the UI face, printed until plan 5b's merge turns them into assertions (lowest printed shares: sidebar 0.963,
 header 0.958, footer 0.991); the
 fixture restores the default look when it closes, and its comparison helper is the package-private
-`settingsui.SettingsMockMatch` on 6a's `MockProfile`.
+`settingsui.SettingsMockMatch` on 6a's `MockProfile`. Its ink probes hold the history pair's glyphs and the footer's
+"?": the classic buttons face (`ButtonFace.iconRole` and `recolours`) draws a joined half's glyph in `text.primary`, the
+disabled half's in `text.strong.secondary` at the disabled alpha, and the "?" in `text.strong.secondary` on a classic
+gradient circle inside the standard edge.
 `ChromeRenderTest.everyLookBuildsItsSettingsFrame` (through the test bridge `settingsui.SettingsFrameRenders`) opens the
 real dialog under every look 6a's chrome renders cover and checks the frame its `SettingsChrome` names;
 `PaintedContrastTest` samples the classic frame's three guarded rules over every palette. Zero pixel change in the default
-look: the gallery and the Settings preview are byte-identical to the base (no skipped files; the gallery's two
-`composition.json` files were re-baselined from Task 3's head for E29). Rulings (plan, "Rulings"): (1) spec row 9 is two
+look: the gallery and the Settings preview are byte-identical to the base (no skipped files). Rulings (plan, "Rulings"): (1) spec row 9 is two
 plans, 9a the chrome and 9b the compositions; (2) `Landed.SETTINGS` lands in 9a's first task, so Enterprise shows the
 classic chrome over today's pages until 9b; (3) the projections reach Settings through `SettingsDialog.Hooks` and
 `PageContext`, the former constructors meaning `Projections.standard(Host)`; (4) carrying `Composition` is not reading
@@ -39,7 +42,7 @@ it; (5) the frame is jasper-ui's `SettingsShell.Frame`, and a frame that is not 
 `border.row`, unguarded, the other three `border.window` through the structural guard; (8) the row menu is jasper-ui's
 model only, so a plugin's composed page keeps its inline Reset; (9) Reset to Default is always offered under the classic
 rows, disabled at the default, on the popup trigger, Shift+F10 or the menu key; (10) a row without a Reset button
-reserves no gap after its control; (11) the font row copy and the stepper's start at the look's standard size; (12) the
+reserves no gap after its control (classic `SETTINGS_TRAILING_EMPTY_GAP` 0); (11) the font row copy and the stepper's start at the look's standard size; (12) the
 hidden keys replace the title-bar row's `shownWhen`; (13) the classic navigation is measured, not the tree face's; (14)
 collapsed sections last one opening, a search shows every section, navigating into one opens it, Left and Right close
 and open; (15) the classic frame's roles are classic values plus three new roles, and the classic HELP button is 22;
@@ -50,7 +53,7 @@ notes (2026-10-17): E1 no rebase, the ancestor is checked; E2 6a's `EnterpriseLo
 `SettingsRolesTest`, `NewRolesTest` and `ClassicCatalogTest` untouched; E5 `PlatformFontSize.standardSize` keys on the
 copy, not 5b's `namesUiFaces()`; E6 `LookRowsTest`'s Enterprise context is the fixture kit; E7 `SettingRow`'s old doc
 comment is folded into the new one; E8 `KitValuesTest` drops the empty `contextActions` after the title note; E9 Task 5
-drops `TreeControl.boxed`; E10 probes that follow the UI face are printed until 5b; E11 the page roles are calibrated on
+adds no boxed state: 4c's `ClassicHeaders.Box` already draws nothing around the navigation; E10 probes that follow the UI face are printed until 5b; E11 the page roles are calibrated on
 printed probes and re-checked at 5b; E12 `pairs.json` is written with `ensure_ascii=False`; E13 the `LANDED` edit only
 appends; E14 `JasperApplication` passes the `projections()` field; E15 each `package-info` names the edge in its own
 words; E16 the pixel base is proven deterministic first (nothing skipped); E17 Task 7's loop closes owners first; E18
@@ -59,18 +62,26 @@ hand-off to 9b's refresh; E21 the Tools rows' order is data; E22 this entry name
 probe points move to what they name; E24 `SettingsNavigationTest` lays the view out first; E25 the two Appearance probes
 are printed for 9b; E26 the dry run; E27 a pre-existing `PaintedContrastTest` order dependence; E28 the font row's search
 words follow the look (`Editors.Factory.lookTerms`), keeping the default look's search previews byte-identical; E29
-Rulings 10's zero gap widens the gallery's one-child `stack-SETTINGS_TRAILING` label from 590 to 600 in
-`{dark,light}-1x/composition.json` (every PNG identical), and an SDK plugin's one-child `SETTINGS_TRAILING` stack likewise
-loses its reserved gap. Deviations from the plan's text: E28 and E29; Task 6's review made the classic joined pair two
+Rulings 10's zero gap widened the gallery's one-child `stack-SETTINGS_TRAILING` label from 590 to 600, which the final
+review withdrew: the empty gap is the catalog's `SETTINGS_TRAILING_EMPTY_GAP` (default 10 as `COLUMN_GAP`, classic 0), so
+the default look keeps its gap. Deviations from the plan's text: E28 and E29 (withdrawn); Task 6's review made the classic joined pair two
 26 px halves overlapping one border (`JOINED_ACTION_WIDTH` 26 in the classic table, `ButtonFace.joinedOverlap`) so the
 parent crumb starts at body x 75.5 as the mock, and the fixture comes back to Appearance from Window so page 01 shows
 Back enabled; this entry is dated 2026-10-17, the day it ran. Residuals: the platform face for Plex; the history buttons'
-chevrons where the mocks draw arrows. At the merge with plan 5b: `PLEX` turns the printed probes and
+chevrons where the mocks draw arrows. Final review: the Settings dialog spec's banner gains its section 19.2 amendment
+line; classic `SETTING_CHOICE_WIDTH` 220 is dropped (no 05 mock measures a bare dropdown row outside Settings); a setting
+row publishes `KitOwnership.CONTEXT_MENU` only while it has a menu; the font row searches only its shown copy; a
+triangle's click during a search changes nothing; the classic footer band keeps a taller footer's height below its rule.
+`tools/visual/check_pairs.py <out> enterprise-settings` on `SettingsChromeMockTest`'s renders passes all eighteen (edge
+agreement 01 0.607, 02 0.581, 03 0.491, 04 0.873, 05 0.876, 06 0.539, 07 0.536, 08 0.551, 09 0.553, 10 0.828, 11 0.616,
+12 0.814, 13 0.488, 14 0.830, 15 0.379, 16 0.578, 17 0.631, 18 0.569); pair 15's floor is 0.35, its `note` naming 9b's
+Project Index composition and the platform face, and the others keep 0.40. At the merge with plan 5b: `PLEX` turns the printed probes and
 shares into assertions (re-check the calibrated page roles), and `PlatformFontSize.standardSize` may read
-`FaceSet.namesUiFaces()` (E5). `./gradlew check --continue`: **11,085 tests, 0 failures, 0 errors, 25
-skipped**. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
+`FaceSet.namesUiFaces()` (E5). `./gradlew check --continue` before the final review: **11,085 tests, 0 failures, 0 errors, 25
+skipped**; the final review adds five tests and ran the touched classes (jasper-ui's metrics, Settings shell, Settings
+controls, classic buttons, setting row menu and kit view tests; jasper-app's `settingsui` package) and the pixel proof. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
 triangles, a right-click on a modified row) and on Windows or Linux (no title-bar or animations rows). Hand-off to plan
-10a: the mock helpers are 6a's `testsupport.MockProfile`, 7's `testsupport.MockCrops` and 9a's package-private
+10a: the mock helpers are 6a's `testsupport.MockProfile`, plan 7's `testsupport.MockCrops` (arriving at its merge) and 9a's package-private
 `settingsui.SettingsMockMatch`; 10a's `testsupport.MockMatch` takes a path none of them uses and reads mocks and ΔE through
 `MockProfile` rather than adding another Lab conversion. Not merged, not pushed.
 

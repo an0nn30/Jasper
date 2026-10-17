@@ -143,6 +143,48 @@ class SettingsShellFrameTest {
         });
     }
 
+    @Test void aTallerFooterKeepsItsHeightBelowTheRule() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var parts = new JComponent[6];
+            for (int i = 0; i < parts.length; i++) { parts[i] = new javax.swing.JPanel(); parts[i].setOpaque(false); }
+            parts[3].setVisible(false);
+            parts[5].setPreferredSize(new java.awt.Dimension(400, 50));
+            var shell = new SettingsShell(context, CLASSIC, parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+            try {
+                shell.setSize(760, 691);
+                shell.doLayout();
+                assertThat(parts[5].getHeight()).as("the footer's preferred height").isEqualTo(50);
+                assertThat(parts[5].getY()).as("below the band's rule").isEqualTo(691 - 50);
+                assertThat(parts[4].getY() + parts[4].getHeight()).as("the body ends at the band").isEqualTo(691 - 51);
+                var image = render(shell);
+                assertThat(image.getRGB(300, 691 - 51) & 0xFFFFFF).as("the rule above the taller band").isEqualTo(ThemePainting.painted(context,
+                    new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW, DerivedColor.SURFACE_FOOTER, SurfaceContrast.Guard.STRUCTURAL)).getRGB() & 0xFFFFFF);
+            } finally { shell.close(); release(context); }
+        });
+    }
+
+    @Test void aNarrowDialogNarrowsTheSidebarToAThird() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var built = shell(context, CLASSIC)) {
+                var shell = built.shell();
+                shell.setSize(600, 500);
+                for (int i = 0; i < 3; i++) layout(shell);
+                var views = built.views();
+                assertThat(views.get(1).getWidth()).as("a third of 600").isEqualTo(200);
+                assertThat(views.get(0).getBounds()).as("search").isEqualTo(new Rectangle(8, 8, 184, 22));
+                assertThat(views.get(2).getBounds()).as("header").isEqualTo(new Rectangle(201 + 14, 0, 600 - 201 - 28, 34));
+                assertThat(views.get(4).getBounds()).as("footer").isEqualTo(new Rectangle(14, 500 - 45 + 1, 600 - 28, 44));
+                var ok = KitViewTest.find(views.get(4), "ok", JComponent.class);
+                assertThat(ok.getX() + ok.getWidth()).as("OK ends at the footer's side").isEqualTo(600 - 28);
+                var image = render(shell);
+                assertThat(image.getRGB(200, 300) & 0xFFFFFF).as("the sidebar rule at the third").isEqualTo(ThemePainting.painted(context,
+                    new dev.jasper.ui.theme.PaintPair(SemanticColor.BORDER_WINDOW, context.kit().colors().navigationSurface(), SurfaceContrast.Guard.STRUCTURAL)).getRGB() & 0xFFFFFF);
+            } finally { release(context); }
+        });
+    }
+
     @Test void theRulesMeetTheirGuardOverEveryPalette() {
         Edt.run(() -> {
             var palettes = new java.util.ArrayList<>(KitFixtures.themes());

@@ -99,6 +99,38 @@ class SettingsChromeMockTest {
         return failures;
     }
 
+    /** A glyph's or fill's ink: the darkest (or lightest) pixel of a logical box of the content. */
+    record Ink(String name, Rectangle box, boolean darkest) { }
+
+    /** The history pair's glyphs and the footer's "?" (its glyph and its fill), which the frame probes do not reach. */
+    static List<Ink> inksOf(Page page) {
+        int h = page.height();
+        return List.of(new Ink("Back glyph", new Rectangle(250, 10, 15, 15), true), new Ink("Forward glyph", new Rectangle(275, 11, 15, 13), true),
+            new Ink("? glyph", new Rectangle(17, h - 37, 15, 15), true), new Ink("? fill", new Rectangle(17, h - 37, 15, 15), false));
+    }
+
+    /** The extreme pixel of {@code box} (logical) in a 2x image. */
+    static int extreme(BufferedImage image, Rectangle box, boolean darkest) {
+        int found = darkest ? 0xFFFFFF : 0, sum = darkest ? Integer.MAX_VALUE : -1;
+        for (int y = 2 * box.y; y < 2 * (box.y + box.height); y++)
+            for (int x = 2 * box.x; x < 2 * (box.x + box.width); x++) {
+                int rgb = image.getRGB(x, y) & 0xFFFFFF, value = (rgb >> 16) + (rgb >> 8 & 0xFF) + (rgb & 0xFF);
+                if (darkest ? value < sum : value > sum) { sum = value; found = rgb; }
+            }
+        return found;
+    }
+
+    /** Each ink within {@link #PROBE} of the mock's; the failures. */
+    static List<String> inks(Page page, BufferedImage render, BufferedImage mock) {
+        var failures = new ArrayList<String>();
+        for (var ink : inksOf(page)) {
+            int ours = extreme(render, ink.box(), ink.darkest()), theirs = extreme(mock, ink.box(), ink.darkest());
+            double distance = SettingsMockMatch.deltaE(ours, theirs);
+            if (distance > PROBE) failures.add(String.format("%s %s: render #%06X, mock #%06X, ΔE %.1f", page.id(), ink.name(), ours, theirs, distance));
+        }
+        return failures;
+    }
+
     @Test void theChromeMatchesTheEighteenMocks() throws Exception {
         var failures = new ArrayList<String>();
         var shares = new StringBuilder();
@@ -111,6 +143,7 @@ class SettingsChromeMockTest {
                 Files.createDirectories(out);
                 ImageIO.write(render[0], "png", out.resolve(page.mock().substring(9, 11) + ".png").toFile());
                 failures.addAll(probes(page, render[0], mock));
+                failures.addAll(inks(page, render[0], mock));
                 int h = 2 * page.height();
                 var areas = List.of(new Rectangle(0, 0, 460, h - 90), new Rectangle(462, 0, 1618, 70), new Rectangle(0, h - 90, 2080, 90));
                 var names = List.of("sidebar", "header", "footer");

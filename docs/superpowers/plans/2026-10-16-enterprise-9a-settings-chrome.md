@@ -19,6 +19,15 @@
 > and 1023 as measured. Residuals: the platform face for Plex; the history buttons' chevrons where the mocks draw
 > arrows. No pixel-proof file skipped.
 
+> **Final review (2026-10-17):** "Plan 9a: final review fixes". E29 is withdrawn: the empty gap is the new role
+> `SETTINGS_TRAILING_EMPTY_GAP` (default 10, classic 0), so the gallery's compositions keep 590. E9's premise was wrong:
+> there was no `TreeControl.boxed` to drop. The classic buttons face draws the history glyphs in `text.primary` (the
+> disabled half's in `text.strong.secondary` at the disabled alpha) and the "?" as a classic gradient circle with a
+> `text.strong.secondary` glyph, held by `SettingsChromeMockTest`'s ink probes; classic `SETTING_CHOICE_WIDTH` 220 is
+> dropped. Task 6's verification adds `python3 tools/visual/check_pairs.py <out> enterprise-settings`: seventeen pairs
+> pass at 0.40 and pair 15 (Project Index, 0.379) at 0.35, with a note naming 9b's composition and the platform face.
+> The Settings dialog spec gains its section 19.2 amendment line.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look the Settings dialog wears its classic chrome, measured against the eighteen

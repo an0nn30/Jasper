@@ -58,14 +58,15 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     @Override public void paintFace(Buttons.KitButton b, Graphics2D g, boolean hover, boolean focused) {
-        if (b.embedded || b.recorder() || b.circular || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
+        if (b.embedded || b.recorder() || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
         var c = b.context();
         boolean flat = ghost(b) && flat(b), selected = b.toggle && b.isSelected(), pressed = b.isEnabled() && b.getModel().isPressed();
         if (flat && !hover && !selected) { ThemePainting.rounded(g, b, c, null, null, focused, false); return; }
         ThemePainting.antialias(g);
         int inset = b.panelDetail ? ThemePainting.metric(c, DesignMetrics.Role.FOCUS_RING) : 0;
         double trim = b.panelDetail ? UIScale.scale((float) c.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)) : 0;
-        double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
+        // A circular button (the Settings footer's ?) is a standard face drawn as a circle, as the mocks draw it.
+        double radius = b.circular ? Math.min(b.getWidth(), b.getHeight()) / 2.0 : ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
         var pair = b.placement().getParent() instanceof Stacks.StackSurface stack && stack.joined ? stack : null;
         Shape face = pair == null ? new RoundRectangle2D.Double(inset, inset, b.getWidth() - 2.0 * inset, b.getHeight() - trim - 2.0 * inset, 2 * radius, 2 * radius)
             : joined(pair, b.placement(), 0, b.getWidth(), b.getHeight(), radius);
@@ -112,7 +113,7 @@ final class ClassicButtonFace implements ButtonFace {
 
     @Override public Color text(Buttons.KitButton b, boolean hover) {
         var c = b.context();
-        if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
+        if (b.embedded || b.recorder() || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
         if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);
         if (!b.isEnabled()) return ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_PRIMARY), DISABLED);
         if (ghost(b) && flat(b)) return ThemePainting.color(c, b.textRole(hover));
@@ -130,7 +131,25 @@ final class ClassicButtonFace implements ButtonFace {
      * row draws that flat face and is faded with it as well.
      */
     @Override public boolean fades(Buttons.KitButton b) {
-        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;
+        return b.embedded || b.recorder() || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;
+    }
+
+    /**
+     * The mocks' glyph inks on a standard face: a joined pair's halves in {@code text.primary}, the disabled half's at the
+     * disabled alpha in {@code text.strong.secondary} (the mocks' #A3A8B0 over its flat fill), and the circular ? in
+     * {@code text.strong.secondary}; every other glyph takes its text role, as by default.
+     */
+    @Override public SemanticColor iconRole(Buttons.KitButton b, boolean hover) {
+        if (joinedHalf(b)) return b.isEnabled() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_STRONG_SECONDARY;
+        if (b.circular) return SemanticColor.TEXT_STRONG_SECONDARY;
+        return b.textRole(hover);
+    }
+
+    /** A joined pair's halves take their ink whatever the artwork: the authored chevron.right keeps its own otherwise. */
+    @Override public boolean recolours(Buttons.KitButton b) { return joinedHalf(b); }
+
+    private static boolean joinedHalf(Buttons.KitButton b) {
+        return !b.onSelection && b.placement().getParent() instanceof Stacks.StackSurface stack && stack.joined;
     }
 
     @Override public Typography.Role label(Nodes.ButtonKind kind, Typography.Role role) {

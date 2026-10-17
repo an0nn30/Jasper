@@ -66,7 +66,11 @@ public final class SettingsShell extends JPanel implements AutoCloseable {
 
     private int metric(DesignMetrics.Role role) { return ThemePainting.metric(context, role); }
     private int sidebar() { return Math.min(metric(DesignMetrics.Role.SETTINGS_SIDEBAR_WIDTH), Math.max(0, getWidth() / 3)); }
-    private int footerHeight() { return Math.max(metric(DesignMetrics.Role.SETTINGS_FOOTER_HEIGHT), footer.getPreferredSize().height); }
+    /** The footer band's height: the classic band holds its rule above the footer, so a taller footer keeps its height. */
+    private int footerHeight() {
+        int rule = frame.integratedTitle() ? 0 : metric(DesignMetrics.Role.HAIRLINE);
+        return Math.max(metric(DesignMetrics.Role.SETTINGS_FOOTER_HEIGHT), footer.getPreferredSize().height + rule);
+    }
     /** The classic frame's search strip: the search field with the sidebar inset above and below it. */
     private int strip() { return 2 * metric(DesignMetrics.Role.SETTINGS_SIDEBAR_INSET) + search.getPreferredSize().height; }
     /**

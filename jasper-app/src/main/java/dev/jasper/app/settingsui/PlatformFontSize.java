@@ -26,10 +26,15 @@ final class PlatformFontSize implements ValueEditor<Float> {
     private boolean inherited = true, chosen;
 
     static Editors.Factory<Float> factory() {
-        // The look's own copy is searched only under that look, so the default look's matches stay as they were.
-        return new Editors.Factory<>((setting, context) -> new PlatformFontSize(context), List.of("Use platform size", PLATFORM_COPY),
-            context -> context.chrome().fontRowCopy().equals(PLATFORM_COPY) ? List.of() : List.of(context.chrome().fontRowCopy()));
+        // The words are the shown copy, the toggle's and then the row's, so the default look's matches stay as they were.
+        return new Editors.Factory<>((setting, context) -> new PlatformFontSize(context), List.of(), context -> {
+            String copy = context.chrome().fontRowCopy();
+            return List.of(toggleCopy(copy), copy);
+        });
     }
+
+    /** The toggle's label for the row's {@code copy}: "Use platform size" for "Use platform font size". */
+    static String toggleCopy(String copy) { return copy.replace(" font size", " size"); }
 
     /**
      * The look's standard interface size: the kit's body size when the look's font row offers the look's default (spec
@@ -55,7 +60,7 @@ final class PlatformFontSize implements ValueEditor<Float> {
     @Override public boolean cardRows() { return true; }
     @Override public Nodes.Node node(String id, ControlState state) { return node(id, state, false); }
     @Override public Nodes.Node node(String id, ControlState state, boolean highlighted) {
-        var toggle = new Nodes.Toggle(id + ":default", state, copy.replace(" font size", " size"), inherited, id + ":default", false);
+        var toggle = new Nodes.Toggle(id + ":default", state, toggleCopy(copy), inherited, id + ":default", false);
         var reset = new Nodes.Button(id + ":reset", new ControlState(!inherited, state.enabled(), false, ""), "", "reset", Nodes.ButtonKind.GHOST,
             id + ":reset", "Reset interface font size to platform default");
         var control = new Nodes.Stack(id + ":toggle-controls", state, Nodes.LayoutRole.SETTINGS_TRAILING,

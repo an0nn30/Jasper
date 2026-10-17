@@ -64,6 +64,40 @@ class SettingsNavigationTest {
         } finally { edt(dialog::cancel); }
     }
 
+    @Test void collapsingTheShownPagesSectionKeepsThePageAndHistoryReopensIt() throws Exception {
+        var dialog = dialog(SettingsChromeTest.CLASSIC);
+        try {
+            edt(() -> {
+                dialog.open(null, "window");
+                dialog.select("keymap");
+                dialog.back();
+                collapse(dialog, "appearance-behavior");
+                assertThat(dialog.currentPage()).as("the shown page stays").isEqualTo("window");
+                assertThat(dialog.view().tree.node().expandedIds()).doesNotContain("appearance-behavior");
+                dialog.forward();
+                assertThat(dialog.currentPage()).isEqualTo("keymap");
+                assertThat(dialog.view().tree.isCollapsed("appearance-behavior")).as("Forward leaves it closed").isTrue();
+                dialog.back();
+                assertThat(dialog.currentPage()).isEqualTo("window");
+                assertThat(dialog.view().tree.node().expandedIds()).as("Back into it opens it").contains("appearance-behavior");
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
+    @Test void aTrianglesClickDuringASearchChangesNothing() throws Exception {
+        var dialog = dialog(SettingsChromeTest.CLASSIC);
+        try {
+            edt(() -> {
+                dialog.open(null, "appearance");
+                dialog.search("font");
+                collapse(dialog, "terminal");
+                assertThat(dialog.view().tree.isCollapsed("terminal")).isFalse();
+                dialog.search("");
+                assertThat(dialog.view().tree.node().expandedIds()).contains("terminal");
+            });
+        } finally { edt(dialog::cancel); }
+    }
+
     @Test void aSearchOpensEverySectionUntilItIsCleared() throws Exception {
         var dialog = dialog(SettingsChromeTest.CLASSIC);
         try {

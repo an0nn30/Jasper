@@ -77,7 +77,8 @@ class ResetMenuTest {
 
     @Test void theFullSpanEditorsOfferTheMenuOnTheirOwnRows() throws Exception {
         edt(() -> {
-            var context = context(SettingsChromeTest.CLASSIC, "[ui]\nappearance = \"light\"\n[ui.font]\nsize = 15\n");
+            var context = context(SettingsChromeTest.CLASSIC, "[ui]\nappearance = \"light\"\n[ui.theme]\ndark = \"catppuccin-mocha\"\n"
+                + "light = \"catppuccin-latte\"\n[ui.font]\nsize = 15\n");
             var page = page("appearance", context, NotificationGroupChoices.NONE);
             try {
                 for (var id : List.of("row:ui.appearance", "row:ui.appearance:light")) {
@@ -88,9 +89,34 @@ class ResetMenuTest {
                 assertThat(find(page.viewSpec().root(), "ui.appearance:reset")).as("no Reset button").isNull();
                 assertThat(find(page.viewSpec().root(), "ui.appearance:light-reset")).as("no reserved lane").isNull();
                 assertThat(row(page, "row:ui.font.size").contextActions()).extracting(MenuItem::action).containsExactly("ui.font.size:reset");
+                assertThat(row(page, "row:ui.font.size").contextActions().getFirst().enabled()).as("the font row while modified").isTrue();
                 assertThat(find(page.viewSpec().root(), "ui.font.size:reset")).isNull();
                 page.event(new UiEvent.Action("ui.appearance:reset"));
-                assertThat(context.draft().value(CoreSettings.UI_APPEARANCE)).isEqualTo(context.draft().defaultValue(CoreSettings.UI_APPEARANCE));
+                // The appearance's reset takes its companions, the two themes, with it.
+                for (var setting : List.<dev.jasper.app.settings.Setting<?>>of(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT))
+                    assertThat((Object) context.draft().value(setting)).as(setting.name()).isEqualTo(context.draft().defaultValue(setting));
+                page.event(new UiEvent.Action("ui.font.size:reset"));
+                assertThat(context.draft().value(CoreSettings.UI_FONT_SIZE)).isEqualTo(context.draft().defaultValue(CoreSettings.UI_FONT_SIZE));
+                assertThat(row(page, "row:ui.font.size").contextActions().getFirst().enabled()).as("the font row at its default").isFalse();
+            } finally { page.dispose(); }
+        });
+    }
+
+    @Test void anExternalRowsMenuResetsItsPendingValue() throws Exception {
+        edt(() -> {
+            var context = context(SettingsChromeTest.CLASSIC, "");
+            var page = SchemaPage.page("system", "System Settings").section("Java Virtual Machine")
+                .external(new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", List.of(), new Nodes.Numeric(512, 1_048_576, 256, 0),
+                    () -> 4096, () -> 2048, value -> "", value -> "", value -> java.util.concurrent.CompletableFuture.completedFuture(null), () -> true))
+                .build(context);
+            page.component();
+            try {
+                var row = row(page, "row:vm.heap");
+                assertThat(find(page.viewSpec().root(), "vm.heap:reset")).as("no Reset button").isNull();
+                assertThat(row.contextActions()).containsExactly(new MenuItem("vm.heap:reset", "Reset to Default", "", "vm.heap:reset", true, false));
+                page.event(new UiEvent.Action("vm.heap:reset"));
+                assertThat(page.externals().getFirst().pending()).as("the default, pending until Apply").isEqualTo(2048);
+                assertThat(row(page, "row:vm.heap").contextActions().getFirst().enabled()).as("at its default").isFalse();
             } finally { page.dispose(); }
         });
     }

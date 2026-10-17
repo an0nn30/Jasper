@@ -523,8 +523,8 @@ final class Stacks {
     /** The final action owns a stable slot even when no override currently makes it visible. */
     static final class SettingsTrailingLayout implements Composition.WidthLayout {
         final KitContext context;SettingsTrailingLayout(KitContext context){this.context=context;}
-        /** The gap before the row's action; a control without one (Reset in the row's menu, spec 12.1) reserves none. */
-        int gap(Container p){return p.getComponentCount()>1?ThemePainting.metric(context,DesignMetrics.Role.COLUMN_GAP):0;}
+        /** The gap before the row's action; a control without one takes the catalog's empty gap (none where Reset is in the row's menu, spec 12.1). */
+        int gap(Container p){return ThemePainting.metric(context,p.getComponentCount()>1?DesignMetrics.Role.COLUMN_GAP:DesignMetrics.Role.SETTINGS_TRAILING_EMPTY_GAP);}
         int action(Container p){return p.getComponentCount()>1?p.getComponent(1).getPreferredSize().width:0;}
         @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap(p)+action(p),c.height);}
         @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap(p)-action(p)));}

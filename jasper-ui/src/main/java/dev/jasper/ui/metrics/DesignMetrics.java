@@ -149,7 +149,10 @@ public final class DesignMetrics {
         SETTINGS_HEADER_INSET(20),
         // Plan 9a: a page's indent under its section in the Settings navigation (the classic navigation's 15), and the gap
         // from a navigation row's leading slot (the classic triangle) to its title.
-        SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6);
+        SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6),
+        // Plan 9a: the gap a SETTINGS_TRAILING stack without its action keeps after the control (today COLUMN_GAP's 10;
+        // the classic rows, whose Reset is in the row's menu, keep none).
+        SETTINGS_TRAILING_EMPTY_GAP(10);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -163,7 +166,6 @@ public final class DesignMetrics {
         values.put(Role.PICKER_DEFAULT_HEIGHT, 22);
         values.put(Role.FULL_FOOTER_BUTTON_HEIGHT, 24);
         values.put(Role.JOINED_ACTION_HEIGHT, 24);
-        values.put(Role.JOINED_ACTION_WIDTH, 26);
         values.put(Role.PANEL_EMPTY_ACTION_HEIGHT, 24);
         values.put(Role.PANEL_SEARCH_HEIGHT, 22);
         values.put(Role.COLUMN_SEARCH_HEIGHT, 22);
@@ -237,6 +239,7 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_FOOTER_SIDE, 14);
         values.put(Role.SETTINGS_ACTION_MIN_WIDTH, 98);
         values.put(Role.CIRCULAR_ACTION_SIZE, 22);
+        values.put(Role.JOINED_ACTION_WIDTH, 26);
         values.put(Role.SETTINGS_HEADER_GAP, 10);
         values.put(Role.SETTINGS_HEADER_TITLE_GAP, 31);
         values.put(Role.SETTINGS_CRUMB_GAP, 6);
@@ -246,13 +249,13 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_SECTION_GAP, 13);
         values.put(Role.SETTINGS_CHOICE_WIDTH, 220);
         values.put(Role.SETTINGS_RICH_CHOICE_WIDTH, 220);
-        values.put(Role.SETTING_CHOICE_WIDTH, 220);
         values.put(Role.SETTINGS_HEADER_INSET, 14);
         values.put(Role.SETTINGS_NAV_INSET, 0);
         values.put(Role.SETTINGS_NAV_ROW_SIDE, 9);
         values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
         values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
         values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
+        values.put(Role.SETTINGS_TRAILING_EMPTY_GAP, 0);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

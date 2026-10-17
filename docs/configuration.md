@@ -83,8 +83,9 @@ Terminal › Shell's Profile lists the shells Jasper detected, including each WS
 
 Changes wait until **Apply** or **OK**; **Cancel** (or Escape) discards them, asking first. A page with unsaved
 changes shows its name in blue, and a setting that differs from its default has a Reset button (under the
-Enterprise look, Reset to Default in the row's context menu), which removes the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
-reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
+Enterprise look, Reset to Default in the row's context menu), which removes the key from the file. Settings writes
+`config.toml` in place and keeps your comments; a value the file would reject is refused with the same message the
+file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
 System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
 Java Virtual Machine section for the [custom VM options](#custom-vm-options).

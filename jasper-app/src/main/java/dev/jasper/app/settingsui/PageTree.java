@@ -31,9 +31,12 @@ final class PageTree {
     /** Whether sections collapse (spec 12.1). */
     void collapsible(boolean value) { collapsible = value; if (!value) collapsed.clear(); }
 
-    /** The user opened or closed a section; the state lives as long as this tree (spec 12.1: it is not saved). */
+    /**
+     * The user opened or closed a section; the state lives as long as this tree (spec 12.1: it is not saved). While a
+     * search runs every section shows, so a triangle's click there changes nothing.
+     */
     void expanded(String id, boolean open) {
-        if (!collapsible) return;
+        if (!collapsible || !counts.isEmpty()) return;
         if (open) collapsed.remove(id); else collapsed.add(id);
     }
 

@@ -79,7 +79,8 @@ class LookRowsTest {
             var classic = spec.build(context(SettingsChromeTest.CLASSIC, KitTestSupport::context));
             var linux = spec.build(context(LINUX_DEFAULT, KitTestSupport::context));
             try {
-                assertThat(classic.searchTerms()).contains("Use the default font size");
+                assertThat(classic.searchTerms()).as("the words the row shows").contains("Use the default font size", "Use the default size")
+                    .doesNotContain("Use platform size", "Use platform font size");
                 assertThat(linux.searchTerms()).as("the default look's words stay as they were")
                     .doesNotContain("Use the default font size").contains("Use platform size", "Use platform font size");
             } finally { classic.dispose(); linux.dispose(); }

@@ -45,7 +45,6 @@ final class SettingRows {
             component.add(title);
             component.add(description);
             popup = new Menus.Popup(context());
-            component.putClientProperty(KitOwnership.CONTEXT_MENU, popup);
             component.getActionMap().put("settingRowMenu", new AbstractAction() {
                 @Override public void actionPerformed(java.awt.event.ActionEvent event) { context(component, 0, component.getHeight()); }
                 // A focused control with its own popup menu keeps the menu key: the root pane's postPopup then opens that menu.
@@ -61,6 +60,8 @@ final class SettingRows {
         private void menu(boolean shown) {
             if (menuShown == shown) return;
             menuShown = shown;
+            // Published only while the row has a menu, so a search for the first context menu passes a plain row by.
+            component.putClientProperty(KitOwnership.CONTEXT_MENU, shown ? popup : null);
             var keys = component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
             for (var stroke : List.of(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F10, java.awt.event.InputEvent.SHIFT_DOWN_MASK),
                     KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_CONTEXT_MENU, 0))) {

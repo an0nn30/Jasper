@@ -227,10 +227,10 @@ final class Buttons {
         KitContext context() { return context; }
         /** The component standing in its parent's layout for this button: itself, or a menu button's surface for its parts and face. */
         Component placement() { return this; }
-        /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
+        /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the face's (by default the text colour). */
         SemanticColor iconRole(boolean hover) {
             if (onSelection) return ink.text;
-            return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : textRole(hover) : Labels.tint(iconSeverity);
+            return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : context.faces().buttons.iconRole(this, hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
@@ -406,8 +406,10 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                 // Re-tint the same named icon for hover without altering component identity.
                 String name = null;
                 if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                // On a selected row the glyph takes the fill's ink whatever its artwork (the palette overload recolours built-ins).
-                javax.swing.Icon artwork = name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), ink.text, getIcon().getIconWidth())
+                // On a selected row, or where the face recolours it, the glyph takes its role whatever its artwork (the palette
+                // overload recolours built-ins).
+                javax.swing.Icon artwork = name != null && (onSelection || context.faces().buttons.recolours(this))
+                    ? context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth())
                     : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
                     ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
                     : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());

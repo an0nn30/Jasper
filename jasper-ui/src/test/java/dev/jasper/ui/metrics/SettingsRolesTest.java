@@ -15,6 +15,7 @@ class SettingsRolesTest {
         ROLES.put("SETTINGS_HEADER_INSET", List.of(20, 14));
         ROLES.put("SETTINGS_NAV_CHILD_INDENT", List.of(0, 15));
         ROLES.put("SETTINGS_NAV_TEXT_GAP", List.of(6, 6));
+        ROLES.put("SETTINGS_TRAILING_EMPTY_GAP", List.of(10, 0));
     }
 
     @Test void theSettingsRolesFollowEachOtherWithTheirValuesInBothCatalogs() {
