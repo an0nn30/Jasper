@@ -3242,3 +3242,35 @@ Each task against itself:
 17. **What the pre-flight did not verify.** The IBM Plex downloads, their SHA-256 sums and zip paths (Task 3 step 1 stops
     on any mismatch), fact 15's name resolution of the real files, and the Gradle-only checks named in the refresh
     paragraph; Task 3 step 6 and Task 5 step 3 run them. Cost if wrong: the task that runs them stops and reports.
+
+### Task 4 review, round 1 (2026-10-17)
+
+Task 5 carries these into the status banner's deviations, the STATUS entry's `<mock notes>`, its chrome and Run window
+numbers and its GUI checks.
+
+18. **The renders hold FlatLaf's user scale at 1.** The gallery's `sftp-connected-short-font24` capture set a 24-point
+    default font, which raised FlatLaf's user scale (no `flatlaf.uiScale` in the test task) to 1.5 for every later
+    capture and for the 2x panels, so half the gallery PNGs and all four `@2x` panels were drawn at 1.5. Like
+    `:jasper-ui:gallery`, `EnterpriseKitRenderTest` now sets `flatlaf.uiScale=1` while it renders; it asserts the scale
+    after every capture and before each panel, and each panel's title (Plex SemiBold at `PANEL_TITLE`'s size) and one
+    body label (Plex Sans at 12 points). Re-measured edge agreements and floors (ruling 11): Light sessions 0.310 (0.26),
+    tunnels 0.057 (0.00), SFTP 0.062 (0.01), File Servers 0.320 (0.27); Dark 0.322 (0.27), 0.059 (0.00), 0.063 (0.01),
+    0.317 (0.26). Tunnels and SFTP stay low because the gallery panels are empty where the mocks show the tunnels table
+    and the file list (Rulings 9).
+19. **Fact-12 colours the mock crops show but the renders lack, dropped from `colours`; deviation awaiting the user's
+    ruling** (ruling 11 says drop only what the crop lacks): `#D9DFEA` (Light sessions, SFTP) and `#3D4658` (Dark
+    sessions, SFTP) are the focused header strip across the top 44 px of those crops, which the gallery panels do not
+    draw (header strips are plan 7's, Rulings 8 and 9); `#2E3135` (Dark tunnels, SFTP) is the card under the mocks'
+    tunnels table and file list, which the empty gallery panels do not paint (plans 6, 7 and 10); `#E4E6E9` (Light File
+    Servers) appears in that crop only as 44 scattered anti-aliased glyph pixels, not as `surface.stripe`, and the 1x
+    render has none. Each returns to its pair when the composition that paints it lands.
+20. **Two mock checks sit on their tolerance** (none widened): in `EnterpriseMenuRowMockTest` Help starts 4 px right of
+    the mock, `within(4)`, in Light and Dark (Window 2, Tools 2 or 3, the rest 0 or 1); in `RunWindowRenderTest` "help
+    text top" is 82 against the mock's 85, tolerance 3, in both states. Follow-up: retune `ClassicMenuRow`'s side and
+    padding or the Run window's help offset so both sit inside their tolerance.
+21. **Follow-up: menu accelerators under Plex.** `Typography`'s glyph fallback covers kit-drawn text only; FlatLaf draws
+    menu accelerators in `defaultFont`, which Rulings 2 makes IBM Plex Sans, and Plex has no glyphs for the macOS modifier
+    symbols, so the classic menus' accelerators may draw as boxes. Not checked headlessly or in the GUI: add a headless
+    test of a classic-row `JMenuItem` with a Cmd+Shift accelerator under `EnterpriseLook` (or set
+    `MenuItem.acceleratorFont` to the platform face when the look's face cannot draw the text), and list the menus'
+    accelerators with the GUI checks.

@@ -728,7 +728,7 @@
       516
     ],
     "render": "jasper-app/build/enterprise-kit/light/sessions@2x.png",
-    "min_agreement": 0.14,
+    "min_agreement": 0.26,
     "colours": [
       "#FFFFFF",
       "#2F65CA",
@@ -765,7 +765,7 @@
       759
     ],
     "render": "jasper-app/build/enterprise-kit/light/sftp@2x.png",
-    "min_agreement": 0.05,
+    "min_agreement": 0.01,
     "colours": [
       "#FFFFFF",
       "#2F65CA",
@@ -784,12 +784,11 @@
       150
     ],
     "render": "jasper-app/build/enterprise-kit/light/fileservers@2x.png",
-    "min_agreement": 0.08,
+    "min_agreement": 0.27,
     "colours": [
       "#FFFFFF",
       "#ECEDEF",
-      "#F0F1F3",
-      "#E4E6E9"
+      "#F0F1F3"
     ]
   },
   {
@@ -802,7 +801,7 @@
       516
     ],
     "render": "jasper-app/build/enterprise-kit/dark/sessions@2x.png",
-    "min_agreement": 0.15,
+    "min_agreement": 0.27,
     "colours": [
       "#2E3135",
       "#3D74D6",
@@ -838,7 +837,7 @@
       759
     ],
     "render": "jasper-app/build/enterprise-kit/dark/sftp@2x.png",
-    "min_agreement": 0.05,
+    "min_agreement": 0.01,
     "colours": [
       "#3D74D6",
       "#3C3F44",
@@ -856,7 +855,7 @@
       150
     ],
     "render": "jasper-app/build/enterprise-kit/dark/fileservers@2x.png",
-    "min_agreement": 0.08,
+    "min_agreement": 0.26,
     "colours": [
       "#2E3135",
       "#3C3F44",
