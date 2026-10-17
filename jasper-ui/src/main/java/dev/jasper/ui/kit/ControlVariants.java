@@ -6,8 +6,7 @@ import java.util.Objects;
 
 /**
  * The value of each of the kit file's 14 {@code [controls]} points (Enterprise presentation spec 5.2), each two-valued:
- * the default look's value first, the classic look's second. Only {@code KitFaces.of} reads it, to choose each control's
- * face once.
+ * the default look's value first, the classic look's second.
  *
  * @param toggle a Toggle: a switch or a checkbox
  * @param exclusive an EXCLUSIVE choice: a segment track or a row of radios
@@ -27,7 +26,8 @@ import java.util.Objects;
 public record ControlVariants(Toggle toggle, Exclusive exclusive, Tabs tabs, Group group, FormLabel formLabel, Empty empty, Table table,
                               Tree tree, Stepper stepper, OrderedList orderedList, Buttons buttons, Tag tag, Route route, Prompt prompt) {
     /** A point's value, named in a kit file by {@link #key()}. */
-    public interface Variant {
+    public sealed interface Variant permits Toggle, Exclusive, Tabs, Group, FormLabel, Empty, Table, Tree, Stepper, OrderedList, Buttons,
+        Tag, Route, Prompt {
         /** The value's name in a kit file: the constant's name in lower case. */
         default String key() { return ((Enum<?>) this).name().toLowerCase(Locale.ROOT); }
     }

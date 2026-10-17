@@ -31,11 +31,14 @@ class MetricTokensTest {
         assertThat(Token.STATUS_DOT.roles()).containsExactly(STATUS_DOT, PANEL_ROW_DOT, TOOL_HEADER_ACTIVE_DOT);
     }
 
-    /** A catalog's own tokens are its first role of each, and applying them changes nothing. */
+    /** A catalog's own tokens are its first role of each, each inside its range (Rulings 17), and applying them changes nothing. */
     @Test void aCatalogsOwnTokensLeaveItAsItIs() {
         for (var catalog : List.of(DesignMetrics.DEFAULT, DesignMetrics.CLASSIC)) {
             var tokens = MetricTokens.of(catalog);
-            for (var token : Token.values()) assertThat(tokens.value(token)).as(token.key()).isEqualTo(catalog.value(token.roles().getFirst()));
+            for (var token : Token.values()) {
+                assertThat(tokens.value(token)).as(token.key()).isEqualTo(catalog.value(token.roles().getFirst()));
+                assertThat(tokens.value(token)).as(token.key() + " in range").isBetween(token.min(), token.max());
+            }
             assertThat(catalog.with(tokens)).isEqualTo(catalog);
         }
         assertThat(List.of(Token.values()).stream().map(t -> MetricTokens.of(DesignMetrics.CLASSIC).value(t)).toList())

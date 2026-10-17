@@ -28,7 +28,7 @@ public final class UiColorKeys {
 
     /**
      * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
-     * the theme's palette, text selection from its terminal colours.
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours.
      */
     public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
         Map<String, Source> sources = switch (Objects.requireNonNull(set)) {

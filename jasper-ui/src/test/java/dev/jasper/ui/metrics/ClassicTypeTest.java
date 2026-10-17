@@ -26,6 +26,25 @@ class ClassicTypeTest {
         assertThat(TypeScale.CLASSIC.body()).isEqualTo(12f);
     }
 
+    /** Spec 5.6's table, read from the spec rather than classic-type.tsv: each listed role's size and weight. */
+    @Test void theSpecsTableHolds() {
+        var groups = new LinkedHashMap<String, java.util.List<String>>();
+        groups.put("12/400", java.util.List.of("BODY", "LABEL", "SETTINGS_BODY", "PANEL_SEARCH", "TITLE_CONTEXT", "TOOLBAR_LABEL",
+            "STATUS_TEXT", "STATUS_PATH", "MONO"));
+        groups.put("11/400", java.util.List.of("DESCRIPTION", "SUPPORTING", "CAPTION", "SETTING_DESCRIPTION", "COUNT", "RESULTS_HEADING",
+            "PALETTE_HINT", "PANEL_HEADER_COUNT", "MONO_SMALL", "MONO_CAPTION"));
+        groups.put("12/600", java.util.List.of("PANEL_TITLE", "PANEL_HEADER_TITLE", "WINDOW_TITLE", "SECTION_LABEL"));
+        groups.put("12/500", java.util.List.of("BODY_STRONG", "PANEL_ROW_SELECTED"));
+        groups.put("15/600", java.util.List.of("DETAIL_TITLE", "PROMPT_TITLE"));
+        groups.put("10/500", java.util.List.of("CHIP"));
+        groups.forEach((expected, names) -> {
+            for (var name : names) {
+                var role = Typography.Role.valueOf(name);
+                assertThat((int) TypeScale.CLASSIC.size(role) + "/" + TypeScale.CLASSIC.weight(role)).as(name).isEqualTo(expected);
+            }
+        });
+    }
+
     /** Rulings 13: group titles carry no extra tracking under the classic scale; the default keeps its own. */
     @Test void onlyTheDefaultScaleTracksItsSectionLabels() {
         assertThat(TypeScale.DEFAULT.labelTracking()).isTrue();

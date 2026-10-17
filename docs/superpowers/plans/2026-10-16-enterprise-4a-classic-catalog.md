@@ -4,9 +4,11 @@
 > plan's text: Task 5's overlay also sets `Button.default.startBorderColor` and `Button.default.endBorderColor`
 > to `accent.edge` (spec 6.5's intent, the default button's border is `accent.edge`: FlatLaf 3.7 reads that border from
 > `startBorderColor` first and ignores `Button.default.borderColor` while it is set); Task 5's text carries it.
-> Residuals handed on: a focused classic button paints flat, because FlatLaf paints the gradient only while the state
-> colour is `Button.startBackground` itself and the inherited `Button.focusedBackground` is a separate colour (without
-> it FlatLaf falls back to its own focus background), for 4b and 4c; an unfocused classic table or tree takes the
+> Final review: Rulings 17 added (spec 5.4's provisional token ranges stand; spec amended).
+> Residuals handed on: a focused, hovered or pressed classic native button paints flat, because FlatLaf paints the
+> gradient only while the state colour is `Button.startBackground` itself and the inherited `Button.focusedBackground`,
+> `hoverBackground` and `pressedBackground` are colours separate from it (without the first FlatLaf falls back to its own
+> focus background), for 4b and 4c; an unfocused classic table or tree takes the
 > terminal-selection wildcard for `selectionInactiveBackground` and `selectionInactiveForeground` (spec 6.5 lists
 > neither), for 4c's mock comparison.
 
@@ -165,6 +167,12 @@ record them in `docs/STATUS.md` (Task 7) and in the banner when executed.
     pairs stay in `PaintedContrastTest.DEFAULT_PAIRS` beside them; the three package tests keep checking their repairs
     meanwhile, and 4a's STATUS entry hands the condition on — cost if wrong: plans 6 and 7 each move one or two
     declarations they would have found already moved.
+17. **Spec 5.4's nine provisional token ranges stand as calibrated** (added by the final review) — every mock draws one
+    value of each token, Enterprise's (Rulings 10), and each lies inside its range, so the mocks give nothing to narrow
+    a range by; the default catalog's own tokens lie inside too (five at the top: `control_radius` 4, `field_radius` 4,
+    `group_radius` 6, `focus_ring` 3, `tool_window_header` 32), and `MetricTokensTest.aCatalogsOwnTokensLeaveItAsItIs`
+    pins both bases in range; spec 5.4's sentence records it — cost if wrong: plan 5 freezes a range that a later plan
+    widens or narrows by editing one enum constant, its test row and the spec's table.
 
 ## Verified facts
 

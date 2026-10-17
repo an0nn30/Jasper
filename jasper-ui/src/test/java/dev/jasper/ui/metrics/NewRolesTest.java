@@ -16,9 +16,10 @@ class NewRolesTest {
         "FOLDER_TAB_PADDING", "FOLDER_TAB_RADIUS", "ROUTE_EDGE", "SIDE_COLUMN_WIDTH", "SIDE_COLUMN_GAP", "SIDE_BUTTON_GAP",
         "STRIPE_LABEL_PADDING", "STRIPE_LABEL_GAP", "DOCK_RULE", "DOCK_RULE_HIT");
 
-    @Test void theAddedRolesCloseTheEnumInOrder() {
+    /** Plan 4's roles are appended together, in order; a later plan's roles may follow them. */
+    @Test void theAddedRolesFollowEachOtherInOrder() {
         var roles = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
-        assertThat(roles.subList(roles.size() - ADDED.size(), roles.size())).containsExactlyElementsOf(ADDED);
+        assertThat(java.util.Collections.indexOfSubList(roles, ADDED)).isNotNegative();
     }
 
     @Test void theRowFloorAndTheFieldRadiusStartAtTheRolesTheyReplace() {
@@ -36,5 +37,20 @@ class NewRolesTest {
             assertThat(DesignMetrics.DEFAULT.contentHeight(DesignMetrics.Role.ROW_HEIGHT, font, frc)).as("%s pt", size)
                 .isEqualTo(DesignMetrics.DEFAULT.contentHeight(DesignMetrics.Role.BUTTON_HEIGHT, font, frc));
         }
+    }
+
+    /** Review Focus 4: the classic catalog's 22 px rows grow past 22 with a large line, by the button padding. */
+    @Test void classicRowsGrowWithTheLine() {
+        var frc = new FontRenderContext(null, true, true);
+        var classic = DesignMetrics.CLASSIC;
+        assertThat(classic.value(DesignMetrics.Role.ROW_HEIGHT)).isEqualTo(22);
+        for (float size : new float[] {12, 18, 24}) {
+            var font = new Font("SansSerif", Font.PLAIN, 1).deriveFont(size);
+            int line = (int) Math.ceil(font.getLineMetrics("Ag", frc).getHeight());
+            assertThat(classic.contentHeight(DesignMetrics.Role.ROW_HEIGHT, font, frc)).as("%s pt", size)
+                .isEqualTo(Math.max(22, line + classic.value(DesignMetrics.Role.BUTTON_VERTICAL_PADDING)));
+        }
+        var large = new Font("SansSerif", Font.PLAIN, 1).deriveFont(24f);
+        assertThat(classic.contentHeight(DesignMetrics.Role.ROW_HEIGHT, large, frc)).as("24 pt").isGreaterThan(22);
     }
 }

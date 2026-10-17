@@ -33,8 +33,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Enterprise presentation spec 6.6 and 16.1.7: geometry and type follow a kit. Outside the catalog's own packages
  * (dev.jasper.ui.metrics and dev.jasper.ui.kit) only AnimationSettings reads DesignMetrics.DEFAULT (ConfigSnapshot is
- * built before any window, so the tab durations come from the default catalog), nothing reads TypeScale.DEFAULT or
- * FaceSet.PLATFORM, only the classes that choose the start-up kit or fall back to it read Kit.DEFAULT, and no static
+ * built before any window, so the tab durations come from the default catalog), nothing reads TypeScale.DEFAULT,
+ * FaceSet.PLATFORM, DesignMetrics.CLASSIC, TypeScale.CLASSIC or Kit.CLASSIC, only the classes that choose the start-up
+ * kit or fall back to it read Kit.DEFAULT, and no static
  * initializer reads a metric or builds a painter, itself or through the methods it calls.
  */
 class StaticDefaultTest {
@@ -181,6 +182,11 @@ class StaticDefaultTest {
     // Probes compiled with this test: what the rules report and what they leave alone. They are never initialized.
     static final class DefaultInAMethod { int gap() { return DesignMetrics.DEFAULT.value(DesignMetrics.Role.HAIRLINE); } }
     static final class TypeDefaultInAMethod { Object scale() { return TypeScale.DEFAULT; } }
+    static final class ClassicInAMethod {
+        Object metrics() { return DesignMetrics.CLASSIC; }
+        Object type() { return TypeScale.CLASSIC; }
+        Object kit() { return Kit.CLASSIC; }
+    }
     static final class FinalFromTheInstalledKit {
         static final int GAP = FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.HAIRLINE);
     }
@@ -205,6 +211,9 @@ class StaticDefaultTest {
     @Test void theRulesReportDefaultReadsStaticMetricFinalsAndStaticPainters() {
         assertThat(probe(DefaultInAMethod.class)).containsExactly(PROBE + "DefaultInAMethod.gap: " + METRICS + ".DEFAULT");
         assertThat(probe(TypeDefaultInAMethod.class)).containsExactly(PROBE + "TypeDefaultInAMethod.scale: dev/jasper/ui/metrics/TypeScale.DEFAULT");
+        assertThat(probe(ClassicInAMethod.class)).as("the classic catalogs are scanned too").containsExactlyInAnyOrder(
+            PROBE + "ClassicInAMethod.metrics: " + METRICS + ".CLASSIC", PROBE + "ClassicInAMethod.type: dev/jasper/ui/metrics/TypeScale.CLASSIC",
+            PROBE + "ClassicInAMethod.kit: " + CLASSIC_KIT);
         assertThat(probe(FinalFromTheInstalledKit.class))
             .contains(PROBE + "FinalFromTheInstalledKit.<clinit>: calls dev/jasper/ui/swing/FlatLafInstaller.installedKit");
         assertThat(probe(FinalThroughAHelper.class))

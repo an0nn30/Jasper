@@ -6,8 +6,9 @@ import java.util.Arrays;
 import java.util.Objects;
 
 /**
- * Logical geometry: one value per {@link Role}. {@link #DEFAULT} is the default catalog; other catalogs derive from it
- * with {@link #with(Role, int)}. Display transforms belong to the host; font growth belongs to content bounds.
+ * Logical geometry: one value per {@link Role}. {@link #DEFAULT} is the default catalog; other catalogs derive from it:
+ * {@link #CLASSIC} with the classic delta, a kit's with {@link #with(MetricTokens)}, a test's with {@link #with(Role, int)}.
+ * Display transforms belong to the host; font growth belongs to content bounds.
  */
 public final class DesignMetrics {
     /** Native short-window overflow keeps at least two rows or text lines in its inner body. */
