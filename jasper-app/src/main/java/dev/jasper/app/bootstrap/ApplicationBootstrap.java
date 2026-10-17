@@ -21,6 +21,7 @@ import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.MemoryReading;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
+import java.awt.GraphicsEnvironment;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
@@ -84,8 +85,11 @@ public final class ApplicationBootstrap {
             UnexpectedExceptions exceptions = acquired.own(installUnexpectedExceptionHandler());
             var endpoint = new AtomicReference<HandoffSocket>();
             var commands = new AtomicReference<CommandListener>();
+            var attempt = startup.selection().attempt();
             Thread shutdown = Thread.ofPlatform().name("jasper-log-shutdown").unstarted(() -> {
                 try {
+                    // An orderly quit before the look proved itself clears its pending mark; any other exit leaves it (spec 4.6).
+                    try { attempt.exiting(); } catch (RuntimeException unrecorded) { LOG.log(System.Logger.Level.WARNING, "Could not update the presentation attempt record", unrecorded); }
                     if (endpoint.get() != null) endpoint.get().close();
                     if (commands.get() != null) commands.get().close();
                 }
@@ -108,6 +112,15 @@ public final class ApplicationBootstrap {
             acquired.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
         }
+    }
+
+    /**
+     * Whether the launch is about to show a window or rehearse one, so the look's attempt is marked pending (spec 4.6):
+     * the first window, or a resident {@code --background} warm-up, never headless and never {@code --no-window}.
+     */
+    static boolean attemptBeforePresenting(AppArguments options, boolean resident, boolean headless) {
+        if (headless || options.noWindow()) return false;
+        return !options.background() || resident;
     }
 
     /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */
@@ -164,6 +177,8 @@ public final class ApplicationBootstrap {
                         return;
                     }
                     if (!options.background()) {
+                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
+                            application.presentationAttempt().pending();
                         long window = System.nanoTime();
                         application.newWindow();
                         StartupTrace.current().phase("first window", window);
@@ -175,6 +190,8 @@ public final class ApplicationBootstrap {
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quitNow();
                     } else {
+                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
+                            application.presentationAttempt().pending();
                         application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
                     }
                 });

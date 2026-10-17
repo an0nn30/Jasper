@@ -659,7 +659,9 @@ public final class PluginRuntime {
         var resolution = selection.resolution();
         statuses.addAll(resolution.rejected());
         for (PluginStatus rejected : resolution.rejected())
-            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.quiet())
+            // Spec 5.9: an invalid kit's notice appears once per digest, not at every start.
+            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.quiet()
+                    && (!rejected.reason().startsWith(PluginStatus.INVALID) || selection.announceInvalid(rejected.id(), rejected.origin())))
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(rejected.id()), Optional.of(rejected.name()),
                     rejected.reason(), Optional.empty()));
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,
@@ -708,6 +710,11 @@ public final class PluginRuntime {
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
                     outcome.reason(), Optional.empty()));
         }
+        // Spec 4.6: a provider that fails to load or start fails its look; this session keeps the chrome, without its services.
+        resolution.presentation().ifPresent(provider -> {
+            if (statuses.stream().anyMatch(status -> status.id().equals(provider.id()) && status.state() == PluginStatus.State.FAILED))
+                selection.attempt().failed();
+        });
         launch = new PluginCatalog.Launch(candidates, statuses, PluginCatalog.versions(resolution.load()), options.safeMode(), selection.build());
         admin = new PluginAdmin(options, Version.parse(JasperSdk.VERSION), () -> launch, created.containment::failures, LOCK_WAIT);
         adminWorker = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().name("jasper-plugin-admin").factory());

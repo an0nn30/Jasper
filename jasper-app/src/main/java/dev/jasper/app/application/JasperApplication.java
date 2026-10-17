@@ -207,6 +207,18 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
+    /** The rehearsal painted: the look proved itself (spec 4.6), recorded off the EDT. */
+    void rehearsalPainted() {
+        var attempt = presentationAttempt();
+        Thread.ofVirtual().name("jasper-presentation-proven").start(attempt::proven);
+    }
+
+    /** The attempt record of the look this process runs; none for the default look or one that fell back. Any thread. */
+    public dev.jasper.app.presentation.PresentationAttempt presentationAttempt() {
+        var current = presentation;
+        return current.provider().isPresent() ? selection.attempt() : dev.jasper.app.presentation.PresentationAttempt.NONE;
+    }
+
     /** The running plugins; null before {@link #startPlugins(AppDirs)}. Tests. */
     PluginRuntime pluginRuntime() { return plugins; }
 
@@ -868,7 +880,10 @@ public final class JasperApplication {
             }
             throw failure;
         }
-        return new Rehearsal.Stage(() -> Rehearsal.paint(window.nativeWindow()), close);
+        return new Rehearsal.Stage(() -> {
+            Rehearsal.paint(window.nativeWindow());
+            rehearsalPainted();
+        }, close);
     }
 
     /** Launch housekeeping for plugins: pending removals and installs. Off the EDT, before {@link #startPlugins}. */
@@ -962,6 +977,17 @@ public final class JasperApplication {
         plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
+        // Spec 4.6: a look the attempt record skipped says so once, and Try Again forgets the record and restarts.
+        selection.skipped().ifPresent(skipped -> notificationCenter.post(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.WARNING,
+                "Jasper started with its standard look")
+            .withContent("The last start with the " + skipped.name() + " look did not finish, so Jasper uses its standard look until you try again.")
+            .withAction(new dev.jasper.app.notifications.NotificationAction("Try Again", () -> Thread.ofVirtual().name("jasper-presentation-retry").start(() -> {
+                skipped.attempt().clear();
+                SwingUtilities.invokeLater(() -> restart(RestartMode.SAME));
+            }), false))));
+        // Spec 4.6: the first window's first paint proves the look, off the EDT.
+        trace.when(StartupTrace.Milestone.FIRST_PAINT, task -> Thread.ofVirtual().name("jasper-presentation-proven").start(task),
+            () -> presentationAttempt().proven());
         boolean macOs = configuration == null ? System.getProperty("os.name").startsWith("Mac") : configuration.macOs();
         var keymap = new dev.jasper.app.shortcuthelp.KeymapPage.Hooks(contributions,
             () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).keybindings(),
@@ -1803,6 +1829,7 @@ public final class JasperApplication {
 
     /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
     public void quitNow() {
+        presentationAttempt().orderlyQuit();
         quitting = true;
         for (TerminalWindow window : List.copyOf(windows)) window.close();
         requestShutdown();

@@ -375,4 +375,17 @@ class ApplicationBootstrapTest {
             assertThat(plain.get().log()).isNull();
         } finally { if (plain.get() != null) plain.get().service().close(); }
     }
+
+    /** Spec 4.6: pending only on the paths about to show a window or rehearse. */
+    @Test void onlyAWindowOrAResidentRehearsalRecordsAPendingLook() {
+        var plain = new AppArguments(null, false, false, false, null, false, false, false);
+        var background = new AppArguments(null, false, true, false, null, false, false, false);
+        var noWindow = new AppArguments(null, false, false, false, null, false, false, true);
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(plain, false, false)).as("the first window").isTrue();
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, false)).as("the resident rehearsal").isTrue();
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(background, false, false)).as("a background exit (quitNow)").isFalse();
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(noWindow, true, false)).as("--no-window, even resident").isFalse();
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(plain, false, true)).as("headless").isFalse();
+        assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, true)).isFalse();
+    }
 }

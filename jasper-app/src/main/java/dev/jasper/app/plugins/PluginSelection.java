@@ -44,10 +44,13 @@ public final class PluginSelection {
     private final Presentation presentation;
     private final PresentationAttempt attempt;
     private final Optional<SkippedLook> skipped;
+    private final Presentations presentations;
+    private final AttemptStore store;
 
     private PluginSelection(PluginRuntime.Options options, String build, List<PluginCandidate> candidates, List<String> problems,
                             PluginResolver.Resolution resolution, Presentation presentation, PresentationAttempt attempt,
-                            Optional<SkippedLook> skipped) {
+                            Optional<SkippedLook> skipped, Presentations presentations, AttemptStore store) {
+        this.presentations = presentations; this.store = store;
         this.options = options; this.build = build; this.candidates = List.copyOf(candidates); this.problems = List.copyOf(problems);
         this.resolution = resolution; this.presentation = presentation; this.attempt = attempt; this.skipped = skipped;
     }
@@ -71,7 +74,7 @@ public final class PluginSelection {
     /** No plugins and the default look: for an application made without the bootstrap. */
     public static PluginSelection none() {
         return new PluginSelection(null, "", List.of(), List.of(), new PluginResolver.Resolution(List.of(), List.of()),
-            Presentation.standard(host()), PresentationAttempt.NONE, Optional.empty());
+            Presentation.standard(host()), PresentationAttempt.NONE, Optional.empty(), Presentations.NONE, null);
     }
 
     static PluginSelection scan(PluginRuntime.Options options, String build, Version sdk, Projections.Host host) {
@@ -112,7 +115,7 @@ public final class PluginSelection {
                     skipped = Optional.of(new SkippedLook(candidate.descriptor().name(), new PresentationAttempt(store, candidate.id(),
                         candidate.descriptor().version().toString(), presentations.of(candidate).orElseThrow().digest(), build)));
         }
-        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped);
+        return new PluginSelection(options, build, candidates, problems, resolution, presentation, attempt, skipped, presentations, store);
     }
 
     /** macOS, and whether its unified title bar is available, read without AWT. */
@@ -154,7 +157,20 @@ public final class PluginSelection {
         var provider = resolution.presentation();
         if (provider.isEmpty()) return this;
         return new PluginSelection(options, build, candidates, problems,
-            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped);
+            PluginResolver.without(resolution, provider.get(), PluginStatus.LOOK_FAILED), presentation.fallback(host()), attempt, skipped,
+            presentations, store);
+    }
+
+    /**
+     * Whether the invalid kit of {@code id} from {@code origin} is news at this start: its digest was not announced before.
+     * Records it as announced. Spec 5.9's "once per digest".
+     */
+    boolean announceInvalid(String id, PluginCandidate.Origin origin) {
+        if (store == null) return true;
+        for (PluginCandidate candidate : candidates)
+            if (candidate.id().equals(id) && candidate.origin() == origin)
+                return presentations.of(candidate).map(facts -> PresentationAttempt.announce(store, id, facts.digest())).orElse(true);
+        return true;
     }
 
     List<PluginCandidate> candidates() { return candidates; }
