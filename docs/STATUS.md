@@ -40,8 +40,7 @@ dialogs; 6b extends `ProjectionReadTest.PROJECTION_READERS` and uses `Enterprise
 renames its `VariantReadTest` references to `ProjectionReadTest` and puts `DesktopTestSupport.closeOwnersNow()` first in
 every `finally { themes.close(); EnterpriseLook.restoreDefault(); }`. At the merge
 with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterprise-fixture.json` goes, and
-`EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue` at the documentation commit: **10,802 tests, 0 failures, 0 errors, 25 skipped**; the final
-review adds seven jasper-app tests, run with the touched and related classes (267 tests in 52 classes, 0 failures). GUI checks for the user (spec 16.2), which wait for plan 5b's Enterprise
+`EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue` after the final review fixes: **10,809 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2), which wait for plan 5b's Enterprise
 or run now under a development plugin whose kit says `title_bar = "native"`, `menu_bar = "window"`, `motion = "none"`
 (`--plugin-dir`): the macOS in-window menu bar and native title (⌘W in a plugin window, its classic File row, About in
 Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
