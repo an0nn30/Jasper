@@ -17,8 +17,6 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.LayoutManager;
-import java.awt.geom.Area;
-import java.awt.geom.RoundRectangle2D;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -305,18 +303,11 @@ public final class RunWindowPresentation {
             }
     }
 
-    /** The help tile: the accent inside a hairline of {@link #tileEdge(Kit)} at the prompt tile's radius. */
-    static void paintTile(Stacks.Tile tile, Graphics2D g) {
-        var context = tile.context;
-        ThemePainting.antialias(g);
-        int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
-        double radius = ThemePainting.metric(context, DesignMetrics.Role.PROMPT_TILE_RADIUS), inner = Math.max(0, radius - line);
-        var outerShape = new RoundRectangle2D.Double(0, 0, tile.getWidth(), tile.getHeight(), 2 * radius, 2 * radius);
-        var innerShape = new RoundRectangle2D.Double(line, line, tile.getWidth() - 2.0 * line, tile.getHeight() - 2.0 * line, 2 * inner, 2 * inner);
-        g.setColor(ThemePainting.color(context, SemanticColor.ACCENT)); g.fill(innerShape);
-        var ring = new Area(outerShape); ring.subtract(new Area(innerShape));
-        g.setColor(SurfaceContrast.painted(context.theme(), tileEdge(context.kit()))); g.fill(ring);
-    }
+    /**
+     * The help tile: the classic prompt's accent tile (plan 4b), inside a hairline of {@link #tileEdge(Kit)} at the prompt
+     * tile's radius, whatever the kit's prompt face.
+     */
+    static void paintTile(Stacks.Tile tile, Graphics2D g) { ClassicPromptFace.paintAccentTile(tile, g, tileEdge(tile.context.kit())); }
 
     /**
      * The help row: the tile, then the text beside it; the text block centred on the tile when shorter, and the reverse,

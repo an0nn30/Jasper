@@ -25,7 +25,13 @@ final class ClassicPromptFace implements PromptFace {
 
     @Override public LayoutManager headerLayout(Stacks.StackControl header) { return new BesideLayout(header); }
 
-    @Override public void paintTile(Stacks.Tile tile, Graphics2D g) {
+    @Override public void paintTile(Stacks.Tile tile, Graphics2D g) { paintAccentTile(tile, g, edge); }
+
+    /**
+     * The accent inside a hairline of {@code edge} at the prompt tile's radius: this face's tile, and the Run window's help
+     * tile ({@code RunWindowPresentation.paintTile}), whatever the kit's prompt face.
+     */
+    static void paintAccentTile(Stacks.Tile tile, Graphics2D g, PaintPair edge) {
         var c = tile.context;
         ThemePainting.antialias(g);
         int line = ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE);

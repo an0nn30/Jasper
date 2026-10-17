@@ -155,12 +155,16 @@ class RunWindowPresentationTest {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             try (var view = new KitView(context, help(), event -> { })) {
                 BufferedImage before = KitFixtures.render(view, 436, 60, 1);
+                // The enterprise kit's prompt is plan 4b's classic face; the Run window's help row comes ahead of it (plan 8a R2).
+                assertThat(((Labels.IconControl) view.control("help.icon")).facePair).as("the classic prompt's glyph pair").isNotNull();
                 view.runWindow(true);
                 KitFixtures.render(view, 436, 60, 1);
                 assertThat(((Labels.IconControl) view.control("help.icon")).inked).as("the Run window inks the glyph").isTrue();
+                assertThat(((Labels.IconControl) view.control("help.icon")).facePair).as("and the face leaves it alone").isNull();
                 view.runWindow(false);
                 BufferedImage after = KitFixtures.render(view, 436, 60, 1);
                 assertThat(((Labels.IconControl) view.control("help.icon")).inked).as("and returns it").isFalse();
+                assertThat(((Labels.IconControl) view.control("help.icon")).facePair).as("to the classic face").isNotNull();
                 for (int y = 0; y < before.getHeight(); y++) for (int x = 0; x < before.getWidth(); x++)
                     assertThat(after.getRGB(x, y)).as("pixel %d,%d", x, y).isEqualTo(before.getRGB(x, y));
             }

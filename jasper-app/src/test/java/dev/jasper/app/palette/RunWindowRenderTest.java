@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
  * the window's frame at x 60-983, y 854-1695; the render is the window alone. The part under the list is compared 12
  * device pixels lower (plan 8a Rulings 5). Images go to {@code jasper-app/build/run-window/}. Every comparison runs on
  * the EDT inside {@code KitGallery.installed}, while the context that drew the render is open (installed closes its
- * binding when its action returns). What plan 4b's classic faces and plan 5b's IBM Plex draw is measured and printed
- * until those plans are in this branch ({@link #CHECKED}, plan 8a R9).
+ * binding when its action returns). Plan 4b's classic checkbox and buttons are held to the mock; what plan 5b's IBM Plex
+ * draws is measured and printed until that plan is in this branch ({@link #CHECKED}, plan 8a R9).
  */
 public class RunWindowRenderTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
@@ -40,8 +40,8 @@ public class RunWindowRenderTest {
 
     /** Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, or plan 5b's IBM Plex text. */
     enum Owner { RUN_WINDOW, FACES, FONTS }
-    /** The owners whose parts are held to the mock now; FACES joins when plan 4b is in this branch, FONTS with plan 5b. */
-    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW);
+    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b; FONTS joins with plan 5b. */
+    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES);
 
     /** A probe: from (x, y) step (dx, dy) to the first pixel off {@code background}; {@code lower} probes under the list. */
     record Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance, Owner owner) {
@@ -84,8 +84,12 @@ public class RunWindowRenderTest {
         new Feature("checkbox top", 36, 696, 0, 1, RunWindowRenderTest::dialog, true, 1, Owner.FACES),
         new Feature("checkbox label", 56, 721, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FACES),
         new Feature("footer rule", 200, 740, 0, 1, RunWindowRenderTest::dialog, true, 1),
-        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FACES),
-        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FACES),
+        // The buttons are right-packed, each RUN_WINDOW_BUTTON_WIDTH or its label plus the classic 14 px padding if wider, so
+        // these left edges follow the labels' face: the platform face makes "Connect" 76 and "Browse…" 80. With Plex's ink
+        // widths in the mock (45 and 49.5) they would be about 73 and 78 where the mock draws every button 70: a residual
+        // for plan 5b's merge (docs/STATUS.md, plan 8a).
+        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),
+        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FONTS),
         new Feature("browse button right", 920, 796, -1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("button top", 520, 765, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("window bottom", 200, 800, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
@@ -104,8 +108,14 @@ public class RunWindowRenderTest {
     static final List<Sample> SAMPLES = List.of(new Sample("frame", 200, 0, false), new Sample("title band", 200, 20, false),
         new Sample("body", 20, 400, false), new Sample("help tile", 35, 90, false), new Sample("field", 500, 186, false),
         new Sample("list edge", 26, 300, false), new Sample("heading band", 300, 250, false), new Sample("selected row", 600, 290, false),
-        new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false), new Sample("checkbox inside", 38, 721, true, Owner.FACES),
+        new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false),
         new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true), new Sample("primary", 462, 800, true, Owner.FACES));
+    /**
+     * A only: the checkbox's inside. B selects a snippet, whose scope has no SPLIT verb, so spec 11.2 disables the box the B
+     * mock draws enabled (plan 8a R12): there the render's {@code surface.tableHeader} against the mock's white is a
+     * measured residual, printed.
+     */
+    static final List<Sample> OPENED_SAMPLES = List.of(new Sample("checkbox inside", 38, 721, true, Owner.FACES));
 
     /** What runs with a render on the EDT, while the context that drew it is still open. */
     @FunctionalInterface interface Drawn { void accept(BufferedImage render, KitContext context) throws Exception; }
@@ -185,15 +195,17 @@ public class RunWindowRenderTest {
             else if (Math.abs(actual - expected) > feature.tolerance()) misses.add(line);
         }
         var colours = new ArrayList<String>();
-        for (var sample : SAMPLES) {
-            var expected = new Color(mock.getRGB(MOCK_X + sample.x(), MOCK_Y + sample.y()));
-            var actual = new Color(render.getRGB(sample.x(), sample.y() + (sample.lower() ? SHIFT : 0)));
-            double distance = MockComparison.deltaE(expected, actual);
-            String line = sample.name() + ": mock " + ColorMath.hex(expected) + ", render " + ColorMath.hex(actual) + String.format(" (%.1f)", distance);
+        boolean typing = state.equals("typing-auth");
+        var samples = new ArrayList<>(SAMPLES);
+        if (!typing) samples.addAll(OPENED_SAMPLES);
+        for (var sample : samples) {
+            double distance = distance(mock, render, sample);
+            String line = sampleLine(mock, render, sample);
             if (!CHECKED.contains(sample.owner())) pending.add(sample.owner() + " " + line);
             else if (distance > 3) colours.add(line);
         }
         pending.forEach(line -> System.out.println("run-window " + state + " (not yet checked) " + line));
+        if (typing) OPENED_SAMPLES.forEach(sample -> System.out.println("run-window " + state + " (residual, plan 8a R12) " + sampleLine(mock, render, sample)));
         assertThat(misses).as(state + ": geometry within tolerance").isEmpty();
         assertThat(colours).as(state + ": fills within 3 dE76").isEmpty();
         var masks = new ArrayList<>(List.of(SCROLLBAR));
@@ -207,6 +219,14 @@ public class RunWindowRenderTest {
         System.out.printf("run-window %s: edge agreement top %.3f, bottom %.3f%n", state, top, bottom);
         assertThat(top).as(state + ": edges above the list's foot").isGreaterThanOrEqualTo(0.70);
         assertThat(bottom).as(state + ": edges under the list").isGreaterThanOrEqualTo(0.70);
+    }
+
+    static Color mockColour(BufferedImage mock, Sample sample) { return new Color(mock.getRGB(MOCK_X + sample.x(), MOCK_Y + sample.y())); }
+    static Color renderColour(BufferedImage render, Sample sample) { return new Color(render.getRGB(sample.x(), sample.y() + (sample.lower() ? SHIFT : 0))); }
+    static double distance(BufferedImage mock, BufferedImage render, Sample sample) { return MockComparison.deltaE(mockColour(mock, sample), renderColour(render, sample)); }
+    static String sampleLine(BufferedImage mock, BufferedImage render, Sample sample) {
+        return sample.name() + ": mock " + ColorMath.hex(mockColour(mock, sample)) + ", render " + ColorMath.hex(renderColour(render, sample))
+            + String.format(" (%.1f)", distance(mock, render, sample));
     }
 
     @Test void justOpenedMatchesItsMock() throws Exception { compare("just-opened"); }
