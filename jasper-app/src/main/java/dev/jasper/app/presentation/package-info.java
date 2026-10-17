@@ -6,7 +6,8 @@
  * {@code Presentation} hands each consumer its projection. Pure values, bounded reads and
  * locked read-modify-writes; no Swing. ChromeSpec is referenced only in this package.
  * <p>Allowed outgoing Jasper dependencies: dev.jasper.app.config, dev.jasper.app.settings, dev.jasper.app.persistence,
- * dev.jasper.app.dock, dev.jasper.ui.kit, dev.jasper.ui.metrics, dev.jasper.ui.theme.
+ * dev.jasper.app.dock, dev.jasper.ui.kit, dev.jasper.ui.metrics, dev.jasper.ui.theme, dev.jasper.ui.icons (the
+ * splash art's check, XML only).
  * The module architecture check forbids package cycles; app types are not an external plugin API.
  */
 package dev.jasper.app.presentation;

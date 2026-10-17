@@ -36,7 +36,7 @@ import org.tomlj.TomlTable;
 /**
  * Reads a kit file (spec 5): TOML 1.0, strict and all or nothing, in the style of the plugin descriptor parser. A kit
  * names its format ({@code kit = 1}) and a host catalog ({@code base}), then optionally the chrome points, the control
- * points, the eleven public tokens, its type base and face files, two colour slots and four setting defaults. Every
+ * points, the eleven public tokens, its type base and face files, two colour slots, four setting defaults and its branding. Every
  * failure is one {@link Invalid} naming the key. Pure: files arrive through {@link Files}.
  */
 public final class KitParser {
@@ -44,7 +44,11 @@ public final class KitParser {
     public static final int MAX_KIT_BYTES = 64 * 1024;
     /** The largest font file: 2 MiB. */
     public static final int MAX_FONT_BYTES = 2 * 1024 * 1024;
-    private static final Set<String> TOP = Set.of("kit", "base", "chrome", "controls", "metrics", "type", "colors", "defaults");
+    /** The largest branding icon: 512 KiB. */
+    public static final int MAX_ICON_BYTES = 512 * 1024;
+    /** The largest splash art: 256 KiB. */
+    public static final int MAX_ART_BYTES = 256 * 1024;
+    private static final Set<String> TOP = Set.of("kit", "base", "chrome", "controls", "metrics", "type", "colors", "defaults", "branding");
     private static final Pattern SEGMENT = Pattern.compile("[a-z0-9_.-]+");
     private static final Pattern COLOUR = Pattern.compile(
         "#(?:[0-9A-Fa-f]{8}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})(?![0-9A-Za-z])|\\b0[xX][0-9A-Fa-f]{6}\\b|\\brgba?\\(");
@@ -137,10 +141,12 @@ public final class KitParser {
      * @param defaults the kit's setting defaults
      * @param dropped the {@code [defaults]} keys left out because the plugin theme they name did not load
      * @param faces the declared face files
+     * @param branding the look's branding; {@link Branding#NONE} without a {@code [branding]} table
      */
-    public record Parsed(Kit kit, ChromeSpec chrome, boolean classicBase, DefaultSource defaults, List<String> dropped, Faces faces) {
+    public record Parsed(Kit kit, ChromeSpec chrome, boolean classicBase, DefaultSource defaults, List<String> dropped, Faces faces,
+                         Branding branding) {
         /** Copies the list. */
-        public Parsed { dropped = List.copyOf(dropped); }
+        public Parsed { dropped = List.copyOf(dropped); Objects.requireNonNull(branding, "branding"); }
     }
 
     private record TypeAndFaces(TypeScale scale, Faces faces) { }
@@ -196,8 +202,9 @@ public final class KitParser {
         TypeAndFaces type = type(table(toml, "type"), start.type(), context);
         ColorSlots colors = colors(table(toml, "colors"), start.colors());
         Defaults defaults = defaults(table(toml, "defaults"), context);
+        Branding branding = branding(table(toml, "branding"), context);
         Kit kit = new Kit(context.id(), metrics, type.scale(), faces(type.faces(), start.faces()), controls, colors, start.uiKeys());
-        return new Parsed(kit, chrome, classic, new DefaultSource(defaults.values()), defaults.dropped(), type.faces());
+        return new Parsed(kit, chrome, classic, new DefaultSource(defaults.values()), defaults.dropped(), type.faces(), branding);
     }
 
     /** A jar path inside the kit's folder: {@code /}-separated segments of {@code [a-z0-9_.-]}, none {@code .} or {@code ..}. */
@@ -427,6 +434,50 @@ public final class KitParser {
         String role = string(table, "colors", key);
         if (!allowed.contains(role)) throw new Invalid("[colors]." + key + ": \"" + role + "\" is not one of " + String.join(", ", allowed));
         return SemanticColor.of(role).orElseThrow();
+    }
+
+    /** Spec 5.1 and 5.9: the product name, the seven icons and the splash art, all required when the table is present. */
+    private static Branding branding(TomlTable table, Context context) throws Invalid {
+        if (table == null) return Branding.NONE;
+        known(table, "branding", List.of("product", "icons", "splash_art"));
+        String product = string(table, "branding", "product");
+        if (product.isBlank() || product.codePointCount(0, product.length()) > 32)
+            throw new Invalid("[branding].product: expected a name of 1 to 32 characters");
+        String folder = string(table, "branding", "icons");
+        if (!path(folder))
+            throw new Invalid("[branding].icons: " + folder + " must be a lowercase path inside the kit's folder, without . or .. segments");
+        var icons = new LinkedHashMap<Integer, byte[]>();
+        for (int size : Branding.SIZES) {
+            String file = folder + "/icon-" + size + ".png";
+            byte[] bytes = context.files().read(context.directory() + file, MAX_ICON_BYTES)
+                .orElseThrow(() -> new Invalid("[branding].icons: " + file + " is not in the plugin's jars"));
+            if (bytes.length > MAX_ICON_BYTES) throw new Invalid("[branding].icons: " + file + " is larger than 512 KiB");
+            int[] pixels = pngSize(bytes);
+            if (pixels.length == 0) throw new Invalid("[branding].icons: " + file + " is not a PNG file");
+            if (pixels[0] != size || pixels[1] != size)
+                throw new Invalid("[branding].icons: " + file + " is " + pixels[0] + " × " + pixels[1] + " pixels, not " + size + " × " + size);
+            icons.put(size, bytes);
+        }
+        String art = string(table, "branding", "splash_art");
+        String where = "[branding].splash_art: " + art;
+        if (!path(art)) throw new Invalid(where + " must be a lowercase path inside the kit's folder, without . or .. segments");
+        if (!art.endsWith(".svg")) throw new Invalid(where + " is not an .svg file");
+        byte[] svg = context.files().read(context.directory() + art, MAX_ART_BYTES)
+            .orElseThrow(() -> new Invalid(where + " is not in the plugin's jars"));
+        if (svg.length > MAX_ART_BYTES) throw new Invalid(where + " is larger than 256 KiB");
+        // The receiving rules the splash's decode applies, on the XML alone: the pre-pass touches no AWT (Rulings 2 and 3).
+        try { dev.jasper.ui.icons.EncodedArtwork.checkSvg(svg); }
+        catch (IllegalArgumentException refused) { throw new Invalid(where + " is not an SVG Jasper can draw: " + refused.getMessage()); }
+        return Branding.of(product, icons, svg);
+    }
+
+    /** A PNG's width and height from its header chunk, or an empty array when the bytes are not a PNG. */
+    private static int[] pngSize(byte[] bytes) {
+        byte[] signature = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+        if (bytes.length < 24 || !Arrays.equals(Arrays.copyOf(bytes, 8), signature)) return new int[0];
+        if (bytes[12] != 'I' || bytes[13] != 'H' || bytes[14] != 'D' || bytes[15] != 'R') return new int[0];
+        var header = ByteBuffer.wrap(bytes);
+        return new int[] {header.getInt(16), header.getInt(20)};
     }
 
     private static Defaults defaults(TomlTable table, Context context) throws Invalid {

@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 /** Spec 5.1 to 5.9: the kit file, its values and every way it can be invalid. */
 class KitParserTest {
     static final String PLEX_SANS = "IBM Plex Sans", PLEX_MONO = "IBM Plex Mono";
-    /** Spec 5.1's shipped kit without [branding] (plan 11's). */
+    /** Spec 5.1's shipped kit without [branding] (KitBrandingTest covers it). */
     static final String FULL = """
         kit = 1
         base = "classic"
@@ -240,7 +240,7 @@ class KitParserTest {
         String head = "kit = 1\nbase = \"default\"\n";
         String ui = "[type.ui]\nfamily = \"F\"\nmedium = \"fonts/ibm-plex-sans-medium.ttf\"\nsemibold = \"fonts/ibm-plex-sans-semibold.ttf\"\n";
         var cases = new java.util.LinkedHashMap<String, String>();
-        cases.put(head + "[branding]\nproduct = \"JasperOps\"\n", "[branding]: unknown table");
+        cases.put(head + "[branding]\nproduct = \"JasperOps\"\n", "[branding].icons: missing");
         cases.put(head + "colour = 1\n", "colour: unknown key");
         cases.put(head + "[chrome]\ntitle = \"x\"\n", "[chrome].title: unknown key");
         cases.put(head + "chrome = 1\n", "chrome: expected a table");
