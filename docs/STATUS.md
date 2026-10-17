@@ -59,7 +59,7 @@ remove and insert); the test compares the raw events across kits and asserts the
 selected row's index keeps its selection ink and odd rows' indices are guarded against `surface.zebra` (a third
 ordered pair); the side layout's minimum is as tall as the side column; an update moves neither the adopted entry row
 nor the add action, and a list gives up an entry row no VERTICAL parent adopts again. Plan 5 turns the classic look on through the Enterprise kit.
-`./gradlew check --continue`: **10910 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
+`./gradlew check --continue`: **10919 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 
 **Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
