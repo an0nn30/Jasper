@@ -5,6 +5,13 @@
 > "Execution notes (2026-10-17)" at the end, which win over the text above them where they differ. Rulings 3 is
 > approved (Execution notes R20).
 
+> **Task 4 review (2026-10-17):** past `CLASSIC_TAB_MIN_LABEL` the strip clips its last tabs (Rulings 7) while the "+"
+> stays at its trailing edge over them, on the strip's fill behind a divider of its own. The clipped tabs are reached
+> with Next Tab, Previous Tab and Select Tab N and through each tab's accessible actions; no list of them is built and
+> a selected clipped tab is not scrolled into view (spec 10.5 names neither; IntelliJ's single-row editor tabs do both,
+> a candidate follow-up). The "+" is a flat, unfocusable `JButton` (Execution notes R24 no longer covers it), and a
+> tab's × closes on a release over it; the close is also the tab's second accessible action, "Close tab".
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look the window's content takes the Workstation and Credential Vault mocks: the classic

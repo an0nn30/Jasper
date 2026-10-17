@@ -23,18 +23,25 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import javax.accessibility.AccessibleAction;
+import javax.accessibility.AccessibleContext;
+import javax.accessibility.AccessibleRole;
+import javax.accessibility.AccessibleState;
+import javax.accessibility.AccessibleStateSet;
+import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JToolTip;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 
 /**
  * Classic editor tabs (spec 10.5; the Workstation mocks): always visible, content-sized, each with a status dot, its
- * label and a persistent ×, a "+" after the last one; the active tab on {@code surface.card} with a 2 px
- * {@code tab.indicator} underline; 1 px {@code border.window} dividers and the strip's rule on {@code surface.tabstrip}.
- * Never moves.
+ * label and a persistent ×, a "+" after the last one (at the trailing edge, over the tabs a crowded strip clips); the
+ * active tab on {@code surface.card} with a 2 px {@code tab.indicator} underline; 1 px {@code border.window} dividers
+ * and the strip's rule on {@code surface.tabstrip}. Never moves.
  */
 final class ClassicTabs extends JPanel implements TabStrip {
     private final WindowContent owner;
@@ -106,7 +113,11 @@ final class ClassicTabs extends JPanel implements TabStrip {
             entries.get(i).setBounds(x, 0, width, height);
             x += width + divider;
         }
-        add.setBounds(x, 0, addWidth, height);
+        // The + follows the last divider; when the tabs run past the edge it stays at the edge, over the clipped tabs,
+        // behind a divider of its own. As child 0 it paints and takes the mouse above them.
+        add.covering = x + addWidth > getWidth();
+        if (add.covering) add.setBounds(Math.max(0, getWidth() - addWidth - divider), 0, addWidth + divider, height);
+        else add.setBounds(x, 0, addWidth, height);
     }
 
     /** The largest label width, at least {@code minimum}, at which every label cut to it fits {@code room}. */
@@ -145,10 +156,10 @@ final class ClassicTabs extends JPanel implements TabStrip {
         graphics.fillRect(0, getHeight() - line, getWidth(), line);
     }
 
-    /** One tab: its dot, its label and its ×, which a click closes. */
+    /** One tab: its dot, its label and its ×, which closes it on a release over it, as a button does. */
     final class Entry extends JComponent {
         private final Component tab;
-        private boolean closeHover;
+        private boolean closeHover, closePressed;
         private Point origin;
 
         Entry(Component tab) {
@@ -157,18 +168,29 @@ final class ClassicTabs extends JPanel implements TabStrip {
             setFont(ThemeZone.font(Typography.Role.BODY));
             var mouse = new MouseAdapter() {
                 private void popup(MouseEvent event) { owner.tabMenu(tab).show(Entry.this, event.getX(), event.getY()); }
+                private void hover(MouseEvent event) {
+                    boolean over = closeBounds().contains(event.getPoint());
+                    if (over != closeHover) { closeHover = over; repaint(); }
+                }
                 @Override public void mousePressed(MouseEvent event) {
                     origin = null;
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
                     if (SwingUtilities.isMiddleMouseButton(event)) { owner.closeTab(tab); return; }
                     if (!SwingUtilities.isLeftMouseButton(event)) return;
-                    if (closeBounds().contains(event.getPoint())) { closeClicked(); return; }
+                    // A press on the × neither selects nor drags; dragging off it before the release cancels the close.
+                    if (closeBounds().contains(event.getPoint())) { closePressed = true; return; }
                     owner.selectTab(tab);
                     origin = SwingUtilities.convertPoint(Entry.this, event.getPoint(), ClassicTabs.this);
                 }
                 @Override public void mouseReleased(MouseEvent event) {
+                    boolean closing = closePressed;
+                    closePressed = false;
                     if (event.isPopupTrigger()) { popup(event); return; }
+                    if (closing) {
+                        if (SwingUtilities.isLeftMouseButton(event) && closeBounds().contains(event.getPoint())) closeClicked();
+                        return;
+                    }
                     Point start = origin; origin = null;
                     if (disposed || start == null) return;
                     Point end = SwingUtilities.convertPoint(Entry.this, event.getPoint(), ClassicTabs.this);
@@ -176,26 +198,43 @@ final class ClassicTabs extends JPanel implements TabStrip {
                     for (int i = 0; i < entries.size(); i++)
                         if (entries.get(i).getBounds().contains(end)) { owner.reorderTab(owner.tabStrip().indexOfComponent(tab), i); break; }
                 }
-                @Override public void mouseMoved(MouseEvent event) {
-                    boolean over = closeBounds().contains(event.getPoint());
-                    if (over != closeHover) { closeHover = over; repaint(); }
-                }
+                @Override public void mouseMoved(MouseEvent event) { hover(event); }
+                // While the × is held, its hover shows whether a release would close.
+                @Override public void mouseDragged(MouseEvent event) { if (closePressed) hover(event); }
                 @Override public void mouseExited(MouseEvent event) { if (closeHover) { closeHover = false; repaint(); } }
             };
             addMouseListener(mouse); addMouseMotionListener(mouse);
         }
 
-        // A bare JComponent has no accessible context; this one names its role.
-        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
-            if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
-                @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.PAGE_TAB; }
-                @Override public javax.accessibility.AccessibleStateSet getAccessibleStateSet() {
-                    var states = super.getAccessibleStateSet();
-                    if (tab == selected) states.add(javax.accessibility.AccessibleState.SELECTED);
-                    return states;
-                }
-            };
+        // A bare JComponent has no accessible context; this one names its role and gives the tab's actions.
+        @Override public AccessibleContext getAccessibleContext() {
+            if (accessibleContext == null) accessibleContext = new AccessibleEntry();
             return accessibleContext;
+        }
+
+        /** A page tab, selected while it is; its first action selects it, its second ("Close tab") is the ×. */
+        private final class AccessibleEntry extends AccessibleJComponent implements AccessibleAction {
+            @Override public AccessibleRole getAccessibleRole() { return AccessibleRole.PAGE_TAB; }
+            @Override public AccessibleStateSet getAccessibleStateSet() {
+                var states = super.getAccessibleStateSet();
+                if (tab == selected) states.add(AccessibleState.SELECTED);
+                return states;
+            }
+            @Override public AccessibleAction getAccessibleAction() { return this; }
+            @Override public int getAccessibleActionCount() { return 2; }
+            // The first is a button's "click", so assistive technology's default action selects rather than closes.
+            @Override public String getAccessibleActionDescription(int index) {
+                return switch (index) {
+                    case 0 -> UIManager.getString("AbstractButton.clickText");
+                    case 1 -> "Close tab";
+                    default -> null;
+                };
+            }
+            @Override public boolean doAccessibleAction(int index) {
+                if (disposed || index < 0 || index > 1) return false;
+                if (index == 0) owner.selectTab(tab); else closeClicked();
+                return true;
+            }
         }
 
         // A tab title comes from the terminal (OSC 0/2), so its tip never renders HTML.
@@ -260,28 +299,30 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
     }
 
-    /** The "+" after the last tab: a new tab. */
-    final class Add extends JComponent {
-        // A bare JComponent has no accessible context; this one names its role.
-        @Override public javax.accessibility.AccessibleContext getAccessibleContext() {
-            if (accessibleContext == null) accessibleContext = new AccessibleJComponent() {
-                @Override public javax.accessibility.AccessibleRole getAccessibleRole() { return javax.accessibility.AccessibleRole.PUSH_BUTTON; }
-            };
-            return accessibleContext;
-        }
+    /** The "+" after the last tab: a flat, unfocusable button that opens a new tab on a release over it. */
+    final class Add extends JButton {
+        /** Whether the + stands over clipped tabs; it then hides them under the strip's fill and a divider before it. */
+        private boolean covering;
 
         Add() {
+            setFocusable(false); setOpaque(false); setContentAreaFilled(false); setBorderPainted(false);
             setToolTipText("New Tab");
             getAccessibleContext().setAccessibleName("New Tab");
-            addMouseListener(new MouseAdapter() {
-                @Override public void mouseClicked(MouseEvent event) { if (!disposed && SwingUtilities.isLeftMouseButton(event)) owner.invoke(ActionId.NEW_TAB); }
-            });
+            addActionListener(event -> { if (!disposed) owner.invoke(ActionId.NEW_TAB); });
         }
 
         @Override protected void paintComponent(Graphics graphics) {
             var palette = ThemeZone.theme(this).semantic();
             int size = metric(DesignMetrics.Role.CHROME_GLYPH), stroke = Math.max(1, UIScale.scale(1));
             int x = metric(DesignMetrics.Role.CLASSIC_TAB_PLUS_INSET), middle = getHeight() / 2;
+            if (covering) {
+                int line = metric(DesignMetrics.Role.HAIRLINE);
+                graphics.setColor(palette.color(SemanticColor.SURFACE_TABSTRIP));
+                graphics.fillRect(0, 0, getWidth(), getHeight());
+                graphics.setColor(palette.color(SemanticColor.BORDER_WINDOW));
+                graphics.fillRect(0, 0, line, getHeight());
+                x += line;
+            }
             graphics.setColor(SurfaceContrast.on(palette, SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_TABSTRIP, SurfaceContrast.TEXT));
             graphics.fillRect(x, middle - stroke / 2, size, stroke);
             graphics.fillRect(x + (size - stroke) / 2, middle - size / 2, stroke, size);

@@ -10,8 +10,12 @@ import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
+import java.awt.Component;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
+import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
 import javax.swing.JMenuItem;
 import javax.swing.JToolTip;
@@ -41,10 +45,14 @@ class ClassicTabsTest {
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
                 owner.update();
-                var strip = tabs(owner, 800);
-                assertThat(strip.isVisible()).as("always visible").isTrue();
-                assertThat(strip.getPreferredSize().height).as("window.tab_height with its rule").isEqualTo(owner.tabHeight());
+                owner.setSize(800, 600);
+                LayoutTestSupport.layoutTree(owner);
+                var strip = (ClassicTabs) owner.tabBar();
                 assertThat(strip.entries()).hasSize(1);
+                assertThat(owner.tabBar().component().getHeight()).as("the mounted strip at one tab: window.tab_height with its rule")
+                    .isEqualTo(owner.tabHeight());
+                assertThat(strip.getWidth()).as("across the terminal column").isPositive();
+                assertThat(strip.entries().getFirst().getWidth()).as("its one tab laid out").isPositive();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -104,6 +112,79 @@ class ClassicTabsTest {
                 int before = owner.tabStrip().getTabCount();
                 strip.entries().get(0).closeClicked();
                 assertThat(owner.tabStrip().getTabCount()).isEqualTo(before - 1);
+
+                // Past the minimum the strip clips its last tabs, and the + stays at its trailing edge, over them.
+                for (int i = owner.tabStrip().getTabCount(); i < 15; i++) {
+                    owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log");
+                }
+                owner.update();
+                tabs(owner, 600);
+                var plus = strip.add();
+                assertThat(strip.entries().getLast().getX()).as("the last tabs clip").isGreaterThan(600);
+                assertThat(plus.getX() + plus.getWidth()).as("a crowded strip keeps the + inside, at its trailing edge").isEqualTo(600);
+                assertThat(strip.getComponentAt(plus.getX() + plus.getWidth() / 2, plus.getHeight() / 2)).as("the + lies over the clipped tabs")
+                    .isSameAs(plus);
+                for (var entry : strip.entries()) {
+                    if (entry.getX() + entry.getWidth() > plus.getX()) continue;
+                    var close = entry.closeBounds();
+                    assertThat(strip.getComponentAt(entry.getX() + close.x + close.width / 2, close.y + close.height / 2))
+                        .as("a whole tab's x takes the mouse").isSameAs(entry);
+                }
+                var under = strip.entries().stream().filter(entry -> entry.getBounds().contains(plus.getX() + 3, 4)).findFirst().orElseThrow();
+                owner.selectTab(owner.tabStrip().getComponentAt(strip.entries().indexOf(under)));
+                owner.update();
+                BufferedImage image = MockProfile.print(strip, 600, owner.tabHeight());
+                var palette = themes.current().chrome().semantic();
+                assertThat(MockProfile.at(image, 2 * (under.getX() + 2), 10)).as("the selected tab under the +, where it shows")
+                    .isEqualTo(palette.color(SemanticColor.SURFACE_CARD));
+                assertThat(MockProfile.at(image, 2 * plus.getX(), 10)).as("the +'s own divider").isEqualTo(palette.color(SemanticColor.BORDER_WINDOW));
+                assertThat(MockProfile.at(image, 2 * (plus.getX() + 3), 10)).as("the + hides the clipped tabs under the strip's fill")
+                    .isEqualTo(palette.color(SemanticColor.SURFACE_TABSTRIP));
+                assertThat(MockProfile.at(image, 2 * (plus.getX() + 1 + 11 + 3), 2 * (plus.getHeight() / 2))).as("the +, 11 after its divider")
+                    .isEqualTo(SurfaceContrast.on(palette, SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_TABSTRIP, SurfaceContrast.TEXT));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    @Test void thePlusAndTheCloseActLikeButtons() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.update();
+                var strip = tabs(owner, 800);
+                var plus = strip.add();
+                // A press and a release a pixel apart make no MOUSE_CLICKED; the + still acts.
+                mouse(plus, MouseEvent.MOUSE_PRESSED, 5, 5);
+                mouse(plus, MouseEvent.MOUSE_RELEASED, 6, 5);
+                assertThat(owner.tabStrip().getTabCount()).as("the + acts on its release").isEqualTo(2);
+                owner.update();
+                tabs(owner, 800);
+                var first = strip.entries().get(0);
+                var close = first.closeBounds();
+                int x = close.x + close.width / 2, y = close.y + close.height / 2;
+                mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
+                assertThat(owner.tabStrip().getTabCount()).as("a press on the x closes nothing yet").isEqualTo(2);
+                assertThat(owner.selectedComponent()).as("nor selects its tab").isSameAs(owner.tabStrip().getComponentAt(1));
+                mouse(first, MouseEvent.MOUSE_RELEASED, 2, y);
+                assertThat(owner.tabStrip().getTabCount()).as("dragged off the x before the release, nothing closes").isEqualTo(2);
+                mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
+                mouse(first, MouseEvent.MOUSE_RELEASED, x + 1, y);
+                assertThat(owner.tabStrip().getTabCount()).as("released over the x, its tab closes").isEqualTo(1);
+
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.update();
+                var action = strip.entries().get(0).getAccessibleContext().getAccessibleAction();
+                assertThat(action.getAccessibleActionCount()).isEqualTo(2);
+                assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close tab");
+                assertThat(action.doAccessibleAction(0)).isTrue();
+                assertThat(owner.selectedComponent()).as("the first action selects the tab").isSameAs(owner.tabStrip().getComponentAt(0));
+                assertThat(action.doAccessibleAction(1)).isTrue();
+                assertThat(owner.tabStrip().getTabCount()).as("the second is the x").isEqualTo(1);
+                var button = plus.getAccessibleContext();
+                assertThat(button.getAccessibleRole()).isEqualTo(AccessibleRole.PUSH_BUTTON);
+                assertThat(button.getAccessibleName()).isEqualTo("New Tab");
+                assertThat(button.getAccessibleAction().getAccessibleActionCount()).as("the + can be pressed").isEqualTo(1);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -148,6 +229,13 @@ class ClassicTabsTest {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), dev.jasper.app.appearance.ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             assertThat(owner.tabBar()).isInstanceOf(WindowTabs.class).isSameAs(owner.windowTabs());
+            owner.setSize(800, 600);
+            LayoutTestSupport.layoutTree(owner);
+            assertThat(owner.tabBar().component().getHeight()).as("unlike the classic tabs, the equal tabs hide at one tab").isZero();
         });
+    }
+
+    private static void mouse(Component component, int id, int x, int y) {
+        component.dispatchEvent(new MouseEvent(component, id, 1, 0, x, y, 1, false, MouseEvent.BUTTON1));
     }
 }
