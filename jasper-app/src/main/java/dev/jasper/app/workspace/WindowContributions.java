@@ -85,7 +85,7 @@ final class WindowContributions implements AutoCloseable {
         owner.area().onHide = this::hidePanel;
         owner.dockDrag().onDrop = this::dropped;
         owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
-        owner.dockDrag().labels = id -> panels.containsKey(id) ? panels.get(id).entry.title() : "";
+        owner.dockDrag().labels = this::stripeLabel;
         dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
@@ -110,6 +110,36 @@ final class WindowContributions implements AutoCloseable {
 
     void applyAccelerators() {
         actions.forEach((id, action) -> action.putValue(Action.ACCELERATOR_KEY, owner.bindings().strokeFor(id).orElse(null)));
+        // A rebind that changes a toggle's digit renames its labelled stripe's label at once (spec 10.7); under the
+        // icon rails every number is empty, so this never re-renders them.
+        if (!numbers().equals(numbers)) renderStripes();
+    }
+
+    /** The digits the stripes last showed, by panel id. */
+    private Map<String, java.util.OptionalInt> numbers = Map.of();
+
+    /** Each docked panel's stripe digit under the window's keymap now. */
+    private Map<String, java.util.OptionalInt> numbers() {
+        var current = new LinkedHashMap<String, java.util.OptionalInt>();
+        for (PanelInstance panel : panels.values()) current.put(panel.entry.id(), number(panel));
+        return current;
+    }
+
+    /**
+     * The digit a panel's label shows: its toggle's under the window's keymap, on labelled stripes only. The icon rails
+     * show no digit, so under them every number is empty and a rebind never re-renders (and so never cancels a drag).
+     */
+    private java.util.OptionalInt number(PanelInstance panel) {
+        if (!(owner.stripes() instanceof StripeSet.LabelledStripes)) return java.util.OptionalInt.empty();
+        return StripeNumbers.of(owner.bindings().strokeFor(panel.entry.toggleActionId()));
+    }
+
+    /** A panel's stripe label, as a drag's gap measures it. */
+    private String stripeLabel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null) return "";
+        return StripeLabels.text(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), Slot.LEFT_TOP, false,
+            panel.entry.badge(), number(panel)));
     }
 
     /** From a shortcut, the palette, a menu, the toolbar or a status item. */
@@ -335,7 +365,7 @@ final class WindowContributions implements AutoCloseable {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
                 windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge()));
+                    panel.entry.badge(), number(panel)));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
@@ -343,6 +373,7 @@ final class WindowContributions implements AutoCloseable {
         owner.leftStripe().render(windows, railActions);
         owner.rightStripe().render(windows, List.of());
         owner.bottomStrip().ifPresent(strip -> strip.render(windows, List.of()));
+        numbers = numbers();
         owner.syncRailVisibility();
     }
 
