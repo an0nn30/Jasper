@@ -74,6 +74,16 @@ public final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    /** A window under {@code look}'s chrome, with this host's keymap. */
+    public static WindowContent content(ShellLauncher launcher, ThemeController themes, WorkspaceChrome look) {
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        WindowContent owner = new WindowContent(launcher, HOME, false, path -> {}, () -> {}, () -> {}, themes,
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, look);
+        OWNERS.add(owner);
+        return owner;
+    }
+    /** Closes the test windows now, on the EDT: before a test closes the theme controller its windows are bound to. */
+    public static void closeOwnersNow() { OWNERS.forEach(WindowContent::close); OWNERS.clear(); }
     public static void closeOwners() throws Exception {
         edt(() -> { OWNERS.forEach(WindowContent::close); OWNERS.clear(); });
     }

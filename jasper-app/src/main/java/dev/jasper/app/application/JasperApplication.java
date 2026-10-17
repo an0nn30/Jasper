@@ -1042,7 +1042,7 @@ public final class JasperApplication {
                 if (vmOptions.editable()) vmOptions.editCustomOptions();
                 else openSettings(invocation.windowId(), "system#vm.heap");
             });
-        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(AboutWindows.helpEntries(macOs));
+        contributions.addMenuSection(MenuTarget.topLevel(MenuTarget.HELP, "Help")).set(AboutWindows.helpEntries(macOs));
         if (configuration != null) {
             var commandLine = new dev.jasper.app.settingsui.CorePages.CommandLineActions(() -> commandInstall.state().text(),
                 () -> installCommand(true),

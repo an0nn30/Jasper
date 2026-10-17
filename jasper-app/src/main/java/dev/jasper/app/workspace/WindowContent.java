@@ -98,6 +98,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean rememberLayout = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
+    /** The look's workspace strategies, fixed for this window's life. */
+    private final WorkspaceChrome look;
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
@@ -220,7 +222,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
+        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
+    }
+
+    /** As above, under the look's workspace chrome (Enterprise presentation spec 9.1). */
+    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
+        this.look = Objects.requireNonNull(look, "look");
         this.detached = detached;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
@@ -710,6 +719,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return SwingUtilities.convertRectangle(header, row, target);
     }
     WindowChrome chrome() { return chrome; }
+    WorkspaceChrome look() { return look; }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }

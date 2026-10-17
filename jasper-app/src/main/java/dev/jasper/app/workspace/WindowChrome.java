@@ -88,13 +88,11 @@ final class WindowChrome {
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
         view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
-        JMenu pane = menu("Pane", ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
-            ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
-            ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT);
-        JMenu tab = menu("Tab", ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
-            ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
-            ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9);
-        menuBar.add(file); menuBar.add(edit); menuBar.add(view); menuBar.add(pane); menuBar.add(tab);
+        JMenu pane = paneMenu();
+        JMenu tab = tabMenu();
+        // The look's layout decides which built-in menus the bar shows from the start (spec 10.2).
+        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, pane, tab))) menuBar.add(fixed);
+        owner.look().menus().style(menuBar);
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
         standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
         standardMenus.put(MenuTarget.Slot.TAB, tab);
@@ -322,6 +320,7 @@ final class WindowChrome {
         contributedSections.clear();
         contributedMenus.forEach(menuBar::remove);
         contributedMenus.clear();
+        MenuBarLayout layout = owner.look().menus();
         if (contributions != null) {
             var sections = contributions.model().menus();
             // Session, Transfer and Tools hold only plugin entries and, like a plugin's own menu, are built fresh on
@@ -330,8 +329,12 @@ final class WindowChrome {
             standardMenus.put(MenuTarget.Slot.SESSION, menu("Session"));
             standardMenus.put(MenuTarget.Slot.TRANSFER, menu("Transfer"));
             standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
+            // A layout that gathers Pane and Tab into another menu builds them fresh too.
+            layout.fresh(standardMenus, this::paneMenu, this::tabMenu);
+            var toolWindows = contributions.model().toolWindowsSection();
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
+                if (!layout.toolWindowsInView() && toolWindows.filter(own -> own == section).isPresent()) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
                 JMenu menu = standardMenus.get(MenuTarget.Slot.valueOf(section.target().key()));
@@ -343,21 +346,39 @@ final class WindowChrome {
                 }
                 for (Component child : built) { menu.add(child); added.add(child); }
             }
-            // The bar orders menus as they are added: Session, Transfer and Tools after Tab, then plugins' own menus.
-            for (MenuTarget.Slot slot : List.of(MenuTarget.Slot.SESSION, MenuTarget.Slot.TRANSFER, MenuTarget.Slot.TOOLS)) {
-                JMenu built = standardMenus.get(slot);
-                if (built.getMenuComponentCount() > 0) { menuBar.add(built); contributedMenus.add(built); }
-            }
+            var topLevel = new ArrayList<MenuBarLayout.TopMenu>();
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.TOP_LEVEL) continue;
                 List<Component> built = build(section.entries(), MenuBarItems.Item::new);
                 if (built.isEmpty()) continue;
                 JMenu menu = observe(new JMenu(section.target().title()));
                 built.forEach(menu::add);
+                topLevel.add(new MenuBarLayout.TopMenu(menu, MenuTarget.HELP.equals(section.target().key())));
+            }
+            // The bar orders menus as they are added; the layout gives the order (spec 10.2).
+            for (JMenu menu : layout.contributed(new MenuBarLayout.Pass(standardMenus, topLevel, label -> menu(label), toolWindowItems()))) {
                 menuBar.add(menu); contributedMenus.add(menu);
             }
         }
         menuBar.revalidate(); menuBar.repaint();
+    }
+
+    private static final ActionId[] PANE_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
+        ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
+    private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
+        ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
+        ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
+    private JMenu paneMenu() { return menu("Pane", PANE_ITEMS); }
+    private JMenu tabMenu() { return menu("Tab", TAB_ITEMS); }
+
+    /** One item per tool window whose toggle action this window has, in registration order. */
+    private List<JMenuItem> toolWindowItems() {
+        var items = new ArrayList<JMenuItem>();
+        for (var panel : contributions.model().panels()) {
+            Action action = contributions.action(panel.toggleActionId());
+            if (action != null) items.add(new MenuBarItems.Item(action));
+        }
+        return items;
     }
 
     private JMenu menu(String label, ActionId... ids) {
@@ -486,6 +507,7 @@ final class WindowChrome {
         toolbarModes.getElements().asIterator().forEachRemaining(item -> item.setSelected(item.getActionCommand().equals(mode.name())));
     }
     void refreshTheme() {
+        owner.look().menus().style(menuBar);
         header.setBackground(ThemeZone.color(header, SemanticColor.SURFACE_APP));
         search.repaint();
         toolbar.setBackground(ThemeZone.color(toolbar, SemanticColor.SURFACE_APP));
