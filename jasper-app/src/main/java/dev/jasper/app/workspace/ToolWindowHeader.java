@@ -44,6 +44,11 @@ final class ToolWindowHeader extends JPanel {
             Font font = ThemeZone.font(Typography.Role.LABEL);
             if (font != null) setFont(ThemeZone.font(Typography.Role.PANEL_TITLE));
         }
+
+        /** A header strip's title is held readable on the strip, focused or not. */
+        @Override public java.awt.Color getForeground() {
+            return flush && painter != null ? painter.headerTitle(ThemeZone.theme(this), focused) : super.getForeground();
+        }
     };
     // Module glyphs: "more" is the horizontal ellipsis and "collapse" the down chevron main's panel redesign chose.
     private final JButton options = button("more", "Options");
@@ -51,8 +56,16 @@ final class ToolWindowHeader extends JPanel {
     private final Supplier<JPopupMenu> menu;
     /** Count or connection name beside the title: the kit panel header's count typography and colour. */
     private final JLabel detail = new JLabel() {
-        @Override public void updateUI() { super.updateUI(); setFont(ThemeZone.font(Typography.Role.COUNT)); }
-        @Override public java.awt.Color getForeground() { return ThemeZone.color(this, SemanticColor.TEXT_TERTIARY); }
+        @Override public void updateUI() {
+            super.updateUI();
+            // A header strip's word detail ("Mac") is in the label face; a count keeps the count face (the mock).
+            setFont(ThemeZone.font(flush && presentation != null && !presentation.detail().matches("\\d+") ? Typography.Role.LABEL : Typography.Role.COUNT));
+        }
+        @Override public java.awt.Color getForeground() {
+            // A header strip's detail is muted, and a count (a parenthesised number) more so (spec 10.7).
+            if (flush && painter != null) return painter.headerDetail(ThemeZone.theme(this), focused, presentation.detail().matches("\\d+"));
+            return ThemeZone.color(this, SemanticColor.TEXT_TERTIARY);
+        }
     };
     private final JPanel labels;
     private final JPanel contributed = new JPanel();
@@ -101,14 +114,15 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(hide);
         // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
         var metrics = kit.metrics();
-        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, metrics.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING), 0, metrics.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
+        setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, metrics.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING),
+            flush ? metrics.value(DesignMetrics.Role.DOCK_RULE) : 0, metrics.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
         detail.putClientProperty("html.disable", Boolean.TRUE);
         labels = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0)) {
             @Override public void doLayout() {
                 int titleWidth = Math.min(title.getPreferredSize().width, getWidth());
                 int height = getHeight();
                 title.setBounds(0, 0, titleWidth, height);
-                int x = titleWidth + styles.metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
+                int x = titleWidth + styles.metric(flush ? DesignMetrics.Role.HEADER_STRIP_TITLE_GAP : DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
                 detail.setBounds(x, 0, Math.max(0, getWidth() - x), height);
             }
             @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
@@ -117,10 +131,37 @@ final class ToolWindowHeader extends JPanel {
         labels.add(title); labels.add(detail);
         add(labels, BorderLayout.CENTER);
         add(buttons, BorderLayout.EAST);
+        if (flush) {
+            // A header strip's hide glyph is the minus, and its actions are 16 px squares 2 apart (Rulings 14 and 15).
+            hide.setIcon(AppIcons.semantic("remove"));
+            for (JButton button : java.util.List.of(options, hide)) actionSize(button);
+            contributed.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEADING, 2, 0));
+            // A box row stretches the actions' row to the strip's height and a flow lays it at the top; a grid bag
+            // centres every action on the strip, as the mocks do.
+            buttons.setLayout(new java.awt.GridBagLayout());
+            detail.setIconTextGap(styles.metric(DesignMetrics.Role.HEADER_STRIP_DOT_GAP));
+        }
+    }
+
+    /** A header strip action's square. */
+    private void actionSize(JButton button) {
+        int side = styles.metric(DesignMetrics.Role.TOOL_HEADER_ACTION);
+        var size = new Dimension(side, side);
+        button.setPreferredSize(size);
+        button.setMinimumSize(size);
+        button.setMaximumSize(size);
     }
 
     /** This native shell owns its surface; no descendant walker styles it. */
-    @Override public java.awt.Color getBackground() { return ThemeZone.color(this, SemanticColor.SURFACE_PANEL); }
+    @Override public java.awt.Color getBackground() {
+        return flush && painter != null ? painter.headerSurface(ThemeZone.theme(this), focused) : ThemeZone.color(this, SemanticColor.SURFACE_PANEL);
+    }
+
+    /** A header strip paints its surface and the 1 px rule along its bottom (spec 10.7). */
+    @Override protected void paintComponent(java.awt.Graphics graphics) {
+        if (!flush) { super.paintComponent(graphics); return; }
+        painter.headerStrip(graphics, getWidth(), getHeight(), ThemeZone.theme(this), focused);
+    }
 
     private static JButton button(String icon, String name) {
         var button = new JButton(AppIcons.semantic(icon));
@@ -145,14 +186,16 @@ final class ToolWindowHeader extends JPanel {
 
     void presentation(dev.jasper.app.contributions.PanelHeaderState state) {
         presentation = java.util.Objects.requireNonNull(state);
-        detail.setText(state.detail());
+        detail.setText(flush && state.detail().matches("\\d+") ? "(" + state.detail() + ")" : state.detail());
         detail.setToolTipText(state.detail().isEmpty() ? null : state.detail());
+        if (flush) detail.setFont(ThemeZone.font(state.detail().matches("\\d+") ? Typography.Role.COUNT : Typography.Role.LABEL));
         detail.setIcon(state.active() ? new javax.swing.Icon() {
             @Override public int getIconWidth() { return styles.metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
             @Override public int getIconHeight() { return getIconWidth(); }
             @Override public void paintIcon(java.awt.Component c, java.awt.Graphics graphics, int x, int y) {
                 // The connected dot is the success status, held readable on the tool window surface it sits on.
-                painter.connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
+                if (flush) painter.headerDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this), focused);
+                else painter.connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
             }
         } : null);
         while (actionButtons.size() > state.actions().size()) {
@@ -167,6 +210,7 @@ final class ToolWindowHeader extends JPanel {
                 button.addActionListener(event -> {
                     if (index < presentation.actions().size()) presentation.actions().get(index).invoke().run();
                 });
+                if (flush) actionSize(button);
                 actionButtons.add(button); contributed.add(button);
             }
             var button = actionButtons.get(i);
@@ -189,7 +233,10 @@ final class ToolWindowHeader extends JPanel {
     /** The options menu as it would open now. */
     JPopupMenu menu() { return menu.get(); }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(logicalHeight())); }
+    @Override public Dimension getPreferredSize() { return new Dimension(super.getPreferredSize().width, UIScale.scale(stripHeight())); }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(super.getMinimumSize().width, UIScale.scale(logicalHeight())); }
+    @Override public Dimension getMinimumSize() { return new Dimension(super.getMinimumSize().width, UIScale.scale(stripHeight())); }
+
+    /** The header's height in logical pixels: a flush strip adds its rule. */
+    private int stripHeight() { return logicalHeight() + (flush ? kit.metrics().value(DesignMetrics.Role.DOCK_RULE) : 0); }
 }

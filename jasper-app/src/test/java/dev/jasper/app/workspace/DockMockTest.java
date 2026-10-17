@@ -11,6 +11,8 @@ import dev.jasper.app.testsupport.MockProfile;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Map;
+import java.awt.Rectangle;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +57,13 @@ class DockMockTest {
     static final Variant DARK = new Variant("dark", MockCrops.DARK, true, 0, 0);
     static final Variant VAULT = new Variant("vault", MockCrops.VAULT, false, MockCrops.VAULT_OFFSET, MockCrops.VAULT_SCRIM);
     static final List<Variant> VARIANTS = List.of(LIGHT, DARK, VAULT);
+    /** The Disconnected Workstation mock (the Unlock Vault mock's window). */
+    static final Variant LIGHT_DISCONNECTED = new Variant("light-disconnected", MockCrops.DISCONNECTED, false, 0, 0);
+    /** Every mock with the connected or disconnected panels it shows. */
+    static final List<Map.Entry<Variant, Boolean>> WORKSTATIONS = List.of(Map.entry(LIGHT, true), Map.entry(LIGHT_DISCONNECTED, false),
+        Map.entry(DARK, true), Map.entry(VAULT, false));
+    /** The header strips' agreement floor over their text, left of their icons. */
+    static final double HEADER_FLOOR = 0.94;
     /** Agreement floors (spec 16.1.4): the share of pixels within 24 per channel of the mock. */
     static final double STRIPE_FLOOR = 0.92;
 
@@ -218,6 +227,72 @@ class DockMockTest {
                 assertThat(MockCrops.near(MockCrops.at(render, 200, y), theirs, variant.fillTolerance())).as(where + ": between the left frames").isTrue();
             } finally { EnterpriseLook.restoreDefault(); }
         }
+    }
+
+    /** The four native header strips (flush frames) against the mocks', the focused one active in its own render. */
+    @Test void nativeHeaderStripsMatchTheMocks() throws Exception {
+        for (var workstation : WORKSTATIONS) compareHeaders(workstation.getKey(), workstation.getValue(), false);
+    }
+
+    /** One fixture per focused frame: SFTP's render for SFTP, File Servers and Tunnels; Sessions' for Sessions. */
+    static void compareHeaders(Variant variant, boolean connected, boolean kitHeaders) throws Exception {
+        try {
+            EnterpriseLook.install(variant.dark());
+            String kind = kitHeaders ? "kit" : "native";
+            try (var fixture = new DockFixture(EnterpriseLook.kit(), EnterpriseLook.theme(variant.dark()), connected, kitHeaders)) {
+                fixture.render(1);
+                fixture.focus("sftp");
+                var render = variant.seen(fixture.render(2));
+                compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), 48, 180, 600);
+                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), 48, 944, 600);
+                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), 2136, 1014, 700);
+                fixture.focus("sessions");
+                render = variant.seen(fixture.render(2));
+                compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), 2136, 180, 700);
+            }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /**
+     * A header strip against its mock crop (2x, its 24 px strip and its rule): the surface and the rule; the ink runs
+     * along it, one per title, dot, detail and icon, the title's start within 2 px, each icon's centre within 2 (the icons
+     * stand from the trailing edge, whatever the face) and each text run's ink; the other text edges (a text run's end
+     * within 3, a later run's start within 2) and the agreeing pixels of the text, left of the icons, follow the title's
+     * advance width and glyphs and are printed until plan 5b's Plex (Execution notes R5).
+     */
+    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth) {
+        String where = variant.name() + " " + name;
+        assertThat(2 * header.width).as(where + ": the frame's width").isEqualTo(mockWidth);
+        assertThat(2 * header.height).as(where + ": 24 and the rule").isEqualTo(50);
+        var mock = variant.crop(mockX, mockY, mockWidth, 50);
+        var mine = MockCrops.crop(render, 2 * header.x, 2 * header.y, mockWidth, 50);
+        MockCrops.write(variant.name() + "-" + name, mine, mock);
+        Color surface = MockCrops.at(mock, 4, 4), rule = MockCrops.at(mock, 4, 49);
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 4), surface, variant.fillTolerance())).as(where + ": the strip").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 48), rule, variant.fillTolerance())).as(where + ": the rule").isTrue();
+        assertThat(MockCrops.near(MockCrops.at(mine, 4, 49), rule, variant.fillTolerance())).as(where + ": the rule, 1 px").isTrue();
+        var theirs = MockCrops.runs(MockCrops.crop(mock, 0, 0, mockWidth, 48), false, 60, 10, surface);
+        var ours = MockCrops.runs(MockCrops.crop(mine, 0, 0, mockWidth, 48), false, 60, 10, surface);
+        assertThat(ours).as(where + ": one run per title, dot, detail and icon").hasSameSizeAs(theirs);
+        int firstIcon = mockWidth;
+        for (int i = 0; i < theirs.size(); i++) {
+            var mockRun = theirs.get(i);
+            var run = ours.get(i);
+            boolean icon = mockRun.start() > mockWidth * 0.6;
+            if (icon) {
+                firstIcon = Math.min(firstIcon, mockRun.start());
+                assertThat((run.start() + run.end()) / 2.0).as(where + " icon " + i + " centre")
+                    .isBetween((mockRun.start() + mockRun.end()) / 2.0 - 2, (mockRun.start() + mockRun.end()) / 2.0 + 2);
+            } else {
+                if (i == 0) assertThat(run.start()).as(where + " title starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
+                else MockProfile.fonts(where + " run " + i + " start", run.start(), mockRun.start(), 2);
+                MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
+                assertThat(MockCrops.near(run.ink(), mockRun.ink(), 24)).as(where + " run " + i + " ink").isTrue();
+            }
+        }
+        int text = Math.max(8, firstIcon - 8);
+        MockCrops.fontsFloor(where + ": agreeing pixels",
+            MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24), HEADER_FLOOR);
     }
 
     // Later tasks add their surfaces above this line.
