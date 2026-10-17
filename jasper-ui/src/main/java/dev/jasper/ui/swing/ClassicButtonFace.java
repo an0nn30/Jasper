@@ -89,8 +89,11 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     /**
-     * The buttons this face leaves to the default treatment (embedded, recorder, circular, LINK, and labels on a selected
-     * row) fade as one layer; every other button draws its own flat disabled face (Rulings 6).
+     * The buttons this face leaves to the default treatment fade as one layer: those {@code paintFace} hands to the
+     * raised face, and those on a selected row, whose labels {@code text} keeps in their role. The condition is
+     * {@code text}'s, which is {@code paintFace}'s with the selected row added, so the three change together. Every
+     * other button draws its own flat disabled face (Rulings 6); a disabled SECONDARY or PRIMARY button on a selected
+     * row draws that flat face and is faded with it as well.
      */
     @Override public boolean fades(Buttons.KitButton b) {
         return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;

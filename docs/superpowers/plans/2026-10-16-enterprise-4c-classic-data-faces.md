@@ -4161,3 +4161,45 @@ Classic data faces: documentation and status
 Co-Authored-By: Claude <noreply@anthropic.com>
 MSG
 ```
+
+## Execution notes (2026-10-16)
+
+Recorded while plan 4b ran on this branch, for this plan's executor.
+
+### E1. Task 3's `ClassicButtonFace` edit also changes `fades`
+
+Plan 4b's Task 2 review made `ButtonFace.fades` take the button (plan 4b, Execution notes X12): the classic face fades
+as one layer the buttons it leaves to the default treatment, and its condition repeats the two lines Task 3 Step 4
+edits for the side column. Step 4's `edit(S + "ClassicButtonFace.java", [...])` list therefore gains a third entry, so a
+disabled LINK add action in the side column draws 4b's flat disabled face (4b's Rulings 6) once, instead of being faded
+again as one layer with its label near 0.18 alpha; verified fact 9 holds for `fades` too:
+
+```python
+    ('''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK;''',
+     '''        return b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn;''', 1),
+```
+
+Checked on plan 4b's code with the three entries simulated for a disabled LINK in an ACTIONS stack: with the `fades`
+entry its face is an opaque `surface.tableHeader` fill inside `border.divider` and `fadesDisabled()` is false; without
+it the whole face is at alpha 107 and the 0.42 label is faded again. Step 1's `ClassicOrderedTest` gains this test after
+`aLinkAddActionLeadsTheSideColumnAsAStandardButton`, and Step 5 expects `ClassicOrderedTest` 7 tests:
+
+```java
+    /** Rulings 15 with plan 4b's Rulings 6: a disabled LINK add action is a flat disabled standard button, faded once. */
+    @Test void aDisabledLinkAddActionIsFlatAndFadedOnce() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var add = new Nodes.Button("key-add", new ControlState(true, false, false, ""), "Add Key…", "add", Nodes.ButtonKind.LINK, "key-add", "");
+            try (var view = new KitView(context, new ViewSpec(markers(List.of(), Optional.of(add))), e -> {})) {
+                KitFixtures.render(view, 420, 120, 1);
+                var button = find(view, "key-add", Buttons.KitButton.class);
+                assertThat(button.sideColumn).isTrue();
+                assertThat(button.fadesDisabled()).as("the face draws its own disabled state").isFalse();
+                var image = paint(button);
+                assertThat(at(image, 3, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_TABLE_HEADER));
+                assertThat(at(image, 0, button.getHeight() / 2)).isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER));
+                assertThat(button.getForeground().getAlpha()).isEqualTo(Math.round(.42f * 255));
+            } finally { release(context); }
+        });
+    }
+```

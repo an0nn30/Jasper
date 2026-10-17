@@ -4533,11 +4533,17 @@ the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labe
 label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
 padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
 notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
-gallery. Residuals: 4a's flat focused, hovered or pressed classic native button stays for 4c (the classic
-`ButtonFace` paints kit buttons only, its gradient in every state); spec 6.4's face table still says "small glyph,
-plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only login field in the
-control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces, the full kit
-matrix and the mock comparison.
+gallery. Deviations (Task 2's review; the plan's Execution notes X12): `ButtonFace.fades` takes the button, so the
+classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's Task 3 edits its
+condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a classic
+read-only field with an error keeps its `border.error` edge. Residuals: 4a's flat focused, hovered or pressed classic
+native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
+classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
+`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
+disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13);
+spec 6.4's face table still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row
+supersedes; TFTP's read-only login field in the control column (spec 6.4) is left to plan 10's File Server
+composition. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
@@ -4569,7 +4575,7 @@ Insert below this plan's title:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this
-> plan's text: [none, or each one].
+> plan's text: [Task 2's three (Execution notes X12), then each other one].
 ```
 
 - [ ] **Step 6: Commit**
@@ -4622,7 +4628,7 @@ changed files. In jasper-app, `StrategyIsolationTest` and `VariantReadTest` comp
 | Task 2 and plan 3c | The `ChoiceCombo` arrow's bare-cell ink and `paintComponent`'s bare-cell return; `ClassicButtonsTest`'s use of `TableVocabularyTest.groups` and `combo` | Yes: already quoted post-3c | none |
 | This plan and plan 3e (parallel) | `docs/STATUS.md` only: 3e's branch (`claude/enterprise-default-look`, `e9cffab2d`) changes no file Tasks 1 to 7 change and nothing in jasper-ui | Yes | X6 |
 | This plan and plan 5a (parallel) | 5a's precondition lists `KitFaces.java`, `ClassicButtonFace.java` and `ClassicFolderTabsFace.java`; `VariantReadTest` allows `dev.jasper.app.presentation`, where 5a's `KitParser` reads `ControlVariants`; `StrategyIsolationTest` forbids 5a's `dev.jasper.app.presentation.ChromeSpec` in faces | Yes: the names match | X6 |
-| This plan and plan 4c (next on this branch) | 4c consumes `Face`, `KitFaces`' fields and `all()` order, `ThemePainting.role` and `painted`, `ClassicGlyphs.down` and `right`, `KitButton.paintContent`, `StackSurface.role`, the prompt face's call at the start of `StackControl.children`, `TextControl.styled`, `KitFixtures.capture`, the final `face-pairs.tsv` rows (4c's verified fact 17), the digest script's two substitutions and the base | Yes: each is produced here under that name | X1 |
+| This plan and plan 4c (next on this branch) | 4c consumes `Face`, `KitFaces`' fields and `all()` order, `ThemePainting.role` and `painted`, `ClassicGlyphs.down` and `right`, `KitButton.paintContent`, `StackSurface.role`, the prompt face's call at the start of `StackControl.children`, `TextControl.styled`, `KitFixtures.capture`, the final `face-pairs.tsv` rows (4c's verified fact 17), the digest script's two substitutions and the base; 4c's Task 3 edits `ClassicButtonFace.paintFace` and `text` so a side-column LINK draws as a standard button, and since Task 2's review `ClassicButtonFace.fades(KitButton)` repeats their condition | Yes: each is produced here under that name; `fades` only once 4c's Task 3 edits it too (4c's Execution notes) | X1, X12 |
 
 ### Each task against itself
 
@@ -4682,3 +4688,23 @@ changed files. In jasper-app, `StrategyIsolationTest` and `VariantReadTest` comp
 - **X11. The two redundant `JTextComponent` casts and their imports are dropped from `ClassicButtonsTest` and
   `ClassicSpinnersTest`; `ClassicGroupsTest`'s `EmptyBorder` cast stays** — the build compiles with `-Xlint:all`, and
   without the third cast `getBorderInsets()` does not compile — cost if wrong: none.
+- **X12. Task 2's first review round deviates from its text in three places, which Task 8's STATUS entry and banner
+  list** — `ButtonFace.fades` takes the button (`boolean fades(Buttons.KitButton)`, where Produces names `fades()`): the
+  classic face fades as one layer the buttons it leaves to the default treatment (those `paintFace` hands to
+  `paintRaised`, and those on a selected row, whose labels `text` keeps in their role), so a disabled LINK still fades
+  and a disabled button whose face draws its own state paints its glyph at 0.42; a disabled classic picker is flat like
+  a disabled button (`surface.tableHeader`, a `border.divider` edge, its line and ▼ at 0.42), not its gradient at
+  `PICKER_DISABLED_PERCENT`; a classic read-only field with an error keeps its `border.error` edge. The `fades`
+  condition repeats `paintFace`'s and `text`'s, and plan 4c's Task 3 changes those two to
+  `b.kind == Nodes.ButtonKind.LINK && !b.sideColumn`, so plan 4c's Execution notes (E1) give `fades` the same edit and
+  a test — cost if wrong: after 4c a disabled side-column LINK add action is faded twice, its label near 0.18 alpha on a
+  faded flat fill (Rulings 6, spec 6.4).
+- **X13. Two disabled faces are faded over their flat faces; Task 8's STATUS entry lists them as residuals** — a
+  disabled classic dropdown without a rich face paints its flat face, and `ChoiceCombo.paint` then fades the closed
+  face to 0.42 (measured with the Enterprise fixture kit on Slate Cobalt Light's `surface.app`: fill `#ECEFF1`, edge
+  `#E2E6EA`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`); a disabled SECONDARY or PRIMARY button on a
+  selected row draws its flat face with its label in its kind's role (`text.strong.secondary`, `text.onAccent`) and
+  fades as one layer, because `text` and `fades` leave buttons on a selected row to the default treatment. Routing the
+  combo's fade through the buttons face (as `fades` does for buttons) is later work; handing buttons on a selected row
+  to `paintRaised` instead would give them the default face (no gradient; the primary's inset line and drop) — cost if
+  wrong: two disabled faces paler than a disabled button.
