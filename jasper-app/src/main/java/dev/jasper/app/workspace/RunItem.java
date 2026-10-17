@@ -6,8 +6,6 @@ import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
-import dev.jasper.ui.theme.DerivedColor;
-import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Dimension;
@@ -110,7 +108,7 @@ final class RunItem extends JComponent {
             SemanticColor ground = shown ? SemanticColor.SURFACE_CONTROL_SELECTED : ruled ? SemanticColor.SURFACE_APP : SemanticColor.SURFACE_STATUS;
             int top = ruled && getParent() instanceof WindowStatusBar ? metric(DesignMetrics.Role.HAIRLINE) : 0;
             if (shown) { g.setColor(theme.semantic().color(ground)); g.fillRect(0, top, getWidth(), getHeight() - top); }
-            g.setColor(SurfaceContrast.painted(theme, new PaintPair(DerivedColor.ACCENT_EDGE, ground, SurfaceContrast.Guard.TEXT)));
+            g.setColor(SurfaceContrast.painted(theme, WindowPairs.run(shown, ruled)));
             int x = metric(DesignMetrics.Role.STATUS_CELL_PADDING), size = metric(DesignMetrics.Role.CHROME_GLYPH), middle = top + (getHeight() - top) / 2;
             g.fill(new Polygon(new int[] {x, x + size, x}, new int[] {middle - size / 2, middle, middle + size / 2}, 3));
             x += size + metric(DesignMetrics.Role.RUN_GLYPH_GAP);

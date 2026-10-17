@@ -5,7 +5,9 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Insets;
 import java.util.Map;
 import javax.swing.BorderFactory;
@@ -17,6 +19,9 @@ import javax.swing.JMenuBar;
  * an open one in the accent, square. Terminal windows and the auxiliary frames of a classic look share it. EDT only.
  */
 public final class ClassicMenuRow {
+    /** An open title on the accent (spec 16.1.1), declared for the window chrome's pairs ({@code WindowPairs}). */
+    public static final PaintPair OPEN_TITLE = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.TEXT);
+
     private ClassicMenuRow() { }
 
     /**
@@ -35,7 +40,7 @@ public final class ClassicMenuRow {
         bar.putClientProperty("FlatLaf.style", Map.of("itemMargins", new Insets(top, padding, bottom, padding),
             "selectionInsets", new Insets(0, 0, 0, 0), "selectionArc", 0,
             "hoverBackground", palette.color(SemanticColor.SURFACE_CONTROL_HOVER),
-            "selectionBackground", palette.color(SemanticColor.ACCENT), "selectionForeground", palette.color(SemanticColor.TEXT_ONACCENT)));
+            "selectionBackground", palette.color(SemanticColor.ACCENT), "selectionForeground", SurfaceContrast.painted(theme, OPEN_TITLE)));
         int side = UIScale.scale(metrics.value(DesignMetrics.Role.MENU_BAR_SIDE)), rule = UIScale.scale(metrics.value(DesignMetrics.Role.HAIRLINE));
         bar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, rule, 0, DerivedColor.BORDER_DIVIDER.color(theme)),
             BorderFactory.createEmptyBorder(0, side, 0, side)));

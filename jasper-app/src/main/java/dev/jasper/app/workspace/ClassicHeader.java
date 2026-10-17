@@ -10,7 +10,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.DerivedColor;
-import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Component;
@@ -108,8 +107,7 @@ final class ClassicHeader implements HeaderComposition {
             int arc = 2 * metric(DesignMetrics.Role.FIELD_RADIUS);
             g.setColor(palette.color(SemanticColor.SURFACE_INPUT));
             g.fillRoundRect(0, 0, width, height, arc, arc);
-            g.setColor(hover ? DerivedColor.BORDER_HOVER.color(theme)
-                : SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_CONTROL, SemanticColor.SURFACE_APP, SurfaceContrast.Guard.CONTROL)));
+            g.setColor(SurfaceContrast.painted(theme, hover ? WindowPairs.SEARCH_HOVER_EDGE : WindowPairs.SEARCH_EDGE));
             g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             if (collapsed) return;
             int pad = metric(DesignMetrics.Role.TOOLBAR_SEARCH_PADDING), hint = 0;
@@ -124,13 +122,13 @@ final class ClassicHeader implements HeaderComposition {
                 g.fillRoundRect(x, y, hint, keyHeight, keyArc, keyArc);
                 g.setColor(DerivedColor.BORDER_DIVIDER.color(theme));
                 g.drawRoundRect(x, y, hint - 1, keyHeight - 1, keyArc, keyArc);
-                g.setColor(palette.color(SemanticColor.TEXT_PLACEHOLDER));
+                g.setColor(SurfaceContrast.painted(theme, WindowPairs.KEYCAP_TEXT));
                 FlatUIUtils.drawString(field, g, shortcut, x + keyPad, y + (keyHeight - mono.getHeight()) / 2 + mono.getAscent());
                 hint += pad;
             }
             g.setFont(ThemeZone.font(Typography.Role.BODY));
             FontMetrics body = g.getFontMetrics();
-            g.setColor(palette.color(SemanticColor.TEXT_PLACEHOLDER));
+            g.setColor(SurfaceContrast.painted(theme, WindowPairs.PLACEHOLDER));
             String text = TitleSearchField.clip("Search everywhere", body, Math.max(0, width - 2 * pad - hint));
             FlatUIUtils.drawString(field, g, text, pad, (height - body.getHeight()) / 2 + body.getAscent());
         } finally { g.dispose(); }
@@ -148,7 +146,7 @@ final class ClassicHeader implements HeaderComposition {
     @Override public void refreshTheme(WindowHeader header) {
         var theme = FlatLafInstaller.installedTheme();
         header.setBorder(BorderFactory.createMatteBorder(0, 0, metric(DesignMetrics.Role.HAIRLINE), 0,
-            SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, SurfaceContrast.Guard.STRUCTURAL))));
+            SurfaceContrast.painted(theme, WindowPairs.RULE)));
         for (var bar : new WindowToolbar[] {header.toolbar(), trailing})
             for (Component child : bar.getComponents())
                 if (child instanceof ClassicToolbarButton button) button.setFont(ThemeZone.font(Typography.Role.TOOLBAR_LABEL));

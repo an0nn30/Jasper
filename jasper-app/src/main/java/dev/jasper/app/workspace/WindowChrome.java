@@ -555,7 +555,7 @@ final class WindowChrome {
         ToolbarSeparator() { super(SwingConstants.VERTICAL); }
         @Override protected void paintComponent(Graphics g) {
             if (!classic) { ChromePainter.installed().rule(this, g, ThemeZone.theme(null)); return; }
-            g.setColor(ThemeZone.color(this, SemanticColor.BORDER_WINDOW));
+            g.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(ThemeZone.theme(this), WindowPairs.RULE));
             g.fillRect(0, 0, getWidth(), getHeight());
         }
     }

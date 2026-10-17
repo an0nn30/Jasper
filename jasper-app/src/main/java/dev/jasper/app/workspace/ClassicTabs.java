@@ -137,7 +137,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
     }
 
     @Override protected void paintComponent(Graphics graphics) {
-        var palette = ThemeZone.theme(this).semantic();
+        var theme = ThemeZone.theme(this); var palette = theme.semantic();
         graphics.setColor(palette.color(SemanticColor.SURFACE_TABSTRIP));
         graphics.fillRect(0, 0, getWidth(), getHeight());
         int line = metric(DesignMetrics.Role.HAIRLINE), indicator = metric(DesignMetrics.Role.TAB_INDICATOR);
@@ -146,7 +146,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             if (entry.tab == selected) {
                 graphics.setColor(palette.color(SemanticColor.SURFACE_CARD));
                 graphics.fillRect(at.x, at.y, at.width, at.height);
-                graphics.setColor(palette.color(SemanticColor.TAB_INDICATOR));
+                graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.TAB_INDICATOR));
                 graphics.fillRect(at.x, at.y + at.height - indicator, at.width, indicator);
             }
             graphics.setColor(palette.color(SemanticColor.BORDER_WINDOW));
@@ -253,7 +253,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
 
         private boolean dotted() { return tab instanceof TerminalTab; }
-        private boolean running() { return tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running(); }
+        boolean running() { return tab instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running(); }
         private String label() { return WindowTabs.capped(owner.tabTitle(tab)); }
         int labelWidth() { return getFontMetrics(getFont()).stringWidth(label()); }
         /** Everything but the label: the leading inset, the dot and its gap, the gap, the ×, the trailing inset. */
@@ -275,12 +275,12 @@ final class ClassicTabs extends JPanel implements TabStrip {
             var g = (Graphics2D) graphics.create();
             try {
                 FlatUIUtils.setRenderingHints(g);
-                var palette = ThemeZone.theme(this).semantic();
-                SemanticColor ground = tab == selected ? SemanticColor.SURFACE_CARD : SemanticColor.SURFACE_TABSTRIP;
+                var theme = ThemeZone.theme(this);
+                boolean chosen = tab == selected;
                 int x = metric(DesignMetrics.Role.CLASSIC_TAB_LEADING), middle = getHeight() / 2;
                 if (dotted()) {
                     int dot = metric(DesignMetrics.Role.STATUS_DOT);
-                    g.setColor(SurfaceContrast.on(palette, running() ? SemanticColor.STATUS_SUCCESS : SemanticColor.STATUS_IDLE, ground, SurfaceContrast.INDICATOR));
+                    g.setColor(SurfaceContrast.painted(theme, WindowPairs.tabDot(running(), chosen)));
                     g.fillOval(x, middle - dot / 2, dot, dot);
                     x += dot + metric(DesignMetrics.Role.CLASSIC_TAB_GAP);
                 }
@@ -288,10 +288,10 @@ final class ClassicTabs extends JPanel implements TabStrip {
                 g.setFont(getFont());
                 FontMetrics metrics = g.getFontMetrics();
                 int room = Math.max(0, close.x - metric(DesignMetrics.Role.CLASSIC_TAB_GAP) - x);
-                Color ink = SurfaceContrast.on(palette, active ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_SECONDARY, ground, SurfaceContrast.TEXT);
+                Color ink = SurfaceContrast.painted(theme, WindowPairs.tabLabel(active, chosen));
                 g.setColor(ink);
                 FlatUIUtils.drawString(this, g, TitleSearchField.clip(label(), metrics, room), x, (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
-                g.setColor(closeHover ? ink : palette.color(SemanticColor.TEXT_PLACEHOLDER));
+                g.setColor(closeHover ? ink : SurfaceContrast.painted(theme, WindowPairs.tabClose(chosen)));
                 g.setStroke(new java.awt.BasicStroke(Math.max(1f, UIScale.scale(1.2f))));
                 g.drawLine(close.x, close.y, close.x + close.width - 1, close.y + close.height - 1);
                 g.drawLine(close.x, close.y + close.height - 1, close.x + close.width - 1, close.y);
@@ -312,7 +312,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
 
         @Override protected void paintComponent(Graphics graphics) {
-            var palette = ThemeZone.theme(this).semantic();
+            var theme = ThemeZone.theme(this); var palette = theme.semantic();
             int size = metric(DesignMetrics.Role.CHROME_GLYPH), stroke = Math.max(1, UIScale.scale(1));
             int x = metric(DesignMetrics.Role.CLASSIC_TAB_PLUS_INSET), middle = getHeight() / 2;
             if (covering) {
@@ -323,7 +323,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
                 graphics.fillRect(0, 0, line, getHeight());
                 x += line;
             }
-            graphics.setColor(SurfaceContrast.on(palette, SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_TABSTRIP, SurfaceContrast.TEXT));
+            graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.TAB_PLUS));
             graphics.fillRect(x, middle - stroke / 2, size, stroke);
             graphics.fillRect(x + (size - stroke) / 2, middle - size / 2, stroke, size);
         }

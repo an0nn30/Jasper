@@ -101,6 +101,20 @@ public final class MockProfile {
         return inks;
     }
 
+    /**
+     * A probe that follows the UI face's advance widths: the fixture kit draws the platform face where the mocks draw
+     * IBM Plex, so until plan 5b ships Plex it is printed as a residual, not asserted (plan 6a Rulings 26 and 29; plan 6b
+     * Execution notes). The merge with plan 5b turns each into an assertion within {@code tolerance}.
+     *
+     * @param what the probe
+     * @param actual the render's value, in the mock's pixels
+     * @param expected the mock's value
+     * @param tolerance the tolerance it is asserted within under Plex
+     */
+    public static void fonts(String what, int actual, int expected, int tolerance) {
+        System.out.printf("FONTS residual until plan 5b: %s %d, mock %d (tolerance %d)%n", what, actual, expected, tolerance);
+    }
+
     /** CIE76 ΔE between two opaque sRGB colours. */
     public static double deltaE(Color a, Color b) {
         double[] p = lab(a), q = lab(b);

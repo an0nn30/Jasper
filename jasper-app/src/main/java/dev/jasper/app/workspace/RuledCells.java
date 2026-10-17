@@ -6,7 +6,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.DerivedColor;
-import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
@@ -51,8 +50,7 @@ final class RuledCells implements StatusCells {
 
     @Override public void refresh(WindowStatusBar bar) {
         var theme = ThemeZone.theme(null);
-        var palette = theme.semantic();
-        Color text = SurfaceContrast.on(palette, SemanticColor.TEXT_STRONG_SECONDARY, SemanticColor.SURFACE_APP, SurfaceContrast.TEXT);
+        Color text = SurfaceContrast.painted(theme, WindowPairs.CELL_TEXT);
         session.setText(bar.session());
         session.setToolTipText(bar.showingContent() ? null : bar.integrationToolTip());
         folder.setText(bar.folder());
@@ -67,8 +65,7 @@ final class RuledCells implements StatusCells {
         config.setVisible(problem);
         if (problem) {
             config.setText("▲ " + bar.configurationText());
-            DerivedColor ground = bar.configurationProblem() == SemanticColor.STATUS_DANGER ? DerivedColor.DANGER_GROUND : DerivedColor.WARNING_GROUND;
-            config.setForeground(SurfaceContrast.painted(theme, new PaintPair(bar.configurationProblem(), ground, SurfaceContrast.Guard.TEXT)));
+            config.setForeground(SurfaceContrast.painted(theme, WindowPairs.configuration(bar.configurationProblem())));
             config.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT));
         }
         bar.revalidate(); bar.repaint();
@@ -133,7 +130,7 @@ final class RuledCells implements StatusCells {
             graphics.setColor(ground.color(theme));
             graphics.fillRect(config.getX() - pad, line, bar.getWidth() - config.getX() + pad, height - line);
         }
-        graphics.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, SurfaceContrast.Guard.STRUCTURAL)));
+        graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.RULE));
         graphics.fillRect(0, 0, bar.getWidth(), line);
         graphics.setColor(DerivedColor.BORDER_DIVIDER.color(theme));
         for (int x : rules) graphics.fillRect(x, line, line, height - line);
@@ -150,7 +147,7 @@ final class RuledCells implements StatusCells {
         }
         if (sessionDotX >= 0 && !bar.showingContent()) {
             int dot = metric(DesignMetrics.Role.STATUS_DOT);
-            graphics.setColor(SurfaceContrast.on(palette, bar.running() ? SemanticColor.STATUS_SUCCESS : SemanticColor.STATUS_IDLE, SemanticColor.SURFACE_APP, SurfaceContrast.INDICATOR));
+            graphics.setColor(SurfaceContrast.painted(theme, WindowPairs.sessionDot(bar.running())));
             // On a copy: the bar's own graphics go on to paint its border and children.
             var g = (java.awt.Graphics2D) graphics.create();
             try {

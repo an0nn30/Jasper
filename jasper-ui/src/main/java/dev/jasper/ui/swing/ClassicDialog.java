@@ -37,6 +37,52 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
     /** Where the card sits in the window. */
     public enum Placement { CENTERED, SHEET }
 
+    /** The strip's title (spec 16.1.1). */
+    public static final PaintPair STRIP_TITLE = new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT);
+
+    /**
+     * The rule under the strip, held apart from the content it parts the strip from (the kit's dialog surface).
+     *
+     * @param dialogSurface the kit's dialog surface slot
+     * @return the pair
+     */
+    public static PaintPair stripRule(SemanticColor dialogSurface) { return new PaintPair(SemanticColor.BORDER_WINDOW, dialogSurface, SurfaceContrast.Guard.STRUCTURAL); }
+
+    /**
+     * The card's frame on the kit's dialog surface.
+     *
+     * @param dialogSurface the kit's dialog surface slot
+     * @return the pair
+     */
+    public static PaintPair frame(SemanticColor dialogSurface) { return new PaintPair(DerivedColor.BORDER_HOVER, dialogSurface, SurfaceContrast.Guard.STRUCTURAL); }
+
+    /**
+     * The swatch of {@code hue} on the strip.
+     *
+     * @param hue a hue other than NONE
+     * @return the pair
+     */
+    public static PaintPair swatch(Nodes.Hue hue) {
+        SemanticColor role = switch (hue) {
+            case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
+            case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL;
+            case NONE -> throw new IllegalArgumentException("NONE draws no swatch");
+        };
+        return new PaintPair(role, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.INDICATOR);
+    }
+
+    /**
+     * Every pair this dialog paints (spec 16.1.1 and 16.1.2): the frame, the strip's rule and title, each swatch.
+     *
+     * @param dialogSurface the kit's dialog surface slot
+     * @return the pairs
+     */
+    public static java.util.List<PaintPair> pairs(SemanticColor dialogSurface) {
+        var pairs = new java.util.ArrayList<PaintPair>(java.util.List.of(frame(dialogSurface), stripRule(dialogSurface), STRIP_TITLE));
+        for (Nodes.Hue hue : Nodes.Hue.values()) if (hue != Nodes.Hue.NONE) pairs.add(swatch(hue));
+        return java.util.List.copyOf(pairs);
+    }
+
     private final KitContext context;
     private final JComponent content;
     private final Placement placement;
@@ -199,7 +245,7 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
             g = (Graphics2D) graphics.create();
             try {
                 ThemePainting.antialias(g);
-                g.setColor(DerivedColor.BORDER_HOVER.color(context.theme()));
+                g.setColor(SurfaceContrast.painted(context.theme(), ClassicDialog.frame(context.kit().colors().dialogSurface())));
                 g.fill(frame());
             } finally { g.dispose(); }
         }
@@ -233,22 +279,18 @@ public final class ClassicDialog extends JComponent implements AutoCloseable {
                 g.setColor(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme));
                 g.fillRect(0, 0, getWidth(), height);
                 // The rule parts the strip from the content: held apart from the dialog surface below it (Execution notes R31).
-                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.BORDER_WINDOW, context.kit().colors().dialogSurface(), SurfaceContrast.Guard.STRUCTURAL)));
+                g.setColor(SurfaceContrast.painted(theme, stripRule(context.kit().colors().dialogSurface())));
                 g.fillRect(0, height, getWidth(), line);
                 int x = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_HEADER_INSET);
-                SemanticColor hue = switch (swatch) {
-                    case BLUE -> SemanticColor.HUE_BLUE; case GREEN -> SemanticColor.HUE_GREEN; case AMBER -> SemanticColor.HUE_AMBER;
-                    case PURPLE -> SemanticColor.HUE_PURPLE; case NEUTRAL -> SemanticColor.HUE_NEUTRAL; case NONE -> null;
-                };
-                if (hue != null) {
+                if (swatch != Nodes.Hue.NONE) {
                     int size = ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SWATCH);
-                    g.setColor(SurfaceContrast.painted(theme, new PaintPair(hue, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.INDICATOR)));
+                    g.setColor(SurfaceContrast.painted(theme, ClassicDialog.swatch(swatch)));
                     g.fillRect(x, (height - size) / 2, size, size);
                     x += size + ThemePainting.metric(context, DesignMetrics.Role.DIALOG_SWATCH_GAP);
                 }
                 g.setFont(ThemePainting.font(context, Typography.Role.WINDOW_TITLE));
                 FontMetrics metrics = g.getFontMetrics();
-                g.setColor(SurfaceContrast.painted(theme, new PaintPair(SemanticColor.TEXT_PRIMARY, DerivedColor.SURFACE_HEADER_ACTIVE, SurfaceContrast.Guard.TEXT)));
+                g.setColor(SurfaceContrast.painted(theme, STRIP_TITLE));
                 g.drawString(title, x, (height - metrics.getHeight()) / 2 + metrics.getAscent());
             } finally { g.dispose(); }
         }

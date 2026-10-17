@@ -7,7 +7,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.ColorMath;
-import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
@@ -72,10 +71,10 @@ final class ClassicToolbarButton extends JButton {
             if (isEnabled() && (getModel().isRollover() || pressed)) {
                 g.setColor(palette.color(pressed ? SemanticColor.SURFACE_CONTROL_SELECTED : SemanticColor.SURFACE_CONTROL_HOVER));
                 g.fillRoundRect(0, 0, width, height, arc, arc);
-                g.setColor(DerivedColor.BORDER_HOVER.color(theme));
+                g.setColor(SurfaceContrast.painted(theme, WindowPairs.BUTTON_FRAME));
                 g.drawRoundRect(0, 0, width - 1, height - 1, arc, arc);
             }
-            Color ink = SurfaceContrast.on(palette, SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_APP, SurfaceContrast.TEXT);
+            Color ink = SurfaceContrast.painted(theme, WindowPairs.BUTTON_LABEL);
             if (!isEnabled()) ink = ColorMath.opacity(ink, .42);
             if (getText() == null) {
                 if (icon != null) icon.paintIcon(this, g, (width - icon.getIconWidth()) / 2, (height - icon.getIconHeight()) / 2);
