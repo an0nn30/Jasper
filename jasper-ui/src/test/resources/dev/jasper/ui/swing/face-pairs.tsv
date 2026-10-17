@@ -1,0 +1,4 @@
+# kit	face	slot	against	guard (spec 16.1.1): every pair each face of Kit.DEFAULT and Kit.CLASSIC declares, in KitFaces order
+classic	ClassicToggleFace	accent.edge	surface.app	CONTRAST:3.0
+classic	ClassicToggleFace	text.onAccent	accent	CONTRAST:3.0
+classic	ClassicToggleFace	border.hover	surface.input	CONTRAST:1.5

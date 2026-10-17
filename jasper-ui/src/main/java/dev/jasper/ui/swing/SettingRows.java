@@ -124,6 +124,55 @@ final class SettingRows {
         boolean stackedDetail(Container parent,int content) {
             return content<owner.title.getPreferredSize().width+gap()+actionWidth(parent);
         }
+        /** The control leads the title (a classic checkbox): the box at the row's leading inset, the text after it. */
+        boolean leading(Container p) {
+            return p.getComponentCount() > 2 && p.getComponent(2) instanceof Switches.SwitchButton button && button.face.leads();
+        }
+
+        /** How far the title starts after the leading inset: the box and its gap to the label. */
+        int lead(Container p) {
+            int ring = ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING);
+            return p.getComponent(2).getPreferredSize().width - 2 * ring + ThemePainting.metric(owner.context(), DesignMetrics.Role.CHECKBOX_LABEL_GAP);
+        }
+
+        int leadingText(int width) {
+            return owner.title.height(width) + (owner.description.isVisible()
+                ? owner.description.height(width) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0);
+        }
+
+        /** The row's least height, as {@link #height} keeps it for a trailing control. */
+        int floor() {
+            var c = owner.context();
+            return owner.panelFooter ? ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(c, DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT)
+                : ThemePainting.metric(c, owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT
+                    : owner.grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT
+                    : owner.prompt && owner.description.isVisible() ? DesignMetrics.Role.PROMPT_SETTING_HEIGHT
+                    : owner.description.isVisible() ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
+                    : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.prompt ? ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE) : 0);
+        }
+
+        int leadingHeight(Container p, int width) {
+            Insets i = p.getInsets();
+            int ring = ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING);
+            int text = leadingText(Math.max(0, width - i.left - i.right - lead(p)));
+            int box = p.getComponent(2).getPreferredSize().height - 2 * ring;
+            return Math.max(floor(), i.top + i.bottom + Math.max(text, box));
+        }
+
+        /** The box centres on the title's first line, its focus ring in the row's padding; the description sits under the title. */
+        void layoutLeading(Container p) {
+            Insets i = p.getInsets();
+            int ring = ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING), lead = lead(p);
+            int w = Math.max(0, p.getWidth() - i.left - i.right - lead), text = leadingText(w);
+            var control = p.getComponent(2); var size = control.getPreferredSize();
+            int box = size.height - 2 * ring, y = Math.max(i.top, (p.getHeight() - Math.max(text, box)) / 2), th = owner.title.height(w);
+            owner.title.setBounds(i.left + lead, y, w, th);
+            int gap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
+            owner.description.setBounds(i.left + lead, y + th + gap, w, owner.description.isVisible() ? owner.description.height(w) : 0);
+            int line = Math.min(th, owner.title.getFontMetrics(owner.title.getFont()).getHeight());
+            control.setBounds(i.left - ring, y + (line - box) / 2 - ring, size.width, size.height);
+        }
+
         @Override public Dimension minimumLayoutSize(Container parent) {
             return owner.settings ? new Dimension(0, 0) : owner.detail ? new Dimension(actionWidth(parent),height(parent,Math.max(actionWidth(parent),parent.getWidth()))) : Composition.WidthLayout.super.minimumLayoutSize(parent);
         }
@@ -163,6 +212,7 @@ final class SettingRows {
 
         @Override
         public int height(Container p, int width) {
+            if (leading(p)) return leadingHeight(p, width);
             Insets i = p.getInsets();
             if(stackedSettings(p,width)){int content=Math.max(0,width-i.left-i.right);return i.top+i.bottom+settingsTextHeight(content)+gap()+Composition.height(p.getComponent(2),Math.min(content,p.getComponent(2).getPreferredSize().width));}
             if (owner.detail) {
@@ -189,6 +239,11 @@ final class SettingRows {
 
         @Override
         public Dimension preferredLayoutSize(Container p) {
+            if (leading(p)) {
+                int w = p.getInsets().left + p.getInsets().right + lead(p)
+                    + Math.max(owner.title.getPreferredSize().width, owner.description.isVisible() ? owner.description.getPreferredSize().width : 0);
+                return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+            }
             int control = p.getComponentCount() > 2 ? p.getComponent(2).getPreferredSize().width : 0;
             // The trailing control takes at most half the row, so a wide control (a list) needs twice its width.
             int w =
@@ -200,6 +255,7 @@ final class SettingRows {
 
         @Override
         public void layoutContainer(Container p) {
+            if (leading(p)) { layoutLeading(p); return; }
             Insets i = p.getInsets();
             if(stackedSettings(p,p.getWidth())){
                 int content=Math.max(0,p.getWidth()-i.left-i.right),title=owner.title.height(content),text=settingsTextHeight(content);

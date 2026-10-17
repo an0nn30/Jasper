@@ -20,6 +20,7 @@ public final class KitContext {
     private final IconRegistry icons;
     private final BooleanSupplier animationsEnabled;
     private final Function<String, String> shortcuts;
+    private final KitFaces faces;
 
     private KitContext(Kit kit, ThemeBinding binding, ThemeRoute route, IconRegistry icons, BooleanSupplier animationsEnabled,
                        Function<String, String> shortcuts) {
@@ -27,6 +28,7 @@ public final class KitContext {
         this.binding = Objects.requireNonNull(binding); this.route = Objects.requireNonNull(route);
         this.icons = Objects.requireNonNull(icons);
         this.animationsEnabled = Objects.requireNonNull(animationsEnabled); this.shortcuts = Objects.requireNonNull(shortcuts);
+        this.faces = KitFaces.of(kit);
     }
     /** A view's private copy, so re-routing one view never re-routes another sharing the caller's context. */
     KitContext(KitContext source) {
@@ -42,6 +44,8 @@ public final class KitContext {
     }
     /** The kit this context renders with. */
     public Kit kit() { return kit; }
+    /** The faces the kit's controls draw with, chosen once for this context. */
+    KitFaces faces() { return faces; }
     /** The action-id-to-binding text menus use. */
     public Function<String, String> shortcuts() { return shortcuts; }
     /** The current binding of {@code actionId} as a menu shows it; "" for none or for an empty id. */

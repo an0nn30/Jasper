@@ -25,6 +25,10 @@ final class ThemePainting {
         return Math.max(metric(context, role), line + metric(context, padding));
     }
     static Color color(KitContext context, SemanticColor role) { return context.theme().semantic().color(role); }
+    /** {@code role}'s colour in the context's theme: a semantic role or a derived one. */
+    static Color role(KitContext context, ColorRole role) { return role.color(context.theme()); }
+    /** {@code pair}'s slot as its guard paints it in the context's theme (spec 7.3). */
+    static Color painted(KitContext context, PaintPair pair) { return SurfaceContrast.painted(context.theme(), pair); }
     /** A mask's face size and treatment; a hollow mask has the face, {@code cutout} above the shadow, cut out. */
     private record ShadowKey(int width, int height, double radius, int blur, double strength, boolean hollow, int cutout) { }
     /** Blurred shadow masks by face size and treatment; a few faces are on screen at once. EDT only. */
