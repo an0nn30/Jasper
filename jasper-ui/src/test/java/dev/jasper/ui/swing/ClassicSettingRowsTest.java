@@ -39,6 +39,36 @@ class ClassicSettingRowsTest {
         });
     }
 
+    /** A Settings page with one row whose control is a text field, as the Credential Vault page's keys folder. */
+    static ViewSpec textRow() {
+        var field = new Nodes.Field("keys", ControlState.READY, Nodes.FieldKind.TEXT, "", "", "Generated keys folder", "");
+        return new ViewSpec(new Nodes.Stack("page", ControlState.READY, Nodes.LayoutRole.SETTINGS_PAGE, List.of(
+            new Nodes.Card("card", ControlState.READY, Nodes.CardKind.SETTINGS, List.of(
+                new Nodes.SettingRow("row:keys", ControlState.READY, "Generated keys folder", "Where generated SSH keys go", field, false))))));
+    }
+
+    /** The keys folder field's preferred width under {@code context}, and the least width its policy gave it. */
+    static int[] textWidth(KitContext context) {
+        try (var view = new KitView(context, textRow(), event -> { })) {
+            view.setSize(760, 120);
+            for (int i = 0; i < 3; i++) InteractiveRowsTest.layout(view);
+            var surface = ((TextFields.FieldControl) view.control("keys")).surface;
+            return new int[] {surface.getPreferredSize().width, surface.least};
+        }
+    }
+
+    /** Plan 9b Task 7: a classic Settings text field is as wide as the page's dropdowns (mocks 12 and 14); the default keeps its columns. */
+    @Test void aClassicSettingsTextFieldIsAsWideAsTheDropdowns() {
+        Edt.run(() -> {
+            var classic = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var standard = KitFixtures.context(KitFixtures.light());
+            try {
+                assertThat(textWidth(classic)[0]).isEqualTo(ThemePainting.metric(classic, dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_CHOICE_WIDTH));
+                assertThat(textWidth(standard)[1]).as("the default policy adds no least width").isZero();
+            } finally { release(classic); release(standard); }
+        });
+    }
+
     /** A Settings page with one row whose control is an ordered list over its entry row, as the Shell page's arguments. */
     static ViewSpec listRow() {
         var list = new Nodes.ItemList("args", ControlState.READY, Nodes.ListKind.ORDERED, List.of(), java.util.Set.of(), "", List.of(),

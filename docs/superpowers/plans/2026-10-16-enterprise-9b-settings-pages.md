@@ -155,6 +155,37 @@
 > white); the entry row 1 px low (256 against 255); Task 1's half pixel above (the program row's rule at 157 against 158)
 > and below (the environment row's rule 340 against 341, the box's bottom 393 against 394).
 
+> **Status, Task 7 (2026-10-17):** every one of the eighteen 05 Settings pages and 07b is compared with its mock; the twelve
+> pages of this task pass their probes and shares (Command Palette 0.999, Desk Buddy 0.999, System Settings 0.959, Font &
+> Colors 0.985, Cursor 0.998, Credential Vault 0.982, Editor 0.939, File Server 0.981, Remote 0.960, Sample 0.970, Shell
+> History 0.961; Project Index 0.929 against its floor 0.92), the composed pages follow Enterprise Dark, and the chrome
+> renders check the Shell page's composition; no classic Settings role value changed. Fixes, each a shared classic
+> geometry the comparison found: the classic spinner was 83 wide, its value taking `SPINNER_WIDTH` less the arrows and the
+> trailing stroke added after it, so `ClassicStepperFace.valueWidth` now subtracts that stroke (82 as the mocks, both
+> strokes included; Command Palette's "spinner left edge" at 929); a Settings text field kept its 16 columns (176) where
+> mocks 12 and 14 draw it as wide as the dropdowns, so `FieldPolicy.settingsWidth` (default 0, classic
+> `SETTINGS_CHOICE_WIDTH` 220) is a TEXT field's least width on a Settings page (`ClassicSettingRowsTest` and
+> `ClassicSpinnersTest` pin both). Pages 13, 15 and 17 drew `#C6CCD5` boxes because the fixture never gave the plugin
+> runtime the look's kit and theme (the application calls `PluginRuntime.presentation` and `appearance` before the
+> plugins start), so a plugin's own page painted the bundled theme: neither the plugin's nor the host's code, the
+> fixture's; `EnterpriseSettings` now supplies both, and the System page's fixture supplies the mock's Java Virtual Machine
+> and Command line sections. Deviations: the probes "Edit Custom VM Options… left edge" became "Edit Custom VM Options…
+> face" (790, 213) and "Reveal right edge" (1010, 219), because both buttons are 1 px wider than the mock's (Task 3's
+> rounded label advances) and 7 apart (`INLINE_GAP`, which Task 6's under-title rows also read) against 6, which puts the
+> left edge at 782; added probes on Project Index's box top and the Vault and File Server text fields' left edge (791);
+> `HALF` holds the rule and box-edge probes under description rows to their place within Task 1's half pixel (the mocks'
+> rows are 47.5 and ours 47, so a rule n such rows down lies up to n/2 px higher: Vault and Editor 1, File Server and Remote
+> 2); a page-wide alternation of 47 and 48 was tried and dropped, because the mocks round their half pixels
+> inconsistently (Remote's last row, Notifications' Groups box and Shell's arguments box each land 1 px off under it) and
+> Tasks 2 and 6 calibrated against the whole 47s. Residuals (printed, not asserted, with their causes in the test):
+> Project Index's projects table (the fixture indexes no project, so the plugin shows its empty state; floor 0.92 from the
+> measured 0.929, the difference image shows the empty state for the table); Sample's checkboxes stay at the row's end
+> and the plugin pages' (13, 15, 17) controls end 36 px early, because a plugin page's own setting rows
+> (`KitSettingRows`) keep the inline Reset slot and the SDK's `SettingRow` has no menu to take Reset (spec 12.1 under a
+> look without inline Reset needs an SDK row menu; hand-off in STATUS); Shell History's list (the mock scrolls after five
+> rows under a horizontal scroll bar); File Server's port description wraps one word later than the mock's; the button
+> gap and widths above; Task 1's checkbox label gap and description offset.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

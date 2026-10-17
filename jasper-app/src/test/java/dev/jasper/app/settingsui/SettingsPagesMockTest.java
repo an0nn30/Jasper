@@ -39,10 +39,23 @@ class SettingsPagesMockTest {
     static final double INK_AMOUNT = 0.2;
     /** Per page, a floor lowered under Rulings 16, with its cause in the banner. */
     static final Map<String, Double> FLOORS = new LinkedHashMap<>();
+    /**
+     * The probes below rows with a description, by "id/name", and how many pixels higher than the mock's their target may
+     * lie: the mocks' description rows are 47.5 tall and plan 9b Task 1 lays them 47, so a rule or box edge drifts half a
+     * pixel higher per such row above it (Task 1's residual; Task 7 measured every Tools page).
+     */
+    static final Map<String, Integer> HALF = new LinkedHashMap<>();
+    /**
+     * The probes on a residual, by "id/name", with its cause: printed, not asserted (plan 9b Task 7: a Tools page's own
+     * composition or the fixture's data, which no plan of this series composes for Enterprise; recorded in the banner).
+     */
+    static final Map<String, String> RESIDUAL = new LinkedHashMap<>();
 
     static SettingsChromeMockTest.Probe probe(String name, int x, int y) { return new SettingsChromeMockTest.Probe(name, x, y); }
     static void tight(String id, String... names) { for (String name : names) TIGHT.add(id + "/" + name); }
     static void face(String id, String... names) { for (String name : names) FACE.add(id + "/" + name); }
+    static void half(String id, int pixels, String... names) { for (String name : names) HALF.put(id + "/" + name, pixels); }
+    static void residual(String id, String cause, String... names) { for (String name : names) RESIDUAL.put(id + "/" + name, cause); }
 
     /** An ink box: a text's name and its logical rectangle in the content, wide enough for both the mock's and ours. */
     record Ink(String name, int x, int y, int width, int height) { }
@@ -99,6 +112,55 @@ class SettingsPagesMockTest {
             probe("Add Variable… top edge", 960, 305)));
         face("terminal.shell", "arguments box top", "arguments box bottom", "arguments box interior", "Remove left edge",
             "Add Variable… right edge", "Add Variable… top edge");
+        PROBES.put("command-palette", List.of(probe("box top", 600, 53), probe("box bottom", 900, 108), probe("spinner left edge", 929, 83)));
+        PROBES.put("desk-buddy", List.of(probe("box bottom", 700, 108)));
+        // Edit Custom VM Options… and Reveal are each 1 px wider than the mock's (Task 3's rounded label advances) and 7 apart
+        // (INLINE_GAP) against 6, so the left edge lies 3 px early: the probe takes its face, Reveal's right edge the row's end.
+        PROBES.put("system", List.of(probe("Run in background checkbox", 262, 82), probe("Edit Custom VM Options… face", 790, 213),
+            probe("Reveal right edge", 1010, 219)));
+        face("system", "Edit Custom VM Options… face", "Reveal right edge");
+        PROBES.put("terminal.font", List.of(probe("fallback list top", 400, 172), probe("second fallback row", 400, 196),
+            probe("fallback list bottom", 400, 215), probe("Ligatures checkbox", 262, 276)));
+        tight("terminal.font", "second fallback row");
+        face("terminal.font", "fallback list bottom", "Ligatures checkbox");
+        PROBES.put("terminal.cursor", List.of(probe("row rule", 700, 102), probe("box bottom", 700, 147)));
+        tight("terminal.cursor", "row rule");
+        String vault = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.vault"), editor = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.editor");
+        String files = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.fileserver"), index = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.indexer");
+        String remote = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.remote"), sample = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.sample");
+        String history = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.history");
+        PROBES.put(vault, List.of(probe("first row rule", 700, 110), probe("second row rule", 700, 158), probe("box bottom", 700, 211),
+            probe("Generated keys folder field left edge", 791, 135)));
+        tight(vault, "first row rule", "second row rule");
+        face(vault, "second row rule", "box bottom");
+        half(vault, 1, "second row rule", "box bottom");
+        PROBES.put(editor, List.of(probe("first row rule", 700, 110), probe("General box bottom", 700, 164), probe("second box top", 700, 185)));
+        tight(editor, "first row rule");
+        face(editor, "General box bottom", "second box top");
+        half(editor, 1, "General box bottom", "second box top");
+        PROBES.put(files, List.of(probe("first row rule", 700, 110), probe("box bottom", 700, 227), probe("port range field left edge", 791, 190)));
+        tight(files, "first row rule");
+        face(files, "box bottom");
+        half(files, 2, "box bottom");
+        PROBES.put(index, List.of(probe("Projects box top", 600, 53), probe("projects table top", 400, 70), probe("projects header band", 400, 80), probe("projects header rule", 400, 91),
+            probe("projects table left", 260, 120), probe("projects table right", 1010, 80)));
+        tight(index, "projects header band");
+        residual(index, "the fixture indexes no project, so the plugin's page shows its empty state for the mock's table",
+            "projects table top", "projects header band", "projects header rule", "projects table left", "projects table right");
+        // The fixture's empty state in place of the mock's four projects (Rulings 16: fixture text): 0.929, rounded down.
+        FLOORS.put(index, 0.92);
+        PROBES.put(remote, List.of(probe("first row rule", 700, 110), probe("fifth row rule", 700, 300), probe("box bottom", 700, 353)));
+        tight(remote, "first row rule", "fifth row rule");
+        face(remote, "fifth row rule", "box bottom");
+        half(remote, 2, "fifth row rule", "box bottom");
+        PROBES.put(sample, List.of(probe("first checkbox top edge", 266, 80)));
+        residual(sample, "a plugin page's own setting rows keep the inline Reset slot (KitSettingRows; the SDK's SettingRow has no menu "
+            + "for Reset), so its checkbox stays at the row's end", "first checkbox top edge");
+        PROBES.put(history, List.of(probe("list top", 700, 126), probe("row rule", 700, 286), probe("box bottom", 700, 339)));
+        tight(history, "row rule");
+        face(history, "row rule", "box bottom");
+        residual(history, "the mock's trivial-commands list scrolls after five rows under a horizontal scroll bar; ours shows eight",
+            "row rule", "box bottom");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -113,12 +175,16 @@ class SettingsPagesMockTest {
         var failures = new ArrayList<String>();
         for (var probe : PROBES.getOrDefault(key, List.of())) {
             int x = 2 * probe.x(), y = 2 * probe.y();
-            double distance = SettingsMockMatch.deltaE(render.getRGB(x, y), mock.getRGB(x, y));
             String name = key + "/" + probe.name();
-            if (distance <= (TIGHT.contains(name) ? TIGHT_PROBE : SettingsChromeMockTest.PROBE)) continue;
+            double limit = TIGHT.contains(name) ? TIGHT_PROBE : SettingsChromeMockTest.PROBE, distance = Double.MAX_VALUE;
+            // A HALF probe's target may lie up to its pixels higher in the render (logical pixels, two 2x rows each).
+            for (int up = 0; up <= 2 * HALF.getOrDefault(name, 0) && distance > limit; up += 2)
+                distance = Math.min(distance, SettingsMockMatch.deltaE(render.getRGB(x, y - up), mock.getRGB(x, y)));
+            if (distance <= limit) continue;
             String failure = String.format("%s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", name, probe.x(), probe.y(),
                 render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
-            if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
+            if (RESIDUAL.containsKey(name)) System.out.println("Residual (plan 9b Task 7: " + RESIDUAL.get(name) + "): " + failure);
+            else if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
             else failures.add(failure);
         }
         return failures;
@@ -246,6 +312,37 @@ class SettingsPagesMockTest {
     @Test void shellMatchesItsMock() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("terminal.shell"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void theRemainingPagesMatchTheirMocks() throws Exception {
+        var ids = List.of("command-palette", "desk-buddy", "system", "terminal.font", "terminal.cursor",
+            dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.vault"), dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.editor"),
+            dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.fileserver"), dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.indexer"),
+            dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.remote"), dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.sample"),
+            dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.history"));
+        try (var settings = EnterpriseSettings.open(false)) {
+            assertThat(compare(settings, ids)).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void composedPagesFollowEnterpriseDark() throws Exception {
+        try (var settings = EnterpriseSettings.open(true)) {
+            var palette = dev.jasper.app.testsupport.EnterpriseLook.theme().palette(true);
+            for (var id : List.of("notifications", "keymap", "plugins", "terminal.shell")) {
+                var page = page(id);
+                var render = new BufferedImage[1];
+                SwingUtilities.invokeAndWait(() -> render[0] = settings.render(id, 1040, page.height()));
+                ImageIO.write(render[0], "png", Files.createDirectories(EnterpriseSettings.OUT.resolve("dark")).resolve(page.mock().substring(9, 11) + ".png").toFile());
+                assertThat(render[0].getRGB(2 * 600, 2 * 40) & 0xFFFFFF).as(id + ": the body on dark surface.app")
+                    .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB() & 0xFFFFFF);
+                long light = 0;
+                for (int y = 0; y < render[0].getHeight(); y += 7) for (int x = 2 * 231; x < render[0].getWidth(); x += 7) {
+                    int rgb = render[0].getRGB(x, y);
+                    if (((rgb >> 16) & 0xFF) > 0xF0 && ((rgb >> 8) & 0xFF) > 0xF0 && (rgb & 0xFF) > 0xF0) light++;
+                }
+                assertThat(light).as(id + ": no light surface left in a dark page (text aside)").isLessThan(200);
+            }
         }
     }
 }

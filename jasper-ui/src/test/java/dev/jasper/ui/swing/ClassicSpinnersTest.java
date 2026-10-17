@@ -37,6 +37,18 @@ class ClassicSpinnersTest {
         });
     }
 
+    /** Plan 9b Task 7: the spinner spans SPINNER_WIDTH, both outline strokes included (the Settings mocks' 82). */
+    @Test void aSpinnerIsSpinnerWidthWideWithItsOutline() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, new ViewSpec(number("height", Nodes.FieldPresentation.STEPPER)), e -> {})) {
+                KitFixtures.render(view, 200, 40, 1);
+                var surface = ((TextFields.FieldControl) view.control("height")).surface;
+                assertThat(surface.getPreferredSize().width).isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.SPINNER_WIDTH));
+            } finally { release(context); }
+        });
+    }
+
     /** Review Focus 5: a SLIDER under the classic kit is a spinner whose arrows step the value. */
     @Test void aSliderIsASpinnerUnderTheClassicKit() {
         Edt.run(() -> {
