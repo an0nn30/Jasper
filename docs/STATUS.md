@@ -30,7 +30,9 @@ FOOTER lines printed for plan 8b: primary button left 428 just opened and 436 ty
 on the accent black (the Run window's selected row, every primary button label) where the Dark Mode mock draws white;
 approved on 2026-10-17 by the orchestrator under the user's overnight authority: `accent`, `selection.bg` and
 `hue.blue` (and 6b's Dark `tab.indicator`) are #3C74D6, one red step, 4.505:1, so that text stays white (spec 7.6
-amended; `EnterpriseThemeTest` locks it).
+amended; `EnterpriseThemeTest` locks it). Found at the merge with plan 6b: the mocks set the status bar's text at 11 px
+(IBM Plex at 11 matches their ink exactly) where spec 5.6 gave the classic `STATUS_TEXT` 12; approved on 2026-10-17 by the orchestrator under the user's overnight authority (the mock
+wins on layout): it is 11/400 (spec 5.6 amended, `classic-type.tsv` follows; the default scale is unchanged).
 The default look is unchanged (gallery byte-identical: 85 PNGs each for Dark and Light, all 322 files equal to
 `e502e102b`'s). Rulings
 (plan, "Rulings"): (1) faces by full name, degrading per face; (2) the look's UI font reaches FlatLaf unless
@@ -60,12 +62,11 @@ pushed. Merged with main (plan 6b) as `b318feae0`: 6b's R47 values are in `enter
 #4A4D53) with `derived-roles-enterprise.tsv` regenerated, Enterprise Dark's accent is #3C74D6 (the ruling above), 6b's
 face-width probes are asserted under IBM Plex (at 2×: "New Session" 134 for the mock's 134, the search field's left
 2114 for 2116, "Settings…" 2744 for 2742, the titles Unlock Vault 139 for 138, Add Login 108 for 108 and Add SSH Key 144
-for 143) but for the status bar's rules before UTF-8 and the warning (2444 and 2554 for 2470 and 2574) and the run
-item's width (130 for 122), printed residuals because the mocks set the status text at 11 px where spec 5.6 gives
-`STATUS_TEXT` 12 (at 11 they measure 2468, 2570 and 122; a finding for the user), Add SSH Key's swatch stays `#2C8B48`
-(ΔE 9.7, R39), the warning cell paints its ▲ and the search keycap and classic tab titles take the platform face where
-IBM Plex has no glyph (they drew boxes), all 32 `check_pairs.py` pairs pass and the default gallery is byte-identical
-(322 files); `./gradlew check --continue`: **11,092 tests, 0 failures, 0 errors, 25 skipped**.
+for 143, and, with the status text at 11 px (the ruling above), the status bar's rules before UTF-8 and the warning 2468
+and 2570 for 2470 and 2574 and the run item 122 wide for 122), Add SSH Key's swatch stays `#2C8B48` (ΔE 9.7, R39), the
+warning cell paints its ▲ and the search keycap, classic tab titles and the session and folder cells take the platform
+face where IBM Plex has no glyph (the first three drew boxes), all 32 `check_pairs.py` pairs pass and the default
+gallery is byte-identical (322 files); `./gradlew check --continue`: **11,092 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;

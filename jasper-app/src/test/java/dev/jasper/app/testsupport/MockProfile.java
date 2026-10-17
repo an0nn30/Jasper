@@ -120,21 +120,6 @@ public final class MockProfile {
             .isCloseTo(expected, org.assertj.core.api.Assertions.within(tolerance));
     }
 
-    /**
-     * A face-width probe that misses the mock under Plex for a recorded reason, printed with its measurement rather than
-     * asserted (plan 5b's merge with plan 6b: the mocks set the status bar's text at 11 px where spec 5.6 gives
-     * {@code STATUS_TEXT} 12).
-     *
-     * @param what the probe
-     * @param actual the render's value, in the mock's pixels
-     * @param expected the mock's value
-     * @param tolerance the tolerance it would be asserted within
-     * @param why the recorded reason
-     */
-    public static void residual(String what, int actual, int expected, int tolerance, String why) {
-        System.out.printf("FONTS residual: %s %d, mock %d (tolerance %d): %s%n", what, actual, expected, tolerance, why);
-    }
-
     /** CIE76 ΔE between two opaque sRGB colours. */
     public static double deltaE(Color a, Color b) {
         double[] p = lab(a), q = lab(b);

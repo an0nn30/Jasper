@@ -74,7 +74,7 @@ public final class TypeScale {
             case PICKER_CAPTION -> new float[] {11, 400};
             case TITLE_CONTEXT -> new float[] {12, 400};
             case TOOLBAR_LABEL -> new float[] {12, 400};
-            case STATUS_TEXT -> new float[] {12, 400};
+            case STATUS_TEXT -> new float[] {11, 400};
             case STATUS_PATH -> new float[] {12, 400};
             case RESULTS_HEADING -> new float[] {11, 400};
             case PALETTE_HINT -> new float[] {11, 400};

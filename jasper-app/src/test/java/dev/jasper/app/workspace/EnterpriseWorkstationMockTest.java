@@ -23,7 +23,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class EnterpriseWorkstationMockTest {
     static final int X = EnterpriseMenuRowMockTest.X, Y = EnterpriseMenuRowMockTest.Y;
-    static final String STATUS_TEXT_SIZE = "the mocks' status text is 11 px, spec 5.6's STATUS_TEXT 12 (at 11 the render gives 2468, 2570 and 122)";
     /** The Run Dialog mock, the one that shows the status bar's run item. */
     static final String RUN = "06 Run Dialog/Run Dialog - Just opened (recent + most used).png";
 
@@ -141,16 +140,14 @@ class EnterpriseWorkstationMockTest {
         var renderRules = dividers(render, row, 0, 2880, divider);
         assertThat(mockRules).as("the mock's seven rules").containsExactly(108, 164, 1966, 2140, 2322, 2470, 2574);
         assertThat(renderRules.size()).as(what + "a rule after the run item, session and folder and before each right cell").isEqualTo(3 + 5);
-        // The mocks set the status text at 11 px (Plex 11's ink: "UTF-8" 58.6 at 2x, the mock's 59), spec 5.6 at 12: each cell is
-        // wider by its text's twelfth, so these two rules and the run item's width are printed residuals (5b's merge with 6b).
-        MockProfile.residual(what + "the rule before UTF-8", renderRules.get(renderRules.size() - 2) + X, 2470, 6, STATUS_TEXT_SIZE);
-        MockProfile.residual(what + "the rule before the warning", renderRules.getLast() + X, 2574, 6, STATUS_TEXT_SIZE);
+        MockProfile.fonts(what + "the rule before UTF-8", renderRules.get(renderRules.size() - 2) + X, 2470, 6);
+        MockProfile.fonts(what + "the rule before the warning", renderRules.getLast() + X, 2574, 6);
         assertThat(MockProfile.deltaE(MockProfile.at(render, 2860, row), MockProfile.at(mock, 2862, 1782)))
             .as(what + "the warning cell's ground").isLessThanOrEqualTo(2.5);
         // Rulings 15: the run item, 60 wide in the Run Dialog mock (its rule at 122).
         var runMock = MockProfile.mock(RUN);
         assertThat(dividers(runMock, 1782, X, 400, MockProfile.at(runMock, 122, 1782))).as("the Run Dialog mock's first rule").startsWith(122);
-        MockProfile.residual(what + "the run item's width", renderRules.getFirst() + X, 122, 4, STATUS_TEXT_SIZE);
+        MockProfile.fonts(what + "the run item's width", renderRules.getFirst() + X, 122, 4);
         MockProfile.write(render.getSubimage(1898, height - 46, 982, 46), "enterprise-" + (dark ? "dark" : "light") + "-status");
     }
 }
