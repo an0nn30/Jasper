@@ -21,6 +21,11 @@ final class SettingRows {
         boolean formLabel;
         /** That shared column, or -1. */
         int column = -1;
+        /**
+         * A form-label row's side inset, which the card sets in place of the row's own padding so the title starts where its
+         * labels do: none in a FORM card, which pads its rows, and the card padding where setting rows span the card.
+         */
+        int formInset;
         SecretFields.SecretControl secret;
         @Override void prompt(boolean value) { prompt=value; }
 
@@ -60,7 +65,10 @@ final class SettingRows {
                             ThemePainting.metric(
                                     context(), grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING : DesignMetrics.Role.SETTING_VERTICAL_PADDING);
             // A panel footer row reserves its separator above its content; the footer paints the full-width rule there.
-            component.setBorder(panelFooter ? new EmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE),0,0,0) : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
+            // A form-label row is laid out like a FormRow: the card's inset replaces its side padding and dependent indent.
+            component.setBorder(panelFooter ? new EmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE),0,0,0)
+                : formLabel ? new EmptyBorder(vertical, formInset, vertical, formInset)
+                : new EmptyBorder(vertical, side + (row.dependent() ? ThemePainting.metric(context(), DesignMetrics.Role.SETTING_DEPENDENT_INDENT) : 0), vertical, side));
             component.setLayout(new RowLayout(this));
             ((SearchHighlight) component).highlight(row.highlighted());
         }

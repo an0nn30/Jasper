@@ -65,7 +65,10 @@ final class Cards {
 
     /**
      * The label policy's shared column for a form card (spec 6.4): its FormRows and non-Toggle SettingRows take it, and a
-     * bare EXCLUSIVE choice is inset to the field column; the default policy keeps each row's fixed column.
+     * bare EXCLUSIVE choice is inset to the field column; the default policy keeps each row's fixed column. A setting row
+     * that takes the column renders like a FormRow: a FORM card pads it as it pads its FormRows, and a MIXED or SETTINGS
+     * card, which lays setting rows edge to edge, gives it the card padding its FormRows take, so the row's title starts
+     * on the card's labels and its control on the field column.
      */
     private static void labelColumnFor(CardControl card, List<ControlRegistry.Control> controls) {
         var labels = card.context().faces().labels;
@@ -77,11 +80,16 @@ final class Cards {
                 widths.add(ThemePainting.measureText(row.title.getFont(), labels.label(((Nodes.SettingRow) row.node).title())));
         }
         int column = form ? labels.column(card.context(), widths) : -1;
+        int rowInset = ((Nodes.Card) card.node).kind() == Nodes.CardKind.FORM ? 0
+            : ThemePainting.metric(card.context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(card.context(), DesignMetrics.Role.HAIRLINE);
         for (var c : controls) {
             if (c instanceof FormRows.RowControl row && row.column != column) { row.column = column; row.component.revalidate(); }
             if (c instanceof SettingRows.RowControl row && !(((Nodes.SettingRow) row.node).control() instanceof Nodes.Toggle)) {
                 boolean asRow = column >= 0;
-                if (row.formLabel != asRow || row.column != column) { row.formLabel = asRow; row.column = column; row.refresh(); }
+                int side = asRow ? rowInset : 0;
+                if (row.formLabel != asRow || row.column != column || row.formInset != side) {
+                    row.formLabel = asRow; row.column = column; row.formInset = side; row.refresh();
+                }
             }
             if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE) {
                 var inset = labels.choiceInset(card.context(), column);

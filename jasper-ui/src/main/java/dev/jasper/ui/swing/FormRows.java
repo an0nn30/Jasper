@@ -49,11 +49,22 @@ final class FormRows {
             label.setForeground(context().faces().labels.labelInk(context(), label.getForeground()));
             context().faces().labels.styleCaption(caption, context());
             port.setText(context().faces().labels.label("Port")); port.setFont(label.getFont()); port.setForeground(label.getForeground());
-            port.setEnabled(component.isEnabled());
+            followPort();
             label.setEnabled(component.isEnabled());
             caption.setEnabled(component.isEnabled());
             component.setLayout(new RowLayout(this));
             ((SettingRows.SearchHighlight) component).highlight(row.highlighted());
+        }
+
+        /**
+         * The mounted "Port:" label shows and enables with the field it names. It reads the field's node and inherited
+         * state, which the field's own {@code state()} applies, so it holds after a refresh that reaches this row first.
+         */
+        void followPort() {
+            if (port.getParent() != component || controls.size() < 2) return;
+            var field = controls.get(1); var state = field.node.state();
+            port.setVisible(state.visible());
+            port.setEnabled(field.parentEnabled && state.enabled() && !state.busy());
         }
 
         @Override
@@ -77,6 +88,7 @@ final class FormRows {
                             .toList());
             label.setLabelFor(controls.getFirst().focusTarget());
             if (ported) port.setLabelFor(controls.get(1).focusTarget());
+            followPort();
         }
     }
 
@@ -179,7 +191,9 @@ final class FormRows {
         public Dimension preferredLayoutSize(Container p) {
             int w = labelWidth() + gap();
             for (int i = 2; i < p.getComponentCount(); i++)
-                w += p.getComponent(i).getPreferredSize().width + (i > 2 ? gap() : 0);
+                // The "Port:" label counts only while it shows.
+                if (p.getComponent(i) != owner.port || owner.port.isVisible())
+                    w += p.getComponent(i).getPreferredSize().width + (i > 2 ? gap() : 0);
             return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
         }
 
@@ -192,8 +206,6 @@ final class FormRows {
 
         @Override
         public void layoutContainer(Container p) {
-            // The "Port:" label shows only while the field it names does.
-            if (p.getComponentCount() > 4 && p.getComponent(4) == owner.port) owner.port.setVisible(p.getComponent(3).isVisible());
             if(stacked(p,p.getWidth())) {
                 int width=p.getWidth(),labelHeight=Composition.height(owner.label,width);
                 owner.label.setBounds(0,0,width,labelHeight);

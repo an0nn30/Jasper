@@ -4533,20 +4533,25 @@ the box title in `text.primary` (the mock's `#3A3D42` is a residual); colon labe
 label column's 100 px floor (Add Login's 94 a residual); form-card settings as rows; bare choices inset; SETTINGS cards
 padded 8; SLIDER as a spinner; the prompt title hidden until plan 6's header strip; keycaps, the joined pair and
 notification cards left to plans 6, 7 and 9; the section surface's class name the only JSON change in the default
-gallery. Deviations (Task 2's review; the plan's Execution notes X12 and X14): `ButtonFace.fades` takes the button, so
-the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's Task 3 edits its
-condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a classic
-read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's surface, so a
-transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a strip's icon-only
-menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface stands; a secret's
-reveal and copy and each crumb are flat until hovered wherever their control stands (`KitButton.inner`). Residuals: 4a's
-flat focused, hovered or pressed classic native button stays for 4c (the classic `ButtonFace` paints kit buttons only,
-its gradient in every state); a disabled classic dropdown without a rich face is faded again over its flat face by
-`ChoiceCombo.paint` (fill `#ECEFF1` and edge `#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button
-paints `#F1F2F2` inside `#D5DAE0`), and a disabled SECONDARY or PRIMARY button on a selected row fades as one layer over
-its flat face (Execution notes X13); spec 6.4's face table still says "small glyph, plain title" for `PromptFace`, which
-the amended 5.2 prompt row supersedes; TFTP's read-only login field in the control column (spec 6.4) is left to plan
-10's File Server composition. Plan 4c adds the data faces, the full kit matrix and the mock comparison.
+gallery. Deviations (Task 2's and Task 5's reviews; the plan's Execution notes X12, X14 and X15): `ButtonFace.fades`
+takes the button, so the classic face fades as one layer only the buttons it leaves to the default treatment (plan 4c's
+Task 3 edits its condition with `paintFace`'s and `text`'s); a disabled classic picker is flat like a disabled button; a
+classic read-only field with an error keeps its `border.error` edge; `FieldPolicy.readOnlyText` takes the field's
+surface, so a transparent read-only field keeps `text.primary`; a menu button's parts paint no face of their own, a
+strip's icon-only menu draws no edge, and a ghost menu is flat in a toolbar row or a panel header, where its surface
+stands; a secret's reveal and copy and each crumb are flat until hovered wherever their control stands
+(`KitButton.inner`); a "Port:" label hides and enables with its field, stays beside it in a stacked row and is its
+`labelFor`; a colon label's note starts after the colon; an EXCLUSIVE choice that leaves a form card drops its inset; a
+form-card setting row takes the card's inset in place of its own padding and dependent indent, so its title and control
+sit on the FormRows' columns in FORM, MIXED and SETTINGS cards. Residuals: 4a's flat focused, hovered or pressed classic
+native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
+classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
+`#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
+disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13); a
+classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); spec 6.4's face table
+still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
+login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
+the full kit matrix and the mock comparison.
 `./gradlew check --continue`: **[tests] tests, [failures] failures, [errors] errors, [skipped] skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 ```
@@ -4578,7 +4583,7 @@ Insert below this plan's title:
 
 ```text
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`[first]..[last]`).** Deviations from this
-> plan's text: [Task 2's three (Execution notes X12) and two (X14), then each other one].
+> plan's text: [Task 2's three (Execution notes X12) and two (X14), Task 5's (X15), then each other one].
 ```
 
 - [ ] **Step 6: Commit**
@@ -4725,3 +4730,22 @@ changed files. In jasper-app, `StrategyIsolationTest` and `VariantReadTest` comp
   otherwise, and `ChoiceCombo.paint` names X13 at its fade — without them the menu parts drew a second gradient and an
   edge where the main part meets the arrow, a reveal drew a boxed button inside its field and the crumbs boxed
   buttons, and a transparent read-only field drew muted text — cost if wrong: one accessor and one flag on `KitButton`.
+- **X15. Task 5's review rounds deviate from its text as follows, which Task 8's STATUS entry and banner list** — round
+  1: the "Port:" label hides with its field and is the field's `labelFor`; a stacked row keeps the label beside its
+  field on the field's line (`RowLayout.stackedHeight` and a stacked branch in `layoutContainer`), `stacked` and
+  `trailing` count the label, and the trailing field's width never goes negative; a colon label's title note starts
+  after the colon; `ViewReconciler.resetComposition` clears an EXCLUSIVE `ChoiceControl`'s border, so a choice that
+  leaves a form card drops its field-column inset; `CardControl.children` calls `labelColumnFor` itself (no private
+  `labelColumn`), and `CardSurface.paintDefault` has no bare block. Round 2: a form-card SettingRow (Rulings 17) renders
+  like a FormRow (spec 6.4), where Step 3 kept the row's own side padding and dependent indent, 10 px or more right of
+  the FormRows in a FORM card: `labelColumnFor` sets `SettingRows.RowControl.formInset`, none in a FORM card, which pads
+  its rows, and `CARD_PADDING` + `HAIRLINE` in a MIXED or SETTINGS card, which lays setting rows edge to edge, and the
+  row's border takes it in place of its side padding, so its title starts on the card's labels and its control on the
+  field column in all three, Add Host's Options › Group included; the "Port:" label shows and enables with its field
+  (`FormRows.RowControl.followPort`, called from `refresh` and `children`, reads the field's node and inherited state,
+  so a refresh that reaches the row first keeps it right), not from layout code, and `preferredLayoutSize` counts it
+  only while it shows. `ClassicGroupsTest` has 13 tests, not 5. One residual for plan 4c's mock comparison: a classic
+  checkbox row in a FULL form's SETTINGS or MIXED card leads at its side padding (`FULL_SETTING_SIDE_PADDING`, 12 in the
+  Enterprise fixture kit), 1 px left of the labels at `CARD_PADDING` + `HAIRLINE` (13), which the mocks align — cost if
+  wrong: a form-card setting row off the FormRows' columns, or a "Port:" label that reads enabled beside a disabled
+  field.

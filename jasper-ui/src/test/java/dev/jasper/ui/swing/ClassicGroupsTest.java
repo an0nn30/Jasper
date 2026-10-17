@@ -39,6 +39,17 @@ class ClassicGroupsTest {
         return new Nodes.SettingRow(id + "-row", READY, "Setting " + id, "", new Nodes.Toggle(id, READY, "Setting " + id, true, id, false), false);
     }
 
+    /** Add Host's Options › Group: a dropdown in a setting row titled {@code title}. */
+    static Nodes.SettingRow groupRow(String id, String title, boolean dependent) {
+        var group = new Nodes.Choice(id, READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("other", "Other", Optional.empty())), "other", title, id);
+        return new Nodes.SettingRow(id + "-row", READY, title, "", group, dependent);
+    }
+
+    /** {@code c}'s x in {@code ancestor}'s coordinates. */
+    static int x(java.awt.Component c, java.awt.Component ancestor) {
+        return SwingUtilities.convertPoint(c.getParent(), c.getLocation(), ancestor).x;
+    }
+
     /** The face's own painting of {@code card}, without its rows. */
     static BufferedImage paintCard(KitContext context, Cards.CardSurface card) {
         var image = new BufferedImage(card.getWidth(), card.getHeight(), BufferedImage.TYPE_INT_ARGB);
@@ -136,19 +147,47 @@ class ClassicGroupsTest {
         });
     }
 
-    /** A hidden Port field takes its "Port:" label with it, stacked or not. */
+    /** A hidden Port field takes its "Port:" label with it, stacked or not, and the hidden label takes no width. */
     @Test void aHiddenPortFieldHidesItsLabel() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
             try (var view = new KitView(context, server(), e -> {})) {
+                var port = find(view, "reachable-row.port", JLabel.class);
+                var row = find(view, "reachable-row", JComponent.class);
+                int shown = row.getPreferredSize().width, gap = ThemePainting.metric(context, DesignMetrics.Role.COLUMN_GAP);
                 view.update(server(new ControlState(false, true, false, "")));
+                assertThat(port.isVisible()).as("hidden before any layout").isFalse();
+                assertThat(row.getPreferredSize().width).as("the hidden label adds no width").isEqualTo(shown - port.getPreferredSize().width - gap);
                 for (int width : new int[] {200, 488}) {
                     KitFixtures.render(view, width, 400, 1);
-                    assertThat(find(view, "reachable-row.port", JLabel.class).isVisible()).as("width " + width).isFalse();
+                    assertThat(port.isVisible()).as("width " + width).isFalse();
                 }
                 view.update(server());
-                KitFixtures.render(view, 488, 400, 1);
-                assertThat(find(view, "reachable-row.port", JLabel.class).isVisible()).isTrue();
+                assertThat(port.isVisible()).isTrue();
+                assertThat(row.getPreferredSize().width).isEqualTo(shown);
+            } finally { release(context); }
+        });
+    }
+
+    /** The "Port:" label takes its field's enabled state, not its row's, through an update and through a refresh alone. */
+    @Test void thePortLabelFollowsItsFieldsEnabledState() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, server(new ControlState(true, false, false, "")), e -> {})) {
+                KitFixtures.render(view, 488, 150, 1);
+                var port = find(view, "reachable-row.port", JLabel.class);
+                assertThat(find(view, "reachable-row", JComponent.class).isEnabled()).isTrue();
+                assertThat(port.isEnabled()).as("a disabled Port field disables its label").isFalse();
+                view.update(server());
+                assertThat(port.isEnabled()).isTrue();
+                view.inheritedEnabled(false);
+                assertThat(port.isEnabled()).as("a disabled view disables the label").isFalse();
+                view.inheritedEnabled(true);
+                assertThat(port.isEnabled()).as("enabling the view again enables it").isTrue();
+                view.update(server(new ControlState(true, false, false, "")));
+                view.inheritedEnabled(false);
+                view.inheritedEnabled(true);
+                assertThat(port.isEnabled()).as("a refresh keeps a disabled field's label disabled").isFalse();
             } finally { release(context); }
         });
     }
@@ -218,26 +257,70 @@ class ClassicGroupsTest {
         });
     }
 
-    /** Rulings 17 and 18: a non-Toggle setting row in a form card takes the label column; a bare EXCLUSIVE choice is inset to it. */
+    /**
+     * Rulings 17 and 18, spec 6.4: in a FORM card a non-Toggle setting row, dependent or not, renders like a FormRow, its
+     * title on the card's labels and its control on the field column; a bare EXCLUSIVE choice is inset to that column.
+     */
     @Test void aSettingRowAndABareChoiceTakeTheFieldColumn() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
-            var group = new Nodes.Choice("group", READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("other", "Other", Optional.empty())), "other", "Group", "group");
             var mode = new Nodes.Choice("mode", READY, Nodes.ChoiceKind.EXCLUSIVE, List.of(new Option("vault", "Vault Credential", Optional.empty()),
                 new Option("agent", "SSH Agent", Optional.empty())), "vault", "Authentication", "mode");
             var spec = new ViewSpec(new Nodes.Card("card", READY, Nodes.CardKind.FORM, List.of(mode,
                 new Nodes.FormRow("user-row", READY, "Username", "", field("user", "root", Nodes.FieldKind.TEXT), Optional.empty()),
-                new Nodes.SettingRow("group-row", READY, "Group", "", group, false))));
+                groupRow("group", "Group", false), groupRow("fallback", "Fallback", true))));
             try (var view = new KitView(context, spec, e -> {})) {
-                KitFixtures.render(view, 488, 140, 1);
+                KitFixtures.render(view, 488, 200, 1);
                 int column = ((FormRows.RowControl) view.control("user-row")).column, gap = ThemePainting.metric(context, DesignMetrics.Role.COLUMN_GAP);
-                var row = (SettingRows.RowControl) view.control("group-row");
-                assertThat(row.formLabel).isTrue();
+                var card = find(view, "card", Cards.CardSurface.class);
+                int labelX = x(find(view, "user-row.label", JLabel.class), card), fieldX = x(find(view, "user", JComponent.class), card);
+                assertThat(fieldX).isEqualTo(labelX + column + gap);
+                for (var id : List.of("group", "fallback")) {
+                    var row = (SettingRows.RowControl) view.control(id + "-row");
+                    assertThat(row.formLabel).as(id).isTrue();
+                    assertThat(x(find(view, id + "-row.title", JComponent.class), card)).as(id + ": the title on the labels").isEqualTo(labelX);
+                    assertThat(x(find(view, id, JComponent.class), card)).as(id + ": the control on the field column").isEqualTo(fieldX);
+                }
                 assertThat(find(view, "group-row.title", JComponent.class).getAccessibleContext().getAccessibleName()).isEqualTo("Group:");
-                var combo = find(view, "group", JComponent.class);
-                assertThat(SwingUtilities.convertPoint(combo.getParent(), combo.getLocation(), row.component).x)
-                    .isEqualTo(row.component.getInsets().left + column + gap);
-                assertThat(((javax.swing.border.EmptyBorder) find(view, "mode", JComponent.class).getBorder()).getBorderInsets().left).isEqualTo(column + gap);
+                var choice = find(view, "mode", JComponent.class);
+                assertThat(((javax.swing.border.EmptyBorder) choice.getBorder()).getBorderInsets().left).isEqualTo(column + gap);
+                assertThat(x(choice, card) + choice.getInsets().left).as("the choice's options start on the field column").isEqualTo(fieldX);
+            } finally { release(context); }
+        });
+    }
+
+    /** Spec 6.4: a MIXED card lays its setting rows edge to edge, and a non-Toggle setting row still lines up with its FormRows. */
+    @Test void aSettingRowInAMixedCardLinesUpWithItsFormRows() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var spec = new ViewSpec(new Nodes.Card("card", READY, Nodes.CardKind.MIXED, List.of(
+                new Nodes.FormRow("user-row", READY, "Username", "", field("user", "root", Nodes.FieldKind.TEXT), Optional.empty()),
+                groupRow("group", "Group", false), toggleRow("a"))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                KitFixtures.render(view, 488, 200, 1);
+                var card = find(view, "card", Cards.CardSurface.class);
+                assertThat(x(find(view, "group-row", JComponent.class), card)).as("the setting row spans the card").isZero();
+                assertThat(x(find(view, "group-row.title", JComponent.class), card)).isEqualTo(x(find(view, "user-row.label", JLabel.class), card));
+                assertThat(x(find(view, "group", JComponent.class), card)).isEqualTo(x(find(view, "user", JComponent.class), card));
+            } finally { release(context); }
+        });
+    }
+
+    /** Rulings 17 (Add Host's Options › Group): a FULL form's SETTINGS card puts its group row on the column of the FORM card above. */
+    @Test void aSettingsCardsGroupRowSitsOnTheFormsFieldColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var form = new Nodes.Form("host", READY, Nodes.FormKind.FULL, "Add Host", Optional.empty(), List.of(
+                new Nodes.Section("connection", READY, "Connection", new Nodes.Card("connection-card", READY, Nodes.CardKind.FORM, List.of(
+                    new Nodes.FormRow("name-row", READY, "Name", "", field("name", "e.g. homelab", Nodes.FieldKind.TEXT), Optional.empty())))),
+                new Nodes.Section("options", READY, "Options", new Nodes.Card("options-card", READY, Nodes.CardKind.SETTINGS, List.of(
+                    groupRow("group", "Group", false), toggleRow("favorite"))))),
+                Optional.empty(), List.of());
+            try (var view = new KitView(context, new ViewSpec(form), e -> {})) {
+                KitFixtures.render(view, 520, 400, 1);
+                assertThat(((SettingRows.RowControl) view.control("group-row")).formLabel).isTrue();
+                assertThat(x(find(view, "group-row.title", JComponent.class), view)).isEqualTo(x(find(view, "name-row.label", JLabel.class), view));
+                assertThat(x(find(view, "group", JComponent.class), view)).isEqualTo(x(find(view, "name", JComponent.class), view));
             } finally { release(context); }
         });
     }
