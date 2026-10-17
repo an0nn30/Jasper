@@ -14,12 +14,30 @@ public final class AuxiliaryWindows implements AutoCloseable {
     private final UiState state;
     private final Function<AuxiliarySurface, AuxiliarySurface.Shell> shells;
     private final List<AuxiliarySurface> open = new ArrayList<>();
+    /** The look's mapping: classic overlays and sheets, and dialogs a native title bar titles. */
+    private final boolean classic, windowTitled;
+    private final dev.jasper.app.presentation.DialogMapping dialogs;
+
+    /** The look's dialog mapping these windows were made with (spec 4.9; {@code PresentationReachTest}). */
+    public dev.jasper.app.presentation.DialogMapping dialogs() { return dialogs; }
 
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells) {
         this(state, shells, (choice, cancellation) -> List.of());
     }
 
     public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser) {
+        this(state, shells, chooser, new dev.jasper.app.presentation.DialogMapping(dev.jasper.app.presentation.DialogMapping.Kind.AS_REQUESTED, false));
+    }
+
+    /**
+     * As above, under the look's dialog mapping (Enterprise presentation spec 10.8): the one reader of
+     * {@code DialogMapping}, it marks every surface it makes, so plugin and app dialogs share the classic path.
+     */
+    public AuxiliaryWindows(UiState state, Function<AuxiliarySurface, AuxiliarySurface.Shell> shells, PathChooser chooser,
+                            dev.jasper.app.presentation.DialogMapping dialogs) {
+        this.dialogs = Objects.requireNonNull(dialogs);
+        this.classic = dialogs.kind() == dev.jasper.app.presentation.DialogMapping.Kind.CLASSIC;
+        this.windowTitled = dialogs.windowTitled();
         this.chooser = Objects.requireNonNull(chooser);
         this.state = Objects.requireNonNull(state);
         this.shells = Objects.requireNonNull(shells);
@@ -125,6 +143,8 @@ public final class AuxiliaryWindows implements AutoCloseable {
     private boolean emptyReported = true;
 
     private AuxiliarySurface track(AuxiliarySurface surface) {
+        surface.classic(classic);
+        if (surface.kind() == AuxiliarySurface.Kind.DIALOG) surface.hostTitled(windowTitled);
         boolean first = open.isEmpty();
         open.add(surface);
         emptyReported = false;

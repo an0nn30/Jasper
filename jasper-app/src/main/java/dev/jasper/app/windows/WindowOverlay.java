@@ -1,6 +1,7 @@
 package dev.jasper.app.windows;
 
 import dev.jasper.app.platform.WindowInput;
+import dev.jasper.ui.swing.ClassicDialog;
 import dev.jasper.ui.swing.KitContext;
 import dev.jasper.ui.swing.ModalOverlay;
 import java.awt.*;
@@ -8,19 +9,42 @@ import java.awt.event.*;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.swing.*;
 import javax.swing.text.JTextComponent;
 
 /**
- * One EDT-owned modal overlay inside an existing root: the kit's {@link ModalOverlay} (the scrim, the centred card and
- * its fade-up motion) with the window's input routed to it. Overlays over one window stack: the newest takes the keys
- * and focus, and closing it hands them back to the one below. Creates no native window.
+ * One EDT-owned modal layer inside an existing root: the kit's {@link ModalOverlay} (the scrim, the centred card and its
+ * fade-up motion) or a {@link ClassicDialog} (Enterprise presentation spec 10.8), with the window's input routed to it.
+ * Layers over one window stack: the newest takes the keys and focus, and closing it hands them back to the one below.
+ * Creates no native window.
  */
 final class WindowOverlay implements AutoCloseable {
     /** The root's open overlays, oldest first; {@link WindowInput#OVERLAY} names the newest. */
     private static final String STACK = "Jasper.windowOverlays";
+
+    /**
+     * What the overlay shows and how it opens and leaves.
+     *
+     * @param component the layer added to the root's layered pane
+     * @param card the card holding the content, the focus cycle root
+     * @param open puts the card in place
+     * @param dismiss takes the layer away, then runs its argument
+     * @param close removes the layer at once and releases it
+     * @param cardBounds where the card is
+     */
+    record Layer(JComponent component, JComponent card, Runnable open, Consumer<Runnable> dismiss, Runnable close, Supplier<Rectangle> cardBounds) {
+        static Layer faded(ModalOverlay overlay) {
+            return new Layer(overlay, overlay.card(), overlay::open, overlay::dismiss, overlay::close, overlay::cardBounds);
+        }
+        static Layer classic(ClassicDialog dialog) {
+            return new Layer(dialog, dialog.card(), dialog::open, dialog::dismiss, dialog::close, dialog::cardBounds);
+        }
+    }
+
     private final JRootPane root;
-    private final ModalOverlay overlay;
+    private final Layer layer;
     /** A dialog's Escape reaches its content (its Cancel); a progress overlay keeps Escape from the window. */
     private final boolean dialog;
     private final KeyboardFocusManager focusManager;
@@ -37,9 +61,17 @@ final class WindowOverlay implements AutoCloseable {
     }
 
     WindowOverlay(JRootPane root, JComponent content, KitContext context, boolean dialog, KeyboardFocusManager focusManager) {
-        this.root = root; this.dialog = dialog; this.focusManager = focusManager;
-        overlay = new ModalOverlay(context, content);
-        var card = overlay.card();
+        this(root, Layer.faded(new ModalOverlay(context, content)), dialog, focusManager);
+    }
+
+    /** A classic dialog over {@code root} (spec 10.8): modal, Escape reaching its content. */
+    static WindowOverlay classic(JRootPane root, ClassicDialog dialog) {
+        return new WindowOverlay(root, Layer.classic(dialog), true, KeyboardFocusManager.getCurrentKeyboardFocusManager());
+    }
+
+    private WindowOverlay(JRootPane root, Layer layer, boolean dialog, KeyboardFocusManager focusManager) {
+        this.root = root; this.layer = layer; this.dialog = dialog; this.focusManager = focusManager;
+        var card = layer.card();
         card.setFocusCycleRoot(true);
         card.setFocusTraversalPolicy(new ContainerOrderFocusTraversalPolicy() {
             @Override protected boolean accept(Component component) {
@@ -49,7 +81,7 @@ final class WindowOverlay implements AutoCloseable {
         });
         card.setFocusable(true);
         // A press on the scrim returns focus to the card.
-        overlay.addMouseListener(new MouseAdapter() {
+        layer.component().addMouseListener(new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) { focus(); }
         });
     }
@@ -68,7 +100,7 @@ final class WindowOverlay implements AutoCloseable {
 
     private void focusChanged(java.beans.PropertyChangeEvent event) {
         if (top() && event.getNewValue() instanceof Component next
-                && SwingUtilities.getRootPane(next) == root && !SwingUtilities.isDescendingFrom(next, overlay.card()))
+                && SwingUtilities.getRootPane(next) == root && !SwingUtilities.isDescendingFrom(next, layer.card()))
             SwingUtilities.invokeLater(() -> { if (top()) focus(); });
     }
 
@@ -79,30 +111,31 @@ final class WindowOverlay implements AutoCloseable {
             shown = true;
             var stack = stack();
             // Each newer overlay takes the layer above the last, over everything the window shows.
-            root.getLayeredPane().add(overlay, Integer.valueOf(JLayeredPane.DRAG_LAYER + 1 + stack.size()));
+            root.getLayeredPane().add(layer.component(), Integer.valueOf(JLayeredPane.DRAG_LAYER + 1 + stack.size()));
             stack.add(this);
             root.putClientProperty(WindowInput.OVERLAY, this);
             root.getLayeredPane().addComponentListener(resize);
             focusManager.addKeyEventDispatcher(keys);
             focusManager.addPropertyChangeListener("focusOwner", focusChanged);
             layout();
-            overlay.open();
+            layer.open().run();
         }
         layout(); focus();
     }
 
     void layout() {
         if (!shown) return;
-        overlay.setBounds(0, 0, root.getLayeredPane().getWidth(), root.getLayeredPane().getHeight());
-        overlay.doLayout(); overlay.revalidate(); overlay.repaint();
+        var component = layer.component();
+        component.setBounds(0, 0, root.getLayeredPane().getWidth(), root.getLayeredPane().getHeight());
+        component.doLayout(); component.revalidate(); component.repaint();
     }
 
-    Rectangle cardBounds() { return overlay.cardBounds(); }
+    Rectangle cardBounds() { return layer.cardBounds().get(); }
 
     void focus() {
         if (!top()) return;
         Component current = focusManager.getFocusOwner();
-        var card = overlay.card();
+        var card = layer.card();
         if (current != null && SwingUtilities.isDescendingFrom(current, card)) return;
         Component first = card.getFocusTraversalPolicy().getDefaultComponent(card);
         if (first == null || !first.requestFocusInWindow()) card.requestFocusInWindow();
@@ -111,7 +144,7 @@ final class WindowOverlay implements AutoCloseable {
     /** Source-root checks let native Vault/trust prompts keep their own input; only the newest overlay filters. */
     boolean filterKey(KeyEvent event) {
         if (!top() || SwingUtilities.getRootPane(event.getComponent()) != root) return false;
-        boolean inside = SwingUtilities.isDescendingFrom(event.getComponent(), overlay.card());
+        boolean inside = SwingUtilities.isDescendingFrom(event.getComponent(), layer.card());
         boolean escape = event.getKeyCode() == KeyEvent.VK_ESCAPE || event.getKeyChar() == 27;
         boolean command = event.isMetaDown() || event.isControlDown() || event.isAltDown();
         boolean editing = event.getComponent() instanceof JTextComponent && !event.isAltDown()
@@ -127,13 +160,13 @@ final class WindowOverlay implements AutoCloseable {
         return false;
     }
 
-    /** Hands input back at once and lets the card fade out; the overlay leaves the window when the exit ends. */
+    /** Hands input back at once and lets the layer leave (a classic dialog leaves at once). */
     @Override public void close() {
         if (closed) return;
         closed = true;
         Component closingFocus = focusManager.getFocusOwner();
         boolean wasTop = top();
-        boolean restore = shown && closingFocus != null && SwingUtilities.isDescendingFrom(closingFocus, overlay);
+        boolean restore = shown && closingFocus != null && SwingUtilities.isDescendingFrom(closingFocus, layer.component());
         boolean wasShown = shown;
         shown = false;
         focusManager.removeKeyEventDispatcher(keys);
@@ -144,8 +177,8 @@ final class WindowOverlay implements AutoCloseable {
         WindowOverlay below = stack.isEmpty() ? null : stack.getLast();
         if (wasTop || root.getClientProperty(WindowInput.OVERLAY) == this) root.putClientProperty(WindowInput.OVERLAY, below);
         if (stack.isEmpty()) root.putClientProperty(STACK, null);
-        Runnable gone = () -> { overlay.card().removeAll(); overlay.close(); root.revalidate(); root.repaint(); };
-        if (wasShown) overlay.dismiss(gone); else gone.run();
+        Runnable gone = () -> { layer.card().removeAll(); layer.close().run(); root.revalidate(); root.repaint(); };
+        if (wasShown) layer.dismiss().accept(gone); else gone.run();
         if (below != null) {
             if (restore) below.focus();
             return;
