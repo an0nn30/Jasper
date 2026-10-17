@@ -4,8 +4,9 @@
 Usage: check_pairs.py OUT_DIR [NAME_FILTER]
 
 For every pairs.json entry with "min_agreement", runs compare_mock.py into OUT_DIR and passes the pair when its edge
-agreement is at least that floor and every colour in "colours" fills a 2x2 block within Delta E 6 (CIE76) in both the
-mock crop and the render. Prints one PASS or FAIL line per pair and exits 1 when any pair fails. Opt-in: never part of
+agreement is at least that floor and every colour in "colours" is present in both images: in the mock crop as a 2x2
+block within Delta E 6 (CIE76), and in the render, which paints theme roles exactly, within Delta E 1.5 as a 2x2 block
+or a straight run of three pixels (a 1 px edge that a fractional layout position leaves one device pixel wide). Prints one PASS or FAIL line per pair and exits 1 when any pair fails. Opt-in: never part of
 ./gradlew check. Render first: ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=light
 -Pjasper.galleryScale=2
 """
@@ -20,7 +21,9 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-TOLERANCE = 6.0
+# The render paints role colours exactly; a tolerance of 6 would let the Enterprise neutrals stand in for one another.
+RENDER_TOLERANCE = 1.5
+MOCK_TOLERANCE = 6.0
 
 
 def lab(rgb):
@@ -32,12 +35,14 @@ def lab(rgb):
     return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], axis=-1)
 
 
-def present(image, colour):
-    """Whether a 2x2 block of image is within TOLERANCE of colour (#RRGGBB)."""
+def present(image, colour, tolerance, lines=False):
+    """Whether a 2x2 block of image (or, with lines, a run of three in a row or a column) is within tolerance of colour."""
     pixels = lab(np.asarray(image.convert("RGB"), dtype=np.float64) / 255.0)
     target = lab(np.array([int(colour[i:i + 2], 16) for i in (1, 3, 5)], dtype=np.float64) / 255.0)
-    close = np.sqrt(((pixels - target) ** 2).sum(axis=-1)) <= TOLERANCE
+    close = np.sqrt(((pixels - target) ** 2).sum(axis=-1)) <= tolerance
     block = close[:-1, :-1] & close[1:, :-1] & close[:-1, 1:] & close[1:, 1:]
+    if lines:
+        return bool(block.any() or (close[:, :-2] & close[:, 1:-1] & close[:, 2:]).any() or (close[:-2] & close[1:-1] & close[2:]).any())
     return bool(block.any())
 
 
@@ -72,7 +77,8 @@ def main():
         found = re.search(r"edge_agreement=([0-9.]+)", result.stdout)
         agreement = float(found.group(1)) if found else 0.0
         mock_image, render_image = crop(mock, pair["crop"]), crop(render, pair.get("render_crop"))
-        missing = [c for c in pair.get("colours", []) if not (present(mock_image, c) and present(render_image, c))]
+        missing = [c for c in pair.get("colours", [])
+                   if not (present(mock_image, c, MOCK_TOLERANCE) and present(render_image, c, RENDER_TOLERANCE, lines=True))]
         ok = found is not None and agreement >= pair["min_agreement"] and not missing
         failed |= not ok
         detail = f"agreement={agreement:.3f} (floor {pair['min_agreement']:.2f})"

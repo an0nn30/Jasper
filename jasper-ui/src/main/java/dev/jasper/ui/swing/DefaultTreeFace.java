@@ -22,7 +22,7 @@ final class DefaultTreeFace implements TreeFace {
         return new Insets(pad, side, pad, side);
     }
     @Override public void paintHeader(JComponent header, Graphics2D g, KitContext context) { }
-    @Override public Border box(KitContext context) { return null; }
+    @Override public Border box(InteractiveRows.RowsControl owner) { return null; }
     @Override public Color hover(KitContext context) { return ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .05); }
     @Override public int indent(KitContext context, int depth) { return depth * com.formdev.flatlaf.util.UIScale.scale(16); }
     @Override public Nodes.ButtonPresentation disclosure() { return Nodes.ButtonPresentation.STANDARD; }

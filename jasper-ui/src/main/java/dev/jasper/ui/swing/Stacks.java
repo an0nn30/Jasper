@@ -21,9 +21,11 @@ final class Stacks {
         final KitContext context;boolean joined,route;
         /** The stack's layout role, which a classic ghost button reads to know a toolbar row from an actions row. */
         Nodes.LayoutRole role;
-        /** A classic route strip's cell starts and the hue of each step's edge (ClassicRouteFace, plan 4c). */
+        /** A classic route strip's cell starts and the hue of each visible step's edge (ClassicRouteFace, plan 4c). */
         int[] cells=new int[0];
         List<Nodes.Hue> hues=List.of();
+        /** Each route step's hue by its component, so a hidden step takes its hue with it. */
+        java.util.Map<Component,Nodes.Hue> stepHues=java.util.Map.of();
         StackSurface(KitContext context){this.context=context;}
         /** A ROUTE strip's arrow positions, left to right, as its layout placed them. */
         int[] arrows=new int[0];

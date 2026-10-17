@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.ui.kit.ControlVariants;
 import dev.jasper.ui.kit.Kit;
+import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.swing.KitFaces;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SurfaceContrast;
@@ -160,7 +161,11 @@ class KitMatrixTest {
         }
     }
 
-    /** Rulings 18: under marked(), every one-colour 3 x 3 block of a classic surface is a role or a blend of two. */
+    /**
+     * Rulings 18: under marked(), every one-colour 3 x 3 block of a classic surface is a role or a blend of two: over the
+     * Enterprise fixtures and the gallery fixtures that hold an Empty state or a Chip, so the classic empty and tag faces
+     * are mapped too.
+     */
     @Test void underMarkedEveryClassicAreaIsARoleOrABlendOfTwo() {
         var theme = KitFixtures.marked();
         var kit = KitFixtures.enterprise();
@@ -171,7 +176,10 @@ class KitMatrixTest {
         allowed.add(java.awt.Color.BLACK);
         allowed.add(java.awt.Color.WHITE);
         var found = new ArrayList<String>();
-        for (var capture : captures(theme, kit, EnterpriseFixtures.create()))
+        var fixtures = new ArrayList<>(EnterpriseFixtures.create());
+        for (var fixture : KitGallery.fixtures()) if (holds(fixture.spec().root(), Nodes.Empty.class) || holds(fixture.spec().root(), Nodes.Chip.class)) fixtures.add(fixture);
+        assertThat(fixtures).as("gallery fixtures with an Empty state or a Chip").hasSizeGreaterThan(EnterpriseFixtures.create().size());
+        for (var capture : captures(theme, kit, fixtures))
             blocks(capture.image(), 3).forEach((rgb, at) -> {
                 if (!blend(rgb, allowed)) found.add(capture.fixture().name() + " #" + Integer.toHexString(rgb & 0xFFFFFF) + " at " + at);
             });
@@ -188,6 +196,13 @@ class KitMatrixTest {
             for (int rgb : painted) found.add(capture.fixture().name() + " #" + Integer.toHexString(rgb & 0xFFFFFF));
         }
         assertThat(found).as("pixels in another theme's colours under custom() and the Enterprise kit").isEmpty();
+    }
+
+    /** Whether {@code node} or any record under it (table cells and list rows included) is a {@code type}. */
+    static boolean holds(Nodes.Node node, Class<? extends Nodes.Node> type) {
+        var records = new ArrayList<Record>();
+        GalleryCoverageTest.records(node, records);
+        return records.stream().anyMatch(type::isInstance);
     }
 
     @Test void aBlendOfTwoAllowedColoursIsAllowedAndAThirdColourIsNot() {

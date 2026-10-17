@@ -13,6 +13,8 @@ final class KitSettingRows {
     private final Function<Setting<?>, SettingSpec<?>> specs;
     private final Map<String, Setting<?>> controls = new LinkedHashMap<>();
     private final Map<String, String> errors = new HashMap<>(), edits = new HashMap<>(), entries = new HashMap<>();
+    /** Each ordered list's selected row index: its rows are keyed by position. */
+    private final Map<String, Integer> selections = new HashMap<>();
     /** An ordered list's entry field and Add button are its control id followed by these. */
     static final String ENTRY=":new",ADD=":add";
     private String query = "";
@@ -26,7 +28,7 @@ final class KitSettingRows {
     }
     boolean valid(){return errors.isEmpty();}
     void staged(Setting<?> setting){String id="settings:"+setting.key();errors.remove(id);edits.remove(id);}
-    void reset(){errors.clear();edits.clear();entries.clear();}
+    void reset(){errors.clear();edits.clear();entries.clear();selections.clear();}
     void highlight(String value){query=Objects.requireNonNull(value);}
     Nodes.Node row(Setting<?> setting){
         var spec=specs.apply(setting);String id="settings:"+setting.key();controls.put(id,setting);
@@ -39,7 +41,7 @@ final class KitSettingRows {
             control=new Nodes.Choice(id,state,Nodes.ChoiceKind.DROPDOWN,options,selected,spec.label(),id);
         }else if(spec.kind() instanceof SettingKind.StringList){
             // As the generated pages (Editors.textList, spec 13): the ordered list, then an entry and Add below it.
-            control=list(id,state,spec.label(),(List<?>)value,entries.getOrDefault(id,""));
+            control=list(id,state,spec.label(),(List<?>)value,entries.getOrDefault(id,""),selections.getOrDefault(id,-1));
         }else if(PluginSettingsPage.Hint.of(spec).font() && spec.kind() instanceof SettingKind.Text){
             // As the generated pages: free text over the installed families, which filter as you type.
             control=font(id,state,spec,edits.getOrDefault(id,value.toString()));
@@ -60,9 +62,10 @@ final class KitSettingRows {
     }
     /**
      * The generated pages' ordered-list editor ({@code Editors.textList()}) node for node: the rows in order as
-     * {@code item-N}, then an entry field and Add, which is enabled while the entry holds text.
+     * {@code item-N} with the {@code selected} row, then an entry field and Add, which is enabled while the entry holds
+     * text.
      */
-    private static Nodes.Stack list(String id,ControlState state,String label,List<?> items,String pending){
+    private static Nodes.Stack list(String id,ControlState state,String label,List<?> items,String pending,int selected){
         var plain=new ControlState(state.visible(),state.enabled(),state.busy(),"");
         var rows=new ArrayList<ListItem>();
         for(int i=0;i<items.size();i++)rows.add(new ListItem("item-"+i,Optional.empty(),
@@ -70,13 +73,15 @@ final class KitSettingRows {
         var entry=new Nodes.Field(id+ENTRY,plain,Nodes.FieldKind.TEXT,pending,"Add…","Add to "+label,pending.isBlank()?"":id+ADD);
         var add=new Nodes.Button(id+ADD,new ControlState(state.visible(),state.enabled()&&!pending.isBlank(),state.busy(),""),"Add","add",
             Nodes.ButtonKind.SECONDARY,id+ADD,"");
-        return new Nodes.Stack(id+":editor",plain,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.ItemList(id,state,Nodes.ListKind.ORDERED,rows,Set.of(),"",List.of()),
+        return new Nodes.Stack(id+":editor",plain,Nodes.LayoutRole.VERTICAL,List.of(new Nodes.ItemList(id,state,Nodes.ListKind.ORDERED,rows,
+            dev.jasper.app.settingsui.Editors.selectedIds(selected,items.size()),"",List.of()),
             new Nodes.Stack(id+":entry",plain,Nodes.LayoutRole.INLINE,List.of(entry,add))));
     }
     /**
      * An ordered list's entry, Add, Remove and reorder, as the generated pages' editor: the entry's text is kept until an
      * Add stages it; a value the kind rejects keeps the entry and shows the row's error until the entry changes; a stale
-     * row or a row selection changes nothing.
+     * row or a row selection changes nothing. The selected row is kept and moves with its item, as the generated pages'
+     * editor keeps it, since the classic side column acts on the selection.
      */
     @SuppressWarnings({"unchecked","rawtypes"})
     private boolean listEvent(UiEvent event){
@@ -88,8 +93,11 @@ final class KitSettingRows {
         switch(event){
             // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
             case UiEvent.Edited edited when edited.id().equals(id+ENTRY) -> { entries.put(id,edited.text()); if(errors.remove(id)!=null)host.changed(); return true; }
-            // The list's own row selection stages nothing, as the generated pages' editor ignores it.
-            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
+            // The list's own row selection stages nothing; it is kept so a move or removal can carry it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> {
+                selections.put(id,selected.ids().stream().mapToInt(row -> itemIndex(row,items.size())).filter(i -> i>=0).min().orElse(-1));
+                return true;
+            }
             case UiEvent.Action action when action.id().equals(id+ADD) -> {
                 String text=entries.getOrDefault(id,"");
                 if(text.isBlank())return true;
@@ -99,11 +107,13 @@ final class KitSettingRows {
                 int index=itemIndex(removed.itemId(),items.size());
                 if(index<0)return true;
                 items.remove(index);
+                selections.computeIfPresent(id,(key,at) -> dev.jasper.app.settingsui.Editors.afterRemoval(at,index));
             }
             case UiEvent.Reordered moved when moved.id().equals(id) -> {
                 int index=itemIndex(moved.itemId(),items.size());
                 if(index<0||moved.destination()<0||moved.destination()>=items.size())return true;
                 items.add(moved.destination(),items.remove(index));
+                selections.computeIfPresent(id,(key,at) -> dev.jasper.app.settingsui.Editors.afterMove(at,index,moved.destination()));
             }
             default -> { return false; }
         }

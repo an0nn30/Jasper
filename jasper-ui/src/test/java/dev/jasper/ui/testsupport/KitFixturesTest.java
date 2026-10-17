@@ -95,5 +95,17 @@ class KitFixturesTest {
         org.assertj.core.api.Assertions.assertThat(dev.jasper.ui.theme.DerivedColor.SURFACE_ZEBRA.color(theme)).isEqualTo(new java.awt.Color(0xF7F8FA));
         org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL)).as("an unnamed role")
             .isEqualTo(KitFixtures.light().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL));
+        // The ruled roles follow the named ones, as JasperTheme derives them for a theme file.
+        var semantic = theme.semantic();
+        for (var rule : java.util.Map.of(dev.jasper.ui.theme.SemanticColor.BORDER_FOCUS, dev.jasper.ui.theme.SemanticColor.ACCENT,
+                dev.jasper.ui.theme.SemanticColor.SURFACE_STATUS, dev.jasper.ui.theme.SemanticColor.SURFACE_APP,
+                dev.jasper.ui.theme.SemanticColor.BORDER_IDENTITY, dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL,
+                dev.jasper.ui.theme.SemanticColor.HUE_BLUE_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_BLUE,
+                dev.jasper.ui.theme.SemanticColor.HUE_GREEN_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_GREEN,
+                dev.jasper.ui.theme.SemanticColor.HUE_AMBER_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_AMBER,
+                dev.jasper.ui.theme.SemanticColor.HUE_PURPLE_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_PURPLE,
+                dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL_SURFACE, dev.jasper.ui.theme.SemanticColor.HUE_NEUTRAL).entrySet())
+            org.assertj.core.api.Assertions.assertThat(semantic.color(rule.getKey())).as(rule.getKey().key()).isEqualTo(semantic.color(rule.getValue()));
+        org.assertj.core.api.Assertions.assertThat(semantic.color(dev.jasper.ui.theme.SemanticColor.HUE_BLUE_SURFACE)).isEqualTo(new java.awt.Color(0x2F65CA));
     }
 }

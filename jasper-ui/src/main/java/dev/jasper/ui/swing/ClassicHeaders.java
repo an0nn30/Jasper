@@ -48,16 +48,25 @@ final class ClassicHeaders {
     /**
      * The 1 px box around a table or tree that is not in a panel body (Rulings 2), its edge through {@code edge}'s guard,
      * around the rows' {@code surface.card} (the mocks' white list). A border paints before the pane's children, so the
-     * fill lies under the header band and the rows.
+     * fill lies under the header band and the rows. The Settings navigation tree, a manager's rail and a table in a
+     * manager's rail or list column stand unboxed on their surface, as the Settings and Vault mocks draw them; a table in
+     * the detail column keeps its box.
      */
     static final class Box implements Border {
+        final InteractiveRows.RowsControl owner;
         final KitContext context;
         final PaintPair edge;
 
-        Box(KitContext context, PaintPair edge) { this.context = context; this.edge = edge; }
+        Box(InteractiveRows.RowsControl owner, PaintPair edge) { this.owner = owner; this.context = owner.context(); this.edge = edge; }
 
-        /** A panel body draws its own rules around the rows. */
-        static boolean drawn(Component c) { return SwingUtilities.getAncestorOfClass(Panels.Body.class, c) == null; }
+        /**
+         * Whether the box shows around {@code c}, asked at every measure and paint because the reconciler sets a tree's
+         * navigation and a control's column after it is built; a panel body draws its own rules around the rows.
+         */
+        boolean drawn(Component c) {
+            if (owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.rail() : owner.column == 0 || owner.column == 1) return false;
+            return SwingUtilities.getAncestorOfClass(Panels.Body.class, c) == null;
+        }
 
         @Override public Insets getBorderInsets(Component c) {
             int line = drawn(c) ? ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) : 0;

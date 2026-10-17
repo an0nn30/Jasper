@@ -81,27 +81,94 @@ class ClassicIndicatorsTest {
         });
     }
 
-    /** Review Focus 3: the tags' text and boxes as their guards make them, over every palette; NONE is neutral. */
-    @Test void aClassicTagIsAnUppercaseLabelInAToneBoxOverEveryPalette() {
+    static ViewSpec empty(Nodes.Button first, Nodes.Button second) {
+        return new ViewSpec(new Nodes.Empty("empty", READY, new Nodes.Icon("empty-icon", READY, "plugin", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Document"),
+            "Could Not Open", "The file could not be read.", List.of(first, second)));
+    }
+
+    static Nodes.Button action(String id, ControlState state, Nodes.ButtonKind kind) { return new Nodes.Button(id, state, id, "", kind, id, ""); }
+
+    /** Final review: the classic state keeps the visible PRIMARY action, or else the first visible one, on every update. */
+    @Test void aClassicEmptyStatePlacesItsVisiblePrimaryOrFirstVisibleAction() {
+        var hidden = new ControlState(false, true, false, "");
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, empty(action("close", READY, Nodes.ButtonKind.SECONDARY), action("retry", READY, Nodes.ButtonKind.PRIMARY)), e -> {})) {
+                KitFixtures.render(view, 360, 220, 1);
+                var control = (EmptyStates.EmptyControl) view.control("empty");
+                assertThat(view.control("retry").component.getParent()).as("the PRIMARY action after a SECONDARY one").isSameAs(control.actions);
+                assertThat(view.control("close").component.getParent()).isNull();
+                view.update(empty(action("close", READY, Nodes.ButtonKind.SECONDARY), action("retry", hidden, Nodes.ButtonKind.PRIMARY)));
+                KitFixtures.render(view, 360, 220, 1);
+                assertThat(view.control("close").component.getParent()).as("a hidden PRIMARY gives way to the first visible action").isSameAs(control.actions);
+                assertThat(view.control("retry").component.getParent()).isNull();
+                view.update(empty(action("close", hidden, Nodes.ButtonKind.SECONDARY), action("retry", READY, Nodes.ButtonKind.SECONDARY)));
+                KitFixtures.render(view, 360, 220, 1);
+                assertThat(view.control("retry").component.getParent()).as("a hidden first action gives way to a visible one").isSameAs(control.actions);
+                assertThat(view.control("close").component.getParent()).isNull();
+            } finally { release(context); }
+        });
+    }
+
+    static final Map<String, Nodes.Hue> CHIP_HUES = Map.of("http", Nodes.Hue.BLUE, "sftp", Nodes.Hue.GREEN, "ftp", Nodes.Hue.AMBER,
+        "rsync", Nodes.Hue.PURPLE, "plain", Nodes.Hue.NEUTRAL, "none", Nodes.Hue.NEUTRAL);
+
+    /** Review Focus 3: an upper-case label of the chip's height over every palette, degenerate ones included. */
+    @Test void aClassicTagIsAnUppercaseLabelOverEveryPalette() {
         var palettes = new ArrayList<>(KitFixtures.themes()); palettes.addAll(KitFixtures.degenerate());
         for (var theme : palettes) Edt.run(() -> {
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
-            var face = (ClassicTagFace) context.faces().tag;
-            String where = theme.name() + (theme.dark() ? " Dark" : " Light");
             try (var view = new KitView(context, chips(), e -> {})) {
                 KitFixtures.render(view, 420, 40, 1);
-                var hues = Map.of("http", Nodes.Hue.BLUE, "sftp", Nodes.Hue.GREEN, "ftp", Nodes.Hue.AMBER, "rsync", Nodes.Hue.PURPLE,
-                    "plain", Nodes.Hue.NEUTRAL, "none", Nodes.Hue.NEUTRAL);
-                for (var entry : hues.entrySet()) {
-                    var label = find(view, entry.getKey(), Indicators.ChipLabel.class);
-                    assertThat(label.getText()).isEqualTo(entry.getKey().toUpperCase(Locale.ROOT));
-                    assertThat(label.getForeground()).as(where + " " + entry.getKey()).isEqualTo(ThemePainting.painted(context, face.text(entry.getValue())));
-                    assertThat(at(paint(label), 0, label.getHeight() / 2)).as(where + " box " + entry.getKey())
-                        .isEqualTo(ThemePainting.painted(context, face.edge(entry.getValue())));
+                for (var id : CHIP_HUES.keySet()) {
+                    var label = find(view, id, Indicators.ChipLabel.class);
+                    assertThat(label.getText()).isEqualTo(id.toUpperCase(Locale.ROOT));
                     assertThat(label.getHeight()).isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.CHIP_HEIGHT));
+                    assertThat(label.edge).as(theme.name() + " " + id).isNotNull();
                 }
             } finally { release(context); }
         });
+    }
+
+    /**
+     * Review Focus 3, as painted: each chip drawn on {@code surface.card}, the ground a tag stands on in a table or list.
+     * Its most contrasting label pixel stands 3:1 from the tint, and its 1 px box stands the structural 1.3:1 apart from
+     * the card outside and the tint inside, over the theme set and Enterprise Light.
+     */
+    @Test void aClassicTagsLabelAndBoxStandOutAsPainted() {
+        var themes = new ArrayList<>(KitFixtures.themes()); themes.add(KitFixtures.enterpriseLight());
+        var failures = new ArrayList<String>();
+        for (var theme : themes) Edt.run(() -> {
+            var context = KitFixtures.context(theme, KitFixtures.enterprise());
+            String where = theme.name() + (theme.dark() ? " Dark" : " Light");
+            var card = ThemePainting.color(context, SemanticColor.SURFACE_CARD);
+            try (var view = new KitView(context, chips(), e -> {})) {
+                KitFixtures.render(view, 420, 40, 1);
+                for (var id : CHIP_HUES.keySet()) {
+                    var label = find(view, id, Indicators.ChipLabel.class);
+                    var image = onCard(label, card);
+                    int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), middle = label.getHeight() / 2;
+                    var tint = at(image, line + 1, middle);
+                    var ring = at(image, 0, middle);
+                    double text = 0;
+                    for (int y = line + 1; y < label.getHeight() - line - 1; y++)
+                        for (int x = line + 1; x < label.getWidth() - line - 1; x++) text = Math.max(text, ColorMath.contrast(at(image, x, y), tint));
+                    if (text < 3.0) failures.add(where + " " + id + " label " + String.format("%.2f", text));
+                    double outside = ColorMath.contrast(ring, card), inside = ColorMath.contrast(ring, tint);
+                    if (outside < SurfaceContrast.STRUCTURAL) failures.add(where + " " + id + " box on the card " + String.format("%.2f", outside));
+                    if (inside < SurfaceContrast.STRUCTURAL) failures.add(where + " " + id + " box on the tint " + String.format("%.2f", inside));
+                }
+            } finally { release(context); }
+        });
+        assertThat(failures).isEmpty();
+    }
+
+    /** {@code label} painted over an opaque {@code ground}, as it stands in a row. */
+    static BufferedImage onCard(JComponent label, Color ground) {
+        var image = new BufferedImage(label.getWidth(), label.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = image.createGraphics();
+        try { g.setColor(ground); g.fillRect(0, 0, label.getWidth(), label.getHeight()); label.paint(g); } finally { g.dispose(); }
+        return image;
     }
 
     @Test void theDefaultTagKeepsItsTintAndCase() {
@@ -156,6 +223,28 @@ class ClassicIndicatorsTest {
                 } finally { release(context); }
             });
         }
+    }
+
+    /** Final review: a hidden step takes its hue with it; each visible cell is edged in its own step's hue. */
+    @Test void aHiddenRouteStepTakesItsHueWithIt() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var face = (ClassicRouteFace) context.faces().route;
+            var stacks = (Nodes.Stack) route(3).root();
+            var steps = new ArrayList<>(stacks.children());
+            var hidden = (Nodes.Stack) steps.get(1);
+            steps.set(1, new Nodes.Stack(hidden.id(), new ControlState(false, true, false, ""), hidden.role(), hidden.children()));
+            try (var view = new KitView(context, new ViewSpec(new Nodes.Stack("route", READY, Nodes.LayoutRole.ROUTE, steps)), e -> {})) {
+                KitFixtures.render(view, 520, 60, 1);
+                var surface = (Stacks.StackSurface) view.control("route").component;
+                assertThat(surface.cells).hasSize(2);
+                var image = paint(surface);
+                int middle = ThemePainting.metric(context, DesignMetrics.Role.ROUTE_TOP) + (surface.getHeight() - ThemePainting.metric(context, DesignMetrics.Role.ROUTE_TOP)) / 2;
+                assertThat(at(image, surface.cells[0] + 1, middle)).isEqualTo(ThemePainting.painted(context, face.edge(HUES.get(0))));
+                assertThat(at(image, surface.cells[1] + 1, middle)).as("the third step's hue on the second cell")
+                    .isEqualTo(ThemePainting.painted(context, face.edge(HUES.get(2))));
+            } finally { release(context); }
+        });
     }
 
     @Test void theDefaultRouteKeepsItsTiles() {

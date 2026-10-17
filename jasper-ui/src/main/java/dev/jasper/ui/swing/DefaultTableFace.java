@@ -21,7 +21,7 @@ final class DefaultTableFace implements TableFace {
         return new Insets(pad, side, pad, side);
     }
     @Override public void paintHeader(JComponent header, Graphics2D g, KitContext context) { }
-    @Override public Border box(KitContext context) { return null; }
+    @Override public Border box(InteractiveRows.RowsControl owner) { return null; }
     @Override public Color hover(KitContext context) { return ColorMath.opacity(ThemePainting.color(context, SemanticColor.HOVER_OVERLAY), .05); }
     @Override public void paintBands(Tables.TableControl table, Graphics2D g, int width) { }
     @Override public boolean headingRule() { return true; }

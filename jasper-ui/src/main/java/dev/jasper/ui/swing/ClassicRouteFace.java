@@ -54,7 +54,9 @@ final class ClassicRouteFace implements RouteFace {
     @Override public LayoutManager layout(Stacks.StackControl route) { return new EdgedLayout(route); }
 
     @Override public void strip(Stacks.StackControl route, List<ControlRegistry.Control> steps) {
-        ((Stacks.StackSurface) route.component).hues = ((Nodes.Stack) route.node).children().stream().map(ClassicRouteFace::hue).toList();
+        var hues = new java.util.IdentityHashMap<Component, Nodes.Hue>();
+        for (var step : steps) hues.put(step.component, hue(step.node));
+        ((Stacks.StackSurface) route.component).stepHues = hues;
     }
 
     /** Upper-case captions in their guarded ink, kept through every later refresh by the text control's hook. */
@@ -176,6 +178,8 @@ final class ClassicRouteFace implements RouteFace {
             int height = parent.getHeight() - top, inner = Math.max(0, parent.getWidth() - 2 * line);
             surface.cells = new int[count];
             surface.arrows = new int[Math.max(0, count - 1)];
+            // The visible steps' hues, cell for cell.
+            surface.hues = steps.stream().map(step -> surface.stepHues.getOrDefault(step, Nodes.Hue.NEUTRAL)).toList();
             for (int i = 0; i < count; i++) {
                 int start = line + (int) ((long) inner * i / count), end = line + (int) ((long) inner * (i + 1) / count);
                 boolean last = i == count - 1;

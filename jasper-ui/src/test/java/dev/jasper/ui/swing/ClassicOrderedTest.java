@@ -47,6 +47,44 @@ class ClassicOrderedTest {
 
     static Buttons.KitButton command(KitView view, String suffix) { return find(view, "@ordered/markers/side/" + suffix, Buttons.KitButton.class); }
 
+    /** Final review: a list that keeps its id but stops being ORDERED gives back its side column, box and layout. */
+    @Test void aListThatStopsBeingOrderedGivesBackItsSideColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, new ViewSpec(markers(three(), Optional.empty())), e -> {})) {
+                KitFixtures.render(view, 600, 120, 1);
+                var list = (ItemLists.ListControl) view.control("markers");
+                var side = list.side;
+                assertThat(side).isNotNull();
+                view.update(new ViewSpec(new Nodes.ItemList("markers", READY, Nodes.ListKind.SINGLE, three(), Set.of(), "", List.of(),
+                    Nodes.SelectionMode.SINGLE, Optional.empty())));
+                KitFixtures.render(view, 600, 120, 1);
+                assertThat(view.control("markers")).as("the control is kept").isSameAs(list);
+                assertThat(list.side).isNull();
+                assertThat(side.getParent()).isNull();
+                assertThat(list.scroll.getLayout()).isInstanceOf(ScrollPaneLayout.UIResource.class);
+                assertThat(list.scroll.getInsets()).isEqualTo(new java.awt.Insets(0, 0, 0, 0));
+            } finally { release(context); }
+        });
+    }
+
+    /** Final review: an ORDERED list without selection keeps its row commands under the classic face; it has nothing to select. */
+    @Test void aPassiveOrderedListKeepsItsRowCommands() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var events = new ArrayList<UiEvent>();
+            var passive = new Nodes.ItemList("markers", READY, Nodes.ListKind.ORDERED, three(), Set.of(), "", List.of(), Nodes.SelectionMode.NONE, Optional.empty());
+            try (var view = new KitView(context, new ViewSpec(passive), events::add)) {
+                KitFixtures.render(view, 600, 120, 1);
+                var list = (ItemLists.ListControl) view.control("markers");
+                assertThat(list.side).isNull();
+                find(view, list.internalId("flake", "up"), AbstractButton.class).doClick(0);
+                find(view, list.internalId("csproj", "remove"), AbstractButton.class).doClick(0);
+                assertThat(events).containsExactly(new UiEvent.Reordered("markers", "flake", 1), new UiEvent.Removed("markers", "csproj"));
+            } finally { release(context); }
+        });
+    }
+
     /** Review Focus 2: nothing to act on disables every command; the ends disable Move Up and Move Down. */
     @Test void theSideColumnActsOnTheSelectionAndDisablesAtTheEnds() {
         Edt.run(() -> {

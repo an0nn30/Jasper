@@ -94,10 +94,9 @@ final class EmptyStates {
                 if (action instanceof Buttons.ButtonControl button && button.button.panelEmpty != panel) { button.button.panelEmpty = panel; button.refresh(); }
             }
             Stacks.mount(tile, List.of(controls.getFirst().component));
-            // The classic state places its first action only (spec 5.2: at most one button); the others keep their controls.
-            Stacks.mount(
-                    actions,
-                    controls.subList(1, controls.size()).stream().limit(context().faces().empty.actions(controls.size() - 1)).map(c -> c.component).toList());
+            // The classic state places one action (spec 5.2: at most one button), chosen again on every update; the others keep
+            // their controls.
+            Stacks.mount(actions, context().faces().empty.actions(controls.subList(1, controls.size())).stream().map(c -> c.component).toList());
             Stacks.mount(content, List.of(tile, title, description, actions));
         }
 

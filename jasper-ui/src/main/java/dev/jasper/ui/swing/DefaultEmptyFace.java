@@ -7,6 +7,6 @@ import java.util.List;
 final class DefaultEmptyFace implements EmptyFace {
     @Override public List<PaintPair> pairs() { return List.of(); }
     @Override public boolean tile() { return true; }
-    @Override public int actions(int declared) { return declared; }
+    @Override public List<ControlRegistry.Control> actions(List<ControlRegistry.Control> declared) { return declared; }
     @Override public void style(EmptyStates.EmptyControl empty) { }
 }

@@ -26,7 +26,7 @@ final class ClassicTreeFace implements TreeFace {
     @Override public void styleTitle(JLabel label, KitContext context, int index) { ClassicHeaders.title(label, context, index, title); }
     @Override public Insets headerInsets(KitContext context, int side, int line) { return ClassicHeaders.insets(context, side, line); }
     @Override public void paintHeader(JComponent header, Graphics2D g, KitContext context) { ClassicHeaders.paint(header, g, context); }
-    @Override public Border box(KitContext context) { return new ClassicHeaders.Box(context, box); }
+    @Override public Border box(InteractiveRows.RowsControl owner) { return new ClassicHeaders.Box(owner, box); }
     @Override public Color hover(KitContext context) { return ThemePainting.role(context, DerivedColor.SURFACE_ROW_HOVER); }
     @Override public int indent(KitContext context, int depth) { return depth * ThemePainting.metric(context, DesignMetrics.Role.TREE_INDENT); }
     @Override public Nodes.ButtonPresentation disclosure() { return Nodes.ButtonPresentation.EMBEDDED; }

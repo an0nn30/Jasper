@@ -18,8 +18,8 @@ interface HeaderFace extends Face {
     Insets headerInsets(KitContext context, int side, int line);
     /** Paints behind the titles: nothing, or the classic band with its separators and rule. */
     void paintHeader(JComponent header, Graphics2D g, KitContext context);
-    /** The scroll pane's border, or null to keep the pane's own. */
-    Border box(KitContext context);
+    /** {@code owner}'s scroll pane border, or null to keep the pane's own. */
+    Border box(InteractiveRows.RowsControl owner);
     /** A hovered or keyboard-focused row's fill. */
     Color hover(KitContext context);
 }

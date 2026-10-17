@@ -15,7 +15,7 @@ geometry check compares luminance edges, not RGB values.
   `:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview).
 - `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*` pairs)
   and prints PASS or FAIL: the edge agreement must reach the floor and each listed colour must fill a 2×2 block within
-  ΔE76 6 in both images. Render first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise
+  ΔE76 6 in the mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. Render first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise
   -Pjasper.galleryTheme=light -Pjasper.galleryScale=2`.
 
 Run with `python3 -I`; the tools need Pillow and NumPy. A high edge agreement is not acceptance: inspect the

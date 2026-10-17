@@ -122,7 +122,7 @@ final class Trees {
         TreeControl(KitView view, Nodes.Tree node) {
             super(view, node, new TreePane(view.context()));
             ((TreePane)scroll).owner=this;
-            var box=context().faces().tree.box(context());
+            var box=context().faces().tree.box(this);
             if(box!=null)scroll.setBorder(box);
             refresh();
             InteractiveRows.bind(canvas, "RIGHT", () -> expandFocused(true));
@@ -310,13 +310,19 @@ final class Trees {
                 trailingWidths[i] = ThemePainting.metric(context(), i == columns - 1
                         ? dev.jasper.ui.metrics.DesignMetrics.Role.TREE_VALUE_COLUMN
                         : dev.jasper.ui.metrics.DesignMetrics.Role.TREE_DETAIL_COLUMN);
-            // Each value is measured in the role it is drawn in.
+            // Each value is measured in the role it is drawn in, and as wide as the labels paint it: their fractional
+            // advance can exceed the integer metrics at a fractional size.
+            var fonts = new java.awt.Font[columns];
             var metrics = new java.awt.FontMetrics[columns];
-            for (int i = 0; i < columns; i++)
-                metrics[i] = canvas.getFontMetrics(ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.valueOf(valueRole(i).name())));
+            for (int i = 0; i < columns; i++) {
+                fonts[i] = ThemePainting.font(context(), dev.jasper.ui.metrics.Typography.Role.valueOf(valueRole(i).name()));
+                metrics[i] = canvas.getFontMetrics(fonts[i]);
+            }
             for (var item : items.values())
-                for (int i = 0; i < item.trailing().size(); i++)
-                    trailingWidths[i] = Math.max(trailingWidths[i], metrics[i].stringWidth(item.trailing().get(i)));
+                for (int i = 0; i < item.trailing().size(); i++) {
+                    String text = item.trailing().get(i);
+                    trailingWidths[i] = Math.max(trailingWidths[i], Math.max(metrics[i].stringWidth(text), ThemePainting.measureText(fonts[i], text)));
+                }
             columnHeader();
         }
 

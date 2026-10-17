@@ -176,13 +176,16 @@ public final class KitGallery {
         }));
     }
 
+    /** The developer font size for a body of {@code points} at the gallery's scale. */
+    private static int bodySize(float points) { return Math.round(UIScale.scale(points)); }
+
     /** One fixture as the gallery renders it: the image it writes and the metadata beside it. */
     public record Capture(Fixture fixture, BufferedImage image, String metadata) {}
 
     /**
      * Runs {@code action} with {@code theme} and {@code kit} installed as the gallery renders them: real FlatLaf, the
-     * platform family at 13 points at the gallery's scale, no caps-lock query and the gallery's focus manager, all
-     * restored afterwards. EDT.
+     * platform family at the kit's body size (13 points for the default kit, 12 for Enterprise) at the gallery's scale,
+     * no caps-lock query and the gallery's focus manager, all restored afterwards. EDT.
      */
     public static void installed(GeneratedTheme theme, dev.jasper.ui.kit.Kit kit, java.util.function.BiConsumer<KitContext, GalleryFocus> action) {
         var priorLaf = UIManager.getLookAndFeel();
@@ -195,7 +198,7 @@ public final class KitGallery {
             // Install before creating any gallery widget, including transition controllers.
             FlatLafInstaller.install(theme, kit);
             UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
-            UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(13)));
+            UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(kit.type().body())));
             if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");
             KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
             var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
@@ -214,8 +217,9 @@ public final class KitGallery {
     public static Capture capture(Fixture fixture, KitContext context, GalleryFocus focus) {
         String family = KitFixtures.platformFamily();
         float scale = UIScale.getUserScaleFactor();
-        // The form font at the gallery's scale, so a 2x render carries 2x text as the 2x mocks do (plan 4c).
-        UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(fixture.name().contains("font24") ? 24 : 13)));
+        // The form font at the kit's body size and the gallery's scale, so a 2x render carries 2x text as the 2x mocks do
+        // and the Enterprise kit draws its own 12-point scale (plan 4c).
+        UIManager.put("defaultFont", new Font(family, Font.PLAIN, bodySize(fixture.name().contains("font24") ? 24 : context.kit().type().body())));
         try (var view = new KitView(context, fixture.spec(), e -> {})) {
             registerCustom(view, fixture.spec().root(), context);
             int width = UIScale.scale(fixture.width()), height = UIScale.scale(fixture.height());

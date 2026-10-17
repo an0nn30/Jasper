@@ -16,7 +16,7 @@ public final class EnterpriseFixtures {
     static final ControlState READY = ControlState.READY;
     static final ControlState DISABLED = new ControlState(true, false, false, "");
 
-    /** The six fixtures, in pairs.json order. */
+    /** The seven fixtures, in pairs.json order. */
     public static List<KitGallery.Fixture> create() {
         return List.of(
             new KitGallery.Fixture("classic-new-tunnel", "04 New Tunnel/New Tunnel - Local.png", "normal", 520, 449, new ViewSpec(tunnel())),
@@ -25,7 +25,11 @@ public final class EnterpriseFixtures {
             new KitGallery.Fixture("classic-notifications-groups", "05 Settings/Settings 03 - Appearance & Behavior - Notifications.png", "normal",
                 751, 529, new ViewSpec(groups())),
             new KitGallery.Fixture("classic-project-markers", "05 Settings/Settings 15 - Tools - Project Index.png", "normal", 751, 92, new ViewSpec(markers())),
-            new KitGallery.Fixture("classic-keymap-tree", "05 Settings/Settings 07 - Keymap.png", "normal", 777, 489, new ViewSpec(keymap())));
+            new KitGallery.Fixture("classic-keymap-tree", "05 Settings/Settings 07 - Keymap.png", "normal", 777, 489, new ViewSpec(keymap())),
+            // The panel draws the table unboxed; standing alone it is boxed, so the render is 1 px larger on each side
+            // than the crop and pairs.json's render_crop cuts the box away.
+            new KitGallery.Fixture("classic-file-servers", "01 Workstation/Workstation - Connected (plugins in use).png", "normal", 302, 45,
+                new ViewSpec(servers())));
     }
 
     static Text text(String id, String value, TextRole role) { return new Text(id, READY, value, role); }
@@ -181,6 +185,16 @@ public final class EnterpriseFixtures {
         }
         return new Tree("keymap", READY, roots, Set.of("clipboard"), Set.of(), "", List.of(new Column("action", "Action", TextRole.BODY, false, 5, Optional.empty()),
             new Column("scope", "Scope", TextRole.DESCRIPTION, false), new Column("shortcut", "Shortcut", TextRole.DESCRIPTION, false)));
+    }
+
+    /** Workstation – Connected: the File Servers table, its one server with the boxed HTTP tag. */
+    static Node servers() {
+        var row = new TableRow("test", Map.of("address", "127.0.0.1:8080", "status", "Stopped"), Optional.empty(), false, Optional.empty(), "", Map.of(
+            "folder", new Stack("test-folder", READY, LayoutRole.INLINE, List.of(text("test-name", "test", TextRole.BODY), new Chip("test-chip", READY, "HTTP", Hue.BLUE)))),
+            Optional.empty());
+        return new Table("servers", READY, List.of(new Column("folder", "Folder", TextRole.BODY, false, 1.5, Optional.empty()),
+            new Column("address", "Address", TextRole.MONO_SMALL, false, 1.6, Optional.empty()), new Column("status", "Status", TextRole.BODY, false, 1, Optional.empty())),
+            List.of(row), Set.of(), "toggle", List.of());
     }
 
     static TreeItem action(String id, String title, String keys) {

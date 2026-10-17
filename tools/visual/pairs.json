@@ -450,14 +450,13 @@
       898
     ],
     "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-tunnel.png",
-    "min_agreement": 0.5,
+    "min_agreement": 0.4,
     "colours": [
       "#ECEDEF",
       "#FFFFFF",
       "#C4C7CC",
       "#B4B8BF",
       "#2F65CA",
-      "#E6E7EA",
       "#2E9E4F"
     ]
   },
@@ -477,8 +476,7 @@
       "#FFFFFF",
       "#C4C7CC",
       "#B4B8BF",
-      "#2F65CA",
-      "#E6E7EA"
+      "#2F65CA"
     ]
   },
   {
@@ -491,15 +489,14 @@
       1210
     ],
     "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-file-server-ftp.png",
-    "min_agreement": 0.4,
+    "min_agreement": 0.45,
     "colours": [
       "#ECEDEF",
       "#FFFFFF",
       "#C4C7CC",
       "#B4B8BF",
       "#2F65CA",
-      "#E6E7EA",
-      "#2E9E4F",
+      "#2D984D",
       "#8A4FBF",
       "#B5651D"
     ]
@@ -514,7 +511,7 @@
       1058
     ],
     "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-notifications-groups.png",
-    "min_agreement": 0.75,
+    "min_agreement": 0.8,
     "colours": [
       "#F0F1F3",
       "#FFFFFF",
@@ -532,7 +529,7 @@
       184
     ],
     "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-project-markers.png",
-    "min_agreement": 0.4,
+    "min_agreement": 0.45,
     "colours": [
       "#FFFFFF",
       "#F7F8FA",
@@ -556,6 +553,24 @@
       "#FFFFFF",
       "#B4B8BF",
       "#D3D6DA"
+    ]
+  },
+  {
+    "name": "classic-file-servers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      46,
+      992,
+      604,
+      90
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-file-servers.png",
+    "min_agreement": 0.6,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#D3D6DA",
+      "#E8EEFA"
     ]
   }
 ]

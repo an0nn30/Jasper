@@ -392,13 +392,28 @@ final class ItemLists {
 
         /** Whether this is an ORDERED list whose face gives its rows no commands, so a side column holds them (plan 4c). */
         boolean sideColumn() {
-            return value().kind() == Nodes.ListKind.ORDERED && !context().faces().ordered.rowCommands();
+            return value().kind() == Nodes.ListKind.ORDERED && !rowCommands();
+        }
+
+        /**
+         * Whether an ORDERED list's rows carry their own commands: under the face that draws them, and always for a list
+         * without selection, whose side column could never have a row to act on.
+         */
+        boolean rowCommands() {
+            return context().faces().ordered.rowCommands() || value().selectionMode() == Nodes.SelectionMode.NONE;
         }
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
             // An entry row stays adopted only while a VERTICAL parent adopts it again on this pass (ClassicOrderedFace.span).
             if (!spanned && entry != null) entry(null);
+            // A list that kept its id but no longer takes a side column gives it back, with the box and its layout.
+            if (side != null && !sideColumn()) {
+                scroll.remove(side);
+                side = null;
+                scroll.setLayout(new ScrollPaneLayout.UIResource());
+                scroll.setBorder(BorderFactory.createEmptyBorder());
+            }
             if (sideColumn()) {
                 // The side column holds the add action; nothing sits under the rows.
                 if (footer != null && footer.getParent() == canvas) canvas.remove(footer);
@@ -430,7 +445,7 @@ final class ItemLists {
                                 ControlState.READY,
                                 Integer.toString(index + 1),
                                 context().faces().ordered.indexRole()));
-                if (context().faces().ordered.rowCommands()) {
+                if (rowCommands()) {
                     trailing.add(commandNode(row, "up", "chevron.up", "Move up", index > 0));
                     trailing.add(
                             commandNode(row, "down", "chevron.down", "Move down", index < size() - 1));
@@ -480,7 +495,7 @@ final class ItemLists {
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             row.tooltip(item.tooltip());
             row.name(item.title());
-            if (value().kind() == Nodes.ListKind.ORDERED && context().faces().ordered.rowCommands()) {
+            if (value().kind() == Nodes.ListKind.ORDERED && rowCommands()) {
                 command(
                         row,
                         "up",
@@ -576,7 +591,8 @@ final class ItemLists {
 
         @Override protected void paintComponent(java.awt.Graphics graphics) {
             super.paintComponent(graphics);
-            if (owner == null || owner.value().kind() != Nodes.ListKind.ORDERED) return;
+            // Only a list with a side column has the classic box (a passive ORDERED list keeps its row commands instead).
+            if (owner == null || !owner.sideColumn()) return;
             var g = (java.awt.Graphics2D) graphics.create();
             try { owner.context().faces().ordered.paintPane(owner, g); } finally { g.dispose(); }
         }

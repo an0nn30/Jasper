@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Spec 16.1.9 in jasper-ui (plan 4c Rulings 23): the same descriptors emit the same events under both shipped kits: a
- * checkbox or switch, a radio or segment, a folder tab or segment, the ordered list's commands, and a read-only field.
+ * checkbox or switch, a radio or segment, a folder tab or segment, a spinner's or stepper's arrows, the ordered list's
+ * commands, and a read-only field; a SLIDER's spinner arrows under the classic kit edit as the slider does.
  */
 @SuppressWarnings("try")
 class ClassicContractTest {
@@ -30,13 +31,21 @@ class ClassicContractTest {
             new Nodes.Toggle("toggle", READY, "Allow changes", false, "toggle", false),
             new Nodes.Choice("protocol", READY, Nodes.ChoiceKind.EXCLUSIVE, options, "a", "Protocol", "protocol"),
             new Nodes.Choice("pages", READY, Nodes.ChoiceKind.TABS, options, "a", "Pages", "pages"),
+            new Nodes.Field("count", READY, Nodes.FieldKind.NUMBER, "42", "", "Count", "", Optional.of(new Nodes.Numeric(0, 100, 1, 0)),
+                Nodes.FieldPresentation.STEPPER),
             new Nodes.Field("folder", READY, Nodes.FieldKind.TEXT, "No folder selected", "", "Folder", "", Optional.empty(),
                 Nodes.FieldPresentation.STANDARD, "", "", "", true),
             new Nodes.ItemList("keys", READY, Nodes.ListKind.ORDERED, List.of(item("a"), item("b")), Set.of(), "", List.of(),
                 Nodes.SelectionMode.SINGLE, Optional.empty()))));
     }
 
+    /** An arrow sets the field's text, which a document reports as a removal and an insertion: the first edit is empty. */
+    static List<UiEvent> settled(List<UiEvent> events) {
+        return events.stream().filter(event -> !(event instanceof UiEvent.Edited edited && edited.text().isEmpty())).toList();
+    }
+
     @Test void theControlsEmitTheSameEventsUnderBothShippedKits() {
+        var raw = new ArrayList<List<UiEvent>>();
         for (var kit : List.of(Kit.DEFAULT, KitFixtures.enterprise())) Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), kit);
             var events = new ArrayList<UiEvent>();
@@ -45,6 +54,7 @@ class ClassicContractTest {
                 find(view, "toggle", AbstractButton.class).doClick(0);
                 find(view, "protocol.option.b", AbstractButton.class).doClick(0);
                 find(view, "pages.option.b", AbstractButton.class).doClick(0);
+                find(view, "count.plus", AbstractButton.class).doClick(0);
                 // As a person types (3b's ReadOnlyFieldsTest): the key-typed action, which a read-only field ignores.
                 var folder = ((TextFields.FieldControl) view.control("folder")).input;
                 new DefaultEditorKit.DefaultKeyTypedAction().actionPerformed(new ActionEvent(folder, ActionEvent.ACTION_PERFORMED, "x"));
@@ -55,10 +65,28 @@ class ClassicContractTest {
                 boolean side = list.side != null;
                 find(view, side ? "@ordered/keys/side/up" : list.internalId("b", "up"), AbstractButton.class).doClick(0);
                 find(view, side ? "@ordered/keys/side/remove" : list.internalId("b", "remove"), AbstractButton.class).doClick(0);
-                assertThat(events).as(kit.id()).containsExactly(new UiEvent.Toggled("toggle", true), new UiEvent.Selected("protocol", Set.of("b")),
-                    new UiEvent.Selected("pages", Set.of("b")), new UiEvent.Selected("keys", Set.of("b")), new UiEvent.Reordered("keys", "b", 0),
+                raw.add(List.copyOf(events));
+                assertThat(settled(events)).as(kit.id()).containsExactly(new UiEvent.Toggled("toggle", true), new UiEvent.Selected("protocol", Set.of("b")),
+                    new UiEvent.Selected("pages", Set.of("b")), new UiEvent.Edited("count", "43"), new UiEvent.Selected("keys", Set.of("b")), new UiEvent.Reordered("keys", "b", 0),
                     new UiEvent.Removed("keys", "b"));
                 assertThat(side).as(kit.id() + " side column").isEqualTo(kit != Kit.DEFAULT);
+            } finally { release(context); }
+        });
+        assertThat(raw.get(1)).as("the same events, transient edits included").isEqualTo(raw.get(0));
+    }
+
+    /** Spec 16.1.9: under the classic kit a SLIDER's spinner arrows emit the edit its slider would. */
+    @Test void aSlidersSpinnerArrowsEmitEditedUnderTheClassicKit() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var events = new ArrayList<UiEvent>();
+            var slider = new Nodes.Field("level", READY, Nodes.FieldKind.NUMBER, "42", "%", "Level", "", Optional.of(new Nodes.Numeric(0, 100, 1, 0)),
+                Nodes.FieldPresentation.SLIDER);
+            try (var view = new KitView(context, new ViewSpec(slider), events::add)) {
+                KitFixtures.render(view, 240, 40, 1);
+                find(view, "level.plus", AbstractButton.class).doClick(0);
+                find(view, "level.minus", AbstractButton.class).doClick(0);
+                assertThat(settled(events)).containsExactly(new UiEvent.Edited("level", "43"), new UiEvent.Edited("level", "42"));
             } finally { release(context); }
         });
     }

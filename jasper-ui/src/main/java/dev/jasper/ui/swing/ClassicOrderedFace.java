@@ -59,12 +59,15 @@ final class ClassicOrderedFace implements OrderedFace {
         list.side.addAction(add);
     }
 
-    /** Each ORDERED list of a VERTICAL stack adopts the INLINE row right after it, which the stack records as placed there. */
+    /**
+     * Each ORDERED list of a VERTICAL stack that has a side column adopts the INLINE row right after it, which the stack
+     * records as placed there.
+     */
     @Override public void span(Stacks.StackControl stack, List<ControlRegistry.Control> controls) {
         if (((Nodes.Stack) stack.node).role() != Nodes.LayoutRole.VERTICAL) return;
         var adopted = new HashMap<String, Container>();
         for (int i = 0; i < controls.size(); i++)
-            if (controls.get(i) instanceof ItemLists.ListControl list && list.value().kind() == Nodes.ListKind.ORDERED) {
+            if (controls.get(i) instanceof ItemLists.ListControl list && list.sideColumn()) {
                 var row = i + 1 < controls.size() && controls.get(i + 1) instanceof Stacks.StackControl next
                     && ((Nodes.Stack) next.node).role() == Nodes.LayoutRole.INLINE ? next : null;
                 list.entry(row == null ? null : row.component);

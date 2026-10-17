@@ -4,8 +4,8 @@ package dev.jasper.ui.swing;
 interface EmptyFace extends Face {
     /** Whether the state shows its tile. */
     boolean tile();
-    /** How many of the state's {@code declared} actions show, the first ones. */
-    int actions(int declared);
+    /** Which of the state's {@code declared} action controls are placed, in their order. */
+    java.util.List<ControlRegistry.Control> actions(java.util.List<ControlRegistry.Control> declared);
     /** Styles the title and description after the state refreshes. */
     void style(EmptyStates.EmptyControl empty);
 }

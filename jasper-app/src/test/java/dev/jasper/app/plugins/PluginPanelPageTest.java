@@ -681,6 +681,12 @@ class PluginPanelPageTest {
         return ((dev.jasper.sdk.ui.Nodes.Stack) row.control()).children().getFirst();
     }
 
+    /** The selected rows of the first host row's ordered list. */
+    private static Set<String> listSelection(HostedKitView view) {
+        var editor = (dev.jasper.sdk.ui.Nodes.Stack) hostControl(view, 0);
+        return ((dev.jasper.sdk.ui.Nodes.ItemList) editor.children().getFirst()).selectedIds();
+    }
+
     /** Spec 13: a plugin's stringList host row is the generated page's ordered-list editor, and edits the same way. */
     @Test void aStringListHostRowIsTheGeneratedPagesOrderedList() throws Exception {
         var view = new AtomicReference<HostedKitView>();
@@ -718,6 +724,13 @@ class PluginPanelPageTest {
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Selected("settings:words", Set.of("item-1")));
             assertThat(rows.get().pending(words.get())).as("selecting a row stages nothing").containsExactly("b", "a");
             assertThat(listError(view.get())).as("selecting a row shows no error").isEmpty();
+            // Rows are keyed by position, so the selection moves with its item (the classic side column acts on it).
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Reordered("settings:words", "item-1", 0));
+            assertThat(rows.get().pending(words.get())).containsExactly("a", "b");
+            assertThat(listSelection(view.get())).as("the moved row stays selected").containsExactly("item-0");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Reordered("settings:words", "item-0", 1));
+            assertThat(rows.get().pending(words.get())).containsExactly("b", "a");
+            assertThat(listSelection(view.get())).containsExactly("item-1");
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", "x/y"));
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:words:add"));
             assertThat(rows.get().pending(words.get())).as("a rejected value is not staged").containsExactly("b", "a");

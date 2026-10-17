@@ -101,6 +101,63 @@ class ClassicTablesTest {
         });
     }
 
+    static Nodes.Table table(String id) {
+        return new Nodes.Table(id, ControlState.READY, COLUMNS, List.of(file(id + "-a", "Applications"), file(id + "-b", "bin")), Set.of(), "", List.of());
+    }
+
+    static Nodes.Tree categories(String id) {
+        return new Nodes.Tree(id, ControlState.READY, List.of(new TreeItem(id + "-all", "All Items", Optional.empty(), true, List.of())), Set.of(), Set.of(), "");
+    }
+
+    /** Final review: at a fractional classic size a column tree's values get the width their labels paint, not less. */
+    @Test void columnTreeValuesAreMeasuredAsTheyPaintAtAFractionalSize() {
+        Edt.run(() -> {
+            var enterprise = KitFixtures.enterprise();
+            var fractional = new dev.jasper.ui.kit.Kit("fractional", enterprise.metrics(), enterprise.type().withBody(13), enterprise.faces(),
+                enterprise.controls(), enterprise.colors(), enterprise.uiKeys());
+            var context = KitFixtures.context(KitFixtures.light(), fractional);
+            var network = new TreeItem("net", "Local Network", Optional.empty(), false,
+                List.of(host("mac", "Mac", "192.168.1.119"), host("mine", "minecraft-local", "192.168.1.124")));
+            var spec = new ViewSpec(new Nodes.Tree("tree", ControlState.READY, List.of(network), Set.of("net"), Set.of(), "",
+                List.of(new Column("name", "Name", Nodes.TextRole.BODY, false), new Column("host", "Host", Nodes.TextRole.MONO_SMALL, false, 1, Optional.of(true)),
+                    new Column("port", "Port", Nodes.TextRole.MONO_SMALL, true))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                KitFixtures.render(view, 420, 160, 1);
+                var tree = (Trees.TreeControl) view.control("tree");
+                var font = ThemePainting.font(context, Typography.Role.valueOf(tree.valueRole(0).name()));
+                assertThat(font.getSize2D() % 1).as("a fractional size").isNotZero();
+                for (var address : List.of("192.168.1.119", "192.168.1.124"))
+                    assertThat(tree.trailingWidths[0]).as(address).isGreaterThanOrEqualTo(ThemePainting.measureText(font, address));
+            } finally { release(context); }
+        });
+    }
+
+    /** Final review: the Settings navigation, a manager's rail and its list column stand unboxed; a detail table keeps its box. */
+    @Test void navigationRailAndListColumnsAreUnboxed() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var navigation = new ViewSpec(new Nodes.Stack("nav", ControlState.READY, Nodes.LayoutRole.SETTINGS_NAVIGATION, List.of(categories("pages"))));
+            try (var view = new KitView(context, navigation, e -> {})) {
+                KitFixtures.render(view, 236, 200, 1);
+                var pages = (Trees.TreeControl) view.control("pages");
+                assertThat(pages.scroll.getInsets()).as("the Settings navigation").isEqualTo(new Insets(0, 0, 0, 0));
+            }
+            var manager = new ViewSpec(new Nodes.Split("manager", ControlState.READY, Nodes.SplitKind.THREE_COLUMN, List.of(categories("rail"), table("items"),
+                new Nodes.Stack("detail", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(table("history"))))));
+            try (var view = new KitView(context, manager, e -> {})) {
+                KitFixtures.render(view, 900, 300, 1);
+                int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+                assertThat(((Trees.TreeControl) view.control("rail")).scroll.getInsets()).as("the rail").isEqualTo(new Insets(0, 0, 0, 0));
+                var items = (Tables.TableControl) view.control("items");
+                assertThat(items.scroll.getInsets()).as("the list column").isEqualTo(new Insets(0, 0, 0, 0));
+                assertThat(at(paint(items.scroll), 0, items.scroll.getHeight() / 2)).as("no edge on the list column")
+                    .isNotEqualTo(ThemePainting.painted(context, context.faces().table.pairs().get(1)));
+                assertThat(((Tables.TableControl) view.control("history")).scroll.getInsets()).as("a table in the detail")
+                    .isEqualTo(new Insets(line, line, line, line));
+            } finally { release(context); }
+        });
+    }
+
     /** Review Focus 1: headings take no fill or press, are banded, and the rows under them indent only their first cell. */
     @Test void aGroupedTableBandsItsHeadingsIndentsItsRowsAndStripesNothing() {
         Edt.run(() -> {

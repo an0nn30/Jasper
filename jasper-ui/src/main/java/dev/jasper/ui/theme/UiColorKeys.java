@@ -31,7 +31,7 @@ public final class UiColorKeys {
     /**
      * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
      * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours; a
-     * classic key with no colour is {@code null}, which removes FlatLaf's default.
+     * classic key with no colour is the string {@code "null"}, FlatLaf's null, which removes FlatLaf's default.
      */
     public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
         Map<String, Source> sources = switch (Objects.requireNonNull(set)) {

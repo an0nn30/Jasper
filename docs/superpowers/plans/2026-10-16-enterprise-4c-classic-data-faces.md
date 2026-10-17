@@ -1,7 +1,9 @@
 # Enterprise presentation 4c: the classic data faces Implementation Plan
 
 > **Status (2026-10-16): executed on `claude/enterprise-classic-catalog` (`dedf877dc..9d11af9b3`).** Deviations from this
-> plan's text: no pair floor was lowered (every pair measured its pre-flight value); spec 6.5's classic overlay list
+> plan's text: no pair floor was lowered at execution (every pair measured its pre-flight value), but the final review
+> found the gallery drew the Enterprise kit at a 13-point body, so its fixes re-derived every floor at 12 points and
+> added a seventh pair (`classic-file-servers`); the final review's other fixes are listed in `docs/STATUS.md`; spec 6.5's classic overlay list
 > gains `Button.focusedBackground`, `hoverBackground` and `pressedBackground` (Execution notes E9); Task 3's reviews
 > added Execution notes E18 (the ordered index's row-aware styling and third pair, the side layout's minimum) and E19
 > (an update moves nothing the classic ordered face placed; a list gives up an entry row no VERTICAL parent adopts
@@ -4837,32 +4839,45 @@ check`; the executor's runs are the evidence for those.
 
 ## Mock comparison (Task 5)
 
-Run on `claude/enterprise-classic-catalog` after Task 5 (base `42707e416`): the Enterprise gallery at 2x over Enterprise
-Light with the Enterprise fixture kit (81 fixtures), compared by `check_pairs.py`. Every pair passes, each measurement
-equals the pre-flight's (Execution notes E10), and every listed colour fills a 2 × 2 block within ΔE76 6 in both
-images. The default gallery for Slate Cobalt Dark and Light at 1x matches the base (`changed: none`, 161 files each).
+Run on `claude/enterprise-classic-catalog` after the final review's fixes: the Enterprise gallery at 2x over Enterprise
+Light with the Enterprise fixture kit (82 fixtures), compared by `check_pairs.py`. The first run (base `42707e416`)
+drew every classic role at 13/12 of its size: the gallery's developer font was 13 under every kit, which the 12-based
+classic scale reads as a 13-point body, so the earlier measurements (0.589, 0.559, 0.481, 0.845, 0.494, 0.521) and
+floors belonged to a 13-point variant of the look. The gallery now sets the developer font to the kit's body (12 for
+Enterprise, 13 for the default kit, so the default gallery is unchanged), and the floors are re-derived by E10's rule
+from the 12-point measurements. A seventh pair, `classic-file-servers`, covers the classic tag (the Workstation File
+Servers table and its HTTP chip; the panel draws that table unboxed, so the standalone render's box sits on the mock's
+`#C4C7CC` panel edges). Every listed colour fills a 2 × 2 block within ΔE76 6 in the mock and appears within ΔE76 1.5 in
+the render, as a 2 × 2 block or a three-pixel line; at the former ΔE 6 on both sides the Enterprise neutrals stood in
+for one another. That check dropped `#E6E7EA` from the three dialog pairs (it is the mock's footer strip, which the
+render does not draw, plan 6; a nearby neutral had matched it) and lists FTP's green as `#2D984D`, the radio swatch as
+its guard paints it on `surface.app`. The default gallery for Slate Cobalt Dark and Light at 1x matches the base
+(`changed: none`, 161 files each).
 
 | Pair | Mock | Agreement | Floor | Colours present in both |
 |---|---|---|---|---|
-| `classic-new-tunnel` | 04 New Tunnel – Local | 0.589 | 0.50 | all 7: `#ECEDEF` `#FFFFFF` `#C4C7CC` `#B4B8BF` `#2F65CA` `#E6E7EA` `#2E9E4F` |
-| `classic-add-host` | 03 Add Host – Default | 0.559 | 0.50 | all 6: the dialog set |
-| `classic-new-file-server-ftp` | 02 New File Server – FTP | 0.481 | 0.40 | all 9: the dialog set, `#2E9E4F` `#8A4FBF` `#B5651D` |
-| `classic-notifications-groups` | Settings 03 Notifications | 0.845 | 0.75 | all 4: `#F0F1F3` `#FFFFFF` `#B4B8BF` `#D3D6DA` |
-| `classic-project-markers` | Settings 15 Project Index | 0.494 | 0.40 | all 4: `#FFFFFF` `#F7F8FA` `#B4B8BF` `#ECEDEF` |
-| `classic-keymap-tree` | Settings 07 Keymap | 0.521 | 0.45 | all 4: the table set |
+| `classic-new-tunnel` | 04 New Tunnel – Local | 0.480 | 0.40 | all 6: `#ECEDEF` `#FFFFFF` `#C4C7CC` `#B4B8BF` `#2F65CA` `#2E9E4F` |
+| `classic-add-host` | 03 Add Host – Default | 0.581 | 0.50 | all 5: the dialog set |
+| `classic-new-file-server-ftp` | 02 New File Server – FTP | 0.531 | 0.45 | all 8: the dialog set, `#2D984D` `#8A4FBF` `#B5651D` |
+| `classic-notifications-groups` | Settings 03 Notifications | 0.852 | 0.80 | all 4: `#F0F1F3` `#FFFFFF` `#B4B8BF` `#D3D6DA` |
+| `classic-project-markers` | Settings 15 Project Index | 0.536 | 0.45 | all 4: `#FFFFFF` `#F7F8FA` `#B4B8BF` `#ECEDEF` |
+| `classic-keymap-tree` | Settings 07 Keymap | 0.503 | 0.45 | all 4: the table set |
+| `classic-file-servers` | 01 Workstation – Connected | 0.686 | 0.60 | all 4: `#F0F1F3` `#FFFFFF` `#D3D6DA` and the tag's tint `#E8EEFA` |
 
 Read by eye (mock left, render right) and measured at 2x pixels with Pillow; logical values are halved. No face defect
-was found: no box, band, separator, edge, fill or glyph lies in the wrong place or role, so no face changed and no floor
-moved. Every pair shares one residual: the platform font, not IBM Plex (plan 5), so text is wider and taller, the data
-face is the platform monospace (heavier than Plex Mono), and BODY_STRONG (section titles, heading and category rows,
-the Notifications heading counts) reads as regular weight.
+was found in the boxes, bands, separators, edges, fills or glyphs. Every pair shares one residual: the platform font,
+not IBM Plex (plan 5). At the same 12-point body the platform face sets body text slightly narrower than the mock's
+Plex (New Tunnel's Type caption fits on one line where the mock wraps it, and the footer's preview is not cut), the
+data face is the platform monospace (heavier than Plex Mono), and BODY_STRONG (section titles, heading and category
+rows, the Notifications heading counts, the tag's label) reads as regular weight.
 
 **New Tunnel – Local.** Matches: the titled Tunnel and Ports boxes, the colon labels and the field column, the plain
 picker's gradient with its drawn ▼ and the host in the data face, the radios, the route strip (one `#B4B8BF` box, three
 equal cells, the neutral, blue and green 3 px hue edges, uppercase captions, data-face values), the checkbox setting,
 the footer's preview and buttons. Differences: the footer has no strip or rule above it (plan 6's dialog footer); the
 route's arrow is heavier and runs to the next cell's edge, where the mock's thin arrow stops a few pixels short (Rulings
-12's drawn → at `ROUTE_ARROW`); the Port fields are a little wider; the Listen on and Forward to fields show
+12's drawn → at `ROUTE_ARROW`); the Type caption fits on one line, so the Ports box starts higher (the platform font);
+the Port fields are a little wider; the Listen on and Forward to fields show
 `localhost` in the body face where the mock uses the data face (fixture copy: `FieldKind.TEXT` fields without the
 TECHNICAL presentation).
 
@@ -4910,6 +4925,13 @@ the two child rows are about 1.5 px shorter than the mock's keycap rows and the 
 trailing counts are `#5C6370`, the mock's `#7A808A` (3c's trailing colour); the header titles are `#3A3D42` (Rulings
 4); titles start 2 px earlier (`ICON_GAP`, as in Notifications) and children 4 px earlier (the 2 px `TREE_INDENT`
 residual of the Mock measurements plus that); the mock's change dot after "Application" is not in the fixture.
+
+**Workstation – Connected, File Servers.** Matches: the 20 px `#F0F1F3` band, its `#D3D6DA` rule and separators,
+the white row, the HTTP tag in upper case on its `#E4EBF8` tint (mock `#E8EEFA`). Differences: the tag's box is
+`tag.border.blue` `#ACC1EA` (spec 7.1's 40 % mix with the card; the mock's `#B9C8EA` is lighter) and its label the hue
+`#2F65CA` in regular weight (mock `#2655AE`, bold; plan 5's Plex); the address starts at its column, where the mock
+draws it later, past the Status separator (a mock inconsistency); the render's 1 px `#B4B8BF` box stands where the
+mock's panel has its `#C4C7CC` edges and no bottom line.
 
 Reproduce from the worktree root:
 

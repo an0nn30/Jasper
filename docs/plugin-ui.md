@@ -60,7 +60,7 @@ visible options, SEARCHABLE, PICKER with a rich `PickerFace`, PREVIEWS, TABS to 
 Use `TextRole.MONO*` and `FieldPresentation.TECHNICAL` for technical values (hosts, ports, paths, commands).
 Under the Enterprise look an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER draws a spinner,
 a Section with its Card draws a titled box, a Table draws a header band, zebra rows and banded headings, a Tree draws ▶
-and ▼, an Empty state shows one button, a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED
+and ▼, an Empty state shows one button (its visible PRIMARY action, or else its first visible one), a Chip is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED
 list's commands move to a side column that acts on the selection; the descriptors and events are the same.
 
 Descriptors say what a control means and the presentation draws it. GHOST is a quiet button, `ButtonPresentation.HELP`

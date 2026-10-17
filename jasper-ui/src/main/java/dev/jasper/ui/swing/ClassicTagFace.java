@@ -12,7 +12,9 @@ import java.util.Locale;
 
 /**
  * The classic tag (spec 5.2 and 7.1, the Workstation "HTTP" chip): the label in upper case, in its hue through the text
- * guard, on the default tint inside a 1 px box in the hue's tag border role (plan 4c Rulings 11).
+ * guard, on the default tint inside a 1 px box in the hue's tag border role (plan 4c Rulings 11). Both pairs are held
+ * against {@code surface.card}, the ground the faint tint stands on and the role {@code tag.border} is mixed with; the
+ * opaque hue surface is only painted at the tile share.
  */
 final class ClassicTagFace implements TagFace {
     private static final List<Nodes.Hue> HUES = List.of(Nodes.Hue.BLUE, Nodes.Hue.GREEN, Nodes.Hue.AMBER, Nodes.Hue.PURPLE, Nodes.Hue.NEUTRAL);
@@ -21,8 +23,8 @@ final class ClassicTagFace implements TagFace {
     ClassicTagFace() {
         var all = new ArrayList<PaintPair>();
         for (var hue : HUES) {
-            all.add(new PaintPair(hue(hue), surface(hue), SurfaceContrast.Guard.TEXT));
-            all.add(new PaintPair(border(hue), surface(hue), SurfaceContrast.Guard.STRUCTURAL));
+            all.add(new PaintPair(hue(hue), SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.TEXT));
+            all.add(new PaintPair(border(hue), SemanticColor.SURFACE_CARD, SurfaceContrast.Guard.STRUCTURAL));
         }
         pairs = List.copyOf(all);
     }
@@ -44,12 +46,6 @@ final class ClassicTagFace implements TagFace {
         };
     }
 
-    private static SemanticColor surface(Nodes.Hue hue) {
-        return switch (hue) {
-            case BLUE -> SemanticColor.HUE_BLUE_SURFACE; case GREEN -> SemanticColor.HUE_GREEN_SURFACE; case AMBER -> SemanticColor.HUE_AMBER_SURFACE;
-            case PURPLE -> SemanticColor.HUE_PURPLE_SURFACE; case NEUTRAL, NONE -> SemanticColor.HUE_NEUTRAL_SURFACE;
-        };
-    }
 
     private static DerivedColor border(Nodes.Hue hue) {
         return switch (hue) {

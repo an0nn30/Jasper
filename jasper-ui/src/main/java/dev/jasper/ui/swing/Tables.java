@@ -150,7 +150,7 @@ final class Tables {
             // The titles sit on whatever is behind the table, as a heading does: an opaque header viewport painted its
             // own strip over a rounded pane's top.
             scroll.getColumnHeader().setOpaque(false);
-            var box = context().faces().table.box(context());
+            var box = context().faces().table.box(this);
             if (box != null) scroll.setBorder(box);
             refresh();
         }

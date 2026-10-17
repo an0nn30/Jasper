@@ -203,6 +203,9 @@ class GalleryCoverageTest {
         assertThat(nodes).as("a technical picker caption").anyMatch(n -> n instanceof Nodes.Choice c && c.face().filter(Nodes.PickerFace::technicalCaption).isPresent());
         assertThat(nodes).as("hued options").anyMatch(n -> n instanceof Nodes.Choice c && c.kind() == Nodes.ChoiceKind.EXCLUSIVE && c.options().stream().allMatch(o -> o.hue().isPresent()));
         assertThat(nodes).as("a PATH field").anyMatch(n -> n instanceof Nodes.Field f && f.kind() == Nodes.FieldKind.PATH);
+        assertThat(nodes).as("a tag in a table cell").anyMatch(n -> n instanceof Nodes.Table t
+            && t.rows().stream().anyMatch(r -> r.cellNodes().values().stream().anyMatch(c -> c instanceof Nodes.Stack stack
+                && stack.children().stream().anyMatch(Nodes.Chip.class::isInstance))));
         var names = EnterpriseFixtures.create().stream().map(KitGallery.Fixture::name).toList();
         assertThat(names).doesNotHaveDuplicates().noneMatch(name -> KitGallery.fixtures().stream().anyMatch(f -> f.name().equals(name)));
     }
