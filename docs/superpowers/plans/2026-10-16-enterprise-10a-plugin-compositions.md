@@ -30,18 +30,19 @@ and NumPy only for the opt-in `tools/visual` comparison.
 are fixtures).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-10`, branch
-`claude/enterprise-plugin-compositions`, cut from `main` at `deafed424`. Run every command from the worktree root. Line
-numbers below are from `deafed424`; plans 3b to 9 execute before this one and move them. Every edit quotes the text it
+`claude/enterprise-plugin-compositions`, which holds `main` at `9c6351e07` with this plan's commits on top. Run every
+command from the worktree root. Line numbers below were re-anchored on 2026-10-17 at `b23f853af` (Execution notes,
+2026-10-17); later tasks move them. Every edit quotes the text it
 replaces, and the edit scripts stop with a message when that text is not found the stated number of times: re-find the
 quoted text (it moves, it does not change), adjust the anchor and re-run; never edit around a missing anchor.
 
 ## Before you start
 
-This plan is written against the code as plans 3b, 3c, 3d, 3e, 4a, 4b, 4c, 5a, 5b, 6, 7, 8 and 9 leave it. Bring the
-branch up to `main` and check that they are in it:
+This plan is written against the code as plans 3b, 3c, 3d, 3e, 4a, 4b, 4c, 5a, 5b, 6, 7, 8a, 9a and 11 leave it. The
+branch already holds `main`; do not rebase (Execution notes R2). Check that they are in it:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 9c6351e07 HEAD && echo "main 9c6351e07 is in the branch"
 grep -c 'record Properties(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java          # 3b: 1
 grep -c 'record Separator(' jasper-sdk/src/main/java/dev/jasper/sdk/ui/Nodes.java           # 3b: 1
 grep -c 'Map<String, Nodes.Node> cellNodes' jasper-sdk/src/main/java/dev/jasper/sdk/ui/TableRow.java   # 3c: 1
@@ -74,7 +75,7 @@ that plan's API and record the change in this plan's status banner. Names this p
 | `interface Face { List<PaintPair> pairs(); }`, `KitFaces` (`of`, `all()`, `declared`), `ThemePainting.role(KitContext, ColorRole)`, `ThemePainting.painted(KitContext, PaintPair)`, `KitContext.faces()` | 4b Task 1 | Task 3 |
 | `DesignMetrics.CLASSIC` built by `classic()` with `values.put(Role.X, n)`, `classic-roles.tsv`, `face-pairs.tsv`, `PaintSpecTest` | 4a Task 3, 4b Task 1 | Task 3 |
 | `KitFixtures.enterprise()`, `KitFixtures.enterpriseLight()`, `KitFixtures.context(GeneratedTheme, Kit)`, `KitFixtures.render(KitView, int, int, double)` | 4a Task 6, 4c Task 4 | Tasks 2, 3 |
-| `EnterpriseResources.ROOT`, `RESOURCES`, `facts()`, `theme()`; `LookFonts.register(KitParser.Faces)` returning the files that did not register; `Capabilities.PRESENTATION_PROVIDE` | 5b Tasks 1, 4; 3a | Task 2 |
+| `EnterpriseResources.ROOT`, `RESOURCES`, `facts()`, `theme()`; 6a/5b's `testsupport.EnterpriseLook` (`kit()`, `theme()`, `controller(boolean)`, `restoreDefault()`), which Task 2 extends; `Capabilities.PRESENTATION_PROVIDE` | 5b Tasks 1, 4; 3a | Task 2 |
 | `ThemeController.startup(boolean, ThemeSelection, Kit, Consumer<InstallationFailure>)`, `PluginHost.kit` (a `Supplier<Kit>` defaulting to `FlatLafInstaller::installedKit`) | 5a Task 10 | Task 2 |
 | The `HostedPlugin` constructor as the staged hosts call it (3d adds `iconHue`; mirror `StagedRemoteHost`'s call) | 3d Task 2 | Task 2 |
 | `PanelHostHeader.Frame { STANDARD, FLUSH, FLUSH_FOCUSED }` and the 4-argument `PanelHostHeader(String, boolean, List<Action>, Frame)`; `ToolWindowArea.frame(Host)` | 7 Task 10 | Task 2 |
@@ -84,7 +85,7 @@ that plan's API and record the change in this plan's status banner. Names this p
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain; run `./gradlew`, never a system `gradle`, and never `./gradlew --stop` (other sessions share the daemons).
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (`packageDist`, `trainAotCache`, `-Pjasper.aot=true`). `:jasper-ui:gallery` is headless and may be run; so may every JUnit render of this plan (`java.awt.headless=true` in the test tasks).
 - Work only in the worktree above on `claude/enterprise-plugin-compositions`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
-- Pixel rule: the default look stays byte-identical. Every plugin change composes its classic layout only under `Layout.CLASSIC`; under `Layout.ROWS` each node it builds is the one it builds today. The jasper-ui change (Task 3) adds three metric roles read only by the classic face and one face pair whose default class calls 3b's code unchanged, so every file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to the base taken in Task 3 Step 1, and every existing `tools/visual/pairs.json` render is unchanged. The jasper-app change (Task 9's `NativeShells.classicFooters`) acts only while `AuxiliarySurface.classic()` is true, which only `DialogMapping.Kind.CLASSIC` sets. No existing render may change; Task 13 proves both.
+- Pixel rule: the default look stays byte-identical. Every plugin change composes its classic layout only under `Layout.CLASSIC`; under `Layout.ROWS` each node it builds is the one it builds today. The jasper-ui change (Task 3) adds three metric roles read only by the classic face and one face pair whose default class calls 3b's code unchanged, so every file the headless gallery writes for Slate Cobalt Dark and Light at scale 1 is byte-identical to the base taken in Task 3 Step 1, and every existing `tools/visual/pairs.json` render is unchanged. Plan 10a changes no jasper-app production code: a native dialog's classic footer band is 6b's `NativeShells.nativeMarks` (Execution notes R7). No existing render may change; Task 13 proves both.
 - Composition belongs to its owner (spec 3.6): only `dev.jasper.<plugin>.workstation` names `dev.jasper.enterprise.api`; the plugin reads `Layout.of(context.services())` once in `start` and passes the value to the constructors that compose; renderers never branch on a look.
 - Every action stays reachable (spec 14.7): each default-look gesture of Remote and File Server has its classic path, listed and exercised by Task 12's `CompositionParityTest`.
 - Mock matching (the user: "make sure our design system/kit matches the mocks perfectly when enabled"): every surface this plan composes has a JUnit render under the shipped Enterprise kit, Plex fonts and theme, Light and (for the Workstation surfaces) Dark, compared with its mock crop by `MockMatch`: the colour bands of its sample columns equal the measured bands of "Mock measurements" within the stated tolerance, every listed colour is present, and the edge agreement reaches the stated floor. Iterate until each assertion passes. A difference that only a face or chrome of an earlier plan can fix is fixed there (the task names the file) or, when that plan's ruling decides it, recorded here as a residual with its measured value; floors are never lowered silently.
@@ -115,62 +116,63 @@ that plan's API and record the change in this plan's status banner. Names this p
 
 ## Verified facts
 
-At `deafed424` unless a plan is named.
+At `b23f853af` (re-anchored on 2026-10-17) unless a plan is named.
 
 1. Remote looks its optional Vault up with `try { vault = context.services().find(VaultApi.class); } catch
    (NoClassDefFoundError absent) { vault = Optional.empty(); }` (`RemotePlugin.java:148`); File Server does the same
-   (`FileServerPlugin.java:141`). `Services.find` reads an optional provider's publication (`Services.java:44-50`).
+   (`FileServerPlugin.java:142`). `Services.find` reads an optional provider's publication (`jasper-sdk` `Services.java:55`).
 2. `verifyPluginArchitecture` runs `jdeps -verbose:class` on each plugin's classes and allows a target package only when
    it is the JDK, the plugin's own, a `declaredImports` entry, the SDK (not `sdk.testing`) or bundled
    (`gradle/plugin-architecture.gradle.kts:10`, `:37-55`); `declaredImports` has no entry for Vault.
-3. Remote's manifest requires Vault and the Editor optionally (`plugins/remote/src/main/resources/plugin.toml:14`); File
-   Server requires Vault optionally (`plugins/fileserver/src/main/resources/plugin.toml:14`); Vault has no `requires`
+3. Remote's manifest requires Vault and the Editor optionally (`plugins/remote/src/main/resources/plugin.toml:13`); File
+   Server requires Vault optionally (`plugins/fileserver/src/main/resources/plugin.toml:13`); Vault has no `requires`
    (`plugins/vault/src/main/resources/plugin.toml`). Each build compiles against the SDK and the APIs it requires with
    `compileOnly` and tests with `testImplementation` (`plugins/remote/build.gradle.kts:7-22`).
 4. `FakePluginHost.start(info, requires, optional, plugin)` gives a plugin the services its required and optional
    providers published (`FakePluginHost.java:219-250`); a plain lambda can be a provider (5b's `EnterprisePluginTest`).
-5. Remote registers Sessions at `Anchor.LEFT` (`RemotePlugin.java:228`), Tunnels at `Anchor.LEFT` (`TunnelsUi.java:116`),
-   SFTP at `Anchor.LEFT` with `withSplit()` (`SftpUi.java:57`); File Servers at `Anchor.LEFT` (`FileServerPlugin.java:190`).
+5. Remote registers Sessions at `Anchor.LEFT` (`RemotePlugin.java:230`), Tunnels at `Anchor.LEFT` (`TunnelsUi.java:116`),
+   SFTP at `Anchor.LEFT` with `withSplit()` (`SftpUi.java:57`); File Servers at `Anchor.LEFT` (`FileServerPlugin.java:198`).
    `Anchor` is `LEFT`, `RIGHT`, `BOTTOM` and a spec's `split` picks the side's secondary half (`Anchor.java:1-15`,
-   `PanelSpec.java:22-62`). The fake prints a panel as `id|title|ANCHOR[+split]|toggle` (`RemotePluginTest.java:60`).
+   `PanelSpec.java:22-62`). The fake prints a panel as `id|title|ANCHOR[+split]|toggle` (`RemotePluginTest.java:53`; File Server's toggle is
+   `dev.jasper.fileserver.show-panel`, `FileServerPluginTest.java:201`).
 6. `HostsPanel` builds one `Nodes.Panel` in `node()` (`HostsPanel.java:301`): a SEARCH field "Search sessions", a SINGLE
    `ItemList` `sessions.rows` of `HostRows` rows (`:321`), a hint and the selected row's card (`:385`) with `card.edit`
    and `card.connect`; ids `host:<uuid>`, `distro:<profile>`, `group:<name>`, `group.wsl`, `error` (`rowId`); its header is
-   published with a blank detail (`:289-297`). `RemotePlugin.createPanel` makes it (`:617-643`) and `credentialLabel` gives
-   "SSH agent", "Vault locked", "needs Credential Vault", "credential missing" or the credential's name (`:699-705`).
+   published with a blank detail (`:294-297`). `RemotePlugin.createPanel` makes it (`:619`) and `credentialLabel` gives
+   "SSH agent", "Vault locked", "needs Credential Vault", "credential missing" or the credential's name (`:701`).
 7. `HostRows.rows(hosts, query, collapsed, defaultGroup, distros, wslCollapsed)` returns a group row followed by its hosts,
    omitting a collapsed group's hosts (`HostRows.java:85-99`); `RemoteHost.label()` is `user@host:port`
    (`RemoteHost.java:44`).
 8. `SessionsToolbar.refresh` registers one action per distribution and host and one `ToolbarItem.menu(icon, "Sessions",
-   ids)` dropdown ending in "Manage Sessions..." (`SessionsToolbar.java:56-90`); `activateHost` focuses a running pane for
-   the host or opens one (`RemotePlugin.java:368-375`, now `activateHost` after 3e).
+   ids)` dropdown ending in "Manage Sessions..." (`SessionsToolbar.java:56-90`; `distroActionId` at `:100`); `activateHost` focuses a running pane for
+   the host or opens one (`RemotePlugin.java:370`, `activateHost`).
 9. `TunnelsPanel.node()` builds a SEARCH filter, a DOUBLE `ItemList` `tunnels.rows` with a trailing Toggle per tunnel and
    the "Quick forwards" heading, or a kit `Empty` "No Tunnels" (`TunnelsPanel.java:233-268`); `menu(rowId, tunnel, state)`
    is the row menu (Start or Stop, Open in Browser, Copy Address, Save as Tunnel… or Edit…, Duplicate, Delete…);
    `TunnelRows.mapping` and `port` format the listen and target parts (`TunnelRows.java:17-36`).
 10. `SftpPanel.panel()` builds the navigation (`:324`: Back, Forward, Refresh, the hidden-items GHOST button, the Upload
-    menu, breadcrumbs), a two-column `Table` `sftp.files` (`:361`) or an `Empty` "Not Connected" with a Choose Session
+    menu, breadcrumbs), a two-column `Table` `sftp.files` (`:369`) or an `Empty` "Not Connected" with a Choose Session
     menu while unloaded, and a footer with the transfers strip, paging, status and the Follow terminal folder row
     (`:299-322`). `SftpUi.create` makes it and hands it `transferStrip.apply(window)` (`SftpUi.java:75-80`).
-11. `TransferUi` registers `SHOW` "Transfers" (`cmd+alt+3`/`alt+3`) to reveal the SFTP sidebar (`TransferUi.java:37-40`);
+11. `TransferUi` registers `SHOW` "Transfers" (`cmd+alt+3`/`alt+3`) to reveal the SFTP sidebar (`TransferUi.java:40`);
     `strip(window)` makes the window's `TransferStrip`, whose `node()` is a VERTICAL stack of a heading and an ItemList
-    (`TransferStrip.java:58-66`).
+    (`TransferStrip.java:64`).
 12. `FileServersPanel.node()` builds a DOUBLE `ItemList` `fileserver.rows` with a trailing Toggle per server, the
-    selected server's details `Card` (`:303`), or an `Empty` "No File Servers" with "Share Folder…" (`:207-240`);
+    selected server's details `Card` (`details`, `:303`), or an `Empty` "No File Servers" with "Share Folder…" (`:207-240`);
     `menu(server)` is the row menu; `ServerRows.address`, `state`, `access` and `folder` format the cells.
 13. `ServerEditor.form()` shows the authorized keys as a COMPACT `ItemList` `server.keys` of `key.<i>` rows with the
-    actions Add from File…, Paste and Remove (`ServerEditor.java:426-438`); `REMOVE_KEY` parses the row ids with
+    actions Add from File…, Paste and Remove (`ServerEditor.java:436-450`); `REMOVE_KEY` parses the row ids with
     `substring(4)`; `AuthorizedKeys.parse(line)` gives `type()`, `fingerprint()` and `comment()`.
 14. `HostEditor` puts the Authentication EXCLUSIVE choice unlabelled in its MIXED card and the Keys `ItemList` (ORDERED,
     add action "Add Stored Key…") in a FormRow (`HostEditor.java:365-372`).
 15. The staged real-host fixtures: `PanelSurfaceFixture(Path, ResolvedTheme, String panel)` loads the staged Remote or File
     Server jar beside a locked Vault, mounts one panel through its real factory and the app's `PanelSite`, and
-    `capture(scale)` prints the view (`PanelSurfaceFixture.java:39-85`, `:202-208`); its stores take fixture data
+    `capture(scale)` prints the view (`PanelSurfaceFixture.java:39-85`, `:201-206`); its stores take fixture data
     (`hosts`, `tunnel`, `fileServer`, `sftp`); a plugin's class loader maps an exported package to its provider's loader
-    (`Map.of("dev.jasper.vault.api", vault.loader)`, `:52`).
+    (`Map.of("dev.jasper.vault.api", vault.loader)`, `:49`).
 16. `KitFixtures.render(view, w, h, scale)` lays out and paints a view into a transparent ARGB image
-    (`KitFixtures.java:196-204`); `tools/visual/compare_mock.py` measures luminance-edge agreement within one pixel over a
-    shift search (`compare_mock.py:44-84`); 4c's `check_pairs.py` reads `min_agreement` and `colours`.
+    (`KitFixtures.java:304`); `tools/visual/compare_mock.py` measures luminance-edge agreement within one pixel over a
+    shift search (`compare_mock.py:40-80`); 4c's `check_pairs.py` reads `min_agreement` and `colours`.
 17. The Enterprise mocks measure as "Mock measurements" below (2× pixels halved, Pillow, `python3 -I`, 2026-10-16).
 
 ## Rulings
@@ -236,7 +238,8 @@ Decisions where the spec is silent, taken on the user's behalf (2026-10-16): "wh
     sentence ("Form and dialog footers sit on `surface.footer` under a `border.window` rule") and the 02, 03 and 04 mocks'
     44 px footer bands; 6b sets the band only for the dialogs it draws in their window, and no other plan paints it for a
     native one; a WINDOW body keeps its own footer; the default mapping reads `classic()` false and changes nothing —
-    cost if wrong: one flag in one method.
+    cost if wrong: one flag in one method. **Superseded on 2026-10-17 (Execution notes R7): 6b's final code already sets
+    the band on a classic native dialog's kit content (`NativeShells.nativeMarks`), so Task 9 adds no host change.**
 
 ## Mock measurements
 
@@ -284,8 +287,7 @@ Positions and sizes inside the surfaces (logical px; ±1 unless noted):
 - jasper-ui (Task 3): new `PropertiesFace`, `DefaultPropertiesFace`, `ClassicPropertiesFace` in `dev.jasper.ui.swing`;
   changed `PropertyLists`, `KitFaces`, `DesignMetrics` and the frozen `compact-roles.tsv`, `classic-roles.tsv`,
   `face-pairs.tsv`; test `ClassicPropertiesTest`.
-- jasper-app production (Task 9): `windows/NativeShells` (`classicFooters`); test `windows/ClassicDialogFooterTest`.
-- jasper-app tests (Task 2): `testsupport/MockMatch`, `application/EnterpriseLook`, `plugins/StagedEnterprise`,
+- jasper-app tests (Task 2): `testsupport/MockMatch`, `testsupport/EnterpriseLook` (6a's, extended), `plugins/StagedEnterprise`,
   `PanelSurfaceFixture` (an Enterprise mode and the Sessions panel), `testsupport/MockMatchTest`; renders in
   `plugins/ClassicCompositionRenderTest` (Tasks 4 to 11).
 - Remote: `ui/HostsPanel` (Task 4), `SessionsToolbar` and new `SessionSelection` (Task 5), `ui/tunnels/TunnelsPanel` and
@@ -623,31 +625,32 @@ EOF
 
 ### Task 2: The Enterprise render harness and the mock matcher
 
-The JUnit side of spec 16.1.4 for plugin surfaces: `EnterpriseLook` installs the shipped kit, the real Plex files and the
-Enterprise theme; `StagedEnterprise` starts the staged Enterprise plugin in a real plugin host so staged consumers find
+The JUnit side of spec 16.1.4 for plugin surfaces: the existing `testsupport.EnterpriseLook` (plans 6a and 5b) installs
+the shipped kit, the real Plex files and the Enterprise theme, and gains the resolved theme the fixtures take;
+`StagedEnterprise` starts the staged Enterprise plugin in a real plugin host so staged consumers find
 `Workstation`; `PanelSurfaceFixture` gains an Enterprise mode and the Sessions panel; `MockMatch` compares a 2× render
 with a mock crop as `tools/visual/compare_mock.py` does, plus colour bands and colour presence.
 
 **Files:**
 - Create: `jasper-app/src/test/java/dev/jasper/app/testsupport/MockMatch.java`,
   `jasper-app/src/test/java/dev/jasper/app/testsupport/MockMatchTest.java`,
-  `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseLook.java`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/StagedEnterprise.java`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/StagedEnterpriseTest.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java`, `docs/design/theme-engine/migration.csv`,
-  `jasper-app/build.gradle.kts` (the test task reads the mocks)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java` (`selection`, `resolved`),
+  `jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java`, `docs/design/theme-engine/migration.csv`
 
 **Interfaces:**
-- Consumes: Task 1's manifests; 5b's `EnterpriseResources`, `LookFonts.register`; 5a's `ThemeController.startup(…, Kit,
-  …)`; `PluginClassLoader`, `HostedPlugin`, `ManagedVaultLoadingTest.jars(Path)`, `AppContractTest.onEdt`.
+- Consumes: Task 1's manifests; 5b's `EnterpriseResources` and 6a/5b's `testsupport.EnterpriseLook` (`kit()`, `theme()`,
+  `controller(boolean)`, `restoreDefault()`); 5a's `ThemeController.startup(…, Kit, …)`; `PluginClassLoader`, `HostedPlugin`,
+  `ManagedVaultLoadingTest.jars(Path)`, `AppContractTest.onEdt`; 7's `MockCrops.fontsFloor`.
 - Produces: `public final class MockMatch` with `REFERENCE`, `OUT`, `record Crop(String mock, int x, int y, int width, int
   height)` (`read()`, `width()`/`height()` in device px), `record Band(int start, int length, Color first, Color last)`,
   `static List<Band> bands(BufferedImage image, int x)` and `bands(image, x, top, bottom)`, `static List<Band> parse(String)`, `static String
   mismatch(List<Band> expected, List<Band> actual, int tolerance)`, `static double deltaE(Color, Color)`, `static boolean
   present(BufferedImage, Color)`, `static double agreement(BufferedImage mock, BufferedImage render)`, `static
   BufferedImage onto(BufferedImage, Color)`, `static void save(String name, BufferedImage mock, BufferedImage render)`;
-  `public final class dev.jasper.app.application.EnterpriseLook` with `static Kit kit()`, `static ThemeSelection
-  selection()`, `static ThemeController controller(boolean dark)`, `static ResolvedTheme resolved(boolean dark)`;
+  `dev.jasper.app.testsupport.EnterpriseLook` gains `static ThemeSelection selection()` and `static ResolvedTheme
+  resolved(boolean dark)` (its `kit()`, `controller(boolean dark)` and `restoreDefault()` exist);
   `final class StagedEnterprise { static PluginClassLoader start(PluginHost host) }`; `PanelSurfaceFixture(Path,
   ResolvedTheme, String panel, boolean enterprise)`, `PanelSurfaceFixture.SESSIONS`, `String layout()`, `BufferedImage
   render(int width, int height)` (2×, opaque over the theme's `surface.panel`, the panel's header row cut off), `int
@@ -704,7 +707,7 @@ package dev.jasper.app.plugins;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.app.application.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseLook;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -723,7 +726,7 @@ class StagedEnterpriseTest {
                 assertThat(rows.layout()).isEqualTo("ROWS");
             }
         } finally {
-            AppContractTest.onEdt(() -> { controller.close(); dev.jasper.app.appearance.ThemeTestSupport.controller(true); });
+            AppContractTest.onEdt(() -> { controller.close(); EnterpriseLook.restoreDefault(); });
         }
     }
 }
@@ -732,7 +735,7 @@ class StagedEnterpriseTest {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-app:compileTestJava`
-Expected: FAIL to compile: "cannot find symbol … class MockMatch", "… EnterpriseLook", "constructor PanelSurfaceFixture …
+Expected: FAIL to compile: "cannot find symbol … class MockMatch", "… resolved(boolean)", "constructor PanelSurfaceFixture …
 cannot be applied" and "cannot find symbol … layout()".
 
 - [ ] **Step 3: Write the harness**
@@ -997,54 +1000,24 @@ public final class MockMatch {
 }
 ```
 
-Create `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseLook.java`:
+Add to `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java` (plans 6a and 5b's shared fixture: its
+`kit()` registers the real Plex files through `EnterpriseResources.kit()`, `controller(boolean)` installs the kit and
+theme, `restoreDefault()` puts Slate Cobalt back), before its `restoreDefault` method:
 
 ```java
-package dev.jasper.app.application;
-
-import dev.jasper.app.appearance.ResolvedTheme;
-import dev.jasper.app.appearance.ThemeController;
-import dev.jasper.app.appearance.ThemeLibrary;
-import dev.jasper.app.appearance.ThemeSelection;
-import dev.jasper.app.config.TerminalSchemeChoice;
-import dev.jasper.app.testsupport.EnterpriseResources;
-import dev.jasper.ui.kit.Kit;
-
-/** The shipped Enterprise look for headless renders: its kit, its Plex files registered once, and its theme. */
-public final class EnterpriseLook {
-    private static Kit kit;
-
-    private EnterpriseLook() { }
-
-    /** The kit parsed from the real {@code enterprise.kit.toml}, after registering the real Plex files once. */
-    public static synchronized Kit kit() {
-        if (kit == null) {
-            var parsed = EnterpriseResources.facts().parsed().orElseThrow();
-            var missing = LookFonts.register(parsed.faces());
-            if (!missing.isEmpty()) throw new AssertionError("Plex did not register: " + missing);
-            kit = parsed.kit();
-        }
-        return kit;
-    }
-
-    /** The Enterprise theme for both appearances. */
+    /** The shipped theme for both appearances, as a selection (plan 10a). */
     public static ThemeSelection selection() {
-        var theme = EnterpriseResources.theme();
-        return new ThemeSelection(ThemeLibrary.bundledOnly(), theme, theme, TerminalSchemeChoice.MATCH);
+        var shown = theme();
+        return new ThemeSelection(ThemeLibrary.bundledOnly(), shown, shown, TerminalSchemeChoice.MATCH);
     }
 
-    /** A controller that has installed the Enterprise kit and theme; EDT; the caller closes it and restores the default look. */
-    public static ThemeController controller(boolean dark) {
-        return ThemeController.startup(dark, selection(), kit(), failure -> { throw new AssertionError(failure); });
+    /** The shipped theme resolved for {@code dark}, as the staged panel fixtures take it (plan 10a). */
+    public static dev.jasper.app.appearance.ResolvedTheme resolved(boolean dark) {
+        return dev.jasper.app.appearance.ResolvedTheme.of(dark, selection());
     }
-
-    /** The Enterprise theme resolved for {@code dark}. */
-    public static ResolvedTheme resolved(boolean dark) { return ResolvedTheme.of(dark, selection()); }
-}
 ```
 
-If 5b's `LookFonts.register` returns another type than a collection of the files that did not register, adapt the
-`missing` check to it (its Task 1 names the method; `EnterpriseKitRenderTest` calls it the same way).
+`ThemeSelection`, `ThemeLibrary` and `TerminalSchemeChoice` are already imported there.
 
 Create `jasper-app/src/test/java/dev/jasper/app/plugins/StagedEnterprise.java`:
 
@@ -1075,8 +1048,7 @@ final class StagedEnterprise {
 }
 ```
 
-If 3d added a component to `HostedPlugin` (its Rulings 8: `iconHue`), write this call as `StagedRemoteHost` writes its
-own, with Enterprise's `Nodes.Hue.BLUE`.
+`HostedPlugin`'s six-argument constructor is the convenience form `StagedRemoteHost` calls (`HostedPlugin.java:24`).
 
 Now extend `PanelSurfaceFixture`:
 
@@ -1118,7 +1090,7 @@ edit(F, [
         this.home = home; this.theme = theme; this.flush = enterprise;''', 1),
     ('''        boolean files = panel.equals(FILE_SERVERS);''',
      '''        this.enterprise = enterprise ? StagedEnterprise.start(vault.host) : null;
-        var exports = enterprise ? Map.of("dev.jasper.vault.api", vault.loader, "dev.jasper.enterprise.api", this.enterprise) : Map.of("dev.jasper.vault.api", vault.loader);
+        Map<String, ClassLoader> exports = enterprise ? Map.of("dev.jasper.vault.api", vault.loader, "dev.jasper.enterprise.api", this.enterprise) : Map.of("dev.jasper.vault.api", vault.loader);
         var optional = enterprise ? Set.of("dev.jasper.vault", "dev.jasper.enterprise") : Set.of("dev.jasper.vault");
         boolean files = panel.equals(FILE_SERVERS);''', 1),
     ('''getClass().getClassLoader(), Map.of("dev.jasper.vault.api", vault.loader));''', '''getClass().getClassLoader(), exports);''', 1),
@@ -1169,16 +1141,11 @@ edit(F, [
      '''    @Override public void close() throws Exception {
         try { onEdt(site::notifyClosed); } finally { try { vault.close(); } finally { try { loader.close(); } finally { if (enterprise != null) enterprise.close(); } } }
     }''', 1)])
-B = "jasper-app/build.gradle.kts"
-edit(B, [
-    ('''    inputs.dir(rootProject.file("plugins/enterprise/src/main/resources")).withPathSensitivity(PathSensitivity.RELATIVE)''',
-     '''    inputs.dir(rootProject.file("plugins/enterprise/src/main/resources")).withPathSensitivity(PathSensitivity.RELATIVE)
-    // Plan 10a: the composition renders are compared with the preserved Enterprise mocks.
-    inputs.dir(rootProject.file("docs/design/enterprise/reference")).withPathSensitivity(PathSensitivity.RELATIVE)''', 1)])
 PY
 ```
 
-The `jasper-app/build.gradle.kts` anchor is 5b Task 4's line; if it reads otherwise, add the mocks input beside it.
+The test task already reads the mocks (`inputs.dir(rootProject.file("docs/design/enterprise/reference"))`,
+`jasper-app/build.gradle.kts:108`), so the build needs no edit.
 `PanelSurfaceFixture`'s Sessions mode mounts the panel `dev.jasper.remote.panel` through its real factory like the others;
 the Vault, the plugin host and the stores are unchanged.
 
@@ -1193,9 +1160,9 @@ them. The default mode keeps `Frame.STANDARD`, so the fixture's existing users (
 staged Tunnels and SFTP tests) see the header as before; none of them calls `render`. If plan 7 named the frame
 otherwise, use its enum and record it in the banner.
 
-Add the ledger rows (`MockMatch`, `MockMatchTest`, `EnterpriseLook`, `StagedEnterprise` and `StagedEnterpriseTest` match
-the pattern through `java.awt`, `dev.jasper.ui`, `Appearance` or `new …Panel`-like names; `PanelSurfaceFixture` already
-has its row):
+Add the ledger rows (`MockMatch`, `MockMatchTest` and `StagedEnterpriseTest` match the pattern through `java.awt` or
+`new …Fixture`-like names; `StagedEnterprise` matches nothing and takes a row anyway, as a staged-host helper;
+`PanelSurfaceFixture` and `testsupport/EnterpriseLook` already have their rows):
 
 ```bash
 python3 -I - <<'PY'
@@ -1204,7 +1171,6 @@ path = pathlib.Path("docs/design/theme-engine/migration.csv")
 rows = [
     ("jasper-app/src/test/java/dev/jasper/app/testsupport/MockMatch.java", "app.testsupport", "MockMatch"),
     ("jasper-app/src/test/java/dev/jasper/app/testsupport/MockMatchTest.java", "app.testsupport", "MockMatchTest"),
-    ("jasper-app/src/test/java/dev/jasper/app/application/EnterpriseLook.java", "app.application", "EnterpriseLook"),
     ("jasper-app/src/test/java/dev/jasper/app/plugins/StagedEnterprise.java", "app.plugins", "StagedEnterprise"),
     ("jasper-app/src/test/java/dev/jasper/app/plugins/StagedEnterpriseTest.java", "app.plugins", "StagedEnterpriseTest")]
 text = path.read_text(encoding="utf-8")
@@ -1229,12 +1195,12 @@ are written from the Python one; fix `bands` (never the measured text).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add jasper-app/src/test jasper-app/build.gradle.kts docs/design/theme-engine/migration.csv
+git add jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Plugin compositions: the Enterprise render harness and the mock matcher
 
-EnterpriseLook installs the shipped kit, the real Plex files and the
-Enterprise theme for headless renders; StagedEnterprise starts the
+EnterpriseLook gains the resolved Enterprise theme the staged fixtures
+take for headless renders; StagedEnterprise starts the
 staged Enterprise plugin in a real host so staged consumers find
 Workstation; PanelSurfaceFixture gains an Enterprise mode, the Sessions
 panel and a 2x render over the panel surface. MockMatch compares a
@@ -1452,7 +1418,7 @@ final class DefaultPropertiesFace implements PropertiesFace {
         for (int i = 0; i < control.labels.size(); i++) {
             var row = properties.rows().get(i); var label = control.labels.get(i); var value = control.values.get(i);
             Composition.style(label, context, Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
-            value.setFont(ThemePainting.font(context, row.technical() ? Typography.Role.MONO : Typography.Role.BODY));
+            value.setFont(ThemePainting.font(context, row.technical() ? Typography.Role.MONO : Typography.Role.BODY, row.value()));
             value.setForeground(row.severity().map(severity -> SurfaceContrast.painted(theme, PropertyLists.valuePair(severity)))
                 .orElseGet(() -> ThemePainting.color(context, SemanticColor.TEXT_PRIMARY)));
         }
@@ -1530,7 +1496,7 @@ final class ClassicPropertiesFace implements PropertiesFace {
             var row = properties.rows().get(i); var label = control.labels.get(i); var value = control.values.get(i);
             label.setFont(ThemePainting.font(context, Typography.Role.BODY));
             label.setForeground(ThemePainting.painted(context, text(SemanticColor.TEXT_SECONDARY, labelGround)));
-            value.setFont(ThemePainting.font(context, row.technical() ? Typography.Role.MONO : Typography.Role.BODY));
+            value.setFont(ThemePainting.font(context, row.technical() ? Typography.Role.MONO : Typography.Role.BODY, row.value()));
             value.setForeground(row.severity().map(severity -> ThemePainting.painted(context, new PaintPair(Labels.tint(severity), valueGround, SurfaceContrast.Guard.TEXT)))
                 .orElseGet(() -> ThemePainting.painted(context, text(SemanticColor.TEXT_PRIMARY, valueGround))));
             label.setOpaque(false); value.setOpaque(false);
@@ -1735,7 +1701,9 @@ final class PropertyLists {
 
 Before replacing it, diff the branch's `PropertyLists.java` with 3b's text quoted in 3b Task 7 Step 3: if 3b's review or a
 later plan changed it, carry those changes into the default face and the control above (the default face must paint
-what the file paints now). `context()` is `ControlRegistry.Control`'s final accessor (`ControlRegistry.java:95`); `node` and `component` are its
+what the file paints now). Checked on 2026-10-17: the only later change is 5b's final review (`911699932`), which picks a
+value's font for its text (`ThemePainting.font(context, role, row.value())`); both faces above carry it (Execution notes
+R8). `context()` is `ControlRegistry.Control`'s final accessor (`ControlRegistry.java:95`); `node` and `component` are its
 fields, which the two one-line accessors expose to the faces.
 
 Then run from the worktree root:
@@ -1981,8 +1949,8 @@ import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import dev.jasper.app.appearance.ThemeTestSupport;
-import dev.jasper.app.application.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockMatch;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
@@ -2002,7 +1970,10 @@ class ClassicCompositionRenderTest {
         DISCONNECTED = "01 Workstation/Workstation - Disconnected.png", DARK = "08 Dark Mode/Workstation Dark - Connected (plugins in use).png";
     @TempDir Path root;
 
-    /** Saves the pair, then checks the render: its size, its bands down {@code sampleX}, its colours and its edge agreement. */
+    /**
+     * Saves the pair, then checks the render: its size, its bands down {@code sampleX}, its colours and its edge agreement,
+     * which follows the UI face's glyphs and is asserted under the shipped IBM Plex ({@link MockCrops#fontsFloor}).
+     */
     static void check(String name, MockMatch.Crop crop, BufferedImage render, int sampleX, String bands, int tolerance, double floor, String... colours) {
         var mock = crop.read();
         MockMatch.save(name, mock, render);
@@ -2010,13 +1981,13 @@ class ClassicCompositionRenderTest {
         assertThat(render.getHeight()).as(name + " height").isEqualTo(crop.height());
         assertThat(MockMatch.mismatch(MockMatch.parse(bands), MockMatch.bands(render, sampleX), tolerance)).as(name + " bands at x " + sampleX).isEmpty();
         for (String colour : colours) assertThat(MockMatch.present(render, Color.decode(colour))).as(name + " shows " + colour).isTrue();
-        assertThat(MockMatch.agreement(mock, render)).as(name + " edge agreement").isGreaterThanOrEqualTo(floor);
+        MockCrops.fontsFloor(name + " edge agreement", MockMatch.agreement(mock, render), floor);
     }
 
     /** Runs {@code body} under the installed Enterprise look in {@code dark}, then restores the default look. */
     static void under(boolean dark, ThrowingRunnable body) throws Exception {
         var controller = onEdtValue(() -> EnterpriseLook.controller(dark));
-        try { body.run(); } finally { onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); }); }
+        try { body.run(); } finally { onEdt(() -> { controller.close(); EnterpriseLook.restoreDefault(); }); }
     }
 
     interface ThrowingRunnable { void run() throws Exception; }
@@ -2266,7 +2237,7 @@ edit(F, [
      '''.newInstance(id, values[i][0], values[i][1], 22, values[i][2], values[i].length > 5 && values[i][5].equals("vault") ? vaultAuth.newInstance(new UUID(0x4100L, i)) : agent,
                     values[i].length > 3 ? values[i][3] : "", values[i].length > 4 && values[i][4].equals("favorite"), Optional.empty(), Instant.EPOCH, Instant.EPOCH);''', 1),
     ('''    /** Puts a saved tunnel through the plugin's own tunnel store; returns its id. */''', '''    /** Selects a host in the window's Sessions panel, as a click does (plan 10a). */
-    public void selectSession(UUID host) {
+    public void selectSession(UUID host) throws InterruptedException {
         onEdt(() -> {
             try {
                 Object panel = ((Map<?, ?>) field(plugin, "panels")).get(vault.window);
@@ -2351,7 +2322,8 @@ Sessions…", and a PRIMARY Connect. The window's choice is shared with its Sess
   `plugins/remote/src/test/java/dev/jasper/remote/SessionToolbarViewTest.java`
 - Modify: `plugins/remote/src/main/java/dev/jasper/remote/SessionsToolbar.java`, `RemotePlugin.java`,
   `jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java` (`toolbarView`),
-  `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicCompositionRenderTest.java`
+  `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicCompositionRenderTest.java`, `docs/design/theme-engine/migration.csv`
+  (`SessionSelection` and `SessionToolbarViewTest`, Execution notes R9)
 
 **Interfaces:**
 - Consumes: Task 4's `HostsPanel.selectRow`, `onSelectionChanged`, `rowId`; 3d's `ToolbarItem.view`, `ToolbarEntry.View`
@@ -2734,9 +2706,28 @@ PY
 `StagedRemoteHost.askHostKey` uses. `SessionsSurfaceFixture.layout(Container)` is the fixture's recursive layout
 (`PanelSurfaceFixture.size` uses it).
 
+Add the ledger rows: `SessionToolbarViewTest` matches the pattern through `import dev.jasper.sdk.ui`, and
+`SessionSelection` through `new ArrayList` (a helper false positive):
+
+```bash
+python3 -I - <<'PY'
+import pathlib
+path = pathlib.Path("docs/design/theme-engine/migration.csv"); text = path.read_text(encoding="utf-8")
+listed = {line.split(",", 1)[0] for line in text.splitlines()}
+T = "plugins/remote/src/test/java/dev/jasper/remote/SessionToolbarViewTest.java"
+rows = [("plugins/remote/src/main/java/dev/jasper/remote/SessionSelection.java", "SessionSelection", "nonvisual-helper,10,none", T,
+         "Helper false positive (new ArrayList); New in Enterprise plan 10a Task 5: each window's chosen session row, shared by the toolbar view and the Sessions tree"),
+        (T, "SessionToolbarViewTest", "nonvisual-helper,none,none", T, "Test/fixture ownership; New in Enterprise plan 10a Task 5")]
+for file, cls, kind, tests, note in rows:
+    if file in listed: raise SystemExit(f"already ledgered: {file}")
+    text += f"{file},dev.jasper.remote,{cls},{kind},{tests},{note}\n"
+path.write_text(text, encoding="utf-8")
+PY
+```
+
 - [ ] **Step 4: Run the tests and match the mock**
 
-Run: `./gradlew :jasper-plugin-remote:test --tests 'dev.jasper.remote.SessionToolbarViewTest' --tests 'dev.jasper.remote.RemotePluginTest' --tests 'dev.jasper.remote.ui.SessionsTreeTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.plugins.StagedRemoteSessionsTest' --continue`
+Run: `./gradlew :jasper-plugin-remote:test --tests 'dev.jasper.remote.SessionToolbarViewTest' --tests 'dev.jasper.remote.RemotePluginTest' --tests 'dev.jasper.remote.ui.SessionsTreeTest' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.plugins.StagedRemoteSessionsTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS: `SessionToolbarViewTest` (4), the Remote suites (the rows layout keeps its dropdown test
 `hostContributesSemanticNetworkNavigationIcons`), `ClassicCompositionRenderTest` (2). The toolbar render's bands are the
 combo's (owned by 4b's classic dropdown face and 3d's `KitView.toolbarStrip`): its 22 px height and its border and
@@ -2746,7 +2737,7 @@ combo. Fix a band defect in its owner; record the measured agreement in the bann
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/remote jasper-app/src/test
+git add plugins/remote jasper-app/src/test docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Plugin compositions: the Session toolbar view
 
@@ -3531,14 +3522,15 @@ In `RemotePluginTest`, after `aStartUnderEnterpriseReadsTheClassicLayoutOnce`:
             assertThat(host.panelView(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, window)).as("Transfers shows its panel").isPresent();
             host.openPanel(SftpUi.PANEL, window);
             settle(host);
-            assertThat(find(host.panelView(SftpUi.PANEL, window).orElseThrow(), dev.jasper.remote.ui.transfers.TransferStrip.ROOT))
+            assertThat(dev.jasper.remote.testsupport.Kits.find(host.panelView(SftpUi.PANEL, window).orElseThrow(), dev.jasper.remote.ui.transfers.TransferStrip.ROOT))
                 .as("the SFTP footer holds no transfers under CLASSIC").isEmpty();
         }
     }
 ```
 
 If the fake prints panels otherwise (`RemotePluginTest.hostContributesSemanticNetworkNavigationIcons` shows the form),
-follow it.
+follow it. `Kits.find` is named in full because `RemotePluginTest` declares its own `find(Component, Class)`, which hides
+the static import.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -3713,8 +3705,10 @@ rows = [("plugins/remote/src/main/java/dev/jasper/remote/ui/transfers/TransfersP
          "plugins/remote/src/test/java/dev/jasper/remote/RemotePluginTest.java",
          "New in Enterprise plan 10a Task 8: registers the BOTTOM panel toggled by TransferUi.SHOW and shows it on that action"),
         (T, "TransfersPanelTest", "nonvisual-helper,none,none", T, "Test/fixture ownership; New in Enterprise plan 10a Task 8")]
+# A row's own source column, not its tests column: the first row's tests name T (Execution notes R10).
+listed = {line.split(",", 1)[0] for line in text.splitlines()}
 for file, cls, kind, tests, note in rows:
-    if file in text: raise SystemExit(f"already ledgered: {file}")
+    if file in listed: raise SystemExit(f"already ledgered: {file}")
     text += f"{file},dev.jasper.remote,{cls},{kind},{tests},{note}\n"
 path.write_text(text, encoding="utf-8")
 PY
@@ -3753,29 +3747,24 @@ Spec 14.4 "Add Host" and Rulings 12: under CLASSIC the Keys list sets `emptyText
 choice sits in the control column (an empty-label FormRow); the side column (4c) reads Add Stored Key…, Remove, Move Up,
 Move Down. New Tunnel's composition is unchanged and is rendered against its mock.
 
-Add Host, New Tunnel and New File Server are FULL forms in native centred dialogs. Plan 6b sets `KitView.dialogBand`
-only for the classic dialogs it draws in their window (`NativeShells.inWindow`), and no earlier plan paints a native
-dialog form's footer band (4b draws none; `Forms.Footer` paints only a WINDOW form's), so spec 10.8's last sentence ("Form
-and dialog footers sit on `surface.footer` under a `border.window` rule") has no owner for native dialogs. This task
-closes it as a host change (Rulings 15): under `DialogMapping.CLASSIC`, `NativeShells.dialog` sets `dialogBand` on every
-kit form it shows that is not a WINDOW body. The headless harness (`AppContractTest.headlessWindows`) runs no shell, so
-`renderSurface` sets the flags the Enterprise host sets before it lays the content out: `hostTitled` (6b's `windowTitled`
-rule for a FULL form under a native title) and `dialogBand`.
+Add Host, New Tunnel and New File Server are FULL forms in native centred dialogs (a modal DIALOG that is not an
+attached sheet opens natively under the classic mapping, `NativeShells.classicPlacement`). Plan 6b's final code already
+gives such a dialog's kit content spec 10.8's footer band: under `DialogMapping.CLASSIC`, `NativeShells.dialog` applies
+`nativeMarks(surface, systemTitle)` (`dialogBand`, and `hostTitled` for a FULL form under a system title bar), now and to
+content set later (Execution notes R7; Rulings 15 is superseded, and this task adds no host change). The headless
+harness (`AppContractTest.headlessWindows`) runs no shell, so `renderSurface` sets the flags the Enterprise host sets
+before it lays the content out: `hostTitled` and `dialogBand`.
 
 **Files:**
 - Modify: `plugins/remote/src/main/java/dev/jasper/remote/ui/HostEditor.java`, `RemotePlugin.java` (`editHost`),
-  `jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java` (`dialog`, new `classicFooters`),
   `jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java` (`invoke`, `surface`, `renderSurface`)
-- Create: `jasper-app/src/test/java/dev/jasper/app/windows/ClassicDialogFooterTest.java`
 - Test: `plugins/remote/src/test/java/dev/jasper/remote/ui/HostEditorTest.java` (one case),
   `jasper-app/src/test/java/dev/jasper/app/plugins/ClassicCompositionRenderTest.java`
 
 **Interfaces:**
-- Consumes: Task 1's `Layout`; 3c's `ItemList.emptyText`; 6b's `KitView.hostTitled(boolean)`, `dialogBand(boolean)`,
-  `AuxiliarySurface.classic()`, `AuxiliaryWindows(UiState, Function, PathChooser, DialogMapping)` and its
-  `NativeShells.dialog` hostTitled loop.
-- Produces: `public HostEditor HostEditor.layout(Layout)`; `static void NativeShells.classicFooters(AuxiliarySurface)`;
-  `PanelSurfaceFixture.invoke(String actionId)`, `AuxiliarySurface surface(String title)`, `BufferedImage
+- Consumes: Task 1's `Layout`; 3c's `ItemList.emptyText`; 6b's `KitView.hostTitled(boolean)`, `dialogBand(boolean)` and
+  `NativeShells.nativeMarks` (the native dialogs' flags, unchanged here).
+- Produces: `public HostEditor HostEditor.layout(Layout)`; `PanelSurfaceFixture.invoke(String actionId)`, `AuxiliarySurface surface(String title)`, `BufferedImage
   renderSurface(AuxiliarySurface, int, int)` (2× over `surface.dialog`, the content's `hostTitled` and `dialogBand` set
   as the Enterprise host sets them).
 
@@ -3802,75 +3791,16 @@ pick, cancel)` factory builds a form on a `FakeKit`, `HostEditorTest.java:28-31`
     }
 ```
 
-Create `jasper-app/src/test/java/dev/jasper/app/windows/ClassicDialogFooterTest.java`:
-
-```java
-package dev.jasper.app.windows;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-import dev.jasper.app.persistence.UiState;
-import dev.jasper.app.presentation.DialogMapping;
-import dev.jasper.app.testsupport.EdtTestExtension;
-import dev.jasper.app.testsupport.KitTestSupport;
-import dev.jasper.ui.model.ControlState;
-import dev.jasper.ui.model.Nodes;
-import dev.jasper.ui.model.ViewSpec;
-import dev.jasper.ui.swing.KitView;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-
-/** Spec 10.8's last sentence: under the classic mapping a native dialog's form footer is the band too (plan 10a Rulings 15). */
-@ExtendWith(EdtTestExtension.class)
-class ClassicDialogFooterTest {
-    static AuxiliaryWindows windows(DialogMapping.Kind kind) {
-        return new AuxiliaryWindows(UiState.inMemory(), surface -> { throw new AssertionError("never shown"); }, (choice, cancel) -> List.of(),
-            new DialogMapping(kind, true));
-    }
-
-    static KitView form(Nodes.FormKind kind) {
-        return new KitView(KitTestSupport.context(), new ViewSpec(new Nodes.Form("form", ControlState.READY, kind, "Add Host", Optional.empty(),
-            List.of(new Nodes.Text("body", ControlState.READY, "Body", Nodes.TextRole.BODY)), Optional.empty(),
-            List.of(new Nodes.Button("save", ControlState.READY, "Save", "", Nodes.ButtonKind.PRIMARY, "save", "")), "")), event -> { });
-    }
-
-    @Test void aClassicNativeDialogFootsItsFormWithTheBand() {
-        var surface = windows(DialogMapping.Kind.CLASSIC).dialog("Add Host", true, UUID.randomUUID());
-        try (var view = form(Nodes.FormKind.FULL)) {
-            surface.setContent(view);
-            NativeShells.classicFooters(surface);
-            assertThat(view.dialogBand()).isTrue();
-        }
-        var body = windows(DialogMapping.Kind.CLASSIC).dialog("Body", true, UUID.randomUUID());
-        try (var view = form(Nodes.FormKind.WINDOW)) {
-            body.setContent(view);
-            NativeShells.classicFooters(body);
-            assertThat(view.dialogBand()).as("a window body keeps its own footer").isFalse();
-        }
-    }
-
-    @Test void theDefaultMappingLeavesTheFooterAsItIs() {
-        var surface = windows(DialogMapping.Kind.AS_REQUESTED).dialog("Add Host", true, UUID.randomUUID());
-        try (var view = form(Nodes.FormKind.FULL)) {
-            surface.setContent(view);
-            NativeShells.classicFooters(surface);
-            assertThat(view.dialogBand()).isFalse();
-        }
-    }
-}
-```
-
-The 4-argument `Nodes.Text`, 9-argument `Nodes.Form` and 7-argument `Nodes.Button` are the kit model's convenience
-constructors (`Nodes.java:76`, `:572`, as `KitMountingTest` uses them); a WINDOW form takes exactly one section.
-
 Add to `ClassicCompositionRenderTest`:
 
 ```java
     static final String ADD_HOST = "0+476 #ECEDEF, 476+1 #C4C7CC, 477+44 #E6E7EA";
-    static final String ADD_HOST_KEYS = "0+3 #ECEDEF, 3+1 #B4B8BF, 4+56 #FFFFFF, 60+1 #B4B8BF, 61+4 #ECEDEF";
+    /**
+     * The keys box's white run under 4c's ordered face: its side column (spec 14.4's Add Stored Key…, Remove, Move Up and
+     * Move Down, which supersedes the mock's two buttons) sets it taller than the mock's 56 (Execution notes R11).
+     */
+    static final int KEYS_BOX = 56;
+    static final String ADD_HOST_KEYS = "0+3 #ECEDEF, 3+1 #B4B8BF, 4+" + KEYS_BOX + " #FFFFFF, " + (4 + KEYS_BOX) + "+1 #B4B8BF, " + (5 + KEYS_BOX) + "+4 #ECEDEF";
     static final String NEW_TUNNEL = "0+404 #ECEDEF, 404+1 #C4C7CC, 405+44 #E6E7EA";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
@@ -3883,7 +3813,7 @@ Add to `ClassicCompositionRenderTest`:
                 var hostCrop = new MockMatch.Crop("03 Add Host/Add Host - Default.png", 2, 60, 1040, 1042);
                 var host = fixture.renderSurface(addHost, hostCrop.logicalWidth(), hostCrop.logicalHeight());
                 check("light/add-host", hostCrop, host, 18, ADD_HOST, 1, 0.55, "#ECEDEF", "#E6E7EA", "#B4B8BF", "#2F65CA");
-                assertThat(MockMatch.mismatch(MockMatch.parse(ADD_HOST_KEYS), MockMatch.bands(host, 298, 500, 630), 1)).as("the keys box").isEmpty();
+                assertThat(MockMatch.mismatch(MockMatch.parse(ADD_HOST_KEYS), MockMatch.bands(host, 298, 500, 500 + 2 * (KEYS_BOX + 9)), 1)).as("the keys box").isEmpty();
                 onEdt(addHost::requestClose);
                 fixture.invoke("dev.jasper.remote.tunnels.new");
                 var tunnelCrop = new MockMatch.Crop("04 New Tunnel/New Tunnel - Local.png", 2, 60, 1040, 898);
@@ -3894,14 +3824,16 @@ Add to `ClassicCompositionRenderTest`:
     }
 ```
 
-The keys-box band reads mock column 300 from y 560 (crop x 298, crop rows 500 to 630). The action ids are
-`RemotePlugin.NEW_HOST` and `TunnelsUi.NEW`; if `TunnelsUi.NEW` is not `dev.jasper.remote.tunnels.new`, use its value.
+The keys-box band reads mock column 300 from y 560 (crop x 298, from crop row 500). `KEYS_BOX` starts at the mock's 56;
+the first run prints the render's bands at that column (`MockMatch.bands(host, 298, 500, 900)`): set `KEYS_BOX` to the
+render's white run between the two `#B4B8BF` rules (the 4c ordered face beside its side column, at least 56) and record
+it in the banner as a residual against the mock (spec 14.4 supersedes the mock's column). The action ids are
+`RemotePlugin.NEW_HOST` (`dev.jasper.remote.hosts.new`) and `TunnelsUi.NEW` (`dev.jasper.remote.tunnels.new`).
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `./gradlew :jasper-plugin-remote:compileTestJava :jasper-app:compileTestJava --continue`
-Expected: FAIL to compile: "cannot find symbol … layout(Layout)", "… invoke(String)", "… renderSurface",
-"… classicFooters(AuxiliarySurface)".
+Expected: FAIL to compile: "cannot find symbol … layout(Layout)", "… invoke(String)", "… renderSurface".
 
 - [ ] **Step 3: The classic Add Host and the fixture's dialogs**
 
@@ -3938,28 +3870,6 @@ R = "plugins/remote/src/main/java/dev/jasper/remote/RemotePlugin.java"
 edit(R, [
     ('''            host -> { if (!stopped && window.isOpen()) openHost(window, host); });''', '''            host -> { if (!stopped && window.isOpen()) openHost(window, host); });
         editor[0].layout(layout);''', 1)])
-N = "jasper-app/src/main/java/dev/jasper/app/windows/NativeShells.java"
-edit(N, [
-    ('''    static boolean resizable(AuxiliarySurface surface) { return !surface.attachedSheet() && !surface.id().isEmpty(); }''',
-     '''    static boolean resizable(AuxiliarySurface surface) { return !surface.attachedSheet() && !surface.id().isEmpty(); }
-
-    /**
-     * Spec 10.8's last sentence for a dialog the system draws: under the classic mapping each kit form in it that is not
-     * a window body puts its footer on {@code surface.footer} under a {@code border.window} rule, as the dialogs drawn in
-     * their window do. The default mapping leaves the content as it is.
-     */
-    static void classicFooters(AuxiliarySurface surface) {
-        if (!surface.classic()) return;
-        for (var child : surface.holder().getComponents())
-            if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()
-                    && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() != dev.jasper.ui.model.Nodes.FormKind.WINDOW)
-                view.dialogBand(true);
-    }''', 1),
-    ('''&& view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
-                        view.hostTitled(true);\n''',
-     '''&& view.spec().root() instanceof dev.jasper.ui.model.Nodes.Form form && form.kind() == dev.jasper.ui.model.Nodes.FormKind.FULL)
-                        view.hostTitled(true);
-            classicFooters(surface);\n''', 1)])
 F = "jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java"
 edit(F, [
     ('''    /** Selects a host in the window's Sessions panel, as a click does (plan 10a). */''', '''    /** Runs one of the plugin's actions in the fixture window, as a menu or a shortcut does (plan 10a). */
@@ -3971,8 +3881,8 @@ edit(F, [
     /**
      * A dialog's content at {@code width} by {@code height} logical pixels, painted at 2x over the theme's {@code
      * surface.dialog}. The headless windows run no shell, so the content takes the flags the Enterprise host gives a
-     * dialog first: {@code hostTitled} (a FULL form under the native title, plan 6b) and {@code dialogBand} (6b's in-window
-     * dialogs, and {@code NativeShells.classicFooters} for native ones).
+     * dialog first: {@code hostTitled} (a FULL form under the native title) and {@code dialogBand} (6b's
+     * {@code NativeShells.nativeMarks} under the classic mapping).
      */
     public BufferedImage renderSurface(dev.jasper.app.windows.AuxiliarySurface surface, int width, int height) {
         return onEdtValue(() -> {
@@ -3992,49 +3902,28 @@ PY
 ```
 
 `HostEditor`'s `ControlState`, `Optional`, `Option` and `Nodes` imports exist (fact 14). `StagedVaultHost.invoke` and
-`awaitSurface` are package-private members the fixture can call (it is in their package). The `NativeShells` anchor is
-the hostTitled loop plan 6b Task 7 adds to `dialog` after its `shell.followTheme(dialog…)` line; `classicFooters` runs
-for every dialog `dialog` shows (a classic overlay whose owner has no showing window included), while the dialogs drawn
-in their window keep 6b's `inWindow` flags.
-
-`ClassicDialogFooterTest` names `dev.jasper.ui`, so it takes its ledger row (`NativeShells` already has one):
-
-```bash
-python3 -I - <<'PY'
-import pathlib
-path = pathlib.Path("docs/design/theme-engine/migration.csv")
-file = "jasper-app/src/test/java/dev/jasper/app/windows/ClassicDialogFooterTest.java"
-text = path.read_text(encoding="utf-8")
-if file in text: raise SystemExit(f"already ledgered: {file}")
-if not text.endswith("\n"): text += "\n"
-text += f"{file},app.windows,ClassicDialogFooterTest,nonvisual-helper,none,none,{file},Test/fixture ownership; New in Enterprise plan 10a Task 9\n"
-path.write_text(text, encoding="utf-8")
-PY
-```
+`awaitSurface` are package-private members the fixture can call (it is in their package).
 
 - [ ] **Step 4: Run the tests and match the mocks**
 
-Run: `./gradlew :jasper-plugin-remote:test --tests 'dev.jasper.remote.ui.HostEditorTest' --tests 'dev.jasper.remote.ui.HostCompositionTest' --tests 'dev.jasper.remote.ui.tunnels.*' :jasper-app:test --tests 'dev.jasper.app.windows.ClassicDialogFooterTest' --tests 'dev.jasper.app.windows.ClassicPlacementTest' --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.plugins.StagedAddHostTest' --tests 'dev.jasper.app.plugins.FileServerRenderEvidenceTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
-Expected: PASS: the new cases and the editor suites unchanged, `ClassicDialogFooterTest` (2), `ClassicPlacementTest`
-unchanged, `ClassicCompositionRenderTest` (5), and the default-look dialog evidence renders unchanged (the pixel proof
-for the host change: `classicFooters` returns at once under `DialogMapping.Kind.AS_REQUESTED`, and jasper-ui is not
-touched, so the gallery cannot change). Render triage: the 44 px footer band and its rule are 6b's `Forms` band
-(`dialogBand`: `surface.footer` under `border.window`, `DIALOG_FOOTER_VERTICAL` and `FORM_SIDES`), turned on for these
-native dialogs by this task's `classicFooters` (and by `renderSurface` in the harness); the group boxes, colon labels, radios and checkboxes are 4b's faces; the keys box and its side column are 4c's ordered face; the
+Run: `./gradlew :jasper-plugin-remote:test --tests 'dev.jasper.remote.ui.HostEditorTest' --tests 'dev.jasper.remote.ui.HostCompositionTest' --tests 'dev.jasper.remote.ui.tunnels.*' :jasper-app:test --tests 'dev.jasper.app.windows.ClassicPlacementTest' --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.plugins.StagedAddHostTest' --tests 'dev.jasper.app.plugins.FileServerRenderEvidenceTest' --tests 'dev.jasper.app.plugins.VaultRenderEvidenceTest' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
+Expected: PASS: the new cases and the editor suites unchanged, `ClassicPlacementTest` unchanged (6b's `nativeMarks`),
+`ClassicCompositionRenderTest` (5), and the default-look dialog evidence renders unchanged (this task changes no host
+code). Render triage: the 44 px footer band and its rule are 6b's `Forms` band (`dialogBand`: `surface.footer` under
+`border.window`, `DIALOG_FOOTER_VERTICAL` and `FORM_SIDES`), turned on for these native dialogs by 6b's
+`NativeShells.nativeMarks` (and by `renderSurface` in the harness); the group boxes, colon labels, radios and checkboxes are 4b's faces; the keys box and its side column are 4c's ordered face; the
 route strip is 4c's route face. The mocks' field values differ only in the fixture's names; record the agreements.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add plugins/remote jasper-app/src/main jasper-app/src/test docs/design/theme-engine/migration.csv
+git add plugins/remote jasper-app/src/test
 git commit -F - <<'EOF'
 Plugin compositions: Add Host's keys and New Tunnel against the mocks
 
 Under the Enterprise look Add Host's keys list reads "No keys" while it
 is empty and its Authentication choice sits in the control column; New
-Tunnel needs no composition change. Under the classic dialog mapping a
-native dialog's form footer is the surface.footer band (spec 10.8).
-Both dialogs render in the real host under the shipped kit and match
+Tunnel needs no composition change. Both dialogs render in the real host under the shipped kit and match
 the Add Host and New Tunnel mocks.
 
 🤖 Generated with Claude Code at The Home Depot
@@ -4366,10 +4255,11 @@ Add to `plugins/fileserver/src/test/java/dev/jasper/fileserver/FileServerPluginT
 `aStartUnderEnterpriseReadsTheClassicLayoutOnce` (Task 1), after its last assertion:
 
 ```java
-            assertThat(host.panels()).contains("dev.jasper.fileserver.panel|File Servers|LEFT+split|dev.jasper.fileserver.show");
+            assertThat(host.panels()).contains("dev.jasper.fileserver.panel|File Servers|LEFT+split|dev.jasper.fileserver.show-panel");
 ```
 
-using the File Server panel's id and toggle action as the class's existing panel assertion prints them.
+(the toggle is `FileServerPlugin.SHOW`, `dev.jasper.fileserver.show-panel`, as the class's existing panel assertion prints it,
+`FileServerPluginTest.java:201`).
 
 Add the ledger row of `FileServersTableTest` (it matches `new …Panel`):
 
@@ -4434,8 +4324,6 @@ empty text "No keys added" and the existing ACTIONS row. The four protocol mocks
 Add to `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerEditorTest.java`:
 
 ```java
-    static final String ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAEgwWITbeAjMHfs63n4fe6AxR8buxH3Wx+IdWdotPF0 alice@laptop";
-
     @Test void underClassicTheAuthorizedKeysAreATable() {
         var events = new java.util.ArrayList<String>();
         var holder = new java.util.concurrent.atomic.AtomicReference<ServerEditor>();
@@ -4462,8 +4350,9 @@ Add to `plugins/fileserver/src/test/java/dev/jasper/fileserver/ui/ServerEditorTe
     }
 ```
 
-If 3e's folder change or 3b's protocol change made the 14-argument constructor take other arguments, build the editor
-as `ServerEditorTest`'s own factory does and call `layout` on it.
+The class already declares the `ED25519` line the case uses (`ServerEditorTest.java:26`). If 3e's folder change or 3b's
+protocol change made the 14-argument constructor take other arguments, build the editor as `ServerEditorTest`'s own
+factory does and call `layout` on it.
 
 Add to `ClassicCompositionRenderTest`:
 
@@ -4547,7 +4436,7 @@ edit(F, [('''        currentEditor = editor[0];\n        dialog.setContent(edito
 P = "jasper-app/src/test/java/dev/jasper/app/plugins/PanelSurfaceFixture.java"
 edit(P, [('''    /** Runs one of the plugin's actions in the fixture window, as a menu or a shortcut does (plan 10a). */''',
           '''    /** Delivers {@code event} to the view of the plugin's {@code pluginField} (a form it keeps), as its kit would (plan 10a). */
-    public void dispatch(String pluginField, dev.jasper.sdk.ui.UiEvent event) {
+    public void dispatch(String pluginField, dev.jasper.sdk.ui.UiEvent event) throws InterruptedException {
         onEdt(() -> {
             try {
                 Object form = field(plugin, pluginField);
@@ -4571,7 +4460,7 @@ host's kit uses; the fixture is in its package.
 Run: `./gradlew :jasper-plugin-fileserver:test --tests 'dev.jasper.fileserver.ui.*' :jasper-app:test --tests 'dev.jasper.app.plugins.ClassicCompositionRenderTest' --tests 'dev.jasper.app.plugins.StagedFileServerFormTest' --continue`
 Expected: PASS: the editor suites (the rows list unchanged), the new case, the renders (7). Render triage: the form's
 groups, radios with swatches and colon labels are plan 4b's faces; the footer band and its rule are 6b's `Forms` band,
-turned on for this native dialog by Task 9's `NativeShells.classicFooters` (and by `renderSurface` in the harness); the keys table box, header band and empty
+turned on for this native dialog by 6b's `NativeShells.nativeMarks` (and by `renderSurface` in the harness); the keys table box, header band and empty
 line are 4c's table face and 3c's empty line. The mocks' "Authorized keys:" colon is a fixture (spec 14.5).
 
 - [ ] **Step 5: Commit**
@@ -5133,7 +5022,8 @@ for protocol, height in [("HTTP", 986), ("FTP", 1210), ("SFTP", 1172), ("TFTP", 
 before = len(pairs)
 for name, mock, crop in new:
     pairs.append({"name": "composition-" + name.replace("/", "-"), "mock": mock, "crop": crop, "render": O + name + "@2x.png",
-                  "min_agreement": 0.55, "colours": ["#F0F1F3" if "light" in name else "#393C41"] if "new-" not in name and "add-host" not in name else ["#ECEDEF", "#E6E7EA"]})
+                  "min_agreement": 0.55, "colours": (["#ECEDEF"] if "light" in name else ["#3C3F44"]) if "session-toolbar" in name
+                  else ["#F0F1F3" if "light" in name else "#393C41"] if "new-" not in name and "add-host" not in name else ["#ECEDEF", "#E6E7EA"]})
 path.write_text(json.dumps(pairs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(before, "->", len(pairs))
 PY
@@ -5204,8 +5094,7 @@ published, ROWS otherwise, including when Enterprise is not installed); `verifyP
 table, SFTP's tools read Hidden files and Upload over a Modified column (disconnected: Choose Session… over "Not
 Connected"), Transfers a bottom panel toggled by ⌘⌥3, and the panels start Sessions and Tunnels right, SFTP and File
 Servers left; File Server's panel is a Folder/Address/Status table over Properties and New File Server lists keys as a
-table; Add Host's keys read "No keys"; under the classic dialog mapping a native dialog's form footer is the
-`surface.footer` band (`NativeShells.classicFooters`). Classic Properties (jasper-ui) follow the table point: the Workstation grid when
+table; Add Host's keys read "No keys". Classic Properties (jasper-ui) follow the table point: the Workstation grid when
 titled, label-colon lines when untitled. `ClassicCompositionRenderTest` renders every surface from the staged plugins
 under the shipped kit, Plex and theme, Light and Dark, against the mocks (bands, colours, edge agreement: <the measured
 agreements>); `CompositionParityTest` checks every default-look gesture's classic path. Rulings (plan, "Rulings"): <one
@@ -5235,3 +5124,154 @@ records plan 10a with its rulings, residuals and the full build.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-17)
+
+Refreshed at `b23f853af` (this branch: `main` at `9c6351e07` plus the plan's two commits). Plans 3b to 3e, 4a to 4c,
+5a, 5b, 6a, 6b, 7, 8a, 9a and 11 are in `main`; 8b and 9b run in parallel worktrees. Method: every Create, Add-to and
+edit script of Tasks 1 to 13 was applied in order to an exported copy of the branch, and every touched module was
+compiled with the JetBrains Runtime 25 `javac` (main and test sources of Remote, File Server, Vault, jasper-ui and
+jasper-app) against the plan-11 worktree's classes, whose SDK, testkit, plugins, terminal and Buddy sources equal
+`main`'s. Before the fixes below: two edit anchors missing (Task 8's ledger, Task 9's `NativeShells`) and five compile
+errors; after them, every anchor is found its stated number of times and every module compiles with zero errors. No
+Gradle and no JUnit ran, so assertions, renders and floors are still to be proved by execution. Source hygiene and
+`ThemeMigrationCoverageTest`'s candidate pattern were checked over every new source: clean after R9.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Finding | Ruling |
+|---|---|---|---|
+| 1 | manifests, builds, `Layout`, the gate, AGENTS.md | All anchors hold; `RemotePlugin.java:148`, `FileServerPlugin.java:142`, `VaultPlugin.start` read the layout once; the gate's names (`own`, `from`, `path`, `line`) exist | none |
+| 2 | `EnterpriseLook`, `PanelSurfaceFixture`, `jasper-app/build.gradle.kts`, ledger | A `testsupport.EnterpriseLook` exists (6a, shipped by 5b); the build already reads the mocks; `exports` mistyped | R4, R5, R6 |
+| 3 | `PropertyLists`, `KitFaces`, `DesignMetrics`, TSVs | 5b's final review changed the value font after 3b; the rest compiles as written | R8 |
+| 4 | `HostsPanel`, `RemotePlugin.createPanel`, `PanelSurfaceFixture.selectSession`, `ClassicCompositionRenderTest` | `selectSession` calls `settle()`, which throws `InterruptedException`; floors are face-dependent | R6, R15 |
+| 5 | `SessionsToolbar`, `SessionSelection`, `RemotePlugin`, `PanelSurfaceFixture.toolbarView`, ledger | `SessionSelection` and `SessionToolbarViewTest` match the ledger pattern and had no rows | R9 |
+| 6 | `TunnelsPanel`, `TunnelsUi`, `RemotePlugin` | Agrees with itself; compiles | none |
+| 7 | `SftpPanel`, `SftpUi`, `RemotePlugin` | Agrees with itself; compiles | none |
+| 8 | `TransferStrip`, `TransfersPanel(s)`, `RemotePluginTest`, ledger | The ledger script's `file in text` finds `TransfersPanelTest` in the first row's tests column and stops before writing; `find` is hidden by `RemotePluginTest.find(Component, Class)` | R10, R12 |
+| 9 | `HostEditor`, `RemotePlugin.editHost`, `NativeShells`, `PanelSurfaceFixture` | 6b's final code replaced the anchored loop with `nativeMarks`, which already bands classic native dialogs; the mock's keys box cannot hold spec 14.4's side column | R7, R11 |
+| 10 | `FileServersPanel`, `FileServerPlugin`, `UiTestAccess`, `FileServerPluginTest` | The panel's toggle is `dev.jasper.fileserver.show-panel`, not `.show` | R13 |
+| 11 | `ServerEditor`, `FileServerPlugin.edit`, `PanelSurfaceFixture.dispatch`, `ServerEditorTest` | `ED25519` is declared twice; `dispatch` calls `settle()`; triage names Task 9's removed method | R6, R7, R14 |
+| 12 | both `CompositionParityTest`s | Agree with Tasks 4 to 11's ids and constructors; compile | none |
+| 13 | docs, `pairs.json`, STATUS, banner | The toolbar pairs list a colour their crop lacks; the STATUS template names `classicFooters` | R7, R17 |
+| 1 and 2 | `layout()` read by reflection | Package-private `layout()` is declared on `RemotePlugin` and `FileServerPlugin`, which the fixture instantiates | none |
+| 1 and 4 to 11 | the `Layout` argument | Each composition root takes the plugin's `layout` from `start`; constructor forms compile | none |
+| 1 and 8, 12 | `FakeEnterprise`, optional `dev.jasper.enterprise` | Consistent | none |
+| 1 and 10 | `FileServerPluginTest.aStartUnderEnterpriseReadsTheClassicLayoutOnce` | Task 10 extends Task 1's method | R13 |
+| 2 and 4 to 11 | `PanelSurfaceFixture(…, true)`, `render`, `EnterpriseLook.resolved`, `MockMatch`, `check` | One shared Enterprise fixture and one restore | R4, R6, R15 |
+| 2, 4, 5, 9, 11 | `PanelSurfaceFixture` edit chain | Task 5 and Task 9 anchor on Task 4's `selectSession` comment, Task 11 on Task 9's `invoke` comment: task order is binding | none |
+| 2 and 13 | `MockMatch.OUT` names and `pairs.json` | The 20 render names match the pairs' `render` paths | none |
+| 3 and 4, 10 | classic Properties | The kit's `table` point is CLASSIC under Enterprise, so the Sessions and File Server Properties draw as the grid | R8 |
+| 3 and 9b (parallel) | `DesignMetrics`, `compact-roles.tsv`, `classic-roles.tsv`, `face-pairs.tsv`, `KitFaces.all()` | Possible concurrent rows | R19 |
+| 4 and 5 | `HostsPanel.selectRow`, `onSelectionChanged`; `RemotePlugin` | Distinct anchors; `panels` is keyed by window id | none |
+| 4, 5, 6, 7, 8 and 12 | panel, toolbar, SFTP and transfer ids | Consistent with the classic compositions | none |
+| 6 and 8 | `TunnelsUi` | Task 6 assigns `layout` before the `register` line Task 8 edits (javac flow check passes) | none |
+| 7 and 8 | `SftpUi` | Task 8's `register` line sits in Task 7's twelve-argument constructor after `this.layout=layout;` | none |
+| 9 and 11 | dialog renders and the native footer band | Both read 6b's band through `renderSurface` | R7 |
+| 10 and 11 | `FileServerPlugin` | Disjoint anchors | none |
+| 10 and 12 | `FileServersPanel` constructor, `UiTestAccess.find` | Consistent | none |
+| 4 to 11 | `ClassicCompositionRenderTest` | Method counts 1, 2, 3, 4, 5, 6, 7 follow the task order | none |
+| 2, 4 to 8, 10, 12 | `migration.csv` appends | Rows were missing in Task 5; Task 8's script stopped itself | R9, R10, R19 |
+| 1, 4 to 9 | `RemotePlugin.java` | Every anchor found once, applied in task order | none |
+
+### Rulings
+
+R1. **The refresh is a javac dry run, not a Gradle run** — what: anchors, signatures and types are proved by applying the
+plan in order to an exported copy and compiling every touched module; why: the orchestrator forbids Gradle here, and
+javac proves exactly what a refresh must (anchors, names, types, flow); cost if wrong: an assertion or render fails at
+execution, which the TDD steps expect and fix in place.
+
+R2. **No rebase** — what: "Before you start" checks that `9c6351e07` is an ancestor instead of running `git rebase main`;
+why: the orchestrator's rule, and the branch already holds `main`; cost if wrong: none.
+
+R3. **Verified facts carry the 2026-10-17 line numbers** — what: facts 1, 3, 5, 6, 8, 10 to 13, 15 and 16 are re-anchored;
+the names table holds (each name compiles); why: 255 commits since `deafed424`; cost if wrong: none (every edit quotes
+its text).
+
+R4. **Task 2 extends `testsupport.EnterpriseLook` instead of creating `application.EnterpriseLook`** — what: it adds
+`selection()` and `resolved(boolean)` to plans 6a and 5b's fixture, the render tests restore with its
+`restoreDefault()`, and the second class and its ledger row go; why: one Plex registration path
+(`EnterpriseResources.kit()`) and one restore, as the chrome, dock and Settings mock tests use, where the plan's class
+registered Plex a second way through `LookFonts.register` and restored with an unclosed controller; cost if wrong: one
+more class later.
+
+R5. **Task 2 leaves `jasper-app/build.gradle.kts` alone** — what: the edit and its `git add` go; why: the test task already
+declares `docs/design/enterprise/reference` an input (`:108`); cost if wrong: none.
+
+R6. **Three javac corrections** — what: `PanelSurfaceFixture`'s `exports` is `Map<String, ClassLoader>` (a
+`Map<String, PluginClassLoader>` does not convert to `PluginClassLoader`'s parameter), and `selectSession` (Task 4) and
+`dispatch` (Task 11) declare `throws InterruptedException` (`StagedVaultHost.settle()` throws it; their callers declare
+`throws Exception`); why: compile errors otherwise; cost if wrong: none.
+
+R7. **Task 9 adds no host change; Rulings 15 is superseded** — what: `NativeShells.classicFooters`, its call and
+`ClassicDialogFooterTest` (with its ledger row) go; Tasks 9, 11 and 13 name 6b's `NativeShells.nativeMarks`; why: 6b's
+final code (`37b8c0718`) already applies `nativeMarks(surface, systemTitle)` in `dialog`, giving every kit view of a
+classic native dialog `dialogBand` (and a FULL form under a system title bar `hostTitled`), now and to content set later,
+which `ClassicPlacementTest` covers; the plan's anchor (6b's earlier loop) is gone; Add Host, New Tunnel and New File
+Server are modal DIALOGs that are not attached sheets, so they open natively and take those marks; cost if wrong: a
+classic native WINDOW-form body would take the band too (no Remote or File Server dialog is one); one condition in
+`nativeMarks` later.
+
+R8. **The Properties faces pick a value's font for its text** — what: `DefaultPropertiesFace` and `ClassicPropertiesFace`
+call `ThemePainting.font(context, role, row.value())`; why: 5b's final review (`911699932`) made `PropertyLists` do so,
+and the pixel rule requires the default face to paint what the file paints now (it was the only difference); cost if
+wrong: the gallery digest check catches it.
+
+R9. **Task 5 ledgers `SessionSelection` and `SessionToolbarViewTest`** — what: a ledger step adds
+`SessionSelection` (`nonvisual-helper,10,none`, a helper false positive: `new ArrayList` matches the candidate pattern)
+and `SessionToolbarViewTest` (`nonvisual-helper,none,none`), the step's run adds `ThemeMigrationCoverageTest` and the
+commit adds the ledger; why: `sourceDiscoveryIncludesTestFixturesAndHelperFalsePositives` fails otherwise; cost if
+wrong: none.
+
+R10. **Task 8's ledger script reads each row's own source column** — what: it compares against the set of first fields;
+why: `file in text` found `TransfersPanelTest` in the first row's tests column and stopped before writing any row; cost
+if wrong: none.
+
+R11. **Add Host's keys box is checked at the classic ordered face's height** — what: `ADD_HOST_KEYS` is built from
+`KEYS_BOX`, set on the first run to the render's white run between the box's rules (at least the mock's 56) and recorded
+as a residual; the band window grows with it; why: spec 14.4 replaces the mock's Add Key… and Remove with Add Stored
+Key…, Remove, Move Up and Move Down, and 4c's STATUS records that the box is taller and the body scrolls, so the mock's
+56 cannot be met; cost if wrong: the box's height is compared with the face, not the mock.
+
+R12. **Task 8 names `Kits.find` in full** — what: `dev.jasper.remote.testsupport.Kits.find(…)`; why: `RemotePluginTest`
+declares `find(Component, Class)`, which hides the static import; cost if wrong: none.
+
+R13. **Task 10's panel assertion uses `dev.jasper.fileserver.show-panel`** — what: the File Servers toggle as
+`FileServerPluginTest.java:201` prints it; why: `.show` is not an action; cost if wrong: none.
+
+R14. **Task 11 drops its `ED25519` constant** — what: the case uses the class's own (same text, `ServerEditorTest.java:26`);
+why: a duplicate field does not compile; cost if wrong: none.
+
+R15. **Edge agreement goes through `MockCrops.fontsFloor`** — what: `ClassicCompositionRenderTest.check` asserts the
+floor under the shipped IBM Plex and prints it only where an installed Plex hides the plugin's files; bands, sizes and
+colours are always asserted; why: the convention of 5b's, 7's and 9a's mock tests, and on this machine Plex resolves, so
+every font-dependent floor is asserted as the orchestrator requires; cost if wrong: on a machine with Plex installed the
+agreement is printed, not asserted.
+
+R16. **The Dark strings keep the mock's accent** — what: `#3D74D6` stays in the measured Dark bands and colours though
+spec 7.6 (amended by 5b) gives Enterprise Dark `#3C74D6`; why: they are the mock's measurements, and the two lie under
+ΔE76 1, inside `MockMatch`'s 4 for bands and 6 for presence; cost if wrong: none.
+
+R17. **The session-toolbar pairs list the toolbar's colours** — what: Light `#ECEDEF`, Dark `#3C3F44`; why:
+`check_pairs.py` asks the render for each colour within ΔE 1.5, and the toolbar crop has no column header band
+(`#F0F1F3` / `#393C41`); cost if wrong: one colour per pair.
+
+R18. **Hand-offs to plan 10** — what: 4b's X10 (TFTP's read-only login in the control column) is not taken, since the
+TFTP mock draws that field flush at the card's edge and the mock wins on layout; 4c's "the mock starts the Access radios
+at the card's edge" stays a residual of 4b's label policy (SDK 0.18 gives a composition no way to undo a bare choice's
+inset); 4c Rulings 10's single empty-state action is met (each Empty here has one); plan 7's header-action glyph sizes
+and Transfers' place after Event Log stay plan 7 residuals (Rulings 14; plan 7 orders nothing inside a slot); 6a
+ruling 31 (the auxiliary frames' File row against the 07 Vault mocks) is plan 10b's; why: scope and the mocks; cost if
+wrong: one FormRow or one strip rule later.
+
+R19. **Shared files with the parallel plans are reconciled at merge** — what: `migration.csv`, `docs/STATUS.md`,
+`tools/visual/pairs.json`, the `DesignMetrics` role tables and frozen TSVs, `face-pairs.tsv`, `KitFaces.all()`,
+`verifyPluginArchitecture` and AGENTS.md may also change in 8b and 9b; Task 3's TSV rows anchor on the
+`FORM_LABEL_WIDTH` rows, so a role 9b adds elsewhere merges cleanly; why: the orchestrator's instruction; cost if wrong:
+a conflict resolved by hand at merge.
+
+R20. **Only plan 10a executes now** — what: Tasks 1 to 13; plan 10b follows on this branch; why: the orchestrator; cost if
+wrong: none.
+
+R21. **A timing-sensitive test may flake once** — what: other plans' builds share the machine; re-run such a test alone
+before treating it as a failure; why: the orchestrator's machine note; cost if wrong: one extra run.
