@@ -259,6 +259,9 @@ public final class DesignMetrics {
         // Tunnels and SFTP panels).
         values.put(Role.PANEL_EMPTY_TEXT_WIDTH, 300);
         values.put(Role.PANEL_EMPTY_LIFT, 0);
+        // Plan 10a: a panel footer's persistent setting row is 28 under its rule (the Workstation mock's SFTP Follow
+        // terminal folder row).
+        values.put(Role.PANEL_FOOTER_ROW_HEIGHT, 28);
         // Plan 9a: the classic Settings frame (Mock measurements).
         values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
         values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);

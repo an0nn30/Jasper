@@ -76,7 +76,12 @@ final class Panels {
                 : compact && panel.searchOrNavigation().isEmpty() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_LIST_TOP) : 0;
             contentSide = side; contentTop = top;
             contentInsets();
-            boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
+            // A classic dock panel (PANEL_SEARCH_RULE) closes its search or navigation row with a full-width rule, and a
+            // one-line navigation row (an INLINE stack) stands as its search row does (plan 10a, the Workstation mock's
+            // Sessions, Tunnels and SFTP panels).
+            int classicRule = column < 0 && panel.searchOrNavigation().isPresent() ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_SEARCH_RULE) : 0;
+            boolean search=panel.searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH
+                || classicRule > 0 && n instanceof Nodes.Stack s && s.role()==Nodes.LayoutRole.INLINE).isPresent();
             int pad = ThemePainting.metric(context(), search && column<0 ? DesignMetrics.Role.PANEL_SEARCH_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
             boolean panelSearch = search && column < 0;
             var padding = new EmptyBorder(
@@ -84,10 +89,8 @@ final class Panels {
                     column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad,
                     ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : search ? DesignMetrics.Role.PANEL_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
                     column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad);
-            // A classic panel's search row closes with a full-width rule (plan 10a, the Workstation mock).
-            int rule = panelSearch ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_SEARCH_RULE) : 0;
-            navigation.setBorder(rule == 0 ? padding : BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(0, 0, rule, 0, ThemePainting.panelRule(context())), padding));
+            navigation.setBorder(classicRule == 0 ? padding : BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, classicRule, 0, ThemePainting.panelRule(context())), padding));
             component.revalidate();
             component.repaint();
         }

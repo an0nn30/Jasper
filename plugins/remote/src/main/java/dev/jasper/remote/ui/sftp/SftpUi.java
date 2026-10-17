@@ -47,12 +47,26 @@ public final class SftpUi implements AutoCloseable {
     private Consumer<Boolean> rememberHidden=shown->{};
     private RemoteEditing editing;
     private volatile boolean closed;
+    /** Which composition the sidebars take (spec 14.4). */
+    private final dev.jasper.remote.workstation.Layout layout;
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip) {
         this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->context.platform().copy(text));
     }
+    /** The sidebars in {@code layout}'s composition; under CLASSIC the window's transfers are the Transfers panel's. */
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,
+                  dev.jasper.remote.workstation.Layout layout) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,text->context.platform().copy(text),layout);
+    }
     public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
                   Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard) {
+        this(context,ui,background,connections,endpoints,transfers,hosts,activePane,transferStrip,releaseStrip,clipboard,dev.jasper.remote.workstation.Layout.ROWS);
+    }
+    public SftpUi(PluginContext context,Executor ui,Executor background,Connections connections,EndpointFactory endpoints,Supplier<TransferCoordinator> transfers,
+                  Supplier<List<RemoteHost>> hosts,Function<WindowHandle,Optional<PaneTarget>> activePane,Function<WindowHandle,dev.jasper.remote.ui.transfers.TransferStrip> transferStrip,Consumer<WindowHandle> releaseStrip,Consumer<String> clipboard,
+                  dev.jasper.remote.workstation.Layout layout) {
+        this.layout=layout;
         this.context=context;this.ui=ui;this.background=background;this.connections=connections;this.endpoints=endpoints;this.transfers=transfers;this.hosts=hosts;this.activePane=activePane;this.transferStrip=transferStrip;this.releaseStrip=releaseStrip;this.clipboard=clipboard;
         context.panels().register(new PanelSpec(PANEL,"SFTP","folder",Anchor.LEFT).withToggleActionId(TOGGLE).withSplit(),this::create);
         // Ruling G6: the old panel-wide Alt+Left/Alt+Right and the table's Alt+Up, now rebindable panel shortcuts.
@@ -73,11 +87,11 @@ public final class SftpUi implements AutoCloseable {
     /** The window's explorer while its panel is open. */
     SftpPanel panel(UUID window) { var view=views.get(window);return view==null?null:view.panel(); }
     private UiView create(PanelHost host) {
-        var panel=new SftpPanel(context.kit());var window=host.window();
+        var panel=new SftpPanel(context.kit(),layout);var window=host.window();
         panel.onHeaderChanged(host::setHeader);
         panel.onChooseSession(chosen-> { if(!closed && window.isOpen()) browse(window,chosen); });
         panel.sessions(hosts.get());
-        panel.transfers(transferStrip.apply(window));
+        if(layout==dev.jasper.remote.workstation.Layout.ROWS) panel.transfers(transferStrip.apply(window));
         Function<ConnectionIdentity,CompletableFuture<FileEndpoint>> open=identity->endpoints.open(Optional.of(identity),window,status->{});
         var controller=new SftpController(context.dataDirectory().resolve("browser-cache"),background,ui,open,panel);
         controller.onFollowRequested(pane->followRequested.accept(pane));
@@ -88,7 +102,7 @@ public final class SftpUi implements AutoCloseable {
         if(editing!=null) panel.editing(new SftpPanel.Editing(entry->activate(view,entry),()->openSelected(view)));
         controller.visible(host.visible());
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
-        host.onClosed(()-> { releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close();panel.close(); });return panel.view();
+        host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);cancelBrowse(window.id());views.remove(window.id());controller.close();operations.close();panel.close(); });return panel.view();
     }
     private View showView(WindowHandle window) {
         var view=views.get(window.id());if(view==null) { context.panels().toggle(PANEL,window);view=views.get(window.id()); }else view.host().show();return view;

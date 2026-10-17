@@ -5325,3 +5325,28 @@ agreements after D4 and D5: light/tunnels 0.812, dark/tunnels 0.812, light/tunne
 D6 (Task 6). **Residual: the Tunnels row and cell positions** — the classic table's row is 22 (mock 24, Rulings 14; the
 band tolerance 2 admits it); the cell values start at their column titles' inset (the mock's Local value sits at x 68,
 left of its title at 85, and its Via value at 298, right of its title at 282), owned by 4c's table face.
+
+D7 (Task 7). **Classic panel navigation rows, in the kit** — what: under `PANEL_SEARCH_RULE` a dock panel's search or
+navigation slot closes with the panel rule (it was the SEARCH field's only), and a one-line navigation row (an INLINE
+stack in that slot) stands as the search row does (`PANEL_SEARCH_TOP`, `PANEL_SEARCH_SIDE`, `PANEL_SEARCH_BOTTOM`), is
+`PANEL_SEARCH_HEIGHT` tall with its controls stretched to that height, names its dropdowns by their labels without a
+caption, and stretches its last control to the row's end (`Stacks.PanelRowLayout`, `StackControl.panelRow` set in
+`ViewReconciler.applyPanelBody`); why: light/sftp had no rule under the navigation (the mock's `61+1 #DDE0E4`), and
+light/sftp-disconnected captioned the dropdown "Choose an SSH session" above a 22 px control beside a natural-width root
+path (navigation 57, then 34, against the mock's 36). Reach: Enterprise only; in the bundled code SFTP is the only dock
+panel whose slot holds something other than a SEARCH field. The default look is unchanged (`PANEL_SEARCH_RULE` 0);
+`ClassicPanelRowTest` covers both.
+
+D8 (Task 7). **Classic `PANEL_FOOTER_ROW_HEIGHT` 28** (was 32) — what: a panel footer's persistent setting row is 28 under
+its rule; why: the mock's Follow terminal folder row (`327+1 #DDE0E4, 328+28`); the render's 32 pushed the rule to 323.
+Reach: Enterprise only (in the bundled code the SFTP Follow row). Measured agreements after D7 and D8: light/sftp 0.708,
+dark/sftp 0.708, light/sftp-disconnected 0.736 (floors 0.55).
+
+D9 (Task 7). **Residual: the SFTP row, table and chooser details** — the navigation is 60 (mock 61): the breadcrumbs field
+is 22 tall (mock 24, 4b's classic field face); the separators are 3b's `border.subtle` hairlines 14 tall (`#E8E8E9`
+Light; the mock's are `#C4C7CC` and 16 tall; Task 7's triage assumed `border.window`); Hidden files and Upload draw in
+the classic GHOST face's secondary ink, and Upload's chevron is the classic menu face's, not ▼ (4b). The column
+separators stand at 132 and 203 (mock 136 and 213) because the classic table's scroll bar takes its width beside the rows
+where the mock overlays it; Size is a numeric column, right-aligned with its title; Modified values draw in MONO_SMALL's
+primary ink (mock `#5C6370`) (4c's table face). Disconnected: the dropdown is its natural 140 wide (mock 168), and the
+disabled breadcrumbs keep a white field (mock `#F0F1F3`, 4b's breadcrumbs face).

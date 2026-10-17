@@ -122,4 +122,37 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    static final String SFTP_LIGHT = "0+61 #F7F7F8, 61+1 #DDE0E4, 62+20 #F0F1F3, 82+1 #D3D6DA, 83+22 #2F65CA, 105+22 #F7F8FA, 127+22 #FFFFFF, "
+        + "149+22 #F7F8FA, 171+22 #FFFFFF, 193+22 #F7F8FA, 215+22 #FFFFFF, 237+22 #F7F8FA, 259+22 #FFFFFF, 281+22 #F7F8FA, 303+22 #FFFFFF, "
+        + "325+2 #F7F8FA, 327+1 #DDE0E4, 328+28 #F7F7F8";
+    static final String SFTP_DARK = "0+61 #35383D, 61+1 #45484E, 62+20 #393C41, 82+1 #4A4D53, 83+22 #3D74D6, 105+22 #313439, 127+22 #2E3135, "
+        + "149+22 #313439, 171+22 #2E3135, 193+22 #313439, 215+22 #2E3135, 237+22 #313439, 259+22 #2E3135, 281+22 #313439, 303+22 #2E3135, "
+        + "325+2 #313439, 327+1 #45484E, 328+28 #35383D";
+    static final String SFTP_DISCONNECTED = "0+36 #F7F7F8, 36+1 #DDE0E4, 37+20 #F0F1F3, 57+1 #D3D6DA, 58+269 #FFFFFF, 327+1 #DDE0E4, 328+28 #F7F7F8";
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theSftpRowAndTableMatchTheWorkstationMocks() throws Exception {
+        String[] folders = {"Applications", "Applications (Parallels)", "bin", "Desktop", "Documents", "Downloads", "go", "IdeaProjects",
+            "Library", "Movies", "Music", "Pictures"};
+        for (boolean dark : new boolean[] {false, true}) under(dark, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("sftp-" + dark), EnterpriseLook.resolved(dark), PanelSurfaceFixture.SFTP, true)) {
+                var entries = new java.util.ArrayList<Object>();
+                for (String folder : folders) entries.add(fixture.fileEntry(folder, "DIRECTORY", 0));
+                fixture.sftp("showPage", new Class<?>[] {String.class, String.class, java.util.List.class, long.class, long.class, boolean.class},
+                    "Mac", "/Users/dustin", entries, 0L, (long) entries.size(), false);
+                var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 48, 230, 600, 712);
+                check((dark ? "dark" : "light") + "/sftp", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 8,
+                    dark ? SFTP_DARK : SFTP_LIGHT, 1, 0.55, dark ? new String[] {"#3D74D6", "#313439"} : new String[] {"#2F65CA", "#F7F8FA", "#C4C7CC"});
+            }
+        });
+        under(false, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("sftp-off"), EnterpriseLook.resolved(false), PanelSurfaceFixture.SFTP, true)) {
+                fixture.hosts(new String[][] {{"Mac", "192.168.1.119", "dustin", "Local Network"}});
+                var crop = new MockMatch.Crop(DISCONNECTED, 48, 230, 600, 712);
+                check("light/sftp-disconnected", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 8, SFTP_DISCONNECTED, 1, 0.55,
+                    "#1E1F22", "#F0F1F3", "#B4B8BF");
+            }
+        });
+    }
 }

@@ -3,11 +3,13 @@ package dev.jasper.remote.ui.sftp;
 import dev.jasper.remote.hosts.RemoteHost;
 import dev.jasper.remote.sftp.FileEntry;
 import dev.jasper.remote.ui.transfers.TransferStrip;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Crumb;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.PanelHeader;
 import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.ui.UiEvent;
@@ -36,6 +38,11 @@ import java.util.function.Consumer;
  * terminal folder switch and the window's transfers. While nothing is connected the body is a "Not Connected" empty
  * state whose Choose Session menu lists the saved hosts; choosing one browses it. In a Copy to host dialog the same browser is embedded in another owner's form
  * ({@link #destination}): folders only, single selection, no menus, no follow switch, a New folder button.
+ *
+ * <p>Under the Enterprise look ({@link Layout#CLASSIC}, Enterprise presentation spec 14.4) the sidebar reads back, forward
+ * and refresh, a separator, Hidden files, a separator and Upload over the breadcrumbs, and the table gains a Modified
+ * column; while nothing is connected a Choose Session… dropdown and the root as disabled breadcrumbs sit above the kept
+ * headers and a "Not Connected" empty state, and the window's transfers live in the Transfers panel instead of the footer.
  *
  * <p>Rows are keyed by entry name. A new listing or page selects its first row. Enter or a double click on one entry
  * opens a folder (or a link, without the Editor) or hands a file or link to the Editor. Each row's own context menu acts
@@ -67,6 +74,8 @@ public final class SftpPanel implements AutoCloseable {
     private final Runnable changed;
     private final Consumer<String> focuser;
     private final boolean destination;
+    /** Which composition the sidebar takes, fixed at construction (spec 3.6); an embedded browser keeps the rows. */
+    private final Layout layout;
     private Actions actions;
     private Editing editing;
     private Runnable back=()->{},forward=()->{},onLoaded=()->{};
@@ -83,13 +92,17 @@ public final class SftpPanel implements AutoCloseable {
     private long offset,total;
 
     /** The sidebar explorer, owning its kit view. */
-    public SftpPanel(UiKit kit) {
+    public SftpPanel(UiKit kit) { this(kit, Layout.ROWS); }
+
+    /** The sidebar explorer in {@code layout}'s composition. */
+    public SftpPanel(UiKit kit, Layout layout) {
+        this.layout=java.util.Objects.requireNonNull(layout);
         changed=null;focuser=null;destination=false;
         view=kit.create(new ViewSpec(panel()),event->{ if(!closed) handle(event); });
     }
 
     private SftpPanel(Runnable changed,Consumer<String> focus) {
-        this.changed=Objects.requireNonNull(changed);this.focuser=Objects.requireNonNull(focus);destination=true;view=null;
+        this.changed=Objects.requireNonNull(changed);this.focuser=Objects.requireNonNull(focus);destination=true;view=null;layout=Layout.ROWS;
     }
 
     /**
@@ -166,6 +179,74 @@ public final class SftpPanel implements AutoCloseable {
     List<String> rowNames() { return entries.stream().map(FileEntry::name).toList(); }
     static String rowId(FileEntry entry) { return ROW+entry.name(); }
 
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    public static final String CHOOSE_DROPDOWN = "sftp.choose.dropdown", TOOLS_SEPARATOR = "sftp.tools.separator", UPLOAD_SEPARATOR = "sftp.upload.separator";
+    static final String CHOOSE_PROMPT = "choose", NO_SESSIONS = "none";
+    /** The classic table's columns, in the Workstation mock's proportions. */
+    static final List<Column> CLASSIC_COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 136, Optional.empty()),
+        new Column("size", "Size", Nodes.TextRole.DESCRIPTION, true, 77, Optional.empty()),
+        new Column("modified", "Modified", Nodes.TextRole.MONO_SMALL, false, 87, Optional.empty()));
+
+    private Nodes.Panel classicPanel() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "SFTP", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var footer = List.<Nodes.Node>of(paging(), status(), resultLine(),
+            new Nodes.SettingRow(FOLLOW_ROW, ControlState.READY, FOLLOW_TEXT, "",
+                new Nodes.Toggle(FOLLOW, state(true, browsingEnabled), FOLLOW_TEXT, following, FOLLOW, true, FOLLOW_DESCRIPTION), false));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(loaded ? classicNavigation() : chooser()), classicTable(),
+            Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer)));
+    }
+
+    private Nodes.Node classicNavigation() {
+        boolean ready = loaded && !working;
+        var tools = List.<Nodes.Node>of(
+            tool(BACK, "back", "Back", browsingEnabled && ready && canBack), tool(FORWARD, "forward", "Forward", browsingEnabled && ready && canForward),
+            tool(REFRESH, "refresh", "Refresh", browsingEnabled && ready), new Nodes.Separator(TOOLS_SEPARATOR, ControlState.READY),
+            new Nodes.Button(HIDDEN, state(true, browsingEnabled && ready), "Hidden files", "", Nodes.ButtonKind.GHOST, HIDDEN, "Show hidden items",
+                Nodes.ButtonPresentation.STANDARD, Optional.empty(), Optional.of(showHidden)),
+            new Nodes.Separator(UPLOAD_SEPARATOR, ControlState.READY),
+            new Nodes.MenuButton(UPLOAD, state(true, ready), "Upload", "", Nodes.ButtonKind.GHOST, UPLOAD, menu(MENU, "", selection()), "Upload files"));
+        var crumbs = new ArrayList<Crumb>(); var steps = crumbs();
+        for (int i = 0; i < steps.size(); i++) crumbs.add(new Crumb(crumbId(i), steps.get(i)[0], List.of()));
+        var path = new Nodes.Breadcrumbs(PATH, state(true, browsingEnabled && !working), crumbs, "Remote directory", editingPath, pathValue, PATH_EDIT, PATH_GO, PATH_DONE);
+        return new Nodes.Stack(NAVIGATION, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.Stack(TOOLS, ControlState.READY, Nodes.LayoutRole.INLINE, tools), path));
+    }
+
+    /** Disconnected: Choose Session… over the saved hosts, and the root as disabled breadcrumbs. */
+    private Nodes.Node chooser() {
+        var options = new ArrayList<Option>();
+        if (sessions.isEmpty()) options.add(new Option(NO_SESSIONS, "No saved sessions", Optional.empty()));
+        else {
+            options.add(new Option(CHOOSE_PROMPT, "Choose Session…", Optional.empty()));
+            for (var host : sessions) options.add(new Option(SESSION + host.id(), host.name(), Optional.empty()));
+        }
+        var choose = new Nodes.Choice(CHOOSE_DROPDOWN, state(true, !sessions.isEmpty() && !working), Nodes.ChoiceKind.DROPDOWN, options,
+            options.getFirst().id(), "Choose an SSH session", "");
+        var root = new Nodes.Breadcrumbs(PATH, state(true, false), List.of(new Crumb(crumbId(0), "/", List.of())), "Remote directory", false, "", PATH_EDIT, PATH_GO, PATH_DONE);
+        return new Nodes.Stack(NAVIGATION, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(choose, root));
+    }
+
+    private Nodes.Table classicTable() {
+        var rows = new ArrayList<TableRow>();
+        if (loaded) for (var entry : entries) {
+            String id = rowId(entry);
+            rows.add(new TableRow(id, Map.of("name", entry.name(), "size", formatSize(entry), "modified", shortModified(entry)), Optional.of(glyph(entry)), false,
+                Optional.of(menu(ROW_MENU, ":" + id, selected.contains(id) ? selection() : List.of(entry))),
+                entry.name() + " — " + formatSize(entry) + " — " + modified(entry)));
+        }
+        Optional<Nodes.Empty> empty = loaded ? Optional.empty() : Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "folder", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "SFTP"), "Not Connected",
+            "Connect to an SSH session to browse its files.", List.of()));
+        return new Nodes.Table(FILES, state(true, !working), CLASSIC_COLUMNS, rows, loaded ? selected : Set.of(), OPEN, loaded ? menu(MENU, "", selection()) : List.of(),
+            Nodes.SelectionMode.MULTIPLE, Nodes.ScrollPolicy.STANDARD, empty, "");
+    }
+
+    /** The modified day as the classic table shows it: "Sep 28". */
+    static String shortModified(FileEntry entry) {
+        return entry.modifiedMillis() < 0 ? "" : DateTimeFormatter.ofPattern("MMM dd", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(entry.modifiedMillis()));
+    }
+
     @Override public void close() {
         if(closed) return;closed=true;headerChanged=header->{};
         if(transfers!=null) transfers.onChanged(()->{});
@@ -187,6 +268,10 @@ public final class SftpPanel implements AutoCloseable {
                 return true;
             }
             case UiEvent.Edited edited when edited.id().equals(PATH) -> { pathValue=edited.text();return true; }
+            case UiEvent.Selected chosen when chosen.id().equals(CHOOSE_DROPDOWN) -> {
+                chosen.ids().stream().findFirst().filter(id -> id.startsWith(SESSION)).ifPresent(this::act);
+                render();return true;
+            }
             case UiEvent.Toggled toggled when toggled.id().equals(FOLLOW) -> {
                 if(browsingEnabled) { following=toggled.checked();render();if(actions!=null) actions.follow().accept(following); }
                 return true;
@@ -296,7 +381,9 @@ public final class SftpPanel implements AutoCloseable {
 
     private static ControlState state(boolean visible,boolean enabled) { return new ControlState(visible,enabled,false,""); }
 
-    private Nodes.Panel panel() {
+    private Nodes.Panel panel() { return layout == Layout.CLASSIC ? classicPanel() : rowsPanel(); }
+
+    private Nodes.Panel rowsPanel() {
         var header=new Nodes.Header(HEADER,ControlState.READY,"SFTP",OptionalInt.empty(),Optional.empty(),Optional.empty(),List.of());
         // Choose Session is a menu of the saved hosts: its label first, the menu chevron after it.
         var choices=new ArrayList<MenuItem>();

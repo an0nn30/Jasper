@@ -121,7 +121,7 @@ final class ViewReconciler implements AutoCloseable {
             text.flow = false;
         }
         if (control instanceof Labels.TextControl label) { label.override = null; label.styled = null; }
-        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
+        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.panelRow = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);
         control.prompt(false);
@@ -290,6 +290,9 @@ final class ViewReconciler implements AutoCloseable {
                     lines.panelFooter = owner.footer; arranged = true;
                     for (var child : stack.children()) if (next.get(child.id()) instanceof SettingRows.RowControl row) { row.panelFooter = true; separated.add(row.component); }
                 }
+                if (owner.column < 0 && ThemePainting.metric(owner.context(), dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_SEARCH_RULE) > 0
+                    && panel.searchOrNavigation().orElse(null) instanceof Nodes.Stack row && row.role() == Nodes.LayoutRole.INLINE
+                    && next.get(row.id()) instanceof Stacks.StackControl line) line.panelRow = true;
                 owner.footer.separators = java.util.List.copyOf(separated);
                 owner.footer.arranged = arranged;
                 owner.footer.flush = arranged && footer instanceof Nodes.Stack lines && lines.children().stream().findFirst()

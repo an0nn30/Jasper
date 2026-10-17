@@ -68,6 +68,13 @@ final class Stacks {
         /** A ROUTE strip's step: a tile beside its lines (set by the reconciler, cleared on every update). */
         boolean routeStep;
         /**
+         * A classic dock panel's one-line navigation row (an INLINE stack in its search slot under {@code PANEL_SEARCH_RULE},
+         * set by the reconciler, cleared on every update): its dropdowns are named by their labels without a caption, and its
+         * last control fills the width the others leave ({@link PanelRowLayout}; the SFTP Disconnected mock's Choose
+         * Session… beside the root path, plan 10a).
+         */
+        boolean panelRow;
+        /**
          * Children a classic face placed in another container on the last pass, by node id, with that container (an
          * ordered list's entry row in the list's pane, plan 4c). The face's span sets it before the stack mounts the rest;
          * the reconciler does not clear it, so its next detach pass leaves an adopted row where it is.
@@ -137,6 +144,7 @@ final class Stacks {
                                 }
                             });
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
+            if (panelRow && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new PanelRowLayout(context()));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
             component.revalidate();
             component.repaint();
@@ -167,7 +175,7 @@ final class Stacks {
             if (embedded && settings) controls.forEach(c -> Composition.label(c, true));
             // A dropdown among actions (a file type filter beside Cancel and Open) is one action-height control: its
             // label is its accessible name, not a caption stacked above the row.
-            if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ACTIONS)
+            if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ACTIONS || panelRow)
                 controls.forEach(c -> { if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN) Composition.label(c, true); });
             // The classic ordered face adopts an entry row into its list's pane (plan 4c) before the stack mounts the rest.
             adopted = java.util.Map.of();
@@ -508,6 +516,38 @@ final class Stacks {
                 var child = children.get(i); int h = Math.min(parent.getHeight(), child.getPreferredSize().height);
                 child.setBounds(x, (parent.getHeight() - h) / 2, Math.max(0, Math.min(widths[i], parent.getWidth() - x)), h);
                 x += widths[i];
+            }
+        }
+    }
+
+    /**
+     * A classic panel's one-line navigation row ({@link StackControl#panelRow}): as tall as the panel's search field, its
+     * controls at their natural widths the inline gap apart and stretched to the row's height, the last one to the row's
+     * end too.
+     */
+    static final class PanelRowLayout implements Composition.WidthLayout {
+        final KitContext context;
+        PanelRowLayout(KitContext context) { this.context = context; }
+        int gap() { return ThemePainting.metric(context, DesignMetrics.Role.INLINE_GAP); }
+        static List<Component> shown(Container parent) { return java.util.Arrays.stream(parent.getComponents()).filter(Component::isVisible).toList(); }
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            var children = shown(parent); Insets insets = parent.getInsets();
+            int width = children.stream().mapToInt(c -> c.getPreferredSize().width).sum() + Math.max(0, children.size() - 1) * gap();
+            return new Dimension(width + insets.left + insets.right, height(parent, width));
+        }
+        @Override public int height(Container parent, int width) {
+            Insets insets = parent.getInsets();
+            int search = ThemePainting.height(context, DesignMetrics.Role.PANEL_SEARCH_HEIGHT, dev.jasper.ui.metrics.Typography.Role.BODY);
+            return insets.top + insets.bottom + Math.max(search, shown(parent).stream().mapToInt(c -> c.getPreferredSize().height).max().orElse(0));
+        }
+        @Override public void layoutContainer(Container parent) {
+            var children = shown(parent); Insets insets = parent.getInsets();
+            int x = insets.left, end = parent.getWidth() - insets.right, height = parent.getHeight() - insets.top - insets.bottom;
+            for (var child : children) {
+                int natural = child.getPreferredSize().width;
+                int w = child == children.getLast() ? Math.max(0, end - x) : Math.min(natural, Math.max(0, end - x));
+                child.setBounds(x, insets.top, w, height);
+                x += w + gap();
             }
         }
     }
