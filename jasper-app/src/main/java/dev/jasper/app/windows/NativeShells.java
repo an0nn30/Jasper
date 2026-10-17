@@ -60,6 +60,7 @@ public final class NativeShells {
     private final Runnable newWindow;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
+    private final ShellChrome shell;
 
     /**
      * Binds the shells to the application.
@@ -72,10 +73,33 @@ public final class NativeShells {
      */
     public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
                         Runnable newWindow, Runnable quit) {
+        this(themes, state, terminalWindows, newWindow, quit, ShellChrome.standard());
+    }
+
+    /**
+     * As above, under the look's shells (Enterprise presentation spec 10.1).
+     *
+     * @param themes the application's look
+     * @param state remembered window bounds
+     * @param terminalWindows finds a terminal window's native window by id, or returns null
+     * @param newWindow opens a terminal window
+     * @param quit quits the application
+     * @param shell the look's title bar, menu row and appearance
+     */
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
+                        Runnable newWindow, Runnable quit, ShellChrome shell) {
+        this.shell = Objects.requireNonNull(shell);
         this.themes = Objects.requireNonNull(themes); this.state = Objects.requireNonNull(state);
         this.terminalWindows = Objects.requireNonNull(terminalWindows);
         this.newWindow = Objects.requireNonNull(newWindow); this.quit = Objects.requireNonNull(quit);
     }
+
+    /**
+     * The look's shells these windows are made under.
+     *
+     * @return the shells' chrome
+     */
+    public ShellChrome chrome() { return shell; }
 
     /**
      * Builds the native window for a surface.
@@ -143,9 +167,13 @@ public final class NativeShells {
         var resources = new ShellResources(surface, frame);
         try {
             frame.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(frame.getRootPane(), surface, MacTitleBar.isSupported());
+            resources.layout = installChrome(frame.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
-            if (bar != null) bar.setMenuBar(menuBar(surface)); else frame.setJMenuBar(menuBar(surface));
+            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key;
+            // a classic look gives it its terminal windows' row.
+            JMenuBar menus = menuBar(surface);
+            if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }
+            shell.followTheme(frame.getRootPane(), bar, themes.current().chrome().dark());
             frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             frame.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -159,7 +187,8 @@ public final class NativeShells {
             else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-                if (bar != null) bar.setLight(!resolved.chrome().dark());
+                if (bar != null) bar.setLight(!resolved.chrome().dark()); else shell.styleMenus(menus);
+                shell.followTheme(frame.getRootPane(), bar, resolved.chrome().dark());
                 resources.layout.body().changed();
             });
             return new AuxiliarySurface.Shell(() -> { if (!surface.closed()) frame.setVisible(true); }, () -> {
@@ -224,8 +253,9 @@ public final class NativeShells {
             dialog.setResizable(resizable(surface));
             dialog.getAccessibleContext().setAccessibleName(surface.title());
             dialog.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(dialog.getRootPane(), surface, MacTitleBar.isSupported());
+            resources.layout = installChrome(dialog.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
+            shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             dialog.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }
@@ -241,6 +271,7 @@ public final class NativeShells {
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
                 if (bar != null) bar.setLight(!resolved.chrome().dark());
+                shell.followTheme(dialog.getRootPane(), bar, resolved.chrome().dark());
                 if (resources.attachment != null) resources.attachment.changed();
             });
             resources.floating = surface.modal() ? FloatWhileActive.attach(dialog) : null;
@@ -417,10 +448,12 @@ public final class NativeShells {
         var panel = new FileChooserPanel(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), model, prefs, local.homePath(), chosen -> { result.set(chosen); dialog.dispose(); },
             file -> prompts.confirmReplace(model.name(file)), prompts::askFolderName);
         // Jasper's own title bar, as on the application's other dialogs, so the chooser matches the theme.
-        MacTitleBar bar = MacTitleBar.install(dialog.getRootPane(), panel, () -> { }, MacTitleBar.isSupported());
+        MacTitleBar bar = MacTitleBar.install(dialog.getRootPane(), panel, () -> { }, shell.unifiedTitle());
+        shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
         Subscription theme = themes.subscribe((resolved, chromeChanged) -> {
             if (chromeChanged) SwingUtilities.updateComponentTreeUI(dialog);
             if (bar != null) bar.setLight(!resolved.chrome().dark());
+            shell.followTheme(dialog.getRootPane(), bar, resolved.chrome().dark());
         });
         try {
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -470,8 +503,9 @@ public final class NativeShells {
      * A document-modal window over {@code owner} holding one kit sheet; closing it by its title bar cancels. When it
      * closes, the owner gets the focus back.
      */
-    private static ChooserPrompts.Modal sheet(Window owner, String title) {
+    private ChooserPrompts.Modal sheet(Window owner, String title) {
         var window = new JDialog(owner, title, Dialog.ModalityType.DOCUMENT_MODAL);
+        shell.followTheme(window.getRootPane(), null, themes.current().chrome().dark());
         window.setIconImages(ApplicationIcon.images());
         window.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         return new ChooserPrompts.Modal() {

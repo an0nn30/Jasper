@@ -142,7 +142,7 @@ class TypographyTest {
     private static Font former(Typography.Role role, boolean selected, String family, float bodySize, boolean platformDefault,
                                float size, int declaredWeight) {
         String resolved = role == Typography.Role.MONO || role == Typography.Role.MONO_SMALL || role == Typography.Role.MONO_CAPTION
-            || role == Typography.Role.PANEL_DETAIL_MONO ? Font.MONOSPACED : family;
+            || role == Typography.Role.PANEL_DETAIL_MONO || role == Typography.Role.RUN_DETAIL ? Font.MONOSPACED : family;
         int weight = selected && role == Typography.Role.LABEL ? 500 : declaredWeight;
         if (platformDefault && role != Typography.Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && APPLE_TEXT)
             resolved = ".AppleSystemUIFont";

@@ -1,7 +1,10 @@
 package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.theme.ColorMath;
+import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
+import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.*;
 import java.awt.geom.Area;
 import java.awt.geom.RoundRectangle2D;
@@ -13,12 +16,19 @@ import javax.swing.border.AbstractBorder;
 /** Shared receiving surface for native composition. The owner refreshes/repaints it with its retained views;
  * this panel owns no subscriptions, domain actions or child lifetime. */
 public class SurfacePanel extends JPanel {
-    /** Floating rounded hit shape, inset content with a square header, and rectangular-hit notification. */
-    public enum Kind { POPUP, CONTENT, NOTICE }
+    /**
+     * Floating rounded hit shape, inset content with a square header, and rectangular-hit notification; the Run window's
+     * framed dialog with a title band and a footer band, its input box around a composite of views, and its list box
+     * (Enterprise presentation plan 8a).
+     */
+    public enum Kind { POPUP, CONTENT, NOTICE, RUN_WINDOW, FIELD, BOX }
     private final KitContext context;
     private final Kind kind;
-    private final IntSupplier header;
+    private final IntSupplier header, footer;
     private SemanticColor fill;
+    /** A FIELD's forced focus look for headless renders; null follows the keyboard focus. */
+    private Boolean focusShown;
+    private final java.beans.PropertyChangeListener focusWatch = event -> repaint();
 
     /** The surface's fill role: the menu surface for a popup, the card surface otherwise unless the owner names another. */
     public void fill(SemanticColor role) { fill = Objects.requireNonNull(role); repaint(); }
@@ -27,11 +37,25 @@ public class SurfacePanel extends JPanel {
     public SurfacePanel(KitContext context, Kind kind) { this(context, kind, () -> 0); }
 
     /** Creates a surface whose content header retains its owner's actual measured allocation. */
-    public SurfacePanel(KitContext context, Kind kind, IntSupplier header) {
+    public SurfacePanel(KitContext context, Kind kind, IntSupplier header) { this(context, kind, header, () -> 0); }
+
+    /**
+     * Creates a surface whose title band ({@code header}) and footer band ({@code footer}) heights its owner measures;
+     * only a RUN_WINDOW paints the bands.
+     */
+    public SurfacePanel(KitContext context, Kind kind, IntSupplier header, IntSupplier footer) {
         super(new BorderLayout());
         this.context = Objects.requireNonNull(context);
         this.kind = Objects.requireNonNull(kind);
         this.header = Objects.requireNonNull(header);
+        this.footer = Objects.requireNonNull(footer);
+        if (kind == Kind.RUN_WINDOW || kind == Kind.FIELD || kind == Kind.BOX) setBorder(new AbstractBorder() {
+            @Override public Insets getBorderInsets(Component c, Insets insets) {
+                int line = metric(DesignMetrics.Role.HAIRLINE) + (kind == Kind.FIELD ? metric(DesignMetrics.Role.FOCUS_RING) : 0);
+                insets.set(line, line, line, line); return insets;
+            }
+            @Override public Insets getBorderInsets(Component c) { return getBorderInsets(c, new Insets(0, 0, 0, 0)); }
+        });
         fill = kind == Kind.POPUP ? SemanticColor.SURFACE_MENU : SemanticColor.SURFACE_CARD;
         setOpaque(false);
         if (kind == Kind.POPUP) setBorder(new AbstractBorder() {
@@ -65,12 +89,91 @@ public class SurfacePanel extends JPanel {
     }
     @Override protected boolean isPaintingOrigin() { return true; }
     @Override public boolean contains(int x,int y) {
-        return kind == Kind.NOTICE || kind == Kind.CONTENT && y < surfaceTop() ? super.contains(x,y) : shape(0).contains(x,y);
+        return kind == Kind.NOTICE || kind == Kind.RUN_WINDOW || kind == Kind.FIELD || kind == Kind.BOX
+            || kind == Kind.CONTENT && y < surfaceTop() ? super.contains(x,y) : shape(0).contains(x,y);
+    }
+
+    /** For headless renders: true or false forces a FIELD's focused or idle look; null follows the keyboard focus. */
+    public void focusShown(Boolean shown) { focusShown = shown; repaint(); }
+
+    /** Whether keyboard focus is inside this surface, or the forced look says it is. */
+    public boolean focusWithin() {
+        if (focusShown != null) return focusShown;
+        var owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
+        return owner != null && SwingUtilities.isDescendingFrom(owner, this);
+    }
+
+    @Override public void addNotify() {
+        super.addNotify();
+        if (kind == Kind.FIELD) KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", focusWatch);
+    }
+
+    @Override public void removeNotify() {
+        if (kind == Kind.FIELD) KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", focusWatch);
+        super.removeNotify();
+    }
+
+    /** The Run window's frame and bands, its field box or its list box; false for the other kinds. */
+    private boolean paintRunKind(Graphics2D g) {
+        int hair = metric(DesignMetrics.Role.HAIRLINE), w = getWidth(), h = getHeight();
+        var theme = context.theme();
+        switch (kind) {
+            case RUN_WINDOW -> {
+                double arc = 2.0 * metric(DesignMetrics.Role.RUN_WINDOW_RADIUS), inner = Math.max(0, arc - 2.0 * hair);
+                var outerShape = new RoundRectangle2D.Double(0, 0, w, h, arc, arc);
+                var innerShape = new RoundRectangle2D.Double(hair, hair, w - 2.0 * hair, h - 2.0 * hair, inner, inner);
+                var body = (Graphics2D) g.create();
+                try {
+                    body.clip(innerShape);
+                    body.setColor(ThemePainting.color(context, context.kit().colors().dialogSurface()));
+                    body.fillRect(0, 0, w, h);
+                    int title = header.getAsInt(), foot = footer.getAsInt();
+                    if (title > 0) {
+                        body.setColor(DerivedColor.SURFACE_HEADER_ACTIVE.color(theme)); body.fillRect(0, hair, w, title);
+                        body.setColor(ThemePainting.color(context, SemanticColor.BORDER_WINDOW)); body.fillRect(0, hair + title, w, hair);
+                    }
+                    if (foot > 0) {
+                        int top = h - hair - foot;
+                        body.setColor(DerivedColor.SURFACE_FOOTER.color(theme)); body.fillRect(0, top, w, foot);
+                        body.setColor(ThemePainting.color(context, SemanticColor.BORDER_WINDOW)); body.fillRect(0, top - hair, w, hair);
+                    }
+                } finally { body.dispose(); }
+                var ring = new Area(outerShape); ring.subtract(new Area(innerShape));
+                g.setColor(DerivedColor.BORDER_HOVER.color(theme)); g.fill(ring);
+                return true;
+            }
+            case FIELD -> {
+                int focusRing = metric(DesignMetrics.Role.FOCUS_RING);
+                double radius = metric(DesignMetrics.Role.FIELD_RADIUS);
+                boolean focused = focusWithin();
+                var box = new RoundRectangle2D.Double(focusRing, focusRing, w - 2.0 * focusRing, h - 2.0 * focusRing, 2 * radius, 2 * radius);
+                if (focused) {
+                    var halo = new Area(new RoundRectangle2D.Double(0, 0, w, h, 2 * (radius + focusRing), 2 * (radius + focusRing)));
+                    halo.subtract(new Area(box));
+                    g.setColor(ColorMath.opacity(ThemePainting.color(context, SemanticColor.BORDER_FOCUS), ThemePainting.focusHaloShare(context, false)));
+                    g.fill(halo);
+                }
+                var inside = new RoundRectangle2D.Double(focusRing + hair, focusRing + hair, w - 2.0 * (focusRing + hair), h - 2.0 * (focusRing + hair),
+                    2 * Math.max(0, radius - hair), 2 * Math.max(0, radius - hair));
+                var edge = new Area(box); edge.subtract(new Area(inside));
+                g.setColor(focused ? ThemePainting.color(context, SemanticColor.BORDER_FOCUS)
+                    : SurfaceContrast.painted(theme, RunWindowPresentation.FIELD_EDGE)); g.fill(edge);
+                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_INPUT)); g.fill(inside);
+                return true;
+            }
+            case BOX -> {
+                g.setColor(SurfaceContrast.painted(theme, RunWindowPresentation.boxEdge(context.kit()))); g.fillRect(0, 0, w, h);
+                g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD)); g.fillRect(hair, hair, Math.max(0, w - 2 * hair), Math.max(0, h - 2 * hair));
+                return true;
+            }
+            default -> { return false; }
+        }
     }
     @Override protected void paintComponent(Graphics graphics) {
         var g = (Graphics2D)graphics.create();
         try {
             ThemePainting.antialias(g);
+            if (paintRunKind(g)) return;
             if(kind == Kind.CONTENT) { g.setColor(getBackground());g.fillRect(0,0,getWidth(),getHeight()); }
             g.setColor(ThemePainting.color(context,fill));
             if(kind == Kind.NOTICE) {

@@ -62,6 +62,104 @@ nor the add action, and a list gives up an entry row no VERTICAL parent adopts a
 `./gradlew check --continue`: **10919 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 
+**Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
+`.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit and the final review fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-6a-window-chrome-shell.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The window shell of spec 10.1, 10.2, 10.4,
+10.9 and 10.10 lands: `Presentation.LANDED` holds `WINDOW_CHROME`, and `WINDOW_CONTENT` (header, tabs, status, run item,
+dialogs) waits for plan 6b. The bootstrap applies `DesktopFlags` (macOS `apple.laf.useScreenMenuBar=false` under in-window
+menus; `TitleBarStyle.NATIVE` on every platform under a native title). `WorkspaceChrome.of` reads the workspace
+projection and picks `StandardMenuBar` (today's) or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus,
+Tools, Window, Help; Window holds Pane, Tab and the tool-window toggles; the mocks' 24 px row over a `border.divider`
+rule). `WindowLook` carries the chrome and the title facts to every terminal window and the rehearsal's, mounted through
+`WindowContent.mount`; `ShellChrome.of` gives auxiliary windows, dialogs and the file chooser the same title bar (an
+auxiliary frame's in-window File row is the classic row, `ClassicMenuRow`), and a native-titled macOS frame follows the
+theme's appearance. About Jasper joins Help when the screen menu bar is off.
+`LookMotion` folds `Motion` into `ui.animations.enabled` once; kit contexts, plugins, the tab strip and the palette read
+it. `WindowTitle` fills the title template. Thirty classic chrome roles (Task 3) serve plans 6a and 6b. The chrome renders
+of spec 16.1.4 run as JUnit (`ChromeRenderTest`: default, Enterprise, complement, fallback and an eight-row covering array);
+`EnterpriseMenuRowMockTest` compares the menu row with the Workstation and Dark Mode mocks (opt-in pairs: `chrome-menu-row-light` edge agreement 0.988, `chrome-menu-row-dark` 0.732 (Rulings 9's rule)).
+Rulings (plan, "Rulings"): (1) row 6 is plans 6a and 6b; (2) the window-chrome group splits, `WINDOW_CONTENT` for 6b;
+(3) Help is `MenuTarget.HELP`, last in the classic bar; (4) the classic Window menu takes the tool-window toggles from
+View; (5) the menu-row roles are the same in both catalogs and the item margins come from the face's line height;
+(6) an open classic title is the accent, a hovered closed one `surface.control.hover`; (7) About is in Help whenever the
+screen menu bar is off; (8) Jasper gives Windows and Linux captions no hint (32 revises the wording), and on macOS every native-titled frame and dialog follows the theme (the chooser's sheets, the diagnostics dialog and Rename Tab included); (9) Enterprise Dark's menu-row rule is
+darker than the mock until plan 6b's `border.divider` override; (10) the title tokens and separators; (11) the one motion
+supplier is the theme controller's flag; (12) mock comparison by profile; Execution notes: (13) Enterprise runs in the
+chrome tests as 4a's fixture kit, spec 5.1's chrome and a fixture theme of spec 7.6's named roles until plan 5b; (16) the
+scan is `ProjectionReadTest`; (17) the pairs are checked with `compare_all.py` until 4c's `check_pairs.py`; (18) the
+menu row is 5 + 9, re-measured on the mocks. Deviations from the plan's text: Execution notes rulings (27) Rename Tab's input dialog follows the window's appearance too, `MacAppearance.follow` is the one writer of NSAppearance and `AboutWindows.helpEntries` takes `aboutInApplicationMenu`; (28) `WindowTitle.format` returns a token-free template as it is, strips an all-empty one and passes `{context}` unstripped; (29) `EnterpriseMenuRowMockTest` compares the titles' positions on macOS only until plan 5b; (30) `ChromeRenderTest.check` asserts structure, and the menu row's painted pairs join it in plan 6b; Task 9's calibration run adds jasper-ui's `KitCalibrationTest` (12 cases), which the plan's jasper-app filter does not reach.
+Final review rulings: (31) the auxiliary frames' classic File row, a residual against the 07 Credential Vault mocks (no
+menu row there; spec 10.1 wins) for plans 6b and 10; (32) the Windows GUI check decides whether Enterprise Dark needs
+`DWMWA_USE_IMMERSIVE_DARK_MODE` (FlatLaf's `FlatNativeWindowsLibrary`); (33) Settings shows `window.native_decorations`
+and `ui.animations.enabled` under a look that overrides them until plan 9 (`docs/configuration.md` says the look wins;
+plan 9's entry conditions: hide them through `SettingsChrome.hiddenKeys`); (34) wiring tests (`PresentationReachTest`,
+`ApplicationBootstrap.applyDesktop`, a still look in the tab strip and the palette, a hosted document's title), and a
+provided pane without a saved identity gives `{session}` its reported host. The headless gallery (Task 9 Step 4) for
+Slate Cobalt Dark and Light is byte-identical to `b9178db45`, 161 files a side.
+Plan-6b entry conditions: the `WINDOW_CONTENT` group, `border.divider` overridable, the header, tabs, status cells and
+dialogs; 6b extends `ProjectionReadTest.PROJECTION_READERS` and uses `EnterpriseLook` and `closeOwnersNow`; 6b's refresh
+renames its `VariantReadTest` references to `ProjectionReadTest` and puts `DesktopTestSupport.closeOwnersNow()` first in
+every `finally { themes.close(); EnterpriseLook.restoreDefault(); }`. At the merge
+with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterprise-fixture.json` goes, and
+`EnterpriseMenuRowMockTest` runs again under Plex. `./gradlew check --continue` after the final review fixes: **10,809 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2), which wait for plan 5b's Enterprise
+or run now under a development plugin whose kit says `title_bar = "native"`, `menu_bar = "window"`, `motion = "none"`
+(`--plugin-dir`): the macOS in-window menu bar and native title (⌘W in a plugin window, its classic File row, About in
+Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
+menu row, nothing moving with animations on. Not pushed.
+Merged with main (plans 4b and 8a) as `bff0edae2`: the `Role` enum, `compact-roles.tsv` and `classic-roles.tsv` take
+8a's thirty `RUN_WINDOW_*` roles after `DOCK_RULE_HIT`, then this plan's thirty chrome roles, so `NewRolesTest.ADDED`,
+`RunWindowRolesTest` and `ChromeRolesTest` hold unchanged (8a R14, Rulings 15); `ProjectionReadTest` stays beside 4b's
+`VariantReadTest` (Rulings 16) and both pass, 8a's `PaletteLook` constants and `PaletteViews.of` naming none of its
+patterns, so `PROJECTION_READERS` is unchanged; the chrome renders and `EnterpriseMenuRowMockTest` pass over 4b's classic
+faces (`compare_all.py` still 0.988 and 0.732); `WindowCommandPaletteTest`'s still-look case reads `revealedHeight`
+through 8a's `view()`; the default gallery's PNGs match this branch's, the JSON differing only in 4b's
+`Cards$SectionSurface`; `./gradlew check --continue`: **10,914 tests, 0 failures, 0 errors, 25 skipped**.
+
+**Enterprise presentation, plan 8a: the Run window view — 2026-10-17** (`claude/enterprise-run-window`, worktree
+`.claude/worktrees/enterprise-8`, `b6baeeab3..720b22d27`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-8a-run-window-view.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The palette has two views behind
+`PaletteView` (spec 11.1): today's card, renamed `CardView`, and `RunWindowView`, built by `PaletteViews.of` from the
+look's `PaletteLook`; the step form and the prefix-to-chip edit are shared (`StepForm`, `QueryEdits`). Headings are typed
+(`PaletteEntry.Header.Kind`: RECENT, USED, SUGGESTED, SECTION, MATCHES) and `RunCopy` words them for the Run window
+("Recent", "Most used", "Suggested", one "Matches" with "i of n"). The Run window is kit views laid out by the app:
+jasper-ui's `KitView.runWindow(true)` gives a view the Run window's rows (21), heading bands (18 and a `border.row` rule)
+and counts, 7 px hue squares that keep their hue on the selection (inside a guarded ring where it would vanish), the 32 px help tile with the filled ▶, a data-face
+query with no ring of its own and the mocks' text colours, from thirty `RUN_WINDOW_*` roles (equal in both catalogs),
+`RUN_HEADING` (11/600) and `RUN_DETAIL` (data face, 10.5/400) in the classic scale; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds
+paint the frame and bands, the field box and the list box. Enter runs the view's primary verb: the card's verb 0, the Run
+window's verb 0 or its SPLIT verb while "Open in a split pane" is ticked (`PaletteViewContractTest`). Compared with the 06
+Run Dialog mocks at 2× under the Enterprise fixture kit and the Enterprise Light fixture theme (`RunWindowRenderTest`):
+the Run window's own geometry probes within a device pixel for edges and three for text, its fills within 3 ΔE76, edge
+agreement 0.901 / 0.807 ("Just opened", top / bottom) and 0.936 / 0.804 ("Typing auth"); IBM Plex's (plan 5b) probes are measured and
+printed until that plan is here (`RunWindowRenderTest.CHECKED`); tuned in the comparison: none. Rulings (plan, "Rulings"): (1) two plans, 8b lands the window; (2) the card renamed `CardView`;
+(3) the step form and prefix edit shared; (4) the Run window's roles, two type roles and two filled icons; (5) the list is
+8 × 21 + 2 × 19 = 206 inside its box, 6 px taller than the mock's cut box, so the window is 427 tall; (6) the title
+shortcut and row tags are plain CAPTION text, as drawn; (7) the help tile is a PROMPT_HEADER `play.filled` icon at the
+Run mock's 32; (8) the Run window's text colours as declared pairs (`RunWindowPresentation.pairs(Kit)`, TEXT-guarded,
+painted over every palette by `PaintedContrastTest`), its list details, tags and count in `text.placeholder` and a
+selected row's detail in the card's supporting ink, TEXT-guarded too since the final review (deviation d), the empty
+line guarded against the dialog surface (a residual); (9) no placeholder in the Open field, the query in the data face; (10) the copy; (11) the second and third
+verbs in each row's context menu; (12) the JUnit comparison with its floors, run on the EDT while each context is open;
+(13) the matches count is the heading's second title node (a heading has a title only); (14) the title row's labels hand
+their presses to the view, so the title text drags; execution notes R1 to R19 (no 4b, 4c or 5b code: the Run window's
+own help tile, 4c's fixture theme, the fixture kit's comparison with owners, the checkbox row from roles, details cut
+at their end). Deviations: (a) Task 3's review round (`c16f1a8dd`): a SWATCH glyph takes a row's glyph size only under `runWindow`, so a compact panel row's swatch keeps its caption size (spec 8.2); `RunWindowPresentation.releaseHelpChildren` returns the help glyph's colours when the flag turns off; `NewRolesTest`'s Run window names sit on their own lines; three more tests (`RunWindowPresentationTest` 2, `SwatchesTest` 1), so the plan adds 36 tests, not 33; (b) Rulings 4's type role sizes are the classic scale's, `RUN_HEADING` 11/600 and `RUN_DETAIL` 10.5/400 (the default scale's are 12/600 and 11.5/400); (c) Task 1 shows the step's card before `step.show` in `CardView.showStep`, so the first field can take focus; (d) the final review's fixes ("Plan 8a: final review fixes"): `RunWindowView.showStep` shows the card first too; a step taller than the list box scrolls inside it (`SurfacePanel.scrolling`) and `StepForm.focusField` scrolls the focused row into view; every pair the Run window paints is declared and guarded (amending Rulings 8): the muted details, tags and count and a selected row's detail TEXT-guarded (Enterprise Light paints #717680 on the card, #686D75 on a heading band and #E3EAF9 on the accent, where the mocks paint #7A808A, #7A808A and #DCE5F7), the help glyph INDICATOR-guarded on the accent, the field and list box edges CONTROL-guarded, and the hue squares INDICATOR-guarded on the card and on the accent, a square that misses keeping its fill inside a hairline ring in the guarded colour (`RunWindowPresentation.authored()` is gone); the help text sits centred in its 18 px line, shows at most two lines and the help row has one height (`RunWindowPresentation.helpHeight`), so the window keeps its height whatever the chip; a row's context-menu verbs are `verb:<verb>:<entry key>` (amending Rulings 11) and run only on the row they name; `setChip` re-reads the ▼ menu; the checkbox's label follows the toggle's drawn width; the 10-argument `PaletteController` constructor and `PaletteEntry.Header(String)` are gone; a "help text top" probe (mock 85, render 81 with the platform face) is FONTS-owned; three more tests. Default look byte-identical: the
+headless gallery's files for Slate Cobalt Dark and Light match the base (Task 4). `./gradlew check --continue`:
+**10,810 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `b9178db45`, had 10,771). GUI checks for the user: none yet (nothing reaches the Run window until 8b). Not pushed.
+Merged with main (plan 4b) as `5fc529882` and reconciled in `d17b2fa43`: the Run window's help layout, glyph ink and
+tile stay ahead of the kit's prompt face, the tile painting through 4b's `ClassicPromptFace.paintAccentTile` (R2); the
+quiet query returns first in `FieldSurface.paintDefault`, where both field policies paint a transparent field (R3);
+FACES joins `RunWindowRenderTest.CHECKED`, the classic checkbox's left, top, label and inside and the primary's fill
+matching the mocks, while the primary and Cancel left edges, which follow the labels' face, are FONTS-owned with a
+residual (the classic 14 px label padding makes "Connect" and "Browse…" 76 and 80 wide in the platform face and about
+73 and 78 in Plex, where the mock draws every button 70) and B's disabled checkbox (`surface.tableHeader` against the
+mock's white, R12) is a printed residual; edge agreement 0.900 / 0.841 and 0.936 / 0.841 (R9); the classic checkbox's
+preferred size is the row's `CHECKBOX_BOX` plus two focus rings, so R7 holds unchanged; `KitFixtures.enterpriseLight()`
+stays for 4c (R4); the default gallery's PNGs match the base, its JSON differing only in 4b's `Cards$SectionSurface`;
+`./gradlew check --continue`: **10,876 tests, 0 failures, 0 errors, 25 skipped**.
+
 **Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit and the final review fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-4b-classic-form-faces.md),

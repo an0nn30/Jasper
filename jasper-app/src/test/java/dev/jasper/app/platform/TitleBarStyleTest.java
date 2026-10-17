@@ -17,6 +17,17 @@ class TitleBarStyleTest {
         }
     }
 
+    /** Spec 10.1: a native-titled look gives every platform the system title bar, in Normal and Compact alike. */
+    @Test void aNativeTitledLookIsNativeEverywhere() {
+        for (boolean macOs : new boolean[] {false, true})
+            for (boolean nativeDecorations : new boolean[] {false, true})
+                for (boolean compact : new boolean[] {false, true}) {
+                    assertThat(TitleBarStyle.choose(macOs, nativeDecorations, compact, true)).isEqualTo(TitleBarStyle.NATIVE);
+                    assertThat(TitleBarStyle.choose(macOs, nativeDecorations, compact, false))
+                        .isEqualTo(TitleBarStyle.choose(macOs, nativeDecorations, compact));
+                }
+    }
+
     @Test void macOsAlwaysUsesItsOwnTitleRow() {
         assertThat(TitleBarStyle.choose(true, false)).isEqualTo(TitleBarStyle.MAC_UNIFIED);
         assertThat(TitleBarStyle.choose(true, true)).isEqualTo(TitleBarStyle.MAC_UNIFIED);

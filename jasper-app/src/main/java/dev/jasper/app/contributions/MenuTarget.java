@@ -13,6 +13,9 @@ public record MenuTarget(Type type, String key, String title) {
     /** The kinds of target. */
     public enum Type { STANDARD, TOP_LEVEL, CONTEXT }
 
+    /** The top-level menu id of the app's Help menu, which a classic menu bar places last. */
+    public static final String HELP = "app.help";
+
     /** The built-in menus that accept a contributed section. */
     public enum Slot { FILE, EDIT, VIEW, PANE, TAB, TOOLS, SESSION, TRANSFER }
 

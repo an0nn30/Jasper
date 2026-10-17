@@ -20,3 +20,7 @@ geometry check compares luminance edges, not RGB values.
 
 Run with `python3 -I`; the tools need Pillow and NumPy. A high edge agreement is not acceptance: inspect the
 region crops, and record native font rasterization and platform title-bar differences separately.
+
+The `chrome-*` pairs compare the `enterprise-*.png` renders that the `Enterprise*MockTest` classes write under
+`jasper-app/build/chrome-renders/` (run `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*Mock*'`);
+`ChromeRenderTest`'s `chrome-*.png` files there are for inspection.

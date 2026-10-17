@@ -18,7 +18,7 @@ public final class IconRegistry implements AutoCloseable {
         java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> new IconArtwork(entry.getValue())));
     // Only explicitly authored built-ins opt into silhouette fill. Public registrations retain
     // the validated outline stroke contract; a name suffix does not grant filled painting.
-    private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled");
+    private static final Set<String> FILLED_BUILT_INS = Set.of("folder.filled", "play.filled", "triangle.down");
     // Original compact-panel sources establish lighter plus/search/pencil/import outlines. Other built-ins
     // retain the common optical stroke; custom registrations never enter this catalog.
     private static final Set<String> FINE_PANEL_BUILT_INS = Set.of("add", "search", "edit", "import");
@@ -147,6 +147,10 @@ public final class IconRegistry implements AutoCloseable {
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return ordinary(name, null, palette, palette.color(tint), logicalSize);
+    }
+    /** {@link #icon(String, SemanticPalette, SemanticColor, int)} in {@code foreground}, a tint a contrast guard has painted. */
+    public Icon icon(String name, SemanticPalette palette, Color foreground, int logicalSize) {
+        return ordinary(name, null, palette, Objects.requireNonNull(foreground), logicalSize);
     }
     /**
      * Artwork on a surface outside the semantic palette (for example an independently coloured terminal surface):
@@ -401,6 +405,9 @@ public final class IconRegistry implements AutoCloseable {
             Map.entry("chevron.left", "M 10 4 L 6 8 L 10 12"),
             Map.entry("terminal", "M 2 3 H 14 V 13 H 2 Z M 4 6 L 7 8 L 4 10 M 9 10 H 12"),
             Map.entry("play", "M 5 2 L 14 8 L 5 14 Z"),
+            // The Run window's solid help glyph and its Open field's menu arrow (plan 8a), as the mocks draw them.
+            Map.entry("play.filled", "M 4 3 L 13 8 L 4 13 Z"),
+            Map.entry("triangle.down", "M 4.5 4.5 L 11.5 4.5 L 8 12.5 Z"),
             Map.entry("warning", "M 8 2 L 15 14 H 1 Z M 8 6 V 9 M 8 12 H 8.1"),
             Map.entry("bell", "M 3 11 L 4 9 V 6 A 4 4 0 0 1 12 6 V 9 L 13 11 Z M 6 13 A 2 2 0 0 0 10 13"),
             Map.entry("info", "M 14 8 A 6 6 0 1 1 2 8 A 6 6 0 1 1 14 8 M 8 7 V 11 M 8 4.5 H 8.1"),

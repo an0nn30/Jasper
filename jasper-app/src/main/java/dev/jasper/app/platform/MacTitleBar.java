@@ -313,8 +313,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
 
     public void setLight(boolean light) {
         if (closed) return;
-        root.putClientProperty("apple.awt.windowAppearance",
-            light ? "NSAppearanceNameAqua" : "NSAppearanceNameDarkAqua");
+        MacAppearance.follow(root, !light);
         refreshColors();
     }
 

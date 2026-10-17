@@ -107,6 +107,8 @@ final class Composition {
         int lineHeight;
         /** Distribute a taller line box's extra leading evenly above and below each line. */
         boolean centeredLeading;
+        /** At most this many lines, the last shortened at its end with an ellipsis; 0 for no limit. */
+        int maxLines;
         int noteStart = -1;
         Color noteColor;
 
@@ -167,6 +169,13 @@ final class Composition {
                 }
                 lines.add(line);
                 line = "";
+            }
+            if (maxLines > 0 && lines.size() > maxLines) {
+                String ellipsis = "\u2026", last = lines.get(maxLines - 1);
+                lines.subList(maxLines, lines.size()).clear();
+                int end = last.length();
+                while (end > 0 && advance(last.substring(0, end) + ellipsis) > width) end = last.offsetByCodePoints(end, -1);
+                lines.set(maxLines - 1, last.substring(0, end).stripTrailing() + ellipsis);
             }
             return lines;
         }

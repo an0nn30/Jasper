@@ -98,6 +98,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private boolean rememberLayout = true;
     private final WorkspaceConfiguration workspaceConfiguration = new WorkspaceConfiguration(this);
     private final WindowChrome chrome;
+    /** The look's workspace strategies, fixed for this window's life. */
+    private final WorkspaceChrome look;
     private final ThemeController themes;
     private final Subscription themeRegistration;
     private JRootPane bindingRoot;
@@ -136,8 +138,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable unregisterConfiguration = () -> {};
     private java.util.function.Consumer<TerminalPane> firstTerminal = pane -> { };
     private boolean firstTerminalSeen;
-    Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
-        this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+    /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
+    private boolean followsThemeAppearance;
+    Consumer<JComponent> showConfigDiagnostics = control -> {
+        if (!followsThemeAppearance) JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+        else showOptionDialog(new JOptionPane(control, JOptionPane.PLAIN_MESSAGE), "Configuration");
+    };
     Consumer<String> onTitle = title -> {};
     /** An error to tell the user about, as a title and details; the application posts it as a notification. */
     public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
@@ -220,7 +226,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
+        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
+    }
+
+    /** As above, under the look's workspace chrome (Enterprise presentation spec 9.1). */
+    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+                  ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
+        this.look = Objects.requireNonNull(look, "look");
         this.detached = detached;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
@@ -299,8 +312,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (bodyLease != null) bodyLease.changed();
     }
 
+    /**
+     * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
+     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
+     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
+     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
+     * renders share this path. Returns the unified bar, or null.
+     */
+    static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
+        MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
+        if (bar == null) installCustomTitleBar(root, content);
+        if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
+        return bar;
+    }
+
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
+                                      Consumer<String> nativeTitle) {
+        return installTitleBar(root, content, supported, false, nativeTitle);
+    }
+
+    /**
+     * As above; with {@code followTheme} a frame that has the system's title bar on macOS takes the theme's appearance,
+     * as Compact does (spec 10.1).
+     */
+    static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported, boolean followTheme,
                                       Consumer<String> nativeTitle) {
         MacTitleBar bar;
         if (content.viewMode == ViewMode.COMPACT) {
@@ -316,11 +352,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         content.onTitle = value -> {
             TerminalPane pane = content.currentPane();
             var document = content.selectedContent();
-            var context = WindowHeaderContext.from(pane == null ? null : pane.snapshot(),
-                Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
+            var snapshot = pane == null ? null : pane.snapshot();
+            Path home = Path.of(System.getProperty("user.home"));
+            var context = WindowHeaderContext.from(snapshot, home, pane == null ? "" : pane.programTitle(),
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
-            nativeTitle.accept(context.label());
+            // The frame title follows the look's template (spec 10.4); the title field keeps the context.
+            nativeTitle.accept(WindowTitle.format(content.look().title(), context.label(),
+                document != null ? document.title() : WindowTitle.session(snapshot),
+                document != null ? document.location() : WindowTitle.directory(snapshot, home)));
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
@@ -328,9 +368,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.onThemeChanged = theme -> bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
             bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(content.theme().chrome()).dark());
         }
-        if (content.viewMode == ViewMode.COMPACT && content.macOs) {
-            content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",
-                theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        // The window's own dialogs (the configuration diagnostics, Rename Tab) follow with it under a native-titled look.
+        content.followsThemeAppearance = bar == null && followTheme && content.macOs;
+        if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {
+            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
             content.onThemeChanged.accept(content.theme());
         }
         if (content.bodyLease != null) content.bodyLease.close();
@@ -710,6 +751,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return SwingUtilities.convertRectangle(header, row, target);
     }
     WindowChrome chrome() { return chrome; }
+    WorkspaceChrome look() { return look; }
+    /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
+    boolean lookAnimates() { return themes.animationsEnabled(); }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }
@@ -1156,6 +1200,37 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     ResolvedTheme theme() { return themes.current(); }
+    boolean followsThemeAppearance() { return followsThemeAppearance; }
+
+    /**
+     * Gives a dialog of this window the window's macOS appearance when the window follows the theme (spec 10.1): an
+     * option pane's dialog is a window of its own, which otherwise takes the system's appearance.
+     */
+    void followAppearance(JRootPane dialogRoot) {
+        if (followsThemeAppearance) dev.jasper.app.platform.MacAppearance.follow(dialogRoot, theme().chrome().dark());
+    }
+
+    /** Shows {@code pane} in a modal dialog over this window, as {@code JOptionPane}'s own show methods do, with its appearance. */
+    private void showOptionDialog(JOptionPane pane, String title) {
+        JDialog dialog = pane.createDialog(this, title);
+        followAppearance(dialog.getRootPane());
+        pane.selectInitialValue();
+        dialog.setVisible(true);
+        dialog.dispose();
+    }
+
+    /** Rename Tab's question: the new name, blank for automatic, or null when cancelled. */
+    String askTabName(String current) {
+        String message = "Tab name (leave blank for automatic):";
+        if (!followsThemeAppearance) return JOptionPane.showInputDialog(this, message, current);
+        // As showInputDialog does, with the window's appearance on its dialog.
+        var pane = new JOptionPane(message, JOptionPane.QUESTION_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+        pane.setWantsInput(true);
+        pane.setInitialSelectionValue(current);
+        showOptionDialog(pane, UIManager.getString("OptionPane.inputDialogTitle", getLocale()));
+        Object value = pane.getInputValue();
+        return value == JOptionPane.UNINITIALIZED_VALUE ? null : (String) value;
+    }
 
     /**
      * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as

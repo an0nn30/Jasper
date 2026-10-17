@@ -67,15 +67,18 @@ final class AboutWindows {
             Optional.empty(), invocation -> showAbout());
     }
 
+    /** Whether About Jasper lives in the application menu instead of Help: on macOS while it shows the screen menu bar. */
+    static boolean aboutInApplicationMenu(boolean macOs, boolean screenMenuBar) { return macOs && screenMenuBar; }
+
     /**
      * Help's entries: Keyboard Shortcuts; Change Memory Settings… and Edit Custom VM Options… in a section of their own;
-     * then About Jasper except on macOS, where About is in the application menu.
+     * then About Jasper unless it is in the application menu ({@link #aboutInApplicationMenu}).
      */
-    static List<MenuEntry> helpEntries(boolean macOs) {
+    static List<MenuEntry> helpEntries(boolean aboutInApplicationMenu) {
         var shortcuts = new MenuEntry.Item("app.shortcuts");
         var memory = new MenuEntry.Item("app.memory");
         var vmOptions = new MenuEntry.Item("app.vmoptions");
-        return macOs ? List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions)
+        return aboutInApplicationMenu ? List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions)
             : List.of(shortcuts, new MenuEntry.Separator(), memory, vmOptions, new MenuEntry.Separator(), new MenuEntry.Item(ABOUT));
     }
 

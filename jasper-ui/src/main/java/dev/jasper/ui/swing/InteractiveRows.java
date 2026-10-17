@@ -1203,6 +1203,7 @@ final class InteractiveRows {
 
         /** A heading shows its title, inset like the rows below it, and a table heading's count at the row's end. */
         void headingLayout() {
+            if (owner.resultsLayout() && owner.view.runWindow()) { RunWindowPresentation.headingLayout(this); return; }
             int pad = ThemePainting.metric(owner.context(), owner.resultsLayout() ? DesignMetrics.Role.RESULTS_ROW_PADDING : owner.identityRows() ? DesignMetrics.Role.IDENTITY_ROW_SIDE : DesignMetrics.Role.ICON_GAP);
             leading.setBounds(0, 0, 0, 0);
             subtitle.setBounds(0, 0, 0, 0);
@@ -1225,11 +1226,13 @@ final class InteractiveRows {
          */
         void resultLayout() {
             var context = owner.context();
-            int side = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_PADDING),
-                    gap = ThemePainting.metric(context, DesignMetrics.Role.RESULTS_ROW_GAP),
-                    icon = ThemePainting.metric(context, DesignMetrics.Role.ICON_RAIL), h = getHeight();
+            // The Run window's rows (plan 8a): its inset, its hue square's column and its gaps.
+            boolean run = owner.view.runWindow();
+            int side = ThemePainting.metric(context, run ? DesignMetrics.Role.RUN_WINDOW_ROW_SIDE : DesignMetrics.Role.RESULTS_ROW_PADDING),
+                    gap = ThemePainting.metric(context, run ? DesignMetrics.Role.RUN_WINDOW_DETAIL_GAP : DesignMetrics.Role.RESULTS_ROW_GAP),
+                    icon = ThemePainting.metric(context, run ? DesignMetrics.Role.RUN_WINDOW_SWATCH : DesignMetrics.Role.ICON_RAIL), h = getHeight();
             leading.setBounds(side, 0, icon, h);
-            int start = side + icon + gap, end = getWidth() - side;
+            int start = side + icon + (run ? ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_ROW_GAP) : gap), end = getWidth() - side;
             int titleWidth = title.getPreferredSize().width;
             int tagWidth = trailing.getComponentCount() == 0 ? 0 : trailing.getPreferredSize().width;
             int detailWidth = subtitle.getComponentCount() == 0 ? 0 : subtitle.getPreferredSize().width;
@@ -1250,6 +1253,7 @@ final class InteractiveRows {
         @Override
         protected void paintComponent(Graphics g) {
             if (!owner.dataRow(index)) {
+                if (owner.resultsLayout() && owner.view.runWindow()) { RunWindowPresentation.paintHeading(this, g); return; }
                 // A heading after other rows opens its section with a hairline rule: a row divider, or the menu's edge in the
                 // palette's results (spec 7).
                 if (index > 0 && owner.headingRule()) {

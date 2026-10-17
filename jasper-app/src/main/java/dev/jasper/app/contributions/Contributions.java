@@ -161,6 +161,13 @@ public final class Contributions {
 
     public List<PanelEntry> panels() { return List.copyOf(panels.values()); }
 
+    /**
+     * The app's View section listing every panel's toggle ("Tool Windows"), while there are panels.
+     *
+     * @return the section, or empty while there are no panels
+     */
+    public Optional<MenuSection> toolWindowsSection() { return Optional.ofNullable(panelsMenu); }
+
     public Subscription addRailAction(String actionId) {
         requireEdt();
         String[] placed = {Objects.requireNonNull(actionId, "actionId")};

@@ -55,19 +55,33 @@ public final class TerminalWindow implements AutoCloseable {
      */
     public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
                    ThemeController themes, ConfigSnapshot initial, CommandHistory history) {
+        this(callbacks, launcher, directory, detached, themes, initial, history, WindowLook.standard());
+    }
+
+    /**
+     * As above, under {@code look}: its workspace chrome and its title bar (Enterprise presentation spec 9.1 and 10.1).
+     *
+     * @param callbacks the application's window callbacks
+     * @param launcher starts the window's shells
+     * @param directory where the first tab starts, or null for where a new shell starts
+     * @param detached whether the window starts without a tab
+     * @param themes the application's look
+     * @param initial the configuration to apply, or null
+     * @param history the shared command history
+     * @param look the window's chrome and title facts
+     */
+    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
+                   ThemeController themes, ConfigSnapshot initial, CommandHistory history, WindowLook look) {
         this.callbacks = callbacks;
         frame.setIconImages(ApplicationIcon.images());
         content = new WindowContent(launcher, directory, detached, callbacks.newWindow(), callbacks.quit(), this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS);
+            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS, look.chrome());
         if (initial != null) {
             if (content.currentPane() != null) content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
             content.applyConfiguration(initial, SystemInfo.isMacOS);
         }
-        titleBar = WindowContent.installTitleBar(frame.getRootPane(), content, MacTitleBar.isSupported(), frame::setTitle);
-        if (titleBar == null) WindowContent.installCustomTitleBar(frame.getRootPane(), content);
+        titleBar = WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        if (titleBar != null) titleBar.setMenuBar(content.menuBar());
-        else frame.setJMenuBar(content.menuBar());
         content.installRootBindings(frame.getRootPane());
         // Native initial focus must not fall through to the first restored tool-panel control.
         frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());

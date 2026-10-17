@@ -1,0 +1,9 @@
+# title_bar	menu_bar	window_title	tool_windows	editor_tabs	status_bar	palette	dialogs	motion
+unified	system	{context}	rails	equal	segments	anchored	as_requested	standard
+native	system	Workstation — {session} — {directory}	stripes	classic	cells	run_window	classic	none
+native	window	{context}	stripes	equal	segments	anchored	classic	none
+native	window	Workstation — {session} — {directory}	rails	classic	cells	run_window	as_requested	standard
+unified	system	{context}	stripes	classic	segments	run_window	as_requested	none
+unified	system	Workstation — {session} — {directory}	stripes	equal	cells	anchored	classic	standard
+native	system	{context}	rails	equal	cells	run_window	classic	none
+native	window	Workstation — {session} — {directory}	stripes	classic	segments	anchored	classic	standard

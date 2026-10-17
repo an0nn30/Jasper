@@ -207,6 +207,13 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
+    /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
+    /** What terminal windows and the rehearsal's are made of under this process's presentation. */
+    dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
+
+    /** The auxiliary windows' shells; null before {@link #startPlugins(AppDirs)}. Tests. */
+    dev.jasper.app.windows.NativeShells nativeShells() { return shells; }
+
     /** The rehearsal painted: the look proved itself (spec 4.6), recorded off the EDT. */
     void rehearsalPainted() {
         var attempt = presentationAttempt();
@@ -329,7 +336,9 @@ public final class JasperApplication {
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,
-            systemAppearance.current(), themesFolder);
+            systemAppearance.current(), themesFolder, LookMotion.of(presentation.projections()));
+        // Without a configuration the setting is its default, on; the look still decides (spec 10.9).
+        if (configuration == null) themes.configureAnimations(LookMotion.of(presentation.projections()).allows(true));
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);
@@ -466,7 +475,7 @@ public final class JasperApplication {
                 requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
                 this::windowActivated, this::windowClosed,
                 state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history);
+                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history, windowLook());
             if (configuration != null) configuration.register(window.content());
             window.content().connectContributions(contributions, uiState);
             UUID windowId = window.content().id();
@@ -865,7 +874,7 @@ public final class JasperApplication {
      */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
         TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
-            new CommandHistory());
+            new CommandHistory(), windowLook());
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
         Rehearsal.silence(window.content());
         // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
@@ -924,7 +933,7 @@ public final class JasperApplication {
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
-            () -> newWindow(), this::quit);
+            () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths);
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();
@@ -1042,7 +1051,7 @@ public final class JasperApplication {
                 if (vmOptions.editable()) vmOptions.editCustomOptions();
                 else openSettings(invocation.windowId(), "system#vm.heap");
             });
-        contributions.addMenuSection(MenuTarget.topLevel("app.help", "Help")).set(AboutWindows.helpEntries(macOs));
+        contributions.addMenuSection(MenuTarget.topLevel(MenuTarget.HELP, "Help")).set(AboutWindows.helpEntries(AboutWindows.aboutInApplicationMenu(macOs, presentation.committedDesktop().screenMenuBar())));
         if (configuration != null) {
             var commandLine = new dev.jasper.app.settingsui.CorePages.CommandLineActions(() -> commandInstall.state().text(),
                 () -> installCommand(true),

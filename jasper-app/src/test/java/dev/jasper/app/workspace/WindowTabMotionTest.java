@@ -125,6 +125,29 @@ class WindowTabMotionTest {
         });
     }
 
+    /** Spec 10.9: a still look keeps the strip still while the window's own animation settings stay on. */
+    @Test void aStillLookSettlesTheStripAtOnceWhateverTheSettings() throws Exception {
+        var themes = new java.util.concurrent.atomic.AtomicReference<dev.jasper.app.appearance.ThemeController>();
+        try {
+            edt(() -> {
+                themes.set(dev.jasper.app.appearance.ThemeTestSupport.controller(true));
+                themes.get().configureAnimations(false);
+                var owner = content(launcher(new ArrayDeque<>()), themes.get());
+                owner.setAnimations(AnimationSettings.defaults());
+                owner.currentTab().rename("first"); owner.update();
+                var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);
+                strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
+                var f = new Fixture(owner, strip, clock);
+                f.add("second");
+                assertThat(f.strip.motionRunning()).isFalse();
+                assertThat(f.entry("first").getBounds()).isEqualTo(new Rectangle(0, 0, 400, 30));
+                assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
+            });
+        } finally {
+            edt(() -> { strips.forEach(WindowTabs::close); strips.clear(); closeOwnersNow(); if (themes.get() != null) themes.get().close(); });
+        }
+    }
+
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTab().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);

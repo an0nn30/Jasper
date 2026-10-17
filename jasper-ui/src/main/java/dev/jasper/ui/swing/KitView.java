@@ -330,6 +330,20 @@ public final class KitView extends JPanel implements AutoCloseable {
     public boolean titleStrip() { return titleStrip; }
     private boolean titleStrip;
     /**
+     * App-only: this view is part of the Run window (Enterprise presentation spec 11.2). Its RESULTS lists take the Run
+     * window's rows, heading bands and counts, its PROMPT_HEADER tile the Run window's tile, its transparent fields the
+     * data face and no ring of their own (the host's field box shows focus), and its text the Run window's colours.
+     * Re-reconciles the current descriptor. EDT confined.
+     */
+    public void runWindow(boolean value) {
+        requireOpen();
+        if (runWindow == value) return;
+        runWindow = value; update(spec);
+    }
+    /** Whether this view is presented as part of the Run window. */
+    public boolean runWindow() { return runWindow; }
+    private boolean runWindow;
+    /**
      * App-only: this view is a toolbar strip, a contributed view in a window's main toolbar. Its icon-only menu buttons
      * show their menu indicator on the borderless control surface, as a title strip's do, and its controls keep the
      * kit's control height, which the toolbar row centres. EDT confined.
