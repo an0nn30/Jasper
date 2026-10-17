@@ -105,6 +105,8 @@ final class Tables {
 
     static final class TableControl extends InteractiveRows.RowsControl {
         final JPanel header = new HeaderBand(this);
+        /** On a Settings page, where a face may show every row ({@link TableFace#everyRowOnPage}). */
+        boolean settings;
         /** Which rows are data rows below a heading row (plan 4c), measured with the data. */
         private boolean[] underHeading = new boolean[0];
         /** The row of every cell node and its descendants, so focus and reveal reach row-mounted nodes. */
@@ -334,6 +336,18 @@ final class Tables {
 
         WeightLayout weights() {
             return new WeightLayout(value().columns().stream().mapToDouble(Column::weight).toArray(),minimums);
+        }
+
+        /** Every row on a Settings page whose face shows them all; otherwise the rows' default eight. */
+        @Override int viewportRowsHeight() {
+            return settings && context().faces().table.everyRowOnPage() ? rowsHeight() : super.viewportRowsHeight();
+        }
+
+        /** Under a face that puts a heading's count under the last column, that column title's text start; else -1. */
+        @Override int headingCountStart() {
+            if (!context().faces().table.countUnderLastColumn() || header.getComponentCount() == 0) return -1;
+            var last = header.getComponent(header.getComponentCount() - 1);
+            return last.getX() + (last instanceof javax.swing.JComponent title ? title.getInsets().left : 0);
         }
 
         @Override

@@ -85,6 +85,14 @@ final class ClassicGroupFace implements GroupFace {
         return new EmptyBorder(gap, 0, gap, 0);
     }
 
+    /**
+     * A FORM card on a Settings page spaces its content by the rows' vertical padding (the Notifications mock's description
+     * 6 above its groups table, plan 9b Task 2).
+     */
+    @Override public int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard) {
+        return page && kind == Nodes.CardKind.FORM ? ThemePainting.metric(context, DesignMetrics.Role.SETTING_VERTICAL_PADDING) : standard;
+    }
+
     /** A Settings page's rows keep their first line clear for the rule {@link #paintCard} draws there. */
     @Override public int rowRule(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE); }
 

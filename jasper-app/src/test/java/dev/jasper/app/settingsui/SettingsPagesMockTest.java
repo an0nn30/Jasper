@@ -52,6 +52,13 @@ class SettingsPagesMockTest {
             probe("Tabs & Panels box top", 700, 285)));
         tight("window", "first row rule", "third row rule", "row rule start", "row rule inset", "row rule end");
         face("window", "Tabs & Panels box top");
+        PROBES.put("notifications", List.of(probe("System checkbox", 262, 86), probe("table box left", 260, 300),
+            probe("table box right", 1010, 233), probe("header band", 400, 233), probe("Display separator", 755, 233),
+            probe("Source separator", 902, 233), probe("header rule", 400, 243), probe("heading band", 400, 255),
+            probe("data row", 400, 277), probe("Display arrow", 800, 275)));
+        tight("notifications", "header band", "heading band");
+        face("notifications", "table box left", "table box right", "header band", "Display separator", "Source separator",
+            "header rule", "heading band", "data row", "Display arrow");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -113,6 +120,12 @@ class SettingsPagesMockTest {
     @Test void appearanceAndWindowMatchTheirMocks() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("appearance", "window"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    @Test void notificationsMatchesItsMock() throws Exception {
+        try (var settings = EnterpriseSettings.open(false)) {
+            assertThat(compare(settings, List.of("notifications"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
     }
 }

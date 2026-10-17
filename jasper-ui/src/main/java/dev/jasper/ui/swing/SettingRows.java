@@ -253,7 +253,11 @@ final class SettingRows {
             return Math.max(floor(), i.top + i.bottom + Math.max(text, box));
         }
 
-        /** The box centres on the title's first line, its focus ring in the row's padding; the description sits under the title. */
+        /**
+         * The box centres on the title's first line, or on the row when a description follows the title (the mocks' Show
+         * system notifications and Run in background, plan 9b Task 2), its focus ring in the row's padding; the description
+         * sits under the title.
+         */
         void layoutLeading(Container p) {
             Insets i = p.getInsets();
             int ring = ThemePainting.metric(owner.context(), DesignMetrics.Role.FOCUS_RING), lead = lead(p);
@@ -263,7 +267,7 @@ final class SettingRows {
             owner.title.setBounds(i.left + lead, y, w, th);
             int gap = owner.description.isVisible() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0;
             owner.description.setBounds(i.left + lead, y + th + gap, w, owner.description.isVisible() ? owner.description.height(w) : 0);
-            control.setBounds(i.left - ring, y + boxTop(th, box) - ring, size.width, size.height);
+            control.setBounds(i.left - ring, (owner.description.isVisible() ? centred(p, box) : y + boxTop(th, box)) - ring, size.width, size.height);
         }
 
         /**

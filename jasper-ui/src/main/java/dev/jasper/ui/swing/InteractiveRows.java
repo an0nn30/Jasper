@@ -172,6 +172,8 @@ final class InteractiveRows {
         abstract String activation();
 
         abstract List<MenuItem> contextActions();
+        /** Where a heading row's count starts, in row coordinates; -1 puts it at the row's end (plan 9b Rulings 5). */
+        int headingCountStart() { return -1; }
 
         /** Whether Enter with no focused row stays with the rows (doing nothing) instead of passing on; tables only. */
         boolean keepsEnterWithoutFocus() {
@@ -1212,7 +1214,9 @@ final class InteractiveRows {
             int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
             // Only a table heading has trailing content (its count); a list heading has a title only.
             int tw = trailing.getComponentCount() == 0 ? 0 : Math.min(trailing.getPreferredSize().width, Math.max(0, getWidth() - 2 * pad));
+            int countAt = owner.headingCountStart();
             if (tw == 0) trailing.setBounds(0, 0, 0, 0);
+            else if (countAt >= 0) trailing.setBounds(Math.min(countAt, Math.max(0, getWidth() - pad - tw)), top, tw, line);
             else trailing.setBounds(getWidth() - pad - tw, top, tw, line);
             title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad - (tw > 0 ? tw + pad : 0)), line);
             title.doLayout();

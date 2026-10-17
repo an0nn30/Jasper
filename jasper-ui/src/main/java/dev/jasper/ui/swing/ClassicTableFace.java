@@ -47,4 +47,8 @@ final class ClassicTableFace implements TableFace {
     @Override public int cellInset(KitContext context) { return ClassicHeaders.inset(context); }
     @Override public int groupIndent(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.GROUP_ROW_INDENT); }
     @Override public void styleCount(JLabel label, KitContext context) { label.setForeground(ThemePainting.painted(context, count)); }
+    /** Plan 9b Rulings 5: the Notifications mock's "6 groups" starts where the Source column's title does. */
+    @Override public boolean countUnderLastColumn() { return true; }
+    /** Plan 9b Task 2: the Notifications mock's groups table shows its twenty-three rows in the page. */
+    @Override public boolean everyRowOnPage() { return true; }
 }

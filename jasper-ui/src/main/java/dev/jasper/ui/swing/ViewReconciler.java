@@ -170,6 +170,7 @@ final class ViewReconciler implements AutoCloseable {
         if (next.get(node.id()) instanceof Cards.CardControl card) card.settings = settings;
         if (next.get(node.id()) instanceof Labels.TextControl text) text.settings = settings;
         if (next.get(node.id()) instanceof TextFields.FieldControl field) field.settings = settings;
+        if (next.get(node.id()) instanceof Tables.TableControl table) table.settings = settings;
         ControlRegistry.children(node).forEach(child -> applySettings(child, next, settings));
     }
     /** The Settings header's root row: history buttons, then the breadcrumb, whose ancestors use the Settings body face. */

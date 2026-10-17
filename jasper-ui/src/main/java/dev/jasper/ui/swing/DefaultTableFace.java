@@ -28,4 +28,6 @@ final class DefaultTableFace implements TableFace {
     @Override public int cellInset(KitContext context) { return 0; }
     @Override public int groupIndent(KitContext context) { return 0; }
     @Override public void styleCount(JLabel count, KitContext context) { }
+    @Override public boolean countUnderLastColumn() { return false; }
+    @Override public boolean everyRowOnPage() { return false; }
 }

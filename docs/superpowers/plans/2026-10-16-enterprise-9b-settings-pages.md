@@ -20,6 +20,25 @@
 > the tile miniatures, the fixture texts ("Match theme", "Use platform font size", the View mode box) and box titles'
 > gap widths.
 
+> **Status, Task 2 (2026-10-17):** the Notifications page matches its probes (share 0.955, floor 0.93). Deviations, each
+> because the merged code differed from the plan's model: the classic composition is a FORM card of the description and
+> the table (the full-span editor's Section body is unpadded; a FORM card pads it 13 inside the Groups box as the mock),
+> and `GroupFace.cardGap` (default the standard `ROW_GAP`; classic `SETTING_VERTICAL_PADDING` for a FORM card on a
+> Settings page) sets the description 6 above the table (mock table top 222); a table showed eight rows and scrolled, so
+> `TableFace.everyRowOnPage` (default false, classic true) shows every row of a table on a Settings page (the `settings`
+> flag now reaches `Tables.TableControl`); the column weights are 488 : 147 : 102, not 10 : 3 : 2.2, because the classic
+> table lays its columns between the header's side insets (267 to 1004), which puts the separators at the mock's 755 and
+> 902; plan 4c's classic cell inset after a separator is `HAIRLINE` + `FIELD_HORIZONTAL_PADDING` (9), not `HAIRLINE` +
+> `ICON_GAP` (7), as plan 4c's Settings 03 note left to this page (titles at 764.5 and 911 against the mock's 765 and
+> 913; it also moves the classic tree headers' titles, which the Keymap mock sets 9.5 after a separator); a cell
+> dropdown's chevron lane is `ButtonFace.cellChevronLane` (default today's; classic the ▼ `DROPDOWN_GLYPH_INSET` after
+> the value), its value keeps the combo's width and is drawn at body size also on a Settings page, and a bare classic
+> cell chevron is `text.placeholder` (#7A808A as the mock); a leading checkbox whose row has a description centres on the
+> row ("System checkbox" at 86 as the mock), a title-only row on its title's x-height middle as Task 1 set. Residuals:
+> the first column's title and cells 2 px nearer the box than the mock's (`ICON_GAP` side), the cells' values 1 to 2 px
+> left of the mock's, the System Notifications box 1 px short (Task 1's 47.5 half pixel), so the Groups box starts 1 px
+> higher.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

@@ -72,7 +72,7 @@ class ClassicTablesTest {
                 assertThat(at(image, header.getWidth() / 2, header.getHeight() - 1)).isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER));
                 var size = (JLabel) header.getComponent(1);
                 assertThat(at(image, size.getX(), 2)).as("the separator before Size").isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER));
-                assertThat(size.getInsets().left).isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP) + rule);
+                assertThat(size.getInsets().left).as("after the separator, a field's text padding (plan 9b Task 2)").isEqualTo(ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING) + rule);
                 assertThat(size.getForeground()).isEqualTo(ThemePainting.painted(context, context.faces().table.pairs().get(0)));
             } finally { release(context); }
         });

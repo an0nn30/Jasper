@@ -43,4 +43,6 @@ interface ButtonFace extends Face {
      * side by side inside the pair's outline, one border where the halves share it.
      */
     int joinedOverlap();
+    /** The width a table cell's dropdown keeps after its value's text padding for its chevron. */
+    int cellChevronLane(KitContext context);
 }

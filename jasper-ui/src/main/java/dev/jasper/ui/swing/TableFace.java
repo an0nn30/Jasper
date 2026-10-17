@@ -15,4 +15,8 @@ interface TableFace extends HeaderFace {
     int groupIndent(KitContext context);
     /** Styles a heading row's count after it refreshes. */
     void styleCount(JLabel count, KitContext context);
+    /** Whether a heading row's count stands under the last column's title (the classic table); otherwise at the row's end. */
+    boolean countUnderLastColumn();
+    /** Whether a table on a Settings page shows every row, the page scrolling instead of the table; otherwise eight. */
+    boolean everyRowOnPage();
 }

@@ -1,5 +1,6 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.PaintPair;
@@ -34,4 +35,8 @@ final class DefaultButtonFace implements ButtonFace {
     @Override public int joinedOverlap() { return 0; }
     @Override public Color menuDivider(KitContext context) { return ThemePainting.color(context, SemanticColor.BORDER_MENU); }
     @Override public List<PaintPair> pairs() { return List.of(); }
+    @Override public int cellChevronLane(KitContext context) {
+        return ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH)
+            + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
+    }
 }
