@@ -1,7 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.ui.metrics.DesignMetrics;
-
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
@@ -50,11 +48,6 @@ import javax.swing.SwingUtilities;
  * old place and resolves the target again. EDT only.
  */
 final class DockDrag {
-    /** How far, in logical pixels, a press must move before it becomes a drag: the installed kit's threshold. */
-    static int threshold() {
-        return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.DOCK_DRAG_THRESHOLD);
-    }
-
     private final JComponent root;
     private final DockState state;
     private final ToolWindowArea area;
@@ -175,7 +168,7 @@ final class DockDrag {
         if (pressedId == null || component != source) return;
         Point at = toRoot(component, event.getPoint());
         if (!active()) {
-            if (at.distance(pressedAt) <= UIScale.scale(threshold())) return;
+            if (at.distance(pressedAt) <= UIScale.scale(area.dragThreshold())) return;
             start();
         }
         update(at);
@@ -238,7 +231,7 @@ final class DockDrag {
         // A stripe drop keeps the window's visibility, so a hidden window stays hidden: no frame would appear to preview.
         boolean staysHidden = target.filter(DockDropResolver.Target::onStripe).isPresent() && !state.visible(dragging);
         Rectangle highlight = staysHidden ? null
-            : target.flatMap(where -> DockGeometry.landing(areaAfter(where.slot()), state, dragging, where.slot(), ToolWindowArea.metrics()))
+            : target.flatMap(where -> DockGeometry.landing(areaAfter(where.slot()), state, dragging, where.slot(), area.metrics()))
                 .map(landing -> SwingUtilities.convertRectangle(area, landing, layers)).orElse(null);
         Rectangle placeholder = null;
         for (ToolStripe stripe : stripes) {
@@ -275,7 +268,7 @@ final class DockDrag {
      * above the workspace's; otherwise it is the workspace's half.
      */
     private int sideSplit(Rectangle workspace) {
-        DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, ToolWindowArea.metrics());
+        DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, area.metrics());
         // The side panels are as tall as the terminal column: the area above the bottom area, or all of it.
         int visibleHeight = layout.terminal().height;
         return workspace.y + (visibleHeight + 1) / 2;
@@ -308,7 +301,7 @@ final class DockDrag {
      * and bottom edges the grown square reaches exactly that far past the button's last pixel on all four sides.
      */
     private boolean nearHome(Point at) {
-        int reach = UIScale.scale(threshold()) + 1;
+        int reach = UIScale.scale(area.dragThreshold()) + 1;
         Rectangle around = new Rectangle(home);
         around.grow(reach, reach);
         return around.contains(at);

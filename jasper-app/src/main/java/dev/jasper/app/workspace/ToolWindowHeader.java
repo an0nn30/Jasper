@@ -27,10 +27,16 @@ import javax.swing.JPopupMenu;
  * tool window background and its non-control area is a drag handle. EDT only.
  */
 final class ToolWindowHeader extends JPanel {
-    /** The installed kit's header height, in logical pixels. */
-    static int logicalHeight() {
-        return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT);
-    }
+    /** The window's kit's header height, in logical pixels, without a flush header's rule. */
+    int logicalHeight() { return kit.metrics().value(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT); }
+
+    /** The window's kit. */
+    private final dev.jasper.ui.kit.Kit kit;
+    /** The window's kit's native styles and chrome painter. */
+    private final NativeStyles styles;
+    private final dev.jasper.ui.swing.ChromePainter painter;
+    /** Whether this is a flush frame's header strip (spec 10.7). */
+    private final boolean flush;
 
     private final JLabel title = new JLabel() {
         @Override public void updateUI() {
@@ -54,12 +60,29 @@ final class ToolWindowHeader extends JPanel {
     private dev.jasper.app.contributions.PanelHeaderState presentation = dev.jasper.app.contributions.PanelHeaderState.EMPTY;
 
     /**
+     * A standard header over the installed kit, as the default look's tests build it.
+     *
      * @param text the window's title, shown as plain text
      * @param menu builds the options menu each time it opens, so it names the window's current slot
      * @param onHide hides the window
      */
     ToolWindowHeader(String text, Supplier<JPopupMenu> menu, Runnable onHide) {
+        this(text, menu, onHide, dev.jasper.ui.swing.FlatLafInstaller.installedKit(), false);
+    }
+
+    /**
+     * @param text the window's title, shown as plain text
+     * @param menu builds the options menu each time it opens, so it names the window's current slot
+     * @param onHide hides the window
+     * @param kit the window's kit
+     * @param flush whether this is a flush frame's header strip
+     */
+    ToolWindowHeader(String text, Supplier<JPopupMenu> menu, Runnable onHide, dev.jasper.ui.kit.Kit kit, boolean flush) {
         super(new BorderLayout());
+        this.kit = java.util.Objects.requireNonNull(kit, "kit");
+        this.styles = new NativeStyles(kit);
+        this.painter = new dev.jasper.ui.swing.ChromePainter(kit);
+        this.flush = flush;
         this.menu = menu;
         title.putClientProperty("html.disable", Boolean.TRUE);
         title.setText(text);
@@ -77,7 +100,7 @@ final class ToolWindowHeader extends JPanel {
         buttons.add(Box.createHorizontalStrut(2));
         buttons.add(hide);
         // An app-owned compound border keeps the padding through look-and-feel switches: the same pattern ToolWindowArea.Host.gutters uses.
-        var metrics = dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics();
+        var metrics = kit.metrics();
         setBorder(BorderFactory.createCompoundBorder(new FlatEmptyBorder(0, metrics.value(DesignMetrics.Role.TOOL_HEADER_LEADING_PADDING), 0, metrics.value(DesignMetrics.Role.TOOL_HEADER_TRAILING_PADDING)), null));
         detail.putClientProperty("html.disable", Boolean.TRUE);
         labels = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0)) {
@@ -85,7 +108,7 @@ final class ToolWindowHeader extends JPanel {
                 int titleWidth = Math.min(title.getPreferredSize().width, getWidth());
                 int height = getHeight();
                 title.setBounds(0, 0, titleWidth, height);
-                int x = titleWidth + NativeStyles.installed().metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
+                int x = titleWidth + styles.metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
                 detail.setBounds(x, 0, Math.max(0, getWidth() - x), height);
             }
             @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }
@@ -113,11 +136,11 @@ final class ToolWindowHeader extends JPanel {
         detail.setText(state.detail());
         detail.setToolTipText(state.detail().isEmpty() ? null : state.detail());
         detail.setIcon(state.active() ? new javax.swing.Icon() {
-            @Override public int getIconWidth() { return NativeStyles.installed().metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
+            @Override public int getIconWidth() { return styles.metric(DesignMetrics.Role.TOOL_HEADER_ACTIVE_DOT); }
             @Override public int getIconHeight() { return getIconWidth(); }
             @Override public void paintIcon(java.awt.Component c, java.awt.Graphics graphics, int x, int y) {
                 // The connected dot is the success status, held readable on the tool window surface it sits on.
-                dev.jasper.ui.swing.ChromePainter.installed().connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
+                painter.connectedDot(graphics, x, y, getIconWidth(), ThemeZone.theme(ToolWindowHeader.this));
             }
         } : null);
         while (actionButtons.size() > state.actions().size()) {

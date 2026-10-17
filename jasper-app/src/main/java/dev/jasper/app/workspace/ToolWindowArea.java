@@ -50,13 +50,19 @@ import javax.swing.UIManager;
  * calls {@link #sync} afterwards. EDT only.
  */
 final class ToolWindowArea extends JPanel {
-    /** The installed kit's exterior gutter, in logical pixels. */
-    private static int gutter() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER); }
-    /** The installed kit's workspace frame arc, in logical pixels. */
-    static int surfaceArc() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC); }
+    /** The window's kit's exterior gutter, in logical pixels. */
+    private int gutter() { return kit.metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER); }
+    /** The window's kit's workspace frame arc, in logical pixels. */
+    int surfaceArc() { return kit.metrics().value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC); }
+    /** How far, in logical pixels, a press must move before it becomes a dock drag: the window's kit's threshold. */
+    int dragThreshold() { return kit.metrics().value(DesignMetrics.Role.DOCK_DRAG_THRESHOLD); }
+    /** The window's kit. */
+    dev.jasper.ui.kit.Kit kit() { return kit; }
+    /** Whether frames are flush: divided by painted rules, with header strips (spec 10.7). */
+    boolean flush() { return flush; }
 
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
-    private static final class Host extends JPanel {
+    private final class Host extends JPanel {
         private final int[] gutters = {-1, -1, -1, -1};
         /** Whether each side's corners are rounded; a side that meets the window edge directly is square. */
         private boolean roundLeft = true, roundRight = true;
@@ -227,7 +233,11 @@ final class ToolWindowArea extends JPanel {
     }
 
     private final DockState state;
-    private final Host center = new Host(false);
+    /** The window's kit: the frames' arc, gutter, rule and header sizes. */
+    private final dev.jasper.ui.kit.Kit kit;
+    /** Whether frames are flush (the classic look's frame style). */
+    private final boolean flush;
+    private final Host center;
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(surfaceArc() / 2)); }
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
@@ -251,9 +261,28 @@ final class ToolWindowArea extends JPanel {
     BiConsumer<JComponent, String> dragSource = (component, id) -> { };
     Consumer<JComponent> releaseDragSource = component -> { };
 
+    /**
+     * An area of standard frames over the installed kit, as the default look's tests build it.
+     *
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     */
     ToolWindowArea(JComponent terminalColumn, DockState state) {
+        this(terminalColumn, state, dev.jasper.ui.swing.FlatLafInstaller.installedKit(), false);
+    }
+
+    /**
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     * @param kit the window's kit
+     * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
+     */
+    ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush) {
         super(null);
         this.state = Objects.requireNonNull(state, "state");
+        this.kit = Objects.requireNonNull(kit, "kit");
+        this.flush = flush;
+        this.center = new Host(false);
         setLayout(new DockLayout());
         center.add(terminalColumn, BorderLayout.CENTER);
         lowerInset.setOpaque(false);
@@ -461,7 +490,7 @@ final class ToolWindowArea extends JPanel {
         var header = new ToolWindowHeader(title,
             () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
                 slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id));
+            () -> onHide.accept(id), kit, flush);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }
@@ -557,5 +586,5 @@ final class ToolWindowArea extends JPanel {
     }
 
     /** The dock metrics at the current UI scale; the drag's preview uses the same. */
-    static DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
+    DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
 }

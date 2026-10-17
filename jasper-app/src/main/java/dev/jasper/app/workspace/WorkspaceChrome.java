@@ -12,7 +12,7 @@ import java.util.Objects;
 public final class WorkspaceChrome {
     /** The default look's chrome. */
     public static final WorkspaceChrome STANDARD = new WorkspaceChrome(new StandardMenuBar(), new TitleFormat("{context}"),
-        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false);
+        WorkspaceLook.Header.UNIFIED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, DockChrome.STANDARD);
 
     private final MenuBarLayout menus;
     private final TitleFormat title;
@@ -23,9 +23,12 @@ public final class WorkspaceChrome {
     /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
     private final WorkspaceLook.Status status;
     private final boolean runItem;
+    /** The dock's look: read here once from the look's stripes and frames (spec 3.3). */
+    private final DockChrome dock;
 
     private WorkspaceChrome(MenuBarLayout menus, TitleFormat title, WorkspaceLook.Header header, WorkspaceLook.Tabs tabs,
-                            WorkspaceLook.Status status, boolean runItem) {
+                            WorkspaceLook.Status status, boolean runItem, DockChrome dock) {
+        this.dock = Objects.requireNonNull(dock);
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);
         this.header = Objects.requireNonNull(header);
@@ -47,11 +50,14 @@ public final class WorkspaceChrome {
             case STANDARD -> new StandardMenuBar();
             case CLASSIC -> new ClassicMenuBar();
         };
-        return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem());
+        return new WorkspaceChrome(menus, title, look.header(), look.tabs(), look.status(), look.runItem(),
+            new DockChrome(look.stripes() == WorkspaceLook.Stripes.LABELLED, look.frames() == WorkspaceLook.FrameStyle.FLUSH));
     }
 
     MenuBarLayout menus() { return menus; }
     TitleFormat title() { return title; }
+    /** How this window docks its tool windows. */
+    DockChrome dock() { return dock; }
     /** A new header composition for one window (spec 10.3). */
     HeaderComposition header() {
         return switch (header) {
@@ -80,8 +86,9 @@ public final class WorkspaceChrome {
     /** Two chromes are equal when they choose the same strategies (the strategies hold no state) and the same template. */
     @Override public boolean equals(Object other) {
         return other instanceof WorkspaceChrome chrome && menus.getClass() == chrome.menus.getClass() && header == chrome.header
-            && tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && title.equals(chrome.title);
+            && tabs == chrome.tabs && status == chrome.status && runItem == chrome.runItem && dock.equals(chrome.dock)
+            && title.equals(chrome.title);
     }
 
-    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, title); }
+    @Override public int hashCode() { return Objects.hash(menus.getClass(), header, tabs, status, runItem, dock, title); }
 }

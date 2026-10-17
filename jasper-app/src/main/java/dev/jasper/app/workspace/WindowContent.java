@@ -269,7 +269,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        area = new ToolWindowArea(terminalColumn, dock);
+        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
         leftStripe.setVisible(false);
