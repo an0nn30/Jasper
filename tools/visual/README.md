@@ -11,7 +11,7 @@ geometry check compares luminance edges, not RGB values.
 - `region.py MOCK RENDER OUT --crop ... --region x,y,w,h` cuts the same content region from both at
   original pixels, with a 20px tick grid, for close inspection.
 - `compare_all.py OUT_DIR [FILTER]` runs every pair in `pairs.json` (mock path, content crop, render path
-  under `*/build/`). Regenerate the renders first (`:jasper-app:themeSurfacePreview`,
+  under `*/build/`, and an optional `note` naming a deliberate difference, which it prints). Regenerate the renders first (`:jasper-app:themeSurfacePreview`,
   `:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview).
 
 Run with `python3 -I`; the tools need Pillow and NumPy. A high edge agreement is not acceptance: inspect the

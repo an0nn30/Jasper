@@ -17,10 +17,12 @@ name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.18.0, <0.19"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read, terminal.environment, editor.provide
+capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read, terminal.environment, editor.provide, presentation.provide
 exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
+presentation = "presentation/look.kit.toml"  # optional, SDK 0.18.0: a kit file in your jars; needs presentation.provide
+enabled_by_default = true          # optional, SDK 0.18.0: false keeps a bundled plugin off until the user turns it on
 
 [[requires]]
 id = "dev.example.other"
@@ -35,6 +37,15 @@ summary = "Run the tool"
 `icon` and `homepage` need Jasper 0.9.3 or later; an older Jasper rejects a
 manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
+
+A presentation provider names its kit file with `presentation` and declares `presentation.provide`; the file's format is
+section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md),
+except that its `[branding]` table is not accepted yet.
+Jasper reads it before the first window, so a change applies after a restart, and one look is active at a time: a
+`--plugin-dir` provider wins over a bundled one, which wins over an installed one, then the lowest id. A kit file that is
+invalid skips the plugin with one message naming the key, a look that did not finish starting is skipped at the next
+start until the user tries again, and `--safe-mode` uses the standard look. `enabled_by_default = false` keeps a bundled
+plugin off until the user turns it on in Settings › Plugins; development and installed plugins ignore it.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
@@ -276,6 +287,7 @@ equal. Finding things needs no capability. What a handle may do does:
 | `clipboard.read` | `Platform.clipboardText()`: read the text on the clipboard (SDK 0.16.1) |
 | `terminal.environment` | `Terminals.environment`: add variables to new local shells (SDK 0.17.1) |
 | `editor.provide` | `Platform.editor`: be the editor Jasper opens files with (SDK 0.17.1) |
+| `presentation.provide` | nothing gated: with the `presentation` key, provide Jasper's look from your kit file, from the next start (SDK 0.18.0) |
 
 Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
 without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
@@ -562,8 +574,8 @@ SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.18.0, <0.19"` when you use them.
   entry is logged. A `[terminal.env]` entry still wins, and when two plugins set one name the first by plugin id wins.
   WSL tabs and provided sessions get none.
 - `context.platform().editor(fileEditor)` (needs `editor.provide`) makes your plugin the editor Jasper opens files with:
-  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`, and a
-  Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
+  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`,
+  File › Open File… (a file the person chose, with no line), and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
   clicked window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown,
   so edit the file and never run it.
   `FileEditor.edit(file, line, window)` runs on the UI thread and returns whether it opened the file; `false`, or a
@@ -621,9 +633,10 @@ the kind rejects falls back to the default and is reported against the file with
 reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
 
 Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
-heading wherever `section` changes, the description under each control, and an editor chosen by kind or by
+heading wherever `section` changes (the page's name heads rows before the first one), the description under each control, and an editor chosen by kind or by
 `editor(EditorHint...)`. An `integer` setting is a stepper and a `number` a decimal field; `unit("min")` (a short unit,
-empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). To build the page yourself, call `context.settings().page(panel)` during `start` with a
+empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). A `stringList` is an ordered list with an entry
+below it that adds a value, on generated pages and in `host.row` rows alike. To build the page yourself, call `context.settings().page(panel)` during `start` with a
 `SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
 setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
 `modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel

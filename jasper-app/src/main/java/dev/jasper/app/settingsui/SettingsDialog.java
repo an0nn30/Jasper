@@ -161,7 +161,7 @@ public final class SettingsDialog {
             return;
         }
         ConfigService.State state = hooks.state().get();
-        draft = new SettingsDraft(state.values());
+        draft = new SettingsDraft(state.values(), state.defaults());
         kit = hooks.kit().get();
         view = new SettingsView(kit, this::event, this::cancel);
         view.onEnter(this::ok);

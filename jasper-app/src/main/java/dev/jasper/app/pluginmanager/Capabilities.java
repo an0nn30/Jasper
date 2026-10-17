@@ -17,6 +17,7 @@ final class Capabilities {
             case "clipboard.read" -> "Read text you copied to the clipboard";
             case "terminal.environment" -> "Set environment variables in new terminal shells";
             case "editor.provide" -> "Open the files Jasper opens for editing";
+            case "presentation.provide" -> "Change Jasper's window chrome and controls after a restart";
             default -> null;
         };
         return meaning == null ? capability : meaning + " (" + capability + ")";

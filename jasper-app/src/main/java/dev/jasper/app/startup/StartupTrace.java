@@ -146,6 +146,14 @@ public final class StartupTrace {
             }));
     }
 
+    private volatile String look = "default";
+
+    /** The look this process runs: its provider's id, or {@code default} (spec 4.10). */
+    public void look(String id) { look = Objects.requireNonNull(id, "id"); }
+
+    /** The look {@link #look(String)} last recorded. */
+    public String look() { return look; }
+
     /** Records {@code milestone} now unless it was already recorded; settles once both settling milestones exist. */
     public void mark(Milestone milestone) {
         Objects.requireNonNull(milestone, "milestone");
@@ -267,6 +275,7 @@ public final class StartupTrace {
         vm.put("cds", status.cds());
         root.put("jvm", vm);
         root.put("kind", kind());
+        root.put("look", look);
         root.put("settled", settled);
         Map<String, Object> milestones = new LinkedHashMap<>();
         for (Milestone milestone : Milestone.values()) millis(milestone).ifPresent(at -> milestones.put(milestone.name(), round(at)));
@@ -300,7 +309,7 @@ public final class StartupTrace {
 
     String line(JvmStatus status) {
         StringBuilder out = new StringBuilder("Startup (").append(kind()).append(", AOT cache ").append(status.aotCache())
-            .append(", CDS ").append(status.cds()).append("):");
+            .append(", CDS ").append(status.cds()).append(", look=").append(look).append("):");
         String separator = " ";
         for (Milestone milestone : Milestone.values()) {
             OptionalDouble at = millis(milestone);

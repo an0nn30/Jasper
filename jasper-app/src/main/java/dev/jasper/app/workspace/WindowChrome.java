@@ -72,7 +72,7 @@ final class WindowChrome {
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
             (java.util.function.Function<Point, Boolean>) point -> null);
-        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
+        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);

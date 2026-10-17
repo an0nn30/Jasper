@@ -5,6 +5,8 @@ the user's review. Replaces the one-paragraph tunnels sketch in section 9 of the
 [Remote design](2026-09-22-jasper-remote-design.md), whose sections 3 to 8 (hosts, connections, trust,
 authentication, shared sessions) this design builds on unchanged except where section 7 says so.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): Remote's entries live in the Session and Transfer standard menus; everything else in this document stands.
+
 **Scope:** SSH port forwarding in the bundled Remote plugin (`dev.jasper.remote`): saved tunnels of three kinds
 (local `-L`, remote `-R`, dynamic `-D` SOCKS5), quick unsaved forwards, a Tunnels rail panel, an editor, a palette
 scope, a status item, actions, live counters, reconnect with backoff, start at launch, and Buddy notices. It needs

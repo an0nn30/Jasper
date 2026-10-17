@@ -31,9 +31,33 @@ import org.tomlj.TomlTable;
  * in particular not at shutdown. Callers choose the thread: never the EDT for {@code transact}.
  */
 final class PluginStateStore {
-    record Entry(boolean enabled, Set<String> consented, boolean remove) {
-        static final Entry DEFAULT = new Entry(true, Set.of(), false);
+    /**
+     * One plugin's saved state. {@code optIn} records that the user turned on a bundled plugin that is off by default
+     * ({@code opt_in = true}); only enabling such a plugin writes it, and any write that disables clears it.
+     */
+    record Entry(boolean enabled, Set<String> consented, boolean remove, boolean optIn) {
+        static final Entry DEFAULT = new Entry(true, Set.of(), false, false);
         Entry { consented = Set.copyOf(consented); }
+        Entry(boolean enabled, Set<String> consented, boolean remove) { this(enabled, consented, remove, false); }
+    }
+
+    /**
+     * The one effective-enabled rule (spec 4.3): enabled unless the entry says disabled, or there is no entry and the
+     * candidate is a bundled plugin whose descriptor says {@code enabled_by_default = false}.
+     */
+    static boolean effective(Entry entryOrNull, PluginCandidate candidate) {
+        if (entryOrNull != null) return entryOrNull.enabled();
+        return candidate.origin() != PluginCandidate.Origin.BUNDLED || candidate.descriptor().enabledByDefault();
+    }
+
+    /**
+     * The entry once maintenance has carried out a pending removal: the entry itself when it is not marked, the bundled
+     * plugin's kept opt-in when it is marked and opted in, otherwise none. Maintenance and the Plugins page's prediction
+     * both use it (spec 4.4).
+     */
+    static java.util.Optional<Entry> afterRemoval(Entry entry) {
+        if (!entry.remove()) return java.util.Optional.of(entry);
+        return entry.optIn() ? java.util.Optional.of(new Entry(true, Set.of(), false, true)) : java.util.Optional.empty();
     }
 
     private static final int MAX_BYTES = 256 * 1024;
@@ -59,7 +83,8 @@ final class PluginStateStore {
         if (!(plugins instanceof TomlTable table)) throw new IOException("Plugin state has a malformed plugins table: " + file);
         for (String id : table.keySet()) {
             if (!(table.get(List.of(id)) instanceof TomlTable entry)) throw new IOException("Plugin state entry is not a table: " + id);
-            result.put(id, new Entry(flag(entry, "enabled", true, id), strings(entry, id), flag(entry, "remove", false, id)));
+            result.put(id, new Entry(flag(entry, "enabled", true, id), strings(entry, id), flag(entry, "remove", false, id),
+                flag(entry, "opt_in", false, id)));
         }
         return result;
     }
@@ -81,11 +106,32 @@ final class PluginStateStore {
         } finally { IN_PROCESS.unlock(); }
     }
 
-    /** Enables or disables, keeping consent and a pending removal. */
-    static UnaryOperator<Map<String, Entry>> enabling(String id, boolean enabled) {
+    /** Enables or disables, keeping consent and a pending removal; disabling clears an opt-in. */
+    static UnaryOperator<Map<String, Entry>> enabling(String id, boolean enabled) { return enabling(id, enabled, false); }
+
+    /** As {@link #enabling(String, boolean)}; {@code optIn} records that this enables a bundled plugin that is off by default. */
+    static UnaryOperator<Map<String, Entry>> enabling(String id, boolean enabled, boolean optIn) {
         return state -> {
             Entry now = state.getOrDefault(id, Entry.DEFAULT);
-            state.put(id, new Entry(enabled, now.consented(), now.remove()));
+            state.put(id, new Entry(enabled, now.consented(), now.remove(), enabled && (optIn || now.optIn())));
+            return state;
+        };
+    }
+
+    /** Enables the presentation provider {@code id} and disables every provider in {@code others}, in one transaction (spec 4.4). */
+    static UnaryOperator<Map<String, Entry>> enablingPresentation(String id, boolean optIn, Set<String> others) {
+        return state -> {
+            enabling(id, true, optIn).apply(state);
+            for (String other : others) enabling(other, false).apply(state);
+            return state;
+        };
+    }
+
+    /** Records consent to the presentation provider {@code id} and disables every provider in {@code others}, in one transaction. */
+    static UnaryOperator<Map<String, Entry>> consentingPresentation(String id, Set<String> capabilities, Set<String> others) {
+        return state -> {
+            consenting(id, capabilities).apply(state);
+            for (String other : others) enabling(other, false).apply(state);
             return state;
         };
     }
@@ -102,7 +148,7 @@ final class PluginStateStore {
     static UnaryOperator<Map<String, Entry>> removing(String id, boolean remove) {
         return state -> {
             Entry now = state.getOrDefault(id, Entry.DEFAULT);
-            Entry next = new Entry(now.enabled(), now.consented(), remove);
+            Entry next = new Entry(now.enabled(), now.consented(), remove, now.optIn());
             if (next.equals(Entry.DEFAULT)) state.remove(id); else state.put(id, next);
             return state;
         };
@@ -151,6 +197,7 @@ final class PluginStateStore {
                 .append("consented = [").append(new TreeSet<>(entry.consented()).stream()
                     .map(capability -> "\"" + capability + "\"").collect(Collectors.joining(", "))).append("]\n")
                 .append("remove = ").append(entry.remove()).append('\n');
+            if (entry.optIn()) text.append("opt_in = true\n");
         }
         return text.toString();
     }

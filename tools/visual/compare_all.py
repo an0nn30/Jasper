@@ -3,7 +3,7 @@
 
 Usage: compare_all.py OUT_DIR [NAME_FILTER]
 
-pairs.json entries: {"name", "mock", "crop", "render", "render_crop"?}. Mock paths are relative to the
+pairs.json entries: {"name", "mock", "crop", "render", "render_crop"?, "note"?}; a note names a deliberate difference. Mock paths are relative to the
 repository's preserved references; render paths are relative to the repository root (build outputs).
 """
 import json
@@ -34,7 +34,8 @@ def main():
             command += ["--render-crop", ",".join(map(str, pair["render_crop"]))]
         result = subprocess.run(command, capture_output=True, text=True)
         summary = (result.stdout.strip().splitlines() or [result.stderr.strip()])[-1]
-        print(f"{pair['name']}: {summary}")
+        note = f" (note: {pair['note']})" if pair.get("note") else ""
+        print(f"{pair['name']}: {summary}{note}")
 
 
 if __name__ == "__main__":

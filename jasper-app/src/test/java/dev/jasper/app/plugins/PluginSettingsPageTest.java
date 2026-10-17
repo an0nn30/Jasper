@@ -113,6 +113,25 @@ class PluginSettingsPageTest {
         });
     }
 
+    /** Spec 12.2 and 13: a generated page's rows before its first section are titled with the page's name. */
+    @Test void aGeneratedPagesLeadingRowsAreTitledWithThePagesName() {
+        start(ID, "Pages", settings -> {
+            settings.declare(SettingSpec.of("vim", SettingKind.bool(), false).label("Vim mode"));
+            settings.declare(SettingSpec.of("sftp.parallel", SettingKind.integer(1, 8), 2).label("Parallel files").section("SFTP"));
+        });
+        var page = page();
+        onEdt(() -> assertThat(sectionTitles(page.component())).containsExactly("Pages", "SFTP"));
+    }
+
+    /** The mounted section headings below {@code root}, in order. */
+    private static List<String> sectionTitles(java.awt.Component root) {
+        var titles = new ArrayList<String>();
+        if (root instanceof javax.swing.JLabel label && label.getName() != null && label.getName().matches("section-\\d+\\.title"))
+            titles.add(label.getText());
+        if (root instanceof java.awt.Container container) for (var child : container.getComponents()) titles.addAll(sectionTitles(child));
+        return titles;
+    }
+
     private static void collect(java.awt.Component root, java.util.function.Predicate<String> name, List<javax.swing.JButton> found) {
         if (root instanceof javax.swing.JButton button && button.getName() != null && name.test(button.getName())) found.add(button);
         if (root instanceof java.awt.Container container) for (var child : container.getComponents()) collect(child, name, found);

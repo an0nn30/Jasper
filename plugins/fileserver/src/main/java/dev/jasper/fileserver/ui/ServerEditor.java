@@ -53,7 +53,7 @@ public final class ServerEditor implements AutoCloseable {
         PORT = "server.port", PASSIVE = "server.passive", WRITABLE = "server.writable", LOGIN = "server.login",
         CHOOSE_ACCOUNT = "server.account.choose", KEYS = "server.keys", ADD_KEY = "server.key.file",
         PASTE_KEY = "server.key.paste", REMOVE_KEY = "server.key.remove", TLS = "server.tls", REQUIRE_TLS = "server.tls.require",
-        SAVE = "server.save", CANCEL = "server.cancel", MESSAGE = "server.message";
+        SAVE = "server.save", CANCEL = "server.cancel", MESSAGE = "server.message", WARNING = "server.warning";
 
     private final UiView view;
     private final List<ServerDefinition> others;
@@ -167,7 +167,8 @@ public final class ServerEditor implements AutoCloseable {
         switch (event) {
             case UiEvent.Edited edit -> {
                 switch (edit.id()) {
-                    case NAME -> name = edit.text(); case FOLDER -> folder = edit.text();
+                    // The folder is read-only (spec 13): only Choose… sets it, so an edit of it is ignored.
+                    case NAME -> name = edit.text();
                     case PORT -> port = edit.text(); case PASSIVE -> passive = edit.text();
                     default -> { return; }
                 }
@@ -402,12 +403,13 @@ public final class ServerEditor implements AutoCloseable {
                 case HTTP -> Nodes.Hue.BLUE; case FTP -> Nodes.Hue.AMBER; case SFTP -> Nodes.Hue.GREEN; case TFTP -> Nodes.Hue.PURPLE;
             }))).toList(), protocol.name(), "Protocol", "")));
         server.add(new Nodes.FormRow("server.folder.row", ControlState.READY, "Folder", "",
-            new Nodes.Field(FOLDER, ControlState.READY, Nodes.FieldKind.PATH, folder, "No folder selected", "Folder", ""),
+            new Nodes.Field(FOLDER, ControlState.READY, Nodes.FieldKind.PATH, folder, "No folder selected", "Folder", "", Optional.empty(),
+                Nodes.FieldPresentation.STANDARD, "", "", "", true),
             Optional.of(new Nodes.Button(CHOOSE_FOLDER, ControlState.READY, "Choose…", "", Nodes.ButtonKind.SECONDARY, CHOOSE_FOLDER, ""))));
-        server.add(new Nodes.FormRow("server.reachable.row", ControlState.READY, "Reachable From", "",
+        server.add(new Nodes.FormRow("server.reachable.row", ControlState.READY, "Reachable from", "",
             new Nodes.Choice(REACHABLE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN,
                 java.util.stream.IntStream.range(0, binds.size()).mapToObj(i -> new Option("bind." + i, binds.get(i).label(), Optional.empty())).toList(),
-                "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0), "Reachable From", ""),
+                "bind." + java.util.stream.IntStream.range(0, binds.size()).filter(i -> binds.get(i).bind().equals(bind)).findFirst().orElse(0), "Reachable from", ""),
             Optional.of(new Nodes.Field(PORT, ControlState.READY, Nodes.FieldKind.PORT, port, "", "Port", ""))));
         server.add(text("server.port.hint", portHint, Nodes.TextRole.DESCRIPTION));
         server.add(new Nodes.FormRow("server.passive.row", state(ftp, true), "Passive ports", "",
@@ -452,11 +454,12 @@ public final class ServerEditor implements AutoCloseable {
                 new Nodes.Toggle(REQUIRE_TLS, state(true, ftp && tls), "Require TLS", ftp && requireTls, REQUIRE_TLS, false), true),
             new Nodes.SettingRow("server.autostart.row", ControlState.READY, "Start when Jasper starts", "",
                 new Nodes.Toggle(AUTOSTART, ControlState.READY, "Start when Jasper starts", autostart, AUTOSTART, false), false));
-        var sections = List.<Nodes.Node>of(section("server.general", "Server", Nodes.CardKind.FORM, server),
+        var sections = new ArrayList<Nodes.Node>(List.of(section("server.general", "Server", Nodes.CardKind.FORM, server),
             section("server.access", "Access", Nodes.CardKind.MIXED, access),
-            section("server.security", "Security & Startup", Nodes.CardKind.SETTINGS, security),
-            text("server.warning", warnings.isEmpty() ? "" : "Warning · " + String.join(" · ", warnings), Nodes.TextRole.DESCRIPTION),
-            text("server.tls.dependency", ftp && requireTls && !tls ? "Require TLS needs Use TLS. Turn Use TLS on to change this requirement." : "", Nodes.TextRole.DESCRIPTION));
+            section("server.security", "Security & Startup", Nodes.CardKind.SETTINGS, security)));
+        // Spec 13: the warnings are one WARNING Notice, shown while there is one; the presentation adds the word Warning.
+        if (!warnings.isEmpty()) sections.add(new Nodes.Notice(WARNING, ControlState.READY, Nodes.Severity.WARNING, String.join(" · ", warnings)));
+        sections.add(text("server.tls.dependency", ftp && requireTls && !tls ? "Require TLS needs Use TLS. Turn Use TLS on to change this requirement." : "", Nodes.TextRole.DESCRIPTION));
         var actions = List.of(
             new Nodes.Button(CANCEL, ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, CANCEL, ""),
             new Nodes.Button(SAVE, new ControlState(true, editable && ready(), !editable, ""), !editable ? "Saving…" : existing ? "Save" : "Add Server", "", Nodes.ButtonKind.PRIMARY, SAVE, ""));

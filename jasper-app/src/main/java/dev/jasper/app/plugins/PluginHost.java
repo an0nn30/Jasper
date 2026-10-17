@@ -96,6 +96,8 @@ final class PluginHost {
     record Outcome(PluginStatus.State state, String reason) { }
 
     java.util.function.BooleanSupplier animations = () -> true;
+    /** The kit plugins' views are made with: the presentation's, or the installed look and feel's for a runtime given none. */
+    java.util.function.Supplier<dev.jasper.ui.kit.Kit> kit = dev.jasper.ui.swing.FlatLafInstaller::installedKit;
     /** The keymap text a plugin's menus show beside an item's action. */
     java.util.function.Function<String, String> shortcuts = action -> "";
     /** The clipboard every plugin's Platform writes to; the application shares it with its own copies. */

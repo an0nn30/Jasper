@@ -76,7 +76,26 @@ class RemotePluginTest {
         }
     }
 
-    @Test void newHostOpensAddHostWithoutTheSessionsPanelAndSitsInTheSshMenu(@TempDir Path dir) throws Exception {
+    /** Spec 13: every entry of the former SSH menu, in its order, in the Session and Transfer standard menus. */
+    @Test void theSessionAndTransferMenusHoldEveryEntryTheSshMenuHad(@TempDir Path dir) throws Exception {
+        Kits.edt(() -> {
+            try (var host = new FakePluginHost()) {
+                host.start(INFO, Set.of(), Set.of(), plugin(dir.resolve("ssh")));
+                settle(host);
+                assertThat(host.failures()).isEmpty();
+                assertThat(host.menu("SESSION")).containsExactly("item:" + RemotePlugin.CONNECT, "item:" + RemotePlugin.HOSTS,
+                    "item:" + RemotePlugin.SPLIT, "---", "item:" + RemotePlugin.NEW_HOST, "item:" + RemotePlugin.IMPORT, "---",
+                    "item:" + dev.jasper.remote.ui.tunnels.TunnelsUi.TOGGLE, "item:" + dev.jasper.remote.ui.tunnels.TunnelsUi.PICK,
+                    "item:" + dev.jasper.remote.ui.tunnels.TunnelsUi.NEW, "item:" + dev.jasper.remote.ui.tunnels.TunnelsUi.FORWARD,
+                    "item:" + dev.jasper.remote.ui.tunnels.TunnelsUi.STOP_ALL);
+                assertThat(host.menu("TRANSFER")).containsExactly("item:" + RemotePlugin.SFTP,
+                    "item:" + dev.jasper.remote.ui.transfers.TransferUi.SHOW);
+                assertThat(host.menu("top:dev.jasper.remote.menu")).as("no SSH menu any more").isEmpty();
+            }
+        });
+    }
+
+    @Test void newHostOpensAddHostWithoutTheSessionsPanelAndSitsInTheSessionMenu(@TempDir Path dir) throws Exception {
         Kits.edt(() -> {
             try (var host = new FakePluginHost()) {
                 RemotePlugin plugin = plugin(dir.resolve("ssh"));
@@ -84,7 +103,7 @@ class RemotePluginTest {
                 settle(host);
                 UUID window = host.addTerminalWindow();
                 assertThat(defaults(host, RemotePlugin.NEW_HOST)).as("unbound until the user binds it").isEqualTo("none|derived|GLOBAL");
-                assertThat(host.menu("top:" + RemotePlugin.MENU)).containsSubsequence("item:" + RemotePlugin.NEW_HOST, "item:" + RemotePlugin.IMPORT);
+                assertThat(host.menu("SESSION")).containsSubsequence("item:" + RemotePlugin.NEW_HOST, "item:" + RemotePlugin.IMPORT);
                 assertThat(host.invoke(RemotePlugin.NEW_HOST, window, null)).isTrue();
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.windows()).containsExactly("dialog|Add Host|true");
@@ -295,7 +314,7 @@ class RemotePluginTest {
             assertThat(host.scopes()).containsExactly("dev.jasper.remote.tunnels.scope|Tunnels|toggle,browse,edit",
                 "dev.jasper.remote.scope|SSH|connect,split,edit");
             assertThat(host.scopePresentation("dev.jasper.remote.scope")).as("spec 14.4").isEqualTo("GREEN|session|STANDARD,SPLIT,STANDARD");
-            assertThat(host.menu("top:dev.jasper.remote.menu")).isNotEmpty();
+            assertThat(host.menu("SESSION")).isNotEmpty();
             assertThat(host.menu("VIEW")).as("View > Tool Windows already lists the three panel toggles").isEmpty();
             assertThat(host.status()).as("hidden at zero").isEmpty();
             assertThat(vault.consumers).containsExactly("dev.jasper.remote");

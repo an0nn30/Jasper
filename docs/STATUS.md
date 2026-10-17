@@ -61,6 +61,81 @@ the full kit matrix and the mock comparison.
 fixes add 7 jasper-ui tests, now 766; the default gallery still matches the base). GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 
+**Enterprise presentation, plan 5a: the presentation provider — 2026-10-16** (`claude/enterprise-provider`, worktree
+`.claude/worktrees/enterprise-5`, `d65dc99f8..934c33f1e`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-5a-provider.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A plugin can provide Jasper's look from a
+declarative kit file. `plugin.toml` gains `presentation`, `themes` and `enabled_by_default`, and `presentation.provide`
+is a host capability (legal only with `presentation`). `PluginStateStore.effective` is the one effective-enabled rule: a
+bundled plugin with `enabled_by_default = false` is off until the user turns it on, which writes `opt_in = true`; the
+three prune paths keep the opt-in. `dev.jasper.app.presentation` holds `KitParser` (strict, one message naming the key;
+`[branding]` stays an unknown table until plan 11), `FontFile` (a face's full name and typographic family without AWT),
+`PresentationFacts` (digest and first problem), the attempt record (`presentation-attempt.toml`: pending, proven, failed,
+announced), every spec 9.1 projection but Branding (plan 11) and `Presentation`. `PluginResolver.resolve` elects one provider (DEV, BUNDLED,
+USER, then id; losers and the attempt skip post no problem; safe mode disables every provider), enabling or consenting
+to one turns the others off in one transaction, and the Plugins page predicts with the same facts. `PluginSelection`
+runs on the bootstrap thread before the `ConfigService`, which takes the kit's defaults for four keys (`DefaultSource`;
+Settings shows and resets to the effective default); the application starts the theme under the selection's kit with
+spec 4.7's four-step fallback, every `KitContext` carries the kit, and `PluginRuntime.start(selection, …)` scans
+nothing again. The start-up line reads `look=<id>`. No plugin ships a presentation yet (plan 5b); the default look is
+unchanged. Rulings (plan, "Rulings"): (1) row 5 is plans 5a and 5b; (2) the projections are complete but gated by
+`Presentation.LANDED` (empty: plans 6 to 9 add their groups), and `DesktopFlags` is computed, not applied; (3) plan 1's
+installed-kit chrome readers stay (the process installs one kit), the `KitContext` sites take the presentation's;
+(4) `PresentationFacts.read` takes a `Source`; (5) descriptor path rule, existence checked when read; (6) safe mode's
+presentation check comes first and dependents of a skipped provider are unmet; (7) attempt fields are optional; (8)
+`enablingPresentation` takes the opt-in; (9) the application takes the selection at construction and
+`startPlugins(AppDirs)` starts it; (10) core-look overloads stay for tests; (11) the bootstrap pre-pass is injectable;
+(12) faces are named by the name table and registered in 5b; (13) deep nesting is invalid TOML; (14) colour-literal,
+title and face rules; (15) the classic base's chrome is the Enterprise column; (16) a blamed kit posts the ordinary
+problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
+host facts without AWT; (20) `PluginRuntime.presentation` takes only the `Kit` (spec 4.9's `DialogMapping` parameter is
+added beside it when the dialog consumer lands); (21) a failed attempt stays failed through a later window and an orderly
+quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from the plan's text: (a) Task 5's review added `PluginStatus.NEEDS_LOOK` and a trial election: a provider that can load only beside another provider (a hard dependency on it, directly or through a library) is skipped with "requires another look's plugin; one look can be active at a time" and the next provider wins, and dependents of an invalid provider are dropped as unmet before the election; (b) Task 12's review made the application's selection and presentation fields volatile; (c) Task 13 puts the new AGENTS.md sentence after "`verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.", so that sentence still refers to the SDK rule; (d) the final review's fixes read presentation files only for candidates the resolver admits (spec 4.4 says every candidate; the election is unchanged), and the restart banner ignores a selected plugin that runs neither now nor after a restart (a provider that failed to start). Plan-5b entry conditions: register the fonts and
+name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
+--continue` after the final review fixes: **10728 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing visible changed). Merged with main (plans 3c and 3e) as `014f911e6`: **10,771 tests, 0 failures, 0 errors, 25 skipped**; merged to local `main`, not pushed.
+
+**Enterprise presentation, plan 3e: the default-look changes — 2026-10-16** (`claude/enterprise-default-look`, worktree
+`.claude/worktrees/enterprise-3e`, `46b9bca82..7de3ee4ec`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-3e-default-look.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec section 13, in both looks. Remote's
+SSH menu is gone: Connect to SSH Host…, Toggle SSH hosts and Split with Same Host, New Host… and Import from
+~/.ssh/config…, and the tunnels group sit in the Session menu, Open SFTP here and Transfers in the Transfer menu,
+where File Server adds the new Share Folder… (what the empty File Servers panel's button runs) and New File Server….
+File › Open File… (`open_file`, no default binding; also a palette command) asks the plugins' file chooser over the
+window for one local file, starting in the pane's folder, and opens it as a Cmd-click does. Vault's status item reads
+"Vault: Locked" or "Vault: Unlocked" ("Vault" with no vault); the Snippets scope's first verb reads "Insert" (id
+`paste`). A Settings page's leading rows that no section heads take the page's name (Command Palette, Desk Buddy,
+Terminal, Cursor, Shell and every generated plugin page, such as Credential Vault), and System Settings opens with
+"General". New File Server's warnings are one WARNING Notice and its folder a read-only field that only the separate
+Choose… sets. A plugin's `stringList` host row is the generated pages' ordered-list editor, node for node, in the host
+and the testkit's fake. Project Index's Location column uses `MONO_SMALL`. Plugin form labels are sentence case (Via
+host, Jump host, Reachable from, Listen on, Forward to). The palette's empty query shows three recent rows. The
+banners of the Snippets, Palette plugins, Remote, Remote tunnels, SDK clipboard and Tools menu, and Vault
+specifications carry spec 19.2's lines. Pixels: no jasper-ui file changed, so the headless gallery is byte-identical;
+measured against renders taken before Task 1, the reference pairs whose renders changed, as section 13 asks, are
+`settings-keymap` 0.294 → 0.293, `host-add` 0.191 → 0.190, `fileserver-add` 0.228 → 0.228, `workspace-rails` 0.818 → 0.807, `workspace-integrated` 0.586 → 0.583, `workspace-palette` 0.375 → 0.349, `tunnel-new` 0.340 → 0.341 (edge agreement before → after), each with a `note` in `tools/visual/pairs.json`; `vault-manager` and
+`vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder);
+every other pair's render is pixel-identical. Rulings (plan, "Rulings"): the reference pairs keep their mocks and gain
+notes; Session keeps the SSH menu's order; Share Folder… runs what New File Server… runs; Open File…
+opens nothing before plugins start; "Vault" with no vault; the verb id stays `paste`;
+one `SchemaPage` rule titles leading groups, plugin-built pages excepted; one Notice joins the warnings; the folder is
+set only through the chooser, in tests too; sentence case covers exactly the five labels, and jasper-ui fixtures keep
+their Title Case copies; the host list is `Editors.textList()`'s node; Location takes `MONO_SMALL`; `SUGGESTED_ROWS`
+stays 10; the banner lines follow each status paragraph. Rulings 4, approved on 2026-10-16 under the user's overnight
+authority: File › Open File… shows Jasper's own file chooser, which every other file pick in the app uses, as IntelliJ
+does by default; spec 11.7 and 13 now say so, with a header amendment line. Deviations from the plan's text:
+Task 9: the plan's Rulings 14 linked the Enterprise design relative to the plans folder, which `AppDocumentationTest` refuses; that link now points into `../specs/`. Task 9: `fileserver-add` changed only in its "Reachable from" label (the read-only folder draws as before and that state has no warning), and its note says so. Task 9: `settings-keymap` (the Keymap lists Open File… and Share Folder…), `workspace-rails` and `workspace-integrated` (the Vault status item reads Vault: Locked) changed by design and carry notes too. Task 9: `vault-manager` and `vault-manager-title` differ run to run at the same code (a generated key's fingerprint and a JUnit temp folder, shown by two renders of one tree), so they carry no note and Step 5 skips them. Final review: a refused Add's error lasts only while the entry's text is unchanged, and the ordered list's own row selection stages nothing, in the host and the fake (refining Rulings 11 and Review Focus 1: Apply is refused only while the refused text stands). Final review: Ruling 2's Transfer order does not ship; bundled plugins start in `PluginResolver` order (File Server before Remote) and sections compose in start order, so Transfer reads Share Folder…, New File Server…, a separator, Open SFTP here, Transfers, which `BundledSamplePluginTest` pins; putting Remote first needs a host ordering ruling in a later plan. Final review: `host-add`'s renders also swap its two managed keys' rows run to run (`importManagedKeys` returns `SshKeyImportResult.keys()`, a `Map.copyOf`), so part of its change is noise. Hand-offs:
+plan 9's classic Settings compositions draw the new leading headings as titled group boxes; plan 10's classic File
+Servers table reuses Share Folder… for its empty state; plan 8's Browse… runs `ActionId.OPEN_FILE`.
+`./gradlew check --continue`: **10,622 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plans 3c and 4a) as `e9cffab2d`: **10,683 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the menu bar reads File, Edit, View, Pane, Tab,
+Session, Transfer, Tools, … with no SSH menu, and every former SSH entry works from Session or Transfer; Transfer reads Share Folder…, New File Server…, —, Open SFTP
+here, Transfers; File › Open
+File… opens a chosen file in the default editor and Cancel opens nothing; the Vault status item reads Vault: Locked
+and Vault: Unlocked as you lock and unlock; New File Server with FTP shows the Warning notice, and Choose… sets the
+read-only folder; Settings › Command Palette, Terminal and System Settings show their first headings; Settings › Tools
+› Project Index edits its lists as ordered lists; the palette's empty query shows three recent rows. Not merged, not
+pushed.
+
 **Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree
 `.claude/worktrees/enterprise-3c`, `d858e8f57..7ea713687`, then this documentation commit and the final review fixes;
 [plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),

@@ -14,13 +14,16 @@ import org.tomlj.TomlTable;
 final class DescriptorParser {
     static final Set<String> CAPABILITIES = Set.of("terminal.observe", "terminal.selection",
         "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
-        "clipboard.read", "terminal.environment", "editor.provide");
+        "clipboard.read", "terminal.environment", "editor.provide", "presentation.provide");
+    /** The capability that goes with the {@code presentation} key, and only with it. */
+    static final String PRESENTATION_PROVIDE = "presentation.provide";
+    private static final java.util.regex.Pattern SEGMENT = java.util.regex.Pattern.compile("[a-z0-9_.-]+");
     /** Packages a plugin may neither define nor export. */
     static final List<String> FORBIDDEN_PACKAGES = List.of("dev.jasper.sdk", "dev.jasper.app",
         "dev.jasper.terminal", "dev.jasper.buddy", "java", "javax", "jdk");
     private static final Set<String> KEYS = Set.of("id", "name", "version", "entry", "sdk", "description",
         "vendor", "capabilities", "exports", "requires", "icon", "homepage", "icon_hue", "icon_selected_ink",
-        "subcommands");
+        "subcommands", "presentation", "themes", "enabled_by_default");
     private static final System.Logger LOG = System.getLogger(DescriptorParser.class.getName());
     private static final String CLASS_NAME = "[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+";
     private static final String PACKAGE_NAME = "[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*";
@@ -65,9 +68,15 @@ final class DescriptorParser {
             if (!exported.matches(PACKAGE_NAME)) throw new InvalidDescriptor("exports is not a package name: " + exported);
             if (forbidden(exported)) throw new InvalidDescriptor("exports names a reserved package: " + exported);
         }
+        String presentation = text(toml, "presentation", false);
+        if (!presentation.isEmpty()) path(presentation, "presentation");
+        boolean provides = capabilities.contains(PRESENTATION_PROVIDE);
+        if (!presentation.isEmpty() && !provides) throw new InvalidDescriptor("presentation needs the " + PRESENTATION_PROVIDE + " capability");
+        if (provides && presentation.isEmpty()) throw new InvalidDescriptor("capabilities: " + PRESENTATION_PROVIDE + " needs the presentation key");
         return new PluginDescriptor(id, name, version, entry, sdk, text(toml, "description", false),
             text(toml, "vendor", false), capabilities, exports, requires(toml, id),
-            icon(text(toml, "icon", false), id), homepage(text(toml, "homepage", false), id), iconHue(toml, id), iconSelectedInk(toml, id), subcommands(toml));
+            icon(text(toml, "icon", false), id), homepage(text(toml, "homepage", false), id), iconHue(toml, id), iconSelectedInk(toml, id), subcommands(toml),
+            presentation, themes(toml), flag(toml, "enabled_by_default", true));
     }
 
     private static dev.jasper.ui.icons.IdentityArtwork.SelectedInk iconSelectedInk(TomlTable toml, String id) throws InvalidDescriptor {
@@ -147,6 +156,49 @@ final class DescriptorParser {
                 Boolean.TRUE.equals(optional)));
         }
         return result;
+    }
+
+    /**
+     * A jar path as the descriptor and kit files name them: {@code /}-separated segments of lowercase letters, digits,
+     * {@code _}, {@code .} and {@code -}, none of them {@code .} or {@code ..}, with no leading or trailing {@code /}.
+     */
+    static boolean jarPath(String path) {
+        if (path.isEmpty() || path.startsWith("/") || path.endsWith("/")) return false;
+        for (String segment : path.split("/", -1))
+            if (!SEGMENT.matcher(segment).matches() || segment.equals(".") || segment.equals("..")) return false;
+        return true;
+    }
+
+    private static void path(String path, String key) throws InvalidDescriptor {
+        if (!jarPath(path)) throw new InvalidDescriptor(key + ": " + path
+            + " must be a jar path of lowercase letters, digits, /, _, . and -, without . or .. segments or a leading /");
+    }
+
+    /** Jasper theme files in the plugin's jars, each named after its theme's id. */
+    private static List<String> themes(TomlTable toml) throws InvalidDescriptor {
+        Object value = toml.get(List.of("themes"));
+        if (value == null) return List.of();
+        if (!(value instanceof TomlArray array)) throw new InvalidDescriptor("themes must be an array of strings");
+        List<String> result = new ArrayList<>();
+        Set<String> ids = new LinkedHashSet<>();
+        for (int i = 0; i < array.size(); i++) {
+            if (!(array.get(i) instanceof String path)) throw new InvalidDescriptor("themes must be an array of strings");
+            path(path, "themes");
+            String file = path.substring(path.lastIndexOf('/') + 1);
+            String id = file.endsWith(".json") ? file.substring(0, file.length() - ".json".length()) : "";
+            if (!dev.jasper.ui.theme.JasperTheme.validId(id))
+                throw new InvalidDescriptor("themes: " + path + " must name <id>.json, the id lowercase letters, digits and dashes");
+            if (!ids.add(id)) throw new InvalidDescriptor("themes names the theme " + id + " twice");
+            result.add(path);
+        }
+        return result;
+    }
+
+    private static boolean flag(TomlTable toml, String key, boolean fallback) throws InvalidDescriptor {
+        Object value = toml.get(List.of(key));
+        if (value == null) return fallback;
+        if (!(value instanceof Boolean flag)) throw new InvalidDescriptor(key + " must be a boolean");
+        return flag;
     }
 
     private static List<PluginDescriptor.Subcommand> subcommands(TomlTable toml) throws InvalidDescriptor {

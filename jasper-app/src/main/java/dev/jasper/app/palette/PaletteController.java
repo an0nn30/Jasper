@@ -18,7 +18,7 @@ import javax.swing.SwingUtilities;
 public final class PaletteController implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(PaletteController.class.getName());
     /** Rows the empty query offers: this many recently used, then ranked ones up to the total. */
-    static final int RECENT_ROWS = 2, SUGGESTED_ROWS = 10;
+    static final int RECENT_ROWS = 3, SUGGESTED_ROWS = 10;
     private final ScopeRegistry scopes;
     private final dev.jasper.app.commands.CommandHistory history;
     private final boolean macOs;

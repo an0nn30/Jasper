@@ -48,7 +48,7 @@ class ServerLifetimeTest {
             var context=contexts.getFirst();var window=host.addTerminalWindow();
             dialog=context.windows().dialog(new DialogSpec("Server",context.terminals().window(window).orElseThrow(),true));
             editor=new ServerEditor(context.kit(),List.of(),Optional.empty(),false,EnumSet.allOf(Protocol.class),List.of(),true,id->Optional.empty(),pick,
-                Optional::empty,ServerEditor.KeySources.NONE,false,save,()->completed++,dialog::close);
+                ()->Optional.of(root),ServerEditor.KeySources.NONE,false,save,()->completed++,dialog::close);
             dialog.setContent(editor.view());dialog.onClosed(editor::close);dialog.show();
         }
         void emit(UiEvent event) { ((FakeKitView)editor.view()).emit(event); }
@@ -56,7 +56,7 @@ class ServerLifetimeTest {
         void vault() { emit(new UiEvent.Selected(ServerEditor.LOGIN,Set.of("vault"))); }
         Nodes.Node node(String id) {return UiTestAccess.node((FakeKitView)editor.view(),id);}
         String face() {return ((Nodes.Choice)node(ServerEditor.CHOOSE_ACCOUNT)).face().orElseThrow().primary();}
-        void valid() {emit(new UiEvent.Edited(ServerEditor.NAME,"fixture"));emit(new UiEvent.Edited(ServerEditor.FOLDER,root.toString()));}
+        void valid() {emit(new UiEvent.Edited(ServerEditor.NAME,"fixture"));emit(new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));}
         @Override public void close() {editor.close();host.close();}
     }
     @Test void anchoredChoicesPreserveEligibilityClearCancelAndOriginalUuid() {

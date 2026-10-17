@@ -163,7 +163,7 @@ public final class TunnelEditor implements AutoCloseable {
     /** The target host's inline problem; a SOCKS proxy has no target. */
     private String forwardProblem() { return kind != TunnelKind.DYNAMIC && forwardHost.isBlank() ? "Enter the host to forward to" : ""; }
 
-    /** The Via Host choice's inline problem: an edited tunnel's host was removed, or there is no saved host at all. */
+    /** The Via host choice's inline problem: an edited tunnel's host was removed, or there is no saved host at all. */
     private String hostProblem() {
         if (selectedHost().isPresent()) return "";
         return hosts.isEmpty() ? "Add a host in Sessions first" : "Choose a host to go through";
@@ -266,7 +266,7 @@ public final class TunnelEditor implements AutoCloseable {
         String nameProblem = duplicate().map(other -> "A tunnel named " + other.name() + " exists").orElse("");
         var tunnel = section(TUNNEL_SECTION, "Tunnel", Nodes.CardKind.FORM, List.of(
             row("row." + NAME, "Name", "", field(NAME, Nodes.FieldKind.TEXT, name, "e.g. Postgres", "Name", true, nameProblem, Nodes.FieldPresentation.STANDARD), Optional.empty()),
-            row("row." + HOST, "Via Host", "", new Nodes.Choice(HOST, new ControlState(true, editable, false, hostProblem()), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via Host", "", "",
+            row("row." + HOST, "Via host", "", new Nodes.Choice(HOST, new ControlState(true, editable, false, hostProblem()), Nodes.ChoiceKind.DROPDOWN, hostOptions, host, "Via host", "", "",
                 Optional.empty(), face), Optional.empty()),
             row("row." + TYPE, "Type", "", new Nodes.Choice(TYPE, state(true, editable), Nodes.ChoiceKind.EXCLUSIVE, List.of(
                 new Option(LOCAL, "Local", Optional.empty()), new Option(REMOTE, "Remote", Optional.empty()), new Option(DYNAMIC, "Dynamic (SOCKS)", Optional.empty())),
@@ -277,10 +277,10 @@ public final class TunnelEditor implements AutoCloseable {
                 case DYNAMIC -> "A SOCKS5 proxy on this computer; each connection goes out through " + via + ".";
             }, Nodes.TextRole.SUPPORTING), Optional.empty())));
         var ports = new ArrayList<Nodes.Node>();
-        ports.add(row(LISTEN_ROW, "Listen On", server ? "on " + via : "this computer",
+        ports.add(row(LISTEN_ROW, "Listen on", server ? "on " + via : "this computer",
             field(LISTEN_ADDRESS, Nodes.FieldKind.TEXT, listenAddress, "localhost", "Listen address", !allowOthers, listenProblem(), Nodes.FieldPresentation.TECHNICAL),
             Optional.of(field(LISTEN_PORT, Nodes.FieldKind.PORT, listenPort, dynamic ? "1080" : "8080", "Listen port", true, portProblem(listenPort, 0), Nodes.FieldPresentation.STANDARD))));
-        ports.add(new Nodes.FormRow(FORWARD_ROW, state(!dynamic, true), "Forward To", server ? "as seen from this computer" : "as seen from " + via,
+        ports.add(new Nodes.FormRow(FORWARD_ROW, state(!dynamic, true), "Forward to", server ? "as seen from this computer" : "as seen from " + via,
             field(FORWARD_HOST, Nodes.FieldKind.TEXT, forwardHost, "localhost", "Target host", true, forwardProblem(), Nodes.FieldPresentation.TECHNICAL),
             Optional.of(field(FORWARD_PORT, Nodes.FieldKind.PORT, forwardPort, "5432", "Target port", true, portProblem(forwardPort, 1), Nodes.FieldPresentation.STANDARD))));
         ports.add(route(via));

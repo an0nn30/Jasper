@@ -21,17 +21,28 @@ public final class SettingsDraft {
     private final Map<Setting<?>, Optional<?>> pending = new LinkedHashMap<>();
     private final List<Runnable> listeners = new ArrayList<>();
     private SettingValues baseline;
+    private final dev.jasper.app.config.DefaultSource defaults;
 
-    public SettingsDraft(SettingValues baseline) { this.baseline = Objects.requireNonNull(baseline, "baseline"); }
+    /** A draft over {@code baseline} under the core look's defaults. */
+    public SettingsDraft(SettingValues baseline) { this(baseline, dev.jasper.app.config.DefaultSource.CORE); }
+
+    /** A draft over {@code baseline} whose defaults are {@code defaults}'s (spec 5.8). */
+    public SettingsDraft(SettingValues baseline, dev.jasper.app.config.DefaultSource defaults) {
+        this.baseline = Objects.requireNonNull(baseline, "baseline");
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
+    }
+
+    /** {@code setting}'s effective default: the look's, else the core default. */
+    public <T> T defaultValue(Setting<T> setting) { return defaults.value(setting); }
 
     public SettingValues baseline() { return baseline; }
 
-    /** The value the dialog shows: the pending edit, else the saved value, else the default. */
+    /** The value the dialog shows: the pending edit, else the saved value, else the effective default. */
     @SuppressWarnings("unchecked")
     public <T> T value(Setting<T> setting) {
-        if (!pending.containsKey(setting)) return baseline.get(setting);
+        if (!pending.containsKey(setting)) return baseline.saved(setting).orElseGet(() -> defaultValue(setting));
         Optional<T> staged = (Optional<T>) pending.get(setting);
-        return staged.orElse(setting.defaultValue());
+        return staged.orElseGet(() -> defaultValue(setting));
     }
 
     /** The saved value, or empty when the file does not set it. */

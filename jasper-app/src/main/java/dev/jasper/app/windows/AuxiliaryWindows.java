@@ -32,6 +32,17 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return List.copyOf(chooser.choose(choice, cancellation));
     }
 
+    /**
+     * File › Open File…'s chooser: one existing local file, chosen over terminal window {@code window} and starting in
+     * {@code folder} when its pane has one; empty when cancelled. EDT.
+     */
+    public java.util.Optional<java.nio.file.Path> openFile(UUID window, java.util.Optional<java.nio.file.Path> folder) {
+        var choice = new PathChoice(window, null, "Open File", java.util.Optional.empty(), PathChoice.Mode.OPEN, false,
+            folder.map(dev.jasper.app.files.Location::local), java.util.Optional.empty(), List.of());
+        return choose(choice, cancel -> { }).stream().filter(dev.jasper.app.files.Location::isLocal)
+            .map(dev.jasper.app.files.Location::localPath).findFirst();
+    }
+
     public AuxiliarySurface window(String id, String title, Dimension preferred, boolean singleton) {
         if (singleton)
             for (AuxiliarySurface existing : open)

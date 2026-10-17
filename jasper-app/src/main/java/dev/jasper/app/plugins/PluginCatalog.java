@@ -14,14 +14,27 @@ import java.util.function.ToIntFunction;
  * disk as it is now, after pending removals and installs. No I/O, no class loading.
  */
 final class PluginCatalog {
-    /** What this process found and chose; {@code selected} maps id to the version chosen to load. */
-    record Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode) {
-        Launch { candidates = List.copyOf(candidates); statuses = List.copyOf(statuses); selected = Map.copyOf(selected); }
+    /**
+     * What this process found and chose; {@code selected} maps id to the version chosen to load, and {@code build} is the
+     * launch's build identity, which the attempt record is compared with.
+     */
+    record Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode, String build) {
+        Launch { candidates = List.copyOf(candidates); statuses = List.copyOf(statuses); selected = Map.copyOf(selected); java.util.Objects.requireNonNull(build); }
+        Launch(List<PluginCandidate> candidates, List<PluginStatus> statuses, Map<String, String> selected, boolean safeMode) {
+            this(candidates, statuses, selected, safeMode, "");
+        }
     }
 
-    /** The disk now: installed candidates of every origin, staged installs by id, and the saved state. */
-    record Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state) {
-        Disk { candidates = List.copyOf(candidates); pending = Map.copyOf(pending); state = Map.copyOf(state); }
+    /**
+     * The disk now: installed candidates of every origin, staged installs by id, and the saved state; {@code presentations}
+     * are the facts and attempt record the next launch would resolve with.
+     */
+    record Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state,
+                Presentations presentations) {
+        Disk { candidates = List.copyOf(candidates); pending = Map.copyOf(pending); state = Map.copyOf(state); java.util.Objects.requireNonNull(presentations); }
+        Disk(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending, Map<String, PluginStateStore.Entry> state) {
+            this(candidates, pending, state, Presentations.NONE);
+        }
     }
 
     private PluginCatalog() { }
@@ -44,6 +57,23 @@ final class PluginCatalog {
         return next;
     }
 
+    /** The saved state once maintenance has carried out the pending removals. */
+    private static Map<String, PluginStateStore.Entry> nextState(Map<String, PluginStateStore.Entry> state) {
+        Map<String, PluginStateStore.Entry> next = new TreeMap<>();
+        state.forEach((id, entry) -> PluginStateStore.afterRemoval(entry).ifPresent(kept -> next.put(id, kept)));
+        return next;
+    }
+
+    /**
+     * The candidates whose presentation files the prediction needs: those the next launch admits, from the disk after
+     * maintenance, as {@link PluginResolver#admitted} decides at the launch.
+     */
+    static List<PluginCandidate> electable(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending,
+                                           Map<String, PluginStateStore.Entry> state, Version sdk, boolean safeMode) {
+        Disk disk = new Disk(candidates, pending, state);
+        return PluginResolver.admitted(afterMaintenance(disk), nextState(state), sdk, safeMode);
+    }
+
     private static boolean removed(Disk disk, String id) {
         PluginStateStore.Entry entry = disk.state().get(id);
         return entry != null && entry.remove();
@@ -57,9 +87,8 @@ final class PluginCatalog {
 
     static PluginRuntime.Snapshot compute(Launch launch, Disk disk, Version sdk, ToIntFunction<String> errors, java.nio.file.Path userDirectory) {
         List<PluginCandidate> next = afterMaintenance(disk);
-        Map<String, PluginStateStore.Entry> nextState = new TreeMap<>(disk.state());
-        nextState.values().removeIf(PluginStateStore.Entry::remove);
-        PluginResolver.Resolution resolution = PluginResolver.resolve(next, nextState, sdk, launch.safeMode());
+        Map<String, PluginStateStore.Entry> nextState = nextState(disk.state());
+        PluginResolver.Resolution resolution = PluginResolver.resolve(next, nextState, sdk, launch.safeMode(), disk.presentations());
         Map<String, String> willRun = versions(resolution.load());
 
         Set<String> ids = new TreeSet<>();
@@ -79,8 +108,9 @@ final class PluginCatalog {
             List<String> capabilities = new ArrayList<>(new TreeSet<>(descriptor.capabilities()));
             List<String> unconsented = new ArrayList<>(capabilities);
             if (!user) unconsented.clear();
-            else if (entry != null) unconsented.removeAll(entry.consented());
-            boolean needsConsent = user && !pendingRemoval && (entry == null || !unconsented.isEmpty());
+            else if (entry != null && !entry.optIn()) unconsented.removeAll(entry.consented());
+            boolean reviewed = entry != null && !entry.optIn();
+            boolean needsConsent = user && !pendingRemoval && (!reviewed || !unconsented.isEmpty());
 
             Optional<PluginStatus> atLaunch = status(launch.statuses(), id);
             Optional<PluginStatus> rejectedNext = status(resolution.rejected(), id);
@@ -91,14 +121,18 @@ final class PluginCatalog {
             rows.add(new PluginRuntime.Row(id, descriptor.name(), descriptor.version().toString(), descriptor.description(),
                 descriptor.vendor(), switch (shown.origin()) { case BUNDLED -> "Bundled"; case USER -> "Installed"; case DEV -> "Development"; },
                 state, reason, capabilities, unconsented, requires(descriptor), errors.applyAsInt(id),
-                entry == null || entry.enabled(), needsConsent,
-                !pendingRemoval && !(user && entry == null), user, pendingRemoval, pendingInstall,
+                PluginStateStore.effective(entry, shown), needsConsent,
+                !pendingRemoval && !(user && !reviewed), user, pendingRemoval, pendingInstall,
                 pending(id, launch, willRun, rejectedNext, pendingRemoval, pendingInstall, descriptor),
                 PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id),
                 descriptor.homepage(), List.copyOf(new TreeSet<>(descriptor.exports())), PluginIconFiles.read(shown)));
         }
+        // A selected plugin that did not run (it failed, or a provider's failed look is skipped next) and will not run next is no change.
+        Map<String, String> ranAtLaunch = new TreeMap<>(launch.selected());
+        ranAtLaunch.keySet().removeIf(id -> !willRun.containsKey(id)
+            && status(launch.statuses(), id).filter(status -> status.state() != PluginStatus.State.ACTIVE).isPresent());
         boolean restartNeeded = !launch.safeMode()
-            && (!willRun.equals(launch.selected()) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));
+            && (!willRun.equals(ranAtLaunch) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));
         return new PluginRuntime.Snapshot(rows, restartNeeded, launch.safeMode());
     }
 

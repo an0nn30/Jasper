@@ -301,4 +301,12 @@ class PluginManagerTest {
         });
         page = null;
     }
+
+    @org.junit.jupiter.api.Test void theRestartBannerNamesTheLooksTurnedOff() throws Exception {
+        start(false, false); // the class's @AfterEach stops the runtime and closes the windows that start makes
+        var plain = new dev.jasper.app.plugins.PluginRuntime.Snapshot(java.util.List.of(), true, false);
+        org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain)).isEqualTo("Restart Jasper to apply your changes.");
+        org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain.withTurnedOff(java.util.List.of("Alpha", "Beta"))))
+            .isEqualTo("Restart Jasper to apply your changes. Alpha and Beta were turned off: one look can be active at a time.");
+    }
 }

@@ -51,7 +51,7 @@ class FileServerRenderEvidenceTest {
         Path data = Files.createDirectories(root.resolve(theme));
         Path home = Files.createDirectories(data.resolve("synthetic-home"));
         var contributions = onEdtValue(Contributions::new);
-        var auxiliary = onEdtValue(AppContractTest::headlessWindows);
+        var auxiliary = onEdtValue(() -> AppContractTest.headlessWindows((choice, cancellation) -> List.of(dev.jasper.app.files.Location.local(home))));
         var terminals = onEdtValue(TerminalFixture::new);
         var problems = new CopyOnWriteArrayList<String>();
         var host = AppContractTest.host(data.resolve("plugins"), Duration.ofMillis(200), contributions, new AtomicBoolean(theme.equals("dark")),
@@ -95,7 +95,7 @@ class FileServerRenderEvidenceTest {
                 onEdt(() -> {
                     ThemeMigrationCapture.save("fileserver-hosted", theme, "new-server", editor.holder(), UIScale.scale(820), UIScale.scale(650));
                     ((JTextComponent) StagedVaultHost.named(editor.holder(), "server.name.input")).setText("Fixture");
-                    ((JTextComponent) StagedVaultHost.named(editor.holder(), "server.folder.input")).setText(home.toString());
+                    ((javax.swing.AbstractButton) StagedVaultHost.named(editor.holder(), "server.folder.choose")).doClick(0);
                     press(StagedVaultHost.named(editor.holder(), "server.name.input"), KeyEvent.VK_D, 'd');
                     press(StagedVaultHost.named(editor.holder(), "server.name.input"), KeyEvent.VK_ENTER, '\n');
                     assertThat(editor.closed()).as("Enter on the old editor had no default button").isFalse();

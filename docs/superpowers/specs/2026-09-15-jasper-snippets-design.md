@@ -2,6 +2,8 @@
 
 **Status:** Implemented on `claude/snippets` in `.worktrees/snippets`, commits `d80d1b0..bb06700` plus the Task 6 documentation commit that records this status. Fresh `./gradlew check --rerun-tasks`: 767 tests, 766 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): the first verb reads Insert; everything else in this document stands.
+
 **Development branch:** `claude/snippets` in `.worktrees/snippets`, from main `b9efd41`.
 
 **Builds on:** the [palette scopes design](2026-09-15-jasper-palette-scopes-design.md), which stays binding. This document adds a third scope, grows the verb contract from two verbs to three, and adds two in-card steps.

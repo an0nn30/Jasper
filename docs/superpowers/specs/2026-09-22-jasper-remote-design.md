@@ -4,6 +4,8 @@
 (`2026-09-22-jasper-vault-design.md`) and realises the SSH side of the SDK design's interop sketch
 and failure walkthroughs (`2026-09-21-jasper-plugin-sdk-design.md`, section 8).
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): Remote's entries live in the Session and Transfer standard menus; everything else in this document stands.
+
 **Scope:** One bundled plugin, `dev.jasper.remote` ("Remote"), delivered in three plans that each
 leave it installable and runnable: **7a SSH** (saved hosts, `~/.ssh/config` import, host-key trust,
 Vault or SSH-agent authentication, ProxyJump, shared per-host sessions, a hosts panel, editor,

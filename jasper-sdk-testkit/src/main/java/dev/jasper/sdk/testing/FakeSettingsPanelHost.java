@@ -28,6 +28,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         final FakeSetting<?> setting;
         String invalidText;
         String error = "";
+        /** An ordered list's entry text, kept until an Add stages it. */
+        String entry = "";
         Row(FakeSetting<?> setting) { this.setting = setting; }
         void clear() { invalidText = null; error = ""; }
     }
@@ -47,7 +49,7 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         guard();
         var handle = settings.handle(setting);
         var row = rows.computeIfAbsent("settings:" + handle.key(), ignored -> new Row(handle));
-        return KitSettingRows.row(handle.spec(), pending(handle), row.invalidText, row.error);
+        return KitSettingRows.row(handle.spec(), pending(handle), row.invalidText, row.error, row.entry);
     }
 
     @SuppressWarnings("unchecked")
@@ -89,6 +91,8 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         guard();
         String id = event.id();
         Row row = rows.get(id);
+        for (Row listed : rows.values())
+            if (listed.setting.spec().kind() instanceof dev.jasper.sdk.settings.SettingKind.StringList && listEvent(listed, event)) return true;
         if (event instanceof UiEvent.Action) {
             Row browsed = rows.values().stream().filter(value -> id.equals("settings:" + value.setting.key() + ":browse")
                 && value.setting.spec().editor().orElse(null) instanceof dev.jasper.sdk.settings.EditorHint.File).findFirst().orElse(null);
@@ -121,6 +125,54 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         changed();
         refresh();
         return true;
+    }
+
+    /** As the host's ordered-list row: the entry's text, Add, Remove and reorder; false when the event is not this row's. */
+    private boolean listEvent(Row row, UiEvent event) {
+        String id = "settings:" + row.setting.key();
+        var items = new java.util.ArrayList<Object>((java.util.List<?>) pending(row.setting));
+        switch (event) {
+            // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
+            case UiEvent.Edited edited when edited.id().equals(id + ":new") -> {
+                row.entry = edited.text();
+                if (!row.error.isEmpty()) { row.error = ""; changed(); }
+                refresh();
+                return true;
+            }
+            // The list's own row selection stages nothing, as the host's row ignores it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
+            case UiEvent.Action action when action.id().equals(id + ":add") -> {
+                if (row.entry.isBlank()) return true;
+                items.add(row.entry);
+            }
+            case UiEvent.Removed removed when removed.id().equals(id) -> {
+                int index = itemIndex(removed.itemId(), items.size());
+                if (index < 0) return true;
+                items.remove(index);
+            }
+            case UiEvent.Reordered moved when moved.id().equals(id) -> {
+                int index = itemIndex(moved.itemId(), items.size());
+                if (index < 0 || moved.destination() < 0 || moved.destination() >= items.size()) return true;
+                items.add(moved.destination(), items.remove(index));
+            }
+            default -> { return false; }
+        }
+        try {
+            stageValue(row.setting, java.util.List.copyOf(items));
+            if (event instanceof UiEvent.Action) row.entry = "";
+        } catch (RuntimeException invalid) {
+            row.error = invalid.getMessage() == null ? "Enter a valid value." : invalid.getMessage();
+        }
+        changed();
+        refresh();
+        return true;
+    }
+
+    /** The index an ordered list's {@code item-N} row id names, or -1 for a row that is gone. */
+    private static int itemIndex(String itemId, int size) {
+        if (!itemId.startsWith("item-")) return -1;
+        try { int index = Integer.parseInt(itemId.substring("item-".length())); return index < size ? index : -1; }
+        catch (NumberFormatException notARow) { return -1; }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

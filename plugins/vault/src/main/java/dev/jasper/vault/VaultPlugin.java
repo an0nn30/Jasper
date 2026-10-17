@@ -157,7 +157,6 @@ public class VaultPlugin implements Plugin {
         fileMenu.add(CHANGE_PASSWORD);
         fileMenu.add(GRANTS);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 50));
-        status.setText("Vault");
 //        context.rail().add(OPEN);
         refreshStatus();
         context.settings().onChanged(() -> { settings = declared.read(context.dataDirectory()); timer.setTimeout(settings.autoLock()); refreshStatus(); vaultChanged(); });
@@ -349,9 +348,19 @@ public class VaultPlugin implements Plugin {
     private void refreshStatus() {
         if (status == null) return;
         LockState state = lock.state();
+        status.setText(statusText(state));
         status.setIcon(state == LockState.UNLOCKED ? unlocked : locked);
         status.setTooltip(tooltip(state, timer.remaining()));
         status.setAction(state == LockState.UNLOCKED ? LOCK : OPEN);
+    }
+
+    /** The status item's text (spec 13): "Vault: Locked", "Vault: Unlocked", or "Vault" while there is no vault yet. */
+    static String statusText(LockState state) {
+        return switch (state) {
+            case NO_VAULT -> "Vault";
+            case LOCKED -> "Vault: Locked";
+            case UNLOCKED -> "Vault: Unlocked";
+        };
     }
 
     /** "Vault locked", "No vault — click to create one", or "Vault unlocked · locks in N min" (omitted when auto-lock is off). */

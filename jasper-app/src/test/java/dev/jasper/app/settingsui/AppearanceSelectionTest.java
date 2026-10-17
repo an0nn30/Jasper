@@ -119,4 +119,18 @@ class AppearanceSelectionTest {
         assertThat(appearance.settings()).startsWith(CoreSettings.UI_APPEARANCE, CoreSettings.UI_THEME_DARK, CoreSettings.UI_THEME_LIGHT,
             CoreSettings.TERMINAL_SCHEME);
     }
+
+    /** Spec 5.8: under a kit default, the untouched pick is the kit's; picking the core default saves it explicitly. */
+    @Test void underAKitDefaultPickingTheCoreDefaultStagesAnExplicitValue() {
+        var kit = new dev.jasper.app.config.DefaultSource(java.util.Map.of(CoreSettings.UI_THEME_DARK, "ocean"));
+        var draft = new SettingsDraft(ConfigLoader.parse(Path.of("config.toml"), "", true).values(), kit);
+        var editor = editor(draft);
+        editor.show(AppearanceMode.SYSTEM);
+        assertThat(pick(editor, 1).selectedId()).isEqualTo("ocean");
+        var reset = (Nodes.Button) ((Nodes.Stack) ((Nodes.SettingRow) parts(editor).get(1)).control()).children().get(1);
+        assertThat(reset.state().visible()).as("at the effective defaults").isFalse();
+        assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.empty());
+        assertThat(editor.event("ui.appearance", new UiEvent.Selected("ui.appearance:dark-theme", java.util.Set.of("slate-cobalt")))).isTrue();
+        assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("slate-cobalt"));
+    }
 }

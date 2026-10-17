@@ -170,9 +170,66 @@ class DescriptorParserTest {
                 .as(c.with()).isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageContaining(c.expected());
         }
         assertThatThrownBy(() -> DescriptorParser.parse("id = ")).isInstanceOf(DescriptorParser.InvalidDescriptor.class);
-        assertThat(DescriptorParser.CAPABILITIES).isEqualTo(Set.of("terminal.observe", "terminal.selection",
-            "terminal.inject", "terminal.open", "session.provide", "palette.contribute", "files.source", "network.listen",
-            "clipboard.read", "terminal.environment", "editor.provide"));
+        assertThat(DescriptorParser.CAPABILITIES).as("every SDK capability, and nothing else")
+            .isEqualTo(Set.copyOf(dev.jasper.sdk.Capabilities.ALL));
+    }
+
+    private static final String LOOK = """
+        id = "dev.example.look"
+        name = "Look"
+        version = "0.1.0"
+        entry = "dev.example.look.LookPlugin"
+        sdk = ">=0.18.0, <0.19"
+        """;
+
+    @Test void aPresentationProviderDeclaresItsKitItsThemesAndThatItIsOffByDefault() throws Exception {
+        var descriptor = DescriptorParser.parse(LOOK + """
+            capabilities = ["presentation.provide"]
+            presentation = "presentation/look.kit.toml"
+            themes = ["themes/look.json", "themes/look-contrast.json"]
+            enabled_by_default = false
+            """);
+        assertThat(descriptor.presentation()).isEqualTo("presentation/look.kit.toml");
+        assertThat(descriptor.declaresPresentation()).isTrue();
+        assertThat(descriptor.themes()).containsExactly("themes/look.json", "themes/look-contrast.json");
+        assertThat(descriptor.themeIds()).containsExactly("look", "look-contrast");
+        assertThat(descriptor.enabledByDefault()).isFalse();
+    }
+
+    @Test void withoutTheKeysAPluginIsOnByDefaultAndProvidesNothing() throws Exception {
+        var descriptor = DescriptorParser.parse(LOOK);
+        assertThat(descriptor.presentation()).isEmpty();
+        assertThat(descriptor.declaresPresentation()).isFalse();
+        assertThat(descriptor.themes()).isEmpty();
+        assertThat(descriptor.enabledByDefault()).isTrue();
+        assertThat(DescriptorParser.parse(LOOK + "themes = [\"themes/extra.json\"]\n").themeIds())
+            .as("any plugin may ship themes, with no capability").containsExactly("extra");
+    }
+
+    @Test void thePresentationKeyAndItsCapabilityNeedEachOther() {
+        assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "presentation = \"look.kit.toml\"\n"))
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class)
+            .hasMessage("presentation needs the presentation.provide capability");
+        assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "capabilities = [\"presentation.provide\"]\n"))
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class)
+            .hasMessage("capabilities: presentation.provide needs the presentation key");
+    }
+
+    @Test void pathsAreLowercaseJarPathsWithoutDotSegmentsOrALeadingSlash() {
+        for (String bad : List.of("/look.kit.toml", "a/../look.kit.toml", "Look.kit.toml", "a//look.kit.toml", "a/./b.toml",
+                "presentation/", "a b.toml", "..", "a\\b.toml"))
+            assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "capabilities = [\"presentation.provide\"]\npresentation = \""
+                    + bad.replace("\\", "\\\\") + "\"\n"))
+                .as(bad).isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageStartingWith("presentation: ");
+        for (String bad : List.of("themes/Look.json", "themes/look.txt", "../look.json", "themes/look_.json", "themes/.json"))
+            assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "themes = [\"" + bad + "\"]\n"))
+                .as(bad).isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessageStartingWith("themes");
+        assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "themes = [\"a/look.json\", \"b/look.json\"]\n"))
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessage("themes names the theme look twice");
+        assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "themes = \"themes/look.json\"\n"))
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessage("themes must be an array of strings");
+        assertThatThrownBy(() -> DescriptorParser.parse(LOOK + "enabled_by_default = \"no\"\n"))
+            .isInstanceOf(DescriptorParser.InvalidDescriptor.class).hasMessage("enabled_by_default must be a boolean");
     }
 
     @Test void aNameThatShowsNothingIsRejected() {

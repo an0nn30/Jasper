@@ -33,6 +33,30 @@ class AuxiliaryWindowsTest {
         assertThat(events).containsExactly("first", "first");
     }
 
+    /** Spec 13: File › Open File… asks for one existing local file over the terminal window, from its pane's folder. */
+    @Test void openFileAsksForOneLocalFileOverTheTerminalWindow() {
+        var asked = new ArrayList<PathChoice>();
+        var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();
+        var folder = java.nio.file.Path.of("project").toAbsolutePath();
+        var host = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { },
+            title -> { }, Rectangle::new, (title, initial) -> java.util.Optional.empty()),
+            (choice, cancellation) -> { asked.add(choice); return List.of(dev.jasper.app.files.Location.local(file)); });
+        UUID window = UUID.randomUUID();
+        assertThat(host.openFile(window, java.util.Optional.of(folder))).contains(file);
+        assertThat(asked).singleElement().satisfies(choice -> {
+            assertThat(choice.terminalOwner()).isEqualTo(window);
+            assertThat(choice.auxiliaryOwner()).isNull();
+            assertThat(choice.title()).isEqualTo("Open File");
+            assertThat(choice.mode()).isEqualTo(PathChoice.Mode.OPEN);
+            assertThat(choice.multiple()).isFalse();
+            assertThat(choice.initial()).isEmpty();
+            assertThat(choice.terminalFolder()).contains(dev.jasper.app.files.Location.local(folder));
+            assertThat(choice.sources()).isEmpty();
+        });
+        var cancelled = new AuxiliaryWindows(UiState.inMemory(), surface -> null, (choice, cancellation) -> List.of());
+        assertThat(cancelled.openFile(window, java.util.Optional.empty())).isEmpty();
+    }
+
     @Test void onlyOneOverlayCanOwnATerminalWindow() {
         UUID owner = UUID.randomUUID();
         var first = windows.overlay("Connecting", owner);

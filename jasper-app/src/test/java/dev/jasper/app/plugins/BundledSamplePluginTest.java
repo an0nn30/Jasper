@@ -56,6 +56,21 @@ class BundledSamplePluginTest {
                     dev.jasper.app.contributions.MenuTarget.Slot.FILE));
                 assertThat(menu.entries()).contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.vault.open"));
             });
+            // Bundled plugins start in PluginResolver's order (File Server before Remote), and sections compose in that order.
+            var transfer = dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.TRANSFER);
+            assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(transfer))
+                .extracting(dev.jasper.app.contributions.MenuSection::entries).as("Transfer: File Server's section, then Remote's")
+                .containsExactly(
+                    List.of(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.fileserver.share-folder"),
+                        new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.fileserver.new")),
+                    List.of(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.sftp"),
+                        new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.transfers")));
+            var session = dev.jasper.app.contributions.MenuTarget.standard(dev.jasper.app.contributions.MenuTarget.Slot.SESSION);
+            assertThat(contributions.menus()).filteredOn(menu -> menu.target().equals(session)).as("Session holds Remote's one section")
+                .singleElement().satisfies(menu -> assertThat(menu.entries())
+                    .contains(new dev.jasper.app.contributions.MenuEntry.Item("dev.jasper.remote.hosts.new")));
+            assertThat(contributions.menus()).noneMatch(menu -> menu.target().type() == dev.jasper.app.contributions.MenuTarget.Type.TOP_LEVEL
+                && menu.target().key().equals("dev.jasper.remote.menu"));
             assertThat(contributions.status()).hasSize(6)
                 .anySatisfy(item -> assertThat(item.text()).startsWith("Sample:"))
                 .anySatisfy(item -> assertThat(item.text()).isEqualTo("Vault"));

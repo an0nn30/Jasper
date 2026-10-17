@@ -21,6 +21,7 @@ import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.MemoryReading;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.bootstrap.StartupResources;
+import java.awt.GraphicsEnvironment;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
@@ -40,24 +41,55 @@ public final class ApplicationBootstrap {
 
     public static void main(String[] args) {
         StartupTrace.current().mark(StartupTrace.Milestone.MAIN_ENTERED);
-        int result = start(args, System.out, System.err, ApplicationBootstrap::prepareDesktop);
+        int result = start(args, System.out, System.err, ApplicationBootstrap::prepare, ApplicationBootstrap::prepareDesktop);
         if (result != 0) System.exit(result);
     }
 
-    record Startup(ConfigService service, AppArguments options) { }
+    /** What the boundary hands the desktop: the service, the arguments, the home, the log (null without the pre-pass) and the selection. */
+    record Startup(ConfigService service, AppArguments options, AppDirs dirs, AppLog log,
+                   dev.jasper.app.plugins.PluginSelection selection) { }
+
+    /** What the pre-pass made: the log, open from here on, and the plugin selection. */
+    record Prepared(AppLog log, dev.jasper.app.plugins.PluginSelection selection) { }
+
+    /** The pre-pass {@link #start} runs after the hand-off checks and before the configuration is read (spec 4.8). */
+    @FunctionalInterface interface Preparation {
+        /** No log, no maintenance and no plugins: what tests of the boundary run. */
+        Preparation NONE = (dirs, options) -> new Prepared(null, dev.jasper.app.plugins.PluginSelection.none());
+        Prepared prepare(AppDirs dirs, AppArguments options);
+    }
+
+    /**
+     * The production pre-pass: the Jasper log, pending plugin removals and installs, then the plugin selection, all on
+     * the bootstrap thread and before AWT, so maintenance and selection log to the log file.
+     */
+    static Prepared prepare(AppDirs dirs, AppArguments options) {
+        AppLog log = AppLog.open(dirs.logs());
+        try {
+            long began = System.nanoTime();
+            JasperApplication.preparePlugins(dirs);
+            Path source = HandoffSocket.codeLocation();
+            String build = source == null ? "" : source + "@" + HandoffSocket.lastModified(source);
+            var selection = dev.jasper.app.plugins.PluginSelection.of(dirs, source, build, options.pluginDir(), options.safeMode());
+            StartupTrace.current().phase("plugin selection", began);
+            return new Prepared(log, selection);
+        } catch (RuntimeException | Error failure) { log.close(); throw failure; }
+    }
     private static void prepareDesktop(Startup startup) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         var acquired = new StartupResources();
         acquired.own(service);
         try {
-            AppDirs dirs = AppDirs.resolve(System.getProperty("os.name"), System.getenv(),
-                Path.of(System.getProperty("user.home")), System.getProperty("jasper.home"));
-            AppLog log = acquired.own(AppLog.open(dirs.logs()));
+            AppDirs dirs = startup.dirs();
+            AppLog log = acquired.own(Objects.requireNonNull(startup.log(), "the desktop needs the pre-pass's log"));
             UnexpectedExceptions exceptions = acquired.own(installUnexpectedExceptionHandler());
             var endpoint = new AtomicReference<HandoffSocket>();
             var commands = new AtomicReference<CommandListener>();
+            var attempt = startup.selection().attempt();
             Thread shutdown = Thread.ofPlatform().name("jasper-log-shutdown").unstarted(() -> {
                 try {
+                    // An orderly quit before the look proved itself clears its pending mark; any other exit leaves it (spec 4.6).
+                    try { attempt.exiting(); } catch (RuntimeException unrecorded) { LOG.log(System.Logger.Level.WARNING, "Could not update the presentation attempt record", unrecorded); }
                     if (endpoint.get() != null) endpoint.get().close();
                     if (commands.get() != null) commands.get().close();
                 }
@@ -70,9 +102,8 @@ public final class ApplicationBootstrap {
             dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
                 service.initialState().snapshot().nativeDecorations(),
                 service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
-            // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
+            // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
-            JasperApplication.preparePlugins(dirs);
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
             // The posted EDT composition owns service; the process hook owns logging, the endpoint and the command
             // listener.
@@ -81,6 +112,15 @@ public final class ApplicationBootstrap {
             acquired.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
         }
+    }
+
+    /**
+     * Whether the launch is about to show a window or rehearse one, so the look's attempt is marked pending (spec 4.6):
+     * the first window, or a resident {@code --background} warm-up, never headless and never {@code --no-window}.
+     */
+    static boolean attemptBeforePresenting(AppArguments options, boolean resident, boolean headless) {
+        if (headless || options.noWindow()) return false;
+        return !options.background() || resident;
     }
 
     /** macOS reads these settings during toolkit/LAF initialization; never change them on reload. */
@@ -119,7 +159,7 @@ public final class ApplicationBootstrap {
             }
             compose(service, () -> new CommandHistory(dirs.commandHistory()),
                 history -> {
-                    JasperApplication application = createApplication(service, history, dirs, options, commands);
+                    JasperApplication application = createApplication(service, history, dirs, options, commands, startup.selection());
                     exceptions.forwardTo(application::unexpected);
                     return application;
                 }, application -> {
@@ -137,6 +177,8 @@ public final class ApplicationBootstrap {
                         return;
                     }
                     if (!options.background()) {
+                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
+                            application.presentationAttempt().pending();
                         long window = System.nanoTime();
                         application.newWindow();
                         StartupTrace.current().phase("first window", window);
@@ -148,6 +190,8 @@ public final class ApplicationBootstrap {
                             : "Started with --background but the handoff endpoint is unavailable; exiting");
                         application.quitNow();
                     } else {
+                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
+                            application.presentationAttempt().pending();
                         application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
                     }
                 });
@@ -160,7 +204,8 @@ public final class ApplicationBootstrap {
     }
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
-                                                       AppArguments options, AtomicReference<CommandListener> commands) {
+                                                       AppArguments options, AtomicReference<CommandListener> commands,
+                                                       dev.jasper.app.plugins.PluginSelection selection) {
         long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
@@ -172,7 +217,7 @@ public final class ApplicationBootstrap {
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
-                () -> System.exit(0), integrationDir, dirs.themes());
+                () -> System.exit(0), integrationDir, dirs.themes(), selection);
             Path source = HandoffSocket.codeLocation();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
@@ -201,7 +246,7 @@ public final class ApplicationBootstrap {
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
             if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
-            application.startPlugins(HandoffSocket.codeLocation(), options.pluginDir(), options.safeMode(), dirs);
+            application.startPlugins(dirs);
             // After the plugins started, so a call that arrives first finds its handler.
             CommandListener listener = serveCommands(application, options, dirs, acquired);
             if (listener != null) commands.set(listener);
@@ -296,6 +341,9 @@ public final class ApplicationBootstrap {
         return start(args, out, error, startup -> launch.accept(startup.service(), startup.options()));
     }
     static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, Consumer<Startup> launch) {
+        return start(args, out, error, Preparation.NONE, launch);
+    }
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, Preparation prepare, Consumer<Startup> launch) {
         AppArguments options;
         try { options = AppArguments.parse(args, Path.of(System.getProperty("user.dir"))); }
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
@@ -319,12 +367,17 @@ public final class ApplicationBootstrap {
         }
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
         var acquired = new StartupResources();
+        Prepared prepared = prepare.prepare(dirs, options);
+        if (prepared.log() != null) acquired.own(prepared.log());
+        StartupTrace.current().look(prepared.selection().presentation().look());
         long read = System.nanoTime();
-        ConfigService service = acquired.own(new ConfigService(file, os.startsWith("Mac")));
+        ConfigService service;
+        try { service = acquired.own(new ConfigService(file, os.startsWith("Mac"), prepared.selection().presentation().defaults())); }
+        catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
         StartupTrace.current().phase("config", read);
         StartupTrace.current().mark(StartupTrace.Milestone.CONFIG_LOADED);
         try {
-            launch.accept(new Startup(service, options));
+            launch.accept(new Startup(service, options, dirs, prepared.log(), prepared.selection()));
             acquired.transfer();
             return 0;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }

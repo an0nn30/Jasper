@@ -3,6 +3,8 @@
 Date: 2026-10-13. Status: approved in conversation; awaiting review of this written spec.
 Branch: `claude/sdk-clipboard` (worktree `.claude/worktrees/sdk-clipboard`), from main `bfc0ba6d`.
 
+Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): Remote's entries live in the Session and Transfer standard menus; everything else in this document stands.
+
 ## Why
 
 Porting an external utility plugin (an encrypt/decrypt dialog) to the SDK showed two gaps the 0.16 kit does not

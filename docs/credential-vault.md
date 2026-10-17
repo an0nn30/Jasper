@@ -40,7 +40,7 @@ during password derivation to abandon the change. Once writing starts, the butto
 **Close** and the form says closing will not cancel. A failed write keeps the old password and
 can be retried; failures are reported even if the form was closed. **Lock** removes
 secrets from the open vault and clears its editor forms. The window stays open with an Unlock button that shows the shared unlock form in place.
-The padlock in the status bar unlocks/opens a locked vault and locks an unlocked vault; its tooltip
+The status bar's **Vault: Locked** or **Vault: Unlocked** item unlocks/opens a locked vault and locks an unlocked vault; its tooltip
 shows the remaining inactivity time. Already connected SSH sessions are unaffected by locking.
 
 **Search Vault Logins** (Cmd+\\, or Ctrl+Shift+\\ on Windows and Linux) opens the command palette on the Vault scope;
@@ -93,7 +93,7 @@ clipboard timing. The following checks need a user-run Jasper window:
 4. Lock the vault, press Cmd+\\ and press Enter on the locked row; after unlocking, the palette is back on the Vault
    scope. Copy a password and username, check each confirmation card, check 30-second clearing, then copy
    ordinary text before expiry and verify it survives.
-5. Set `auto_lock_minutes = 1`, leave Jasper inactive and verify the padlock locks. Set it to 0
+5. Set `auto_lock_minutes = 1`, leave Jasper inactive and verify the status item reads Vault: Locked. Set it to 0
    and confirm the countdown disappears. Restore the desired timeout.
 6. With a consumer plugin, exercise Allow once, Always and Deny; revoke its saved grant in the
    manager and verify the next fetch asks again.

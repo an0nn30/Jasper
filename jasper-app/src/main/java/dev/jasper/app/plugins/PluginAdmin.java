@@ -9,10 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
+import java.util.function.UnaryOperator;
 
 /**
  * What the Plugins manager can do, synchronously: each operation is one state transaction followed by a
@@ -41,7 +44,11 @@ final class PluginAdmin {
         Map<String, PluginCandidate> pending = new TreeMap<>();
         for (PluginCandidate staged : PluginDiscovery.scan(options.userDirectory().resolve(PluginMaintenance.PENDING),
                 PluginCandidate.Origin.USER, problems)) pending.put(staged.id(), staged);
-        return new PluginCatalog.Disk(candidates, pending, store.read());
+        var state = store.read();
+        var at = launch.get();
+        var attempts = new dev.jasper.app.presentation.AttemptStore(options.stateFile().toAbsolutePath().getParent()).read();
+        var electable = PluginCatalog.electable(candidates, pending, state, sdk, at.safeMode());
+        return new PluginCatalog.Disk(candidates, pending, state, Presentations.read(electable, attempts, at.build()));
     }
 
     PluginRuntime.Snapshot snapshot() throws IOException {
@@ -51,19 +58,64 @@ final class PluginAdmin {
     PluginRuntime.Snapshot setEnabled(String id, boolean enabled) throws IOException {
         PluginCatalog.Disk disk = disk();
         PluginCandidate subject = PluginCatalog.subject(disk, id).orElseThrow(() -> new IOException("No such plugin: " + id));
-        if (subject.origin() == PluginCandidate.Origin.USER && !disk.state().containsKey(id))
+        PluginStateStore.Entry entry = disk.state().get(id);
+        if (subject.origin() == PluginCandidate.Origin.USER && (entry == null || entry.optIn()))
             throw new IOException("Review " + subject.descriptor().name() + " before enabling or disabling it");
-        store.transact(PluginStateStore.enabling(id, enabled));
+        boolean optIn = enabled && subject.origin() == PluginCandidate.Origin.BUNDLED && !subject.descriptor().enabledByDefault();
+        if (enabled && subject.descriptor().declaresPresentation()) {
+            var others = new TreeMap<String, String>();
+            store.transact(turningOthersOff(disk, id, others, ids -> PluginStateStore.enablingPresentation(id, optIn, ids)));
+            return snapshot().withTurnedOff(others.values());
+        }
+        store.transact(PluginStateStore.enabling(id, enabled, optIn));
         return snapshot();
     }
 
     /** {@code reviewed} is what the user saw; consent is refused when the plugin on disk declares something else. */
     PluginRuntime.Snapshot consent(String id, List<String> reviewed) throws IOException {
-        PluginCandidate subject = PluginCatalog.subject(disk(), id).orElseThrow(() -> new IOException("No such plugin: " + id));
+        PluginCatalog.Disk disk = disk();
+        PluginCandidate subject = PluginCatalog.subject(disk, id).orElseThrow(() -> new IOException("No such plugin: " + id));
         if (subject.origin() != PluginCandidate.Origin.USER) throw new IOException(subject.descriptor().name() + " needs no consent");
         requireReviewed(subject, reviewed);
+        if (subject.descriptor().declaresPresentation()) {
+            var others = new TreeMap<String, String>();
+            store.transact(turningOthersOff(disk, id, others,
+                ids -> PluginStateStore.consentingPresentation(id, subject.descriptor().capabilities(), ids)));
+            return snapshot().withTurnedOff(others.values());
+        }
         store.transact(PluginStateStore.consenting(id, subject.descriptor().capabilities()));
         return snapshot();
+    }
+
+    /**
+     * An edit that decides, from the locked state, which other providers to turn off and applies {@code edit} with them
+     * (spec 4.4); {@code turnedOff} receives their ids and names. The candidates come from the disk scan, which the lock
+     * does not change.
+     */
+    private static UnaryOperator<Map<String, PluginStateStore.Entry>> turningOthersOff(PluginCatalog.Disk disk, String id,
+            Map<String, String> turnedOff, Function<Set<String>, UnaryOperator<Map<String, PluginStateStore.Entry>>> edit) {
+        return state -> {
+            turnedOff.clear();
+            turnedOff.putAll(otherProviders(disk, state, id));
+            return edit.apply(Set.copyOf(turnedOff.keySet())).apply(state);
+        };
+    }
+
+    /**
+     * The other presentation providers the next start would treat as enabled, by id with their names: effectively enabled
+     * and, for a user copy, reviewed.
+     */
+    private static Map<String, String> otherProviders(PluginCatalog.Disk disk, Map<String, PluginStateStore.Entry> state, String id) {
+        var others = new TreeMap<String, String>();
+        var all = new ArrayList<>(disk.candidates());
+        all.addAll(disk.pending().values());
+        for (PluginCandidate candidate : all) {
+            if (candidate.id().equals(id) || !candidate.descriptor().declaresPresentation()) continue;
+            PluginStateStore.Entry entry = state.get(candidate.id());
+            boolean unreviewed = candidate.origin() == PluginCandidate.Origin.USER && (entry == null || entry.optIn());
+            if (PluginStateStore.effective(entry, candidate) && !unreviewed) others.putIfAbsent(candidate.id(), candidate.descriptor().name());
+        }
+        return others;
     }
 
     private static void requireReviewed(PluginCandidate subject, List<String> reviewed) throws IOException {
@@ -109,7 +161,15 @@ final class PluginAdmin {
         Optional<PluginCandidate> candidate = PluginDiscovery.single(directory, PluginCandidate.Origin.USER, problems);
         if (candidate.isEmpty()) throw new IOException("The staged plugin is no longer readable: " + String.join("; ", problems));
         requireReviewed(candidate.get(), reviewed);
-        PluginInstaller.commit(new PluginInstaller.Staged(directory, candidate.get()), options.userDirectory(), store);
+        PluginDescriptor descriptor = candidate.get().descriptor();
+        var staging = new PluginInstaller.Staged(directory, candidate.get());
+        if (descriptor.declaresPresentation()) {
+            var others = new TreeMap<String, String>();
+            PluginInstaller.commit(staging, options.userDirectory(), store, turningOthersOff(disk(), descriptor.id(), others,
+                ids -> PluginStateStore.consentingPresentation(descriptor.id(), descriptor.capabilities(), ids)));
+            return snapshot().withTurnedOff(others.values());
+        }
+        PluginInstaller.commit(staging, options.userDirectory(), store);
         return snapshot();
     }
 

@@ -11,6 +11,7 @@ public enum ActionId {
     NEW_TAB("new_tab", "New Tab", "cmd+t", "ctrl+shift+t"),
     CLOSE_TAB("close_tab", "Close Tab", "alt+cmd+w", "ctrl+alt+shift+w"),
     NEW_WINDOW("new_window", "New Window", "cmd+n", "ctrl+shift+n"),
+    OPEN_FILE("open_file", "Open File…", "none", "none"),
     SPLIT_RIGHT("split_right", "Split Right", "cmd+d", "ctrl+shift+d"),
     SPLIT_DOWN("split_down", "Split Down", "cmd+shift+d", "ctrl+alt+shift+d"),
     CLOSE_PANE("close_pane", "Close Pane", "cmd+w", "ctrl+shift+w"),

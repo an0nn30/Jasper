@@ -79,6 +79,7 @@ public final class FileServerPlugin implements Plugin {
     public static final String PANEL = ID + ".panel";
     public static final String SHOW = ID + ".show-panel";
     public static final String NEW = ID + ".new";
+    public static final String SHARE_FOLDER = ID + ".share-folder";
     public static final String STOP_ALL = ID + ".stop-all";
     public static final String STATUS = ID + ".status";
     public static final String SERVERS = ID + ".servers";
@@ -153,6 +154,13 @@ public final class FileServerPlugin implements Plugin {
         context.actions().register(ActionSpec.of(NEW, "New File Server…").withIcon("add")
                 .withKeywords(List.of("file server", "share", "folder", "http")),
             invoked -> edit(invoked.window(), Optional.empty(), false));
+        // Spec 13: Share Folder… runs what the empty File Servers panel's button runs; it and New File Server… sit in Transfer.
+        context.actions().register(ActionSpec.of(SHARE_FOLDER, "Share Folder…").withIcon(icon)
+                .withKeywords(List.of("file server", "share", "folder", "serve")),
+            invoked -> edit(invoked.window(), Optional.empty(), false));
+        var transfer = context.menus().standard(dev.jasper.sdk.ui.StandardMenu.TRANSFER);
+        transfer.add(SHARE_FOLDER);
+        transfer.add(NEW);
         stopAll = context.actions().register(ActionSpec.of(STOP_ALL, "Stop All File Servers").withKeywords(List.of("file server", "stop", "share")),
             invoked -> registry.stopAll());
         stopAll.setEnabled(false);

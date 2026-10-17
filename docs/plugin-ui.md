@@ -177,7 +177,7 @@ confirms (set `pending` while a start or stop is in flight).
 - **Route strip.** `Stack` with `LayoutRole.ROUTE`: equal columns, each a child stack of an `Icon` beside a description
   and a `MONO_SMALL` line; the host draws the arrows (New Tunnel's "This computer → Via → Target").
 - **Rich dropdown face.** A DROPDOWN or PICKER `Choice` can carry a `PickerFace` (tile, primary text, caption) that
-  describes the selected option, as New Tunnel's Via Host does.
+  describes the selected option, as New Tunnel's Via host does.
 - **Credential pickers.** Use the Vault API's anchored picker rather than building one; it brings search, groups,
   None and the creation footer.
 - **Empty states.** `Empty(icon, title, description, actions)`; actions may be buttons, a `MenuButton` (Choose

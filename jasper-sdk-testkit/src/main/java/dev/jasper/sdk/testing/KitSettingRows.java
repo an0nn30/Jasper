@@ -9,7 +9,7 @@ import java.util.function.UnaryOperator;
 final class KitSettingRows {
     private KitSettingRows() {}
 
-    static Nodes.Node row(SettingSpec<?> spec, Object value, String invalidText, String error) {
+    static Nodes.Node row(SettingSpec<?> spec, Object value, String invalidText, String error, String entry) {
         String id = "settings:" + spec.key();
         var state = new ControlState(true, true, false, error);
         Nodes.Node input;
@@ -23,6 +23,9 @@ final class KitSettingRows {
                 if (option.value().equals(value)) selected = option.token();
             }
             input = new Nodes.Choice(id, state, Nodes.ChoiceKind.DROPDOWN, options, selected, spec.label(), id);
+        } else if (spec.kind() instanceof SettingKind.StringList) {
+            // As the host: the generated pages' ordered list, then an entry and Add below it.
+            input = list(id, state, spec.label(), (List<?>) value, entry);
         } else if (spec.kind() instanceof SettingKind.Text && spec.editor().orElse(null) instanceof EditorHint.Font font) {
             // As the host: free text over the installed families, which filter as you type.
             List<String> families = font.monospaced() ? InstalledFonts.MONOSPACED : InstalledFonts.ALL;
@@ -33,10 +36,9 @@ final class KitSettingRows {
         } else {
             var numeric = spec.kind() instanceof SettingKind.IntegerRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 1, 0))
                 : spec.kind() instanceof SettingKind.NumberRange range ? Optional.of(new Nodes.Numeric(range.min(), range.max(), 0.1, 2)) : Optional.<Nodes.Numeric>empty();
-            var kind = numeric.isPresent() ? Nodes.FieldKind.NUMBER : value instanceof List<?> ? Nodes.FieldKind.TEXTAREA
+            var kind = numeric.isPresent() ? Nodes.FieldKind.NUMBER
                 : spec.editor().orElse(null) instanceof EditorHint.File ? Nodes.FieldKind.PATH : Nodes.FieldKind.TEXT;
-            String text = invalidText != null ? invalidText : value instanceof List<?> items
-                ? String.join("\n", items.stream().map(Object::toString).toList()) : String.valueOf(value);
+            String text = invalidText != null ? invalidText : String.valueOf(value);
             // As the host: a bounded integer is the Settings stepper, a bounded decimal a number field, both with the unit.
             // As the host: a path ends with Browse.
             input = new Nodes.Field(id, state, kind, text, numeric.isPresent() ? spec.unit() : "", spec.label(),
@@ -52,6 +54,21 @@ final class KitSettingRows {
             Nodes.ButtonKind.GHOST, id + ":reset", "Reset " + spec.label() + " to default");
         return new Nodes.SettingRow(id + ":row", state, spec.label(), spec.description(),
             new Nodes.Stack(id + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(input, reset)), false);
+    }
+
+    /** As the host: the generated pages' ordered-list editor, its rows {@code item-N}, then the entry and Add. */
+    private static Nodes.Stack list(String id, ControlState state, String label, List<?> items, String pending) {
+        var plain = new ControlState(state.visible(), state.enabled(), state.busy(), "");
+        var rows = new ArrayList<ListItem>();
+        for (int i = 0; i < items.size(); i++)
+            rows.add(new ListItem("item-" + i, Optional.empty(),
+                List.of(new Nodes.Text(id + ":item-" + i, ControlState.READY, items.get(i).toString(), Nodes.TextRole.BODY)), List.of(), List.of()));
+        var entry = new Nodes.Field(id + ":new", plain, Nodes.FieldKind.TEXT, pending, "Add…", "Add to " + label, pending.isBlank() ? "" : id + ":add");
+        var add = new Nodes.Button(id + ":add", new ControlState(state.visible(), state.enabled() && !pending.isBlank(), state.busy(), ""), "Add", "add",
+            Nodes.ButtonKind.SECONDARY, id + ":add", "");
+        return new Nodes.Stack(id + ":editor", plain, Nodes.LayoutRole.VERTICAL, List.of(
+            new Nodes.ItemList(id, state, Nodes.ListKind.ORDERED, rows, Set.of(), "", List.of()),
+            new Nodes.Stack(id + ":entry", plain, Nodes.LayoutRole.INLINE, List.of(entry, add))));
     }
 
     /** The installed families a font setting's row offers, read once: all, and those that draw 'i' and 'W' alike. */

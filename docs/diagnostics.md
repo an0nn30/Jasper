@@ -30,14 +30,14 @@ shell output is painted and every plugin has started, for a `--background` launc
 every plugin has started (that line reads `Startup (background, …)`), and otherwise 10 seconds after the process
 started. A launch that hands off to an already running Jasper, or quits before settling, logs none. For example:
 
-    Startup (cold, AOT cache used, CDS on): main entered 71 ms, config loaded 90 ms, … output painted 512 ms, plugins bound 980 ms | application 210 ms, plugins 280 ms
+    Startup (cold, AOT cache used, CDS on, look=default): main entered 71 ms, config loaded 90 ms, … output painted 512 ms, plugins bound 980 ms | application 210 ms, plugins 280 ms
 
 Times before the `|` are milliseconds since the operating system started the process; after it, each phase is how long
 that piece of work took. Phases overlap (`application` includes `plugins`), so do not add them up. `AOT cache stale`
 means the cache in the package no longer matches its jars (for example after a copy that did not keep modification
 times) and costs more than having none. `AOT cache skipped: <reason>` means Jasper's launcher started the JVM without
 it: `launch-failed` (Java failed to start with it at this launch), `remembered` (at an earlier one) or `environment`
-(`JASPER_AOT_CACHE_SKIP` is set). Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …,
+(`JASPER_AOT_CACHE_SKIP` is set). `look=` names the look: `default`, or the id of the plugin that provides it. Each window a running Jasper opens logs `Window (<trigger>): shown …, first paint …,
 output painted … after the request`. With `-Djasper.startupTrace=<file>` the same data is also written as JSON; the
 start-up benchmark uses it.
 

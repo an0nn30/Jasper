@@ -22,7 +22,7 @@ class SftpPluginTest {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             var context=host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
-            assertThat(host.failures()).isEmpty();assertThat(host.menu("top:dev.jasper.remote.menu")).contains("item:dev.jasper.remote.sftp","item:dev.jasper.remote.transfers");
+            assertThat(host.failures()).isEmpty();assertThat(host.menu("TRANSFER")).containsExactly("item:dev.jasper.remote.sftp","item:dev.jasper.remote.transfers");
             assertThat(host.panels()).contains("dev.jasper.remote.sftp.panel|SFTP|LEFT+split|dev.jasper.remote.sftp.toggle").noneMatch(panel->panel.startsWith("dev.jasper.remote.transfers.panel"));
             assertThat(host.actions()).noneMatch(action->action.startsWith("dev.jasper.remote.transfers.toggle"));
             assertThat(host.openRequests()).isEmpty();assertThat(host.windows()).isEmpty();
