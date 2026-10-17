@@ -164,12 +164,41 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         return ids;
     }
 
-    /** Selects a host in the window's Sessions panel, as a click does (plan 10a). */
+    /**
+     * The window's contributed toolbar view (spec 10.3), made by its real factory, marked as the window chrome marks it
+     * (the toolbar strip, the chrome route), kept at its own height and centred in the row as the toolbar places it, and
+     * painted at 2x over the theme's {@code surface.app}, the toolbar row's surface (plan 10a).
+     */
+    public BufferedImage toolbarView(int width, int height) {
+        return onEdtValue(() -> {
+            var entry = vault.contributions.toolbar().stream().filter(dev.jasper.app.contributions.ToolbarEntry.View.class::isInstance)
+                .map(dev.jasper.app.contributions.ToolbarEntry.View.class::cast).findFirst().orElseThrow(() -> new AssertionError("no toolbar view"));
+            var mounted = entry.factory().apply(vault.window).orElseThrow(() -> new AssertionError("the toolbar view's factory failed"));
+            var component = mounted.component();
+            if (component instanceof KitView kit) { kit.toolbarStrip(true); kit.route(dev.jasper.ui.theme.ThemeRoute.CHROME); }
+            var preferred = component.getPreferredSize();
+            int rowHeight = Math.min(height, preferred.height);
+            component.setSize(Math.min(width, preferred.width), rowHeight);
+            for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(component);
+            var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { graphics.scale(2, 2); graphics.translate(0, (height - rowHeight) / 2); component.printAll(graphics); } finally { graphics.dispose(); }
+            mounted.close();
+            return dev.jasper.app.testsupport.MockMatch.onto(image, theme.workspace().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
+        });
+    }
+
+    /**
+     * Selects a host in the window's Sessions panel (the fixture's panel), as a click does: the view reports the row's
+     * selection, so the panel's selection listeners (the window's shared session choice) hear it (plan 10a).
+     */
     public void selectSession(UUID host) throws InterruptedException {
         onEdt(() -> {
             try {
-                Object panel = ((Map<?, ?>) field(plugin, "panels")).get(vault.window);
-                panel.getClass().getMethod("select", UUID.class).invoke(panel, host);
+                if (((Map<?, ?>) field(plugin, "panels")).get(vault.window) == null) throw new AssertionError("no Sessions panel");
+                var dispatch = KitView.class.getDeclaredMethod("dispatch", dev.jasper.ui.model.UiEvent.class);
+                dispatch.setAccessible(true);
+                dispatch.invoke(view, new dev.jasper.ui.model.UiEvent.Selected("sessions.rows", Set.of("host:" + host)));
             } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
         });
         StagedVaultHost.settle();

@@ -104,6 +104,8 @@ public class RemotePlugin implements Plugin {
     private StatusItem status;
     private PluginAction splitAction;
     private SessionsToolbar sessionsToolbar;
+    /** Each window's chosen session, shared by its toolbar view and its Sessions tree under CLASSIC (spec 14.4). */
+    private final SessionSelection sessionSelection = new SessionSelection();
     private Timer poll;
     private String icon;
     private String serverIcon;
@@ -236,7 +238,8 @@ public class RemotePlugin implements Plugin {
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
             PanelHost panel = panelHosts.get(window.id());
             if (panel == null) showPanel(window); else panel.show();
-        }, () -> distros, this::openDistro);
+        }, () -> distros, this::openDistro, layout, sessionSelection, this::activeHostId);
+        sessionSelection.onChanged((windowId, row) -> { var shown = panels.get(windowId); if (shown != null) row.ifPresent(shown::selectRow); });
 
         store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); sftpUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
@@ -627,6 +630,7 @@ public class RemotePlugin implements Plugin {
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
             (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), layout);
         panel.onHeaderChanged(host::setHeader);
+        panel.onSelectionChanged(row -> sessionSelection.set(window.id(), row));
         panel.setCredentialLabels(this::credentialLabel);
         panel.setDefaultGroup(panelState.defaultGroup());
         panel.onRenameDefaultGroup(() -> renameDefaultGroup(window));
@@ -677,6 +681,11 @@ public class RemotePlugin implements Plugin {
             panel.setDistros(distros, this::distroSessions);
             panel.setHosts(store.hosts(), store.error());
         }
+    }
+
+    /** The host of the window's active pane, when Remote opened that pane. */
+    private Optional<UUID> activeHostId(WindowHandle window) {
+        return window.activeTab().flatMap(tab -> tab.activePane()).flatMap(pane -> Optional.ofNullable(panes.get(pane.id())));
     }
 
     private int sessionCount(RemoteHost host) { return (int) panes.values().stream().filter(host.id()::equals).count(); }

@@ -82,4 +82,21 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    static final String TOOLBAR_LIGHT = "0+6 #ECEDEF, 6+1 #B4B8BF, 7+20 #FEFEFE~#F1F2F4, 27+1 #B4B8BF, 28+6 #ECEDEF";
+    static final String TOOLBAR_DARK = "0+6 #3C3F44, 6+1 #5A5E65, 7+20 #4A4D52~#45484D, 27+1 #5A5E65, 28+6 #3C3F44";
+
+    @Test @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void theSessionToolbarViewMatchesTheWorkstationMocks() throws Exception {
+        for (boolean dark : new boolean[] {false, true}) under(dark, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("toolbar-" + dark), EnterpriseLook.resolved(dark), PanelSurfaceFixture.SESSIONS, true)) {
+                var ids = fixture.hosts(new String[][] {{"Mac", "192.168.1.119", "dustin", "Local Network"},
+                    {"minecraft-local", "192.168.1.124", "dustin", "Local Network", "favorite"}});
+                fixture.selectSession(ids.get(1));
+                var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 660, 110, 720, 68);
+                check((dark ? "dark" : "light") + "/session-toolbar", crop, fixture.toolbarView(crop.logicalWidth(), crop.logicalHeight()), 130,
+                    dark ? TOOLBAR_DARK : TOOLBAR_LIGHT, 1, 0.50, dark ? new String[] {"#3D74D6", "#3C3F44"} : new String[] {"#2F65CA", "#ECEDEF", "#2655AE"});
+            }
+        });
+    }
 }

@@ -2,13 +2,20 @@ package dev.jasper.remote;
 
 import dev.jasper.remote.hosts.HostStore;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
+import dev.jasper.sdk.ui.ControlState;
+import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.ToolbarItem;
+import dev.jasper.sdk.ui.UiEvent;
+import dev.jasper.sdk.ui.UiView;
+import dev.jasper.sdk.ui.ViewSpec;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,10 +23,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -41,19 +50,44 @@ final class SessionsToolbar implements AutoCloseable {
     private final Map<String, PluginAction> distroActions = new HashMap<>();
     private List<String> placed = List.of();
     private Subscription placement;
+    /** Which composition the toolbar takes (spec 14.4): the dropdown under ROWS, one view per window under CLASSIC. */
+    private final Layout layout;
+    private final SessionSelection selection;
+    private final Consumer<WindowHandle> showHosts;
+    private final Function<WindowHandle, Optional<UUID>> activeHost;
+    private final Map<UUID, UiView> views = new HashMap<>();
+    static final String VIEW = "session", LABEL = "session.label", CHOICE = "session.choice", CONNECT = "session.connect",
+        MANAGE_OPTION = "manage", NONE_OPTION = "none";
 
     SessionsToolbar(PluginContext context, HostStore store, String icon, BiConsumer<WindowHandle, RemoteHost> activate,
                     Consumer<WindowHandle> showHosts, Supplier<List<ShellProfileInfo>> distros,
                     BiConsumer<WindowHandle, ShellProfileInfo> openDistro) {
+        this(context, store, icon, activate, showHosts, distros, openDistro, Layout.ROWS, new SessionSelection(), window -> Optional.empty());
+    }
+
+    /**
+     * {@code selection} is the windows' chosen rows, shared with their Sessions trees; {@code activeHost} is a window's active
+     * SSH pane's host, the fallback while nothing is chosen.
+     */
+    SessionsToolbar(PluginContext context, HostStore store, String icon, BiConsumer<WindowHandle, RemoteHost> activate,
+                    Consumer<WindowHandle> showHosts, Supplier<List<ShellProfileInfo>> distros,
+                    BiConsumer<WindowHandle, ShellProfileInfo> openDistro, Layout layout, SessionSelection selection,
+                    Function<WindowHandle, Optional<UUID>> activeHost) {
+        this.layout = layout; this.selection = selection; this.showHosts = showHosts; this.activeHost = activeHost;
         this.context = context; this.store = store; this.icon = icon; this.activate = activate;
         this.distros = distros; this.openDistro = openDistro;
         this.distroIcon = "terminal";
         manage = context.actions().register(ActionSpec.of(MANAGE, "Manage Sessions...").withIcon(icon),
             invoked -> showHosts.accept(invoked.window()));
+        if (layout == Layout.CLASSIC) {
+            placement = context.toolbar().add(ToolbarItem.view(this::create));
+            selection.onChanged((window, row) -> renderViews());
+        }
         refresh();
     }
 
     void refresh() {
+        if (layout == Layout.CLASSIC) { renderViews(); return; }
         var ids = new ArrayList<String>();
         Set<String> listed = new HashSet<>();
         for (ShellProfileInfo profile : distros.get()) {
@@ -94,6 +128,74 @@ final class SessionsToolbar implements AutoCloseable {
         for (UUID id : List.copyOf(actions.keySet())) {
             if (store.host(id).isEmpty()) actions.remove(id).close();
         }
+    }
+
+    // ---- the classic toolbar view (spec 14.4)
+
+    private UiView create(WindowHandle window) {
+        var view = context.kit().create(new ViewSpec(classic(window)), event -> classicEvent(window, event));
+        views.put(window.id(), view);
+        return view;
+    }
+
+    /** Every open window's view shows the current hosts, distributions and choice; a closed window's view is dropped. */
+    private void renderViews() {
+        for (var entry : List.copyOf(views.entrySet())) {
+            var window = context.terminals().window(entry.getKey()).filter(WindowHandle::isOpen);
+            if (window.isEmpty()) { views.remove(entry.getKey()); selection.forget(entry.getKey()); continue; }
+            try { entry.getValue().update(new ViewSpec(classic(window.get()))); }
+            catch (IllegalStateException closed) { views.remove(entry.getKey()); }
+        }
+    }
+
+    private List<Option> options() {
+        var options = new ArrayList<Option>();
+        store.hosts().stream().sorted(Comparator.comparing(RemoteHost::name, String.CASE_INSENSITIVE_ORDER).thenComparing(RemoteHost::id))
+            .forEach(host -> options.add(new Option("host:" + host.id(), host.name() + " (" + host.hostname() + ")", Optional.empty())));
+        for (ShellProfileInfo profile : distros.get())
+            options.add(new Option("distro:" + profile.id(), profile.name() + profile.detail().map(detail -> " (" + detail + ")").orElse(""), Optional.empty()));
+        if (options.isEmpty()) options.add(new Option(NONE_OPTION, "No saved sessions", Optional.empty()));
+        options.add(new Option(MANAGE_OPTION, "Manage Sessions…", Optional.empty()));
+        return options;
+    }
+
+    /** The window's row: its choice while it is listed, else its active SSH pane's host, else the first host or distribution. */
+    Optional<String> current(WindowHandle window) {
+        var listed = options().stream().map(Option::id).filter(id -> id.startsWith("host:") || id.startsWith("distro:")).toList();
+        var chosen = selection.get(window.id()).filter(listed::contains);
+        if (chosen.isPresent()) return chosen;
+        var pane = activeHost.apply(window).map(id -> "host:" + id).filter(listed::contains);
+        return pane.isPresent() ? pane : listed.stream().findFirst();
+    }
+
+    private Nodes.Stack classic(WindowHandle window) {
+        var current = current(window);
+        return new Nodes.Stack(VIEW, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Text(LABEL, ControlState.READY, "Session:", Nodes.TextRole.LABEL),
+            new Nodes.Choice(CHOICE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options(), current.orElse(NONE_OPTION), "Session", ""),
+            new Nodes.Button(CONNECT, new ControlState(true, current.isPresent(), false, ""), "Connect", "", Nodes.ButtonKind.PRIMARY, CONNECT, "")));
+    }
+
+    private void classicEvent(WindowHandle window, UiEvent event) {
+        switch (event) {
+            case UiEvent.Selected chosen when chosen.id().equals(CHOICE) -> {
+                String id = chosen.ids().stream().findFirst().orElse(NONE_OPTION);
+                if (id.equals(MANAGE_OPTION)) showHosts.accept(window);
+                else if (!id.equals(NONE_OPTION)) selection.set(window.id(), Optional.of(id));
+                renderViews();
+            }
+            case UiEvent.Action action when action.id().equals(CONNECT) -> connect(window);
+            default -> { }
+        }
+    }
+
+    /** Connect: activates the window's host (focus a running pane, else open one) or opens its distribution. */
+    void connect(WindowHandle window) {
+        current(window).ifPresent(row -> {
+            if (row.startsWith("host:")) store.host(UUID.fromString(row.substring("host:".length()))).ifPresent(host -> activate.accept(window, host));
+            else distros.get().stream().filter(profile -> ("distro:" + profile.id()).equals(row)).findFirst()
+                .ifPresent(profile -> openDistro.accept(window, profile));
+        });
     }
 
     /** A valid action id for any profile id: distribution names may hold capitals and dots, which action ids may not. */

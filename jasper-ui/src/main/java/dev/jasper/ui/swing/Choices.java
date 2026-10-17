@@ -28,8 +28,11 @@ final class Choices {
         /** A FULL-form setting row's trailing dropdown uses the compact setting-control height. */
         boolean fullSetting;
         @Override void embeddedLabel(boolean value) { embedded=value;label.setVisible(labelShown()); }
-        /** A TABS choice is labelled by its tabs; its label stays the accessible name. */
-        boolean labelShown() { return !embedded && ((Nodes.Choice)node).kind() != Nodes.ChoiceKind.TABS; }
+        /**
+         * A TABS choice is labelled by its tabs, and a choice in a toolbar view's one-line row by the view's LABEL text
+         * (spec 10.3); either label stays the accessible name.
+         */
+        boolean labelShown() { return !embedded && ((Nodes.Choice)node).kind() != Nodes.ChoiceKind.TABS && !view.toolbarStrip(); }
         /**
          * A DROPDOWN in a table cell (its row sets this on every populate): bare until hovered, focused or open, as wide
          * as its value and chevron, and while bare on a selected row its value and chevron take {@code ink}; null off one.

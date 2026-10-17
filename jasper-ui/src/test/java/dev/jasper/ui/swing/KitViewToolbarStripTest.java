@@ -69,6 +69,29 @@ class KitViewToolbarStripTest {
         });
     }
 
+    /** Plan 10a: a toolbar view's row is one line, so its LABEL text names a dropdown, whose own label stays its accessible name. */
+    @Test void aToolbarStripShowsNoCaptionAboveADropdown() {
+        Edt.run(() -> {
+            var ready = ControlState.READY;
+            var spec = new ViewSpec(new Nodes.Stack("bar", ready, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Text("bar.label", ready, "Session:", Nodes.TextRole.LABEL),
+                new Nodes.Choice("bar.host", ready, Nodes.ChoiceKind.DROPDOWN, List.of(new dev.jasper.ui.model.Option("mac", "Mac", java.util.Optional.empty())),
+                    "mac", "Session", "host"))));
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, spec, event -> { })) {
+                var choice = (Choices.ChoiceControl) view.control("bar.host");
+                assertThat(choice.label.isVisible()).as("a caption outside a toolbar").isTrue();
+                int captioned = view.getPreferredSize().height;
+                view.toolbarStrip(true);
+                assertThat(choice.label.isVisible()).as("no caption in a toolbar strip").isFalse();
+                assertThat(choice.input.getAccessibleContext().getAccessibleName()).isEqualTo("Session");
+                assertThat(view.getPreferredSize().height).as("one line").isLessThan(captioned);
+                view.toolbarStrip(false);
+                assertThat(choice.label.isVisible()).isTrue();
+            } finally { context.binding().close(); context.icons().close(); }
+        });
+    }
+
     @Test void theFlagIsReportedAndAClosedViewRefusesIt() {
         Edt.run(() -> {
             var context = KitFixtures.context();
