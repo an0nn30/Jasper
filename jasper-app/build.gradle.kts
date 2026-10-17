@@ -100,6 +100,7 @@ tasks.test {
     inputs.file(configExample).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/expected")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.file("docs/design/theme-engine/migration.csv")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.file("docs/design/enterprise/reference")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.fileTree("docs/design/theme-engine/before-f16ae32f")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(rootProject.layout.projectDirectory.file("docs/configuration.md")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.file("packaging/icons/Jasper.icns"), rootProject.file("packaging/icons/Jasper.ico"),

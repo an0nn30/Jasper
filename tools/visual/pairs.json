@@ -439,5 +439,50 @@
     ],
     "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png",
     "note": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case. Edge agreement 0.340 before, 0.341 after."
+  },
+  {
+    "name": "chrome-menu-row-light",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      60,
+      2880,
+      50
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-light-window.png",
+    "render_crop": [
+      0,
+      0,
+      2880,
+      50
+    ],
+    "min_agreement": 0.5,
+    "colours": [
+      "#ECEDEF",
+      "#D3D6DA",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "chrome-menu-row-dark",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      60,
+      2880,
+      50
+    ],
+    "render": "jasper-app/build/chrome-renders/enterprise-dark-window.png",
+    "render_crop": [
+      0,
+      0,
+      2880,
+      50
+    ],
+    "min_agreement": 0.5,
+    "colours": [
+      "#3C3F44",
+      "#DFE1E5"
+    ]
   }
 ]
