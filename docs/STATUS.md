@@ -51,8 +51,8 @@ parenthesised in `text.secondary`, the dot held to 3:1 on the header's surface; 
 classic catalog (the final review: each glyph in a 10 px box, in one ink); (16) derived surfaces lean toward the variant's text (`SurfaceContrast.beyond` replaces `apart`); (17)
 a non-default look's dock under `[look."<id>"]`, the rest of ui-state global, a bad look entry falls back alone; (18) a
 look's first dock uses the default sizes and each panel's registered slot; (19) Event Log is the panel's title and
-accessible name only; (20) the dock group lands in Task 12; (21) the mock comparisons crop surfaces, aligned on the
-fill's centre across the thickness, the Unlock Vault crops under the 21 % scrim; (22) the default look's pixel proof is
+accessible name only; (20) the dock group lands in Task 12; (21) the mock comparisons crop surfaces, the side
+stripes from their outer edge (as approved below), the Unlock Vault crops under the 21 % scrim; (22) the default look's pixel proof is
 the gallery plus `DefaultDockPixelsTest`; (23) 4a Rulings 16's three hand-offs are taken here; (24) a stripe never
 scrolls, labels past its end are clipped; (25) labelled side stripes have no foot group; (26) this plan writes spec
 19.2's banner lines for the Dock layout and Notifications designs. Execution notes (2026-10-17): R1 refreshed at
@@ -85,7 +85,10 @@ review's fixes. GUI checks for the user (spec 16.2): stripe drag and drop includ
 bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip (Catppuccin included), the header action glyphs, and Enterprise Dark's dock
 against the Dark Mode mock. Rulings 4 for the bottom strip, approved on 2026-10-17 by the orchestrator under the user's
 overnight authority (the mock wins on layout): the bottom strip is the Workstation mocks' 24 px plus its 1 px rule,
-independent of `window.rail_width` (spec 10.7 amended); the side stripes keep their thickness. Not merged, not pushed.
+independent of `window.rail_width` (spec 10.7 amended); the side stripes keep their thickness. Rulings 21 for the side
+labels, approved on 2026-10-17 under the same authority: a side label's line lies at the stripe's outer edge as the mocks
+set it (its baseline the face's ascent from that edge, caps 3 to 12 px from it), not centred, the 28 px stripe's extra
+thickness on its inner side. Not merged, not pushed.
 Merged with main (plans 5b, 11 and 9a) as `decb7a418`: `EnterpriseLook.theme(boolean)` and `install(boolean)` draw the
 shipped kit, IBM Plex and theme, and the printed probes are asserted under Plex (`MockProfile.fonts`,
 `MockCrops.fontsFloor`) after the labels take the mocks' measure, `STRIPE_LABEL_PADDING` 10 (Rulings 5's ±1), a label's
@@ -93,10 +96,9 @@ length its padding and its kerned fractional advance rounded (`ChromePainter.set
 the side stripes' fill (their thickness less the rule; Rulings 8's lead was 1 px past the mocks') on a whole-pixel
 baseline, and a header strip's count `HEADER_STRIP_COUNT_GAP` (6, new) after the title's set advance, a dot or word the
 title gap after it (at 2x the stripes' and the strip's edges within 2 px, the header counts' starts within 1 and ends
-within 3; agreement: headers 0.945 to 0.984 for 0.94, the bottom strip 0.932 to 0.935 for 0.92, the side stripes 0.920
-to 0.935 compared on the mocks' label line, which the mocks set at the stripe's outer edge, 7 px at 2x from our centred
-labels (`DockMockTest.LABEL_LINE`, a residual), for a floor lowered explicitly to 0.91 since the Light left stripe
-agrees at 0.9197 over the open tile, #D7D9DC against the mock's #CFD4DC, 8 apart, now `tileTolerance`); the bottom strip
+within 3; agreement: headers 0.945 to 0.984 for 0.94, the bottom strip 0.932 to 0.935 for 0.92, the side stripes 0.932
+to 0.946 for 0.92 with their labels' line at the outer edge as approved above, within 1 px of the mocks' (exact); the
+Light open tile, #D7D9DC against the mock's #CFD4DC, measures 8 apart, now `tileTolerance`); the bottom strip
 is 24 + 1 (`BOTTOM_STRIP_HEIGHT`, new, as approved above) and its probes and pairs compare the whole strip with its rule;
 `derived-roles-enterprise.tsv` and `EnterpriseThemeTest` pass unchanged under `SurfaceContrast.beyond` (no Enterprise
 derived role moved); `EnterpriseFirstWindowTest` asserts Event Log at Bottom Left and the look's dock layout key; the

@@ -116,13 +116,17 @@ class LabelledStripeTest {
                     false, badge, OptionalInt.empty())), List.of());
                 var image = MockCrops.render(stripe, stripe.getPreferredSize().width, 200, 1);
                 Rectangle label = stripe.buttons().getFirst().getBounds();
-                int rows = 0, sum = 0;
+                int rows = 0, sum = 0, across = 0;
                 for (int y = label.y; y < label.y + label.height; y++)
-                    for (int x = label.x; x < label.x + label.width; x++) if (image.getRGB(x, y) == ground.getRGB()) { rows++; sum += y; }
+                    for (int x = label.x; x < label.x + label.width; x++)
+                        if (image.getRGB(x, y) == ground.getRGB()) { rows++; sum += y; across += x; }
                 assertThat(rows).as(side + ": the pill is painted").isPositive();
-                int middle = label.y + label.height / 2;
+                int middle = label.y + label.height / 2, centre = label.x + label.width / 2;
                 if (side == Side.LEFT) assertThat(sum / rows).as("the pill ends the label, read bottom to top").isLessThan(middle);
                 else assertThat(sum / rows).as("the pill ends the label, read top to bottom").isGreaterThan(middle);
+                // The label's line, and its pill with it, lies along the stripe's outer edge, as the mocks set it.
+                if (side == Side.LEFT) assertThat(across / rows).as("on the left stripe's outer half").isLessThan(centre);
+                else assertThat(across / rows).as("on the right stripe's outer half").isGreaterThan(centre);
             }
         } finally { EnterpriseLook.restoreDefault(); }
     }

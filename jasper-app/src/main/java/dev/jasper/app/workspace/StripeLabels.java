@@ -14,6 +14,8 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.font.FontRenderContext;
+import java.awt.font.LineMetrics;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -81,24 +83,39 @@ final class StripeLabels {
     }
 
     /**
-     * Paints a label in text space, from its start, centred across {@code across} on a whole-pixel baseline (the mocks'
-     * bottom strip sets its 24 px line's at 17): its text, held on the stripe, a hovered tile or an open tile, then its
-     * badge's pill.
+     * Paints a label in text space, from its start, on a whole-pixel baseline: its text, held on the stripe, a hovered tile
+     * or an open tile, then its badge's pill on the text's line. Text space's {@code y} runs across from a side stripe's
+     * outer edge, where the mocks set a side label's line ({@code outerEdge}: the baseline the face's ascent from that
+     * edge, the extra thickness of the stripe on its inner side); otherwise the line is centred across {@code across} (the
+     * mocks' bottom strip sets its 24 px line's baseline at 17).
      */
-    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, GeneratedTheme theme, boolean open, boolean hover) {
+    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, boolean outerEdge, GeneratedTheme theme,
+               boolean open, boolean hover) {
         painter.prepareText(g);
         Font font = font();
         g.setFont(font);
         FontMetrics metrics = g.getFontMetrics(font);
+        int baseline, lineHeight;
+        if (outerEdge) {
+            LineMetrics line = font.getLineMetrics(text, TEXT_CONTEXT);
+            baseline = Math.round(line.getAscent());
+            lineHeight = Math.round(line.getAscent() + line.getDescent());
+        } else {
+            baseline = Math.round((across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent());
+            lineHeight = across;
+        }
         int x = styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING);
         g.setColor(painter.stripeLabel(theme, open, hover));
-        g.drawString(text, (float) x, (float) Math.round((across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent()));
+        g.drawString(text, (float) x, (float) baseline);
         if (badge.isEmpty()) return;
         String count = Integer.toString(badge.get().count());
         Dimension pill = painter.countPill(count);
         painter.countPill(g, x + painter.measureText(font, text) + styles.metric(DesignMetrics.Role.STRIPE_PILL_GAP),
-            (across - pill.height) / 2, count, theme, badge.get().tone() == PanelBadge.Tone.ERROR);
+            (lineHeight - pill.height) / 2, count, theme, badge.get().tone() == PanelBadge.Tone.ERROR);
     }
+
+    /** The fractional antialiased context a side label's line is measured in. */
+    private static final FontRenderContext TEXT_CONTEXT = new FontRenderContext(null, true, true);
 
     /**
      * One label: a window's toggle or a rail action's button, which its stripe lays out and paints. An action's label has a

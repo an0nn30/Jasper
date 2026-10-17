@@ -251,7 +251,7 @@ final class BottomStrip extends DockStripe {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
-            labels.paint(g, label.text(), label.badge(), label.getHeight(), theme, open, hover);
+            labels.paint(g, label.text(), label.badge(), label.getHeight(), false, theme, open, hover);
         } finally { g.dispose(); }
     }
 }
