@@ -1,7 +1,6 @@
 package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
@@ -10,9 +9,8 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 
-/** SDK 0.18's Properties (spec 8.2): a heading over a card of label and value rows. */
+/** SDK 0.18's Properties (spec 8.2): a heading over its rows, drawn by the kit's {@link PropertiesFace}. */
 final class PropertyLists {
     private PropertyLists() {}
 
@@ -22,43 +20,42 @@ final class PropertyLists {
     }
 
     static final class PropertiesControl extends ControlRegistry.Control {
-        final JLabel title = Labels.literal();
-        final Cards.CardSurface card;
+        final PropertiesFace face;
+        final JLabel title;
+        final JComponent rows;
         final ArrayList<JLabel> labels = new ArrayList<>(), values = new ArrayList<>();
 
         PropertiesControl(KitView view, Nodes.Properties node) {
             super(view, node, new JPanel());
             component.setOpaque(false);
-            card = new Cards.CardSurface(view.context());
+            face = view.context().faces().properties;
+            title = face.title();
+            rows = face.container(this);
             KitOwnership.mark(title, node.id() + ".title");
-            KitOwnership.mark(card, node.id() + ".rows");
-            card.setLayout(new Grid(this));
-            Stacks.mount(component, List.<JComponent>of(title, card));
+            KitOwnership.mark(rows, node.id() + ".rows");
+            rows.setLayout(face.grid(this));
+            Stacks.mount(component, List.<JComponent>of(title, rows));
             refresh();
         }
 
         @Override void refresh() {
             state();
-            var properties = (Nodes.Properties) node; var theme = context().theme();
+            var properties = (Nodes.Properties) node;
             int count = properties.rows().size();
-            while (labels.size() > count) { card.remove(labels.removeLast()); card.remove(values.removeLast()); }
+            while (labels.size() > count) { rows.remove(labels.removeLast()); rows.remove(values.removeLast()); }
             while (labels.size() < count) {
                 int index = labels.size();
                 var label = Labels.literal(); var value = Labels.literal();
                 KitOwnership.mark(label, node.id() + ".label." + index);
                 KitOwnership.mark(value, node.id() + ".value." + index);
                 label.setLabelFor(value);
-                labels.add(label); values.add(value); card.add(label); card.add(value);
+                labels.add(label); values.add(value); rows.add(label); rows.add(value);
             }
             for (int i = 0; i < count; i++) {
                 var row = properties.rows().get(i); var label = labels.get(i); var value = values.get(i);
-                label.setText(row.label());
-                Composition.style(label, context(), Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
+                label.setText(face.labelText(properties, row.label()));
                 value.setText(row.value());
                 value.setToolTipText(row.value().isEmpty() ? null : row.value());
-                value.setFont(ThemePainting.font(context(), row.technical() ? Typography.Role.MONO : Typography.Role.BODY, row.value()));
-                value.setForeground(row.severity().map(severity -> SurfaceContrast.painted(theme, valuePair(severity)))
-                    .orElseGet(() -> ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)));
                 // A data value keeps its end in view when it is shortened, as monospaced text does.
                 value.putClientProperty("Jasper.leadingEllipsis", row.technical());
                 label.setEnabled(component.isEnabled()); value.setEnabled(component.isEnabled());
@@ -66,15 +63,34 @@ final class PropertyLists {
             title.setText(properties.title());
             title.setVisible(!properties.title().isBlank());
             title.setEnabled(component.isEnabled());
-            Composition.style(title, context(), Typography.Role.SECTION_LABEL, SemanticColor.TEXT_TERTIARY);
-            int pad = ThemePainting.metric(context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(context(), DesignMetrics.Role.HAIRLINE);
-            card.setBorder(new EmptyBorder(pad, pad, pad, pad));
-            component.setLayout(new Composition.Vertical(ThemePainting.metric(context(), DesignMetrics.Role.SECTION_LABEL_GAP)));
+            face.style(this);
             component.revalidate(); component.repaint();
+        }
+
+        Nodes.Node node() { return node; }
+        JComponent component() { return component; }
+    }
+
+    /** The classic heading: a literal label that fills its background when the face makes it opaque (the title band). */
+    static final class TitleLabel extends Labels.LiteralLabel {
+        TitleLabel() { putClientProperty("html.disable", true); }
+        @Override protected void paintComponent(Graphics g) {
+            if (isOpaque()) { g.setColor(getBackground()); g.fillRect(0, 0, getWidth(), getHeight()); }
+            super.paintComponent(g);
         }
     }
 
-    /** A label column as wide as the widest label, then one value column; one line per row. */
+    /** The classic rows' container: the face paints its bands and rules under the labels and values. */
+    static final class GridSurface extends JPanel {
+        final PropertiesControl owner;
+        GridSurface(PropertiesControl owner) { this.owner = owner; setOpaque(false); }
+        @Override protected void paintComponent(Graphics g) {
+            var graphics = (Graphics2D) g.create();
+            try { owner.face.paint(owner, graphics, getWidth(), getHeight()); } finally { graphics.dispose(); }
+        }
+    }
+
+    /** A label column as wide as the widest label, then one value column; one line per row (the default face). */
     static final class Grid implements Composition.WidthLayout {
         final PropertiesControl owner;
 

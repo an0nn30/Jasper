@@ -30,6 +30,12 @@ classic	ClassicEmptyFace	text.secondary	surface.app	CONTRAST:4.5
 classic	ClassicTableFace	text.strong.secondary	surface.tableHeader	CONTRAST:4.5
 classic	ClassicTableFace	border.control	surface.app	CONTRAST:1.5
 classic	ClassicTableFace	text.secondary	surface.tableHeader	CONTRAST:4.5
+classic	ClassicPropertiesFace	text.strong.secondary	surface.panel	CONTRAST:4.5
+classic	ClassicPropertiesFace	text.secondary	surface.panel	CONTRAST:4.5
+classic	ClassicPropertiesFace	text.primary	surface.card	CONTRAST:4.5
+classic	ClassicPropertiesFace	border.window	surface.panel	CONTRAST:1.3
+classic	ClassicPropertiesFace	text.secondary	surface.app	CONTRAST:4.5
+classic	ClassicPropertiesFace	text.primary	surface.app	CONTRAST:4.5
 classic	ClassicTreeFace	text.strong.secondary	surface.tableHeader	CONTRAST:4.5
 classic	ClassicTreeFace	border.control	surface.app	CONTRAST:1.5
 classic	ClassicTreeFace	text.secondary	surface.card	CONTRAST:3.0
