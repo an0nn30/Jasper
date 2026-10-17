@@ -636,8 +636,8 @@ keys and focus, and closing it hands them to the one below (Vault unlock over Re
 overlay's `show` blocks in a secondary loop until it closes and lets Escape reach its form; a progress overlay returns
 at once and keeps Escape from the window. Under the classic dialog mapping (the Enterprise presentation) a modal overlay
 or attached sheet whose owner window is showing is a `ClassicDialog` hosted by the same `WindowOverlay`, centred on the
-window or joined under its title bar; without a showing window it opens as a native dialog. `GraphiteChromeTest` writes headless full-window
-previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
+window or joined under its title bar; without a showing window it opens as a native dialog. `GraphiteChromeTest` writes
+headless full-window previews to `build/render-preview/fluid-workspace-{dark,light}.png`.
 
 
 Status-bar breadcrumbs are rendered by `PathBreadcrumbs` from the focused pane's

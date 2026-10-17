@@ -15,34 +15,53 @@ every surface; a marked modal overlay or attached sheet over a showing window is
 `WindowOverlay`, centred on the whole window or joined under its title bar, its form titled by the strip
 (`KitView.hostTitled`) and footed by the band (`dialogBand`); without a showing window it opens natively. The Enterprise
 fixture theme (`enterprise-fixture.json`, until plan 5b, which copies the values) takes the mocks' tab strip, tab
-indicator, scrim and dividers. `EnterpriseWorkstationMockTest` and
-`EnterpriseDialogMockTest` compare the toolbar row, tabs and status cells with the Workstation and Dark Mode mocks and
-the dialogs with Credential Vault 1, 4 and 5 under 6a's fixture kit and theme (opt-in pairs through `compare_all.py`:
-menu row 0.988 and 0.988, toolbar 0.737 and 0.724, tabs 0.809 and 0.799, status 0.692 and 0.695 (Light and Dark), Unlock Vault strip 0.985 and footer 0.799, Add Login strip 0.962 and footer 1.000, Add SSH Key strip 0.925; swatches: Add Login `2F65CA` against the mock's `2F65CA` (ΔE 0.0), Add SSH Key `2C8B48` against `2E9E4F` (ΔE 9.7, Execution notes R39); probes that follow the face's widths, printed until plan 5b's Plex: at 2×, Light and Dark: "New Session"'s ink width 141 and 140 for 134, the search field's left 2110 for 2116, "Settings…" from 2740 for 2742, the rules before UTF-8 and the warning 2418 and 2536 for 2470 and 2574, the run item 130 wide for 122; the titles Unlock Vault 143 for 138, Add Login 116 for 108 and Add SSH Key 154 for 143). Rulings (plan,
-"Rulings"): (1) the window content lands at the end; (2) the mocks' tab strip, tab indicator, scrim and dividers are
-Enterprise theme values; (3) **approved on 2026-10-17 by the orchestrator under the user's overnight authority:
-`border.divider` becomes a ninth overridable derived role, a deviation from spec 7.2** (Enterprise Dark's recipe value
-`#2B2D31` is darker than the mock's `#4A4D53`; the spec's 7.1 and 7.2 are amended); (4) the
-toolbar's leading pack is a separate branch; (5) the classic header's trailing group, field shrink and collapse,
-`hidden` and `icons`; (6) the search field's light keycap; (7) classic tabs keep `window.tab_height` (the mock's strip
-is 1 px shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the
-configuration cell only for a problem; (9) the run item in `accent.edge`, on `surface.control.selected` while the
-palette is open; (10) `ClassicDialog` in jasper-ui, radius 4, **centred on the whole window, a deviation from spec
-10.8's "centred in the window's content" (the mock wins on layout)**; (11) `AuxiliaryWindows` marks every surface,
-native without a showing window (a sheet as a centred dialog), content set later marked too; (12) `hostTitled` hides
-the form's title label and only a hero that repeats it (a prompt keeps its tile and message), and `dialogBand` lets the
-card own the form's frame; (13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the
-Workstation render leads with the run item; (16) under a native title the header row is window chrome; (17) the
-window chrome's declared pairs (`WindowPairs`, `ClassicDialog.pairs`) are sampled over every palette under both kits,
-the `border.divider` rules painted as the role; Execution notes (2026-10-17) R18 to R53 (the fixture theme in 5b's
-place, `ProjectionReadTest`, `WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the
-band's trailing actions, the tab strip's dividers painted as the role, the face-width probes printed until 5b, 5b's
-merge items, and the run item on its bar's surface).
-Deviations from the plan's text: Task 2's review: `WindowToolbar`'s leading pack gives way as the trailing one does (a button that overflowed before a wide view returns once the view hides, labels return once the row fits them) and the overflow button takes the gap only after a shown control; Task 4's review (the plan's banner): past `CLASSIC_TAB_MIN_LABEL` the strip clips its last tabs under a "+" kept at its trailing edge (clipped tabs are reached by Next Tab, Previous Tab, Select Tab N and their accessible actions; no list, no scroll into view, a candidate follow-up), the "+" is a flat unfocusable `JButton`, a tab's × closes on a release over it and is the tab's "Close tab" action, and tab tips are capped with HTML off; Task 5's review: `RuledCells` rules each contributed item halfway between it and the one before it, progress views are cells, a content tab hides "UTF-8", a narrow bar collapses cells without a rule, and the idle run item lies on its bar's surface (`WindowPairs.SLASH_RUN`, Execution notes R53), CHECKED while the palette is open and run on a release; Task 7's review (the plan's banner): a surface owned by a classic dialog hangs from its window (`NativeShells.drawnInWindow`), an attached sheet is never host-titled, `create` decides through `NativeShells.ClassicRoute`, the host flags are `CLASSIC_FLAGS`, the strip takes no focus, a classic modal overlay that opens natively passes through `nativeFallback` (host-titled once native), an owner window under a minimised one is not showing, and a centred dialog follows its window's title bar (`NativeShells.followTitleBar`). `./gradlew check --continue`: **10,966 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec
-16.2): with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell,
-"▶ Run…" opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second
-dialog over the first, the window closing under them, full screen under them, and either requested over a minimised
-window, which opens it natively). Not merged, not pushed.
+indicator, scrim and dividers. `EnterpriseWorkstationMockTest` and `EnterpriseDialogMockTest` compare the toolbar row,
+tabs and status cells with the Workstation and Dark Mode mocks and the dialogs with Credential Vault 1, 4 and 5 under
+6a's fixture kit and theme (opt-in pairs through `compare_all.py`: menu row 0.988 and 0.988, toolbar 0.737 and 0.724,
+tabs 0.809 and 0.799, status 0.692 and 0.695 (Light and Dark), Unlock Vault strip 0.985 and footer 0.799, Add Login
+strip 0.962 and footer 1.000, Add SSH Key strip 0.925; swatches: Add Login `2F65CA` against the mock's `2F65CA` (ΔE
+0.0), Add SSH Key `2C8B48` against `2E9E4F` (ΔE 9.7, Execution notes R39); probes that follow the face's widths, printed
+until plan 5b's Plex: at 2×, Light and Dark: "New Session"'s ink width 141 and 140 for 134, the search field's left 2110
+for 2116, "Settings…" from 2740 for 2742, the rules before UTF-8 and the warning 2418 and 2536 for 2470 and 2574, the
+run item 130 wide for 122; the titles Unlock Vault 143 for 138, Add Login 116 for 108 and Add SSH Key 154 for 143).
+Rulings (plan, "Rulings"): (1) the window content lands at the end; (2) the mocks' tab strip, tab indicator, scrim and
+dividers are Enterprise theme values; (3) **approved on 2026-10-17 by the orchestrator under the user's overnight
+authority: `border.divider` becomes a ninth overridable derived role, a deviation from spec 7.2** (Enterprise Dark's
+recipe value `#2B2D31` is darker than the mock's `#4A4D53`; the spec's 7.1 and 7.2 are amended); (4) the toolbar's
+leading pack is a separate branch; (5) the classic header's trailing group, field shrink and collapse, `hidden` and
+`icons`; (6) the search field's light keycap; (7) classic tabs keep `window.tab_height` (the mock's strip is 1 px
+shorter); (8) ruled cells keep `window.status_bar_height` (the mock's bar is 2 px shorter) and show the configuration
+cell only for a problem; (9) the run item in `accent.edge`, on `surface.control.selected` while the palette is open;
+(10) `ClassicDialog` in jasper-ui, radius 4, **centred on the whole window, a deviation from spec 10.8's "centred in the
+window's content" (the mock wins on layout)**; (11) `AuxiliaryWindows` marks every surface, native without a showing
+window (a sheet as a centred dialog), content set later marked too; (12) `hostTitled` hides the form's title label and
+only a hero that repeats it (a prompt keeps its tile and message), and `dialogBand` lets the card own the form's frame;
+(13) the Vault bodies are plan 10's; (14) a swatch is its hue's theme role; (15) the Workstation render leads with the
+run item; (16) under a native title the header row is window chrome; (17) the window chrome's declared pairs
+(`WindowPairs`, `ClassicDialog.pairs`) are sampled over every palette under both kits, the `border.divider` rules
+painted as the role; Execution notes (2026-10-17) R18 to R53 (the fixture theme in 5b's place, `ProjectionReadTest`,
+`WorkspaceChrome`'s equality, the strip rule against the dialog surface, the ring frame, the band's trailing actions,
+the tab strip's dividers painted as the role, the face-width probes printed until 5b, 5b's merge items, and the run item
+on its bar's surface).
+Deviations from the plan's text: Task 2's review: `WindowToolbar`'s leading pack gives way as the trailing one does (a
+button that overflowed before a wide view returns once the view hides, labels return once the row fits them) and the
+overflow button takes the gap only after a shown control; Task 4's review (the plan's banner): past
+`CLASSIC_TAB_MIN_LABEL` the strip clips its last tabs under a "+" kept at its trailing edge (clipped tabs are reached by
+Next Tab, Previous Tab, Select Tab N and their accessible actions; no list, no scroll into view, a candidate follow-up),
+the "+" is a flat unfocusable `JButton`, a tab's × closes on a release over it and is the tab's "Close tab" action, and
+tab tips are capped with HTML off; Task 5's review: `RuledCells` rules each contributed item halfway between it and the
+one before it, progress views are cells, a content tab hides "UTF-8", a narrow bar collapses cells without a rule, and
+the idle run item lies on its bar's surface (`WindowPairs.SLASH_RUN`, Execution notes R53), CHECKED while the palette is
+open and run on a release; Task 7's review (the plan's banner): a surface owned by a classic dialog hangs from its
+window (`NativeShells.drawnInWindow`), an attached sheet is never host-titled, `create` decides through
+`NativeShells.ClassicRoute`, the host flags are `CLASSIC_FLAGS`, the strip takes no focus, a classic modal overlay that
+opens natively passes through `nativeFallback` (host-titled once native), an owner window under a minimised one is not
+showing, and a centred dialog follows its window's title bar (`NativeShells.followTitleBar`).
+`./gradlew check --continue`: **10,966 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user (spec 16.2):
+with Enterprise on, the toolbar row giving way as the window narrows, many tabs, a configuration warning cell, "▶ Run…"
+opening the palette, Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog
+over the first, the window closing under them, full screen under them, and either requested over a minimised window,
+which opens it natively). Not merged, not pushed.
 
 **Enterprise presentation, plan 6a: the window shell — 2026-10-16** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `c1999c303..7fb8ee9c3`, then this documentation commit and the final review fixes;

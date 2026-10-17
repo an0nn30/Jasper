@@ -221,18 +221,18 @@ the system title bar stays and the header is the top row of `WindowContent`. A l
 Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
 macOS's screen menu bar off, so each window's menus are a row in the window (an auxiliary frame's File row takes the
 classic row's look, `ClassicMenuRow`). A native-titled macOS frame's appearance follows the theme; Jasper gives the
-Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and `ShellChrome.of` (windows) read the look's projections and choose
-the strategies, among them `MenuBarLayout`: `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session,
-Transfer, plugin menus, Tools, Window, Help). `WindowTitle` fills the look's title template. `WorkspaceChrome.of`
-also picks the window content: `HeaderComposition` (`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed
-buttons with the search field and Settings… trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`),
-`StatusCells` (`SlashSegments`, or `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's
-dialog mapping and marks the surfaces it makes; `NativeShells` draws a marked modal overlay or attached sheet whose
-window is showing in that window as a `ClassicDialog`. The field shows `WindowHeaderContext` and opens the palette, which
-`WindowCommandPalette` anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized
-to content with a 3 px selection underline, wheel scrolling and a ▾ list of all tabs. Each pane's
-`FindBar` is IntelliJ's single-line find row. App icons resolve from bundled assets. Since SDK
-0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured to the chrome
+Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
+`ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
+`StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
+`WindowTitle` fills the look's title template. `WorkspaceChrome.of` also picks the window content: `HeaderComposition`
+(`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field and Settings…
+trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
+`RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
+it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
+`ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`
+anchors to the field's bounds. `WindowTabs` are IntelliJ editor tabs sized to content with a 3 px selection underline,
+wheel scrolling and a ▾ list of all tabs. Each pane's `FindBar` is IntelliJ's single-line find row. App icons resolve
+from bundled assets. Since SDK 0.7.6, plugin-supplied SVGs draw as authored and are no longer recoloured to the chrome
 foreground (see [SDK architecture](sdk-architecture.md)).
 The header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
 named glyphs painted inside them use the kit's original chrome artwork (`IconRegistry.chromeIcon`) without changing
