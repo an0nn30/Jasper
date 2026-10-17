@@ -169,7 +169,7 @@ public final class AboutView extends JPanel {
         String committed = build.committedLine(hooks.zone());
         if (!committed.isEmpty()) facts.add(text(COMMITTED, committed, Nodes.TextRole.CAPTION));
         facts.add(text(LICENSE, "PolyForm Noncommercial 1.0.0", Nodes.TextRole.CAPTION));
-        facts.add(text(COPYRIGHT, "Copyright 2026 Dustin McKenna-Watts", Nodes.TextRole.CAPTION));
+        facts.add(text(COPYRIGHT, BuildInfo.COPYRIGHT, Nodes.TextRole.CAPTION));
         return new ViewSpec(new Nodes.Form("about", ControlState.READY, Nodes.FormKind.PROMPT_COMPACT, "About Jasper",
             Optional.of(new Nodes.Stack("about.hero", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, hero)),
             List.of(new Nodes.Stack("about.facts", ControlState.READY, Nodes.LayoutRole.PROMPT_HEADER, facts)), Optional.empty(),

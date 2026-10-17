@@ -102,4 +102,15 @@ class BuildInfoTest {
     @Test void theBuildWritesTheResource() {
         assertThat(BuildInfo.class.getResource(BuildInfo.RESOURCE)).isNotNull();
     }
+
+    /** Spec 10.11: the splash's version line is the version and the short commit, as About shows them. */
+    @Test void theSplashLineIsTheVersionAndTheShortCommitAsAboutShowsThem() {
+        assertThat(BuildInfo.of(facts("headTags", "v1.2.0")).buildLine()).isEqualTo("1.2.0 · Build 8ba67ed3");
+        assertThat(BuildInfo.of(facts("describe", "v1.2.0-14-g8ba67ed3")).buildLine()).isEqualTo("1.2.0 + 14 commits · Build 8ba67ed3");
+        assertThat(BuildInfo.of(facts()).buildLine()).as("no version").isEqualTo("Build 8ba67ed3");
+        assertThat(new BuildInfo(false, java.util.Optional.of("1.2.0"), 0, "", "", false, java.util.Optional.empty()).buildLine())
+            .as("no commit").isEqualTo("1.2.0");
+        assertThat(BuildInfo.UNKNOWN.buildLine()).isEqualTo("Development build");
+        assertThat(BuildInfo.COPYRIGHT).isEqualTo("Copyright 2026 Dustin McKenna-Watts");
+    }
 }
