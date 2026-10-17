@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.swing.*;
 
-/** One row of stable-size controls packed against the trailing edge; lower-priority controls move whole
+/** One row of stable-size controls packed against the trailing edge, or with {@link #packLeading} against the leading
+ * edge; lower-priority controls move whole
  * into a live overflow menu behind a vertical ellipsis. A contributed view never does: it hides while the row is too
  * narrow for it. */
 final class WindowToolbar extends JToolBar {
@@ -95,6 +96,17 @@ final class WindowToolbar extends JToolBar {
         return width;
     }
 
+    /** {@link #leadingWidth} with room for the overflow button when {@code overflowing}: a gap after a shown control, then the button. */
+    private int leadingWidth(java.util.Set<Component> hidden, boolean overflowing) {
+        int width = leadingWidth(hidden);
+        return overflowing ? width + buttonSide() + (anyShown(hidden) ? UIScale.scale(leading.gap()) : 0) : width;
+    }
+
+    private boolean anyShown(java.util.Set<Component> hidden) {
+        for (Component child : getComponents()) if (placed(child) && !hidden.contains(child)) return true;
+        return false;
+    }
+
     private boolean followedByShown(Component separator, java.util.Set<Component> hidden) {
         for (int i = getComponentIndex(separator) + 1; i < getComponentCount(); i++) {
             Component next = getComponent(i);
@@ -113,22 +125,40 @@ final class WindowToolbar extends JToolBar {
         // Labels give way before any control moves into the overflow menu.
         applyLabels(labelsWanted);
         var none = java.util.Collections.<Component>emptySet();
-        if (labelsWanted && leadingWidth(none) > available) applyLabels(false);
+        boolean labelsGaveWay = labelsWanted && leadingWidth(none) > available;
+        if (labelsGaveWay) applyLabels(false);
         var hidden = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Component, Boolean>());
         var removable = new ArrayList<Component>();
         for (Component child : getComponents()) if (placed(child)) removable.add(child);
         java.util.Collections.reverse(removable);
         removable.sort(Comparator.comparingInt(control -> ((JComponent) control).getClientProperty(PRIORITY) instanceof Integer p ? p : 50));
-        boolean overflowing = false;
+        boolean overflowing = false, viewHid = false;
+        var overflowed = new ArrayList<Component>();
         for (Component control : removable) {
-            if (leadingWidth(hidden) + (overflowing ? gap + side : 0) <= available) break;
+            if (leadingWidth(hidden, overflowing) <= available) break;
             boolean view = isView(control);
             if (!view && !(((JComponent) control).getClientProperty(MENU) instanceof Supplier<?>)) continue;
             hidden.add(control);
-            if (!view) overflowing = true;
+            if (view) viewHid = true; else { overflowing = true; overflowed.add(control); }
+        }
+        if (viewHid) {
+            // As in the trailing layout: buttons that gave way before a wide view come back, the most recently overflowed
+            // first, while they fit beside the overflow button any others still need.
+            for (int i = overflowed.size() - 1; i >= 0; i--) {
+                Component control = overflowed.get(i);
+                hidden.remove(control);
+                if (leadingWidth(hidden, i > 0) > available) { hidden.add(control); break; }
+                overflowed.remove(i);
+            }
+            overflowing = !overflowed.isEmpty();
+            // Labels that gave way for the view come back too when the row still fits with them.
+            if (labelsGaveWay) {
+                applyLabels(true);
+                if (leadingWidth(hidden, overflowing) > available) applyLabels(false);
+            }
         }
         int x = padding;
-        boolean previous = false;
+        boolean previous = false, anyShown = false;
         for (Component child : getComponents()) {
             if (child == overflow) continue;
             if (placed(child)) {
@@ -140,7 +170,7 @@ final class WindowToolbar extends JToolBar {
                 int height = isView(child) ? Math.min(getHeight(), child.getPreferredSize().height) : side;
                 child.setBounds(x, (getHeight() - height) / 2, width, height);
                 x += width;
-                previous = true;
+                previous = anyShown = true;
             } else if (child instanceof JSeparator) {
                 boolean shown = previous && followedByShown(child, hidden);
                 child.setVisible(shown);
@@ -152,7 +182,7 @@ final class WindowToolbar extends JToolBar {
             }
         }
         overflow.setVisible(overflowing);
-        if (overflowing) overflow.setBounds(x + gap, (getHeight() - side) / 2, side, side);
+        if (overflowing) overflow.setBounds(anyShown ? x + gap : x, (getHeight() - side) / 2, side, side);
         else overflow.setBounds(0, 0, 0, 0);
     }
     JButton overflowButton() { return overflow; }

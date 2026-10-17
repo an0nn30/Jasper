@@ -69,15 +69,49 @@ class WindowToolbarLeadingTest {
             assertThat(zoom.isVisible()).as("Maximize (priority 10) moves into the menu before the view (40)").isFalse();
             assertThat(view.isVisible()).isTrue();
             assertThat(bar.overflowButton().getX()).as("the overflow button follows the last shown control").isEqualTo(8 + 96 + 21 + 300 + 8);
-            bar.setSize(300, 34); bar.doLayout();
+            bar.setSize(8 + 96 + 8 + 24 + 8, 34); bar.doLayout();
             assertThat(view.isVisible()).as("then the view hides; it never overflows").isFalse();
             assertThat(bar.overflowMenu().getComponentCount()).as("only Maximize is in the menu").isEqualTo(1);
             assertThat(bar.overflowButton().getX()).isEqualTo(8 + 96 + 8);
             assertThat(first.isVisible()).isTrue();
+            bar.setSize(300, 34); bar.doLayout();
+            assertThat(view.isVisible()).isFalse();
+            assertThat(zoom.isVisible()).as("Maximize gave way before the view and fits once it hid").isTrue();
+            assertThat(zoom.getX()).isEqualTo(8 + 96 + 8);
+            assertThat(bar.overflowButton().isVisible()).isFalse();
+            assertThat(bar.overflowMenu().getComponentCount()).isZero();
+            bar.setSize(8 + 24 + 8, 34); bar.doLayout();
+            assertThat(first.isVisible() || zoom.isVisible() || view.isVisible()).isFalse();
+            assertThat(bar.overflowButton().getX()).as("with nothing shown the overflow button sits at the padding").isEqualTo(8);
             bar.setSize(1000, 34); bar.doLayout();
             assertThat(view.isVisible() && zoom.isVisible()).as("room again").isTrue();
             assertThat(bar.overflowButton().isVisible()).isFalse();
         });
+    }
+
+    /** As the trailing row's review fix (plan 3d): labels that gave way for a wide view come back once it hid. */
+    @Test void labelsThatGaveWayForAViewComeBackOnceItHid() throws Exception {
+        edt(() -> {
+            var bar = new WindowToolbar(() -> { });
+            bar.packLeading(CLASSIC);
+            bar.setBarHeight(34);
+            var labelled = new JButton(new AbstractAction("Sessions") { @Override public void actionPerformed(ActionEvent event) { } }) {
+                @Override public Dimension getPreferredSize() { return new Dimension(getText() == null ? 24 : 90, 24); }
+            };
+            labelled.putClientProperty("label", "Sessions");
+            WindowToolbar.entry(labelled, 80, () -> new JMenuItem("Sessions"));
+            bar.add(labelled);
+            var view = new JPanel(); view.setPreferredSize(new Dimension(300, 22)); WindowToolbar.view(view, 40); bar.add(view);
+            bar.finish();
+            bar.setSize(8 + 200 + 8, 34); bar.doLayout();
+            assertThat(view.isVisible()).isFalse();
+            assertThat(labelled.getText()).as("the row fits the label without the view").isEqualTo("Sessions");
+            assertThat(labelled.getBounds()).isEqualTo(new Rectangle(8, 5, 90, 24));
+        });
+    }
+
+    @Test void theClassicSpacingReadsTheClassicMetrics() {
+        assertThat(WindowToolbar.Leading.classic(dev.jasper.ui.metrics.DesignMetrics.CLASSIC)).isEqualTo(CLASSIC);
     }
 
     @Test void aTrailingRowLaysOutAsBefore() throws Exception {
