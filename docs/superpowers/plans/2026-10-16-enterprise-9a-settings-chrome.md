@@ -9,12 +9,13 @@ look implies hidden, and the look's font row copy; the default look stays byte-i
 
 **Architecture:** Plan 5a's `SettingsChrome` and `Composition` projections land (`Presentation.Landed.SETTINGS`) and reach
 the dialog through `SettingsDialog.Hooks` and every page through `PageContext`; only the six composition roots of spec 9.1
-may read `Composition` (`CompositionReadTest`), and the compositions themselves are plan 9b's. The dialog turns
+may read `Composition` (6a's `ProjectionReadTest`), and the compositions themselves are plan 9b's. The dialog turns
 `SettingsChrome` into values for jasper-ui: a `SettingsShell.Frame` (whether the header row is the window's title row,
 whether the navigation collapses), a row-menu on `Nodes.SettingRow` (`contextActions`, jasper-ui model only), and the
 classic catalog's Settings roles, which plan 9a measures from the mocks and adds to `DesignMetrics.CLASSIC`. A headless
-fixture (`EnterpriseSettings`) opens the real dialog under the shipped kit, Plex and the Enterprise theme over the bundled
-plugins, and `SettingsChromeMockTest` compares its 2x renders with each mock's sidebar, header and footer.
+fixture (`EnterpriseSettings`) opens the real dialog under plan 6a's `EnterpriseLook` (the fixture kit and theme in the
+platform faces until plan 5b ships the kit, Plex and the theme) over the bundled plugins, and `SettingsChromeMockTest`
+compares its 2x renders with each mock's sidebar, header and footer.
 
 **Tech Stack:** Java 25 on JetBrains Runtime 25, Swing and FlatLaf 3.7, the JDK class-file API (`java.lang.classfile`),
 Gradle 9.7 (Kotlin DSL), JUnit 6.1.3 and AssertJ 3.27.7, Python 3.11+ standard library for the mechanical edit scripts
@@ -30,47 +31,49 @@ and [9b](2026-10-16-enterprise-9b-settings-pages.md) (spec 12.2's compositions: 
 recording band, Plugins, Shell, and the full-page renders).
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/enterprise-9`, branch
-`claude/enterprise-settings`, cut from `main` at `deafed424` and holding only this plan's and 9b's files until it
-executes. Run every command from the worktree root, never in `~/projects/moray`. Line numbers below are from `deafed424`
-and move with the earlier plans; every edit quotes the exact text it replaces, and the edit scripts stop with a message
+`claude/enterprise-settings`, cut from `main` at `deafed424` and now at `main`'s `759b2b7d9` plus this plan's and 9b's
+files (refreshed on 2026-10-17; see "Execution notes (2026-10-17)" at the end, which rule where they differ from the text
+above them). Run every command from the worktree root, never in `~/projects/moray`. Line numbers below are from
+`759b2b7d9`; every edit quotes the exact text it replaces, and the edit scripts stop with a message
 when that text is not found the stated number of times. If a script stops, re-find the quoted text (it moves, it does not
 change), adjust the anchor, re-run, and record the re-anchoring in this plan's status banner; never edit around a missing
 anchor. Plan 9b executes on the same branch after this plan.
 
 ## Before you start
 
-Plans 1 to 8 execute before this plan (spec 19.1: "1 to 11 in sequence"). Bring the branch up to `main` and check that
-every plan this one builds on is in it:
+Plans 3a to 6b and 8a are on `main` and in this branch (`759b2b7d9`). Plans 5b (the Enterprise plugin, IBM Plex, the shipped
+theme, `EnterpriseLook` switching to the shipped kit), 7 (dock chrome) and 8b (the Run window) run in parallel in other
+worktrees; this plan depends on none of them (Execution notes E1, E2, E19). Do not rebase, merge or push. Check what the
+plan builds on:
 
 ```bash
-git rebase main
+git merge-base --is-ancestor 759b2b7d9 HEAD && echo "main 759b2b7d9 is in the branch"
 grep -c 'record SettingsChrome(' jasper-app/src/main/java/dev/jasper/app/presentation/SettingsChrome.java      # 5a: 1
 grep -c 'enum Composition' jasper-app/src/main/java/dev/jasper/app/presentation/Composition.java               # 5a: 1
 grep -c 'public static final Set<Landed> LANDED' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java  # 5a: 1
 grep -c 'public <T> T defaultValue(Setting<T> setting)' jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsDraft.java  # 5a: 1
-grep -c 'namesUiFaces' jasper-ui/src/main/java/dev/jasper/ui/metrics/FaceSet.java                              # 5b: at least 1
-ls jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseResources.java \
-   jasper-app/src/main/java/dev/jasper/app/application/LookFonts.java \
-   jasper-app/src/main/java/dev/jasper/app/appearance/PluginThemes.java \
-   plugins/enterprise/src/main/resources/themes/enterprise.json                                                # 5b: all exist
 ls jasper-ui/src/main/java/dev/jasper/ui/swing/ClassicTreeFace.java jasper-ui/src/main/java/dev/jasper/ui/kit/ColorSlots.java  # 4a, 4c
 grep -c 'GROUP_ROW_INDENT' jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java                     # 4c: at least 1
 grep -c 'boolean disclosure;' jasper-ui/src/main/java/dev/jasper/ui/swing/Buttons.java                         # 4c: 1
 grep -c 'TableRow heading(' jasper-ui/src/main/java/dev/jasper/ui/model/TableRow.java                          # 3c: 1
-grep -o 'Landed\.[A-Z_]*' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java | sort -u     # 6-8: WINDOW_CHROME, DOCK_CHROME, RUN_WINDOW
+grep -o 'Landed\.[A-Z_]*' jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java | sort -u     # 6a, 6b: WINDOW_CHROME, WINDOW_CONTENT
 ls jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java jasper-app/src/test/java/dev/jasper/app/testsupport/MockProfile.java \
-   jasper-app/src/test/java/dev/jasper/app/workspace/ChromeRenderTest.java                                     # 6a: all exist
+   jasper-app/src/test/java/dev/jasper/app/workspace/ChromeRenderTest.java \
+   jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java                                # 6a: all exist
 grep -c 'DialogMapping dialogs) {' jasper-app/src/main/java/dev/jasper/app/windows/AuxiliaryWindows.java       # 6b: 1
+ls jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseResources.java 2>/dev/null | wc -l            # 5b not here: 0
 ```
 
-If a check prints 0, a file is missing, or the last line lacks one of the three groups, stop: this plan needs those plans
-on `main`. Plans 6 to 8 were written at the same time as this plan; before Task 1, read their merged code for
-`Presentation.LANDED`, `ProjectionsTest`, `DesignMetrics.Role`'s last constants, `NewRolesTest.ADDED`,
-`ClassicCatalogTest.theSpecsNamedValuesHold`, `classic-roles.tsv`'s last rows and `tools/visual/pairs.json`, which they
-extend as this plan does; the scripts below find those by pattern, not by line. The test support this plan builds on
-is plan 6a's `testsupport.EnterpriseLook` (the shipped kit with Plex registered, `controller(dark)`, `restoreDefault()`)
-and `testsupport.MockProfile` (`mock`, `deltaE`, `print`, `write`), and 6a's `workspace.ChromeRenderTest` (`cases()`,
-`Case`), which Task 7 extends. Task 6's whole-area comparison is this plan's own package-private
+If a check prints otherwise, stop and report: this plan needs those plans on the branch. The Landed line lists only the
+window groups: plans 7 and 8b add `DOCK_CHROME` and `RUN_WINDOW` in their own worktrees. They extend `Presentation.LANDED`,
+`ProjectionsTest`, `DesignMetrics.Role`'s last constants, both role tables, `ProjectionReadTest.PROJECTION_READERS`,
+`migration.csv`, `docs/STATUS.md` and `tools/visual/pairs.json` as this plan does; the scripts below find those by
+pattern, not by line, and every edit stays appended and textually local so the merges reconcile them. The test support
+this plan builds on is plan 6a's `testsupport.EnterpriseLook` (until plan 5b merges: the fixture kit
+`KitFixtures.enterprise()`, the kit file's `CHROME` table and the fixture theme `enterprise-fixture.json`, in the platform
+faces; `controller(dark)`, `theme()`, `kit()`, `chrome()`, `restoreDefault()`) and `testsupport.MockProfile` (`ROOT`,
+`REFERENCE`, `mock`, `deltaE`, `fonts`, `print`, `write`), and 6a's `workspace.ChromeRenderTest` (`cases()`, `Case`),
+which Task 7 extends. Task 6's whole-area comparison is this plan's own package-private
 `settingsui.SettingsMockMatch` (an alignment search no earlier helper has), built on `MockProfile`; plan 10a's
 `testsupport.MockMatch` is a different class, so the two never share a path.
 
@@ -94,17 +97,24 @@ Every later "pixel proof" step compares with this base with the script below, sa
 cat > build/plan9-base/compare.py <<'PY'
 """Plan 9 pixel proof: the default look's gallery and Settings preview are byte-identical to build/plan9-base."""
 import hashlib, pathlib, sys
+# Files that differ between two runs of the same code (Execution notes E16); each is named in the plan's banner.
+SKIP = set()
 def digests(root):
     return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}
 bad = []
 for base, now in [("build/plan9-base/dark-1x", "jasper-ui/build/gallery/dark-1x"), ("build/plan9-base/light-1x", "jasper-ui/build/gallery/light-1x"),
                   ("build/plan9-base/settings-preview", "jasper-app/build/settings-preview")]:
     a, b = digests(pathlib.Path(base)), digests(pathlib.Path(now))
-    bad += [f"{now}/{name}" for name in sorted(set(a) | set(b)) if a.get(name) != b.get(name)]
+    bad += [f"{now}/{name}" for name in sorted(set(a) | set(b)) if a.get(name) != b.get(name) and f"{now}/{name}" not in SKIP]
 print("changed:", bad if bad else "none")
 sys.exit(1 if bad else 0)
 PY
 ```
+
+Then prove the base is deterministic before Task 1 (Execution notes E16): run the three Gradle commands above once more
+(not the `rm` and `cp` lines) and `python3 -I build/plan9-base/compare.py`. Expected: `changed: none`. A file it names
+differs between two runs of the same code: add its printed path to `SKIP`, run the commands and the script again until it
+prints `changed: none`, and record every skipped file in the plan's status banner.
 
 ## Global Constraints
 
@@ -112,9 +122,9 @@ PY
 - Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache (AGENTS.md); no task runs `packageDist`, `trainAotCache` or `-Pjasper.aot=true`. `:jasper-ui:gallery` and `:jasper-app:settingsPreview` are headless and may be run; the JUnit renders are headless.
 - Work only in the worktree above on `claude/enterprise-settings`; one commit per task; every commit message ends with the two lines `🤖 Generated with Claude Code at The Home Depot` and `Co-Authored-By: Claude <noreply@anthropic.com>` separated by a blank line. Do not push or merge.
 - Pixel rule: the default look does not change. Every file the headless gallery writes for Slate Cobalt Dark and Light and every file `:jasper-app:settingsPreview` writes (the real Settings dialog under the default look, dark and light, at the default and an 18 pt interface font) is byte-identical to `build/plan9-base` (the compare script above). No existing render may change; the only new images are this plan's own under `jasper-app/build/enterprise-settings/`, `jasper-ui/build/classic-faces/`, `jasper-app/build/settings-mock/` and the `settings-*` prints in `jasper-app/build/chrome-renders/` (inspection output, not committed). Tasks 3, 4, 5, 6 and 8 prove it.
-- `SettingsChrome` changes values only (spec 12.1); renderers never branch on a look (spec 3.6). jasper-ui receives values (`SettingsShell.Frame`, `SettingRow.contextActions`, catalog roles), never `SettingsChrome`, `Composition` or `ChromeSpec`. Only the composition roots of spec 9.1 read `Composition` (`CompositionReadTest`, Task 1); this plan adds no reader.
+- `SettingsChrome` changes values only (spec 12.1); renderers never branch on a look (spec 3.6). jasper-ui receives values (`SettingsShell.Frame`, `SettingRow.contextActions`, catalog roles), never `SettingsChrome`, `Composition` or `ChromeSpec`. Only the composition roots of spec 9.1 read `Composition` (6a's `ProjectionReadTest`, extended in Task 1); this plan adds no reader.
 - Colours come from the theme only (`ColourLiteralScanTest`): the frame paints semantic roles, the kit's two colour slots and spec 7.1's derived roles; the mock hex values below are test targets, never source literals in main code. Glyphs (the ▼/▶ triangles) are plan 4c's drawn shapes.
-- New metric roles are appended at the end of `DesignMetrics.Role` (after every role plans 4 to 8 added), with their rows appended to `compact-roles.tsv` and `classic-roles.tsv`, and their names appended to `NewRolesTest.ADDED`; a classic value of an existing role is a `values.put` line in `DesignMetrics.CLASSIC` and the matching row of `classic-roles.tsv`, nothing else.
+- New metric roles are appended at the end of `DesignMetrics.Role` (after every role plans 4a, 4c, 6a and 8a added), with their rows appended to `compact-roles.tsv` and `classic-roles.tsv`, and their names and default and classic values in this plan's `metrics.SettingsRolesTest.ROLES` (as 6a's `ChromeRolesTest` holds its roles; `NewRolesTest.ADDED` stays plan 4's contiguous run, Execution notes E4); a classic value of an existing role is a `values.put` line in `DesignMetrics.CLASSIC` and the matching row of `classic-roles.tsv`, nothing else.
 - Javadoc doclint fails the build on errors: jasper-app runs `-Xdoclint:all`, jasper-ui `-Xdoclint:all,-missing`; every `{@link}` must resolve; no comment may contain a raw `<`, `>`, `&` or `->`. New public types and members carry comments, and record components an `@param`.
 - `docs/design/theme-engine/migration.csv`: every new source under jasper-app, the SDK, the testkit or plugins that `ThemeMigrationCoverageTest.CANDIDATE` matches gets its row in the same commit. A row has exactly eight comma-separated fields (`path,package,Class,nonvisual-helper,none,none,evidence,disposition`); a disposition begins "New in Enterprise plan 9a Task N" ("Test/fixture ownership; New in …" for a test) and uses semicolons, never commas. Each task lists its rows; each task's test run includes `ThemeMigrationCoverageTest`, which names any row still missing.
 - Documentation edits are the smallest that make each document accurate (AGENTS.md); `docs/superpowers/` history and earlier `docs/STATUS.md` entries are not rewritten.
@@ -223,15 +233,16 @@ Decisions where the spec is silent or a literal reading cannot be built, taken o
 
 ## Verified facts
 
-Read at `deafed424`; facts about plans 3b to 8 cite the plan.
+Read at `deafed424` and re-read at `759b2b7d9` on 2026-10-17 (line numbers are the refreshed ones); facts about the
+unmerged plans 5b, 7 and 8b cite the plan.
 
 1. `SettingsDialog.Hooks` is an 8-component record (`SettingsDialog.java:54-62`); `open` builds the draft, the view, the
    pages' `PageContext` (`:163-169`), then `windows.modalDialog("app.settings", "Settings", new Dimension(1000, 700),
    ownerOrNull)` and `surface.integratedTitle(view::titleRowHeight)` (`:174-177`); `event` routes search, `PageTree`
    selections and the header and footer actions (`:190-209`); `show` puts the page, the breadcrumb and the tree
-   selection (`:252-262`). Plan 5a Task 7 turns `:164` into `new SettingsDraft(state.values(), state.defaults())`.
-2. `PageContext` is a 7-component record with 6- and 5-argument conveniences and `withDraft` (`PageContext.java:23-46`);
-   13 `new PageContext(` calls exist, ten in tests (`grep -rn 'new PageContext(' jasper-app plugins`).
+   selection (`:252-262`). `:164` reads `new SettingsDraft(state.values(), state.defaults())` (5a).
+2. `PageContext` is a 7-component record with 6- and 5-argument conveniences and `withDraft` (`PageContext.java:22-46`);
+   15 `new PageContext(` calls exist, thirteen in tests (`grep -rn 'new PageContext(' jasper-app plugins`).
 3. `SettingsView` builds the search, the navigation (a `SETTINGS_NAVIGATION` stack around `PageTree.node()`), the header
    (back and forward in `JOINED_ACTIONS`, the parent crumb as DESCRIPTION, a chevron icon, the page as WINDOW_TITLE), the
    banner and the footer (HELP, the message line, Cancel, Apply, OK in `SETTINGS_FOOTER`) and hands them to
@@ -239,67 +250,82 @@ Read at `deafed424`; facts about plans 3b to 8 cite the plan.
 4. `SettingsShell.doLayout` puts the search at `(inset, titleRowHeight)`, the navigation `SETTINGS_SEARCH_GAP` below it,
    the header at `left + SETTINGS_PAGE_INSET`, the body at `left`, the footer `SETTINGS_FOOTER_SIDE` in; `paintComponent`
    fills `SURFACE_DIALOG`, then `SURFACE_SIDEBAR` over the sidebar and the footer, and draws three `BORDER_SUBTLE` lines
-   (`SettingsShell.java:35-63`).
+   (`SettingsShell.java:27-62`).
 5. `ViewReconciler.applySettingsHeader` gives the header's DESCRIPTION text the `SETTINGS_BODY` override
-   (`ViewReconciler.java:168-174`), so the parent crumb is 12/400 under `TypeScale.CLASSIC`; `applySettingsNavigation`
-   sets `tree.settingsNavigation` and the gutter `SETTINGS_NAV_INSET` (`:175-180`); `popupOpen` lists the controls whose
-   popups are open (`:359-365`).
+   (`ViewReconciler.java:176-182`), so the parent crumb is 12/400 under `TypeScale.CLASSIC`; `applySettingsNavigation`
+   sets `tree.settingsNavigation` and the gutter `SETTINGS_NAV_INSET` (`:183-188`); `popupOpen` lists the controls whose
+   popups are open (`:369-375`).
 6. `KitView.settingsChrome(boolean)` is the kit-internal flag `SettingsShell` sets on its views (`KitView.java:130-141`).
 7. `PageTree.node()` opens every branch (`PageTree.java:83-90`); a `TreeItem` carries no icon in the navigation
    (`:76-81`).
-8. `Trees.TreeControl`: navigation rows have no disclosure (`Trees.java:308`, `!settingsNavigation`), `expandFocused`
-   returns in the navigation (`:291-297`), navigation and rail rows have indent 0 (`:306`), a heading's height is
-   `SETTINGS_NAV_HEADING` with `SECTION_LABEL` (`:177`), group gaps come from `SETTINGS_NAV_HEADING_GAP` and
-   `SETTINGS_NAV_GROUP_GAP` (`:163-169`), leaf titles take the `SETTINGS_BODY` override (`:346-350`). Plan 4c Task 1 adds
-   `context().faces().tree.box(context())` as the pane's border, the tree face's `indent` and `disclosure()` and the
-   `styleDisclosure` call after `row.slot(row.leading, leading);`, and `Buttons.KitButton.disclosure` with its preferred
-   size `glyph + DISCLOSURE_GAP − ICON_GAP` (4c, Task 1 Step 4).
+8. `Trees.TreeControl`: navigation rows have no disclosure (`Trees.java:412`, `!settingsNavigation`), `expandFocused`
+   returns in the navigation (`:395-401`), navigation and rail rows have indent 0 (`:410`), a heading's height is
+   `SETTINGS_NAV_HEADING` with `SECTION_LABEL` (`:217`), group gaps come from `SETTINGS_NAV_HEADING_GAP` and
+   `SETTINGS_NAV_GROUP_GAP` (`:207-208`), leaf titles take the `SETTINGS_BODY` override (`:453-456`). Plan 4c's pane border
+   is `context().faces().tree.box(this)` (`:125`); the classic face's box is a `ClassicHeaders.Box`, which draws nothing
+   and takes no insets around a Settings navigation tree or a rail (`ClassicHeaders.java:66-69`, 4c's final review). 4c
+   also added the tree face's `indent` and `disclosure()`, the `styleDisclosure` call after `row.slot(row.leading,
+   leading);` (`:439-440`), and `Buttons.KitButton.disclosure` with its preferred size `glyph + DISCLOSURE_GAP − ICON_GAP`
+   (`Buttons.java:133`, `:236-237`).
 9. `InteractiveRows.Row.doLayout` uses `SETTINGS_NAV_ROW_SIDE` as a navigation row's side and as the gap after its
-   leading slot (`InteractiveRows.java:1096`, `:1109`); `paintFill` fills a selected or hovered row across the canvas
-   width (`:818-828`).
-10. `SchemaPage.row` builds each ordinary row's `SETTINGS_TRAILING` stack of control and Reset (`SchemaPage.java:335-343`),
-    `externalNode` likewise (`:358-369`); `event` resets a row whose `resetId()` (`<setting>:reset`) is the action
-    (`:398-412`), which also serves full-span editors whose own Reset uses `<id>:reset`; built rows are those with
-    `row.shown()` (`:226`, `:248`, `:271`, `:292`).
+   leading slot (`InteractiveRows.java:1125`, `:1140`); `paintFill` fills a selected or hovered row across the canvas
+   width (`:871-881`).
+10. `SchemaPage.row` builds each ordinary row's `SETTINGS_TRAILING` stack of control and Reset (`SchemaPage.java:342-350`),
+    `externalNode` likewise (`:364-374`); `event` resets a row whose `resetId()` (`<setting>:reset`) is the action
+    (`:403-404`), which also serves full-span editors whose own Reset uses `<id>:reset`; built rows are those with
+    `row.shown()` (`:225`, `:248`, `:271`, `:307`); 3e's `heading` reads no row.
 11. `Stacks.SettingsTrailingLayout` keeps `COLUMN_GAP` before the second child even when there is none
-    (`Stacks.java:474-484`); `SettingsFooterLayout` gives each trailing button at least `SETTINGS_ACTION_MIN_WIDTH`, `BUTTON_GAP`
-    apart (`:400-425`); `SettingsHeaderLayout`'s gaps are `SETTINGS_HEADER_GAP` after the history buttons,
-    `SETTINGS_HEADER_TITLE_GAP` for a page without ancestors and `SETTINGS_CRUMB_GAP` between crumbs (`:432-437`);
-    `SettingsLayout` places the page's sections `SETTINGS_PAGE_INSET` in, `SETTINGS_PAGE_TOP` down, at most
-    `SETTINGS_CARD_WIDTH` wide, `SETTINGS_SECTION_GAP` apart (`:498-529`).
-12. `Nodes.SettingRow` (jasper-ui model) has 8 components and two conveniences (`Nodes.java:418-431`); `KitValues`
-    projects the SDK's row with the 8-component form (`jasper-app/.../plugins/KitValues.java:23`).
+    (`Stacks.java:522-531`); every `SETTINGS_TRAILING` stack in the code base has two children today; `SettingsFooterLayout`
+    gives each trailing button at least `SETTINGS_ACTION_MIN_WIDTH`, `BUTTON_GAP` apart (`:448-478`);
+    `SettingsHeaderLayout`'s gaps are `SETTINGS_HEADER_GAP` after the history buttons, `SETTINGS_HEADER_TITLE_GAP` for a
+    page without ancestors and `SETTINGS_CRUMB_GAP` between crumbs (`:480-`); `SettingsLayout` places the page's sections
+    `SETTINGS_PAGE_INSET` in, `SETTINGS_PAGE_TOP` down, at most `SETTINGS_CARD_WIDTH` wide, `SETTINGS_SECTION_GAP` apart
+    (`:546-`).
+12. `Nodes.SettingRow` (jasper-ui model) has 8 components, a one-line doc comment and two conveniences
+    (`Nodes.java:435-450`); `KitValues` projects the SDK's row with the 8-component form (`jasper-app/.../plugins/KitValues.java:23`),
+    and `KitValuesTest` compares four projections by `toString()` (two of them hold a `SettingRow`).
 13. `BreadcrumbControls` builds a crumb's own menu from `MenuItem`s into a `Menus.Popup` with `Menus.Item.describe` and
-    reports `UiEvent.Action(item.action())` (`BreadcrumbControls.java:216-243`); the popup is registered as
+    reports `UiEvent.Action(item.action())` (`BreadcrumbControls.java:219-245`); the popup is registered as
     `KitOwnership.CONTEXT_MENU` (`:59-61`).
 14. Full-span editors build their own rows and Reset: `AppearanceSelection` (`:58-75`, Reset `<id>:reset` and an invisible
     lane), `PlatformFontSize` (`:17-22`), `NotificationGroupsEditor` (`:85-87`, `resetId(id, i)`), `WorkspaceEditors.Opacity`
-    (`:27-30`, invisible reserved buttons); plugin composed pages' host rows are SDK rows (`KitSettingRows.java:79-84`).
+    (`:27-30`, invisible reserved buttons); plugin composed pages' host rows are SDK rows (`KitSettingRows.java:61`, `:162`).
 15. `CorePages` shows `window.native_decorations` with `.shownWhen(!com.formdev.flatlaf.util.SystemInfo.isMacOS)`
     (`CorePages.java:124`) and `ui.animations.enabled` in its own Animations section (`:108-109`).
 16. `PlatformFontSize` starts its stepper at `UI_FONT_SIZE.example()` (14) and labels the row "Use platform font size"
-    and the toggle "Use platform size" (`PlatformFontSize.java:12-22`); plan 5a Task 7 gives it the draft and compares with
-    `Editors.effectiveDefault(draft,UI_FONT_SIZE)`, the exact text 5a's `DefaultsPrecedenceTest` reads in the file.
+    and the toggle "Use platform size" (`PlatformFontSize.java:12-23`); it holds the draft and compares with
+    `Editors.effectiveDefault(draft,UI_FONT_SIZE)` (`:25-26`, 5a), the exact text 5a's `DefaultsPrecedenceTest` reads in the
+    file (`DefaultsPrecedenceTest.java:91-92`).
 17. Plan 5a Task 8: `Projections.of(chrome, classicBase, namesUiFace, providerId, host, landed)` computes
     `SettingsChrome(integratedTitle = titleBar != NATIVE, collapsibleNav = classic, inlineReset = !classic, hiddenKeys,
-    fontRowCopy)` and `Composition`; `Presentation.LANDED` gates the SETTINGS group; `ProjectionsTest` pins it.
+    fontRowCopy)` and `Composition`; `Presentation.LANDED` (`Presentation.java:43-44`, today `WINDOW_CHROME` and
+    `WINDOW_CONTENT`) gates the SETTINGS group; `ProjectionsTest` pins it. `Presentation.standard(host).projections()` is
+    the same value as this plan's `Projections.standard(host)`.
 18. Plan 4a: `DesignMetrics.CLASSIC` is built by `values.put(Role.X, n)` lines ending with
-    `values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);`; `SETTINGS_NAV_ROW` and `SETTINGS_NAV_HEADING` are 22 and
-    `SETTINGS_SIDEBAR_WIDTH` 230 there; `NewRolesTest.ADDED` lists the added roles, which close the enum in order, and
-    `ClassicCatalogTest.theSpecsNamedValuesHold` requires each to equal its default except `ROW_HEIGHT` and
-    `FIELD_RADIUS`; `ColorSlots(dialogSurface, navigationSurface)` is `Kit.colors()` (4a Task 4).
+    `values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);` (`DesignMetrics.java:227`); `SETTINGS_NAV_ROW` and
+    `SETTINGS_NAV_HEADING` are 22 and `SETTINGS_SIDEBAR_WIDTH` 230 there; the enum ends with 4a's and 4c's roles, 8a's
+    thirty `RUN_WINDOW_*` and 6a's thirty chrome roles (`DIALOG_FOOTER_VERTICAL(8);` last); `NewRolesTest.ADDED` lists
+    plan 4's roles and 8a's as one contiguous run (`theAddedRolesFollowEachOtherInOrder`), 6a's chrome roles are
+    `ChromeRolesTest.ROLES`, and `ClassicCatalogTest.theSpecsNamedValuesHold` requires each `ADDED` role to equal its
+    default except `ROW_HEIGHT` and `FIELD_RADIUS`; `ColorSlots(dialogSurface, navigationSurface)` is `Kit.colors()`
+    (4a Task 4).
 19. Plan 4b: `ThemePainting.role(KitContext, ColorRole)` and `ThemePainting.painted(KitContext, PaintPair)` (4b Task 1).
-20. Plan 5b: `EnterpriseResources.facts().parsed()` is the shipped kit through the production parser, `theme()` the
-    Enterprise `JasperTheme`, `LookFonts.register(KitParser.Faces)` (package-private in `dev.jasper.app.application`)
-    registers Plex and returns its problems, `PluginThemes(provided, reserved, dormant, problems)` with
-    `PluginThemes.Provided(theme, pluginName)` and `ThemeLibrary.of(PluginThemes)`; `FaceSet.namesUiFaces()` (5b Tasks
-    1 to 4).
+20. Plan 5b is not merged (it runs in parallel): there is no `EnterpriseResources`, `LookFonts`, `PluginThemes`,
+    `FaceSet.namesUiFaces()` or shipped `enterprise.json`. Plan 6a's `testsupport.EnterpriseLook` stands in: `kit()` is
+    `KitFixtures.enterprise()` (the classic base with the kit file's tokens, a 12-point body, `ColorSlots(SURFACE_APP,
+    SURFACE_CARD)`, `FaceSet.PLATFORM`), `chrome()` the kit file's `CHROME`, `theme()` the fixture `JasperTheme`
+    (`enterprise-fixture.json`), `controller(dark)` installs both and `restoreDefault()` installs Slate Cobalt under the
+    default kit again; plan 5b's merge switches it to the shipped kit, Plex and theme. `MockProfile.fonts(what, actual,
+    expected, tolerance)` prints a probe that follows the UI face as a "FONTS residual until plan 5b".
 21. `SettingsDialogPreview` and `Settings9bPreview` open the real dialog headless over `AuxiliaryWindows` with a shell that
     hands back `surface.holder()`, a real `PluginRuntime` over `jasper.stagedPlugins`, `PluginManager` and `KeymapPage`,
     and paint the holder at 2x with `printAll` (`SettingsDialogPreview.java:45-145`, `Settings9bPreview.java:28-60`,
     `SettingsSurfacePreview.java:96-118`); jasper-app's test task sets `jasper.stagedPlugins`, `jasper.repoRoot` and
-    `jasper.appJar` (`jasper-app/build.gradle.kts:83-98`).
-22. `StaticDefaultTest.classFiles(Path jar, int minimum)` reads a jar's classes (`StaticDefaultTest.java:154`).
+    `jasper.appJar` (`jasper-app/build.gradle.kts:86-95`).
+22. `StaticDefaultTest.classFiles(Path jar, int minimum)` reads a jar's classes (`StaticDefaultTest.java:160`).
+23. Plan 6a's `ProjectionReadTest` (`architecture/ProjectionReadTest.java`) holds spec 16.1.7's projection readers in
+    `PROJECTION_READERS` (`Map<Pattern, Predicate<String>>` over each class's constant-pool strings), with
+    `projectionReaders(List<byte[]>)` and `Scanned`; "Plans 6b to 9 add their points" there.
 
 ### Mock measurements
 
@@ -340,13 +366,13 @@ starts at 2x (2, 60). Values below are logical pixels from the content's top-lef
   `swing/SettingsShell.java` (`Frame`, the classic frame), `swing/KitView.java` (`collapsibleNavigation`),
   `swing/Trees.java`, `swing/Buttons.java`, `swing/InteractiveRows.java` (the collapsible navigation),
   `metrics/DesignMetrics.java` (three roles, the classic Settings values).
-- Tests: `jasper-app/src/test/java/dev/jasper/app/` `architecture/CompositionReadTest`, `presentation/ProjectionsTest`,
-  `settingsui/SettingsChromeTest`, `LookRowsTest`, `ResetMenuTest`, `SettingsNavigationTest`, `EnterpriseSettings`
-  (fixture), `SettingsMockMatch`, `SettingsChromeMockTest`, `SettingsFrameRenders` (bridge); 6a's
-  `workspace/ChromeRenderTest` and `appearance/PaintedContrastTest` (extended);
-  `jasper-ui/src/test/java/dev/jasper/ui/swing/` `SettingRowMenuTest`, `SettingsShellFrameTest`,
-  `CollapsibleNavigationTest`; frozen tables `metrics/compact-roles.tsv`, `metrics/classic-roles.tsv`; `NewRolesTest`,
-  `ClassicCatalogTest`.
+- Tests: `jasper-app/src/test/java/dev/jasper/app/` `architecture/ProjectionReadTest` (6a's, extended),
+  `presentation/ProjectionsTest`, `settingsui/SettingsChromeTest`, `LookRowsTest`, `ResetMenuTest`, `SettingsNavigationTest`,
+  `EnterpriseSettings` (fixture), `SettingsMockMatch`, `SettingsChromeMockTest`, `SettingsFrameRenders` (bridge),
+  `plugins/KitValuesTest` (four comparisons); 6a's `workspace/ChromeRenderTest` and `appearance/PaintedContrastTest`
+  (extended); `jasper-ui/src/test/java/dev/jasper/ui/swing/` `SettingRowMenuTest`, `SettingsShellFrameTest`,
+  `CollapsibleNavigationTest`; `jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest`; frozen tables
+  `metrics/compact-roles.tsv`, `metrics/classic-roles.tsv`.
 - Tools: `tools/visual/pairs.json` (eighteen `enterprise-settings-*` pairs; the existing `settings-*` pairs are the default look's).
 
 ---
@@ -356,20 +382,21 @@ starts at 2x (2, 60). Values below are logical pixels from the content's top-lef
 Plan 5a computed `SettingsChrome` and `Composition` but held them at the default until this plan; `Landed.SETTINGS`
 lets them follow the kit file. The dialog takes both in its hooks and gives both to every page; `JasperApplication`
 passes the presentation's. `Projections.standard(Host)` is the default look's value for everything made without a
-presentation. `CompositionReadTest` keeps `Composition` reads in spec 9.1's six roots.
+presentation. 6a's `ProjectionReadTest` gains `Composition`'s readers: spec 9.1's six roots (Execution notes E3).
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/presentation/Presentation.java` (`LANDED`), `Projections.java` (`standard`)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/PageContext.java:12-50`, `SettingsDialog.java:42-62,168-169`, `package-info.java:4-5`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:973-975`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:1079-1081`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/pluginmanager/package-info.java`, `jasper-app/src/main/java/dev/jasper/app/shortcuthelp/package-info.java`
-- Modify: `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java`
-- Create: `jasper-app/src/test/java/dev/jasper/app/architecture/CompositionReadTest.java`, `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java`
-- Modify: `docs/design/theme-engine/migration.csv` (rows for the two new tests)
+- Modify: `jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java`, `jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java` (6a's)
+- Create: `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java`
+- Modify: `docs/design/theme-engine/migration.csv` (the new test's row)
 
 **Interfaces:**
 - Consumes: plan 5a's `SettingsChrome`, `Composition`, `Projections.of`, `Projections.Host`, `Presentation.Landed`,
-  `JasperApplication.presentation()`.
+  `JasperApplication`'s `presentation` field; plan 6a's `ProjectionReadTest.PROJECTION_READERS`, `projectionReaders`,
+  `Scanned`.
 - Produces: `public static Projections Projections.standard(Projections.Host host)`; `Presentation.LANDED` containing
   `Landed.SETTINGS`; `PageContext(SettingsDraft, Consumer<String>, Consumer<Runnable>, BiFunction<…>, Runnable,
   Supplier<AuxiliarySurface>, Supplier<KitContext>, SettingsChrome chrome, Composition composition)` (the 7-, 6- and
@@ -379,74 +406,65 @@ presentation. `CompositionReadTest` keeps `Composition` reads in spec 9.1's six 
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `jasper-app/src/test/java/dev/jasper/app/architecture/CompositionReadTest.java`:
+Extend plan 6a's `ProjectionReadTest` with `Composition`'s readers (Execution notes E3): a fourth `PROJECTION_READERS`
+entry whose pattern matches only the bare class name `dev/jasper/app/presentation/Composition` (the constant-pool class
+entry a constant, a method, a switch or a cast over `Composition` needs), never a descriptor such as
+`Ldev/jasper/app/presentation/Composition;` that a class carrying the value holds (Rulings 4), and a case that proves
+both. Run from the worktree root:
 
-```java
-package dev.jasper.app.architecture;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.lang.classfile.ClassFile;
-import java.lang.classfile.constantpool.FieldRefEntry;
-import java.lang.classfile.constantpool.MethodRefEntry;
-import java.lang.constant.ClassDesc;
-import java.lang.constant.MethodTypeDesc;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import org.junit.jupiter.api.Test;
-
-/**
- * Enterprise presentation spec 9.1 and 16.1.7: the Composition value is read (its constants or its methods named) only by
- * the composition roots and the presentation package that computes it; every other class only carries it.
- */
-class CompositionReadTest {
-    static final String COMPOSITION = "dev/jasper/app/presentation/Composition";
-    static final Set<String> ROOTS = Set.of("dev/jasper/app/settingsui/CorePages", "dev/jasper/app/settingsui/AppearanceSelection",
+```bash
+python3 -I - <<'PY'
+"""Plan 9a Task 1 step 1: ProjectionReadTest keeps Composition's reads in spec 9.1's composition roots (appended)."""
+import pathlib
+path = pathlib.Path("jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java")
+text = path.read_text(encoding="utf-8")
+if "COMPOSITION_ROOTS" in text: raise SystemExit("ProjectionReadTest: the Composition readers exist already")
+entry = '''            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"));'''
+if text.count(entry) != 1: raise SystemExit("ProjectionReadTest: the map's DialogMapping entry moved; append the Composition entry after its last entry")
+text = text.replace(entry, entry[:-2] + ''',
+        // Plan 9a (spec 9.1 and 16.1.7): naming Composition's class (a constant, a method, a switch) is a read, which only
+        // the composition roots make; a class that only carries the value names it in descriptors, which this does not match.
+        Pattern.compile("^dev/jasper/app/presentation/Composition$"), ProjectionReadTest::compositionRoot);''', 1)
+addition = '''
+    /** Plan 9a: spec 9.1's composition roots, the only classes besides the presentation package that read Composition. */
+    static final Set<String> COMPOSITION_ROOTS = Set.of("dev/jasper/app/settingsui/CorePages", "dev/jasper/app/settingsui/AppearanceSelection",
         "dev/jasper/app/settingsui/NotificationGroupsEditor", "dev/jasper/app/settingsui/Editors",
         "dev/jasper/app/shortcuthelp/KeymapPage", "dev/jasper/app/pluginmanager/PluginsPage");
 
-    static boolean allowed(String type) {
+    /** Whether the class {@code type} (an internal name) may read Composition: the presentation package, a root or a class nested in one. */
+    static boolean compositionRoot(String type) {
         if (type.startsWith("dev/jasper/app/presentation/")) return true;
         int nested = type.indexOf('$');
-        return ROOTS.contains(nested < 0 ? type : type.substring(0, nested));
+        return COMPOSITION_ROOTS.contains(nested < 0 ? type : type.substring(0, nested));
     }
 
-    /** The classes among {@code files} that name a field or a method of Composition; {@code all} keeps the allowed ones. */
-    static List<String> readers(List<byte[]> files, boolean all) {
-        var found = new ArrayList<String>();
-        for (var bytes : files) {
-            var model = ClassFile.of().parse(bytes);
-            String name = model.thisClass().asInternalName();
-            if (name.equals(COMPOSITION) || !all && allowed(name)) continue;
-            boolean reads = false;
-            for (var entry : model.constantPool()) {
-                if (entry instanceof FieldRefEntry field && field.owner().asInternalName().equals(COMPOSITION)) reads = true;
-                if (entry instanceof MethodRefEntry method && method.owner().asInternalName().equals(COMPOSITION)) reads = true;
-            }
-            if (reads) found.add(name);
-        }
-        return found;
-    }
-
-    @Test void onlyTheCompositionRootsAndThePresentationPackageReadIt() throws Exception {
+    /** Plan 9a: the Composition scan is live, a read elsewhere is reported, and a class that only carries the value is not. */
+    @Test void compositionIsReadOnlyByItsRoots() throws Exception {
         var files = StaticDefaultTest.classFiles(Path.of(System.getProperty("jasper.appJar")), 400);
-        assertThat(readers(files, true)).as("the scan is live").contains("dev/jasper/app/presentation/Projections");
-        assertThat(readers(files, false)).isEmpty();
-    }
-
-    @Test void aReadElsewhereIsReported() {
+        var read = Pattern.compile("^dev/jasper/app/presentation/Composition$");
+        assertThat(files.stream().map(Scanned::of).filter(scanned -> scanned.strings().stream().anyMatch(s -> read.matcher(s).find()))
+                .map(Scanned::name))
+            .as("the composition scan is live").contains("dev/jasper/app/presentation/Projections");
         var composition = ClassDesc.of("dev.jasper.app.presentation.Composition");
         byte[] probe = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.CompositionProbe"), builder -> builder
-            .withMethodBody("probe", MethodTypeDesc.of(composition), ClassFile.ACC_STATIC,
+            .withMethodBody("probe", java.lang.constant.MethodTypeDesc.of(composition), ClassFile.ACC_STATIC,
                 code -> code.getstatic(composition, "CLASSIC", composition).areturn()));
         byte[] carrier = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.CompositionCarrier"), builder -> builder
             .withField("composition", composition, ClassFile.ACC_PRIVATE));
-        assertThat(readers(List.of(probe, carrier), false)).containsExactly("dev/jasper/app/workspace/CompositionProbe");
+        assertThat(projectionReaders(List.of(probe, carrier)))
+            .containsExactly("dev/jasper/app/workspace/CompositionProbe reads " + read.pattern());
     }
 }
+'''
+body = text.rstrip()
+if not body.endswith("}"): raise SystemExit("ProjectionReadTest: expected the closing brace last")
+path.write_text(body[:-1].rstrip() + "\n" + addition, encoding="utf-8")
+PY
 ```
+
+`ProjectionReadTest` imports `ClassFile`, `ClassDesc`, `Path`, `List`, `Set`, `Pattern` and `Test`; `Scanned` and
+`projectionReaders` are its own. The existing `onlyTheFactoriesReadTheLooksVariants` now also fails for a `Composition`
+read outside the roots, and `aLookReadElsewhereIsReported` keeps its three reports (its probe names no `Composition`).
 
 Create `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java`:
 
@@ -588,9 +606,10 @@ nothing else there.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.SettingsChromeTest' --tests 'dev.jasper.app.presentation.ProjectionsTest' --tests 'dev.jasper.app.architecture.CompositionReadTest'`
+Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.SettingsChromeTest' --tests 'dev.jasper.app.presentation.ProjectionsTest' --tests 'dev.jasper.app.architecture.ProjectionReadTest'`
 Expected: FAIL at `compileTestJava`: "cannot find symbol" for `Projections.standard`, `PageContext.chrome()`,
-`PageContext.composition()`, `PageContext.standard()`, `SettingsDialog.chrome()` and the 10-argument `SettingsDialog.Hooks`.
+`PageContext.composition()`, `PageContext.standard()`, `SettingsDialog.chrome()` and the 10-argument `SettingsDialog.Hooks`
+(`ProjectionReadTest`'s new case compiles and passes once the source set compiles: it reads only what exists).
 
 - [ ] **Step 3: Land the group and carry the projections**
 
@@ -615,8 +634,8 @@ if "SETTINGS" in rhs: raise SystemExit("Presentation: SETTINGS has landed alread
 if rhs in ("Set.of()", "java.util.Set.of()"): landed = "Set.of(Landed.SETTINGS)"
 elif rhs.endswith(")"): landed = rhs[:-1] + ", Landed.SETTINGS)"
 else: raise SystemExit(f"Presentation: unexpected LANDED {rhs!r}")
-text = text.replace(found.group(0), "    /** The groups that have landed (spec 19.1 rows 6 to 9): their projections follow the kit file. */\n"
-    + found.group(2) + landed + ";\n", 1)
+# Plans 7 and 8b append to the same line in parallel: keep its comment, append SETTINGS only (Execution notes E13).
+text = text.replace(found.group(0), found.group(1) + found.group(2) + landed + ";\n", 1)
 path.write_text(text, encoding="utf-8")
 edit(P + "Projections.java", [
     ('''    /**
@@ -730,29 +749,28 @@ edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java
     ('''                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME)));
             configuration.settingsOpener(''',
      '''                    () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
-                    presentation().projections().settings(), presentation().projections().composition()));
+                    presentation.projections().settings(), presentation.projections().composition()));
             configuration.settingsOpener(''', 1)])
-for name in ("pluginmanager", "shortcuthelp"):
+# Each sentence keeps its own words: pluginmanager names packages in full, shortcuthelp by their last segment (E15).
+for name, edge in (("pluginmanager", "dev.jasper.app.presentation (its page composition),"), ("shortcuthelp", "presentation (its page composition),")):
     path = pathlib.Path(f"jasper-app/src/main/java/dev/jasper/app/{name}/package-info.java"); text = path.read_text(encoding="utf-8")
-    if "dev.jasper.app.presentation" in text: continue
+    if "presentation (its page composition)" in text: continue
     marker = "Allowed outgoing Jasper dependencies:"
     if text.count(marker) != 1: raise SystemExit(f"{name}/package-info.java: expected one {marker!r}")
-    path.write_text(text.replace(marker, marker + " dev.jasper.app.presentation (its page composition),", 1), encoding="utf-8")
+    path.write_text(text.replace(marker, marker + " " + edge, 1), encoding="utf-8")
 PY
 ```
 
 If a `package-info.java` names its edges without the "Allowed outgoing Jasper dependencies:" sentence, the script stops:
 add "dev.jasper.app.presentation (its page composition)" to the sentence that lists its dependencies, in its own words.
 
-Add the two `migration.csv` rows (both tests construct lists; the ledger's pattern names them):
+Add the new test's `migration.csv` row (it imports `java.awt.Rectangle`, which the ledger's pattern matches):
 
 ```bash
 python3 -I - <<'PY'
 import pathlib
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv")
 rows = [
-    "jasper-app/src/test/java/dev/jasper/app/architecture/CompositionReadTest.java,app.architecture,CompositionReadTest,nonvisual-helper,none,none,"
-    "jasper-app/src/test/java/dev/jasper/app/architecture/CompositionReadTest.java,Test/fixture ownership; New in Enterprise plan 9a Task 1; only the composition roots read Composition",
     "jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java,app.settingsui,SettingsChromeTest,nonvisual-helper,none,none,"
     "jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java,Test/fixture ownership; New in Enterprise plan 9a Task 1; the Settings projections reach every page"]
 text = ledger.read_text(encoding="utf-8")
@@ -764,9 +782,11 @@ PY
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.presentation.*' --tests 'dev.jasper.app.architecture.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' :jasper-app:verifyApplicationArchitecture --continue`
 Expected: PASS: `SettingsChromeTest` (2), `ProjectionsTest` (its cases plus `theSettingsGroupHasLanded` and
-`theStandardProjectionsAreTheDefaultLooks`),
-`CompositionReadTest` (2), every existing Settings and architecture test; `verifyApplicationArchitecture` reports no cycle
-(`settingsui`, `pluginmanager` and `shortcuthelp` reach `presentation`, which reaches none of them).
+`theStandardProjectionsAreTheDefaultLooks`), `ProjectionReadTest` (3, with `compositionIsReadOnlyByItsRoots`; no carrier
+such as `PageContext`, `SettingsDialog$Hooks` or `JasperApplication` is reported), every existing Settings and
+architecture test; `verifyApplicationArchitecture` reports no cycle (`settingsui` reaches `presentation`, which reaches
+only `config`, `dock`, `persistence` and `settings`). If the scan reports a carrier, find the class entry with `javap -v`
+on its class file and record it in the banner; never widen `compositionRoot` (E3).
 
 - [ ] **Step 5: Commit**
 
@@ -774,7 +794,7 @@ Expected: PASS: `SettingsChromeTest` (2), `ProjectionsTest` (its cases plus `the
 git add jasper-app/src/main/java/dev/jasper/app/presentation jasper-app/src/main/java/dev/jasper/app/settingsui \
   jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java \
   jasper-app/src/main/java/dev/jasper/app/pluginmanager/package-info.java jasper-app/src/main/java/dev/jasper/app/shortcuthelp/package-info.java \
-  jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java jasper-app/src/test/java/dev/jasper/app/architecture/CompositionReadTest.java \
+  jasper-app/src/test/java/dev/jasper/app/presentation/ProjectionsTest.java jasper-app/src/test/java/dev/jasper/app/architecture/ProjectionReadTest.java \
   jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsChromeTest.java docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Settings chrome: the Settings projections land and reach every page
@@ -783,7 +803,7 @@ Presentation.LANDED gains SETTINGS, so SettingsChrome and Composition
 follow the kit file. SettingsDialog.Hooks carries both from the
 application's presentation and hands both to every page in its
 PageContext; without a presentation both are Projections.standard, the
-default look on this host. CompositionReadTest keeps reads of Composition
+default look on this host. ProjectionReadTest keeps reads of Composition
 in spec 9.1's six composition roots.
 
 🤖 Generated with Claude Code at The Home Depot
@@ -800,17 +820,18 @@ macOS, now through the same rule. The interface font row takes the look's copy, 
 at the look's standard size.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:221-299` (built rows)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:220-325` (built rows)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/CorePages.java:124`
 - Replace: `jasper-app/src/main/java/dev/jasper/app/settingsui/PlatformFontSize.java` (whole file)
 - Create: `jasper-app/src/test/java/dev/jasper/app/settingsui/LookRowsTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (one row)
 
 **Interfaces:**
-- Consumes: Task 1's `PageContext.chrome()`; plan 5a's `Editors.effectiveDefault(SettingsDraft, Setting)`; plan 5b's
-  `FaceSet.namesUiFaces()`; `KitContext.kit()`, `Kit.faces()`, `Kit.type()`, `TypeScale.body()`.
-- Produces: package-private `boolean SchemaPage.built(RowItem)` (private); `PlatformFontSize(PageContext context)`;
-  package-private `static float PlatformFontSize.standardSize(PageContext context)`.
+- Consumes: Task 1's `PageContext.chrome()`; plan 5a's `Editors.effectiveDefault(SettingsDraft, Setting)` and the 9.1
+  table's font row copies; `KitContext.kit()`, `Kit.type()`, `TypeScale.body()`; plan 4a's `KitFixtures.enterprise()` and
+  4c's `KitFixtures.enterpriseLight()` (tests). Plan 5b's `FaceSet.namesUiFaces()` is not used (Execution notes E5).
+- Produces: private `boolean SchemaPage.built(RowItem)`; `PlatformFontSize(PageContext context)`; package-private
+  `static final String PlatformFontSize.PLATFORM_COPY` and `static float PlatformFontSize.standardSize(PageContext context)`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -826,7 +847,6 @@ import dev.jasper.app.config.ConfigLoader;
 import dev.jasper.app.config.CoreSettings;
 import dev.jasper.app.presentation.Composition;
 import dev.jasper.app.presentation.SettingsChrome;
-import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.KitTestSupport;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.UiEvent;
@@ -893,12 +913,12 @@ class LookRowsTest {
 
     @Test void theFontRowSpeaksForTheLookAndStartsAtItsStandardSize() throws Exception {
         edt(() -> {
-            var parsed = EnterpriseResources.facts().parsed().orElseThrow();
-            var enterprise = KitFixtures.context(KitFixtures.light(), parsed.kit());
+            // Plan 4a's Enterprise fixture kit (12-point body) until plan 5b's shipped kit (Execution notes E2, E6).
+            var enterprise = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             var standard = KitFixtures.context(KitFixtures.light());
             try {
                 var classic = context(SettingsChromeTest.CLASSIC, () -> enterprise);
-                assertThat(PlatformFontSize.standardSize(classic)).as("[type].base").isEqualTo(12f);
+                assertThat(PlatformFontSize.standardSize(classic)).as("the kit's body size").isEqualTo(12f);
                 assertThat(PlatformFontSize.standardSize(context(LINUX_DEFAULT, () -> standard))).as("the example").isEqualTo(14f);
                 var editor = new PlatformFontSize(classic);
                 var node = (Nodes.Stack) editor.node(CoreSettings.UI_FONT_SIZE.name(), dev.jasper.ui.model.ControlState.READY);
@@ -963,8 +983,9 @@ edit(S + "CorePages.java", [
 PY
 ```
 
-If plan 3e's `heading` (or any later code) reads `row.shown()` on a `RowItem`, change that read to `built(row)` too, so
-a hidden row never heads or titles a section; record it in the banner.
+The four reads above are every `row.shown()` on a `RowItem` (`searchTerms`, `sectionShown`, `component`, `viewSpec`);
+3e's `heading` reads no row (re-read on 2026-10-17). If a later edit added another, change it to `built(row)` too and
+record it in the banner.
 
 Replace `jasper-app/src/main/java/dev/jasper/app/settingsui/PlatformFontSize.java` with:
 
@@ -983,9 +1004,12 @@ import java.util.function.Supplier;
 /**
  * A look-size switch and a manual stepper, kept mounted while inheritance controls visibility. The switch's copy is the
  * look's ({@code SettingsChrome.fontRowCopy}, spec 12.1); the first untick starts the stepper at the look's standard size
- * (spec 12.2: the kit's body size when it names a UI face, the setting's example otherwise).
+ * (spec 12.2: the kit's body size when the look's row offers the look's default, the setting's example otherwise).
  */
 final class PlatformFontSize implements ValueEditor<Float> {
+    /** The default look's font row copy: the row offers the platform's size, not a size the look's kit names. */
+    static final String PLATFORM_COPY = "Use platform font size";
+
     private final Editors.NumberField<Float> number;
     private final SettingsDraft draft;
     private final String copy;
@@ -994,13 +1018,17 @@ final class PlatformFontSize implements ValueEditor<Float> {
 
     static Editors.Factory<Float> factory() {
         return new Editors.Factory<>((setting, context) -> new PlatformFontSize(context),
-            List.of("Use platform size", "Use platform font size", "Use the default font size"));
+            List.of("Use platform size", PLATFORM_COPY, "Use the default font size"));
     }
 
-    /** The look's standard interface size: the kit's body size when it names a UI face, else the setting's example. */
+    /**
+     * The look's standard interface size: the kit's body size when the look's font row offers the look's default (spec
+     * 9.1 words it so exactly when the kit names a UI face), else the setting's example. Only the first reads the kit, so a
+     * context without a kit (its 5- and 6-argument forms) keeps working under the default look.
+     */
     static float standardSize(PageContext context) {
-        var kit = context.kit().get().kit();
-        return kit.faces().namesUiFaces() ? kit.type().body() : UI_FONT_SIZE.example().orElse(13f);
+        if (context.chrome().fontRowCopy().equals(PLATFORM_COPY)) return UI_FONT_SIZE.example().orElse(13f);
+        return context.kit().get().kit().type().body();
     }
 
     PlatformFontSize(PageContext context) {
@@ -1043,7 +1071,10 @@ final class PlatformFontSize implements ValueEditor<Float> {
 ```
 
 The default look's copy is "Use platform font size", so its toggle still reads "Use platform size" and its stepper still
-starts at 14: the default look's descriptors are unchanged (the pixel proof in Task 3 covers it). The two comparisons are
+starts at 14 without reading the kit: the default look's descriptors are unchanged (the pixel proof in Task 3 covers it).
+`standardSize` keys on the 9.1 table's copy rather than plan 5b's `FaceSet.namesUiFaces()`, which is not on the branch;
+`Projections.of` words the copy "Use the default font size" exactly when the kit names a UI face, so the two agree
+(Execution notes E5). The two comparisons are
 spelled `Editors.effectiveDefault(draft,UI_FONT_SIZE)`, without a space, as plan 5a wrote them: 5a's
 `DefaultsPrecedenceTest.noAllowlistedKeyReachesACoreDefaultComparison` reads `PlatformFontSize.java` for that exact
 text, and the file holds no `UI_FONT_SIZE.defaultValue()`. Add the test's
@@ -1097,11 +1128,12 @@ schema rows, external rows and the full-span editors (Appearance, interface font
 opacity) follow the chrome.
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:418-431` (`SettingRow`)
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SettingRows.java:17-68`, `Stacks.java:474-484`, `ViewReconciler.java:359-365`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java:435-450` (`SettingRow`)
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SettingRows.java:17-82`, `Stacks.java:522-531`, `ViewReconciler.java:369-375`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/SettingRowMenuTest.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:335-369`, `AppearanceSelection.java:34-75`,
-  `PlatformFontSize.java` (Task 2's file), `NotificationGroupsEditor.java:37-41,85-87`, `WorkspaceEditors.java:11-30`, `Editors.java:191-194`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SchemaPage.java:342-374`, `AppearanceSelection.java:24-76`,
+  `PlatformFontSize.java` (Task 2's file), `NotificationGroupsEditor.java:27-42,85-87`, `WorkspaceEditors.java:11-30`, `Editors.java:194-198`
+- Modify: `jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java` (four comparisons, Execution notes E8)
 - Create: `jasper-app/src/test/java/dev/jasper/app/settingsui/ResetMenuTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (one row)
 
@@ -1341,16 +1373,17 @@ def edit(name, edits):
     path.write_text(text, encoding="utf-8")
 U = "jasper-ui/src/main/java/dev/jasper/ui/"
 edit(U + "model/Nodes.java", [
-    ('''    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote) implements Node {
+    ('''    /** {@code highlighted} marks a row matching the host's current search. */
+    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote) implements Node {
         public SettingRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(title, "title");
             Objects.requireNonNull(description); Objects.requireNonNull(titleNote);
             Objects.requireNonNull(control);
         }''', '''    /**
-     * A settings row: title, description and its control. {@code contextActions} is the row's own menu (Enterprise
-     * presentation spec 12.1: Reset to Default when the look has no inline Reset); empty means none. Host-only: the SDK's
-     * rows have no menu.
+     * A settings row: title, description and its control; {@code highlighted} marks a row matching the host's current
+     * search. {@code contextActions} is the row's own menu (Enterprise presentation spec 12.1: Reset to Default when the
+     * look has no inline Reset); empty means none. Host-only: the SDK's rows have no menu.
      */
     public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote,
                              List<MenuItem> contextActions) implements Node {
@@ -1451,8 +1484,9 @@ PY
 ```
 
 `SettingRows.java` imports `java.awt.*` and `javax.swing.*`, so `Component`, `JComponent`, `KeyStroke` and
-`AbstractAction` resolve; `List` is `java.util.List` (its own import). If plan 4b reworded the anchored lines of
-`SettingRows` or `SettingsTrailingLayout`, re-anchor on the same statements.
+`AbstractAction` resolve; `List` is `java.util.List` (its own import). The `Nodes` anchor includes the record's existing
+one-line doc comment, which the new comment absorbs, so no dangling doc comment is left (Execution notes E7). Every
+anchor above was re-read at `759b2b7d9` (4b and 4c left them as quoted).
 
 - [ ] **Step 4: Put Reset in the menu on the app's rows**
 
@@ -1579,6 +1613,10 @@ edit(S + "NotificationGroupsEditor.java", [
 edit(S + "Editors.java", [
     ('''        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit()),''',
      '''        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit(), context.chrome().inlineReset()),''', 1)])
+# The host-only menu is empty after projecting an SDK row; the projection stays lossless (Execution notes E8).
+edit("jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java", [
+    ('''for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}''',
+     '''for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}''', 4)])
 for path, text in pending: path.write_text(text, encoding="utf-8")
 PY
 ```
@@ -1624,7 +1662,8 @@ Expected: `changed: none`.
 git add jasper-ui/src/main/java/dev/jasper/ui/model/Nodes.java jasper-ui/src/main/java/dev/jasper/ui/swing/SettingRows.java \
   jasper-ui/src/main/java/dev/jasper/ui/swing/Stacks.java jasper-ui/src/main/java/dev/jasper/ui/swing/ViewReconciler.java \
   jasper-ui/src/test/java/dev/jasper/ui/swing/SettingRowMenuTest.java jasper-app/src/main/java/dev/jasper/app/settingsui \
-  jasper-app/src/test/java/dev/jasper/app/settingsui/ResetMenuTest.java docs/design/theme-engine/migration.csv
+  jasper-app/src/test/java/dev/jasper/app/settingsui/ResetMenuTest.java jasper-app/src/test/java/dev/jasper/app/plugins/KitValuesTest.java \
+  docs/design/theme-engine/migration.csv
 git commit -F - <<'EOF'
 Settings chrome: Reset to Default in the row's menu
 
@@ -1651,9 +1690,9 @@ integrated frame is today's.
 **Files:**
 - Replace: `jasper-ui/src/main/java/dev/jasper/ui/swing/SettingsShell.java` (whole file)
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (one role; the classic Settings values)
-- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java`, `ClassicCatalogTest.java`
+- Modify: `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsView.java:43-57`, `SettingsDialog.java:166,176-177`
-- Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/SettingsShellFrameTest.java`
+- Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/SettingsShellFrameTest.java`, `jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest.java` (Execution notes E4)
 - Modify: `jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java` (one test)
 
 **Interfaces:**
@@ -1840,7 +1879,46 @@ class SettingsShellFrameTest {
 ```
 
 `KitFixtures.enterprise()` (plan 4a) is the classic catalog under the Enterprise tokens and `KitFixtures.enterpriseLight()`
-(plan 4c) the Enterprise Light fixture theme; both are jasper-ui test fixtures.
+(plan 4c) the Enterprise Light fixture theme; both are jasper-ui test fixtures. The search field's 22 and the rows below
+it hold for a UI line of at most 16 px (`contentHeight` keeps the role's value while line plus padding fits), as
+`DesignMetricsTest.aThirteenPointLineMakesTheCompactHeights` assumes for the default catalog.
+
+This plan's roles get their own test, as plan 6a's `ChromeRolesTest` holds its chrome roles (`NewRolesTest.ADDED` must
+stay one contiguous run, which 6a's roles now follow; Execution notes E4).
+
+Create `jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest.java`:
+
+```java
+package dev.jasper.ui.metrics;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+/** Plan 9a: the Settings frame's roles, appended together after plan 4a's, with their default and classic values. */
+class SettingsRolesTest {
+    /** Each role's default value, then its classic value, in enum order. */
+    static final Map<String, List<Integer>> ROLES = new LinkedHashMap<>();
+    static {
+        ROLES.put("SETTINGS_HEADER_INSET", List.of(20, 14));
+    }
+
+    @Test void theSettingsRolesFollowEachOtherWithTheirValuesInBothCatalogs() {
+        var names = java.util.Arrays.stream(DesignMetrics.Role.values()).map(Enum::name).toList();
+        int first = names.indexOf(ROLES.keySet().iterator().next());
+        assertThat(first).as("appended after plan 4a's roles").isGreaterThan(names.indexOf("DOCK_RULE_HIT"));
+        assertThat(names.subList(first, first + ROLES.size())).containsExactlyElementsOf(ROLES.keySet());
+        ROLES.forEach((name, values) -> {
+            var role = DesignMetrics.Role.valueOf(name);
+            assertThat(DesignMetrics.DEFAULT.value(role)).as("default " + name).isEqualTo(values.get(0));
+            assertThat(DesignMetrics.CLASSIC.value(role)).as("classic " + name).isEqualTo(values.get(1));
+        });
+    }
+}
+```
 
 Spec 16.1.2 has `PaintedContrastTest` sample every chrome painter's declared pairs as painted over the shared palette
 sweep; the classic frame's three guarded rules join it. Insert the test before `searchHint`, as plan 7 inserts its dock
@@ -1894,7 +1972,7 @@ the body and footer start one hairline below the header and footer rules.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.SettingsShellFrameTest'`
+Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.SettingsShellFrameTest' --tests 'dev.jasper.ui.metrics.SettingsRolesTest'`
 Expected: FAIL at compile: "cannot find symbol: class Frame", "variable SETTINGS_HEADER_INSET", "method framePairs".
 
 - [ ] **Step 3: Write the frame**
@@ -2088,27 +2166,19 @@ for i, row in enumerate(rows):
     if name in values: rows[i] = f"{name}\t{values[name]}"; seen.add(name)
 if seen != set(values): raise SystemExit(f"classic-roles.tsv: missing {sorted(set(values) - seen)}")
 classic.write_text("\n".join(rows) + "\n", encoding="utf-8")
-N = "jasper-ui/src/test/java/dev/jasper/ui/metrics/"
-path = pathlib.Path(N + "NewRolesTest.java"); text = path.read_text(encoding="utf-8")
-added = re.search(r"static final List<String> ADDED = List\.of\((.*?)\);", text, re.S)
-if not added: raise SystemExit("NewRolesTest: ADDED moved")
-text = text[:added.end(1)] + ', "SETTINGS_HEADER_INSET"' + text[added.end(1):]
-path.write_text(text, encoding="utf-8")
-edit(N + "ClassicCatalogTest.java", [
-    ('''role != DesignMetrics.Role.FIELD_RADIUS''',
-     '''role != DesignMetrics.Role.FIELD_RADIUS
-                && !java.util.Set.of("SETTINGS_HEADER_INSET", "SETTINGS_NAV_CHILD_INDENT").contains(name)''', 1)])
 PY
 ```
 
-`SETTINGS_NAV_CHILD_INDENT` is Task 5's role; naming it here keeps the exception in one place. If a later plan already
-turned the `FIELD_RADIUS` condition into a set of names, add the two names to that set instead.
+`NewRolesTest` and `ClassicCatalogTest` stay as they are: the new role is `SettingsRolesTest`'s, not part of `ADDED`
+(Execution notes E4). The enum's last constant is 6a's `DIALOG_FOOTER_VERTICAL(8);` today, the first `NAME(n);` after
+`public enum Role`, which the script finds by pattern.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.SettingsShellFrameTest' --tests 'dev.jasper.ui.metrics.*' --tests 'dev.jasper.ui.swing.SettingsKitTest' --tests 'dev.jasper.ui.swing.SettingsControlsTest' :jasper-app:test --tests 'dev.jasper.app.appearance.PaintedContrastTest' --continue`
-Expected: PASS: `SettingsShellFrameTest` (4), `NewRolesTest`, `ClassicCatalogTest`, `DesignMetricsTest` (the two frozen
-tables), the Settings kit tests, and `PaintedContrastTest` with
+Expected: PASS: `SettingsShellFrameTest` (4), `SettingsRolesTest` (1), `NewRolesTest`, `ChromeRolesTest` and
+`ClassicCatalogTest` unchanged, `DesignMetricsTest` (the two frozen tables), the Settings kit tests, and
+`PaintedContrastTest` with
 `theClassicSettingsFramePaintsEachRuleAsItsGuardMakesItOverEveryPalette` (the theme set, the degenerate palettes and
 Enterprise Light).
 
@@ -2165,7 +2235,7 @@ Expected: PASS for the tests; `changed: none` (the default kit's integrated fram
 ```bash
 git add jasper-ui/src/main/java/dev/jasper/ui/swing/SettingsShell.java jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java \
   jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv jasper-ui/src/test/resources/dev/jasper/ui/metrics/classic-roles.tsv \
-  jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java jasper-ui/src/test/java/dev/jasper/ui/metrics/ClassicCatalogTest.java \
+  jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest.java \
   jasper-ui/src/test/java/dev/jasper/ui/swing/SettingsShellFrameTest.java jasper-app/src/test/java/dev/jasper/app/appearance/PaintedContrastTest.java \
   jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsView.java jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsDialog.java
 git commit -F - <<'EOF'
@@ -2193,19 +2263,19 @@ and Right) closes and opens the section, a click on its title selects its page, 
 The classic catalog places the rows as the mocks do (Rulings 13); the selection is the sidebar's full width.
 
 **Files:**
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SettingsShell.java` (Task 4's file), `KitView.java:130-141`, `ViewReconciler.java:175-180`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java` (post-4c text), `Buttons.java` (post-4c text), `InteractiveRows.java:1109`
-- Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (two roles, four classic values), the two role tables, `NewRolesTest.java`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/SettingsShell.java` (Task 4's file), `KitView.java:131-141`, `ViewReconciler.java:183-188`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/swing/Trees.java:168,395-401,410-412,439-440,457` (post-4c text), `Buttons.java:133,237` (post-4c text), `InteractiveRows.java:1140`
+- Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (two roles, five classic values), the two role tables, `SettingsRolesTest.java` (Task 4's)
 - Modify: `jasper-app/src/main/java/dev/jasper/app/settingsui/PageTree.java`, `SettingsDialog.java:183-185,190-209,252-258`
 - Create: `jasper-ui/src/test/java/dev/jasper/ui/swing/CollapsibleNavigationTest.java`, `jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsNavigationTest.java`
 - Modify: `docs/design/theme-engine/migration.csv` (one row)
 
 **Interfaces:**
 - Consumes: Task 4's `SettingsShell.Frame.collapsibleNavigation()`; plan 4c's `TreeFace.disclosure()`, `styleDisclosure`,
-  `KitButton.disclosure`, `TreeFace.box`.
+  `KitButton.disclosure`, and `ClassicHeaders.Box`, which already frames nothing around a Settings navigation tree (fact 8).
 - Produces: package-private `void KitView.collapsibleNavigation(boolean)` and `boolean collapsibleNavigation()`;
-  `boolean Trees.TreeControl.collapsibleNavigation`, `void Trees.TreeControl.boxed(boolean)`; `int
-  Buttons.KitButton.disclosureWidth`; `DesignMetrics.Role.SETTINGS_NAV_CHILD_INDENT(0)`, `SETTINGS_NAV_TEXT_GAP(6)`;
+  `boolean Trees.TreeControl.collapsibleNavigation`; `int Buttons.KitButton.disclosureWidth`;
+  `DesignMetrics.Role.SETTINGS_NAV_CHILD_INDENT(0)`, `SETTINGS_NAV_TEXT_GAP(6)`;
   package-private `PageTree.collapsible(boolean)`, `expanded(String, boolean)`, `reveal(String)`, `isCollapsed(String)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2338,8 +2408,16 @@ class SettingsNavigationTest {
             SettingsChromeTest.hooks(chrome, Composition.CLASSIC));
     }
 
+    /** Sizes and lays out the headless dialog's view as its window would: the navigation mounts the rows it shows. */
+    static SettingsView shown(SettingsDialog dialog) {
+        var view = dialog.view();
+        view.setSize(1000, 700);
+        for (int i = 0; i < 3; i++) KitTestSupport.layout(view);
+        return view;
+    }
+
     static void collapse(SettingsDialog dialog, String section) {
-        KitTestSupport.require(dialog.view(), "@tree/pages/" + section + "/expand", AbstractButton.class).doClick(0);
+        KitTestSupport.require(shown(dialog), "@tree/pages/" + section + "/expand", AbstractButton.class).doClick(0);
     }
 
     @Test void aSectionsTriangleClosesItAndATitleClickSelectsItsPage() throws Exception {
@@ -2406,7 +2484,8 @@ class SettingsNavigationTest {
         try {
             edt(() -> {
                 dialog.open(null, "keymap");
-                assertThat(KitTestSupport.find(dialog.view(), "@tree/pages/terminal/expand", AbstractButton.class)).isNull();
+                assertThat(KitTestSupport.find(shown(dialog), "@tree/pages/terminal/expand", AbstractButton.class)).isNull();
+                assertThat(KitTestSupport.find(dialog.view(), "@tree/pages/terminal/title", java.awt.Component.class)).as("the row is mounted").isNotNull();
             });
         } finally { edt(dialog::cancel); }
     }
@@ -2414,7 +2493,8 @@ class SettingsNavigationTest {
 ```
 
 `KitTestSupport.find` returns null when nothing has the name (`require` fails); `CorePages.pages` with the fake Keymap
-and Plugins pages is the four-argument form of fact 1's tests.
+and Plugins pages is the four-argument form of fact 1's tests. `shown` sizes the view first: the navigation mounts only
+the rows its viewport shows, and the headless dialog has no window to size it (Execution notes E24).
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -2450,17 +2530,9 @@ edit(U + "swing/SettingsShell.java", [
         appearance =''', 1)])
 edit(U + "swing/ViewReconciler.java", [
     ('''        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.gutter(''',
-     '''        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.collapsibleNavigation=navigation&&view.collapsibleNavigation();tree.boxed(!navigation);tree.gutter(''', 1)])
+     '''        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.collapsibleNavigation=navigation&&view.collapsibleNavigation();tree.gutter(''', 1)])
 edit(U + "swing/Trees.java", [
-    ('''            ((TreePane)scroll).owner=this;
-            var box=context().faces().tree.box(context());
-            if(box!=null)scroll.setBorder(box);''', '''            ((TreePane)scroll).owner=this;
-            plainBorder=scroll.getBorder();box=context().faces().tree.box(context());
-            if(box!=null)scroll.setBorder(box);''', 1),
-    ('''        @Override int minimumRowHeight(){''', '''        private javax.swing.border.Border plainBorder, box;
-        /** The tree face's box, or the pane's own border where the box frames nothing (the Settings navigation). */
-        void boxed(boolean value){var border=value&&box!=null?box:plainBorder;if(scroll.getBorder()!=border)scroll.setBorder(border);}
-        /** The Settings navigation's sections collapse behind a disclosure triangle (Enterprise presentation spec 12.1). */
+    ('''        @Override int minimumRowHeight(){''', '''        /** The Settings navigation's sections collapse behind a disclosure triangle (Enterprise presentation spec 12.1). */
         boolean collapsibleNavigation;
         @Override int minimumRowHeight(){''', 1),
     ('''        /** Settings navigation's headings stay open. */
@@ -2513,16 +2585,19 @@ for i, row in enumerate(rows):
     if name in values: rows[i] = f"{name}\t{values[name]}"; seen.add(name)
 if seen != set(values): raise SystemExit(f"classic-roles.tsv: missing {sorted(set(values) - seen)}")
 classic.write_text("\n".join(rows) + "\n", encoding="utf-8")
-path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java"); text = path.read_text(encoding="utf-8")
-if text.count('"SETTINGS_HEADER_INSET"') != 1: raise SystemExit("NewRolesTest: Task 4's role is missing")
-path.write_text(text.replace('"SETTINGS_HEADER_INSET"', '"SETTINGS_HEADER_INSET", "SETTINGS_NAV_CHILD_INDENT", "SETTINGS_NAV_TEXT_GAP"', 1), encoding="utf-8")
+path = pathlib.Path("jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest.java"); text = path.read_text(encoding="utf-8")
+old = '''        ROLES.put("SETTINGS_HEADER_INSET", List.of(20, 14));\n'''
+if text.count(old) != 1: raise SystemExit("SettingsRolesTest: Task 4's role is missing")
+path.write_text(text.replace(old, old + '''        ROLES.put("SETTINGS_NAV_CHILD_INDENT", List.of(0, 15));
+        ROLES.put("SETTINGS_NAV_TEXT_GAP", List.of(6, 6));\n''', 1), encoding="utf-8")
 PY
 ```
 
-The Trees anchors are plan 4c's text (fact 8): `((TreePane)scroll).owner=this;` with 4c's box lines, 4c's
-`styleDisclosure` call, and `row.indent = settingsNavigation || rail()?0:` at the head of the indent expression 4c
-completed. The navigation's default values (`SETTINGS_NAV_CHILD_INDENT` 0; a navigation row has no leading slot by
-default, so `SETTINGS_NAV_TEXT_GAP` is never read) keep the default look's rows where they are.
+The Trees anchors are plan 4c's text (fact 8, re-read at `759b2b7d9`): 4c's `styleDisclosure` call and `row.indent =
+settingsNavigation || rail()?0:` at the head of the indent expression 4c completed. The pane's border needs no change:
+4c's `ClassicHeaders.Box.drawn` already leaves out a Settings navigation tree at every measure and paint (Execution notes
+E9). The navigation's default values (`SETTINGS_NAV_CHILD_INDENT` 0; a navigation row has no leading slot by default, so
+`SETTINGS_NAV_TEXT_GAP` is never read) keep the default look's rows where they are.
 
 - [ ] **Step 4: Track the sections in the dialog**
 
@@ -2602,10 +2677,11 @@ PY
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-ui:test --tests 'dev.jasper.ui.swing.*' --tests 'dev.jasper.ui.metrics.*' :jasper-app:test --tests 'dev.jasper.app.settingsui.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
-Expected: PASS: `CollapsibleNavigationTest` (3), `SettingsNavigationTest` (5), `TreesTest`, `TreeDetailTest`,
-`ClassicTablesTest`, `SelectionInkTest` and every Settings test. If `theClassicNavigationIsPlacedAsTheMocksPlaceIt`
+Expected: PASS: `CollapsibleNavigationTest` (3), `SettingsNavigationTest` (5), `SettingsRolesTest` (1), `TreesTest`,
+`TreeDetailTest`, `ClassicTablesTest`, `SelectionInkTest` and every Settings test. If `theClassicNavigationIsPlacedAsTheMocksPlaceIt`
 reports another x for the section title, read the leading slot's width and the gap after it in
-`InteractiveRows.Row.doLayout` and correct `SETTINGS_NAV_TEXT_GAP` or the disclosure width (both tables) until the
+`InteractiveRows.Row.doLayout` and correct `SETTINGS_NAV_TEXT_GAP` or the disclosure width (both tables and
+`SettingsRolesTest`) until the
 title is at 21; the triangle's own position comes from 4c's glyph centring inside its button.
 
 - [ ] **Step 6: Prove the default look unchanged and commit**
@@ -2614,7 +2690,7 @@ title is at 21; the triangle's own position comes from 4c's glyph centring insid
 ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=dark && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=light
 ./gradlew :jasper-app:settingsPreview
 python3 -I build/plan9-base/compare.py
-git add jasper-ui/src/main/java/dev/jasper/ui jasper-ui/src/test/resources/dev/jasper/ui/metrics jasper-ui/src/test/java/dev/jasper/ui/metrics/NewRolesTest.java \
+git add jasper-ui/src/main/java/dev/jasper/ui jasper-ui/src/test/resources/dev/jasper/ui/metrics jasper-ui/src/test/java/dev/jasper/ui/metrics/SettingsRolesTest.java \
   jasper-ui/src/test/java/dev/jasper/ui/swing/CollapsibleNavigationTest.java jasper-app/src/main/java/dev/jasper/app/settingsui/PageTree.java \
   jasper-app/src/main/java/dev/jasper/app/settingsui/SettingsDialog.java jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsNavigationTest.java \
   docs/design/theme-engine/migration.csv
@@ -2638,9 +2714,9 @@ Expected before the commit: `changed: none`.
 
 ### Task 6: The real dialog under Enterprise, compared with the eighteen mocks
 
-`EnterpriseSettings` opens the real Settings dialog headless under plan 6a's `EnterpriseLook` (the shipped kit, its
-registered Plex faces and the Enterprise theme), with spec 9.1's projections from the parsed kit, over the bundled plugins
-and a fixture user plugin, and restores the default look when it closes.
+`EnterpriseSettings` opens the real Settings dialog headless under plan 6a's `EnterpriseLook` (until plan 5b merges: the
+fixture kit and theme in the platform faces; then the shipped kit, Plex and theme), with spec 9.1's projections of the kit
+file's chrome, over the bundled plugins and a fixture user plugin, and restores the default look when it closes.
 `SettingsChromeMockTest` renders each of the eighteen pages at 2x into `jasper-app/build/enterprise-settings/` and checks
 the chrome against each mock: probes on every OS (rules, surfaces, the selected row), pixel shares on macOS. The
 calibrated page roles of Rulings 16 are settled here. `tools/visual/pairs.json` gains the eighteen pairs for the opt-in
@@ -2653,11 +2729,12 @@ tools.
 - Modify (calibration only): `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java` (Task 4's three calibrated values) and `classic-roles.tsv`
 
 **Interfaces:**
-- Consumes: plan 6a's `EnterpriseLook.controller(boolean)` and `restoreDefault()`, `MockProfile.mock(String)`,
-  `MockProfile.deltaE(Color, Color)` and `MockProfile.REFERENCE`; plan 6b's `AuxiliaryWindows(UiState, Function,
-  PathChooser, DialogMapping)`; plan 5b's `EnterpriseResources`; plan 5a's `Presentation.of`, `Projections.Host`,
-  `ConfigLoader.parse(Path, String, boolean, DefaultSource)`, `ConfigService.State` (9 components);
-  `PluginRuntime.pluginNames()`; Tasks 1 to 5.
+- Consumes: plan 6a's `EnterpriseLook.controller(boolean)`, `theme()`, `chrome()`, `kit()` and `restoreDefault()`,
+  `MockProfile.mock(String)`, `MockProfile.deltaE(Color, Color)`, `MockProfile.ROOT` and `MockProfile.REFERENCE`; plan
+  6b's `AuxiliaryWindows(UiState, Function, PathChooser, DialogMapping)`; plan 5a's `Projections.of`,
+  `Projections.Host`, `Presentation.LANDED`, `ConfigLoader.parse(Path, String, boolean)` and `ConfigService.State`'s
+  8-argument form (the core defaults, Execution notes E2); `PluginRuntime.pluginNames()`; Tasks 1 to 5. Plan 5b's
+  `EnterpriseResources` is not used.
 - Produces: package-private `final class SettingsMockMatch` with `record Result(double matching, int dx, int dy)`,
   `static BufferedImage mock(String)`, `static BufferedImage crop(BufferedImage, Rectangle)`, `static double deltaE(int,
   int)`, `static Result compare(BufferedImage, BufferedImage, int shift, double tolerance)`, `static void inspect(Path,
@@ -2815,8 +2892,8 @@ import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.EnterpriseLook;
-import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.KitTestSupport;
+import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.app.testsupport.PluginJars;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -2840,15 +2917,15 @@ import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
 /**
- * The real Settings dialog under the shipped Enterprise look, headless: plan 6a's {@link EnterpriseLook} (the parsed kit,
- * the registered Plex faces, the Enterprise theme), spec 9.1's projections and the dialog mapping the application gives
+ * The real Settings dialog under the Enterprise look, headless: plan 6a's {@link EnterpriseLook} (the fixture kit and theme
+ * until plan 5b ships the kit, Plex and the theme), spec 9.1's projections and the dialog mapping the application gives
  * its windows, over the bundled plugins and a fixture user plugin (plan 9a Rulings 18). The look is installed for the
  * whole JVM, so {@link #close} (and a failed {@link #open}) installs the default look again. Never creates a native
  * window. Open on any thread; every method but {@link #open} and {@link #close} runs on the EDT.
  */
 final class EnterpriseSettings implements AutoCloseable {
     /** Where the renders go, under {@code light/} and {@code dark/}. */
-    static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/enterprise-settings");
+    static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/enterprise-settings");
     /** The values the mocks show, as a config file (plan 9a Rulings 18). */
     static final String CONFIG = """
         [ui]
@@ -2920,8 +2997,7 @@ final class EnterpriseSettings implements AutoCloseable {
 
     /** Opens the dialog at Appearance under Enterprise Light ({@code dark} false) or Dark. */
     static EnterpriseSettings open(boolean dark) throws Exception {
-        var parsed = EnterpriseResources.facts().parsed().orElseThrow();
-        var enterprise = EnterpriseResources.theme();
+        var enterprise = EnterpriseLook.theme();
         Path home = Files.createTempDirectory("jasper-enterprise-settings");
         // The mocks' user-installed plugin (a fixture): THD Sourcing Crypto 1.2.0 by The Home Depot Sourcing.
         PluginJars.build(home.resolve("plugins/com.homedepot.sourcing.crypto/jars"), "main.jar",
@@ -2931,11 +3007,14 @@ final class EnterpriseSettings implements AutoCloseable {
         Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"com.homedepot.sourcing.crypto\"]\nenabled = true\nconsented = []\n");
         Path file = home.resolve("config.toml");
         Files.writeString(file, CONFIG);
-        var loaded = ConfigLoader.parse(file, CONFIG, true, parsed.defaults());
+        // The core defaults until plan 5b's kit file supplies the look's own (Execution notes E2); CONFIG sets every shown value.
+        var loaded = ConfigLoader.parse(file, CONFIG, true);
         var state = new ConfigService.State(loaded.snapshot(), loaded.diagnostics(), file, true, loaded.legacyKeys(), loaded.deadTables(),
-            loaded.values(), false, parsed.defaults());
-        var projections = Presentation.of(new Presentation.Provider("dev.jasper.enterprise", "Enterprise", "fixture", "fixture"), parsed,
-            new Projections.Host(true, true)).projections();
+            loaded.values(), false);
+        // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
+        // named UI face, on the macOS host the mocks were drawn on.
+        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true),
+            Presentation.LANDED);
         var holder = new JComponent[1];
         // The application's mapping (plan 6b): under Enterprise the dialog's sheets and confirmations take the classic path.
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {
@@ -3011,10 +3090,12 @@ final class EnterpriseSettings implements AutoCloseable {
 }
 ```
 
-The fixture uses the APIs of facts 20 and 21 as they stand after plans 5a, 5b, 6a and 6b. `ThemeController.close` only
+The fixture uses the APIs of facts 20 and 21 as they stand at `759b2b7d9` (plans 5a, 6a and 6b; plan 5b's merge switches
+`EnterpriseLook` to the shipped kit and theme, which the fixture then follows unchanged). `ThemeController.close` only
 drops its listeners, and jasper-app's tests share one JVM, so the Enterprise look `EnterpriseLook.controller` installs
 would outlive the test without `restoreDefault()`; `close` runs it in a `finally` on the EDT. If a signature differs (for
-example `NotificationGroupChoices.Group`'s 6-argument form or the order of `ConfigService.State`'s ninth component), adapt
+example `NotificationGroupChoices.Group`'s 6-argument form, re-read as `(id, name, owner, defaultMode, ownerId,
+ownerIcon)`), adapt
 the call to the merged API and record it in the banner; the fixture's data stay as written. The descriptor edit is `SettingsDialogPreview.java:55-58`'s.
 
 - [ ] **Step 3: Write the chrome comparison**
@@ -3038,7 +3119,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Enterprise presentation spec 12.1 and 16.1.4: the Settings chrome against the eighteen 05 Settings mocks (plan 9a's
- * "Mock measurements"): probes on every OS, pixel shares of the sidebar, header and footer on macOS (Rulings 17).
+ * "Mock measurements"): probes on every OS, pixel shares of the sidebar, header and footer on macOS (Rulings 17); the
+ * probes that follow the UI face and the shares are printed until the fixture draws the shipped faces (Execution notes E10).
  */
 class SettingsChromeMockTest {
     /**
@@ -3073,6 +3155,15 @@ class SettingsChromeMockTest {
 
     static final double TOLERANCE = 12, PROBE = 3;
     static final boolean MAC = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+    /**
+     * Whether the Enterprise fixture draws the shipped UI faces: false until plan 5b's merge switches 6a's EnterpriseLook to
+     * the shipped kit, which turns the printed checks into assertions with no edit (Execution notes E10).
+     */
+    static final boolean PLEX = dev.jasper.app.testsupport.EnterpriseLook.kit().faces() != dev.jasper.ui.metrics.FaceSet.PLATFORM;
+    /** The probes whose place follows the UI face's line: a titled box's border sits at its title line's middle. */
+    static final java.util.Set<String> FONTS = java.util.Set.of("first box top", "Theme box bottom", "Workspace box top");
+    /** The probes whose place follows plan 9b's Appearance composition (the Theme box's height): printed here, 9b's to assert. */
+    static final java.util.Set<String> COMPOSED = java.util.Set.of("Theme box bottom", "Workspace box top");
 
     /** The mock's content, as the render covers it: from 2x (2, 60). */
     static BufferedImage content(Page page) {
@@ -3091,7 +3182,7 @@ class SettingsChromeMockTest {
             new Probe("body", 640, 36), new Probe("footer rule", 300, h - 45), new Probe("footer band", 300, h - 3), new Probe("selected row", 215, selected),
             new Probe("selection at the left edge", 1, selected), new Probe("selection at the right edge", 229, selected)));
         if (page.id().equals("command-palette"))
-            probes.addAll(List.of(new Probe("first box top", 600, 53), new Probe("box left", 247, 100), new Probe("box right", 1023, 100)));
+            probes.addAll(List.of(new Probe("first box top", 600, 53), new Probe("box left", 247, 70), new Probe("box right", 1023, 70)));
         if (page.id().equals("appearance"))
             probes.addAll(List.of(new Probe("Theme box bottom", 1000, 313), new Probe("Workspace box top", 1000, 334)));
         return probes;
@@ -3103,8 +3194,12 @@ class SettingsChromeMockTest {
         for (var probe : probesOf(page)) {
             int x = 2 * probe.x(), y = 2 * probe.y();
             double distance = SettingsMockMatch.deltaE(render.getRGB(x, y), mock.getRGB(x, y));
-            if (distance > PROBE) failures.add(String.format("%s %s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", page.id(), probe.name(),
-                probe.x(), probe.y(), render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance));
+            if (distance <= PROBE) continue;
+            String failure = String.format("%s %s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", page.id(), probe.name(),
+                probe.x(), probe.y(), render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
+            if (COMPOSED.contains(probe.name())) System.out.println("Plan 9b's composition: " + failure);
+            else if (FONTS.contains(probe.name()) && !PLEX) System.out.println("FONTS residual until plan 5b: " + failure);
+            else failures.add(failure);
         }
         return failures;
     }
@@ -3132,7 +3227,9 @@ class SettingsChromeMockTest {
                     shares.append(String.format("%s %s %.3f (%d, %d)%n", page.id(), names.get(i), result.matching(), result.dx(), result.dy()));
                     if (result.matching() < floors.get(i)) {
                         SettingsMockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), page.mock().substring(9, 11) + "-" + names.get(i), ours, theirs, TOLERANCE);
-                        if (MAC) failures.add(String.format("%s %s: %.3f below %.2f", page.id(), names.get(i), result.matching(), floors.get(i)));
+                        String below = String.format("%s %s: %.3f below %.2f", page.id(), names.get(i), result.matching(), floors.get(i));
+                        if (MAC && PLEX) failures.add(below);
+                        else System.out.println((MAC ? "FONTS residual until plan 5b: " : "Not asserted off macOS (Rulings 17): ") + below);
                     }
                 }
             }
@@ -3146,11 +3243,12 @@ class SettingsChromeMockTest {
             var render = new BufferedImage[1];
             SwingUtilities.invokeAndWait(() -> render[0] = settings.render("appearance", 1040, 691));
             ImageIO.write(render[0], "png", Files.createDirectories(EnterpriseSettings.OUT.resolve("dark")).resolve("01.png").toFile());
-            var palette = dev.jasper.app.testsupport.EnterpriseResources.theme().palette(true);
+            var palette = dev.jasper.app.testsupport.EnterpriseLook.theme().palette(true);
             var light = content(PAGES.getFirst());
             assertThat(render[0].getRGB(230, 8) & 0xFFFFFF).as("the strip is dark surface.sidebar")
                 .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_SIDEBAR).getRGB() & 0xFFFFFF);
-            assertThat(render[0].getRGB(1280, 200) & 0xFFFFFF).as("the body is dark surface.app")
+            // Logical (640, 40): the body between the header rule and the first box (lower, the Theme box's tiles begin).
+            assertThat(render[0].getRGB(1280, 80) & 0xFFFFFF).as("the body is dark surface.app")
                 .isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB() & 0xFFFFFF);
             assertThat(render[0].getRGB(1280, 68) & 0xFFFFFF).as("the header rule stands apart from the body")
                 .isNotEqualTo(render[0].getRGB(1280, 72) & 0xFFFFFF);
@@ -3168,23 +3266,30 @@ selection; the Keymap recording mock is plan 9b's.
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.settingsui.SettingsChromeMockTest' --continue`
 
-Then read `jasper-app/build/enterprise-settings/chrome-shares.txt` and, for a failure, the
-`compare/<nn>-<part>-diff.png` (mismatches in magenta). Expected: PASS; on macOS every share at or above its floor. Fix
-by cause, re-running after each change:
+Then read `jasper-app/build/enterprise-settings/chrome-shares.txt`, the test's printed "FONTS residual" lines and, for a
+share below its floor, the `compare/<nn>-<part>-diff.png` (mismatches in magenta). Expected: PASS. Until plan 5b merges
+(`PLEX` false) the three page-geometry probes and every share are printed, not asserted (Execution notes E10): record the
+lowest printed share per part and the page probes in the banner. Fix by cause, re-running after each change:
 
 - a probe failure at a rule, a surface or the selected row is a geometry or role defect of Tasks 4 and 5: correct the
   role value (both tables) or the frame code, never the probe;
 - magenta along whole edges of text or controls in the header (the breadcrumb at 75, 212 and 225; the lone title at 96)
   means a header gap: adjust `SETTINGS_HEADER_GAP`, `SETTINGS_CRUMB_GAP` or `SETTINGS_HEADER_TITLE_GAP`;
-- magenta confined to glyph interiors with every edge aligned is rasterization: on macOS, lower that part's floor to the
-  measured share rounded down to 0.01, never below 0.90, and record the share and cause in the banner.
+- magenta confined to glyph interiors with every edge aligned is rasterization: once `PLEX` is true, on macOS, lower that
+  part's floor to the measured share rounded down to 0.01, never below 0.90, and record the share and cause in the
+  banner; before that it is the platform face standing in for Plex, recorded and not tuned.
 
 Calibrate Rulings 16's page roles with the page probes `probesOf` already holds: on Command Palette the first titled
 box's top border at logical y 53 (18 below the header rule at 34 and its 1 px) and its edges at x 247 and 1023 (16 inside
-the body); on Appearance the Theme box's bottom border at y 313 and the Workspace box's top border at y 334 (21 apart).
-Adjust `SETTINGS_PAGE_TOP` until the first passes and `SETTINGS_SECTION_GAP` until the second does (both tables; 4b's
-titled box puts its border at its title line's middle). Record the calibrated values, with `SETTINGS_CRUMB_GAP`, in the
-banner.
+the body, probed at y 70, inside the box under today's rows and 9b's compositions alike: the mock's box is 52 tall, this
+plan's 38, E23); on Appearance the Theme box's bottom border at y 313 and the Workspace box's top border at y 334 (21 apart).
+Adjust `SETTINGS_PAGE_TOP` until the first passes and `SETTINGS_SECTION_GAP` until the Workspace box's top border is 21
+below the Theme box's bottom border, as in the mock (both tables; 4b's titled box puts its border at its title line's
+middle). The two Appearance probes' absolute rows follow the Theme box's height, which is plan 9b's Appearance
+composition, so this plan prints them (`COMPOSED`) and calibrates on their distance (Execution notes E25). Until `PLEX`
+is true the first box's top is printed too: calibrate on the printed ΔE (within `PROBE`) and record that the values are
+re-checked when the 5b merge turns them into assertions
+(Execution notes E11). Record the calibrated values, with `SETTINGS_CRUMB_GAP`, in the banner.
 
 - [ ] **Step 5: Add the pairs for the opt-in tools and the ledger rows**
 
@@ -3209,7 +3314,8 @@ for name in names:
     height = heights.get(number, 691)
     pairs.append({"name": "enterprise-settings-" + number, "mock": R + "Settings " + name + ".png", "crop": [2, 60, 2080, 2 * height],
                   "render": "jasper-app/build/enterprise-settings/light/" + number + ".png", "min_agreement": 0.40, "colours": chrome})
-path.write_text(json.dumps(pairs, indent=2) + "\n", encoding="utf-8")
+# ensure_ascii=False keeps the existing non-ASCII notes byte for byte, so the diff is insertions only (Execution notes E12).
+path.write_text(json.dumps(pairs, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 ledger = pathlib.Path("docs/design/theme-engine/migration.csv")
 rows = [
     "jasper-app/src/test/java/dev/jasper/app/settingsui/SettingsMockMatch.java,app.settingsui,SettingsMockMatch,nonvisual-helper,none,none,"
@@ -3416,6 +3522,7 @@ block = '''    /** Plan 9a (spec 12.1 and 16.1.4): the real Settings dialog unde
                         () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.projections());
                     MockProfile.write(image, "settings-" + look.name());
                 } finally {
+                    DesktopTestSupport.closeOwnersNow();
                     themes.close();
                     EnterpriseLook.restoreDefault();
                 }
@@ -3428,7 +3535,9 @@ path.write_text(text.replace(anchor, block + anchor), encoding="utf-8")
 PY
 ```
 
-`ChromeRenderTest` imports `ThemeController`, `EnterpriseLook`, `MockProfile` and `DesktopTestSupport.edt`. Add the
+`ChromeRenderTest` imports `ThemeController`, `EnterpriseLook`, `MockProfile` and `DesktopTestSupport.edt`, and shares
+`DesktopTestSupport`'s package; `closeOwnersNow()` comes first in the `finally`, as in `everyLookBuildsItsChromeFlush`
+(6a's entry conditions, Execution notes E17). Add the
 bridge's `migration.csv` row:
 
 ```bash
@@ -3475,7 +3584,7 @@ EOF
 ### Task 8: Documentation, STATUS and the whole build
 
 **Files:**
-- Modify: `docs/app-architecture.md:166`, `docs/configuration.md:84-86`, `docs/ui-maintenance.md` (one sentence), `docs/STATUS.md` (new entry at the top)
+- Modify: `docs/app-architecture.md:166`, `docs/configuration.md:84-86,197,225`, `docs/ui-maintenance.md` (one sentence, only if it describes `SettingsShell`; at `759b2b7d9` neither it nor `docs/ui-architecture.md` does), `docs/STATUS.md` (new entry at the top)
 - Modify: this plan's status banner
 
 **Interfaces:**
@@ -3502,7 +3611,12 @@ edit("docs/app-architecture.md", [
 edit("docs/configuration.md", [
     ('''changes shows its name in blue, and a setting that differs from its default has a Reset button, which removes
 the key from the file.''', '''changes shows its name in blue, and a setting that differs from its default has a Reset button (under the
-Enterprise look, Reset to Default in the row's context menu), which removes the key from the file.''', 1)])
+Enterprise look, Reset to Default in the row's context menu), which removes the key from the file.''', 1),
+    # 6a Rulings 33: the guide says the look wins; Settings now hides the two rows under such a look (Execution notes E18).
+    ('''a look with the system title bar uses it whatever this says | Next start |''',
+     '''a look with the system title bar uses it whatever this says, and Settings hides it | Next start |''', 1),
+    ('''a look without motion keeps everything still whatever this says | Live |''',
+     '''a look without motion keeps everything still whatever this says, and Settings hides it | Live |''', 1)])
 PY
 grep -n "SettingsShell\|Settings shell" docs/ui-maintenance.md docs/ui-architecture.md | head
 ```
@@ -3553,7 +3667,7 @@ bracketed values from this execution: the commit range, the calibrated values, t
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec 12.1 under the Enterprise look,
 measured on the eighteen `05 Settings` mocks. `Presentation.Landed.SETTINGS` lands, so `SettingsChrome` and
 `Composition` follow the kit file; `SettingsDialog.Hooks` carries both from the application's presentation and every
-page's `PageContext` carries both (without a presentation, `Projections.standard`), and `CompositionReadTest` keeps
+page's `PageContext` carries both (without a presentation, `Projections.standard`), and 6a's `ProjectionReadTest` keeps
 `Composition` reads in spec 9.1's six roots. jasper-ui receives values: `SettingsShell.Frame(integratedTitle,
 collapsibleNavigation)` draws the classic dialog when the header is not the title row (a search strip on
 `surface.sidebar` ruled in `border.row`, the navigation on the `navigation_surface` slot, `border.window` rules through
@@ -3563,17 +3677,22 @@ navigation's own measured geometry (rows 22, side 9, triangle 6 + 6, children 15
 sidebar). Under `inlineReset = false` every Settings row offers Reset to Default in its menu; `hiddenKeys` decides the
 built rows (the title-bar row's macOS rule is the default look's hidden key now); the interface font row takes
 `fontRowCopy` and starts its stepper at the look's size (12). New roles `SETTINGS_HEADER_INSET` (20; classic 14),
-`SETTINGS_NAV_CHILD_INDENT` (0; 15), `SETTINGS_NAV_TEXT_GAP` (6); classic Settings values in `DesignMetrics.CLASSIC`
-(header 34, footer 45, buttons 98, "?" 22, page inset 16, dropdowns 220, page top [n], section gap [n], crumb gap [n]).
-`EnterpriseSettings` opens the real dialog under the shipped kit, Plex and the Enterprise theme over the bundled plugins;
-`SettingsChromeMockTest` compares each page's sidebar, header and footer with its mock: probes on every OS, pixel shares
-on macOS ([lowest share per part]); its fixture builds on plan 6a's `EnterpriseLook` and restores the default look when it
-closes, and its comparison helper is the package-private `settingsui.SettingsMockMatch` on 6a's `MockProfile`.
+`SETTINGS_NAV_CHILD_INDENT` (0; 15), `SETTINGS_NAV_TEXT_GAP` (6), held by `SettingsRolesTest`; classic Settings values in
+`DesignMetrics.CLASSIC` (header 34, footer 45, buttons 98, "?" 22, page inset 16, dropdowns 220, page top [n], section gap
+[n], crumb gap [n]). `EnterpriseSettings` opens the real dialog under plan 6a's `EnterpriseLook` (the fixture kit and theme
+in the platform faces until plan 5b) over the bundled plugins; `SettingsChromeMockTest` compares each page's sidebar,
+header and footer with its mock: frame probes on every OS; the three page-geometry probes and the pixel shares, which
+follow the UI face, printed until plan 5b's merge turns them into assertions ([lowest printed share per part]); the
+fixture restores the default look when it closes, and its comparison helper is the package-private
+`settingsui.SettingsMockMatch` on 6a's `MockProfile`.
 `ChromeRenderTest.everyLookBuildsItsSettingsFrame` (through the test bridge `settingsui.SettingsFrameRenders`) opens the
 real dialog under every look 6a's chrome renders cover and checks the frame its `SettingsChrome` names;
 `PaintedContrastTest` samples the classic frame's three guarded rules over every palette. Zero pixel change in the default
-look: the gallery and the Settings preview are byte-identical to the base. Rulings (plan, "Rulings"): [the nineteen, one line each]. Deviations from the plan's text:
-[the re-anchorings and adaptations, or "none"]. `./gradlew check --continue`: **[n] tests, 0 failures, 0 errors, [n]
+look: the gallery and the Settings preview are byte-identical to the base ([skipped files, or none]). Rulings (plan,
+"Rulings"): [the nineteen, one line each]; Execution notes (2026-10-17) E1 to E27: [one line each]. Deviations from the
+plan's text: [the re-anchorings and adaptations, or "none"]. At the merge with plan 5b: `PLEX` turns the printed probes and
+shares into assertions (re-check the calibrated page roles), and `PlatformFontSize.standardSize` may read
+`FaceSet.namesUiFaces()` (E5). `./gradlew check --continue`: **[n] tests, 0 failures, 0 errors, [n]
 skipped**. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
 triangles, a right-click on a modified row) and on Windows or Linux (no title-bar or animations rows). Hand-off to plan
 10a: the mock helpers are 6a's `testsupport.MockProfile`, 7's `testsupport.MockCrops` and 9a's package-private
@@ -3602,3 +3721,219 @@ the whole build's counts.
 Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 ```
+
+## Execution notes (2026-10-17)
+
+Refreshed for execution against `759b2b7d9` (plans 3e, 4a to 4c, 5a, 6a, 6b and 8a merged; 5b, 7 and 8b running in
+parallel; this branch also holds plan 9b, which executes after this plan and gets its own refresh). Every anchor, quoted
+text, path, signature and line number above was re-read in the worktree; the text above is updated where the code moved
+or changed, and these notes rule where the refresh changed the plan's meaning or the plan disagreed with itself.
+
+Re-verified unchanged: every edit anchor of Tasks 1 to 8 in `Presentation`, `Projections` ("Spec 4.7's fallback"),
+`PageContext`, `SettingsDialog` (the Hooks block, the page factory, `view()`, the view's construction, the integrated
+title, `tree.show`, the `Selected` case, `show`), `settingsui/package-info`, `JasperApplication` (`ThemeRoute.CHROME)));`
+at `:1081`), `SchemaPage` (the four `row.shown()` reads, `rows()`, `row`, `externalNode`), `CorePages:124`,
+`PlatformFontSize`, `Nodes.SettingRow` (plus its doc comment), `SettingRows`, `Stacks.SettingsTrailingLayout`,
+`ViewReconciler` (`popupOpen`, `applySettingsNavigation`), `WorkspaceEditors`, `AppearanceSelection`,
+`NotificationGroupsEditor`, `Editors.notificationGroups`, `SettingsShell` (Task 4 replaces it whole; Task 5's anchor is
+Task 4's text), `SettingsView`, `KitView.settingsSurface()`, `Trees` (`expandFocused`, the indent head, the disclosure
+condition, `styleDisclosure`, the emphasis comment, `minimumRowHeight`), `Buttons` (`boolean disclosure;`, the
+disclosure size), `InteractiveRows` (the text gap), `DesignMetrics` (the enum's first `NAME(n);`, the classic delta's
+last `values.put`), both role tables (every role Tasks 4 and 5 retune has a row), `PageTree`, `PaintedContrastTest`
+(`searchHint`, `palettes()`, `paint`, `name`), `ChromeRenderTest` (`cases()`, `Case`, the covering-array test), the
+documents' anchors, and the fixtures' APIs (`AuxiliaryWindows`' four-argument form, `AuxiliarySurface.Shell`,
+`PluginRuntime`, `PluginManager.Hooks`, `KeymapPage.Hooks`, `InstalledThemes`, `AppearanceChoices`, `PluginJars`,
+`NotificationGroupChoices.Group`, `MockProfile`, `KitTestSupport`, `KitFixtures`, `Edt`). `ChromeRenderTest.cases()`
+builds every look with `EnumSet.allOf(Landed)`, so its Settings frames follow the kit whatever `LANDED` holds.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Finding | Ruling |
+|---|---|---|---|
+| 1 ↔ 2 | `PageContext.chrome()`; `SettingsChromeTest.CLASSIC`; `migration.csv` | Agree: Task 2 reads the record component Task 1 adds; ledger rows are appended and distinct | — |
+| 1 ↔ 3 | `PageContext.chrome()`; `SettingsChromeTest.CLASSIC` | Agree | — |
+| 1 ↔ 4 | `SettingsDialog.java` (1: `:54-62`, `:168-169`, `:211`; 4: `:166`, `:176-177`); `SettingsDialog.Hooks.chrome()` | Agree: disjoint lines; Task 4 reads `hooks.chrome()` (its Interfaces line names `SettingsDialog.chrome()`, the same value) | — |
+| 1 ↔ 5 | `SettingsDialog.java` (5: `:183-185`, `:194`, `:256-257`); `SettingsChromeTest.windows()`, `hooks()` | Agree | — |
+| 1 ↔ 6 | the 10-argument `Hooks`; `Presentation.LANDED` | Task 6 built projections from 5b's parsed kit | E2 |
+| 1 ↔ 7 | the 10-argument `Hooks`; `ChromeRenderTest` | Agree | — |
+| 1 ↔ 9b | `CompositionReadTest`, which 9b runs and extends | The reader scan moves into `ProjectionReadTest` | E3, E20 |
+| 2 ↔ 3 | `PlatformFontSize.java` (Task 3 edits Task 2's file); `SchemaPage.java` | Agree: Task 3's four `PlatformFontSize` anchors are Task 2's text, untouched by E5's change; the `SchemaPage` edits are disjoint | — |
+| 2 ↔ 3, 5, 7 | `LookRowsTest.LINUX_DEFAULT` | Agree | — |
+| 3 ↔ 5 | `ViewReconciler.java` (`popupOpen` against `applySettingsNavigation`) | Agree: disjoint lines | — |
+| 3 ↔ 7 | Reset button id `palette.visible_rows:reset` | Agree: `SchemaPage.Row.resetId()` | — |
+| 3 ↔ plugins | `Nodes.SettingRow` gains a component; `KitValuesTest` compares projections by `toString()` | Two of its four comparisons hold a `SettingRow` and would fail | E8 |
+| 3 ↔ plugins | `KitSettingRows.java:206`, `:217` copy rows with the 8-argument form | Agree: SDK rows carry no menu (Rulings 8) | — |
+| 4 ↔ 5 | `SettingsShell.java`; `DesignMetrics.java`; both tables; the role test | Agree: Task 5 anchors Task 4's `SETTINGS_HEADER_INSET(20);` and `values.put(Role.SETTINGS_HEADER_INSET, 14);`; the role test is `SettingsRolesTest` | E4 |
+| 4 ↔ 6 | Task 6 calibrates Task 4's `SETTINGS_PAGE_TOP`, `SETTINGS_SECTION_GAP`, `SETTINGS_CRUMB_GAP` | Agree: both tables; until 5b on printed probes | E11 |
+| 4 ↔ 7 | `SettingsShell.framePairs`, `titleRowHeight()` | Agree | — |
+| 5 ↔ 6 | the selected row's probe (rows 22 from 43) | Agree; the Tools rows' order is data | E21 |
+| 5 ↔ 7 | triangle id `@tree/pages/<id>/expand` | Agree: `Trees` names the expand button so | — |
+| 6 ↔ 7 | `pairs.json`; `migration.csv` | Agree: appended | E12 |
+| 6, 8 ↔ 5b, 7, 8b | `EnterpriseLook`, role tables, `migration.csv`, `STATUS.md`, `pairs.json`, `ProjectionReadTest`, `LANDED` | Shared with parallel plans | E19 |
+| 1 | itself | `git rebase main` in "Before you start" against the workflow's no-rebase rule; `CompositionReadTest` against "projection reads belong to `ProjectionReadTest`"; the `LANDED` script rewrote a comment line plans 7 and 8b also touch; `presentation()` against the class's own `presentation.` style; one marker text for two package-info styles | E1, E3, E13, E14, E15 |
+| 2 | itself | Interfaces named `SchemaPage.built` package-private and private; `standardSize` used 5b's `namesUiFaces` and read the kit even under the default look, where 5- and 6-argument contexts have none; `LookRowsTest` used 5b's `EnterpriseResources` | E5, E6 |
+| 3 | itself | The new `SettingRow` doc comment left the record's existing one dangling | E7 |
+| 4 | itself | Appending to `NewRolesTest.ADDED` breaks its contiguity test now that 6a's roles follow 8a's; the `ClassicCatalogTest` exemption then has nothing to exempt | E4 |
+| 5 | itself | `boxed()` duplicates 4c's `ClassicHeaders.Box.drawn`, and its anchor quoted `tree.box(context())` (now `tree.box(this)`); `SettingsNavigationTest` looked for rows the unsized headless navigation never mounts | E9, E24 |
+| 6 | itself | The fixture, its projections, defaults and output path came from 5b; font-following probes and shares asserted with the platform face standing in for Plex; two probe points fell outside what they name (the box edges below the box, the dark body on a theme tile); the Appearance boxes' absolute rows follow 9b's composition; `json.dumps` would escape the file's non-ASCII notes, so "insertions only" fails | E2, E10, E11, E12, E23, E25 |
+| 7 | itself | The loop's `finally` lacked 6a's `closeOwnersNow()` first | E17 |
+| 8 | itself | STATUS template named 5b's fixture and `CompositionReadTest`; the configuration guide's two rows still say only that the look wins | E18, E22 |
+| all | the pixel proof | A render that differs between two runs of the same code would fail every proof | E16 |
+
+### Rulings
+
+E1. **No rebase: "Before you start" checks that `759b2b7d9` is an ancestor instead of running `git rebase main`** — the
+branch already holds `main` at `759b2b7d9`, and the workflow forbids rebase, merge and push — cost if wrong: none; a newer
+`main` is merged by the orchestrator.
+
+E2. **Plan 5b's fixtures give way to plan 6a's `EnterpriseLook`**: `EnterpriseSettings` installs
+`EnterpriseLook.controller(dark)`, previews themes with `EnterpriseLook.theme()`, writes under `MockProfile.ROOT`, builds
+its projections with `Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", Host(true, true),
+Presentation.LANDED)` (the kit file's chrome, its classic base and its named UI face) and reads `CONFIG` under the core
+defaults (`ConfigLoader.parse(Path, String, boolean)`, the 8-argument `ConfigService.State`) — 5b runs in parallel and
+the orchestrator says not to depend on it; 5b's merge switches `EnterpriseLook` to the shipped kit, faces and theme, so
+the fixture follows without an edit — cost if wrong: until that merge the Enterprise kit's own defaults are not in effect
+in the renders; `CONFIG` sets every value the mocks show, so only a Reset menu item's enabled state could differ.
+
+E3. **`Composition`'s readers are a fourth entry of 6a's `ProjectionReadTest.PROJECTION_READERS`, with the anchored
+pattern `^dev/jasper/app/presentation/Composition$` and the predicate `compositionRoot` (the presentation package and spec
+9.1's six roots with their nested classes), plus the case `compositionIsReadOnlyByItsRoots`; `CompositionReadTest` and
+its ledger row are not created** — the orchestrator: projection reads belong to `ProjectionReadTest` (6a Rulings 16,
+"plans 6b to 9 add their points"); the bare class name is the constant-pool class entry that a constant, a method, a
+switch or a cast over `Composition` needs, while a class that only carries the value (`PageContext`,
+`SettingsDialog$Hooks`, `JasperApplication`) names it only inside descriptors, so Rulings 4 holds unchanged — cost if
+wrong: should javac give a carrier a class entry, the scan flags it in Task 1 Step 4; find it with `javap -v`, record
+it, and never widen the predicate.
+
+E4. **This plan's roles live in a new `metrics.SettingsRolesTest` (role, default value, classic value, appended after
+4a's roles, contiguous), not in `NewRolesTest.ADDED`; `NewRolesTest` and `ClassicCatalogTest` are not edited** — `ADDED`
+must stay one contiguous run (`theAddedRolesFollowEachOtherInOrder`) and 6a's thirty chrome roles now follow 8a's last
+`RUN_WINDOW_*`, so appending there would fail; `ClassicCatalogTest`'s equal-to-default rule iterates `ADDED` only, so no
+exemption is needed; 6a's `ChromeRolesTest` set the pattern — cost if wrong: one test file.
+
+E5. **`PlatformFontSize.standardSize` keys on the look's font row copy (`PLATFORM_COPY`, "Use platform font size": the
+example, 14; any other copy: the kit's body size) and reads the kit only off the platform copy** — plan 5b's
+`FaceSet.namesUiFaces()` is not on the branch; `Projections.of` words the copy "Use the default font size" exactly when
+the kit names a UI face, so the rule is the same; a 5- or 6-argument `PageContext` has no kit (`noKit` throws), and the
+default look's first untick must keep working there — cost if wrong: one condition, which may read `namesUiFaces()`
+after the 5b merge with identical results.
+
+E6. **`LookRowsTest`'s Enterprise context is `KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise())`
+(12-point body)** — as E2 — cost if wrong: none.
+
+E7. **`Nodes.SettingRow`'s one-line doc comment ("`{@code highlighted}` marks a row matching the host's current
+search") is part of the anchor and folded into the new comment** — two consecutive doc comments leave the first dangling
+(`-Xlint:all` warns; javadoc uses the last) — cost if wrong: none.
+
+E8. **`KitValuesTest`'s four `for(var node:nodes)` projection comparisons replace `titleNote=, contextActions=[]` by
+`titleNote=` in the module string (Task 3 Step 4)** — jasper-ui's row gains a host-only component (Rulings 8), so its
+`toString()` differs from the SDK row's by exactly that empty list after its (empty) title note; a blanket strip of
+`, contextActions=[]` would also remove the empty menus of crumbs and item lists, which both sides print (the dry run
+showed three such failures); the projection itself is unchanged and lossless — cost if wrong: none; a projected row
+could not carry a menu (`KitValues` uses the 8-argument form), and every row in those lists has an empty title note.
+
+E9. **Task 5 drops `Trees.TreeControl.boxed`, its `plainBorder` and `box` fields and `ViewReconciler`'s
+`tree.boxed(!navigation)`** — 4c's final review made `ClassicHeaders.Box.drawn` return false, with zero insets, for a
+Settings navigation tree or a rail at every measure and paint, and the quoted anchor `tree.box(context())` is
+`tree.box(this)` now — cost if wrong: none; `CollapsibleNavigationTest`'s full-width selection checks it.
+
+E10. **Probes that follow the UI face are printed until plan 5b merges**: `SettingsChromeMockTest` asserts the frame
+probes on every OS (strip, strip rule, navigation, sidebar rule, body edge, header and its rule, body, footer rule and
+band, the selected row and both its edges, the box edges at x 247 and 1023), while the three page-geometry probes (first
+box top, Theme box bottom, Workspace box top, set `FONTS`) and the pixel-share floors are asserted only when `PLEX`
+(`EnterpriseLook.kit().faces() != FaceSet.PLATFORM`) holds, the floors on macOS only (Rulings 17), and the two Appearance
+probes stay printed in this plan (E25); otherwise each is
+printed ("FONTS residual until plan 5b", 6a's `MockProfile.fonts` convention) and the inspect images are still written.
+`Probe` keeps its three components, which 9b uses. The search field's 22 and the 22 px rows hold for a UI line up to
+16 px (`contentHeight`), so the sidebar's vertical probes stay asserted — the orchestrator's instruction; a titled box's
+border follows its title line, and text pixels follow the face — cost if wrong: a regression in those three probes or
+in a share shows only in the printout until 5b's merge turns `PLEX` on with no edit; all eighteen mocks are still
+rendered and compared.
+
+E11. **Task 6 calibrates `SETTINGS_PAGE_TOP`, `SETTINGS_SECTION_GAP` and `SETTINGS_CRUMB_GAP` on the printed probes
+(within `PROBE`) and records that they are re-checked when `PLEX` turns on** — the platform face's title line can differ
+from Plex's by a pixel — cost if wrong: a one-pixel retune at the 5b merge, two table rows.
+
+E12. **`pairs.json` is rewritten with `json.dumps(..., indent=2, ensure_ascii=False)`** — the file holds non-ASCII notes
+and round-trips byte for byte only so (checked); the default escapes them and the diff is no longer insertions only —
+cost if wrong: none.
+
+E13. **The `LANDED` edit keeps its doc comment and only appends `Landed.SETTINGS`** — plans 7 and 8b append to the same
+line in parallel; the smallest edit merges most easily — cost if wrong: none.
+
+E14. **`JasperApplication` passes `presentation.projections()` (the field)**, as `:212`, `:341` and `:938-939` do —
+cost if wrong: none.
+
+E15. **Each `package-info` names the new edge in its own words: pluginmanager's "dev.jasper.app.presentation (its page
+composition)", shortcuthelp's "presentation (its page composition)"**; both edges are recorded ahead of 9b's readers —
+the plan's own fallback ("in its own words"); `verifyApplicationArchitecture` reads jdeps, not these sentences — cost if
+wrong: none.
+
+E16. **The pixel base is recorded, then the three Gradle commands are run again and must compare `changed: none`; a
+file that differs between the two runs goes into `compare.py`'s `SKIP` and the banner** — plan 3e found renders that
+differ run to run at the same code; one would false-fail every proof — cost if wrong: a skipped file is unproven
+(expected: none).
+
+E17. **Task 7's loop calls `DesktopTestSupport.closeOwnersNow()` first in its `finally`** — 6a's entry conditions; the
+dialog opens no terminal window, so it is housekeeping — cost if wrong: none.
+
+E18. **`docs/configuration.md`'s rows for `window.native_decorations` and `ui.animations.enabled` gain ", and Settings
+hides it"** — 6a Rulings 33 recorded that the guide says the look wins until plan 9 hides the rows; a reader looking for
+the switch under such a look would be misled — cost if wrong: two clauses.
+
+E19. **Plans 5b, 7 and 8b run in parallel and are reconciled at merge**: `LANDED` holds `WINDOW_CHROME` and
+`WINDOW_CONTENT` (Task 1 appends `SETTINGS`); Task 1's `ProjectionsTest` cases use explicit sets and
+`Presentation.LANDED`, so they hold whatever 7 and 8b add; the `Role` enum and both tables (this plan's roles stay one
+appended block), `ProjectionReadTest`'s map, `migration.csv`, `STATUS.md` and `pairs.json` are edited by appending —
+cost if wrong: mechanical merge conflicts on those lines.
+
+E20. **Hand-off to 9b's refresh**: `CompositionReadTest` is `ProjectionReadTest`'s Composition entry (9b's new readers
+are its roots already); `NewRolesTest.ADDED` and `ClassicCatalogTest`'s exception set become `SettingsRolesTest.ROLES`
+entries with their classic values; `EnterpriseResources` becomes `EnterpriseLook`; `SettingsChromeMockTest.Probe` keeps
+three components, font-following probes are named in its `FONTS`, and the two Appearance probes in `COMPOSED` are 9b's
+to assert (E25) — cost if wrong: 9b's refresh re-anchors them.
+
+E21. **The Tools rows' order in `PAGES` (Credential Vault 14 to Shell History 20) is data**: if the selected-row probe
+finds a different order, correct `PAGES`' row numbers, never the probe; likewise Rulings 18's "bundled Enterprise row on
+Plugins" residual does not arise until 5b ships the plugin — cost if wrong: none.
+
+E22. **The STATUS template names the fixture, `ProjectionReadTest`, `SettingsRolesTest`, the printed probes, the skipped
+files and the 5b merge items (E5, E10, E11)** — so the entry records what this execution proves before 5b — cost if
+wrong: none.
+
+E23. **Two probe points move to what they name: Command Palette's box edges are probed at y 70 (was 100) and the dark
+variant's body at 2x (1280, 80), logical (640, 40) (was (1280, 200))** — the dry run (E26) found y 100 below this plan's
+38 px box (rows as today; the mock's box is 52 tall, 9b's composition) and (640, 100) inside the Theme box's dark preview
+tile (`#35383D` in both variants); the probes test the box's x edges and the body's surface, not those heights — cost if
+wrong: none.
+
+E24. **`SettingsNavigationTest` sizes and lays out the dialog's view (`shown`, 1000 × 700) before it looks for a
+section's triangle, and the default-look case checks that the Terminal row is mounted** — the navigation mounts only the
+rows its viewport shows and the headless dialog has no window, so the Terminal row (row 9) was never mounted; the
+default-look case would have passed vacuously — cost if wrong: none.
+
+E25. **The Appearance probes "Theme box bottom" (y 313) and "Workspace box top" (y 334) are printed in this plan whatever
+`PLEX` says (`COMPOSED`), and `SETTINGS_SECTION_GAP` is calibrated on their distance (21 in the mock)** — the Theme box's
+height is plan 9b's Appearance composition (the dry run: 306 and 327 against 313 and 334, 21 apart in both); 9b's
+refresh moves them into its assertions — cost if wrong: an Appearance page-geometry regression is printed, not failed,
+until 9b.
+
+E26. **Dry run (evidence for this refresh, nothing committed)**: a scratch copy of `759b2b7d9` with every script and file
+of Tasks 1 to 8 applied in order (all 21 scripts exit 0; Task 6's pairs edit is insertions only) compiled with the JBR's
+`javac` (jasper-ui main and tests, jasper-app main and tests, against jasper-sdk, -buddy, -terminal and -sdk-testkit) and
+ran under the JUnit launcher, headless, outside Gradle: jasper-ui 840 of 842 (the two failures need the built jar and the
+README the scratch copy lacks); jasper-app's `settingsui`, `presentation`, `pluginmanager`, `shortcuthelp`, `config` and
+`architecture` packages, `KitValuesTest`, `PluginSettingsPageTest`, `PluginPanelPageTest`, `PaintedContrastTest`,
+`ThemeMigrationCoverageTest` and `ChromeRenderTest` (with `everyLookBuildsItsSettingsFrame`) pass after E8, E23 and E24,
+apart from tests that need Gradle's jars or properties; `SettingsChromeMockTest` passes over all eighteen mocks with
+plugins staged. Measured there under the platform faces and the plan's starting values (page top 10, section gap 13,
+crumb gap 6): shares sidebar 0.963 to 0.973 (best at dx 2), header 0.957 to 0.991, footer 0.991 to 0.993; Command
+Palette's first box top at 52 against the mock's 53 (so `SETTINGS_PAGE_TOP` 11 is the likely calibration), its edges at
+247 and 1023 as measured; the Appearance boxes 21 apart as in the mock (E25). These are hints for Task 6 Step 4, which
+measures again in the worktree.
+
+E27. **A pre-existing order dependence, not this plan's**: on the base code (`759b2b7d9`, no 9a edit) the JUnit launcher
+running `PluginPanelPageTest` (with `KitValuesTest` and `PluginSettingsPageTest`) before `PaintedContrastTest` fails the
+latter's `theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette` ("Enterprise Light, selected row"); alone, or in
+Gradle's class order (appearance before plugins), it passes — cost if wrong: should `check` show it, it is the existing
+leak (report it), not a 9a defect.
