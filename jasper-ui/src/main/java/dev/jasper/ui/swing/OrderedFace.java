@@ -12,8 +12,8 @@ interface OrderedFace extends Face {
     boolean rowCommands();
     /** The role of a row's index. */
     Nodes.TextRole indexRole();
-    /** Styles a row's index after it refreshes. */
-    void styleIndex(JLabel index, KitContext context);
+    /** Styles the index of the unselected row at {@code row} after it refreshes; a selected row keeps its ink. */
+    void styleIndex(JLabel index, KitContext context, int row);
     /** Paints the list's canvas behind its rows. */
     void paintCanvas(InteractiveRows.Canvas canvas, Graphics graphics);
     /** Paints the list's pane behind its viewport. */

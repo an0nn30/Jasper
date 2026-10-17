@@ -12,7 +12,7 @@ final class DefaultOrderedFace implements OrderedFace {
     @Override public List<PaintPair> pairs() { return List.of(); }
     @Override public boolean rowCommands() { return true; }
     @Override public Nodes.TextRole indexRole() { return Nodes.TextRole.CAPTION; }
-    @Override public void styleIndex(JLabel index, KitContext context) { }
+    @Override public void styleIndex(JLabel index, KitContext context, int row) { }
     @Override public void paintCanvas(InteractiveRows.Canvas canvas, Graphics graphics) { canvas.paintOrdered(graphics); }
     @Override public void paintPane(ItemLists.ListControl list, Graphics2D g) { }
     @Override public void mount(ItemLists.ListControl list, ControlRegistry.Control add) { }

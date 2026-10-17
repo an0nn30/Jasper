@@ -4807,3 +4807,9 @@ check`; the executor's runs are the evidence for those.
   LINK to this plan, and spec 6.4 names only the side column's LINK add action ("draws as a standard button"); no mock
   of this plan's draws another LINK — cost if wrong: a classic LINK elsewhere looks as by default until a composition
   asks otherwise.
+- **E18. Task 3's review: `OrderedFace.styleIndex` takes the row (`styleIndex(JLabel, KitContext, int row)`), the
+  classic face declares a third pair (`text.tertiary` on `surface.zebra`, a fourth `face-pairs.tsv` row) for odd rows'
+  indices, a selected row's index keeps its selection ink (`ItemLists.populate` styles unselected rows only), and
+  `SideLayout`'s minimum is as tall as the side column** — the index painted `text.tertiary` on `selection.bg` (about
+  1.0:1 in Slate Cobalt Light) and was guarded against the even rows' surface only, and a host sizing to the minimum
+  clipped Move Down — cost if wrong: none (`ClassicOrderedTest` checks all three).

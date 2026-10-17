@@ -431,7 +431,8 @@ final class ItemLists {
             if (value().kind() == Nodes.ListKind.ORDERED && row.controls.get(internalId(row.id, "index")) instanceof Labels.TextControl number) {
                 // A fixed index column keeps every key glyph and name on one vertical line.
                 ((Labels.LiteralLabel) number.component).columnWidth = ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_INDEX_WIDTH);
-                context().faces().ordered.styleIndex((JLabel) number.component, context());
+                // A selected row's index keeps the ink its refresh gave it.
+                if (!row.inked) context().faces().ordered.styleIndex((JLabel) number.component, context(), index);
             }
             if (item.leading().orElse(null) instanceof Nodes.Icon icon && (icon.size() == Nodes.IconSize.RAIL || icon.size() == Nodes.IconSize.PROMPT) && icon.hue() != Nodes.Hue.NONE) {
                 ((Labels.IconControl)row.controls.get(icon.id())).tile(context().metrics().value(value().kind() == Nodes.ListKind.DOUBLE ? DesignMetrics.Role.CATEGORY_ROW_TILE : DesignMetrics.Role.CATEGORY_RAIL_TILE), selected.contains(item.id()));

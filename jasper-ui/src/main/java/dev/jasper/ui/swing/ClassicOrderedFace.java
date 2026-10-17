@@ -15,18 +15,22 @@ import javax.swing.border.Border;
  * an entry row its VERTICAL parent holds right after it.
  */
 final class ClassicOrderedFace implements OrderedFace {
-    private final PaintPair box, index;
+    private final PaintPair box, index, zebraIndex;
 
     /** A face whose box stands on {@code surface}, the kit's dialog surface. */
     ClassicOrderedFace(SemanticColor surface) {
         box = new PaintPair(SemanticColor.BORDER_CONTROL, surface, SurfaceContrast.Guard.CONTROL);
         index = new PaintPair(SemanticColor.TEXT_TERTIARY, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.TEXT);
+        zebraIndex = new PaintPair(SemanticColor.TEXT_TERTIARY, DerivedColor.SURFACE_ZEBRA, SurfaceContrast.Guard.TEXT);
     }
 
-    @Override public List<PaintPair> pairs() { return List.of(box, index); }
+    @Override public List<PaintPair> pairs() { return List.of(box, index, zebraIndex); }
     @Override public boolean rowCommands() { return false; }
     @Override public Nodes.TextRole indexRole() { return Nodes.TextRole.MONO_CAPTION; }
-    @Override public void styleIndex(JLabel label, KitContext context) { label.setForeground(ThemePainting.painted(context, index)); }
+    /** An even row's index on {@code surface.input}, an odd row's on {@code surface.zebra}. */
+    @Override public void styleIndex(JLabel label, KitContext context, int row) {
+        label.setForeground(ThemePainting.painted(context, row % 2 == 1 ? zebraIndex : index));
+    }
 
     /** Odd rows in {@code surface.zebra}; the box and its fill are the pane's. */
     @Override public void paintCanvas(InteractiveRows.Canvas canvas, Graphics graphics) {
@@ -118,8 +122,12 @@ final class ClassicOrderedFace implements OrderedFace {
             }
         }
 
-        @Override public Dimension preferredLayoutSize(Container parent) {
-            var size = super.preferredLayoutSize(parent);
+        @Override public Dimension preferredLayoutSize(Container parent) { return spanned(super.preferredLayoutSize(parent)); }
+
+        @Override public Dimension minimumLayoutSize(Container parent) { return spanned(super.minimumLayoutSize(parent)); }
+
+        /** {@code size}, at least as tall as the side column (the right inset already holds its width). */
+        private Dimension spanned(Dimension size) {
             if (list.side != null) size.height = Math.max(size.height, list.side.getPreferredSize().height);
             return size;
         }

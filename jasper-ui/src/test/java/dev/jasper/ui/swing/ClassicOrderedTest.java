@@ -64,6 +64,9 @@ class ClassicOrderedTest {
                 assertThat(List.of(command(view, "remove").isEnabled(), command(view, "up").isEnabled(), command(view, "down").isEnabled()))
                     .containsExactly(true, true, false);
                 assertThat(list.selectionShown(2)).as("the selection shows while a button has focus").isTrue();
+                var caption = new Nodes.Text("index", READY, "3", Nodes.TextRole.MONO_CAPTION);
+                assertThat(find(view, list.internalId("flake", "index"), JLabel.class).getForeground()).as("a selected row's index keeps its ink")
+                    .isEqualTo(ThemePainting.color(context, Labels.TextControl.onSelection(caption, InteractiveRows.Ink.SELECTION)));
                 events.clear();
                 command(view, "up").doClick(0);
                 assertThat(events).containsExactly(new UiEvent.Reordered("markers", "flake", 1));
@@ -115,6 +118,7 @@ class ClassicOrderedTest {
                 assertThat(entry.getY()).isGreaterThanOrEqualTo(viewport.getY() + viewport.getHeight());
                 assertThat(entry.getWidth()).isEqualTo(list.scroll.getWidth() - list.side.getWidth() - gap);
                 assertThat(list.scroll.getHeight()).isGreaterThanOrEqualTo(list.side.getPreferredSize().height);
+                assertThat(list.scroll.getMinimumSize().height).as("the minimum keeps Move Down").isGreaterThanOrEqualTo(list.side.getPreferredSize().height);
             } finally { release(context); }
         });
     }
@@ -172,6 +176,8 @@ class ClassicOrderedTest {
                 var index = find(view, list.internalId("csproj", "index"), JLabel.class);
                 assertThat(index.getForeground()).as(where + " index").isEqualTo(ThemePainting.painted(context, pairs.get(1)));
                 assertThat(index.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.MONO_CAPTION));
+                assertThat(find(view, list.internalId("xcode", "index"), JLabel.class).getForeground()).as(where + " index on the zebra")
+                    .isEqualTo(ThemePainting.painted(context, pairs.get(2)));
                 var odd = list.mounted.get("xcode");
                 assertThat(at(paint(list.canvas), list.canvas.getWidth() - 2, odd.getY() + odd.getHeight() / 2)).as(where + " zebra")
                     .isEqualTo(ThemePainting.role(context, DerivedColor.SURFACE_ZEBRA));
