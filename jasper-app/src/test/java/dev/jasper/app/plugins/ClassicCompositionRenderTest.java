@@ -53,11 +53,6 @@ class ClassicCompositionRenderTest {
     static final String SESSIONS_DARK = "0+36 #35383D, 36+1 #45484E, 37+20 #393C41, 57+1 #4A4D53, 58+44 #2E3135, 102+22 #3D74D6, "
         + "124+111 #2E3135, 235+1 #2A2C30, 236+22 #35383D, 258+1 #45484E, 259+22 #35383D, 281+1 #3F4247, 282+22 #35383D, 304+1 #3F4247, "
         + "305+22 #35383D, 327+1 #3F4247, 328+22 #35383D, 350+1 #3F4247, 351+40 #35383D";
-    /**
-     * The Dark mock's rule above the Properties is {@code border.window} (#2A2C30) at 1.19:1 on {@code surface.panel}; spec
-     * 7.3's structural guard lifts it toward the ink to its 1.3:1 floor (#4E5054), a residual the guard decides.
-     */
-    static final String SESSIONS_DARK_GUARDED = SESSIONS_DARK.replace("235+1 #2A2C30", "235+1 #4E5054");
     /** The Disconnected mock stripes its second host (#F7F8FA); classic trees are not striped (Rulings 14), so the render reads white. */
     static final String SESSIONS_DISCONNECTED = "0+36 #F7F7F8, 36+1 #DDE0E4, 37+20 #F0F1F3, 57+1 #D3D6DA, 58+22 #FFFFFF, 80+22 #2F65CA, "
         + "102+133 #FFFFFF, 235+1 #C4C7CC, 236+22 #F7F7F8, 258+1 #DDE0E4, 259+22 #F7F7F8, 281+1 #E6E8EB, 282+22 #F7F7F8, 304+1 #E6E8EB, "
@@ -72,7 +67,7 @@ class ClassicCompositionRenderTest {
                 fixture.selectSession(ids.get(1));
                 var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 2136, 230, 700, 782);
                 check((dark ? "dark" : "light") + "/sessions", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 4,
-                    dark ? SESSIONS_DARK_GUARDED : SESSIONS_LIGHT, 1, 0.55,
+                    dark ? SESSIONS_DARK : SESSIONS_LIGHT, 1, 0.55,
                     dark ? new String[] {"#3D74D6", "#393C41", "#35383D"} : new String[] {"#2F65CA", "#F0F1F3", "#F7F7F8", "#E6E8EB"});
             }
         });

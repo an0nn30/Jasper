@@ -33,12 +33,16 @@ final class ClassicPropertiesFace implements PropertiesFace {
 
     @Override public List<PaintPair> pairs() {
         return List.of(text(SemanticColor.TEXT_STRONG_SECONDARY, SemanticColor.SURFACE_PANEL), text(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_PANEL),
-            text(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CARD), WINDOW_RULE,
+            text(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_CARD),
             text(SemanticColor.TEXT_SECONDARY, surface), text(SemanticColor.TEXT_PRIMARY, surface));
     }
 
-    /** The rule above the title band. */
-    private static final PaintPair WINDOW_RULE = new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_PANEL, SurfaceContrast.Guard.STRUCTURAL);
+    /**
+     * The rule above the title band: {@code border.window} as the theme gives it, unguarded, as plan 6b Rulings 34 paints
+     * the tab strip's dividers; Enterprise Dark's {@code #2A2C30} on {@code surface.panel} is under the structural floor,
+     * and the guard would lift it to a rule lighter than the panel (plan 10a Execution deviations).
+     */
+    private static Color windowRule(KitContext context) { return ThemePainting.role(context, SemanticColor.BORDER_WINDOW); }
 
     /**
      * The grid's rules under the title, under each row and after the label column: the panel rule
@@ -81,7 +85,7 @@ final class ClassicPropertiesFace implements PropertiesFace {
         title.setOpaque(grid);
         title.setBackground(ThemePainting.role(context, SemanticColor.SURFACE_PANEL));
         title.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(hairline, 0, 0, 0, ThemePainting.painted(context, WINDOW_RULE)),
+            BorderFactory.createMatteBorder(hairline, 0, 0, 0, windowRule(context)),
             BorderFactory.createMatteBorder(0, 0, hairline, 0, rule(context))),
             new EmptyBorder(above, hairline + gap, below, gap)));
         control.rows.setBorder(new EmptyBorder(0, 0, 0, 0));

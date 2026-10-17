@@ -5275,3 +5275,34 @@ wrong: none.
 
 R21. **A timing-sensitive test may flake once** — what: other plans' builds share the machine; re-run such a test alone
 before treating it as a failure; why: the orchestrator's machine note; cost if wrong: one extra run.
+
+### Execution deviations
+
+Recorded while the tasks run; Task 13 carries them into the status banner and the STATUS entry.
+
+D1 (Task 4). **The classic Properties' rule above the title is `border.window` as the theme gives it, unguarded** — what:
+`ClassicPropertiesFace` paints it with `ThemePainting.role` and declares no pair for it (`face-pairs.tsv` loses its
+`border.window on surface.panel` row); why: Enterprise Dark's `#2A2C30` on `surface.panel` is 1.19:1, and the structural
+guard lifted it to `#4E5054` (ΔE about 15 from the Dark mock's rule), a line lighter than the panel; plan 6b Rulings 34
+settled the same case for the tab strip this way, and the measured `SESSIONS_DARK` band is asserted verbatim; cost if
+wrong: a theme whose `border.window` equals `surface.panel` loses that one rule.
+
+D2 (Task 4). **Classic panel chrome the Sessions mock needed, in the kit** — what: under the Enterprise metrics a panel's
+SEARCH row stands `PANEL_SEARCH_TOP` 6 below the strip, `PANEL_SEARCH_SIDE` 8 from the sides, over a
+`PANEL_SEARCH_RULE` 1 px full-width rule (`ThemePainting.panelRule`, `border.subtle` over `surface.panel`); a classic table
+or tree in a panel body stands on `surface.card` without its box; a footer stack led by titled Properties lays them out
+flush at full width, each later line `PROPERTY_ACTIONS_PADDING` 8 below, an ACTIONS row at its natural width against the
+trailing inset (`PropertiesFace.flush`; untitled Properties keep the footer's padding); the grid's inner rules are the
+panel rule, not `border.row`. Reach: every panel under Enterprise whose search slot holds a SEARCH field (in the bundled
+code: Sessions and Tunnels; the app's Plugin Manager, file chooser and Shortcut help mount theirs as separate views) or
+whose body is a classic table or tree (SFTP, and Tunnels and File Servers once Tasks 6 and 10 compose them); only the
+Sessions surface was compared with a mock in Task 4, and Tasks 6, 7 and 10 confirm Tunnels, SFTP and File Servers against
+theirs. The default look is unchanged (both new roles are 0 there, and
+`DefaultPropertiesFace.flush` is false); `ClassicPanelBodyTest` covers the classic behaviour.
+
+D3 (Task 4). **Residual: the Sessions tree's column geometry** — measured at 2x on the Light render against 01 Connected:
+the Name|Host and Host|Port separators stand at logical x 148 and 248 (mock 166 and 293), and the Host and Port titles
+and values are right-aligned (the mock left-aligns them, titles at 176 and 303); `HostsPanel.COLUMNS`' weights (3, 2.3,
+1) have no effect in 4c's classic tree face. Owner: 3c Rulings 7 and 4c's tree face (4c records the same difference for
+Keymap); a classic tree-face follow-up that honours `Column.weight` and left-aligns non-numeric trailing columns closes it.
+The band checks at x 4 do not see it.

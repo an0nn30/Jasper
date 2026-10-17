@@ -247,7 +247,7 @@ public final class DesignMetrics {
         values.put(Role.PANEL_HEADER_CONTRIBUTED_GLYPH, 10);
         values.put(Role.PANEL_HEADER_ACTION_VERTICAL, 0);
         values.put(Role.PANEL_HEADER_TRAILING_PADDING, 7);
-        // Plan 10a: a panel's search row stands 6 below the header strip, 8 from the sides, over a 1 px border.row rule
+        // Plan 10a: a panel's search row stands 6 below the header strip, 8 from the sides, over a 1 px panel rule
         // (the Workstation mock's Sessions and Tunnels panels).
         values.put(Role.PANEL_SEARCH_SIDE, 8);
         values.put(Role.PANEL_SEARCH_TOP, 6);

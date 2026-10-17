@@ -90,7 +90,7 @@ class ClassicPropertiesTest {
         var face = new ClassicPropertiesFace(SemanticColor.SURFACE_DIALOG);
         assertThat(face.pairs()).extracting(pair -> pair.slot().key() + " on " + pair.against().key()).containsExactly(
             "text.strong.secondary on surface.panel", "text.secondary on surface.panel", "text.primary on surface.card",
-            "border.window on surface.panel", "text.secondary on surface.dialog",
+            "text.secondary on surface.dialog",
             "text.primary on surface.dialog");
         assertThat(new DefaultPropertiesFace().pairs()).isEmpty();
     }
