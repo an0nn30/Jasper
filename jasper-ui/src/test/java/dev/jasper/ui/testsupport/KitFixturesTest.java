@@ -82,4 +82,18 @@ class KitFixturesTest {
         assertThat(KitFixtures.custom().semantic()).isEqualTo(KitFixtures.custom(KitFixtures.dark()).semantic());
         assertThat(KitFixtures.marked().semantic()).isEqualTo(KitFixtures.marked(KitFixtures.dark()).semantic());
     }
+
+    /** Plan 4c Rulings 20: Enterprise Light names spec 7.6's Light roles and overrides; the rest is Slate Cobalt Light's. */
+    @org.junit.jupiter.api.Test void enterpriseLightIsSpecSevenSixsLightTable() {
+        var theme = KitFixtures.enterpriseLight();
+        org.assertj.core.api.Assertions.assertThat(theme.name()).isEqualTo("Enterprise");
+        org.assertj.core.api.Assertions.assertThat(theme.dark()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_APP)).isEqualTo(new java.awt.Color(0xECEDEF));
+        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.ACCENT)).isEqualTo(new java.awt.Color(0x2F65CA));
+        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL)).isEqualTo(new java.awt.Color(0xB4B8BF));
+        org.assertj.core.api.Assertions.assertThat(dev.jasper.ui.theme.DerivedColor.SURFACE_TABLE_HEADER.color(theme)).isEqualTo(new java.awt.Color(0xF0F1F3));
+        org.assertj.core.api.Assertions.assertThat(dev.jasper.ui.theme.DerivedColor.SURFACE_ZEBRA.color(theme)).isEqualTo(new java.awt.Color(0xF7F8FA));
+        org.assertj.core.api.Assertions.assertThat(theme.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL)).as("an unnamed role")
+            .isEqualTo(KitFixtures.light().semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL));
+    }
 }

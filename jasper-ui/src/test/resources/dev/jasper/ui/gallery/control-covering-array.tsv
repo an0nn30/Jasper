@@ -1,0 +1,8 @@
+# toggle exclusive tabs group form_label empty table tree stepper ordered_list buttons tag route prompt (spec 5.2's order; 1 = the classic value); strength 2 in seven rows (plan 4c Rulings 19)
+0	0	0	0	0	0	0	0	0	0	0	0	0	0
+1	1	1	1	1	1	1	1	1	1	0	0	0	0
+1	1	1	1	1	1	0	0	0	0	1	1	1	1
+1	1	1	0	0	0	1	1	1	0	1	1	1	0
+1	0	0	1	1	0	1	1	0	1	1	1	0	1
+0	1	0	1	0	1	1	0	1	1	1	0	1	1
+0	0	1	0	1	1	0	1	1	1	0	1	1	1

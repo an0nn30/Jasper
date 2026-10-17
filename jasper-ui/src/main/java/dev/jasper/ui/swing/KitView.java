@@ -218,7 +218,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     public void selectAll(String fieldId) {
         requireOpen();
         var control = reconciler.control(Objects.requireNonNull(fieldId));
-        if (!(control instanceof TextFields.FieldControl field)) throw new IllegalArgumentException("Node is not a field: " + fieldId);
+        if (!(control instanceof TextFields.FieldControl field) || slider(control)) throw new IllegalArgumentException("Node is not a field: " + fieldId);
         field.input.selectAll();
     }
     /**
@@ -238,8 +238,13 @@ public final class KitView extends JPanel implements AutoCloseable {
      */
     public boolean composing(String fieldId) {
         requireOpen();
-        if (reconciler.control(Objects.requireNonNull(fieldId)) instanceof TextFields.FieldControl field) return field.composing;
+        var control = reconciler.control(Objects.requireNonNull(fieldId));
+        if (control instanceof TextFields.FieldControl field && !slider(control)) return field.composing;
         throw new IllegalArgumentException("Node is not a field: " + fieldId);
+    }
+    /** A SLIDER field is no text field under either kit, though the classic stepper face builds it as a spinner (spec 16.1.9). */
+    private static boolean slider(ControlRegistry.Control control) {
+        return control.node instanceof Nodes.Field field && field.presentation() == Nodes.FieldPresentation.SLIDER;
     }
     /** Register by Custom.contentId (not node id); ordinary Swing trees cannot enter through this method. */
     public void registerContent(String id, JComponent component, AutoCloseable lifetime) { requireOpen(); reconciler.registerContent(id, Objects.requireNonNull(component), Objects.requireNonNull(lifetime)); }

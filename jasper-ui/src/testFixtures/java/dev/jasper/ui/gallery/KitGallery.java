@@ -114,6 +114,12 @@ public final class KitGallery {
         result.add(new Fixture("tables-0-18", "", "normal", 640, 860, TableFixtures.create()));
         return List.copyOf(result);
     }
+    /** The gallery and the Enterprise fixtures (plan 4c): what the Enterprise gallery and the classic kit matrix render. */
+    public static List<Fixture> enterpriseCatalog() {
+        var all = new ArrayList<>(fixtures());
+        all.addAll(EnterpriseFixtures.create());
+        return List.copyOf(all);
+    }
     private static Fixture panelState(String name, String panel, String state, java.util.function.Consumer<PanelFixtures.Demo> transition) {
         ViewSpec[] spec = {null};
         Edt.run(() -> {
