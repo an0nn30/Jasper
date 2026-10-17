@@ -99,6 +99,14 @@ class AboutWindowsTest {
         assertThat(about.aboutSurface()).isPresent();
     }
 
+    /** Spec 10.2: About is in Help on every platform once the menus are rows in the window, macOS included. */
+    @Test void aboutIsInTheApplicationMenuOnlyWhileMacOsShowsTheScreenMenuBar() {
+        assertThat(AboutWindows.aboutInApplicationMenu(true, true)).isTrue();
+        assertThat(AboutWindows.aboutInApplicationMenu(true, false)).isFalse();
+        assertThat(AboutWindows.aboutInApplicationMenu(false, true)).isFalse();
+        assertThat(AboutWindows.helpEntries(AboutWindows.aboutInApplicationMenu(true, false))).contains(new MenuEntry.Item("app.about"));
+    }
+
     @Test void helpListsTheVmOptionsActionsAfterKeyboardShortcutsAndAboutLastExceptOnMacOs() {
         assertThat(AboutWindows.helpEntries(false)).containsExactly(new MenuEntry.Item("app.shortcuts"), new MenuEntry.Separator(),
             new MenuEntry.Item("app.memory"), new MenuEntry.Item("app.vmoptions"), new MenuEntry.Separator(), new MenuEntry.Item("app.about"));

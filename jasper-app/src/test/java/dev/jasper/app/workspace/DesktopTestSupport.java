@@ -84,6 +84,8 @@ public final class DesktopTestSupport {
     }
     /** Closes the test windows now, on the EDT: before a test closes the theme controller its windows are bound to. */
     public static void closeOwnersNow() { OWNERS.forEach(WindowContent::close); OWNERS.clear(); }
+    /** Closes {@code owner} with the other test windows. */
+    public static WindowContent track(WindowContent owner) { OWNERS.add(owner); return owner; }
     public static void closeOwners() throws Exception {
         edt(() -> { OWNERS.forEach(WindowContent::close); OWNERS.clear(); });
     }

@@ -138,8 +138,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable unregisterConfiguration = () -> {};
     private java.util.function.Consumer<TerminalPane> firstTerminal = pane -> { };
     private boolean firstTerminalSeen;
-    Consumer<JComponent> showConfigDiagnostics = control -> JOptionPane.showMessageDialog(
-        this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+    /** Whether this window's macOS appearance follows the theme (a native-titled look, spec 10.1); its dialogs follow too. */
+    private boolean followsThemeAppearance;
+    Consumer<JComponent> showConfigDiagnostics = control -> {
+        if (!followsThemeAppearance) {
+            JOptionPane.showMessageDialog(this, control, "Configuration", JOptionPane.PLAIN_MESSAGE);
+            return;
+        }
+        // As showMessageDialog does, with the frame's appearance on the option pane's dialog.
+        var dialog = new JOptionPane(control, JOptionPane.PLAIN_MESSAGE).createDialog(this, "Configuration");
+        dialog.getRootPane().putClientProperty("apple.awt.windowAppearance",
+            theme().chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
+        dialog.setVisible(true);
+        dialog.dispose();
+    };
     Consumer<String> onTitle = title -> {};
     /** An error to tell the user about, as a title and details; the application posts it as a notification. */
     public java.util.function.BiConsumer<String, String> onError = WindowContent::unheard;
@@ -308,8 +320,31 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (bodyLease != null) bodyLease.changed();
     }
 
+    /**
+     * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
+     * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
+     * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
+     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
+     * renders share this path. Returns the unified bar, or null.
+     */
+    static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
+        MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
+        if (bar == null) installCustomTitleBar(root, content);
+        if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
+        return bar;
+    }
+
     /** Workspace adapter: wires title/theme values to the platform-only title bar. */
     static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported,
+                                      Consumer<String> nativeTitle) {
+        return installTitleBar(root, content, supported, false, nativeTitle);
+    }
+
+    /**
+     * As above; with {@code followTheme} a frame that has the system's title bar on macOS takes the theme's appearance,
+     * as Compact does (spec 10.1).
+     */
+    static MacTitleBar installTitleBar(JRootPane root, WindowContent content, boolean supported, boolean followTheme,
                                       Consumer<String> nativeTitle) {
         MacTitleBar bar;
         if (content.viewMode == ViewMode.COMPACT) {
@@ -337,7 +372,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             content.onThemeChanged = theme -> bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
             bar.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(content.theme().chrome()).dark());
         }
-        if (content.viewMode == ViewMode.COMPACT && content.macOs) {
+        // The window's own dialogs (the configuration diagnostics) follow with it under a native-titled look.
+        content.followsThemeAppearance = bar == null && followTheme && content.macOs;
+        if ((content.viewMode == ViewMode.COMPACT || bar == null && followTheme) && content.macOs) {
             content.onThemeChanged = theme -> root.putClientProperty("apple.awt.windowAppearance",
                 theme.chrome().dark() ? "NSAppearanceNameDarkAqua" : "NSAppearanceNameAqua");
             content.onThemeChanged.accept(content.theme());
@@ -1166,6 +1203,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     ResolvedTheme theme() { return themes.current(); }
+    boolean followsThemeAppearance() { return followsThemeAppearance; }
 
     /**
      * Slate Cobalt's Dark ({@code dark}) or Light variant in every window sharing this window's themes, as
