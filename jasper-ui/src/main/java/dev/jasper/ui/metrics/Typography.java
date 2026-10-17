@@ -24,7 +24,9 @@ public final class Typography {
         BODY(13, 400), BODY_STRONG(13, 500), LABEL(12.5f, 400), DESCRIPTION(12.5f, 400),
         SETTINGS_BODY(13, 400), SETTINGS_PREVIEW(12, 400),
         SUPPORTING(11.5f, 400), CAPTION(11.5f, 400), SETTING_DESCRIPTION(11, 400), SECTION_LABEL(11, 600), COUNT(11, 400), CHIP(9.5f, 400), MONO(12, 400), MONO_SMALL(11.5f, 400), MONO_CAPTION(11, 400),
-        ORDERED_ACTION(12, 400);
+        ORDERED_ACTION(12, 400),
+        // The Run window's headings and data text (plan 8a): the mocks' 11 px semibold and 0.87 em data face.
+        RUN_HEADING(12, 600), RUN_DETAIL(11.5f, 400);
         /** The role's size and weight in {@link TypeScale#DEFAULT}; every reading goes through a scale. */
         final float declaredSize;
         final int declaredWeight;
@@ -71,7 +73,7 @@ public final class Typography {
     public Font font(Role role, boolean selected) {
         Objects.requireNonNull(role);
         int weight = selected && role == Role.LABEL ? 500 : scale.weight(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO
+        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO || role == Role.RUN_DETAIL
             ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : family;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && role != Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)

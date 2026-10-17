@@ -141,6 +141,7 @@ final class Labels {
                     * ThemePainting.font(context(), Typography.Role.BODY).getSize2D() / 13f) : 0;
             // Supporting paragraphs sit centred in their measured line box rather than on its top.
             ((LiteralLabel)label).wrapped.centeredLeading = supporting;
+            if (view.runWindow()) RunWindowPresentation.text(context(), text, (LiteralLabel) label, inked);
             label.repaint();
         }
     }
@@ -172,13 +173,15 @@ final class Labels {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
             if (icon.size() == Nodes.IconSize.SWATCH) {
                 // A swatch is its hue, whatever the composition: no tile, no artwork, no selection ink (spec 8.2).
-                int extent = com.formdev.flatlaf.util.UIScale.scale(context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
+                int extent = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
                 ((LiteralLabel)label).iconOffset = 0;
                 label.setIcon(new Swatch(Choices.hue(context(), icon.hue()), extent)); label.setDisabledIcon(label.getIcon());
                 label.getAccessibleContext().setAccessibleName(icon.accessibleName()); label.setToolTipText(icon.accessibleName());
                 return;
             }
-            int size = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), icon.size()));
+            int size = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride
+                : view.runWindow() && icon.size() == Nodes.IconSize.PROMPT ? context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.RUN_WINDOW_TILE_GLYPH)
+                : context().icons().size(context().metrics(), icon.size()));
             ((LiteralLabel)label).iconOffset=panelDetail && tileSize == 0 ? ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.PANEL_DETAIL_TEXT_BASELINE) : 0;
             var receiving=view.artworkPresentation(node.id());
             int savedSize=tileSize, savedHeight=tileHeight, savedGlyph=tileGlyph;

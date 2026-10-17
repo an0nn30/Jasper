@@ -281,7 +281,7 @@ final class TextFields {
                 scroll.getVerticalScrollBar().setBackground(ThemePainting.color(context(), SemanticColor.SURFACE_INPUT));
                 scroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
             }
-            var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || field.presentation() == Nodes.FieldPresentation.TECHNICAL ? Typography.Role.MONO : Typography.Role.BODY;
+            var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || (field.presentation() == Nodes.FieldPresentation.TECHNICAL || view.runWindow() && field.presentation() == Nodes.FieldPresentation.TRANSPARENT) ? Typography.Role.MONO : Typography.Role.BODY;
             input.setFont(ThemePainting.font(context(), role));
             surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
             input.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY));
@@ -297,6 +297,7 @@ final class TextFields {
             label.setText(field.label()); label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             label.setForeground(ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY)); label.setEnabled(component.isEnabled());
             surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
+            surface.quiet = surface.transparent && view.runWindow();
             surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;
             error.setText(field.state().error()); error.setVisible(!field.state().error().isEmpty());
             error.setEnabled(component.isEnabled());
@@ -317,7 +318,7 @@ final class TextFields {
             leading.setBorder(new EmptyBorder(0, 0, 0, gap));
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
             int padding = ThemePainting.metric(context(), panelSearch ? DesignMetrics.Role.PANEL_SEARCH_PADDING : surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_PADDING : field.kind() == Nodes.FieldKind.TEXTAREA ? DesignMetrics.Role.TEXTAREA_PADDING : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            surface.setBorder(new EmptyBorder(ring * 2, padding, ring * 2, padding));
+            surface.setBorder(surface.quiet ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(ring * 2, padding, ring * 2, padding));
             if (trailing != null) { trailing.parentEnabled = interactive(); trailing.refresh(); }
             if (browse != null) {
                 browse.parentEnabled = parentEnabled; browse.update(browseNode(field)); browse.component.setVisible(!field.trailingAction().isBlank());
@@ -393,6 +394,8 @@ final class TextFields {
         Typography.Role role = Typography.Role.BODY; String hint = ""; boolean error;
         /** The parent surface is the field's backdrop: no input fill, the outline kept. */
         boolean transparent;
+        /** A Run window's query (plan 8a): its host's field box paints the edge and the focus, so this surface paints nothing. */
+        boolean quiet;
         /** A PORT field rests at the shared port width; an enlarged font still grows it past that. */
         boolean port;
         ThemePainting.Focus focus;
@@ -449,6 +452,7 @@ final class TextFields {
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D)graphics.create();
             try {
+                if (quiet) { putClientProperty("Jasper.kit.halo", null); return; }
                 if (transparent && focus.visible() && !error) ThemePainting.transparentFocus(g, this, context, DesignMetrics.Role.TRANSPARENT_FIELD_FOCUS_RADIUS);
                 else ThemePainting.rounded(g, this, context, transparent ? null : ThemePainting.color(context, SemanticColor.SURFACE_INPUT),
                     ThemePainting.color(context, error ? SemanticColor.BORDER_ERROR : focus.visible() ? SemanticColor.BORDER_FOCUS : SemanticColor.BORDER_INPUT),
