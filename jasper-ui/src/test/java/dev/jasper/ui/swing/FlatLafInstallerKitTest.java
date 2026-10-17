@@ -6,6 +6,10 @@ import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.testsupport.Edt;
 import dev.jasper.ui.testsupport.KitFixtures;
+import dev.jasper.ui.theme.ColorMath;
+import dev.jasper.ui.theme.ColorRole;
+import dev.jasper.ui.theme.DerivedColor;
+import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.ThemeBinding;
 import dev.jasper.ui.theme.ThemePair;
 import java.util.List;
@@ -18,10 +22,50 @@ import org.junit.jupiter.api.Test;
 
 /** The kit an appearance is installed under travels with its look and feel, like the theme, and gives FlatLaf's geometry. */
 class FlatLafInstallerKitTest {
-    /** The default kit with other geometry: radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
+    /** The default kit with other geometry: control and field radius 2 (arcs 4), a 2 px focus ring and a 40% dark popup shadow. */
     private static Kit other() {
-        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FOCUS_RING, 2)
-            .with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+        return KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.CONTROL_RADIUS, 2).with(DesignMetrics.Role.FIELD_RADIUS, 2)
+            .with(DesignMetrics.Role.FOCUS_RING, 2).with(DesignMetrics.Role.POPOVER_SHADOW_PERCENT_DARK, 40));
+    }
+
+    /** Enterprise presentation plan 4: a field's arc follows FIELD_RADIUS, and the control arcs keep CONTROL_RADIUS. */
+    @Test void theTextComponentArcFollowsTheFieldRadiusAlone() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                FlatLafInstaller.install(KitFixtures.dark(), KitFixtures.kit(Kit.DEFAULT.metrics().with(DesignMetrics.Role.FIELD_RADIUS, 1)));
+                assertThat(UIManager.getInt("TextComponent.arc")).isEqualTo(2);
+                for (var key : List.of("Button.arc", "Component.arc")) assertThat(UIManager.getInt(key)).as(key).isEqualTo(8);
+            } finally { set(prior); }
+        });
+    }
+
+    /**
+     * Plan 4a: the classic overlay reaches FlatLaf's installed defaults; the new keys win over the wildcards before them,
+     * and the default button's border is read from {@code startBorderColor}.
+     */
+    @Test void theClassicKeySetReachesTheInstalledDefaults() {
+        Edt.run(() -> {
+            var prior = UIManager.getLookAndFeel();
+            try {
+                for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) {
+                    FlatLafInstaller.install(theme, Kit.CLASSIC);
+                    var expected = new java.util.LinkedHashMap<String, ColorRole>();
+                    for (var key : List.of("Table", "Tree")) {
+                        expected.put(key + ".selectionBackground", SemanticColor.SELECTION_BG);
+                        expected.put(key + ".selectionForeground", SemanticColor.TEXT_ONSELECTION);
+                    }
+                    expected.put("Button.default.startBorderColor", DerivedColor.ACCENT_EDGE);
+                    expected.put("Button.endBackground", DerivedColor.BUTTON_END);
+                    expected.put("TableHeader.background", DerivedColor.SURFACE_TABLE_HEADER);
+                    expected.put("Table.alternateRowColor", DerivedColor.SURFACE_ZEBRA);
+                    expected.forEach((key, role) -> assertThat(ColorMath.hex(UIManager.getColor(key))).as(theme.name() + " " + key)
+                        .isEqualTo(ColorMath.hex(role.color(theme))));
+                    assertThat(UIManager.getColor("Table.selectionBackground")).as("not the terminal selection")
+                        .isNotEqualTo(theme.terminal().selection());
+                }
+            } finally { set(prior); }
+        });
     }
 
     /** Review Focus 1: before any Jasper look and feel the installed kit is the default; it never throws. */

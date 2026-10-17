@@ -42,6 +42,67 @@ read-only folder; Settings › Command Palette, Terminal and System Settings sho
 › Project Index edits its lists as ordered lists; the palette's empty query shows three recent rows. Not merged, not
 pushed.
 
+**Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree
+`.claude/worktrees/enterprise-3c`, `d858e8f57..7ea713687`, then this documentation commit and the final review fixes;
+[plan](superpowers/plans/2026-10-15-enterprise-3c-sdk-0-18-tables.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). SDK 0.18 gains spec 8.2's table
+vocabulary, mirrored in the jasper-ui model, projected losslessly by `KitValues`, walked by both runtimes' descriptor
+walks, and carried by the shared kit and plugin contracts: `Tree.columns` (a header over the trailing values, header clicks report
+`Sorted`), `TableRow.cellNodes` (Text, StatusDot, Icon, Chip, an INLINE stack of those, or a DROPDOWN `Choice`; one
+content per column; a DROPDOWN with a rich face is refused), `TableRow.heading` with `Heading` and `countNoun` ("6 groups"), `Table.empty` (one action at
+most) or `Table.emptyText`, and `ItemList.emptyText`. Every former constructor stays with the new components empty.
+The default look draws a cell node in its weighted column, the cell DROPDOWN bare (value then chevron, the face only
+on hover, focus or while open, the selection ink while bare), a heading row as a strong title with its muted count
+that keys, clicks and type-ahead never land on, the empty line, an empty table's state centred below its kept
+headers, and a column tree's header over right-aligned values with a reserved count column. Zero pixel change: the
+headless gallery's files for Slate Cobalt Dark and Light are byte-identical to the base but for `manifest.json`, the
+last contact sheet and the new `tables-0-18` fixture. Planned deviations and rulings (plan, "Planned deviations and
+rulings"): (1) the admission and refusal case is in `PluginContractTest`, the per-view behaviour in
+`KitContractTest`; (2) `cellNodes` iterates in
+column-id order; (3) a `countNoun` needs a count and is lowercase with no surrounding spaces, and a heading row has
+nothing but its heading; (4) a heading row is BODY_STRONG with a CAPTION count and no indent below it; (5) a table's
+`empty` is mounted only while it has no rows, and both runtimes refuse focus, reveal and anchors into it while rows show; (6)
+the empty line shows only with no items, one row tall (inside a filter-driven list's reserved rows), above an
+ItemList's add action; (7) tree columns right-align the values in their column's role, pad missing ones and reserve the count column, and
+keycap-presented trees are plan 9's; (8) a muted row dims plain cells and Text cell nodes; (9) the cell dropdown is as
+wide as its selected plain value, its value starts under the column's title and the cell before it gives way; (10)
+the SDK README's 0.18.0 sentence names the additions. A cell node's own area (an inline stack's or a dropdown's,
+beside its content) selects, activates and opens the row's menu, and hovering the chevron keeps the face. Hand-offs: plan 4's classic faces draw the same descriptors
+(grid lines, the indent under headings, the mocks' header strip); plans 9 and 10 adopt them (Notifications, Keymap,
+Sessions, Tunnels, File Servers, SFTP, Add Host's keys); 3e owns the default-look changes of section 13.
+`./gradlew check --continue` after the final review fixes: **10,637 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plan 4a) as `1a69de6a7`: `./gradlew check --continue` **10,669 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (no plugin or page uses the vocabulary
+yet). Not merged, not pushed.
+
+**Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
+`.claude/worktrees/enterprise-4`, `7d8c189c3..485316ed2`, then this documentation commit
+and the final review fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-4a-classic-catalog.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). The values of the classic look, with no
+pixel changed. Plan 2's hand-offs: guards measure a translucent slot laid over its surface (a slot that holds keeps its
+alpha), `KitMatrixTest` counts a foreign colour only where it fills a 2 × 2 block, `custom(base)` tints and
+`marked(base)` drops authored overrides, and the structural guard is pinned engaging on Latte's window border.
+`DesignMetrics.Role` gains `ROW_HEIGHT` (the list, table and tree row floor) and `FIELD_RADIUS` (fields and FlatLaf's
+`TextComponent.arc`) at today's values and 32 classic-only roles at spec 5.5's and the mocks' values; `MetricTokens` holds spec 5.4's
+11 tokens and `DesignMetrics.with(MetricTokens)` moves each token's roles by its change from the base;
+`DesignMetrics.CLASSIC` (`classic-roles.tsv`), `TypeScale.CLASSIC` (`classic-type.tsv`, no label tracking) and
+`UiKeySet.CLASSIC` (`ui-color-keys-classic.tsv`) are frozen; `Kit` gains `ControlVariants` and `ColorSlots`, with
+`Kit.CLASSIC`; the fixtures gain the Enterprise and complement kits. The headless gallery is byte-identical. Rulings
+(plan, "Rulings"): row 4 is three plans (4a values, 4b form faces, 4c data faces, matrix and comparison); the
+translucent guard; the area rule; the fixtures' overrides; plan 2's package-test repairs (`PanelHeaders`' dot,
+the status bar's configuration text, notification counts) carried to the chrome-face plans 6 and 7, which give those
+painters faces (the hand-off stays open); the measured classic-only roles; buttons two taller than
+fields (24 and 22, every mock); tokens by delta, paddings by formula; the classic base tuned as Enterprise; the
+calibrated type roles; `DESCRIPTION` kept at the spec's 11 although the New File Server mock draws 12 (a residual for
+4c); the table and tree selection foregrounds; spec 5.4's provisional token ranges stand (Rulings 17, spec 5.4 amended), with
+both bases' own tokens pinned in range. Deviation: the overlay also sets `Button.default.startBorderColor` and
+`endBorderColor` to `accent.edge`, which FlatLaf reads before `Button.default.borderColor`. Residuals: a focused,
+hovered or pressed classic native button paints flat (`Button.focusedBackground`, `hoverBackground` and
+`pressedBackground` are colours separate from `startBackground`; 4b's `ButtonFace` and 4c); unfocused table and tree selections keep the terminal-selection wildcard (4c's
+comparison). Plan 5's entry condition: its `KitParser` in jasper-app reads `Kit.CLASSIC`, so it lifts `StaticDefaultTest`'s
+`Kit.CLASSIC` pin. Plan 4b starts with `KitFaces`. `./gradlew check --continue`:
+**10,640 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing
+visible changed). Not merged, not pushed.
+
 **Enterprise presentation, plan 3b: SDK 0.18 controls — 2026-10-16** (`claude/enterprise-sdk-0-18-controls`, worktree
 `.claude/worktrees/enterprise-3b`, `abf90c83a..2a4944861`, then this documentation commit;
 [plan](superpowers/plans/2026-10-15-enterprise-3b-sdk-0-18-controls.md),

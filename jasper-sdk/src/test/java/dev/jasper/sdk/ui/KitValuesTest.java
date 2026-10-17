@@ -386,4 +386,127 @@ class KitValuesTest {
         assertThatThrownBy(() -> plain.withShortcut(" ")).isInstanceOf(IllegalArgumentException.class);
         assertThatNullPointerException().isThrownBy(() -> new MenuItem("open", "Open", "", "open", true, false, Hue.BLUE, null));
     }
+    private static TableRow cellRow(Node node) {
+        return new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "", Map.of("col", node), Optional.empty());
+    }
+    private static Button emptyAction(String id) {
+        return new Button(id, ControlState.READY, "New Tunnel…", "", ButtonKind.SECONDARY, id, "");
+    }
+    /** Plan 3c (spec 8.2): the new components default to nothing through every existing constructor. */
+    @Test void zeroEighteenTableFieldsDefaultToNothing() {
+        var row = new TableRow("r", Map.of("name", "a"), Optional.empty());
+        assertThat(row.cellNodes()).isEmpty();
+        assertThat(row.heading()).isEmpty();
+        assertThat(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "tip").cellNodes()).isEmpty();
+        var table = new Table("t", ControlState.READY, List.of(), List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD);
+        assertThat(table.empty()).isEmpty();
+        assertThat(table.emptyText()).isEmpty();
+        assertThat(new Tree("tree", ControlState.READY, List.of(), Set.of(), Set.of(), "").columns()).isEmpty();
+        var list = new ItemList("l", ControlState.READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, Optional.empty(),
+            OptionalInt.empty(), "", "", "", "", "");
+        assertThat(list.emptyText()).isEmpty();
+        assertThatNullPointerException().isThrownBy(() -> new ItemList("l", ControlState.READY, ListKind.SINGLE, List.of(), Set.of(), "", List.of(),
+            SelectionMode.SINGLE, Optional.empty(), OptionalInt.empty(), "", "", "", "", "", null));
+    }
+    /** Plan 3c (spec 8.2): a cell node is presentation or a DROPDOWN, in a column of its own, and a view node. */
+    @Test void cellNodesArePresentationOrADropdownInAColumnOfTheirOwn() {
+        var dot = new StatusDot("d", ControlState.READY, StatusKind.SUCCESS);
+        var options = List.of(new Option("card", "Card", Optional.empty()), new Option("sticky", "Sticky card", Optional.empty()));
+        List<Node> accepted = List.of(text("t"), dot, new Icon("i", ControlState.READY, "server", Hue.NONE, IconSize.CAPTION, "Server"),
+            new Chip("c", ControlState.READY, "HTTP", Hue.BLUE), new Nodes.Stack("s", ControlState.READY, LayoutRole.INLINE, List.of(dot, text("word"))),
+            new Choice("choice", ControlState.READY, ChoiceKind.DROPDOWN, options, "card", "Display", ""));
+        for (var node : accepted) assertThat(cellRow(node).cellNodes()).containsEntry("col", node);
+        List<Node> refused = List.of(new Button("b", ControlState.READY, "Go", "", ButtonKind.SECONDARY, "go", ""),
+            new Nodes.Stack("v", ControlState.READY, LayoutRole.VERTICAL, List.of(text("x"))),
+            new Nodes.Stack("deep", ControlState.READY, LayoutRole.INLINE, List.of(new Nodes.Stack("inner", ControlState.READY, LayoutRole.INLINE, List.of(text("y"))))),
+            new Nodes.Stack("act", ControlState.READY, LayoutRole.INLINE, List.of(new Button("b2", ControlState.READY, "Go", "", ButtonKind.SECONDARY, "go", ""))),
+            new Choice("picker", ControlState.READY, ChoiceKind.PICKER, List.of(), "", "Pick", "pick"),
+            new Choice("rich", ControlState.READY, ChoiceKind.DROPDOWN, options, "card", "Display", "", "", Optional.empty(),
+                Optional.of(new PickerFace("Card", "", "", Hue.NONE, PickerDensity.DEFAULT))),
+            new Toggle("on", ControlState.READY, "On", true, "on", true));
+        for (var node : refused) assertThatIllegalArgumentException().as(node.id()).isThrownBy(() -> cellRow(node));
+        assertThatIllegalArgumentException().as("one column, two contents").isThrownBy(() ->
+            new TableRow("r", Map.of("col", "text"), Optional.empty(), false, Optional.empty(), "", Map.of("col", text("t")), Optional.empty()));
+        var columns = List.of(new Column("col", "Column", TextRole.BODY, false));
+        assertThatIllegalArgumentException().as("unknown column").isThrownBy(() -> new ViewSpec(new Table("t", ControlState.READY, columns,
+            List.of(new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "", Map.of("other", text("t")), Optional.empty())), Set.of(), "", List.of())));
+        assertThatIllegalArgumentException().as("cell node ids are view ids").isThrownBy(() -> new ViewSpec(new Nodes.Stack("root", ControlState.READY,
+            LayoutRole.VERTICAL, List.of(text("same"), new Table("t", ControlState.READY, columns, List.of(cellRow(text("same"))), Set.of(), "", List.of())))));
+        assertThatCode(() -> new ViewSpec(new Table("t", ControlState.READY, columns, List.of(cellRow(text("cell"))), Set.of(), "", List.of())))
+            .doesNotThrowAnyException();
+        var many = new LinkedHashMap<String, Node>();
+        for (int i = 11; i >= 0; i--) many.put("c" + (char) ('a' + i), text("t" + i));
+        var row = new TableRow("r", Map.of(), Optional.empty(), false, Optional.empty(), "", many, Optional.empty());
+        assertThat(row.cellNodes().keySet()).as("column-id order")
+            .containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(0, 11).mapToObj(i -> "c" + (char) ('a' + i)).toList());
+        assertThat(row.cellNodes()).isEqualTo(Map.copyOf(many));
+        assertThatThrownBy(() -> row.cellNodes().put("x", text("x"))).isInstanceOf(UnsupportedOperationException.class);
+    }
+    /** Plan 3c (spec 8.2): a heading row is a title and a count, and a table never selects it. */
+    @Test void headingRowsCarryATitleAndACountAndAreNeverSelected() {
+        var heading = TableRow.heading("jasper", "Jasper", OptionalInt.of(6), "group");
+        assertThat(heading.heading()).hasValue(new TableRow.Heading("Jasper", OptionalInt.of(6), "group"));
+        assertThat(heading.cells()).isEmpty();
+        assertThat(heading.cellNodes()).isEmpty();
+        assertThat(TableRow.heading("bare", "Bare", OptionalInt.of(4), "").heading().orElseThrow().countNoun()).isEmpty();
+        assertThat(TableRow.heading("none", "None", OptionalInt.empty(), "").heading().orElseThrow().count()).isEmpty();
+        assertThat(TableRow.heading("two", "Two", OptionalInt.of(2), "file server").heading().orElseThrow().countNoun()).isEqualTo("file server");
+        assertThatIllegalArgumentException().as("blank title").isThrownBy(() -> TableRow.heading("h", " ", OptionalInt.empty(), ""));
+        assertThatIllegalArgumentException().as("negative count").isThrownBy(() -> TableRow.heading("h", "H", OptionalInt.of(-1), ""));
+        assertThatIllegalArgumentException().as("noun without count").isThrownBy(() -> TableRow.heading("h", "H", OptionalInt.empty(), "group"));
+        assertThatIllegalArgumentException().as("capitalised noun").isThrownBy(() -> TableRow.heading("h", "H", OptionalInt.of(2), "Group"));
+        assertThatIllegalArgumentException().as("noun with spaces around it").isThrownBy(() -> TableRow.heading("h", "H", OptionalInt.of(2), " group"));
+        var title = Optional.of(new TableRow.Heading("H", OptionalInt.empty(), ""));
+        assertThatIllegalArgumentException().as("cells").isThrownBy(() -> new TableRow("h", Map.of("c", "x"), Optional.empty(), false, Optional.empty(), "", Map.of(), title));
+        assertThatIllegalArgumentException().as("cell nodes").isThrownBy(() -> new TableRow("h", Map.of(), Optional.empty(), false, Optional.empty(), "", Map.of("c", text("x")), title));
+        assertThatIllegalArgumentException().as("icon").isThrownBy(() -> new TableRow("h", Map.of(), Optional.of("file"), false, Optional.empty(), "", Map.of(), title));
+        assertThatIllegalArgumentException().as("muted").isThrownBy(() -> new TableRow("h", Map.of(), Optional.empty(), true, Optional.empty(), "", Map.of(), title));
+        assertThatIllegalArgumentException().as("menu").isThrownBy(() -> new TableRow("h", Map.of(), Optional.empty(), false, Optional.of(List.of()), "", Map.of(), title));
+        assertThatIllegalArgumentException().as("tooltip").isThrownBy(() -> new TableRow("h", Map.of(), Optional.empty(), false, Optional.empty(), "Tip", Map.of(), title));
+        var columns = List.of(new Column("c", "C", TextRole.BODY, false));
+        assertThatIllegalArgumentException().as("selected heading").isThrownBy(() -> new Table("t", ControlState.READY, columns, List.of(heading), Set.of("jasper"), "", List.of()));
+        assertThatCode(() -> new ViewSpec(new Table("t", ControlState.READY, columns, List.of(heading, new TableRow("r", Map.of("c", "x"), Optional.empty())),
+            Set.of("r"), "", List.of()))).doesNotThrowAnyException();
+    }
+    /** Plan 3c (spec 8.2): an empty table shows a state with at most one action or a line, not both. */
+    @Test void emptyStatesAreExclusiveAndATablesStateHasOneAction() {
+        var columns = List.of(new Column("c", "C", TextRole.BODY, false));
+        var icon = new Icon("e.icon", ControlState.READY, "server", Hue.NEUTRAL, IconSize.EMPTY, "Servers");
+        var one = new Empty("e", ControlState.READY, icon, "No Tunnels", "", List.of(emptyAction("new")));
+        var table = new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.of(one), "");
+        assertThat(table.empty()).hasValue(one);
+        assertThat(new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD,
+            Optional.empty(), "Not Connected").emptyText()).isEqualTo("Not Connected");
+        assertThatIllegalArgumentException().as("state and line").isThrownBy(() -> new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(),
+            SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.of(one), "Not Connected"));
+        assertThatCode(() -> new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, ScrollPolicy.STANDARD,
+            Optional.of(one), " ")).as("a blank line is no line").doesNotThrowAnyException();
+        var two = new Empty("e", ControlState.READY, icon, "No Tunnels", "", List.of(emptyAction("a"), emptyAction("b")));
+        assertThatIllegalArgumentException().as("two actions").isThrownBy(() -> new Table("t", ControlState.READY, columns, List.of(), Set.of(), "", List.of(),
+            SelectionMode.SINGLE, ScrollPolicy.STANDARD, Optional.of(two), ""));
+        assertThatIllegalArgumentException().as("the state's ids are view ids").isThrownBy(() ->
+            new ViewSpec(new Nodes.Stack("root", ControlState.READY, LayoutRole.VERTICAL, List.of(text("e"), table))));
+        assertThatCode(() -> new ViewSpec(table)).doesNotThrowAnyException();
+        var list = new ItemList("l", ControlState.READY, ListKind.ORDERED, List.of(), Set.of(), "", List.of(), SelectionMode.SINGLE, Optional.empty(),
+            OptionalInt.empty(), "", "", "", "", "", "No keys");
+        assertThat(new ViewSpec(list).root()).isEqualTo(list);
+    }
+    /** Plan 3c (spec 8.2): tree columns title the items and their trailing values. */
+    @Test void treeColumnsTitleTheItemsAndTheirTrailingValues() {
+        var columns = List.of(new Column("name", "Name", TextRole.BODY, false), new Column("host", "Host", TextRole.MONO_SMALL, false),
+            new Column("port", "Port", TextRole.MONO_SMALL, true));
+        var mac = new TreeItem("mac", "Mac", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.empty(), List.of("192.168.1.119", "22"), Optional.empty());
+        var tree = new Tree("sessions", ControlState.READY, List.of(new TreeItem("lan", "Local Network", Optional.empty(), false, List.of(mac))),
+            Set.of("lan"), Set.of("mac"), "connect", columns);
+        assertThat(new ViewSpec(tree).root()).isEqualTo(tree);
+        var extra = new TreeItem("extra", "Extra", Optional.empty(), true, List.of(), OptionalInt.empty(), false, "", Optional.empty(), List.of("a", "b", "c"), Optional.empty());
+        assertThatIllegalArgumentException().as("a nested item with three values under two value columns").isThrownBy(() -> new ViewSpec(new Tree("t",
+            ControlState.READY, List.of(new TreeItem("b", "B", Optional.empty(), false, List.of(extra))), Set.of(), Set.of(), "", columns)));
+        assertThatCode(() -> new ViewSpec(new Tree("t", ControlState.READY, List.of(extra), Set.of(), Set.of(), "")))
+            .as("without columns, values are free").doesNotThrowAnyException();
+        assertThatCode(() -> new ViewSpec(new Tree("t", ControlState.READY, List.of(new TreeItem("few", "Few", Optional.empty(), true, List.of())),
+            Set.of(), Set.of(), "", columns))).as("fewer values than columns").doesNotThrowAnyException();
+        assertThatIllegalArgumentException().as("duplicate column").isThrownBy(() -> new Tree("t", ControlState.READY, List.of(), Set.of(), Set.of(), "",
+            List.of(columns.get(0), columns.get(0))));
+    }
 }

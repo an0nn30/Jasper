@@ -37,11 +37,12 @@ public record ViewSpec(Node root) {
             if (children.get(i) instanceof Separator && (i == 0 || i == children.size() - 1 || children.get(i - 1) instanceof Separator))
                 throw new IllegalArgumentException("A Separator stands between two items, never first, last or beside another separator");
     }
-    private static void tree(TreeItem item, Set<String> ids, Set<String> branches, int depth) {
+    private static void tree(TreeItem item, Set<String> ids, Set<String> branches, int depth, int values) {
         if (depth > 128) throw new IllegalArgumentException("Tree too deep");
         if (!ids.add(item.id())) throw new IllegalArgumentException("Duplicate tree item: " + item.id());
+        if (item.trailing().size() > values) throw new IllegalArgumentException("More trailing values than columns after the title: " + item.id());
         if (!item.leaf()) branches.add(item.id());
-        for (var child : item.children()) tree(child, ids, branches, depth + 1);
+        for (var child : item.children()) tree(child, ids, branches, depth + 1, values);
     }
     private static void validate(Node node, Set<String> ids, Set<String> contentIds, Set<String> lists, Set<String> listRefs, int depth, int[] count) {
         if (depth > 128 || ++count[0] > 100_000) throw new IllegalArgumentException("View too deep or large");
@@ -78,12 +79,18 @@ public record ViewSpec(Node root) {
             }
             case Table n -> {
                 var columns = new HashSet<>(n.columns().stream().map(Column::id).toList());
-                for (var row : n.rows()) references(row.cells().keySet(), columns);
+                for (var row : n.rows()) {
+                    references(row.cells().keySet(), columns);
+                    references(row.cellNodes().keySet(), columns);
+                    children.addAll(row.cellNodes().values());
+                }
                 references(n.selectedIds(), new HashSet<>(n.rows().stream().map(TableRow::id).toList()));
+                n.empty().ifPresent(children::add);
             }
             case Tree n -> {
                 var itemIds = new HashSet<String>(); var branches = new HashSet<String>();
-                for (var item : n.roots()) tree(item, itemIds, branches, 0);
+                int values = n.columns().isEmpty() ? Integer.MAX_VALUE : n.columns().size() - 1;
+                for (var item : n.roots()) tree(item, itemIds, branches, 0, values);
                 references(n.selectedIds(), itemIds); references(n.expandedIds(), branches);
             }
             case Text _, Icon _, Button _, MenuButton _, StatusDot _, Field _, Secret _, Toggle _, Chip _, Progress _, Strength _, Breadcrumbs _, Custom _, Separator _, Properties _ -> { }

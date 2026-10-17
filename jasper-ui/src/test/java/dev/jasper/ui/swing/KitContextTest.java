@@ -61,7 +61,7 @@ class KitContextTest {
             UIManager.getDefaults().forEach((key, value) -> { if (keys.contains(key)) saved.put(key, value); });
             var context = KitFixtures.context();
             var large = KitFixtures.context(KitFixtures.dark(), new Kit("large-body", DesignMetrics.DEFAULT, TypeScale.DEFAULT.withBody(20),
-                FaceSet.PLATFORM, UiKeySet.DEFAULT));
+                FaceSet.PLATFORM, dev.jasper.ui.kit.ControlVariants.DEFAULT, dev.jasper.ui.kit.ColorSlots.DEFAULT, UiKeySet.DEFAULT));
             try {
                 UIManager.put("defaultFont", null); UIManager.put("Label.font", null); UIManager.put("Jasper.uiFontFamilyOverride", null);
                 same(context, Typography.UserFont.NONE);

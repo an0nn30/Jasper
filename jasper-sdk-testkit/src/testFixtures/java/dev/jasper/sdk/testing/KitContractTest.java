@@ -229,6 +229,11 @@ public abstract class KitContractTest {
         cases.put("table-row",name -> descriptorTable(Optional.of(name),Optional.empty(),List.of()));
         cases.put("table-row-menu",name -> descriptorTable(Optional.empty(),Optional.of(List.of(descriptorMenu(name))),List.of()));
         cases.put("table-menu",name -> descriptorTable(Optional.empty(),Optional.empty(),List.of(descriptorMenu(name))));
+        // SDK 0.18 (plan 3c): a cell node and an empty table's state are descriptor positions too.
+        cases.put("table-cell-node",name -> new Nodes.Table("table",ControlState.READY,List.of(new Column("col","Column",Nodes.TextRole.BODY,false)),
+            List.of(new TableRow("row",Map.of(),Optional.empty(),false,Optional.empty(),"",Map.of("col",descriptorIcon(name)),Optional.empty())),Set.of(),"",List.of()));
+        cases.put("table-empty",name -> new Nodes.Table("table",ControlState.READY,List.of(new Column("col","Column",Nodes.TextRole.BODY,false)),List.of(),Set.of(),"",List.of(),
+            Nodes.SelectionMode.SINGLE,Nodes.ScrollPolicy.STANDARD,Optional.of(new Nodes.Empty("empty",ControlState.READY,descriptorIcon(name),"Nothing","",List.of())),""));
         cases.put("tree-hidden-child",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("branch","Branch",Optional.empty(),false,List.of(new TreeItem("leaf","Leaf",Optional.of(name),true,List.of())))),Set.of(),Set.of(),""));
         cases.put("tree-row-menu",name -> new Nodes.Tree("tree",ControlState.READY,List.of(new TreeItem("leaf","Leaf",Optional.empty(),true,List.of(),OptionalInt.empty(),false,"",Optional.empty(),List.of(),Optional.of(List.of(descriptorMenu(name))))),Set.of(),Set.of(),""));
         cases.put("breadcrumb-menu",name -> new Nodes.Breadcrumbs("crumbs",ControlState.READY,List.of(new Crumb("crumb","Crumb",List.of(descriptorMenu(name)))),"Path",false,"","edit","submit","cancel"));
@@ -589,5 +594,43 @@ public abstract class KitContractTest {
             view.update(spec); assertThat(view.spec()).isEqualTo(spec);
             emit(view, new UiEvent.Action("open")); assertThat(events).containsExactly(new UiEvent.Action("open"));
         } finally { view.close(); stop(kit); }
+    }); }
+    /** SDK 0.18 (plan 3c): a column tree, a grouped table with a cell dropdown and an inline cell, an empty table's state and two empty lines. */
+    public static ViewSpec tables(String display, boolean tunnels) {
+        var c=ControlState.READY;
+        var sessions=new Nodes.Tree("sessions",c,List.of(new TreeItem("lan","Local Network",Optional.empty(),false,List.of(new TreeItem("mac","Mac",Optional.empty(),true,List.of(),
+            OptionalInt.empty(),false,"",Optional.of(Nodes.StatusKind.SUCCESS),List.of("192.168.1.119","22"),Optional.empty())))),Set.of("lan"),Set.of("mac"),"connect",
+            List.of(new Column("name","Name",Nodes.TextRole.BODY,false),new Column("host","Host",Nodes.TextRole.MONO_SMALL,false),new Column("port","Port",Nodes.TextRole.MONO_SMALL,true)));
+        var displays=List.of(new Option("card","Card",Optional.empty()),new Option("sticky","Sticky card",Optional.empty()));
+        var groups=new Nodes.Table("groups",c,List.of(new Column("group","Group",Nodes.TextRole.BODY,false),new Column("display","Display",Nodes.TextRole.BODY,false)),
+            List.of(TableRow.heading("jasper","Jasper",OptionalInt.of(1),"group"),new TableRow("errors",Map.of("group","Internal errors"),Optional.empty(),false,Optional.empty(),"",
+                Map.of("display",new Nodes.Choice("errors.display",c,Nodes.ChoiceKind.DROPDOWN,displays,display,"Display","")),Optional.empty())),Set.of(),"edit",List.of());
+        var rows=tunnels?List.of(new TableRow("web",Map.of("local","8080"),Optional.empty(),false,Optional.empty(),"",Map.of("type",new Nodes.Stack("web.type",c,Nodes.LayoutRole.INLINE,
+            List.of(new Nodes.StatusDot("web.dot",c,Nodes.StatusKind.SUCCESS),new Nodes.Text("web.kind",c,"Local",Nodes.TextRole.BODY)))),Optional.empty())):List.<TableRow>of();
+        var state=new Nodes.Empty("tunnels.empty",c,new Nodes.Icon("tunnels.empty.icon",c,"tunnel",Nodes.Hue.NEUTRAL,Nodes.IconSize.EMPTY,"Tunnels"),"No Tunnels",
+            "Forward a local port to a remote host.",List.of(new Nodes.Button("tunnels.new",c,"New Tunnel\u2026","",Nodes.ButtonKind.SECONDARY,"new-tunnel","")));
+        var table=new Nodes.Table("tunnels",c,List.of(new Column("type","Type",Nodes.TextRole.BODY,false),new Column("local","Local",Nodes.TextRole.MONO_SMALL,false)),rows,Set.of(),"toggle",
+            List.of(),Nodes.SelectionMode.SINGLE,Nodes.ScrollPolicy.STANDARD,Optional.of(state),"");
+        var files=new Nodes.Table("files",c,List.of(new Column("name","Name",Nodes.TextRole.BODY,false)),List.of(),Set.of(),"",List.of(),Nodes.SelectionMode.SINGLE,
+            Nodes.ScrollPolicy.STANDARD,Optional.empty(),"Not Connected");
+        var keys=new Nodes.ItemList("keys",c,Nodes.ListKind.ORDERED,List.of(),Set.of(),"",List.of(),Nodes.SelectionMode.SINGLE,Optional.empty(),OptionalInt.empty(),"","","","","","No keys");
+        return new ViewSpec(new Nodes.Stack("tables",c,Nodes.LayoutRole.VERTICAL,List.of(sessions,groups,table,files,keys)));
+    }
+    @Test void tableVocabularyMountsUpdatesAndReportsCellChoicesSortsAndTheEmptyStateAction() throws Exception { edt(() -> {
+        var kit=kit("owner");var events=new ArrayList<UiEvent>();var view=kit.create(tables("card",false),events::add);
+        try {
+            assertThat(view.spec()).isEqualTo(tables("card",false));
+            view.focus("tunnels.new");
+            view.update(tables("sticky",true));assertThat(view.spec()).isEqualTo(tables("sticky",true));
+            // Ruling 5: rows unmount the empty state, so neither runtime focuses or reveals into it.
+            assertThatIllegalArgumentException().as("focus into the state while rows show").isThrownBy(() -> view.focus("tunnels.new"));
+            assertThatIllegalArgumentException().as("reveal into the state while rows show").isThrownBy(() -> view.reveal("tunnels.empty.icon"));
+            view.focus("errors.display");view.reveal("web.kind");
+            emit(view,new UiEvent.Selected("errors.display",Set.of("card")));emit(view,new UiEvent.Sorted("sessions","host"));
+            emit(view,new UiEvent.Selected("groups",Set.of("errors")));
+            view.update(tables("card",false));emit(view,new UiEvent.Action("new-tunnel"));
+            assertThat(events).containsExactly(new UiEvent.Selected("errors.display",Set.of("card")),new UiEvent.Sorted("sessions","host"),
+                new UiEvent.Selected("groups",Set.of("errors")),new UiEvent.Action("new-tunnel"));
+        }finally{view.close();stop(kit);}
     }); }
 }

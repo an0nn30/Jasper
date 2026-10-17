@@ -500,7 +500,8 @@ public final class Nodes {
      * Backspace on the focused row report (an unselected row is selected first); blank leaves those keys to the host.
      * A plain left single click on a row also reports {@link UiEvent.Clicked} after its selection. RESULTS lists take
      * neither action. {@code detailsAction}, {@code copyAction} and {@code cancelAction} bind D, platform Copy and
-     * Escape only while the row canvas has focus; blank actions pass the key to an enclosing control.
+     * Escape only while the row canvas has focus; blank actions pass the key to an enclosing control. With no items the
+     * body shows {@code emptyText} as one muted line, above {@code addAction}; blank shows nothing (since 0.18.0).
      *
      * @param id stable list id
      * @param state visibility and interaction state
@@ -517,8 +518,9 @@ public final class Nodes {
      * @param detailsAction focused-row D action
      * @param copyAction focused-row platform Copy action
      * @param cancelAction focused-row Escape action
+     * @param emptyText the line the body shows while there are no items; blank for none
      */
-    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction) implements Node {
+    public record ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction, String emptyText) implements Node {
         public ItemList {
             ModelChecks.id(id); Objects.requireNonNull(state);
             Objects.requireNonNull(kind);
@@ -532,6 +534,7 @@ public final class Nodes {
             if (visibleRows.isPresent() && visibleRows.getAsInt() < 1) throw new IllegalArgumentException("Visible rows must be positive");
             Objects.requireNonNull(enterAction); Objects.requireNonNull(deleteAction);
             Objects.requireNonNull(detailsAction); Objects.requireNonNull(copyAction); Objects.requireNonNull(cancelAction);
+            Objects.requireNonNull(emptyText);
             if (kind == ListKind.RESULTS && (!enterAction.isEmpty() || !deleteAction.isEmpty() || !detailsAction.isEmpty() || !copyAction.isEmpty() || !cancelAction.isEmpty()))
                 throw new IllegalArgumentException("RESULTS rows never take focus, so they have no row key actions");
             ModelChecks.unique(items, ListItem::id);
@@ -540,6 +543,10 @@ public final class Nodes {
                 if (kind == ListKind.ORDERED) throw new IllegalArgumentException("Ordered lists have no headings");
                 if (selectedIds.contains(item.id())) throw new IllegalArgumentException("A heading is never selected");
             }
+        }
+        /** A list that shows nothing while it has no items. */
+        public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction, String detailsAction, String copyAction, String cancelAction) {
+            this(id, state, kind, items, selectedIds, activateAction, contextActions, selectionMode, addAction, visibleRows, enterAction, deleteAction, detailsAction, copyAction, cancelAction, "");
         }
         /** A list without D, Copy or Escape row actions. */
         public ItemList(String id, ControlState state, ListKind kind, List<ListItem> items, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, Optional<Button> addAction, OptionalInt visibleRows, String enterAction, String deleteAction) {
@@ -635,8 +642,16 @@ public final class Nodes {
         }
     }
 
-    /** Column collection with explicit single or multiple (Shift, Cmd/Ctrl or Space) selection and an explicit scroll policy. */
-    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll) implements Node {
+    /**
+     * Column collection with explicit single or multiple (Shift, Cmd/Ctrl or Space) selection and an explicit scroll policy.
+     * A heading row ({@link TableRow#heading()}) groups the rows below it and is never selected. With no rows the body
+     * shows {@code empty} (a state with at most one action) or the muted line {@code emptyText}, below the column
+     * headers, which stay; the two are exclusive, and a blank {@code emptyText} shows nothing.
+     *
+     * @since 0.18.0 for {@code empty} and {@code emptyText}
+     */
+    public record Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll,
+                        Optional<Empty> empty, String emptyText) implements Node {
         public Table {
             ModelChecks.id(id); Objects.requireNonNull(state);
             columns = List.copyOf(columns);
@@ -650,6 +665,14 @@ public final class Nodes {
             ModelChecks.unique(columns, Column::id);
             ModelChecks.unique(rows, TableRow::id);
             ModelChecks.unique(contextActions, MenuItem::id);
+            Objects.requireNonNull(empty); Objects.requireNonNull(emptyText);
+            if (empty.isPresent() && !emptyText.isBlank()) throw new IllegalArgumentException("A table shows an empty state or an empty line, not both");
+            if (empty.isPresent() && empty.get().actions().size() > 1) throw new IllegalArgumentException("A table's empty state has at most one action");
+            for (var row : rows) if (row.heading().isPresent() && selectedIds.contains(row.id())) throw new IllegalArgumentException("A heading row is never selected");
+        }
+        /** A table whose body shows nothing while it has no rows. */
+        public Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode, ScrollPolicy scroll) {
+            this(id, state, columns, rows, selectedIds, activateAction, contextActions, selectionMode, scroll, Optional.empty(), "");
         }
         public Table(String id, ControlState state, List<Column> columns, List<TableRow> rows, Set<String> selectedIds, String activateAction, List<MenuItem> contextActions, SelectionMode selectionMode) {
             this(id, state, columns, rows, selectedIds, activateAction, contextActions, selectionMode, ScrollPolicy.STANDARD);
@@ -659,13 +682,27 @@ public final class Nodes {
         }
     }
 
-    public record Tree(String id, ControlState state, List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction) implements Node {
+    /**
+     * A tree of items. A non-empty {@code columns} shows a header over the rows: the first column titles the items, and
+     * each later column titles one of the items' {@link TreeItem#trailing()} values, in order, so an item has at most
+     * one value per column after the first. Clicking a column header reports {@link UiEvent.Sorted}, as a
+     * {@link Table}'s does; the owner orders the items. Empty {@code columns} shows no header.
+     *
+     * @since 0.18.0 for {@code columns}
+     */
+    public record Tree(String id, ControlState state, List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction, List<Column> columns) implements Node {
         public Tree {
             ModelChecks.id(id); Objects.requireNonNull(state);
             roots = List.copyOf(roots);
             expandedIds = Set.copyOf(expandedIds);
             selectedIds = Set.copyOf(selectedIds);
             Objects.requireNonNull(activateAction);
+            columns = List.copyOf(columns);
+            ModelChecks.unique(columns, Column::id);
+        }
+        /** A tree without column headers. */
+        public Tree(String id, ControlState state, List<TreeItem> roots, Set<String> expandedIds, Set<String> selectedIds, String activateAction) {
+            this(id, state, roots, expandedIds, selectedIds, activateAction, List.of());
         }
     }
 

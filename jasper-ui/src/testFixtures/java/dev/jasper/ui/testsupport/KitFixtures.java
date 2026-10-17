@@ -24,19 +24,56 @@ public final class KitFixtures {
 
     /** The default kit with {@code metrics}: a kit that differs from the default in geometry alone. */
     public static Kit kit(DesignMetrics metrics) {
-        return new Kit("test", metrics, Kit.DEFAULT.type(), Kit.DEFAULT.faces(), Kit.DEFAULT.uiKeys());
+        return new Kit("test", metrics, Kit.DEFAULT.type(), Kit.DEFAULT.faces(), Kit.DEFAULT.controls(), Kit.DEFAULT.colors(),
+            Kit.DEFAULT.uiKeys());
+    }
+
+    /** The shipped Enterprise kit file's {@code [metrics]} (spec 5.1), over the classic base's own tokens. */
+    public static dev.jasper.ui.metrics.MetricTokens enterpriseTokens() {
+        var tokens = dev.jasper.ui.metrics.MetricTokens.of(DesignMetrics.CLASSIC);
+        int[] values = {22, 22, 3, 2, 3, 2, 24, 12, 20, 230, 7};
+        for (var token : dev.jasper.ui.metrics.MetricTokens.Token.values()) tokens = tokens.with(token, values[token.ordinal()]);
+        return tokens;
+    }
+
+    /**
+     * Spec 16.1.3's Enterprise fixture kit: the classic base with the shipped file's tokens, its 12-point body, its control
+     * variants, colour slots and key set, and the platform faces (the Plex faces arrive with plan 5).
+     */
+    public static Kit enterprise() {
+        return new Kit("enterprise", DesignMetrics.CLASSIC.with(enterpriseTokens()), dev.jasper.ui.metrics.TypeScale.CLASSIC.withBody(12),
+            dev.jasper.ui.metrics.FaceSet.PLATFORM, dev.jasper.ui.kit.ControlVariants.CLASSIC,
+            new dev.jasper.ui.kit.ColorSlots(SemanticColor.SURFACE_APP, SemanticColor.SURFACE_CARD), UiKeySet.CLASSIC);
+    }
+
+    /** Spec 16.1.3's complement kit: every control point at the value Enterprise does not use, with Enterprise's tokens and type. */
+    public static Kit complement() {
+        var enterprise = enterprise();
+        return new Kit("complement", enterprise.metrics(), enterprise.type(), enterprise.faces(), enterprise.controls().complement(),
+            enterprise.colors(), enterprise.uiKeys());
+    }
+
+    /** {@code base} with {@code controls}: a covering-array row (spec 16.1.3). */
+    public static Kit withControls(Kit base, dev.jasper.ui.kit.ControlVariants controls) {
+        return new Kit(base.id() + "+controls", base.metrics(), base.type(), base.faces(), controls, base.colors(), base.uiKeys());
     }
 
     /** A third appearance: Slate Cobalt Dark with every role 20% plum (alpha kept), so a hard-coded variant colour shows. */
-    public static GeneratedTheme custom() {
+    public static GeneratedTheme custom() { return custom(dark()); }
+
+    /** {@code base} with every role and every authored derived override 20% plum (alpha kept). */
+    public static GeneratedTheme custom(GeneratedTheme base) {
         var plum = new java.awt.Color(0x7a3fa0);
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) {
-            var base = dark().semantic().color(role);
-            var mixed = ColorMath.mix(base, plum, .8);
-            values.put(role, new java.awt.Color(mixed.getRed(), mixed.getGreen(), mixed.getBlue(), base.getAlpha()));
+            var own = base.semantic().color(role);
+            var mixed = ColorMath.mix(own, plum, .8);
+            values.put(role, new java.awt.Color(mixed.getRed(), mixed.getGreen(), mixed.getBlue(), own.getAlpha()));
         }
-        return withSemantic(dark(), new SemanticPalette(values));
+        var overrides = new java.util.EnumMap<DerivedColor, java.awt.Color>(DerivedColor.class);
+        base.derivedOverrides().forEach((role, colour) -> overrides.put(role, ColorMath.mix(colour, plum, .8)));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(values), base.terminal(), base.editor(),
+            base.syntax(), base.glass(), overrides);
     }
 
     /**
@@ -208,11 +245,14 @@ public final class KitFixtures {
     }
 
     /** The dark fixture with every semantic role in its own colour, so a painted pixel names the role it came from. */
-    public static GeneratedTheme marked() {
-        var base = dark();
+    public static GeneratedTheme marked() { return marked(dark()); }
+
+    /** {@code base} with every semantic role in its marker colour and no authored overrides, so every derived role follows the markers. */
+    public static GeneratedTheme marked(GeneratedTheme base) {
         var values = new java.util.EnumMap<SemanticColor, java.awt.Color>(SemanticColor.class);
         for (var role : SemanticColor.values()) values.put(role, marker(role));
-        return withSemantic(base, new SemanticPalette(values));
+        return new GeneratedTheme(base.name(), base.dark(), base.author(), new SemanticPalette(values), base.terminal(), base.editor(),
+            base.syntax(), base.glass(), java.util.Map.of());
     }
 
     /** {@code role}'s marker colour in {@link #marked()}: opaque, its red channel unique to the role. */

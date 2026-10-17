@@ -67,4 +67,19 @@ class KitFixturesTest {
     }
 
     private static int rgb(SemanticPalette palette, SemanticColor role) { return palette.color(role).getRGB() & 0xFFFFFF; }
+
+    /** Plan 4 (Rulings 4): custom() tints every authored override as it tints the roles; marked() drops them. */
+    @Test void customTintsAndMarkedDropsTheAuthoredOverrides() {
+        var latte = KitFixtures.themes().stream().filter(t -> t.name().equals("Catppuccin Latte")).findFirst().orElseThrow();
+        assertThat(latte.derivedOverrides()).as("Latte authors overrides").isNotEmpty();
+        var custom = KitFixtures.custom(latte);
+        assertThat(custom.derivedOverrides().keySet()).isEqualTo(latte.derivedOverrides().keySet());
+        latte.derivedOverrides().forEach((role, colour) ->
+            assertThat(custom.derivedOverrides().get(role)).as(role.key()).isNotEqualTo(colour));
+        var marked = KitFixtures.marked(latte);
+        assertThat(marked.derivedOverrides()).isEmpty();
+        for (var role : SemanticColor.values()) assertThat(marked.semantic().color(role)).isEqualTo(KitFixtures.marker(role));
+        assertThat(KitFixtures.custom().semantic()).isEqualTo(KitFixtures.custom(KitFixtures.dark()).semantic());
+        assertThat(KitFixtures.marked().semantic()).isEqualTo(KitFixtures.marked(KitFixtures.dark()).semantic());
+    }
 }

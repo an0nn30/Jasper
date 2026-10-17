@@ -78,7 +78,7 @@ class WorkspaceMetricsTest {
             var kit = new dev.jasper.ui.kit.Kit("statics", base.metrics().with(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT, 40)
                 .with(DesignMetrics.Role.DOCK_DRAG_THRESHOLD, 9).with(DesignMetrics.Role.WORKSPACE_SURFACE_ARC, 0)
                 .with(DesignMetrics.Role.TITLE_SEARCH_WIDTH, 300).with(DesignMetrics.Role.TOOLBAR_BUTTON_TRIM, 10),
-                base.type(), base.faces(), base.uiKeys());
+                base.type(), base.faces(), base.controls(), base.colors(), base.uiKeys());
             var original = javax.swing.UIManager.getLookAndFeel();
             try {
                 dev.jasper.ui.swing.FlatLafInstaller.install(dev.jasper.app.appearance.ThemeTestSupport.generated(true), kit);

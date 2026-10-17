@@ -87,11 +87,21 @@ public final class SurfaceContrast {
 
     /**
      * {@code pair}'s slot as painted in {@code theme}: its guard applied against the pair's other role, toward
-     * {@code text.primary} first. The roles themselves are never changed.
+     * {@code text.primary} first. A translucent slot is measured as it shows, laid over the role it is painted on (a
+     * translucent {@code against} first over {@code surface.app}); while that holds the slot keeps its alpha, and a
+     * repair is opaque. The roles themselves are never changed.
      */
     public static Color painted(GeneratedTheme theme, PaintPair pair) {
-        return pair.guard().apply(pair.slot().color(theme), pair.against().color(theme),
-            theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+        Color under = flat(pair.against().color(theme), theme.semantic().color(SemanticColor.SURFACE_APP));
+        Color slot = pair.slot().color(theme), shown = flat(slot, under);
+        return pair.guard().holds(shown, under) ? slot
+            : pair.guard().apply(shown, under, theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+    }
+
+    /** {@code color} as it shows over {@code under} (taken as opaque): itself when opaque, else laid over it. */
+    static Color flat(Color color, Color under) {
+        Color base = under.getAlpha() == 255 ? under : new Color(under.getRGB() | 0xFF000000);
+        return color.getAlpha() == 255 ? color : ColorMath.mix(color, base, color.getAlpha() / 255.0);
     }
 
     /** {@code role} as painted on {@code surface}: unchanged when it meets {@code minimum}, else made readable there. */

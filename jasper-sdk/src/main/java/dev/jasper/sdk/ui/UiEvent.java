@@ -33,6 +33,6 @@ public sealed interface UiEvent {
      * list's Enter) action instead.
      */
     record Clicked(String id, String itemId) implements UiEvent { public Clicked { ModelChecks.id(id); ModelChecks.id(itemId); } }
-    /** Sort intent: id is the table owner, columnId the clicked column header; the host owns the order. */
+    /** Sort intent: id is the table or tree owner, columnId the clicked column header; the host owns the order. */
     record Sorted(String id, String columnId) implements UiEvent { public Sorted { ModelChecks.id(id); ModelChecks.id(columnId); } }
 }

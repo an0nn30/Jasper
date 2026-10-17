@@ -9,36 +9,41 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role; text selection in text
- * components takes the variant's terminal selection and a search field's no-match background the
- * {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys before it that end in the
- * suffix.
+ * FlatLaf's colour defaults for a theme variant in a {@link UiKeySet}, each from a semantic role (or, in the classic
+ * set, a derived one); text selection in text components takes the variant's terminal selection and a search field's
+ * no-match background the {@linkplain #errorTint error tint}. Order matters: a {@code *.suffix} key recolours the keys
+ * before it that end in the suffix.
  */
 public final class UiColorKeys {
     private UiColorKeys() {}
 
-    private sealed interface Source permits Role, TextSelection, ErrorTint {}
+    private sealed interface Source permits Role, Derived, TextSelection, ErrorTint {}
     private record Role(SemanticColor role) implements Source {}
+    private record Derived(DerivedColor role) implements Source {}
     private record TextSelection() implements Source {}
     private record ErrorTint() implements Source {}
     private static final Source SELECTED_TEXT = new TextSelection(), ERROR = new ErrorTint();
     private static final Map<String, Source> KEYS = keys();
+    private static final Map<String, Source> CLASSIC_KEYS = classicKeys();
 
     /**
      * {@code set}'s keys for {@code theme} in FlatLaf's order, each as {@code #rrggbb} or {@code #rrggbbaa}: the roles from
-     * the theme's palette, text selection from its terminal colours.
+     * the theme's palette (and, in the classic set, its derived roles), text selection from its terminal colours.
      */
     public static Map<String, Object> flatLaf(GeneratedTheme theme, UiKeySet set) {
         Map<String, Source> sources = switch (Objects.requireNonNull(set)) {
             case DEFAULT -> KEYS;
+            case CLASSIC -> CLASSIC_KEYS;
         };
-        return values(sources, theme.semantic(), theme.terminal().selection());
+        return values(sources, theme, theme.terminal().selection());
     }
 
-    private static Map<String, Object> values(Map<String, Source> sources, SemanticPalette palette, Color textSelection) {
+    private static Map<String, Object> values(Map<String, Source> sources, GeneratedTheme theme, Color textSelection) {
+        var palette = theme.semantic();
         var keys = new LinkedHashMap<String, Object>();
         sources.forEach((key, source) -> keys.put(key, ColorMath.hex(switch (source) {
             case Role role -> palette.color(role.role());
+            case Derived role -> role.role().color(theme);
             case TextSelection ignored -> textSelection;
             case ErrorTint ignored -> errorTint(palette);
         })));
@@ -187,4 +192,33 @@ public final class UiColorKeys {
     }
 
     private static void role(Map<String, Source> keys, String key, SemanticColor role) { keys.put(key, new Role(role)); }
+
+    /**
+     * The classic overlay (spec 6.5): the default keys, an existing key recoloured in place and a new key after every
+     * wildcard, so the table and tree selections take {@code selection.bg} over the terminal-selection wildcard.
+     */
+    private static Map<String, Source> classicKeys() {
+        var keys = new LinkedHashMap<String, Source>(KEYS);
+        keys.put("TableHeader.background", new Derived(DerivedColor.SURFACE_TABLE_HEADER));
+        role(keys, "TableHeader.foreground", TEXT_SECONDARY);
+        keys.put("TableHeader.separatorColor", new Derived(DerivedColor.BORDER_DIVIDER));
+        keys.put("TableHeader.bottomSeparatorColor", new Derived(DerivedColor.BORDER_DIVIDER));
+        keys.put("Table.alternateRowColor", new Derived(DerivedColor.SURFACE_ZEBRA));
+        keys.put("Table.gridColor", new Derived(DerivedColor.BORDER_DIVIDER));
+        role(keys, "Table.selectionBackground", SELECTION_BG);
+        role(keys, "Table.selectionForeground", TEXT_ONSELECTION);
+        role(keys, "Tree.selectionBackground", SELECTION_BG);
+        role(keys, "Tree.selectionForeground", TEXT_ONSELECTION);
+        role(keys, "Button.startBackground", BUTTON_SECONDARY_BG);
+        keys.put("Button.endBackground", new Derived(DerivedColor.BUTTON_END));
+        keys.put("Button.hoverBorderColor", new Derived(DerivedColor.BORDER_HOVER));
+        keys.put("Button.default.borderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        // FlatLaf reads the default border from startBorderColor first and ignores borderColor while it is set.
+        keys.put("Button.default.startBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        keys.put("Button.default.endBorderColor", new Derived(DerivedColor.ACCENT_EDGE));
+        role(keys, "MenuBar.selectionBackground", ACCENT);
+        role(keys, "MenuBar.selectionForeground", TEXT_ONACCENT);
+        keys.put("ToolBar.separatorColor", new Derived(DerivedColor.BORDER_DIVIDER));
+        return Collections.unmodifiableMap(keys);
+    }
 }
