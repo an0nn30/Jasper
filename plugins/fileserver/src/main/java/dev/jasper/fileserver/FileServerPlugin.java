@@ -200,7 +200,10 @@ public final class FileServerPlugin implements Plugin {
         scope = new FileServerScope(() -> registry.servers(), environment.home(), this::toggle,
             (window, id) -> registry.server(id).ifPresent(view -> edit(window, Optional.of(view.definition()), true)), SERVERS);
         context.palette().register(scope);
-        context.panels().register(new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
+        // Enterprise's default slots (spec 14.5): File Servers beneath SFTP on the left.
+        context.panels().register(layout == dev.jasper.fileserver.workstation.Layout.CLASSIC
+            ? new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW).withSplit()
+            : new PanelSpec(PANEL, "File Servers", "server", Anchor.LEFT).withToggleActionId(SHOW), this::createPanel);
         status = context.statusBar().add(new StatusItemSpec(STATUS, Side.RIGHT, 70));
         status.setIcon(icon);
         status.setAction(SHOW);
@@ -262,7 +265,7 @@ public final class FileServerPlugin implements Plugin {
             id -> registry.password(id).ifPresent(this::copy), registry::clearActivity,
             id -> showFingerprints(window, id)),
             registry::activity, environment.home(), ServerRows.firewallHint(environment.osName()), environment.zone(),
-            "add");
+            "add", layout);
         panel.onHeaderChanged(host::setHeader);
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());

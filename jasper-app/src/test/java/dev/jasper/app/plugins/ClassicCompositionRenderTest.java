@@ -195,4 +195,31 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    static final String FILE_SERVERS_LIGHT = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+335 #FFFFFF";
+    static final String FILE_SERVERS_DARK = "0+20 #393C41, 20+1 #4A4D53, 21+335 #2E3135";
+    /**
+     * The HTTP tag's mock colours the render shows: its tint and box. Its ink is 4c's hue through the text guard (plan 4c
+     * Rulings 11), #2F65CA where the mock draws #2655AE (Delta E 8.8), a recorded residual of the classic tag face.
+     */
+    static final String[] FILE_SERVERS_TAG = {"#E8EEFA", "#B9C8EA"};
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theFileServersTableMatchesTheWorkstationMocks() throws Exception {
+        for (boolean dark : new boolean[] {false, true}) under(dark, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("servers-" + dark), EnterpriseLook.resolved(dark), PanelSurfaceFixture.FILE_SERVERS, true)) {
+                fixture.fileServer("test", "HTTP");
+                var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 48, 994, 600, 712);
+                check((dark ? "dark" : "light") + "/file-servers", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 8,
+                    dark ? FILE_SERVERS_DARK : FILE_SERVERS_LIGHT, 1, 0.55, dark ? new String[] {"#393C41", "#2E3135"} : new String[] {"#F0F1F3", FILE_SERVERS_TAG[0], FILE_SERVERS_TAG[1]});
+            }
+        });
+        under(false, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("servers-none"), EnterpriseLook.resolved(false), PanelSurfaceFixture.FILE_SERVERS, true)) {
+                var crop = new MockMatch.Crop(DISCONNECTED, 48, 994, 600, 712);
+                check("light/file-servers-none", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 8, FILE_SERVERS_LIGHT, 1, 0.55,
+                    "#1E1F22", "#5C6370", "#B4B8BF");
+            }
+        });
+    }
 }

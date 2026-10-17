@@ -5382,3 +5382,23 @@ face); the Group dropdown shows "Other" as its placeholder in the placeholder in
 face of New Tunnel adds " · Local Network" (the fixture host's group); disabled footer buttons are `#F0F1F3` with a
 `#D3D6DA` edge (the mock's `#E1E3E6` and `#CDD0D5`, 4b's disabled face). The Username placeholder's data face in the
 mock is a fixture (spec 5.6).
+
+D15 (Task 10). **The classic File Servers footer belongs to the chosen server, after its Properties** — what: the status
+line "<name> — <state>. Click to toggle." shows only while a server is chosen, as the second line of the footer stack
+after the Properties (then the activity under Show Activity); `FileServersTableTest`'s footer assertion moves from the
+unselected case (which now asserts no footer) to the chosen one; why: the 01 mocks draw the File Servers body white to
+the bottom with nothing chosen (`21+335 #FFFFFF`; the plan's always-on footer drew a 21 px raised band there and failed
+`FILE_SERVERS_LIGHT`), and a footer stack led by titled Properties is the one Task 4's D2 stands flush as the
+Workstation grid (led by the text, the grid stood inset in a raised band); spec 14.5's footer copy is kept. Cost if
+wrong: with nothing chosen, activating the first row has no line naming it.
+
+D16 (Task 10). **Residual: the HTTP tag's ink, and the File Servers colour list** — the render's tag label is the blue
+hue through the text guard, `#2F65CA` in regular weight (mock `#2655AE`, bold: ΔE 8.8), as plan 4c's Rulings 11 decides
+and 4c's comparison records (with the box `#ACC1EA` against the mock's `#B9C8EA`, ΔE 5.0, inside presence's 6). So
+`light/file-servers` asks for the mock's tag tint `#E8EEFA` (render `#E4EBF8`, ΔE 1.3) and box `#B9C8EA` in place of
+`#2655AE` (`FILE_SERVERS_TAG`). Owner: 4c's classic tag face.
+
+D17 (Task 10). **Residual: File Servers cells** — the Status cell leads with spec 14.5's status dot, which the mock does
+not draw; "Stopped" is `text.primary` (mock `#3A3D42`); Address is a numeric column, so its title is right-aligned too
+(the mock left-aligns it at 120) (4c's table face). Measured: light/file-servers 0.753, dark/file-servers 0.753,
+light/file-servers-none 0.804 (floors 0.55); bands match exactly.

@@ -6,11 +6,14 @@ import dev.jasper.fileserver.definition.ServerDefinition;
 import dev.jasper.fileserver.runtime.ActivityLog;
 import dev.jasper.fileserver.runtime.ServerRegistry;
 import dev.jasper.fileserver.runtime.ServerState.Phase;
+import dev.jasper.fileserver.workstation.Layout;
+import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelHeader;
+import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
@@ -22,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -52,6 +56,8 @@ public final class FileServersPanel implements AutoCloseable {
     private final String firewall;
     private final ZoneId zone;
     private final String headerAddIcon;
+    /** Which composition this panel takes, fixed at construction (spec 3.6). */
+    private final Layout layout;
     private Consumer<PanelHeader> headerChanged = header -> { };
     private List<ServerRegistry.View> servers = List.of();
     private Optional<String> problem = Optional.empty(), tlsFingerprint = Optional.empty(), hostKeyFingerprint = Optional.empty();
@@ -64,6 +70,13 @@ public final class FileServersPanel implements AutoCloseable {
 
     public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
                             Path home, String firewallHint, ZoneId zone, String headerAddIcon) {
+        this(kit, actions, log, home, firewallHint, zone, headerAddIcon, Layout.ROWS);
+    }
+
+    /** The panel in {@code layout}'s composition. */
+    public FileServersPanel(UiKit kit, Actions actions, Function<UUID, List<ActivityLog.Entry>> log,
+                            Path home, String firewallHint, ZoneId zone, String headerAddIcon, Layout layout) {
+        this.layout = java.util.Objects.requireNonNull(layout);
         this.actions = actions; this.log = log; this.home = home; this.firewall = firewallHint; this.zone = zone;
         this.headerAddIcon = headerAddIcon;
         view = kit.create(new ViewSpec(node()), this::event);
@@ -204,7 +217,9 @@ public final class FileServersPanel implements AutoCloseable {
     private static ControlState state(boolean visible, boolean enabled) { return new ControlState(visible, enabled, false, ""); }
     private static Nodes.Text text(String id, String value, Nodes.TextRole role) { return new Nodes.Text(id, ControlState.READY, value, role); }
 
-    private Nodes.Panel node() {
+    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+
+    private Nodes.Panel rowsNode() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "File Servers", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         if (servers.isEmpty()) {
             Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,
@@ -299,6 +314,111 @@ public final class FileServersPanel implements AutoCloseable {
         return new MenuItem("menu." + verb + ":" + id, label, "", "menu:" + verb + ":" + id, enabled, false);
     }
     private static MenuItem separator(String part, UUID id) { return new MenuItem("separator." + part + ":" + id, "", "", "", false, true); }
+
+    // ---- the classic composition (Enterprise presentation spec 14.5)
+
+    /** The classic table's columns, in the Workstation mock's proportions. */
+    static final List<Column> COLUMNS = List.of(new Column("folder", "Folder", Nodes.TextRole.BODY, false, 110, Optional.empty()),
+        new Column("address", "Address", Nodes.TextRole.MONO, true, 117, Optional.empty()), new Column("status", "Status", Nodes.TextRole.BODY, false, 73, Optional.empty()));
+    public static final String PROPERTIES = "fileserver.properties", FOOTER = "fileserver.footer", NOTICE = "fileserver.notice";
+
+    private Nodes.Panel classicNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "File Servers", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        var rows = new ArrayList<TableRow>();
+        for (ServerRows.Row row : ServerRows.rows(servers, Optional.empty())) {
+            switch (row) {
+                case ServerRows.Header heading -> rows.add(TableRow.heading("fileserver.temporary", heading.title(), OptionalInt.empty(), ""));
+                case ServerRows.Server server -> rows.add(tableRow(server.view()));
+                case ServerRows.Problem ignored -> { }
+            }
+        }
+        Optional<Nodes.Empty> empty = servers.isEmpty() ? Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon("fileserver.empty.icon", ControlState.READY, "server", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "File Servers"),
+            "No File Servers", "Share a local folder over HTTP with devices on your network.",
+            List.of(new Nodes.Button("fileserver.empty.new", ControlState.READY, "Share Folder…", "", Nodes.ButtonKind.SECONDARY, "fileserver.empty.new", ""))))
+            : Optional.empty();
+        var table = new Nodes.Table(ROWS, ControlState.READY, COLUMNS, rows, chosen == null ? Set.of() : Set.of(rowId(chosen)), ENTER_TOGGLE, List.of(),
+            Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, "");
+        Optional<Nodes.Node> top = problem.map(error -> new Nodes.Stack(NOTICE + ".stack", ControlState.READY, Nodes.LayoutRole.VERTICAL,
+            List.of(new Nodes.Notice(NOTICE, ControlState.READY, Nodes.Severity.DANGER, "servers.toml: " + error, List.of()))));
+        // The chosen server's Properties (leading, so the classic face stands them flush) and its status line; with
+        // nothing chosen the body stays the table alone, as the Workstation mock draws it.
+        var below = new ArrayList<Nodes.Node>();
+        if (chosen != null) selectedView().ifPresent(server -> {
+            below.add(properties(server));
+            below.add(new Nodes.Text(FOOTER, ControlState.READY,
+                server.definition().name() + " — " + ServerRows.state(server.state()).toLowerCase(Locale.ROOT) + ". Click to toggle.", Nodes.TextRole.CAPTION));
+            if (detailsOpen) below.addAll(activity());
+        });
+        return new Nodes.Panel(ROOT, ControlState.READY, header, top, table,
+            below.isEmpty() ? Optional.empty() : Optional.of(new Nodes.Stack("fileserver.below", ControlState.READY, Nodes.LayoutRole.VERTICAL, below)));
+    }
+
+    private TableRow tableRow(ServerRegistry.View server) {
+        ServerDefinition definition = server.definition();
+        UUID id = definition.id(); String prefix = "row." + id;
+        var folder = new Nodes.Stack(prefix + ".folder", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(text(prefix + ".name", definition.name(), Nodes.TextRole.BODY),
+            new Nodes.Chip(prefix + ".protocol", ControlState.READY, definition.protocol().label(), protocolHue(definition.protocol()))));
+        var status = new Nodes.Stack(prefix + ".status", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.StatusDot(prefix + ".dot", ControlState.READY, dot(server.state().phase())), text(prefix + ".state", ServerRows.state(server.state()), Nodes.TextRole.BODY)));
+        return new TableRow(rowId(id), Map.of("address", ServerRows.address(server)), Optional.empty(), false, Optional.of(classicMenu(server)),
+            definition.name() + ", " + definition.protocol().label() + ", " + ServerRows.address(server) + ", " + tooltip(server),
+            Map.of("folder", folder, "status", status), Optional.empty());
+    }
+
+    /** Running is success, a transition or a wait for the Vault a warning, a failure danger, stopped idle. */
+    static Nodes.StatusKind dot(Phase phase) {
+        return switch (phase) {
+            case RUNNING -> Nodes.StatusKind.SUCCESS;
+            case STARTING, STOPPING, WAITING_FOR_VAULT -> Nodes.StatusKind.WARNING;
+            case FAILED -> Nodes.StatusKind.DANGER;
+            case STOPPED -> Nodes.StatusKind.IDLE;
+        };
+    }
+
+    /** The row menu of the default look, with Copy URI for Copy Address and Show Activity for Show Details (Rulings 10). */
+    private List<MenuItem> classicMenu(ServerRegistry.View server) {
+        UUID id = server.definition().id();
+        var items = new ArrayList<MenuItem>();
+        for (MenuItem item : menu(server)) {
+            if (item.action().equals("menu:copy:" + id)) items.add(menuItem("copy", id, "Copy URI", item.enabled()));
+            else if (item.action().equals("menu:details:" + id)) items.add(menuItem("details", id, detailsOpen ? "Hide Activity" : "Show Activity", true));
+            else items.add(item);
+        }
+        return List.copyOf(items);
+    }
+
+    private Nodes.Node properties(ServerRegistry.View server) {
+        ServerDefinition definition = server.definition();
+        var rows = new ArrayList<Nodes.PropertyRow>();
+        rows.add(new Nodes.PropertyRow("Folder", ServerRows.folder(definition.folder(), home), true));
+        rows.add(new Nodes.PropertyRow("Protocol", definition.protocol().label(), false));
+        rows.add(new Nodes.PropertyRow("Port", String.valueOf(definition.port()), true));
+        rows.add(new Nodes.PropertyRow("Access", ServerRows.access(definition), false));
+        rows.add(new Nodes.PropertyRow("Reachable from", definition.bind().label(), false));
+        server.user().ifPresent(user -> rows.add(new Nodes.PropertyRow("User", user, true)));
+        if (definition.tls()) rows.add(new Nodes.PropertyRow("TLS certificate", tlsFingerprint.orElse("Created when the server first starts"), tlsFingerprint.isPresent()));
+        if (definition.protocol() == Protocol.SFTP)
+            rows.add(new Nodes.PropertyRow("SSH host key", hostKeyFingerprint.orElse("Created when the server first starts"), hostKeyFingerprint.isPresent()));
+        for (int i = 0; i < server.addresses().size(); i++)
+            rows.add(new Nodes.PropertyRow(server.addresses().size() == 1 ? "Address" : "Address " + (i + 1), server.addresses().get(i).toString(), true));
+        List<String> warnings = ServerRows.warnings(definition);
+        if (!warnings.isEmpty()) rows.add(new Nodes.PropertyRow("Warning", String.join(" · ", warnings), false, Optional.of(Nodes.Severity.WARNING)));
+        return new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + definition.name(), rows);
+    }
+
+    /** The default look's activity log and its Clear and Copy, shown by Show Activity. */
+    private List<Nodes.Node> activity() {
+        var activityRows = new ArrayList<ListItem>();
+        for (int i = 0; i < activityLines.size(); i++) activityRows.add(new ListItem("fileserver.activity.line." + i,
+            Optional.empty(), List.of(text("fileserver.activity.text." + i, activityLines.get(i), Nodes.TextRole.MONO_SMALL)), List.of(), List.of()));
+        return List.of(text("fileserver.activity.title", "Activity", Nodes.TextRole.SECTION_LABEL),
+            new Nodes.ItemList("fileserver.activity.log", ControlState.READY, Nodes.ListKind.COMPACT, activityRows, Set.of(), "", List.of(),
+                Nodes.SelectionMode.NONE, Optional.empty(), OptionalInt.of(8), "", ""),
+            new Nodes.Stack("fileserver.activity.actions", ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                new Nodes.Button("fileserver.activity.clear", ControlState.READY, "Clear", "remove", Nodes.ButtonKind.GHOST, "fileserver.activity.clear", ""),
+                new Nodes.Button("fileserver.activity.copy", ControlState.READY, "Copy", "copy", Nodes.ButtonKind.GHOST, "fileserver.activity.copy", ""))));
+    }
 
     private Nodes.Node details(ServerRegistry.View server) {
         ServerDefinition definition = server.definition();

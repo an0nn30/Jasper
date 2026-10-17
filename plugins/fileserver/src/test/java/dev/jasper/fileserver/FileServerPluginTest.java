@@ -72,6 +72,7 @@ class FileServerPluginTest {
             host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.enterprise"), plugin);
             assertThat(host.failures()).isEmpty();
             assertThat(plugin.layout()).isEqualTo(dev.jasper.fileserver.workstation.Layout.CLASSIC);
+            assertThat(host.panels()).contains("dev.jasper.fileserver.panel|File Servers|LEFT+split|dev.jasper.fileserver.show-panel");
         }
     }
 

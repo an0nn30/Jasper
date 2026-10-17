@@ -62,6 +62,8 @@ public final class UiTestAccess {
         return menu;
     }
     public static FakeKitView fake(dev.jasper.sdk.ui.UiView view) { return (FakeKitView) view; }
+    /** The node {@code id} of the view's current spec, or empty when the view has none. */
+    public static java.util.Optional<Nodes.Node> find(FakeKitView view, String id) { return java.util.Optional.ofNullable(node(view, id)); }
     public static Nodes.Node node(FakeKitView view, String id) {
         AtomicReference<Nodes.Node> found = new AtomicReference<>();
         edt(() -> walk(view.spec().root(), id, found));
