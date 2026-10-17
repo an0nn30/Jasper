@@ -439,5 +439,123 @@
     ],
     "render": "jasper-app/build/theme-surfaces/dark/tunnel-new/local.png",
     "note": "Spec 13 (plan 3e): the labels \"Via host\", \"Listen on\" and \"Forward to\" are sentence case. Edge agreement 0.340 before, 0.341 after."
+  },
+  {
+    "name": "classic-new-tunnel",
+    "mock": "docs/design/enterprise/reference/04 New Tunnel/New Tunnel - Local.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      898
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-tunnel.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA",
+      "#E6E7EA",
+      "#2E9E4F"
+    ]
+  },
+  {
+    "name": "classic-add-host",
+    "mock": "docs/design/enterprise/reference/03 Add Host/Add Host - Default.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1042
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-add-host.png",
+    "min_agreement": 0.5,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA",
+      "#E6E7EA"
+    ]
+  },
+  {
+    "name": "classic-new-file-server-ftp",
+    "mock": "docs/design/enterprise/reference/02 New File Server/New File Server - FTP.png",
+    "crop": [
+      2,
+      60,
+      1040,
+      1210
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-new-file-server-ftp.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#ECEDEF",
+      "#FFFFFF",
+      "#C4C7CC",
+      "#B4B8BF",
+      "#2F65CA",
+      "#E6E7EA",
+      "#2E9E4F",
+      "#8A4FBF",
+      "#B5651D"
+    ]
+  },
+  {
+    "name": "classic-notifications-groups",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "crop": [
+      522,
+      504,
+      1502,
+      1058
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-notifications-groups.png",
+    "min_agreement": 0.75,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF",
+      "#D3D6DA"
+    ]
+  },
+  {
+    "name": "classic-project-markers",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 15 - Tools - Project Index.png",
+    "crop": [
+      522,
+      792,
+      1502,
+      184
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-project-markers.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#FFFFFF",
+      "#F7F8FA",
+      "#B4B8BF",
+      "#ECEDEF"
+    ]
+  },
+  {
+    "name": "classic-keymap-tree",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07 - Keymap.png",
+    "crop": [
+      496,
+      226,
+      1554,
+      978
+    ],
+    "render": "jasper-ui/build/gallery/enterprise-light-2x/classic-keymap-tree.png",
+    "min_agreement": 0.45,
+    "colours": [
+      "#F0F1F3",
+      "#FFFFFF",
+      "#B4B8BF",
+      "#D3D6DA"
+    ]
   }
 ]

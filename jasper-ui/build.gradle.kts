@@ -35,13 +35,17 @@ tasks.register<JavaExec>("gallery") {
     })
     val scale = providers.gradleProperty("jasper.galleryScale").orElse("1")
     val theme = providers.gradleProperty("jasper.galleryTheme").orElse("dark")
+    val kit = providers.gradleProperty("jasper.galleryKit").orElse("default")
     doFirst {
         require(scale.get() in listOf("1", "2")) { "jasper.galleryScale must be 1 or 2" }
         require(theme.get() in listOf("dark", "light")) { "Unknown jasper.galleryTheme" }
+        require(kit.get() in listOf("default", "enterprise")) { "jasper.galleryKit must be default or enterprise" }
+        require(kit.get() == "default" || theme.get() == "light") { "The Enterprise gallery renders Enterprise Light only" }
     }
     systemProperty("java.awt.headless", "true")
     systemProperty("flatlaf.uiScale", scale.get())
     systemProperty("jasper.galleryTheme", theme.get())
+    systemProperty("jasper.galleryKit", kit.get())
     args(layout.buildDirectory.dir("gallery").get().asFile.absolutePath)
 }
 tasks.withType<Javadoc>().configureEach {

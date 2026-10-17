@@ -4826,3 +4826,97 @@ check`; the executor's runs are the evidence for those.
   of the pane and the add action out of the side column and put them back, so a focused marker field or Add button
   lost focus and its IME on each host echo, and a list moved out of its VERTICAL parent kept a closed entry row painted
   in its pane — cost if wrong: none (both tests fail without the change).
+
+## Mock comparison (Task 5)
+
+Run on `claude/enterprise-classic-catalog` after Task 5 (base `42707e416`): the Enterprise gallery at 2x over Enterprise
+Light with the Enterprise fixture kit (81 fixtures), compared by `check_pairs.py`. Every pair passes, each measurement
+equals the pre-flight's (Execution notes E10), and every listed colour fills a 2 × 2 block within ΔE76 6 in both
+images. The default gallery for Slate Cobalt Dark and Light at 1x matches the base (`changed: none`, 161 files each).
+
+| Pair | Mock | Agreement | Floor | Colours present in both |
+|---|---|---|---|---|
+| `classic-new-tunnel` | 04 New Tunnel – Local | 0.589 | 0.50 | all 7: `#ECEDEF` `#FFFFFF` `#C4C7CC` `#B4B8BF` `#2F65CA` `#E6E7EA` `#2E9E4F` |
+| `classic-add-host` | 03 Add Host – Default | 0.559 | 0.50 | all 6: the dialog set |
+| `classic-new-file-server-ftp` | 02 New File Server – FTP | 0.481 | 0.40 | all 9: the dialog set, `#2E9E4F` `#8A4FBF` `#B5651D` |
+| `classic-notifications-groups` | Settings 03 Notifications | 0.845 | 0.75 | all 4: `#F0F1F3` `#FFFFFF` `#B4B8BF` `#D3D6DA` |
+| `classic-project-markers` | Settings 15 Project Index | 0.494 | 0.40 | all 4: `#FFFFFF` `#F7F8FA` `#B4B8BF` `#ECEDEF` |
+| `classic-keymap-tree` | Settings 07 Keymap | 0.521 | 0.45 | all 4: the table set |
+
+Read by eye (mock left, render right) and measured at 2x pixels with Pillow; logical values are halved. No face defect
+was found: no box, band, separator, edge, fill or glyph lies in the wrong place or role, so no face changed and no floor
+moved. Every pair shares one residual: the platform font, not IBM Plex (plan 5), so text is wider and taller, the data
+face is the platform monospace (heavier than Plex Mono), and BODY_STRONG (section titles, heading and category rows,
+the Notifications heading counts) reads as regular weight.
+
+**New Tunnel – Local.** Matches: the titled Tunnel and Ports boxes, the colon labels and the field column, the plain
+picker's gradient with its drawn ▼ and the host in the data face, the radios, the route strip (one `#B4B8BF` box, three
+equal cells, the neutral, blue and green 3 px hue edges, uppercase captions, data-face values), the checkbox setting,
+the footer's preview and buttons. Differences: the footer has no strip or rule above it (plan 6's dialog footer); the
+route's arrow is heavier and runs to the next cell's edge, where the mock's thin arrow stops a few pixels short (Rulings
+12's drawn → at `ROUTE_ARROW`); the Port fields are a little wider; the Listen on and Forward to fields show
+`localhost` in the body face where the mock uses the data face (fixture copy: `FieldKind.TEXT` fields without the
+TECHNICAL presentation).
+
+**Add Host – Default.** Matches: the three titled boxes, the technical fields in the data face, the jump host dropdown,
+the Authentication radios at the field column, the Credential picker, the keys box with Add Key… leading the side
+column, the footer's three buttons. Differences: the side column shows Remove, Move Up and Move Down (Rulings 14; the
+mock has Add Key… and Remove only), so the keys box is about twice the mock's height and the 521-tall body scrolls
+(its scroll bar shows at the right edge), hiding "Track shell folder"; "No keys" sits at the box's top (3c's empty
+line; the mock centres it); the Group dropdown is narrower than the mock's (the setting row's control width, plan 9).
+
+**New File Server – FTP.** Matches: the Server box with the hued protocol radios (blue, amber, green and purple
+squares), the technical Passive ports field, the Reachable from dropdown with its Port field, the Access radios, the
+Account picker, the Allow changes setting under its rule, the Security & Startup box with the disabled Require TLS row
+dimmed and indented (Execution notes E6). Differences: the folder's trailing button reads "Browse…" on an editable
+field (a PATH field's action; plan 3e's composition has a read-only field and a separate Choose…, plan 10); the Access
+radios and the help caption start at the field column and the radios wrap (4b's bare-choice inset; the mock starts
+them at the card's edge, a composition matter for plan 10); the account picker reads "Choose…", not "Choose Vault
+account…" (fixture copy); no warning notice (the fixture places none).
+
+**Settings 03 Notifications.** Matches: the 20 px `#F0F1F3` header band and its `#D3D6DA` rule, the Display separator
+within 1 px of the mock's (the Source separator 4 px earlier, the fixture's column weights), the 22 px heading bands with no rule above them, the white unstriped rows, the
+14 px grouped indent, the in-cell dropdowns under the Display title, the `#B4B8BF` box. Differences: each heading's
+count sits at the trailing edge (Rulings 7); an in-cell dropdown's ▼ sits at a fixed offset in its column, where the
+mock draws it right after the value (3c's in-cell dropdown); the header titles are `#3A3D42`, the mock's `#4A4F57`
+(Rulings 4); every title and cell sits 2 px nearer its column's start than the mock's: the first 7.5 from the box's
+outer edge (mock 9.5) and those after a separator 7.5 to 8 (mock 10 for titles, 11 to 11.5 for cells), because
+`ICON_GAP` is 6 in both catalogs, where this plan's Mock measurements row assumed the mock's 8 (Rulings 5's rule
+holds; a wider classic cell inset needs a new role, left to plan 9's Notifications page).
+
+**Settings 15 Project Index.** Matches: the square `#B4B8BF` box, the white rows with the second striped `#F7F8FA`,
+the data-face markers with their indices, the side column of equal Remove, Move Up and Move Down buttons, 6.5 from the
+box and top-aligned with it. Differences: the adopted entry row's field keeps its preferred width (an INLINE stack does
+not stretch it; the mock runs it to the Add button at the box's edge; plan 9's Project Index composition); the rows are
+22 tall, not 20 (`ORDERED_ROW_HEIGHT` 20 is a minimum and the platform monospace row is taller), so the box is 68 tall
+(mock 64) and the entry row, 4 lower, is clipped by the 92-tall fixture; the side column is 6 px wider (its buttons'
+platform-font width exceeds `SIDE_COLUMN_WIDTH`), so the box ends 6 px earlier; the indices are `#5C6370`, the mock's
+`#9AA0A8`, because spec 7.6 gives Enterprise Light's `text.tertiary` `#5C6370` (the palette is plan 5's); the area
+around the list is the workspace surface (`#F7F7F8`), where the mock shows its Settings page (a bare-stack fixture).
+
+**Settings 07 Keymap.** Matches: the header band, rule and separators as in Notifications, the drawn ▶ and ▼ in
+`#5C6370`, the 22 px category rows, the expanded Clipboard's children indented, no stripes, the white rows inside the
+box. Differences: Scope and Shortcut are content-sized and right-aligned, titles included (3c's column tree), where
+the mock gives them weighted, left-aligned columns; keycaps are text ("⌘C"; the app's keycap trees are plan 9's), so
+the two child rows are about 1.5 px shorter than the mock's keycap rows and the categories below sit about 3 px higher; the
+trailing counts are `#5C6370`, the mock's `#7A808A` (3c's trailing colour); the header titles are `#3A3D42` (Rulings
+4); titles start 2 px earlier (`ICON_GAP`, as in Notifications) and children 4 px earlier (the 2 px `TREE_INDENT`
+residual of the Mock measurements plus that); the mock's change dot after "Application" is not in the fixture.
+
+Reproduce from the worktree root:
+
+```bash
+./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=light -Pjasper.galleryScale=2
+python3 -I tools/visual/check_pairs.py jasper-ui/build/classic-compare
+python3 -I - <<'PY'
+import pathlib
+from PIL import Image
+out = pathlib.Path("jasper-ui/build/classic-compare/view"); out.mkdir(parents=True, exist_ok=True)
+for side in sorted(pathlib.Path("jasper-ui/build/classic-compare").glob("classic-*-side.png")):
+    image = Image.open(side); third = image.width // 3
+    image.crop((0, 0, 2 * third, image.height)).save(out / side.name.replace("-side", ""))
+PY
+```
+
+The views are `jasper-ui/build/classic-compare/view/classic-*.png` (mock | render); `classic-*-blend.png` and
+`classic-*.txt` (per-band agreement) sit beside them.

@@ -129,6 +129,11 @@ public final class KitGallery {
         });
         return new Fixture(name, "", state, name.contains("short") ? 240 : 264, name.contains("short") ? 180 : 424, spec[0]);
     }
+    /** The Enterprise gallery's theme: Enterprise Light (plan 4c Rulings 21; Enterprise Dark is plan 5's). */
+    static GeneratedTheme enterpriseTheme(String name) {
+        if (!name.equals("light")) throw new IllegalArgumentException("The Enterprise gallery renders Enterprise Light only");
+        return KitFixtures.enterpriseLight();
+    }
     public static GeneratedTheme theme(String name) {
         return switch (name) {
             case "dark" -> KitFixtures.dark(); case "light" -> KitFixtures.light();
@@ -146,21 +151,26 @@ public final class KitGallery {
     public static void main(String[] args) throws Exception {
         Path output = Path.of(args.length == 0 ? "jasper-ui/build/gallery" : args[0]);
         String name = System.getProperty("jasper.galleryTheme", "dark");
-        GeneratedTheme theme = theme(name);
-        Edt.run(() -> installed(theme, dev.jasper.ui.kit.Kit.DEFAULT, (context, focus) -> {
+        // Plan 4c: the Enterprise gallery renders the gallery and the Enterprise fixtures with the Enterprise fixture kit.
+        boolean enterprise = "enterprise".equals(System.getProperty("jasper.galleryKit", "default"));
+        GeneratedTheme theme = enterprise ? enterpriseTheme(name) : theme(name);
+        var kit = enterprise ? KitFixtures.enterprise() : dev.jasper.ui.kit.Kit.DEFAULT;
+        var catalog = enterprise ? enterpriseCatalog() : fixtures();
+        String label = (enterprise ? "enterprise-" : "") + name;
+        Edt.run(() -> installed(theme, kit, (context, focus) -> {
             try {
                 float scale = UIScale.getUserScaleFactor();
-                Path directory = output.resolve(name + "-" + (int)scale + "x");
+                Path directory = output.resolve(label + "-" + (int)scale + "x");
                 Files.createDirectories(directory);
                 var contact = new ArrayList<Rendered>();
-                for (Fixture fixture : fixtures()) {
+                for (Fixture fixture : catalog) {
                     var capture = capture(fixture, context, focus);
                     ImageIO.write(capture.image(), "png", directory.resolve(fixture.name() + ".png").toFile());
                     Files.writeString(directory.resolve(fixture.name() + ".json"), capture.metadata());
                     contact.add(new Rendered(fixture.name(), capture.image()));
                 }
                 writeSheets(directory, contact, scale);
-                Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(name) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":" + Nodes.Node.class.getPermittedSubclasses().length + "}");
+                Files.writeString(directory.resolve("manifest.json"), "{\"theme\":" + quote(label) + ",\"scale\":" + scale + ",\"deviceScale\":1,\"lookAndFeel\":" + quote(UIManager.getLookAndFeel().getClass().getName()) + ",\"fixtureCount\":" + contact.size() + ",\"nodeKinds\":" + Nodes.Node.class.getPermittedSubclasses().length + "}");
                 System.out.println("Rendered " + contact.size() + " fixtures with " + UIManager.getLookAndFeel().getName() + " at " + scale + "x to " + directory);
             } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
         }));
@@ -171,7 +181,8 @@ public final class KitGallery {
 
     /**
      * Runs {@code action} with {@code theme} and {@code kit} installed as the gallery renders them: real FlatLaf, the
-     * platform family at 13 points, no caps-lock query and the gallery's focus manager, all restored afterwards. EDT.
+     * platform family at 13 points at the gallery's scale, no caps-lock query and the gallery's focus manager, all
+     * restored afterwards. EDT.
      */
     public static void installed(GeneratedTheme theme, dev.jasper.ui.kit.Kit kit, java.util.function.BiConsumer<KitContext, GalleryFocus> action) {
         var priorLaf = UIManager.getLookAndFeel();
@@ -184,7 +195,7 @@ public final class KitGallery {
             // Install before creating any gallery widget, including transition controllers.
             FlatLafInstaller.install(theme, kit);
             UIManager.put("PasswordField.showCapsLock", false); // native keyboard-lock queries are unavailable headlessly
-            UIManager.put("defaultFont", new Font(family, Font.PLAIN, 13));
+            UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(13)));
             if (!(UIManager.getLookAndFeel() instanceof FlatLaf)) throw new AssertionError("Gallery must use real FlatLaf");
             KeyboardFocusManager.setCurrentKeyboardFocusManager(focus);
             var binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
@@ -203,7 +214,8 @@ public final class KitGallery {
     public static Capture capture(Fixture fixture, KitContext context, GalleryFocus focus) {
         String family = KitFixtures.platformFamily();
         float scale = UIScale.getUserScaleFactor();
-        UIManager.put("defaultFont", new Font(family, Font.PLAIN, fixture.name().contains("font24") ? 24 : 13));
+        // The form font at the gallery's scale, so a 2x render carries 2x text as the 2x mocks do (plan 4c).
+        UIManager.put("defaultFont", new Font(family, Font.PLAIN, UIScale.scale(fixture.name().contains("font24") ? 24 : 13)));
         try (var view = new KitView(context, fixture.spec(), e -> {})) {
             registerCustom(view, fixture.spec().root(), context);
             int width = UIScale.scale(fixture.width()), height = UIScale.scale(fixture.height());
