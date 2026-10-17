@@ -21,12 +21,10 @@ sealed interface PaletteHome permits TitleFieldHome, CornerHome {
      * @param titleClear the title row clear of the window controls
      * @param workArea the dock work area (between the stripes, above the bottom strip and the status bar), or null
      * @param margin the view's inset from the window's edges
-     * @param homeSide the corner home's inset from the work area's left edge
-     * @param homeBottom the corner home's inset from the work area's bottom edge
      * @param compact whether the window is in Compact mode
      */
     record Geometry(Rectangle window, Rectangle workspace, Rectangle field, Rectangle titleClear, Rectangle workArea, int margin,
-                    int homeSide, int homeBottom, boolean compact) { }
+                    boolean compact) { }
 
     /** The view's home for its {@code preferred} size, or null when it has none here. */
     Rectangle home(Geometry geometry, Dimension preferred);

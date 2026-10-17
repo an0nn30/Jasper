@@ -1,6 +1,7 @@
 # Jasper command palette — approved design
 
 **Status:** Approved by the user on 2026-09-12 following the interactive visual review. Implemented through Tasks 1–6 on `codex/command-palette-design`, then integrated into `main` with user approval on 2026-09-13, including the higher placement in `c4f3335`; all six task reviews and whole-branch/scoped review are complete through `28a7ff0`; native acceptance remains user-run. The selected treatment is the 560px raised card, 12px outer corners and 40px result rows in the app’s purple chrome, with equivalent classic-dark/light treatments.
+
 Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): under the Enterprise look the palette is the Run window, with its own home, saved place and closing rules; everything else in this document stands.
 
 **Development branch:** `codex/command-palette-design`, from main `1db31b1`.

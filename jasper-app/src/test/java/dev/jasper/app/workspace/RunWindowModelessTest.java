@@ -116,6 +116,41 @@ class RunWindowModelessTest {
         });
     }
 
+    /** A scope whose one row is what it reads when it searches, as History reads the target pane's folder. */
+    static PaletteScope reading(String[] folder) {
+        return new PaletteScope() {
+            @Override public String id() { return "test.folder"; }
+            @Override public String label() { return "Folder"; }
+            @Override public String placeholder() { return "Search the folder"; }
+            @Override public List<PaletteVerb> verbs() { return List.of(new PaletteVerb("run", "Run")); }
+            @Override public PaletteResults search(String query, PaletteContext context) {
+                return new PaletteResults(List.of(PaletteRow.of(folder[0], folder[0])), null, null);
+            }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteContext context) { }
+            @Override public Subscription onChanged(Runnable listener) { return new Subscription(() -> { }); }
+        };
+    }
+
+    /**
+     * Final review: an opener focusing the open Run window rebuilds its rows, so they follow the pane the person left (a
+     * pane switch in the tab or a cd rebuilds nothing by itself); the fixture's folder stands for the target's.
+     */
+    @Test void anOpenerRebuildsTheRows() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            var folder = new String[] {"first"};
+            try (var o = open(PaletteLook.RUN_WINDOW)) {
+                o.owner().scopes().register(reading(folder));
+                var palette = o.owner().commandPalette();
+                palette.open("test.folder"); LayoutTestSupport.layoutTree(o.root());
+                assertThat(palette.view().selectedKey()).isEqualTo("test.folder/first");
+                folder[0] = "second";
+                palette.open("test.folder");
+                assertThat(palette.isOpen()).as("the opener focuses it").isTrue();
+                assertThat(palette.view().selectedKey()).as("its rows read the target again").isEqualTo("test.folder/second");
+            }
+        });
+    }
+
     @Test void itClosesOnTheCloseButtonAndCancelAndHasNoReveal() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var o = open(PaletteLook.RUN_WINDOW)) {

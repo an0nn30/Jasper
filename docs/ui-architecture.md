@@ -241,8 +241,8 @@ for their text and measured height; a TRANSPARENT search field shows the rail-si
 The host-only `KitView.setHintPresentation(stackId, hint)` gives one stack (the palette footer) the compact hint face:
 its CAPTION text and embedded links use `PALETTE_HINT` (11) and its children `PALETTE_HINT_ACTION_GAP`; same-id updates
 keep it and it is not part of the plugin SDK. The host-only `KitView.runWindow(true)` presents a view as part of the
-Run window: its RESULTS rows, heading bands and counts, PROMPT_HEADER tile, transparent field and text take the
-`RUN_WINDOW_*` roles, `RUN_HEADING` and `RUN_DETAIL`; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds paint the
+Run window: its RESULTS rows, heading bands and counts, PROMPT_HEADER tile, transparent field, buttons' label padding
+(`RUN_WINDOW_BUTTON_PADDING`) and text take the `RUN_WINDOW_*` roles, `RUN_HEADING` and `RUN_DETAIL`; `SurfacePanel`'s `RUN_WINDOW`, `FIELD` and `BOX` kinds paint the
 window's frame and bands, its field box and its list box. `ChromePainter` (one per kit; app chrome paints with `ChromePainter.installed()`) owns the native chrome's painting (tab strip, toolbar
 rules and action widths, status dot, rail badges, connected dot, split dividers, drop guides, find and title-bar rules,
 palette shadow, and the classic dock's rules, stripe labels, count pills and header strips, whose colours it paints

@@ -1,6 +1,7 @@
 # Jasper palette scopes and shell history — design
 
 **Status:** Implemented on `claude/palette-scopes` in `.worktrees/palette-scopes`, commits `bd76fe4..67743ba` plus the Task 11 documentation commit that records this status. Fresh `./gradlew check --rerun-tasks`: 739 tests, 738 passed, one existing font skip, zero failures/errors. No GUI, merge or push.
+
 Amended on 2026-10-15 by the [Enterprise presentation design](2026-10-15-jasper-enterprise-presentation-design.md): the Run window closes only on Escape, ×, Cancel or running a row; everything else in this document stands.
 
 **Development branch:** `claude/palette-scopes` in `.worktrees/palette-scopes`, from main `86352b9`.

@@ -72,15 +72,17 @@ public final class PaletteController implements AutoCloseable {
     /**
      * As {@link #open(String, PaletteTarget, BooleanSupplier)}; afterwards {@code queryOrNull} replaces the
      * query text and {@code rowIdOrNull} selects a row of the resulting list. Opening the chip that is
-     * already showing dismisses the card instead, and then neither is applied; the Run window focuses its field.
+     * already showing dismisses the card instead, and then neither is applied; the Run window focuses its field and
+     * rebuilds its list for the current target.
      */
     public boolean open(String tabId, PaletteTarget target, BooleanSupplier valid, String queryOrNull, String rowIdOrNull) {
         if (closed || !hasScope(tabId)) return false;
         if (open) {
             if (!tabId.equals(tab)) activate(tabId);
-            // The Run window stays open: its opener focuses it and a query or row it carries applies (spec 11.6, Execution
-            // notes R8); the card closes.
-            else if (palette.modeless()) palette.focusQuery();
+            // The Run window stays open: its opener focuses it, its rows follow the pane the person left (the list ranks by
+            // the target's folder and project) and a query or row it carries applies (spec 11.6, Execution notes R8); the
+            // card closes.
+            else if (palette.modeless()) { palette.focusQuery(); rebuild(true); }
             else { dismiss(); return false; }
         } else {
             generation++;

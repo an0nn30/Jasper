@@ -41,17 +41,18 @@ digits are search text. Every colour comes from the installed theme.
 ## The Run window
 
 Under the Enterprise look the palette is the Run window, at the bottom-left of the tool window area above the bottom
-strip and the status bar. Its shortcut, the "▶ Run…" status item and the toolbar's Search everywhere field open it, and
-put the cursor back in its Open field while it is open. It stays open while you work: clicking a pane gives that pane
-the keyboard, and a row runs in the pane that is current when you run it. It closes on Escape (with the cursor in it),
-×, Cancel or running a row. Drag it by its title row or an empty area; dropped near its home or below it, it goes back
-there, and a double click on its title row sends it home. Its place is kept for every window
-(`[palette.run_window]` in `ui-state.toml`). The list keeps the height of `palette.visible_rows` rows under "Recent" and
-"Most used", or one "Matches" heading that counts the matches while you type; each row shows its kind's colour. The line
-under the list names the selected row ("Session: dustin@192.168.1.119:22"); "Open in a split pane" makes Enter and the
-primary button run the row's split verb where its kind has one; the primary button reads the row's first verb, and the
-other two are in the row's context menu. Browse… opens a file with the default editor, as File › Open File… does, and
-the Run window stays open.
+strip and the status bar. Its shortcut, the "▶ Run…" status item and the toolbar's Search everywhere field open it,
+and put the cursor back in its Open field while it is open, as a click on the window does. It stays open while you
+work: clicking a pane gives that pane the keyboard, and a row runs in the pane that is current when you run it. It
+closes on Escape (with the cursor in it), ×, Cancel or running a row. Drag it by its title row or an empty area;
+dropped near its home or below it, it goes back there, and a double click on its title row sends it home. Its place is
+kept for every window (`[palette.run_window]` in `ui-state.toml`). The list keeps the height of `palette.visible_rows`
+rows (fewer when the window is too short for its home) under "Recent" and "Most used" (or "Suggested"), or one
+"Matches" heading that counts the matches while you type; each row shows its kind's colour. The line under the list
+names the selected row ("Session: dustin@192.168.1.119:22"); "Open in a split pane" makes Enter and the primary button
+run the row's split verb where its kind has one; the primary button reads the row's first verb, and the other two are
+in the row's context menu. Browse… opens a file with the default editor, as File › Open File… does, and the Run window
+stays open.
 
 ## Commands
 

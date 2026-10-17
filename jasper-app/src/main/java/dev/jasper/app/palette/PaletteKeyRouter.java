@@ -57,7 +57,7 @@ public final class PaletteKeyRouter implements AutoCloseable {
     /** Root-map fallback shares the policy, but has no physical key sequence to retain. */
     public boolean dispatchShortcut(KeyStroke stroke, Component source) { return route(stroke, source, code -> {}); }
 
-    /** Side-effect free: whether {@link #dispatchShortcut} would take this stroke (an opening shortcut, or any while open). */
+    /** Side-effect free: whether {@link #dispatchShortcut} would take this stroke (an opening shortcut, or any while the card is open; with the Run window open, only the openers). */
     public boolean claimsShortcut(KeyStroke stroke) { return claimsShortcut(stroke, null); }
 
     /** As {@link #claimsShortcut(KeyStroke)} for a key from {@code source}: the Run window claims only its own keys and openers. */

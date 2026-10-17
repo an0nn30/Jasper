@@ -77,6 +77,8 @@ final class WindowCommandPalette implements AutoCloseable {
         root.getLayeredPane().add(overlay, JLayeredPane.MODAL_LAYER);
         root.addComponentListener(resize); root.getLayeredPane().addComponentListener(resize);
         owner.addComponentListener(resize); owner.tabStrip().addComponentListener(resize);
+        // The corner home measures the dock work area, which can move without the tab strip resizing.
+        owner.area().addComponentListener(resize);
         layoutOverlay();
     }
 
@@ -102,6 +104,12 @@ final class WindowCommandPalette implements AutoCloseable {
                 owner.updateActions();
                 originTab = owner.currentTab(); originPane = owner.currentPane();
                 priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+            } else if (view.modeless()) {
+                // An opener focusing the open Run window from elsewhere: Escape then returns where the person was now.
+                Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                if (focus != null && !controller.owns(focus) && SwingUtilities.isDescendingFrom(focus, owner)) {
+                    originTab = owner.currentTab(); originPane = owner.currentPane(); priorFocus = focus;
+                }
             }
             boolean modeless = view.modeless();
             PaletteTarget target = modeless ? currentTarget() : originPane == null ? PaletteTarget.window(owner.id()) : target(originPane);
@@ -285,6 +293,7 @@ final class WindowCommandPalette implements AutoCloseable {
         if (root == null) return;
         root.removeComponentListener(resize); root.getLayeredPane().removeComponentListener(resize);
         owner.removeComponentListener(resize); owner.tabStrip().removeComponentListener(resize);
+        owner.area().removeComponentListener(resize);
         root.getLayeredPane().remove(overlay); root.repaint(); root = null;
     }
 
@@ -295,10 +304,8 @@ final class WindowCommandPalette implements AutoCloseable {
 
     /** What the home reads of this window, in the overlay's coordinates. */
     private PaletteHome.Geometry geometry() {
-        var styles = NativeStyles.installed();
         return new PaletteHome.Geometry(new Rectangle(0, 0, overlay.getWidth(), overlay.getHeight()), overlay.workspace(),
             owner.paletteAnchor(overlay), owner.titleRowClear(overlay), owner.paletteWorkArea(overlay), margin(),
-            styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE), styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM),
             owner.viewMode() == ViewMode.COMPACT);
     }
 

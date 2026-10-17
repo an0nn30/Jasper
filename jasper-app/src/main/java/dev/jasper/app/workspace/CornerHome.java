@@ -1,6 +1,8 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.persistence.UiState;
+import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.swing.NativeStyles;
 import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.util.Optional;
@@ -15,7 +17,10 @@ final class CornerHome implements PaletteHome {
         Rectangle work = g.workArea();
         if (work == null || work.width <= 0 || work.height <= 0) return null;
         Dimension size = WindowCommandPalette.fitted(work, preferred, g.margin());
-        int insetX = Math.min(g.homeSide(), Math.max(0, work.width / 2)), insetY = Math.min(g.homeBottom(), Math.max(0, work.height / 2));
+        // The two insets are read here only, so the card's home never reads a Run window role.
+        var styles = NativeStyles.installed();
+        int side = styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE), bottom = styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM);
+        int insetX = Math.min(side, Math.max(0, work.width / 2)), insetY = Math.min(bottom, Math.max(0, work.height / 2));
         return new Rectangle(work.x + insetX, work.y + work.height - insetY - size.height, size.width, size.height);
     }
 
