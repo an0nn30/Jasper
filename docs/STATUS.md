@@ -54,8 +54,18 @@ start within 1 px. After these fixes, `./gradlew check --continue`:
 GUI checks for the user: turn Enterprise on in Settings › Plugins, restart, and compare Enterprise Light and Dark with
 the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chrome is plans 6 to 9's); turn it off and
 check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
-hidden files (Execution notes, ruling 3); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged, not
-pushed.
+hidden files (Execution notes, ruling 3); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged into main, not
+pushed. Merged with main (plan 6b) as `b318feae0`: 6b's R47 values are in `enterprise.json` (Light `surface.tabstrip`
+#E8E9EB, `tab.indicator` #2F65CA, `surface.scrim` #00000036, `border.divider` #D3D6DA; Dark #3A3D42, #3C74D6, #00000036,
+#4A4D53) with `derived-roles-enterprise.tsv` regenerated, Enterprise Dark's accent is #3C74D6 (the ruling above), 6b's
+face-width probes are asserted under IBM Plex (at 2×: "New Session" 134 for the mock's 134, the search field's left
+2114 for 2116, "Settings…" 2744 for 2742, the titles Unlock Vault 139 for 138, Add Login 108 for 108 and Add SSH Key 144
+for 143) but for the status bar's rules before UTF-8 and the warning (2444 and 2554 for 2470 and 2574) and the run
+item's width (130 for 122), printed residuals because the mocks set the status text at 11 px where spec 5.6 gives
+`STATUS_TEXT` 12 (at 11 they measure 2468, 2570 and 122; a finding for the user), Add SSH Key's swatch stays `#2C8B48`
+(ΔE 9.7, R39), the warning cell paints its ▲ and the search keycap and classic tab titles take the platform face where
+IBM Plex has no glyph (they drew boxes), all 32 `check_pairs.py` pairs pass and the default gallery is byte-identical
+(322 files); `./gradlew check --continue`: **11,092 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;
