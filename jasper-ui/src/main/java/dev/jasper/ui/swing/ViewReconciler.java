@@ -110,7 +110,7 @@ final class ViewReconciler implements AutoCloseable {
             menu.main.panel = false;
             menu.arrow.panel = false;
         }
-        if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.tile(0, false); }
+        if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.facePair = null; icon.tile(0, false); }
         if (control instanceof EmptyStates.EmptyControl empty) empty.panel = false;
         if (control instanceof Labels.TextControl preview) preview.formPreview = false;
         if (control instanceof Labels.TextControl && control.component instanceof Labels.LiteralLabel text) {
@@ -415,6 +415,11 @@ final class ViewReconciler implements AutoCloseable {
         for (var control : mounted.values()) if (control instanceof SecretFields.SecretControl secret
                 && (secret == source || !group.isEmpty() && group.equals(((Nodes.Secret)secret.node).revealGroup()))) secret.reveal(revealed);
     }
-    void refresh() { applyArtworkComposition(view.spec().root(),mounted,false); mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();}); view.revalidate(); view.repaint(); }
+    void refresh() {
+        applyArtworkComposition(view.spec().root(),mounted,false); mounted.values().forEach(ControlRegistry.Control::refresh); mounted.values().forEach(c -> {if(c instanceof Panels.PanelControl panel)panel.presentation();});
+        // A form card's label column follows its labels' refreshed fonts (a theme or interface font change).
+        mounted.values().forEach(c -> { if (c instanceof Cards.CardControl card) card.relabel(); });
+        view.revalidate(); view.repaint();
+    }
     @Override public void close() { mounted.values().forEach(ControlRegistry.Control::close); mounted.clear(); view.removeAll(); }
 }

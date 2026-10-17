@@ -19,7 +19,7 @@ import javax.swing.SwingUtilities;
  */
 final class ClassicButtonFace implements ButtonFace {
     private static final float DISABLED = .42f;
-    private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow;
+    private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel;
 
     /** A face whose buttons stand on {@code surface}, the kit's dialog surface. */
     ClassicButtonFace(SemanticColor surface) {
@@ -29,12 +29,13 @@ final class ClassicButtonFace implements ButtonFace {
         primaryEdge = new PaintPair(DerivedColor.ACCENT_EDGE, surface, SurfaceContrast.Guard.CONTROL);
         hoverEdge = new PaintPair(DerivedColor.BORDER_HOVER, surface, SurfaceContrast.Guard.CONTROL);
         arrow = new PaintPair(SemanticColor.TEXT_SECONDARY, SemanticColor.BUTTON_SECONDARY_BG, SurfaceContrast.Guard.INDICATOR);
+        primaryHoverLabel = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT_HOVER, SurfaceContrast.Guard.TEXT);
     }
 
-    @Override public List<PaintPair> pairs() { return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow); }
+    @Override public List<PaintPair> pairs() { return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel); }
 
     /**
-     * Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots, and as a composite control's
+     * Plan 4b Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots, and as a composite control's
      * inner part; a standard button elsewhere. A menu button's parts and face stand where its surface does.
      */
     static boolean flat(Buttons.KitButton b) {
@@ -88,7 +89,8 @@ final class ClassicButtonFace implements ButtonFace {
         if (b.embedded || b.recorder() || b.circular || b.onSelection || b.kind == Nodes.ButtonKind.LINK) return ThemePainting.color(c, b.textRole(hover));
         if (!b.isEnabled()) return ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_PRIMARY), DISABLED);
         if (ghost(b) && flat(b)) return ThemePainting.color(c, b.textRole(hover));
-        if (b.kind == Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, primaryLabel);
+        // A hovered or pressed primary fills accent.hover (paintFace), so its label is guarded there.
+        if (b.kind == Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, hover || b.getModel().isPressed() ? primaryHoverLabel : primaryLabel);
         var role = b.textRole(hover);
         return role == SemanticColor.TEXT_STRONG_SECONDARY || ghost(b) ? ThemePainting.painted(c, label) : ThemePainting.color(c, role);
     }
@@ -97,7 +99,7 @@ final class ClassicButtonFace implements ButtonFace {
      * The buttons this face leaves to the default treatment fade as one layer: those {@code paintFace} hands to the
      * raised face, and those on a selected row, whose labels {@code text} keeps in their role. The condition is
      * {@code text}'s, which is {@code paintFace}'s with the selected row added, so the three change together. Every
-     * other button draws its own flat disabled face (Rulings 6); a disabled SECONDARY or PRIMARY button on a selected
+     * other button draws its own flat disabled face (plan 4b Rulings 6); a disabled SECONDARY or PRIMARY button on a selected
      * row draws that flat face and is faded with it as well.
      */
     @Override public boolean fades(Buttons.KitButton b) {
@@ -144,7 +146,7 @@ final class ClassicButtonFace implements ButtonFace {
             double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
             var shape = new RoundRectangle2D.Double(0, 0, owner.getWidth(), owner.getHeight(), 2 * radius, 2 * radius);
             boolean enabled = owner.isEnabled();
-            // Disabled, like a disabled dropdown and button (Rulings 6): a flat fill, the lighter edge, then the line and arrow faded.
+            // Disabled, like a disabled dropdown and button (plan 4b Rulings 6): a flat fill, the lighter edge, then the line and arrow faded.
             if (enabled) gradient(g, c, shape, false);
             else { g.setColor(ThemePainting.role(c, DerivedColor.SURFACE_TABLE_HEADER)); g.fill(shape); }
             ThemePainting.rounded(g, owner, c, null, focus || expanded ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)

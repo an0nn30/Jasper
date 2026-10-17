@@ -268,13 +268,7 @@ final class SettingRows {
                     owner.title.height(w)
                             + (owner.description.isVisible() ? owner.description.height(w) + ThemePainting.metric(owner.context(), DesignMetrics.Role.SETTING_DESCRIPTION_GAP) : 0);
             int control = p.getComponentCount() > 2 ? Composition.height(p.getComponent(2), tw) : 0;
-            return Math.max(
-                    owner.panelFooter ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(owner.context(), DesignMetrics.Role.PANEL_FOOTER_ROW_HEIGHT) : ThemePainting.metric(
-                            owner.context(),
-                            owner.settings ? owner.description.isVisible() ? DesignMetrics.Role.SETTINGS_DESCRIPTION_HEIGHT : owner.grouped ? DesignMetrics.Role.SETTINGS_GROUP_ROW_HEIGHT : DesignMetrics.Role.SETTINGS_ROW_HEIGHT : owner.prompt && owner.description.isVisible() ? DesignMetrics.Role.PROMPT_SETTING_HEIGHT : owner.description.isVisible()
-                                    ? owner.fullForm ? DesignMetrics.Role.FULL_SETTING_DESCRIPTION_HEIGHT : DesignMetrics.Role.SETTING_DESCRIPTION_HEIGHT
-                                    : DesignMetrics.Role.SETTING_HEIGHT) + (owner.fullForm && !owner.prompt ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE) : 0),
-                    i.top + i.bottom + Math.max(text, control));
+            return Math.max(floor(), i.top + i.bottom + Math.max(text, control));
         }
 
         @Override

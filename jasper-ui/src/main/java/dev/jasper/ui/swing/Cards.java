@@ -20,6 +20,8 @@ final class Cards {
         boolean fullForm, detail;
         /** On a Settings page: rows share the card's top stroke, and the bottom stroke has its own line below the last row. */
         boolean settings;
+        /** The children of the last update, which {@link #relabel} measures again. */
+        private List<ControlRegistry.Control> members = List.of();
         CardControl(KitView view, Nodes.Card node) {
             super(view, node, new CardSurface(view.context()));
             refresh();
@@ -50,6 +52,7 @@ final class Cards {
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
+            members = List.copyOf(controls);
             labelColumnFor(this, controls);
             ((CardSurface) component).settings =
                     controls.stream()
@@ -61,6 +64,9 @@ final class Cards {
             controls.forEach(c -> { if (c instanceof SettingRows.RowControl row && row.grouped != grouped) { row.grouped = grouped; row.refresh(); } });
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
         }
+
+        /** Measures the label column again after every control has refreshed (a theme or interface font change). */
+        void relabel() { labelColumnFor(this, members); }
     }
 
     /**
@@ -75,9 +81,12 @@ final class Cards {
         boolean form = card.fullForm || controls.stream().anyMatch(c -> c instanceof FormRows.RowControl);
         var widths = new java.util.ArrayList<Integer>();
         for (var c : controls) {
+            // A hidden row does not widen the column for the rows shown; a setting row measures its title as it shows it.
+            if (!c.node.state().visible()) continue;
             if (c instanceof FormRows.RowControl row) widths.add(row.label.getPreferredSize().width);
-            if (c instanceof SettingRows.RowControl row && !(((Nodes.SettingRow) row.node).control() instanceof Nodes.Toggle))
-                widths.add(ThemePainting.measureText(row.title.getFont(), labels.label(((Nodes.SettingRow) row.node).title())));
+            if (c instanceof SettingRows.RowControl row && row.node instanceof Nodes.SettingRow setting && !(setting.control() instanceof Nodes.Toggle))
+                widths.add(ThemePainting.measureText(row.title.getFont(),
+                    labels.label(setting.title()) + (setting.titleNote().isEmpty() ? "" : " · " + setting.titleNote())));
         }
         int column = form ? labels.column(card.context(), widths) : -1;
         int rowInset = ((Nodes.Card) card.node).kind() == Nodes.CardKind.FORM ? 0

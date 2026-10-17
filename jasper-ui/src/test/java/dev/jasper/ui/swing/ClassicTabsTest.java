@@ -57,6 +57,19 @@ class ClassicTabsTest {
         });
     }
 
+    /** Review Focus 5: Left, Right, Home and End move along the folder tabs and select, as on the segment track. */
+    @Test void theKeysMoveAlongTheFolderTabs() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise()); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(tabs()), events::add)) {
+                KitFixtures.render(view, 420, 40, 1);
+                var overview = find(view, "tabs.option.overview", Choices.SegmentButton.class);
+                for (String key : List.of("RIGHT", "LEFT", "END", "HOME", "UP", "DOWN")) ClassicChoicesTest.press(overview, key);
+                assertThat(ClassicChoicesTest.selected(events)).containsExactly("details", "details", "details", "overview", "overview", "overview");
+            } finally { release(context); }
+        });
+    }
+
     @Test void theDefaultKitKeepsTheSegmentTrack() {
         Edt.run(() -> {
             var context = KitFixtures.context();

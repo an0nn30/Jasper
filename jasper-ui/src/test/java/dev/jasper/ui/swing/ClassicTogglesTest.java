@@ -17,10 +17,12 @@ import org.junit.jupiter.api.Test;
 /** Spec 5.2's toggle point: the classic face is a checkbox leading its label; the default keeps the switch. */
 @SuppressWarnings("try")
 class ClassicTogglesTest {
-    static ViewSpec row(boolean checked, ControlState state) {
+    static ViewSpec row(boolean checked, ControlState state) { return row(checked, state, false); }
+
+    static ViewSpec row(boolean checked, ControlState state, boolean pending) {
         return new ViewSpec(new Nodes.Card("card", ControlState.READY, Nodes.CardKind.SETTINGS, List.of(
             new Nodes.SettingRow("row", ControlState.READY, "Allow changes", "Clients can upload, rename and delete files",
-                new Nodes.Toggle("toggle", state, "Allow changes", checked, "toggle", false), false))));
+                new Nodes.Toggle("toggle", state, "Allow changes", checked, "toggle", false, "", pending), false))));
     }
 
     static BufferedImage paint(JComponent component) {
@@ -67,6 +69,18 @@ class ClassicTogglesTest {
                         assertThat(edge).as(where + " edge").isEqualTo(ThemePainting.painted(context, checked ? pairs.get(0) : pairs.get(2)));
                         assertThat(fill).as(where + " fill").isEqualTo(ThemePainting.color(context, checked ? SemanticColor.ACCENT : SemanticColor.SURFACE_INPUT));
                     }
+                // A pending box: status.warning with its dash guarded there; the dash's middle pixel is fully covered.
+                try (var view = new KitView(context, row(false, ControlState.READY, true), e -> {})) {
+                    KitFixtures.render(view, 480, 80, 1);
+                    var box = find(view, "toggle", Switches.SwitchButton.class);
+                    var image = paint(box);
+                    int size = ThemePainting.metric(context, DesignMetrics.Role.CHECKBOX_BOX);
+                    int x = (box.getWidth() - size) / 2, y = (box.getHeight() - size) / 2;
+                    String where = theme.name() + (theme.dark() ? " Dark" : " Light") + " pending";
+                    assertThat(new Color(image.getRGB(x + size - 3, y + size - 3), true)).as(where + " fill")
+                        .isEqualTo(ThemePainting.color(context, SemanticColor.STATUS_WARNING));
+                    assertThat(new Color(image.getRGB(x + size / 2, y + (int) (6.5 * size / 13)), true)).as(where + " dash").isEqualTo(ThemePainting.painted(context, pairs.get(3)));
+                }
             } finally { release(context); }
         });
     }
@@ -90,6 +104,11 @@ class ClassicTogglesTest {
                 assertThat(new Color(image.getRGB(x, y + size / 2), true)).as("ink edge")
                     .isEqualTo(ThemePainting.color(context, SemanticColor.TEXT_ONSELECTION));
                 assertThat(image.getRGB(x + size - 3, y + size - 3) >>> 24).as("no fill on the row's fill").isZero();
+                box.setEnabled(false);
+                image = paint(box);
+                var ink = ThemePainting.color(context, SemanticColor.TEXT_ONSELECTION);
+                assertThat(image.getRGB(x, y + size / 2) >>> 24).as("a disabled box on the row's fill is faded")
+                    .isEqualTo((int) Math.round(ink.getAlpha() * ClassicToggleFace.DISABLED_OPACITY));
             } finally { release(context); }
         });
     }

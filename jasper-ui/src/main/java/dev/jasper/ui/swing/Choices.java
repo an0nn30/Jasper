@@ -148,8 +148,8 @@ final class Choices {
                             ActionListener listener = event -> select(option.id()); button.addActionListener(listener); optionLifetimes.add(() -> button.removeActionListener(listener));
                             int index = i;
                             bind(button, "LEFT", () -> navigate(index - 1)); bind(button, "RIGHT", () -> navigate(index + 1));
-                            bind(button, "UP", () -> navigate(index - columns()));
-                            bind(button, "DOWN", () -> navigate(index + columns()));
+                            bind(button, "UP", () -> navigate(vertical(index, -1)));
+                            bind(button, "DOWN", () -> navigate(vertical(index, 1)));
                             bind(button, "HOME", () -> navigate(0)); bind(button, "END", () -> navigate(options.size() - 1));
                             input.add(button);
                         }
@@ -186,8 +186,24 @@ final class Choices {
         private void select(String id) { emit(new UiEvent.Selected(node.id(), Set.of(id))); }
         /** The face this choice's options draw with: the tabs point's for a TABS choice, the exclusive point's otherwise. */
         ChoiceFace optionsFace() { return ((Nodes.Choice) node).kind() == Nodes.ChoiceKind.TABS ? context().faces().tabs : context().faces().exclusive; }
-        /** How many options Up and Down move by: a segment line's worth, or every option on a radio row. */
+        /** How many options Up and Down move by on a segment track: a line's worth, or every option on one line. */
         private int columns() { return input.getLayout() instanceof SegmentLayout layout ? layout.columns(input, input.getWidth()) : Math.max(1, options.size()); }
+        /**
+         * The option Up ({@code -1}) or Down ({@code 1}) moves to from {@code index}: a line's worth away on a segment
+         * track; on a wrapping row (radios, folder tabs), the option at the same place in the line above or below, or that
+         * line's last option when it is shorter, the first and last lines wrapping round.
+         */
+        private int vertical(int index, int direction) {
+            if (!(input.getLayout() instanceof ClassicRadiosFace.RowLayout layout)) return index + direction * columns();
+            var lines = layout.lines(input, input.getWidth()); var focused = input.getComponent(index);
+            for (int line = 0; line < lines.size(); line++) {
+                int at = lines.get(line).indexOf(focused);
+                if (at < 0) continue;
+                var target = lines.get(Math.floorMod(line + direction, lines.size()));
+                return java.util.Arrays.asList(input.getComponents()).indexOf(target.get(Math.min(at, target.size() - 1)));
+            }
+            return index;
+        }
         @Override JComponent focusTarget() { return input.getComponentCount() > 0 && input instanceof SegmentTrack ? (JComponent)input.getComponent(0) : input; }
     }
     /** An option row as the kit's dropdowns paint it; {@code role} overrides the text color (for placeholders). */
@@ -441,7 +457,7 @@ final class Choices {
                 PickerMenus.paintFace(this, graphics, context, face, face.primary().isEmpty(), focus != null && focus.visible(), hover, isPopupVisible());
                 return;
             }
-            // Disabled fades the closed face as one layer; the classic face's is already flat, so it reads paler than a disabled button (plan 4b, X13).
+            // Disabled fades the closed face as one layer; the classic face's is already flat, so it reads paler than a disabled button (plan 4b Execution notes X13).
             var g = (Graphics2D)graphics.create(); try { if (!isEnabled()) g.setComposite(AlphaComposite.SrcOver.derive(.42f)); super.paint(g); } finally { g.dispose(); }
         }
         @Override protected void paintComponent(Graphics graphics) {

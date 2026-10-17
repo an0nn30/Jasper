@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 4b: the classic form faces — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
-`.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit;
+`.claude/worktrees/enterprise-4`, `004866f59..372ae8e67`, then this documentation commit and the final review fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-4b-classic-form-faces.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). `KitFaces` chooses one face per control
 point from the kit's `ControlVariants`, once per `KitContext`; each control asks its face, and each default face calls
@@ -16,7 +16,9 @@ the label policy (a card, or a titled box; plain labels, or a colon label column
 "Port:" label, form-card settings as rows and bare choices at the field column), the stepper (stepper, or a spinner, a
 SLIDER included) and the prompt (the tile over the title, or the plain prompt with a 30 px accent tile beside the message
 and the title left to the header strip). The default look's two repaired pairs are now the default choice face's
-declarations. `StrategyIsolationTest` (faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler no
+declarations, painted through `SurfaceContrast.painted`, which lays a translucent role over `surface.app` before
+measuring it (the same colour as before for the opaque roles of every shipped theme; a user theme with a translucent
+`segment.selected.bg`, `surface.card` or `text.primary` now gets the composited repair). `StrategyIsolationTest` (faces never reference `Kit`, `ControlVariants` or `ChromeSpec`; the reconciler no
 face), `VariantReadTest` (`ControlVariants` only in the kit package, `dev.jasper.app.presentation` and `KitFaces`) and
 `PaintSpecTest` (`face-pairs.tsv`) guard them. Rulings (plan, "Rulings"): faces package-private with
 `KitFaces.declared` public; default faces call moved code; one `ChoiceFace` for exclusive and tabs; `border.hover`
@@ -39,16 +41,24 @@ form-card setting row takes the card's inset in place of its own padding and dep
 sit on the FormRows' columns in FORM, MIXED and SETTINGS cards. Two more from Tasks 4 and 7: the folder tabs' baseline
 runs along the tabs' foot, not the track's, so it stays under them when a layout stretches the track; the classic
 prompt's message is left-aligned beside its tile, where the reconciler's flow pass centres prompt header text for the
-default face. Residuals: 4a's flat focused, hovered or pressed classic
+default face. Final review fixes: a prompt header without an icon (About's hero and facts) lays its lines from the
+leading edge; the colon label column is measured again after a theme or interface font refresh, skips hidden rows and
+counts a setting row's note; the classic prompt's glyph (`text.onAccent` on `accent`), the pending checkbox's dash
+(`text.onAccent` on `status.warning`) and a hovered or pressed primary's label (`text.onAccent` on `accent.hover`) are
+declared pairs painted through their guards, so `face-pairs.tsv` has three more rows; a disabled checkbox on a selected
+row fades to 0.42; a primary menu button takes the primary's medium label; on a wrapping radio row or folder tabs, Up
+and Down move to the same place on the line above or below (Rulings 11). Residuals: 4a's flat focused, hovered or pressed classic
 native button stays for 4c (the classic `ButtonFace` paints kit buttons only, its gradient in every state); a disabled
 classic dropdown without a rich face is faded again over its flat face by `ChoiceCombo.paint` (fill `#ECEFF1` and edge
 `#E2E6EA` on Slate Cobalt Light's `surface.app`, where a disabled button paints `#F1F2F2` inside `#D5DAE0`), and a
 disabled SECONDARY or PRIMARY button on a selected row fades as one layer over its flat face (Execution notes X13); a
-classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); spec 6.4's face table
+classic checkbox row in a FULL form's SETTINGS or MIXED card leads 1 px left of the labels (X15); a classic radio's focus halo loses its leftmost 2 px to the
+option's bounds, as does a preview radio's focus ring; spec 6.4's face table
 still says "small glyph, plain title" for `PromptFace`, which the amended 5.2 prompt row supersedes; TFTP's read-only
 login field in the control column (spec 6.4) is left to plan 10's File Server composition. Plan 4c adds the data faces,
 the full kit matrix and the mock comparison.
-`./gradlew check --continue`: **10,728 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for
+`./gradlew check --continue` before the final review fixes: **10,728 tests, 0 failures, 0 errors, 25 skipped**; the
+fixes add 7 jasper-ui tests (jasper-ui 766 tests, 0 failures; the default gallery still matches the base). GUI checks for
 the user: none new (no shipped kit uses the classic faces until plan 5). Not merged, not pushed.
 
 **Enterprise presentation, plan 3c: SDK 0.18 tables — 2026-10-16** (`claude/enterprise-sdk-0-18-tables`, worktree

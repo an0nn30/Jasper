@@ -102,6 +102,10 @@ class ClassicButtonsTest {
                 assertThat(b.getForeground()).isEqualTo(ThemePainting.painted(context, pairs.get(0)));
                 assertThat(b.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.BODY_STRONG));
                 assertThat(b.getClientProperty(ThemePainting.DROP)).as("Review Focus 2: no drop").isNull();
+                assertThat(context.faces().buttons.text(b, true)).as("hovered, the label is guarded on accent.hover")
+                    .isEqualTo(ThemePainting.painted(context, pairs.get(6)));
+                b.getModel().setArmed(true); b.getModel().setPressed(true);
+                assertThat(context.faces().buttons.text(b, false)).as("pressed").isEqualTo(ThemePainting.painted(context, pairs.get(6)));
             } finally { release(context); }
         });
     }
@@ -209,6 +213,19 @@ class ClassicButtonsTest {
                 int h = control.component.getHeight(), seam = control.arrow.getX();
                 assertThat(at(surface, 0, h / 2)).isEqualTo(ThemePainting.painted(context, pairs.get(2)));
                 assertThat(at(surface, seam, h / 2)).as("no edge between the parts").isEqualTo(at(surface, seam - 3, h / 2)).isEqualTo(at(surface, seam + 3, h / 2));
+            } finally { release(context); }
+        });
+    }
+
+    /** Spec 5.2: a primary menu button's parts take the primary's medium label, as a primary button does; the default keeps LABEL. */
+    @Test void aPrimaryMenuButtonHasTheMediumLabel() {
+        for (var kit : List.of(KitFixtures.enterprise(), dev.jasper.ui.kit.Kit.DEFAULT)) Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), kit);
+            try (var view = new KitView(context, stack(Nodes.LayoutRole.ACTIONS, menu(Nodes.ButtonKind.PRIMARY, "connect")), e -> {})) {
+                KitFixtures.render(view, 300, 60, 1);
+                var control = (Menus.MenuControl) view.control("menu");
+                var role = kit == dev.jasper.ui.kit.Kit.DEFAULT ? Typography.Role.LABEL : Typography.Role.BODY_STRONG;
+                for (var part : List.of(control.main, control.arrow)) assertThat(part.getFont()).as(kit.id()).isEqualTo(ThemePainting.font(context, role));
             } finally { release(context); }
         });
     }

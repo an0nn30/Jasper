@@ -18,7 +18,7 @@ final class ClassicFieldPolicy implements FieldPolicy {
 
     @Override public List<PaintPair> pairs() { return List.of(readOnlyEdge, readOnlyLabel); }
 
-    /** Rulings 10: no SEARCH or PATH glyph, and no PORT colon (its row gives it a "Port:" label). */
+    /** Plan 4b Rulings 10: no SEARCH or PATH glyph, and no PORT colon (its row gives it a "Port:" label). */
     @Override public boolean glyph(Nodes.FieldKind kind) { return false; }
 
     @Override public void paintField(TextFields.FieldSurface s, Graphics2D g) {

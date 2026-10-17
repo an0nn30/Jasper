@@ -89,19 +89,50 @@ class ClassicChoicesTest {
         });
     }
 
-    /** Review Focus 5: Left, Right, Home and End move and select; Up and Down never throw on the radio row. */
+    static void press(JComponent option, String key) {
+        var action = option.getActionMap().get("choice." + key);
+        assertThat(action).as(key).isNotNull();
+        action.actionPerformed(new java.awt.event.ActionEvent(option, 0, key));
+    }
+
+    static List<String> selected(List<UiEvent> events) {
+        return events.stream().map(e -> ((UiEvent.Selected) e).ids().iterator().next()).toList();
+    }
+
+    /**
+     * Review Focus 5 and Rulings 11: Left, Right, Home and End move and select as on the segment track; Up and Down move
+     * to the same place on the next line, so on one line they stay on the focused radio.
+     */
     @Test void theKeysMoveAlongTheRadios() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise()); var events = new ArrayList<UiEvent>();
             try (var view = new KitView(context, new ViewSpec(protocol("ftp")), events::add)) {
                 KitFixtures.render(view, 420, 40, 1);
                 var ftp = find(view, "protocol.option.ftp", Choices.SegmentButton.class);
-                for (String key : List.of("RIGHT", "LEFT", "UP", "DOWN", "HOME", "END")) {
-                    var action = ftp.getActionMap().get("choice." + key);
-                    assertThat(action).as(key).isNotNull();
-                    action.actionPerformed(new java.awt.event.ActionEvent(ftp, 0, key));
-                }
-                assertThat(events).extracting(Object::toString).hasSize(6);
+                for (String key : List.of("RIGHT", "LEFT", "UP", "DOWN", "HOME", "END")) press(ftp, key);
+                assertThat(selected(events)).containsExactly("sftp", "http", "ftp", "ftp", "http", "tftp");
+            } finally { release(context); }
+        });
+    }
+
+    /** Rulings 11: on a wrapped row Up and Down move between the lines, the first and last wrapping round. */
+    @Test void upAndDownMoveBetweenTheLinesOfAWrappedRow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise()); var events = new ArrayList<UiEvent>();
+            try (var view = new KitView(context, new ViewSpec(protocol("ftp")), events::add)) {
+                KitFixtures.render(view, 150, 80, 1);
+                var http = find(view, "protocol.option.http", Choices.SegmentButton.class);
+                var below = new ArrayList<String>();
+                for (var id : List.of("ftp", "sftp", "tftp"))
+                    if (find(view, "protocol.option." + id, Choices.SegmentButton.class).getY() > http.getY()
+                        && find(view, "protocol.option." + id, Choices.SegmentButton.class).getX() == http.getX()) below.add(id);
+                assertThat(below).as("the second line starts under the first").hasSize(1);
+                var lines = new TreeSet<Integer>();
+                for (var id : List.of("http", "ftp", "sftp", "tftp")) lines.add(find(view, "protocol.option." + id, Choices.SegmentButton.class).getY());
+                assertThat(lines).as("two lines").hasSize(2);
+                press(http, "DOWN"); press(http, "UP");
+                press(find(view, "protocol.option." + below.getFirst(), Choices.SegmentButton.class), "DOWN");
+                assertThat(selected(events)).containsExactly(below.getFirst(), below.getFirst(), "http");
             } finally { release(context); }
         });
     }

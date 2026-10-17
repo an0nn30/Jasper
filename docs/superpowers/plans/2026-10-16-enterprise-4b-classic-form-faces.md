@@ -9,7 +9,8 @@
 > card's inset; `ClassicGroupsTest` has 13 tests), Task 4's (the folder tabs' baseline runs along the tabs' foot, not the
 > track's, and `ClassicTabsTest` checks it) and Task 7's (the classic prompt's message is left-aligned beside its tile,
 > undoing the centring the reconciler's flow pass gives prompt header text; `ClassicPromptsTest` checks it after an
-> update too).
+> update too). The final review fixes add three declared pairs beyond this plan's `face-pairs.tsv` (the classic prompt's
+> glyph, the pending checkbox's dash and the hovered or pressed primary's label; `docs/STATUS.md` lists the fixes).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

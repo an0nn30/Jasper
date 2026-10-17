@@ -190,7 +190,7 @@ final class Menus {
             for (var button : java.util.List.of(main, arrow)) {
                 button.kind = menu.kind();
                 button.setEnabled(component.isEnabled());
-                Composition.style(button, context(), Typography.Role.LABEL, button.textRole(false));
+                Composition.style(button, context(), context().faces().buttons.label(menu.kind(), Typography.Role.LABEL), button.textRole(false));
                 int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING),
                         pad = ThemePainting.metric(context(), DesignMetrics.Role.MENU_ITEM_PADDING);
                 button.embedded = embedded;

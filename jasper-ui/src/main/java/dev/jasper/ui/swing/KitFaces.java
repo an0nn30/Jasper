@@ -28,11 +28,14 @@ public final class KitFaces {
             case CHECKBOX -> new ClassicToggleFace(colors.dialogSurface());
         };
         // The text-field policy is built with the buttons point (spec 6.4).
-        switch (controls.buttons()) {
-            case RAISED -> { buttons = new DefaultButtonFace(); fields = new DefaultFieldPolicy(); }
-            case CLASSIC -> { buttons = new ClassicButtonFace(colors.dialogSurface()); fields = new ClassicFieldPolicy(colors.dialogSurface()); }
-            default -> throw new IllegalStateException("Unknown buttons variant " + controls.buttons());
-        }
+        buttons = switch (controls.buttons()) {
+            case RAISED -> new DefaultButtonFace();
+            case CLASSIC -> new ClassicButtonFace(colors.dialogSurface());
+        };
+        fields = switch (controls.buttons()) {
+            case RAISED -> new DefaultFieldPolicy();
+            case CLASSIC -> new ClassicFieldPolicy(colors.dialogSurface());
+        };
         exclusive = switch (controls.exclusive()) {
             case SEGMENTS -> new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL, DefaultChoiceFace.SELECTED_CAPTION));
             case RADIOS -> new ClassicRadiosFace(colors.dialogSurface());

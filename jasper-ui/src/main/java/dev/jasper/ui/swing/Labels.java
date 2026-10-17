@@ -166,6 +166,11 @@ final class Labels {
         /** On a selected row's fill (set by the row before each refresh): the glyph takes the fill's ink, a tile selected. */
         boolean inked;
         InteractiveRows.Ink ink = InteractiveRows.Ink.SELECTION;
+        /**
+         * A face's glyph pair (the classic prompt's on-accent glyph on its tile): the glyph is painted as the pair's guard
+         * makes it on the pair's surface. The face sets it on every update; the reconciler clears it before each update.
+         */
+        dev.jasper.ui.theme.PaintPair facePair;
         void tile(int logicalSize, boolean value) { tile(logicalSize, logicalSize, 0, value); }
         /** A containing composition's logical glyph size in place of the icon's size role; 0 restores the role. */
         void glyph(int logicalSize) { if (glyphOverride != logicalSize) { glyphOverride = logicalSize; refresh(); } }
@@ -190,7 +195,9 @@ final class Labels {
                 tileGlyph=context().metrics().value(receiving==ArtworkPresentation.IDENTITY_ROW ? dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_ROW_GLYPH : dev.jasper.ui.metrics.DesignMetrics.Role.IDENTITY_HEADER_GLYPH);
             }
             // A selected row recolours every vector glyph in its fill's ink; registered identity artwork keeps its pixels.
-            label.setIcon(inked && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT ? context().icons().icon(icon.name(), context().theme().semantic(), ink.text, size)
+            label.setIcon(facePair != null && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT
+                    ? context().icons().icon(icon.name(), ThemePainting.role(context(), facePair.against()), ThemePainting.painted(context(), facePair), size)
+                : inked && tileSize == 0 && receiving == ArtworkPresentation.DEFAULT ? context().icons().icon(icon.name(), context().theme().semantic(), ink.text, size)
                 : receiving==ArtworkPresentation.IDENTITY_HEADER ? context().icons().identityHeader(context().metrics(), icon.name(),context().theme(),icon.hue(),com.formdev.flatlaf.util.UIScale.scale(tileSize),com.formdev.flatlaf.util.UIScale.scale(tileHeight),com.formdev.flatlaf.util.UIScale.scale(tileGlyph))
                 : tileSize > 0 ? context().icons().tile(context().metrics(), icon.name(), context().theme(), icon.hue(), com.formdev.flatlaf.util.UIScale.scale(tileSize), com.formdev.flatlaf.util.UIScale.scale(tileHeight), com.formdev.flatlaf.util.UIScale.scale(tileGlyph), selected || inked ? ink.text : null)
                 : panelDetail ? context().icons().panel(icon.name(), context().theme(), icon.severity().isPresent() ? tint(icon.severity().get()) : SemanticColor.HUE_NEUTRAL, size)

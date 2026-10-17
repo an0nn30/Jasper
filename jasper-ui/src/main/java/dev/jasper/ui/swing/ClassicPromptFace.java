@@ -13,12 +13,15 @@ import java.util.List;
  * header strip, and a 30 px accent tile with an on-accent glyph sits beside the message.
  */
 final class ClassicPromptFace implements PromptFace {
-    private final PaintPair edge;
+    private final PaintPair edge, glyph;
 
     /** A face whose tile stands on {@code surface}, the kit's dialog surface. */
-    ClassicPromptFace(SemanticColor surface) { edge = new PaintPair(DerivedColor.ACCENT_EDGE, surface, SurfaceContrast.Guard.INDICATOR); }
+    ClassicPromptFace(SemanticColor surface) {
+        edge = new PaintPair(DerivedColor.ACCENT_EDGE, surface, SurfaceContrast.Guard.INDICATOR);
+        glyph = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT, SurfaceContrast.Guard.INDICATOR);
+    }
 
-    @Override public List<PaintPair> pairs() { return List.of(edge); }
+    @Override public List<PaintPair> pairs() { return List.of(edge, glyph); }
 
     @Override public LayoutManager headerLayout(Stacks.StackControl header) { return new BesideLayout(header); }
 
@@ -46,34 +49,41 @@ final class ClassicPromptFace implements PromptFace {
             // The message reads from the tile (Unlock Vault mock); the reconciler's flow pass, which runs before
             // children on every update, centres prompt header text for the default face.
             if (control.component instanceof Labels.LiteralLabel label) label.wrapped.centered = false;
-            if (control instanceof Labels.IconControl icon && !icon.inked) { icon.inked = true; icon.ink = InteractiveRows.Ink.ACCENT; icon.refresh(); }
+            // The glyph is the on-accent ink on the tile, held there by its guard; the reconciler clears it before each update.
+            if (control instanceof Labels.IconControl icon && icon.facePair != glyph) { icon.facePair = glyph; icon.refresh(); }
         }
     }
 
-    /** The tile, then the other children stacked beside it, the block centred on the tile when it is shorter. */
+    /**
+     * The tile, then the other children stacked beside it, the block centred on the tile when it is shorter. A header
+     * whose tile is not mounted (a hero or section without an icon) lays its lines out from the leading edge.
+     */
     static final class BesideLayout implements Composition.WidthLayout {
         private final Stacks.StackControl owner;
         BesideLayout(Stacks.StackControl owner) { this.owner = owner; }
         int gap() { return ThemePainting.metric(owner.context(), DesignMetrics.Role.PROMPT_TILE_GAP); }
+        boolean tiled(Container p) { return owner.tile.getParent() == p && owner.tile.isVisible(); }
+        Dimension tile(Container p) { return tiled(p) ? owner.tile.getPreferredSize() : new Dimension(); }
+        int lead(Container p) { return tiled(p) ? owner.tile.getPreferredSize().width + gap() : 0; }
         List<Component> lines(Container p) {
             return java.util.Arrays.stream(p.getComponents()).filter(c -> c.isVisible() && c != owner.tile).toList();
         }
-        int room(int width) { return Math.max(0, width - owner.tile.getPreferredSize().width - gap()); }
+        int room(Container p, int width) { return Math.max(0, width - lead(p)); }
         int text(Container p, int width) {
             var lines = lines(p); int h = 0;
-            for (int i = 0; i < lines.size(); i++) h += (i > 0 ? ThemePainting.metric(owner.context(), DesignMetrics.Role.DESCRIPTION_GAP) : 0) + Composition.height(lines.get(i), room(width));
+            for (int i = 0; i < lines.size(); i++) h += (i > 0 ? ThemePainting.metric(owner.context(), DesignMetrics.Role.DESCRIPTION_GAP) : 0) + Composition.height(lines.get(i), room(p, width));
             return h;
         }
-        @Override public int height(Container p, int width) { return Math.max(owner.tile.getPreferredSize().height, text(p, width)); }
+        @Override public int height(Container p, int width) { return Math.max(tile(p).height, text(p, width)); }
         @Override public Dimension preferredLayoutSize(Container p) {
-            int w = owner.tile.getPreferredSize().width + gap() + lines(p).stream().mapToInt(c -> c.getPreferredSize().width).max().orElse(0);
+            int w = lead(p) + lines(p).stream().mapToInt(c -> c.getPreferredSize().width).max().orElse(0);
             return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
         }
         @Override public void layoutContainer(Container p) {
-            var size = owner.tile.getPreferredSize();
+            var size = tile(p);
             int textHeight = text(p, p.getWidth()), top = Math.max(0, (size.height - textHeight) / 2);
-            owner.tile.setBounds(0, Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
-            int x = size.width + gap(), y = top, width = room(p.getWidth());
+            if (tiled(p)) owner.tile.setBounds(0, Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
+            int x = lead(p), y = top, width = room(p, p.getWidth());
             for (var line : lines(p)) {
                 int h = Composition.height(line, width);
                 line.setBounds(x, y, width, h);

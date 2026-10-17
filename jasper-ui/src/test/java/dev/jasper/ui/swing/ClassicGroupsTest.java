@@ -107,6 +107,48 @@ class ClassicGroupsTest {
         });
     }
 
+    /** Review Focus 4: a larger interface font widens the label column on the refresh it causes, without an update. */
+    @Test void aLargerInterfaceFontWidensTheLabelColumnWithoutAnUpdate() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            Object previous = UIManager.get("defaultFont");
+            try (var view = new KitView(context, server(), e -> {})) {
+                KitFixtures.render(view, 488, 150, 1);
+                var rows = List.of("name-row", "reachable-row", "passive-row");
+                int before = ((FormRows.RowControl) view.control("passive-row")).column;
+                UIManager.put("defaultFont", new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, 24));
+                int widest = rows.stream().mapToInt(id -> find(view, id + ".label", JLabel.class).getPreferredSize().width).max().orElseThrow();
+                int column = Math.max(widest, ThemePainting.metric(context, DesignMetrics.Role.FORM_LABEL_WIDTH));
+                assertThat(column).as("precondition: the larger font needs a wider column").isGreaterThan(before);
+                for (var id : rows) assertThat(((FormRows.RowControl) view.control(id)).column).as(id).isEqualTo(column);
+            } finally { UIManager.put("defaultFont", previous); release(context); }
+        });
+    }
+
+    /** A hidden row does not widen the column, and a setting row's title is measured with its note. */
+    @Test void theColumnMeasuresTheShownRowsAsTheyShow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            var group = new Nodes.Choice("group", READY, Nodes.ChoiceKind.DROPDOWN, List.of(new Option("other", "Other", Optional.empty())), "other", "Group", "group");
+            var spec = new ViewSpec(new Nodes.Card("card", READY, Nodes.CardKind.FORM, List.of(
+                new Nodes.FormRow("name-row", READY, "Name", "", field("name", "", Nodes.FieldKind.TEXT), Optional.empty(), false),
+                new Nodes.FormRow("hidden-row", new ControlState(false, true, false, ""), "A label far wider than every row that shows",
+                    "", field("hidden", "", Nodes.FieldKind.TEXT), Optional.empty(), false),
+                new Nodes.SettingRow("group-row", READY, "Group", "", group, false, false, "shared with every host in it"))));
+            try (var view = new KitView(context, spec, e -> {})) {
+                KitFixtures.render(view, 640, 150, 1);
+                var row = (SettingRows.RowControl) view.control("group-row");
+                int noted = ThemePainting.measureText(row.title.getFont(), context.faces().labels.label("Group") + " \u00b7 shared with every host in it");
+                int column = Math.max(Math.max(noted, find(view, "name-row.label", JLabel.class).getPreferredSize().width),
+                    ThemePainting.metric(context, DesignMetrics.Role.FORM_LABEL_WIDTH));
+                assertThat(noted).as("precondition: the note widens the column past the floor")
+                    .isGreaterThan(ThemePainting.metric(context, DesignMetrics.Role.FORM_LABEL_WIDTH));
+                assertThat(row.column).isEqualTo(column);
+                assertThat(((FormRows.RowControl) view.control("name-row")).column).isEqualTo(column);
+            } finally { release(context); }
+        });
+    }
+
     /** Review Focus 4: a trailing PORT field gets its own "Port:" label beside it. */
     @Test void aTrailingPortFieldHasItsOwnLabel() {
         Edt.run(() -> {
