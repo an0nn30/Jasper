@@ -207,4 +207,14 @@ public final class PaletteTestSupport {
 
     /** Rows the Commands scope builds for {@code commands}, for tests that seed the list directly. */
     public static List<PaletteRow> rows(CommandsScope scope, List<Command> commands) { return scope.rows(commands); }
+
+    /** The Run window's mounted query input. */
+    public static javax.swing.text.JTextComponent runQuery(JComponent window) {
+        return KitTestSupport.require(((RunWindowView) window).viewFor(RunWindowView.QUERY), RunWindowView.QUERY + ".input", javax.swing.text.JTextComponent.class);
+    }
+
+    /** As a click on the Run window's button {@code action} (its kit views report their actions to {@code handle}). */
+    public static void handle(PaletteView view, String action) {
+        ((RunWindowView) view).handle(new dev.jasper.ui.model.UiEvent.Action(action));
+    }
 }

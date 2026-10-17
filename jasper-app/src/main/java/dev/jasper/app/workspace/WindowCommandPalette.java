@@ -97,7 +97,11 @@ final class WindowCommandPalette implements AutoCloseable {
                 originTab = owner.currentTab(); originPane = owner.currentPane();
                 priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             }
-            if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
+            boolean modeless = view.modeless();
+            PaletteTarget target = modeless ? currentTarget() : originPane == null ? PaletteTarget.window(owner.id()) : target(originPane);
+            if (controller.open(id, target, modeless ? this::attached : this::validOrigin, queryOrNull, rowIdOrNull)) {
+                // The Run window runs a row where the person last worked (plan 8b Rulings 4).
+                if (modeless && !wasOpen) controller.follow(this::currentTarget);
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
                 if (!wasOpen) startReveal();
@@ -114,6 +118,24 @@ final class WindowCommandPalette implements AutoCloseable {
             () -> pane.session() == null ? java.util.Optional.empty() : pane.session().workingDirectory(),
             pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
     }
+
+    /** The window's current pane, or the window when it has none. */
+    private PaletteTarget currentTarget() {
+        TerminalPane pane = owner.currentPane();
+        return pane == null ? PaletteTarget.window(owner.id()) : target(pane);
+    }
+
+    /** The Run window lives as long as its window is open and attached (spec 11.6: "it goes with its window"). */
+    private boolean attached() { return !closed && root != null && SwingUtilities.isDescendingFrom(owner, root.getLayeredPane()); }
+
+    /** A tab switch dismisses the card and refreshes the Run window. */
+    void tabChanged() { if (view.modeless()) controller.refresh(); else dismiss(); }
+
+    /** The window losing focus dismisses the card; the Run window stays. */
+    void windowDeactivated() { if (!view.modeless()) dismiss(); }
+
+    /** Whether the palette holds the window's input: the open card does; the Run window never does (plan 8b Rulings 5). */
+    boolean blocksActions() { return isOpen() && !view.modeless(); }
 
     private boolean validOrigin() {
         return owner.isActiveAndOpen() && owner.currentTab() == originTab
@@ -143,7 +165,8 @@ final class WindowCommandPalette implements AutoCloseable {
     /** The card drops open vertically: its bottom edge leaves the field fast and settles slowly. */
     private void startReveal() {
         stopReveal();
-        if (!animations.enabled() || !owner.lookAnimates()) return;
+        // The Run window has no reveal or other motion (spec 11.6).
+        if (!animations.enabled() || !owner.lookAnimates() || view.modeless()) return;
         revealStart = clock.getAsLong();
         view.setReveal(0); overlay.repaint();
         reveal = new Timer(8, event -> animate(clock.getAsLong()));
@@ -382,6 +405,10 @@ final class WindowCommandPalette implements AutoCloseable {
             };
             addMouseListener(mouse); addMouseMotionListener(mouse);
             addMouseWheelListener(MouseEvent::consume);
+        }
+        /** The card's overlay takes every press; the Run window's passes every press outside the window through (spec 11.6). */
+        @Override public boolean contains(int x, int y) {
+            return view.modeless() ? palette.isVisible() && palette.getBounds().contains(x, y) : super.contains(x, y);
         }
         /** The workspace, which spans the window including its rail and tool panels. */
         Rectangle workspace() { return SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this); }

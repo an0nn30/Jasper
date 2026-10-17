@@ -291,7 +291,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.dismiss();
+                if (commandPalette != null) commandPalette.tabChanged();
                 update();
                 focusSelected();
             }
@@ -1054,7 +1054,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
+        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
         pane.applyTheme(themes.current());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
@@ -1148,7 +1148,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Side-effect free apart from refreshing enablement: whether {@link #dispatchShortcut} would take the key. */
     boolean claimsShortcut(KeyStroke stroke, Component source) {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
-        if (paletteKeys.claimsShortcut(stroke)) return true;
+        if (paletteKeys.claimsShortcut(stroke, source == null ? this : source)) return true;
         var document = selectedContent();
         if (document != null) {
             if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
@@ -1489,7 +1489,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setActive(boolean value) {
-        if (!value && commandPalette != null) commandPalette.dismiss();
+        if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();

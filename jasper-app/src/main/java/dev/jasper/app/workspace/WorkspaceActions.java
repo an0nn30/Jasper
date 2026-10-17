@@ -33,7 +33,7 @@ final class WorkspaceActions {
 
     void invoke(ActionId id) {
         if (dev.jasper.app.platform.WindowInput.blocked(owner) && id != ActionId.QUIT) return;
-        if (owner.commandPalette() != null && owner.commandPalette().isOpen()
+        if (owner.commandPalette() != null && owner.commandPalette().blocksActions()
             && id != ActionId.COMMAND_PALETTE) return;
         update();
         if (!action(id).isEnabled()) return;
