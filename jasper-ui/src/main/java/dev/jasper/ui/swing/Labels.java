@@ -172,8 +172,9 @@ final class Labels {
         @Override void refresh() {
             var icon = (Nodes.Icon)node; var label = (JLabel)component; state();
             if (icon.size() == Nodes.IconSize.SWATCH) {
-                // A swatch is its hue, whatever the composition: no tile, no artwork, no selection ink (spec 8.2).
-                int extent = com.formdev.flatlaf.util.UIScale.scale(glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
+                // A swatch is its hue, whatever the composition: no tile, no artwork, no selection ink (spec 8.2). Only the
+                // Run window's rows (plan 8a) draw it at their own size; a compact panel row's glyph size leaves it alone.
+                int extent = com.formdev.flatlaf.util.UIScale.scale(view.runWindow() && glyphOverride > 0 ? glyphOverride : context().icons().size(context().metrics(), Nodes.IconSize.SWATCH));
                 ((LiteralLabel)label).iconOffset = 0;
                 label.setIcon(new Swatch(Choices.hue(context(), icon.hue()), extent)); label.setDisabledIcon(label.getIcon());
                 label.getAccessibleContext().setAccessibleName(icon.accessibleName()); label.setToolTipText(icon.accessibleName());

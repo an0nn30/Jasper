@@ -103,13 +103,61 @@ class RunWindowPresentationTest {
         });
     }
 
+    /** The Run window's help row: its PROMPT_HEADER stack with the play glyph and the help text. */
+    static ViewSpec help() {
+        return new ViewSpec(new Nodes.Stack("help", READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
+            new Nodes.Icon("help.icon", READY, "play.filled", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Run"),
+            text("help.text", "Type the name of a session, command, file or snippet, and Jasper will open it for you.", Nodes.TextRole.DESCRIPTION)), ""));
+    }
+
+    @Test void turningTheFlagOffPaintsTheClassicHelpRowAgain() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var view = new KitView(context, help(), event -> { })) {
+                BufferedImage before = KitFixtures.render(view, 436, 60, 1);
+                view.runWindow(true);
+                KitFixtures.render(view, 436, 60, 1);
+                assertThat(((Labels.IconControl) view.control("help.icon")).inked).as("the Run window inks the glyph").isTrue();
+                view.runWindow(false);
+                BufferedImage after = KitFixtures.render(view, 436, 60, 1);
+                assertThat(((Labels.IconControl) view.control("help.icon")).inked).as("and returns it").isFalse();
+                for (int y = 0; y < before.getHeight(); y++) for (int x = 0; x < before.getWidth(); x++)
+                    assertThat(after.getRGB(x, y)).as("pixel %d,%d", x, y).isEqualTo(before.getRGB(x, y));
+            }
+        });
+    }
+
+    @Test void aRowKeepsTheRunWindowsDetailAcrossUpdates() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var view = new KitView(context, list(), event -> { })) {
+                view.runWindow(true);
+                KitFixtures.render(view, 436, 120, 1);
+                view.update(list());
+                KitFixtures.render(view, 436, 120, 1);
+                var placeholder = context.theme().semantic().color(SemanticColor.TEXT_PLACEHOLDER);
+                var detail = find(view, "b.detail", JLabel.class);
+                assertThat(detail.getForeground()).as("the same descriptor").isEqualTo(placeholder);
+                assertThat(detail.getClientProperty("Jasper.leadingEllipsis")).isEqualTo(false);
+                var items = new ArrayList<>(((Nodes.ItemList) list().root()).items());
+                var b = items.get(2);
+                items.set(2, new ListItem(b.id(), b.leading(), b.title(), List.of(text("b.detail", "gcloud auth login --brief", Nodes.TextRole.MONO)), b.trailing()));
+                view.update(new ViewSpec(new Nodes.ItemList("results", READY, Nodes.ListKind.RESULTS, items, Set.of("a"), "run", List.of(),
+                    Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(8))));
+                KitFixtures.render(view, 436, 120, 1);
+                detail = find(view, "b.detail", JLabel.class);
+                assertThat(detail.getText()).isEqualTo("gcloud auth login --brief");
+                assertThat(detail.getForeground()).as("a changed detail").isEqualTo(placeholder);
+                assertThat(detail.getClientProperty("Jasper.leadingEllipsis")).isEqualTo(false);
+                assertThat(detail.getFont()).isEqualTo(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
+            }
+        });
+    }
+
     @Test void theHelpRowIsTheRunTileBesideItsTextInTheRunWindowsColours() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
-            var help = new ViewSpec(new Nodes.Stack("help", READY, Nodes.LayoutRole.PROMPT_HEADER, List.of(
-                new Nodes.Icon("help.icon", READY, "play.filled", Nodes.Hue.BLUE, Nodes.IconSize.PROMPT, "Run"),
-                text("help.text", "Type the name of a session, command, file or snippet, and Jasper will open it for you.", Nodes.TextRole.DESCRIPTION)), ""));
-            try (var view = new KitView(context, help, event -> { })) {
+            try (var view = new KitView(context, help(), event -> { })) {
                 KitFixtures.render(view, 436, 60, 1);
                 int classicTile = find(view, "help.tile", JComponent.class).getWidth();
                 view.runWindow(true);

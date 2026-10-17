@@ -234,6 +234,14 @@ public final class RunWindowPresentation {
         }
     }
 
+    /** A help row's children once the flag is off again: the glyph {@link #helpChildren} inked returns to its own colours. */
+    static void releaseHelpChildren(List<ControlRegistry.Control> controls) {
+        for (var control : controls)
+            if (control instanceof Labels.IconControl icon && icon.inked && icon.ink == InteractiveRows.Ink.ACCENT) {
+                icon.inked = false; icon.ink = InteractiveRows.Ink.SELECTION; icon.refresh();
+            }
+    }
+
     /** The help tile: the accent inside a hairline of {@link #tileEdge(Kit)} at the prompt tile's radius. */
     static void paintTile(Stacks.Tile tile, Graphics2D g) {
         var context = tile.context;

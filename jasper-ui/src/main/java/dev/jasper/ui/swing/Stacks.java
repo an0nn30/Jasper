@@ -47,6 +47,8 @@ final class Stacks {
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup, hint, settingsHeader, keycapDetail;
         /** An INLINE row among a DOCUMENT split's bars, assigned by the reconciler; see {@link DocumentBarLayout}. */
         boolean documentBar;
+        /** The Run window's help row inked this PROMPT_HEADER's glyph (plan 8a); turning the flag off returns it. */
+        boolean helpInked;
         /** A VERTICAL group of a DOCUMENT split's bars: its rows carry their own padding, so they stack without gaps. */
         boolean documentBarGroup;
         /** Components of Field and Text children, in order: the bar's fill candidates; Text ones also hold status. */
@@ -134,7 +136,8 @@ final class Stacks {
         @Override
         void children(List<ControlRegistry.Control> controls) {
             children = List.copyOf(controls);
-            if (view.runWindow() && ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER) RunWindowPresentation.helpChildren(controls);
+            if (view.runWindow() && ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER) { RunWindowPresentation.helpChildren(controls); helpInked = true; }
+            else if (helpInked) { RunWindowPresentation.releaseHelpChildren(controls); helpInked = false; }
             if(((Nodes.Stack)node).role()==Nodes.LayoutRole.SETTINGS_GROUP_HEADER)
                 controls.forEach(c->{if(c instanceof Labels.IconControl icon)icon.tile(context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().metrics().value(DesignMetrics.Role.SETTINGS_ICON_TILE),context().icons().size(context().metrics(), Nodes.IconSize.CONTROL),false);});
             if (embedded && settings) controls.forEach(c -> Composition.label(c, true));
