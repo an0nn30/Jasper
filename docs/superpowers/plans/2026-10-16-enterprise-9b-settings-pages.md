@@ -49,6 +49,32 @@
 > Index against mock 15). The classic table shows no settings-search highlight: only `SettingRow` and `FormRow` carry one,
 > and the search still reveals the table.
 
+> **Status, Task 3 (2026-10-17):** the Keymap page matches its probes (share 0.986, floor 0.93): search, tools, header,
+> separators, rows, titles, scopes, counts and keycaps on the mock's pixels. Calibration, measured from mock 07 (each a
+> classic value of an existing role, besides the plan's): `KEYCAP_TREE_INSET` 5 to 0 (the first row under the header
+> rule), `KEYCAP_VERTICAL_PADDING` 4 to 2, `KEYCAP_SQUARE_EXTRA` 3 to 0, `KEYCAP_PADDING` 5 to 3 and `KEYCAP_GAP` 2 to 3
+> (16 px square caps 3 apart, so leaves are 24 tall), `KEYCAP_EDGE_ALPHA` 87 to 116 and `KEYCAP_FACE_ALPHA` 12 to 8 (#B5B8BE
+> on #F7F7F7 for the mock's #B4B8BF on #F7F8F9), `KEYMAP_STATUS_GAP` 6 to 5, and `BUTTON_HORIZONTAL_PADDING` 14 to 11
+> (Find by Shortcut 110, Expand All 80, Collapse All 85; mock 11's Add Variable… and Browse… have the same 11 px sides;
+> it also sets FlatLaf's classic `Button.margin`; the full jasper-ui and jasper-app suites pass);
+> `KEYCAP_GROUP_TEXT_GAP` stays 6, not 7 (the title's ink at the mock's 2x 545). Deviations, each because the code differs
+> from the plan's model: a laned tree takes the tree face's disclosure (the drawn ▶ and ▼; it was a chevron button whose
+> width varied between rows) and its title role (BODY_STRONG, the mock's semibold); the scope is in the Scope column's
+> role and the count in the Shortcut column's (`ShortcutTree.COLUMNS`: Scope BODY, Shortcut CAPTION, as the mock's 13 and
+> 12 px), both in `text.placeholder` (#7A808A) and on the title's baseline; a laned tree asks for every row
+> (`viewportRowsHeight`), and the classic panel lays the list at that height, at most the room left, with the status line
+> right below it (`ShortcutPanel.FittedLayout`; the mock's tree ends at its last row); the classic search field keeps its
+> 22 px centred on the 24 px buttons; the classic status is one caption line ("N shortcuts · Contextual keys are
+> read-only"), and the recording hint names "Stop"; the header's Action title starts over the disclosure
+> (`KEYCAP_GROUP_SIDE`, the mock's 2x 513); the trailing slot spans only from the modified mark or the Scope lane; the
+> default `toolsSpec` reuses the one `clear`; `KeymapLanesTest` drops an unused import; the "Find by Shortcut left edge"
+> probe (737, 65) became "Find by Shortcut face" (740, 65), because Find by Shortcut and Collapse All are each 1 px wider
+> than the mock's (the labels' fractional advances round up), which puts the edge at 735. Residuals: the fixture's
+> counts (130 shortcuts over eighteen sections: no THD Sourcing Crypto actions, Application 15, File Server 17, Remote
+> 22) and no customized section (the mock's Application ●), "1 shortcut" (Rulings 8), the ⌘ glyph's platform face, the
+> ▶ 1 px narrower than the mock's, the buttons' gradient (plan 4b's face) and the search placeholder (#7A808A, 1 px
+> higher than the mock's #9AA0A8; the shared field face).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look (`Composition.CLASSIC`) the app's own Settings pages take spec 12.2's classic

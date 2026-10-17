@@ -22,13 +22,23 @@ final class ShortcutTree {
     private static final String ACTION = "action/";
 
     private final boolean macOs;
+    private final boolean columns;
     private final Set<String> expanded = new HashSet<>();
     private final Set<String> collapsedWhileSearching = new HashSet<>();
     private final LinkedHashMap<String, List<ShortcutEntry>> groups = new LinkedHashMap<>();
     private boolean searching;
     private String selected;
 
-    ShortcutTree(boolean macOs) { this.macOs = macOs; }
+    ShortcutTree(boolean macOs) { this(macOs, false); }
+
+    /** {@code columns}: Action, Scope and Shortcut columns, a section's count in its Shortcut lane (plan 9b Rulings 8). */
+    ShortcutTree(boolean macOs, boolean columns) { this.macOs = macOs; this.columns = columns; }
+
+    /** The classic columns; a section's count reads at caption size in the Shortcut lane, the scope at body size (the mock). */
+    static final java.util.List<dev.jasper.ui.model.Column> COLUMNS = java.util.List.of(
+        new dev.jasper.ui.model.Column("action", "Action", Nodes.TextRole.BODY, false),
+        new dev.jasper.ui.model.Column("scope", "Scope", Nodes.TextRole.BODY, false),
+        new dev.jasper.ui.model.Column("shortcut", "Shortcut", Nodes.TextRole.CAPTION, false));
 
     static String groupId(String group) { return GROUP + group; }
     static String actionId(ShortcutEntry entry) { return ACTION + entry.id(); }
@@ -110,10 +120,13 @@ final class ShortcutTree {
             boolean shown = isOpen(group);
             if (shown) open.add(groupId(group));
             // A section holding a shortcut that differs from its default is emphasized, as IntelliJ shows it.
-            roots.add(new TreeItem(groupId(group), group, Optional.of(rows.stream().map(ShortcutEntry::groupIcon).filter(icon->!icon.equals("plugin")).findFirst().orElse("plugin")), false, children, OptionalInt.of(rows.size()),
+            var icon = Optional.of(rows.stream().map(ShortcutEntry::groupIcon).filter(name->!name.equals("plugin")).findFirst().orElse("plugin"));
+            if (columns) roots.add(new TreeItem(groupId(group), group, Optional.empty(), false, children, OptionalInt.empty(), customized,
+                shown ? "Collapse section" : "Expand section", Optional.empty(), List.of("", rows.size() + (rows.size() == 1 ? " shortcut" : " shortcuts")), Optional.empty()));
+            else roots.add(new TreeItem(groupId(group), group, icon, false, children, OptionalInt.of(rows.size()),
                 customized, shown ? "Collapse section" : "Expand section", Optional.empty(), List.of(), Optional.empty()));
         });
         // No activate action: a click reports Clicked, so a double click acts once; the panel owns Enter.
-        return new Nodes.Tree(ID, ControlState.READY, roots, open, selected == null ? Set.of() : Set.of(selected), "");
+        return new Nodes.Tree(ID, ControlState.READY, roots, open, selected == null ? Set.of() : Set.of(selected), "", columns ? COLUMNS : List.of());
     }
 }

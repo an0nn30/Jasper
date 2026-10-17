@@ -97,6 +97,18 @@ final class Trees {
             var children = parent.getComponents();
             int gap = ThemePainting.metric(owner.context(), dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
             int height = Math.max(0, parent.getHeight() - insets.top - insets.bottom);
+            if (owner.laned()) {
+                // Plan 9b Rulings 7: the titles span the rows' lanes, measured from the header's end as the rows measure theirs;
+                // the Action title starts over the sections' disclosure, as the mock sets it.
+                int w = parent.getWidth(), scope = owner.scopeLaneStart(w), shortcut = owner.shortcutLaneStart(w);
+                int first = ThemePainting.metric(owner.context(), dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_GROUP_SIDE);
+                int[][] lanes = {{first, scope - first}, {scope, shortcut - scope}, {shortcut, w - shortcut}};
+                for (int i = 0; i < children.length && i < lanes.length; i++) {
+                    children[i].setBounds(lanes[i][0], insets.top, Math.max(0, lanes[i][1]), height);
+                    if (children[i] instanceof javax.swing.JLabel label) label.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+                }
+                return;
+            }
             int end = parent.getWidth() - insets.right - (owner.countWidth > 0 ? owner.countWidth + gap : 0);
             for (int i = children.length - 1; i >= 1; i--) {
                 int width = i - 1 < owner.trailingWidths.length ? owner.trailingWidths[i - 1] : children[i].getPreferredSize().width;
@@ -177,7 +189,64 @@ final class Trees {
             int available=Math.max(0,width-ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT)-2*ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP));
             return Math.min(available,Math.min(caps.getIconWidth(),Math.max(caps.minimumWidth(),available/2)));
         }
+        /** A keycap tree with columns (the classic Keymap) lays every row on its header's lanes (plan 9b Rulings 7). */
+        boolean laned(){return !presentation.isEmpty() && !value().columns().isEmpty();}
+        private int laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role role){return ThemePainting.metric(context(),role);}
+        /** The Scope lane's start for a row or header {@code width} wide: the Shortcut and Scope lanes back from its end. */
+        int scopeLaneStart(int width){return Math.max(0,width-laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYMAP_SHORTCUT_COLUMN)-laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYMAP_SCOPE_COLUMN));}
+        /** The Shortcut lane's start for a row or header {@code width} wide. */
+        int shortcutLaneStart(int width){return Math.max(0,width-laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYMAP_SHORTCUT_COLUMN));}
+        private static java.awt.Component named(java.awt.Component[] children,String... names){
+            for(var name:names)for(var child:children)if(name.equals(child.getName()))return child;
+            return null;
+        }
+        /**
+         * Title in the Action lane, scope right-aligned before the Shortcut lane, keys or a section's count in it; the trailing
+         * slot spans from the section's modified mark (after its title) or the Scope lane to the row's end.
+         */
+        private boolean layoutLanes(InteractiveRows.Row row){
+            int width=row.getWidth(),height=row.getHeight();
+            int pad=laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_GROUP_SIDE),start=Math.min(width,pad+row.indent);
+            int lw=row.leading.getComponentCount()==0?0:row.leading.getPreferredSize().width;
+            row.leading.setBounds(start,0,lw,height);row.leading.doLayout();
+            int titleX=start+lw+(lw>0?laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_GROUP_TEXT_GAP):0);
+            int scope=scopeLaneStart(width),shortcut=shortcutLaneStart(width);
+            row.title.setBounds(titleX,0,Math.max(0,scope-titleX),height);row.title.doLayout();
+            row.subtitle.setBounds(0,0,0,0);
+            var children=row.trailing.getComponents();
+            for(var child:children)child.setBounds(0,0,0,0);
+            String base="@tree/"+node.id()+"/"+itemId(row.index)+"/";
+            var keys=named(children,base+"keys",base+"trailing/1");
+            var where=named(children,base+"context",base+"trailing/0");
+            var mark=named(children,base+"modified");
+            var markSize=mark==null?null:mark.getPreferredSize();
+            int markX=mark==null?scope:Math.max(0,Math.min(scope-markSize.width,titleX+Math.min(row.title.getWidth(),row.title.getPreferredSize().width)+laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP)));
+            int left=Math.min(scope,markX);
+            row.trailing.setBounds(left,0,width-left,height);
+            int keysX=shortcut+laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYMAP_KEYS_INSET);
+            if(keys!=null){keys.setBounds(keysX-left,0,Math.max(0,width-keysX),height);if(keys instanceof javax.swing.JLabel label)label.setHorizontalAlignment(javax.swing.SwingConstants.LEFT);}
+            if(where!=null){where.setBounds(scope-left,0,Math.max(0,shortcut-laneMetric(dev.jasper.ui.metrics.DesignMetrics.Role.KEYMAP_SCOPE_GAP)-scope),height);
+                if(where instanceof javax.swing.JLabel label)label.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);}
+            // The scope and a section's count stand on the title's baseline, as the mock sets them; keycaps stay centred.
+            int baseline=titleBaseline(row);
+            for(var lane:new java.awt.Component[]{where,presentation.containsKey(itemId(row.index))?null:keys})
+                if(baseline>=0 && lane instanceof javax.swing.JLabel label && label.getIcon()==null){
+                    int h=Math.min(height,label.getPreferredSize().height),b=label.getBaseline(label.getWidth(),h);
+                    if(b>=0)label.setBounds(label.getX(),Math.max(0,Math.min(height-h,baseline-b)),label.getWidth(),h);
+                }
+            if(mark!=null)mark.setBounds(markX-left,(height-markSize.height)/2,markSize.width,markSize.height);
+            return true;
+        }
+        /** The baseline of {@code row}'s title text in the row, or -1. */
+        private static int titleBaseline(InteractiveRows.Row row){
+            for(var child:row.title.getComponents())if(child instanceof javax.swing.JLabel label && label.getHeight()>0){
+                int b=label.getBaseline(label.getWidth(),label.getHeight());
+                if(b>=0)return javax.swing.SwingUtilities.convertPoint(label,0,b,row).y;
+            }
+            return -1;
+        }
         boolean layoutPresented(InteractiveRows.Row row) {
+            if(laned())return layoutLanes(row);
             var value=presentation.get(itemId(row.index));if(value==null)return false;
             int pad=ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.ICON_GAP);
             int start=Math.min(row.getWidth(),pad+row.indent),end=Math.max(start,row.getWidth()-detailTrailing()),height=row.getHeight();
@@ -200,6 +269,8 @@ final class Trees {
             row.title.setBounds(start,0,Math.max(0,end-trailing-pad-start),height);row.title.doLayout();
             row.subtitle.setBounds(0,0,0,0);return true;
         }
+        /** A laned tree asks for every row; its host bounds it and it scrolls beyond (the classic Keymap stands as tall as its rows). */
+        @Override int viewportRowsHeight(){return laned()?rowsHeight():super.viewportRowsHeight();}
         @Override int rowHeightAt(int index){return rowShellHeight(index)+navigationGapAfter(index)+(detail!=null && itemId(index).equals(detail.itemId)?detailHeight():0);}
         /** A labelled group's heading carries its own space; an unlabelled root group is set apart by a wider gap. */
         private int navigationGapAfter(int index) {
@@ -422,7 +493,7 @@ final class Trees {
                                         : "chevron.right",
                                 Nodes.ButtonKind.GHOST,
                                 "expand",
-                                "Expand or collapse " + item.title(),presentation.isEmpty()?context().faces().tree.disclosure():Nodes.ButtonPresentation.EMBEDDED));
+                                "Expand or collapse " + item.title(),presentation.isEmpty() || laned()?context().faces().tree.disclosure():Nodes.ButtonPresentation.EMBEDDED));
             item.icon()
                     .ifPresent(
                             icon ->
@@ -438,7 +509,8 @@ final class Trees {
             item.status().ifPresent(status -> leading.add(new Nodes.StatusDot(
                     "@tree/" + node.id() + "/" + item.id() + "/status", ControlState.READY, status)));
             row.slot(row.leading, leading);
-            if (!item.leaf() && presentation.isEmpty() && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl expand)
+            // A laned keycap tree's sections take the tree face's disclosure, as a column tree's branches do (plan 9b Rulings 7).
+            if (!item.leaf() && (presentation.isEmpty() || laned()) && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl expand)
                 context().faces().tree.styleDisclosure(expand.button, context(), value().expandedIds().contains(item.id()));
             // The navigation's triangle stands alone; its title follows at the navigation's text gap (plan 9a Rulings 13).
             if (settingsNavigation && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl navigationExpand)
@@ -453,7 +525,7 @@ final class Trees {
                                     titleId,
                                     ControlState.READY,
                                     item.title(),
-                                    (settingsNavigation || rail()) && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()?Nodes.TextRole.PANEL_TITLE:context().faces().tree.title(item.leaf(), item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY))));
+                                    (settingsNavigation || rail()) && !item.leaf()?Nodes.TextRole.SECTION_LABEL:!presentation.isEmpty()&&!item.leaf()&&!laned()?Nodes.TextRole.PANEL_TITLE:context().faces().tree.title(item.leaf(), item.emphasized() ? Nodes.TextRole.BODY_STRONG : Nodes.TextRole.BODY))));
             // Settings navigation pages use the Settings body face; recycled rows restore the declared role.
             if(row.controls.get(titleId) instanceof Labels.TextControl titleText) {
                 var role=settingsNavigation && item.leaf() ? dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY : null;
@@ -476,8 +548,9 @@ final class Trees {
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/trailing/" + i,
                         ControlState.READY, i < item.trailing().size() ? item.trailing().get(i) : "", valueRole(i)));
             if(presented!=null) {
-                if(presented.locked())trailing.add(new Nodes.Icon("@tree/"+node.id()+"/"+item.id()+"/lock",ControlState.READY,"lock",Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,"Read-only contextual key"));
-                trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/context",ControlState.READY,presented.context(),Nodes.TextRole.CAPTION));
+                // On lanes a read-only key shows no lock glyph (plan 9b Rulings 8); its row's tooltip still says it.
+                if(presented.locked() && value().columns().isEmpty())trailing.add(new Nodes.Icon("@tree/"+node.id()+"/"+item.id()+"/lock",ControlState.READY,"lock",Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,"Read-only contextual key"));
+                trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/context",ControlState.READY,presented.context(),laned()?valueRole(0):Nodes.TextRole.CAPTION));
                 trailing.add(new Nodes.Text("@tree/"+node.id()+"/"+item.id()+"/keys",ControlState.READY,presented.keycaps().map(KeycapSequence::accessibleName).orElse(item.trailing().isEmpty()?"":item.trailing().getLast()),Nodes.TextRole.CAPTION));
             }
             String modifiedId="@tree/"+node.id()+"/"+item.id()+"/modified";
@@ -488,8 +561,12 @@ final class Trees {
             if (presented == null && countWidth > 0 && item.count().isEmpty())
                 trailing.add(new Nodes.Text("@tree/" + node.id() + "/" + item.id() + "/count", ControlState.READY, "", Nodes.TextRole.COUNT));
             row.slot(row.trailing, trailing);
-            if(presented!=null)row.trailing.setLayout(null);
+            if(presented!=null || laned())row.trailing.setLayout(null);
             if(row.controls.get(modifiedId) instanceof Indicators.DotControl dot){dot.modified=true;dot.refresh();}
+            // On lanes the scope and a section's count read in the placeholder ink, as the Keymap mock sets them (plan 9b Rulings 8).
+            if(laned() && !row.inked)for(var suffix:List.of("/context","/trailing/0","/trailing/1"))
+                if(row.controls.get("@tree/"+node.id()+"/"+item.id()+suffix) instanceof Labels.TextControl lane)
+                    lane.component.setForeground(ThemePainting.color(context(),dev.jasper.ui.theme.SemanticColor.TEXT_PLACEHOLDER));
             if(presented!=null) {
                 // Context reads right-aligned against the keys column; a recycled row measures its own text.
                 var label=(javax.swing.JLabel)row.controls.get("@tree/"+node.id()+"/"+item.id()+"/context").component;

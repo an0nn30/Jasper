@@ -73,6 +73,13 @@ class SettingsPagesMockTest {
         // 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561, #5C6370).
         INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14), new Ink("Default", 908, 270, 48, 14)));
         face("notifications", "6 groups", "Default");
+        // Find by Shortcut and Collapse All are each 1 px wider than the mock's (the labels' fractional advances round up), so
+        // the Find by Shortcut probe takes its face 3 px inside the mock's left edge (737), which ours meets at 735.
+        PROBES.put("keymap", List.of(probe("search field top", 300, 54), probe("Find by Shortcut face", 740, 65),
+            probe("tool button top", 790, 53), probe("tree box top", 600, 83), probe("header band", 600, 94), probe("header rule", 600, 104),
+            probe("Scope separator", 779, 94), probe("Shortcut separator", 886, 94), probe("Copy keycap edge", 911, 180)));
+        tight("keymap", "header band");
+        face("keymap", "header rule", "Copy keycap edge");
     }
 
     /** The body: right of the sidebar rule, below the header rule, above the footer rule (2x pixels). */
@@ -174,6 +181,19 @@ class SettingsPagesMockTest {
     @Test void notificationsMatchesItsMock() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("notifications"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
+        }
+    }
+
+    /** The dialog's Keymap page, selected; EDT. */
+    static dev.jasper.app.shortcuthelp.KeymapPage keymap(EnterpriseSettings settings) {
+        settings.dialog().select("keymap");
+        return (dev.jasper.app.shortcuthelp.KeymapPage) settings.dialog().pages().stream().filter(page -> page.id().equals("keymap")).findFirst().orElseThrow();
+    }
+
+    @Test void keymapMatchesItsMock() throws Exception {
+        try (var settings = EnterpriseSettings.open(false)) {
+            SwingUtilities.invokeAndWait(() -> dev.jasper.app.shortcuthelp.ShortcutPreviewSupport.expand(keymap(settings), "Clipboard"));
+            assertThat(compare(settings, List.of("keymap"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
         }
     }
 }

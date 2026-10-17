@@ -15,4 +15,9 @@ public final class ShortcutPreviewSupport {
         if(!panel.dispatch(released))throw new AssertionError("Actual recorder did not drain release");
     }
     public static void action(KeymapPage page,String label) {ShortcutKit.editorAction(page.panel(),label);}
+
+    /** Opens {@code section}, as a click on its triangle does. */
+    public static void expand(KeymapPage page, String section) {
+        page.panel().event(new dev.jasper.ui.model.UiEvent.Expanded(ShortcutTree.ID, ShortcutTree.groupId(section), true));
+    }
 }

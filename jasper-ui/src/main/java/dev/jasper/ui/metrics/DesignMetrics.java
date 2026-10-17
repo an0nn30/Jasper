@@ -154,7 +154,9 @@ public final class DesignMetrics {
         SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6),
         // Plan 9a: the gap a SETTINGS_TRAILING stack without its action keeps after the control (today COLUMN_GAP's 10;
         // the classic rows, whose Reset is in the row's menu, keep none).
-        SETTINGS_TRAILING_EMPTY_GAP(10);
+        SETTINGS_TRAILING_EMPTY_GAP(10),
+        // Plan 9b: the lanes of a keycap tree with columns (the classic Keymap mock), read only there; equal in both catalogs.
+        KEYMAP_SCOPE_COLUMN(107), KEYMAP_SHORTCUT_COLUMN(137), KEYMAP_KEYS_INSET(25), KEYMAP_SCOPE_GAP(30);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -258,6 +260,24 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
         values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
         values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
+        // Plan 9b: the classic Keymap (Mock measurements).
+        values.put(Role.KEYMAP_PAGE_TOP_PADDING, 18);
+        values.put(Role.KEYMAP_PAGE_PADDING, 16);
+        values.put(Role.KEYMAP_SECTION_GAP, 6);
+        values.put(Role.KEYCAP_GROUP_SIDE, 8);
+        values.put(Role.KEYCAP_TREE_LEAF_INDENT, 26);
+        values.put(Role.KEYCAP_DETAIL_INSET, 4);
+        // Plan 9b Task 3: the mock's rows from the header rule, 16 px square keycaps 3 apart in #B4B8BF on #F7F8F9, and buttons
+        // with 11 px sides (Find by Shortcut 110 wide; Shell's Add Variable… and Browse… keep the same sides).
+        values.put(Role.KEYCAP_TREE_INSET, 0);
+        values.put(Role.KEYCAP_VERTICAL_PADDING, 2);
+        values.put(Role.KEYCAP_SQUARE_EXTRA, 0);
+        values.put(Role.KEYCAP_GAP, 3);
+        values.put(Role.KEYCAP_PADDING, 3);
+        values.put(Role.KEYCAP_EDGE_ALPHA, 116);
+        values.put(Role.KEYCAP_FACE_ALPHA, 8);
+        values.put(Role.BUTTON_HORIZONTAL_PADDING, 11);
+        values.put(Role.KEYMAP_STATUS_GAP, 5);
         // Plan 9b Task 1: the classic Settings rows as mocks 01 and 02 draw them (39 apart; 47 with a description).
         values.put(Role.SETTINGS_ROW_HEIGHT, 39);
         values.put(Role.SETTINGS_DESCRIPTION_HEIGHT, 47);

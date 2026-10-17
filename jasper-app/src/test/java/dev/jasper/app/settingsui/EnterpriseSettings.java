@@ -155,6 +155,15 @@ final class EnterpriseSettings implements AutoCloseable {
                     home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                     PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
                 runtime[0].start(Map.of(), dark);
+                // The application's own actions, as it registers them at start (the mock's config, commandline and
+                // notifications sections); the core sections come from ActionId, the plugins' from the staged plugins.
+                for (String[] action : new String[][] {{"plugins.manage", "Manage Plugins…"}, {"app.shortcuts", "Keyboard Shortcuts…"},
+                        {"app.about", "About Jasper"}, {"app.memory", "Change Memory Settings…"}, {"app.vmoptions", "Edit Custom VM Options…"},
+                        {"app.memory.gc", "Run Garbage Collection"}, {"config.migrate", "Migrate Config"},
+                        {"commandline.install", "Install 'jasper' Command in PATH"}, {"commandline.uninstall", "Uninstall 'jasper' Command from PATH"},
+                        {"notifications.errors", "Notifications: Show Errors"}, {"notifications.history", "Notifications: Show History"},
+                        {"notifications.dismiss", "Notifications: Dismiss Cards"}})
+                    contributions.addAction(action[0], action[1], null, List.of(), Optional.empty(), invocation -> { });
                 var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
                 var manager = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
                     ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
