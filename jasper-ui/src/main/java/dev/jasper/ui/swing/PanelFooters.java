@@ -31,6 +31,11 @@ final class PanelFooters {
          * padding and its stack places each line itself.
          */
         boolean flush;
+        /**
+         * The footer is a status line under a classic table or tree body ({@code PANEL_STATUS_RULE}): the panel places it
+         * right below the rows, and it stands on {@code surface.card} under that rule down to the panel's bottom.
+         */
+        boolean inline;
 
         Footer(KitContext context, String id) {
             this.context = context;
@@ -44,7 +49,8 @@ final class PanelFooters {
             // any other footer content keeps the ordinary footer padding.
             int side = ThemePainting.metric(context, arranged ? DesignMetrics.Role.PANEL_FOOTER_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING),
                     vertical = arranged ? 0 : ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
-            setBorder(detail || flush ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(vertical, side, vertical, side));
+            int rule = inline ? ThemePainting.metric(context, DesignMetrics.Role.PANEL_STATUS_RULE) : 0;
+            setBorder(detail || flush ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(vertical + rule, side, vertical, side));
             setLayout(new Composition.Vertical(0));
         }
 
@@ -86,6 +92,13 @@ final class PanelFooters {
                 ThemePainting.antialias(g);
                 // A separator is one physical pixel at every device/user scale.
                 double stroke = 1.0 / Math.abs(g.getTransform().getScaleY());
+                if (inline) {
+                    g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                    g.setColor(ThemePainting.subtleRule(context, SemanticColor.SURFACE_CARD));
+                    g.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.PANEL_STATUS_RULE));
+                    return;
+                }
                 if (detail || !arranged) {
                     int radius = ThemePainting.metric(context, DesignMetrics.Role.CARD_RADIUS);
                     g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_PANEL_RAISED));

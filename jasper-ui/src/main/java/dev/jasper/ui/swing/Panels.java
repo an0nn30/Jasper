@@ -60,6 +60,7 @@ final class Panels {
         @Override
         void refresh() {
             state();
+            footer.inline = statusLine();
             footer.refresh();
             ((Surface)component).column = column;
             ((Surface)component).painted = view.panelSurface();
@@ -116,6 +117,7 @@ final class Panels {
                 } else if (childParent(c.node) == footer) {
                     footerControl = c;
                     footer.detail = c.node instanceof Nodes.Stack stack && stack.role() == Nodes.LayoutRole.DETAIL;
+                    footer.inline = statusLine();
                     footer.refresh();
                     footer.mount(c.component);
                 } else if (childParent(c.node) == content) {
@@ -126,6 +128,16 @@ final class Panels {
             contentInsets();
             presentation();
             Stacks.mount(component, List.of(header.component, scroll, footerScroll));
+        }
+
+        /**
+         * A dock panel's single text footer under a table or tree body, in a kit with {@code PANEL_STATUS_RULE}: a status
+         * line that follows the rows (the classic Tunnels panel).
+         */
+        boolean statusLine() {
+            var p = (Nodes.Panel) node;
+            return column < 0 && ThemePainting.metric(context(), DesignMetrics.Role.PANEL_STATUS_RULE) > 0
+                && p.footer().filter(n -> n instanceof Nodes.Text).isPresent() && (p.body() instanceof Nodes.Table || p.body() instanceof Nodes.Tree);
         }
 
         /** The body's logical side inset and its top inset in pixels, from the last refresh. */
@@ -204,6 +216,21 @@ final class Panels {
             return Composition.height(control.component, width);
         }
 
+        /** The rows' whole height (every row, not the one row {@link #contentHeight} keeps), with the content's insets. */
+        int rowsHeight(int width) {
+            if (!(control instanceof InteractiveRows.RowsControl rows) || !control.component.isVisible()) return contentHeight(width);
+            Insets insets = rows.scroll.getInsets(), content = this.content.getInsets();
+            int height = rows.canvas.getPreferredSize().height + insets.top + insets.bottom + content.top + content.bottom;
+            var header = rows.scroll.getColumnHeader();
+            if (header != null && header.isVisible()) height += header.getPreferredSize().height;
+            var border = rows.scroll.getViewportBorder();
+            if (border != null) {
+                Insets viewport = border.getBorderInsets(rows.scroll);
+                height += viewport.top + viewport.bottom;
+            }
+            return height;
+        }
+
         @Override
         public Dimension getPreferredSize() {
             int w = width();
@@ -278,9 +305,15 @@ final class Panels {
             int footerMinimum=owner.footer.isVisible() ? owner.footer.interactiveHeight(owner.footer) : 0;
             int hh = Math.min(Math.max(0,h-footerMinimum), owner.header.component.isVisible() ? Composition.height(owner.header.component,w) : 0);
             int fh = owner.footer.isVisible() ? Math.min(Math.max(0,h-hh),owner.footer.height(w)) : 0;
+            int fy = h - fh;
+            // A status line follows the rows and stands down to the bottom; with more rows than fit it stays at the bottom.
+            if (owner.footer.inline && fh > 0) {
+                fy = Math.max(hh, Math.min(fy, hh + owner.body.navigationHeight(w) + owner.body.rowsHeight(w)));
+                fh = h - fy;
+            }
             owner.header.component.setBounds(0, 0, w, hh);
-            owner.scroll.setBounds(0, hh, w, Math.max(0, h - fh - hh));
-            owner.footerScroll.setBounds(0, h - fh, w, fh);
+            owner.scroll.setBounds(0, hh, w, Math.max(0, fy - hh));
+            owner.footerScroll.setBounds(0, fy, w, fh);
         }
     }
 

@@ -63,7 +63,7 @@ public final class DesignMetrics {
         // theme.md's alpha treatments on base tokens: the focus ring (about 32% in Dark), the error ring, and category
         // tiles and chips (16–18% in Dark, 12–14% in Light).
         FOCUS_HALO_PERCENT_DARK(32), FOCUS_HALO_PERCENT_LIGHT(25), ERROR_HALO_PERCENT(22), TILE_PERCENT_DARK(17), TILE_PERCENT_LIGHT(13),
-        FOCUS_RING(3), PANEL_HEADER(35), PANEL_HEADER_BOTTOM_GAP(5), PANEL_HEADER_ACTION(24), PANEL_HEADER_ACTION_GAP(2), PANEL_HEADER_TRAILING_PADDING(6), PANEL_HEADER_CONTRIBUTED_GLYPH(18), PANEL_SEARCH_SIDE(7), PANEL_SEARCH_BOTTOM(6), PANEL_SEARCH_HEIGHT(24), PANEL_SEARCH_VERTICAL_PADDING(8), PANEL_HEADER_ACTION_VERTICAL(7), PANEL_SEARCH_PADDING(5), PANEL_SEARCH_GAP(3), PANEL_SEARCH_TEXT_BASELINE(1), PANEL_SEARCH_TOP(0), PANEL_SEARCH_RULE(0), PANEL_FOOTER(30), SWITCH_WIDTH(32), SWITCH_HEIGHT(18), SWITCH_KNOB(14),
+        FOCUS_RING(3), PANEL_HEADER(35), PANEL_HEADER_BOTTOM_GAP(5), PANEL_HEADER_ACTION(24), PANEL_HEADER_ACTION_GAP(2), PANEL_HEADER_TRAILING_PADDING(6), PANEL_HEADER_CONTRIBUTED_GLYPH(18), PANEL_SEARCH_SIDE(7), PANEL_SEARCH_BOTTOM(6), PANEL_SEARCH_HEIGHT(24), PANEL_SEARCH_VERTICAL_PADDING(8), PANEL_HEADER_ACTION_VERTICAL(7), PANEL_SEARCH_PADDING(5), PANEL_SEARCH_GAP(3), PANEL_SEARCH_TEXT_BASELINE(1), PANEL_SEARCH_TOP(0), PANEL_SEARCH_RULE(0), PANEL_STATUS_RULE(0), PANEL_FOOTER(30), SWITCH_WIDTH(32), SWITCH_HEIGHT(18), SWITCH_KNOB(14),
         COMPACT_SWITCH_WIDTH(28), COMPACT_SWITCH_HEIGHT(16), COMPACT_SWITCH_KNOB(12),
         ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_PROMPT(24),
         FIELD_VERTICAL_PADDING(8), BUTTON_VERTICAL_PADDING(8), BUTTON_GAP(6), ICON_GAP(6),
@@ -252,6 +252,13 @@ public final class DesignMetrics {
         values.put(Role.PANEL_SEARCH_SIDE, 8);
         values.put(Role.PANEL_SEARCH_TOP, 6);
         values.put(Role.PANEL_SEARCH_RULE, 1);
+        // Plan 10a: a status line under a panel's table follows the rows on surface.card under a 1 px panel rule (the
+        // Workstation mock's Tunnels panel).
+        values.put(Role.PANEL_STATUS_RULE, 1);
+        // Plan 10a: a panel's empty state centres in the body and wraps its sentence at up to 300 (the Workstation mock's
+        // Tunnels and SFTP panels).
+        values.put(Role.PANEL_EMPTY_TEXT_WIDTH, 300);
+        values.put(Role.PANEL_EMPTY_LIFT, 0);
         // Plan 9a: the classic Settings frame (Mock measurements).
         values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
         values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);

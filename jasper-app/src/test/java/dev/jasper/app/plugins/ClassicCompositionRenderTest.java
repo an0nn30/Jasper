@@ -99,4 +99,27 @@ class ClassicCompositionRenderTest {
             }
         });
     }
+
+    static final String TUNNELS_LIGHT = "0+36 #F7F7F8, 36+1 #DDE0E4, 37+20 #F0F1F3, 57+1 #D3D6DA, 58+24 #FFFFFF, 82+1 #EEF0F2, 83+238 #FFFFFF";
+    static final String TUNNELS_DARK = "0+36 #35383D, 36+1 #45484E, 37+20 #393C41, 57+1 #4A4D53, 58+24 #2E3135, 82+1 #3E4146, 83+238 #2E3135";
+    static final String TUNNELS_NONE = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+300 #FFFFFF";
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theTunnelsTableMatchesTheWorkstationMocks() throws Exception {
+        for (boolean dark : new boolean[] {false, true}) under(dark, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("tunnels-" + dark), EnterpriseLook.resolved(dark), PanelSurfaceFixture.TUNNELS, true)) {
+                var mac = fixture.hosts(new String[][] {{"Mac", "192.168.1.119", "dustin", "Local Network"}}).getFirst();
+                fixture.tunnel("test", mac, "LOCAL", 8080, "localhost", 234);
+                var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 2136, 1064, 700, 642);
+                check((dark ? "dark" : "light") + "/tunnels", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 4,
+                    dark ? TUNNELS_DARK : TUNNELS_LIGHT, 2, 0.55, dark ? new String[] {"#393C41", "#2E3135"} : new String[] {"#F0F1F3", "#A3A8B0", "#5C6370"});
+            }
+        });
+        under(false, () -> {
+            try (var fixture = new PanelSurfaceFixture(root.resolve("tunnels-none"), EnterpriseLook.resolved(false), PanelSurfaceFixture.TUNNELS, true)) {
+                var crop = new MockMatch.Crop(DISCONNECTED, 2136, 1064, 700, 642);
+                check("light/tunnels-none", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 4, TUNNELS_NONE, 1, 0.55, "#1E1F22", "#B4B8BF");
+            }
+        });
+    }
 }

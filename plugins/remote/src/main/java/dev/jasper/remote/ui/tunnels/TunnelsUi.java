@@ -1,6 +1,7 @@
 package dev.jasper.remote.ui.tunnels;
 
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelManager;
 import dev.jasper.remote.tunnels.TunnelState;
@@ -58,6 +59,8 @@ public final class TunnelsUi implements AutoCloseable {
     public static final String NOTIFICATIONS = "dev.jasper.remote.tunnels";
 
     private final PluginContext context;
+    /** Which composition the Tunnels panels take (spec 14.4). */
+    private final Layout layout;
     private final Executor ui;
     private final TunnelStore store;
     private final TunnelManager manager;
@@ -86,13 +89,26 @@ public final class TunnelsUi implements AutoCloseable {
             text -> context.platform().copy(text));
     }
 
+    /** The tunnels UI in {@code layout}'s composition (spec 14.4). */
+    public TunnelsUi(PluginContext context, Executor ui, TunnelStore store, TunnelManager manager, Supplier<List<RemoteHost>> hosts,
+                     Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost, Layout layout) {
+        this(context, ui, store, manager, hosts, host, paneHost, text -> context.platform().copy(text), layout);
+    }
+
+    public TunnelsUi(PluginContext context, Executor ui, TunnelStore store, TunnelManager manager, Supplier<List<RemoteHost>> hosts,
+                     Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost, Consumer<String> clipboard) {
+        this(context, ui, store, manager, hosts, host, paneHost, clipboard, Layout.ROWS);
+    }
+
     /**
      * @param host a saved host by id
      * @param paneHost the saved host behind an SSH pane, by pane id; empty for any other pane
      * @param clipboard where Copy Address puts its text
+     * @param layout which composition the Tunnels panels take
      */
     public TunnelsUi(PluginContext context, Executor ui, TunnelStore store, TunnelManager manager, Supplier<List<RemoteHost>> hosts,
-                     Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost, Consumer<String> clipboard) {
+                     Function<UUID, Optional<RemoteHost>> host, Function<UUID, Optional<RemoteHost>> paneHost, Consumer<String> clipboard, Layout layout) {
+        this.layout = layout;
         this.context = context; this.ui = ui; this.store = store; this.manager = manager; this.hosts = hosts; this.host = host;
         this.clipboard = clipboard;
         notifications = context.notifications().group(new GroupSpec(NOTIFICATIONS, "Tunnels", DisplayMode.CARD));
@@ -168,7 +184,7 @@ public final class TunnelsUi implements AutoCloseable {
         var panel = new TunnelsPanel(context.kit(), new TunnelsPanel.Actions(tunnel -> manager.start(tunnel, window), tunnel -> manager.stop(tunnel.id()),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::duplicate, tunnel -> delete(window, tunnel),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
-            () -> edit(window, Optional.empty(), Optional.empty())));
+            () -> edit(window, Optional.empty(), Optional.empty())), layout);
         panel.onHeaderChanged(panelHost::setHeader);
         panels.put(window.id(), panel);
         panelHosts.put(window.id(), panelHost);

@@ -5306,3 +5306,22 @@ and values are right-aligned (the mock left-aligns them, titles at 176 and 303);
 1) have no effect in 4c's classic tree face. Owner: 3c Rulings 7 and 4c's tree face (4c records the same difference for
 Keymap); a classic tree-face follow-up that honours `Column.weight` and left-aligns non-numeric trailing columns closes it.
 The band checks at x 4 do not see it.
+
+D4 (Task 6). **A classic panel's status line follows its table's rows** — what: the Tunnels mock draws "test — inactive.
+Click to toggle." on the white body 8 below the row, under a 1 px rule (`#EEF0F2` Light, `#3E4146` Dark: `border.subtle`
+over `surface.card`), with no footer band; the raised footer band at the panel's bottom failed `TUNNELS_LIGHT`. Under the
+new `PANEL_STATUS_RULE` role (1 in CLASSIC, 0 in the default catalog) a dock panel's single `Text` footer under a `Table`
+or `Tree` body stands right below the rows on `surface.card` under that rule, down to the panel's bottom
+(`PanelFooters.Footer.inline`, `Panels.Layout`, `ThemePainting.subtleRule`); with more rows than fit it stays at the
+bottom. Reach: Enterprise only (in the bundled code the classic Tunnels panel; File Servers if Task 10 gives it a text
+footer). `ClassicStatusLineTest` covers it.
+
+D5 (Task 6). **Classic panel empty states centre and wrap at up to 300** — what: CLASSIC `PANEL_EMPTY_TEXT_WIDTH` 300
+(was the default's 206) and `PANEL_EMPTY_LIFT` 0 (was 4); why: the Tunnels mock wraps "Forward a local port to a remote
+host, or use Forward" (285 wide) and centres the state in the body, the SFTP Disconnected mock sets its 241-wide sentence
+on one line, centred; at 206 the "No Tunnels" render wrapped in three lines and its edge agreement was 0.447. Measured
+agreements after D4 and D5: light/tunnels 0.812, dark/tunnels 0.812, light/tunnels-none 0.914 (floors 0.55).
+
+D6 (Task 6). **Residual: the Tunnels row and cell positions** — the classic table's row is 22 (mock 24, Rulings 14; the
+band tolerance 2 admits it); the cell values start at their column titles' inset (the mock's Local value sits at x 68,
+left of its title at 85, and its Via value at 298, right of its title at 282), owned by 4c's table face.

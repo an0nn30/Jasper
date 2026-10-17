@@ -3,11 +3,14 @@ package dev.jasper.remote.ui.tunnels;
 import dev.jasper.remote.tunnels.Tunnel;
 import dev.jasper.remote.tunnels.TunnelKind;
 import dev.jasper.remote.tunnels.TunnelState;
+import dev.jasper.remote.workstation.Layout;
+import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelHeader;
+import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -53,6 +57,8 @@ public final class TunnelsPanel implements AutoCloseable {
     static final String SWITCH = "switch:", MENU = "menu:", ROW = "tunnel:";
 
     private final Actions actions;
+    /** Which composition this panel takes, fixed at construction (spec 3.6). */
+    private final Layout layout;
     private final LongSupplier nanos;
     private final long multiClickNanos;
     private final UiView view;
@@ -71,11 +77,19 @@ public final class TunnelsPanel implements AutoCloseable {
         this(kit, actions, System::nanoTime, multiClickInterval());
     }
 
+    /** The panel in {@code layout}'s composition. */
+    public TunnelsPanel(UiKit kit, Actions actions, Layout layout) {
+        this(kit, actions, System::nanoTime, multiClickInterval(), layout);
+    }
+
     /**
      * {@code nanos} and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a switch from
      * two separate operations: the old switch acted once per gesture.
      */
-    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos) {
+    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos) { this(kit, actions, nanos, multiClickNanos, Layout.ROWS); }
+
+    TunnelsPanel(UiKit kit, Actions actions, LongSupplier nanos, long multiClickNanos, Layout layout) {
+        this.layout = Objects.requireNonNull(layout);
         this.actions = Objects.requireNonNull(actions); this.nanos = Objects.requireNonNull(nanos);
         if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
         this.multiClickNanos = multiClickNanos;
@@ -110,6 +124,74 @@ public final class TunnelsPanel implements AutoCloseable {
 
     /** The row id of a tunnel. */
     static String rowId(UUID tunnel) { return ROW + tunnel; }
+
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    /** The classic table's columns, in the Workstation mock's proportions. */
+    static final List<Column> COLUMNS = List.of(new Column("type", "Type", Nodes.TextRole.BODY, false, 76, Optional.empty()),
+        new Column("local", "Local", Nodes.TextRole.MONO, false, 87, Optional.empty()), new Column("remote", "Remote", Nodes.TextRole.MONO, false, 110, Optional.empty()),
+        new Column("via", "Via", Nodes.TextRole.BODY, false, 77, Optional.empty()));
+    public static final String FOOTER = "tunnels.footer", TOP = "tunnels.top";
+
+    private Nodes.Panel classicNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
+        List<Row> rows = shown();
+        if (selectedRow != null && rows.stream().noneMatch(row -> row.id().equals(selectedRow) && row.tunnel() != null)) selectedRow = null;
+        boolean none = saved.isEmpty() && quick.isEmpty();
+        var tableRows = new ArrayList<TableRow>();
+        for (Row row : rows) {
+            if (row.id().equals(QUICK_HEADING)) tableRows.add(TableRow.heading(QUICK_HEADING, "Quick forwards", OptionalInt.empty(), ""));
+            else if (row.tunnel() != null) tableRows.add(tableRow(row));
+        }
+        Optional<Nodes.Empty> empty = none ? Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "tunnel", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Tunnels"), "No Tunnels",
+            "Forward a local port to a remote host, or use Forward Port from an SSH pane.",
+            List.of(new Nodes.Button(EMPTY_NEW, ControlState.READY, "New Tunnel…", "", Nodes.ButtonKind.SECONDARY, EMPTY_NEW, "")))) : Optional.empty();
+        boolean filtered = !none && tableRows.stream().noneMatch(row -> row.heading().isEmpty());
+        var table = new Nodes.Table(ROWS, ControlState.READY, COLUMNS, tableRows, selectedRow == null ? Set.of() : Set.of(selectedRow), TOGGLE, List.of(),
+            Nodes.SelectionMode.SINGLE, Nodes.ScrollPolicy.STANDARD, empty, filtered ? "No tunnels match" : "");
+        var top = new ArrayList<Nodes.Node>();
+        error.ifPresent(message -> top.add(new Nodes.Notice(PROBLEM, ControlState.READY, Nodes.Severity.DANGER, problemText(), List.of())));
+        if (!none) top.add(new Nodes.Field(FILTER, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter tunnels", "Filter tunnels", ""));
+        Optional<Nodes.Node> search = top.isEmpty() ? Optional.empty()
+            : top.size() == 1 && top.getFirst() instanceof Nodes.Field ? Optional.of(top.getFirst())
+            : Optional.of(new Nodes.Stack(TOP, ControlState.READY, Nodes.LayoutRole.VERTICAL, top));
+        Optional<Nodes.Node> footer = selected().or(() -> rows.stream().map(Row::tunnel).filter(Objects::nonNull).findFirst())
+            .map(tunnel -> new Nodes.Text(FOOTER, ControlState.READY, footerText(tunnel), Nodes.TextRole.CAPTION));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, search, table, footer);
+    }
+
+    private TableRow tableRow(Row row) {
+        Tunnel tunnel = row.tunnel(); String id = row.id();
+        TunnelState state = states.apply(tunnel.id());
+        Optional<String> hostName = hostNames.apply(tunnel.hostId());
+        String word = switch (tunnel.kind()) { case LOCAL -> "Local"; case REMOTE -> "Remote"; case DYNAMIC -> "Dynamic"; };
+        var type = new Nodes.Stack("row." + id + ".type", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.StatusDot("row." + id + ".dot", ControlState.READY, dot(state)), new Nodes.Text("row." + id + ".kind", ControlState.READY, word, Nodes.TextRole.BODY)));
+        String port = TunnelRows.port(tunnel, state);
+        String listen = (tunnel.bindAddress().equals(Tunnel.LOCALHOST) ? "" : bracketed(tunnel.bindAddress())) + ":" + port;
+        String target = bracketed(tunnel.targetHost()) + ":" + tunnel.targetPort();
+        String local = tunnel.kind() == TunnelKind.REMOTE ? target : listen;
+        String remote = switch (tunnel.kind()) { case LOCAL -> target; case REMOTE -> listen; case DYNAMIC -> "SOCKS5"; };
+        String detail = TunnelRows.detail(tunnel, state, hostName, clock.get());
+        return new TableRow(id, Map.of("local", local, "remote", remote, "via", hostName.orElse("—")), Optional.empty(), false,
+            Optional.of(menu(id, tunnel, state)), TunnelRows.title(tunnel, state) + ", " + TunnelRows.mapping(tunnel, state) + ", " + detail,
+            Map.of("type", type), Optional.empty());
+    }
+
+    private static String bracketed(String host) { return host.contains(":") ? "[" + host + "]" : host; }
+
+    /** The selected tunnel's, else the first one's, line: its name, its confirmed state and the gesture. */
+    private String footerText(Tunnel tunnel) {
+        TunnelState state = states.apply(tunnel.id());
+        String word = switch (state) {
+            case TunnelState.Up up -> "active";
+            case TunnelState.Starting starting -> "starting";
+            case TunnelState.Failed failed -> "failed: " + failed.reason();
+            case TunnelState.Stopped stopped -> "inactive";
+        };
+        return TunnelRows.title(tunnel, state) + " — " + word + ". Click to toggle.";
+    }
 
     @Override public void close() {
         if (closed) return;
@@ -230,7 +312,9 @@ public final class TunnelsPanel implements AutoCloseable {
         return new Nodes.Icon(id, ControlState.READY, glyph, Nodes.Hue.NONE, size, name, Optional.of(severity));
     }
 
-    private Nodes.Panel node() {
+    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+
+    private Nodes.Panel rowsNode() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "Tunnels", OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
         if (saved.isEmpty() && quick.isEmpty()) {
             Nodes.Node empty = new Nodes.Empty(EMPTY, ControlState.READY,

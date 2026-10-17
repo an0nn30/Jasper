@@ -40,9 +40,11 @@ final class ThemePainting {
      * A classic panel's faint rule, under its search row and in its Properties grid: {@code border.subtle} laid over
      * {@code surface.panel}, opaque, as the Workstation and Dark Mode mocks draw them (plan 10a).
      */
-    static Color panelRule(KitContext context) {
+    static Color panelRule(KitContext context) { return subtleRule(context, SemanticColor.SURFACE_PANEL); }
+    /** {@code border.subtle} laid over {@code ground}, opaque: a classic faint rule on that surface. */
+    static Color subtleRule(KitContext context, SemanticColor ground) {
         Color subtle = color(context, SemanticColor.BORDER_SUBTLE);
-        return dev.jasper.ui.theme.ColorMath.mix(subtle, color(context, SemanticColor.SURFACE_PANEL), subtle.getAlpha() / 255.0);
+        return dev.jasper.ui.theme.ColorMath.mix(subtle, color(context, ground), subtle.getAlpha() / 255.0);
     }
     /** A mask's face size and treatment; a hollow mask has the face, {@code cutout} above the shadow, cut out. */
     private record ShadowKey(int width, int height, double radius, int blur, double strength, boolean hollow, int cutout) { }

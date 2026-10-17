@@ -182,7 +182,7 @@ public class RemotePlugin implements Plugin {
         tunnelStore = new dev.jasper.remote.tunnels.TunnelStore(context.dataDirectory().resolve("tunnels.toml"), context.background(), ui);
         tunnelsUi = new dev.jasper.remote.ui.tunnels.TunnelsUi(context, ui, tunnelStore,
             new dev.jasper.remote.tunnels.TunnelManager(connections, () -> settings.connection().connectTimeout(), context.background(), ui),
-            store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host));
+            store::hosts, store::host, paneId -> Optional.ofNullable(panes.get(paneId)).flatMap(store::host), layout);
         remoteHosts=new dev.jasper.remote.chooser.RemoteHosts(store::hosts,connections::connected,store::onChanged,connections::onChanged,
             paneId->context.terminals().pane(paneId).flatMap(this::sftpPane).map(target->new dev.jasper.remote.chooser.RemoteHosts.Located(target.identity(),target.directory())),
             connections::resolveIdentity,(identity,window)->endpoints.open(Optional.of(identity),window,status->{}),()->context.terminals().activeWindow());
