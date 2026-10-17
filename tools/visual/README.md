@@ -12,11 +12,15 @@ geometry check compares luminance edges, not RGB values.
   original pixels, with a 20px tick grid, for close inspection.
 - `compare_all.py OUT_DIR [FILTER]` runs every pair in `pairs.json` (mock path, content crop, render path
   under `*/build/`, and an optional `note` naming a deliberate difference, which it prints). Regenerate the renders first (`:jasper-app:themeSurfacePreview`,
-  `:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview).
-- `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*`, the `run-window-*`, the `chrome-*` and the `dock-*` pairs)
+  `:jasper-app:settings9bPreview`, the staged render evidence tests, `EnterpriseKitRenderTest` and the
+  workspace preview).
+- The Boot Splash frames are 1x (720 × 440), so their pairs (`enterprise-splash-*`) take the 1x renders
+  `BootSplashMockTest` writes under `jasper-app/build/enterprise-splash/`.
+- `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*`, the `run-window-*`, the `chrome-*`, the `enterprise-light-*`, the `enterprise-dark-*` and the `dock-*` pairs)
   and prints PASS or FAIL: the edge agreement must reach the floor and each listed colour must fill a 2×2 block within
   ΔE76 6 in the mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. Render the `classic-*` pairs first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise
-  -Pjasper.galleryTheme=light -Pjasper.galleryScale=2`; `RunWindowRenderTest` writes the `run-window-*` renders under `jasper-app/build/run-window/`.
+  -Pjasper.galleryTheme=light -Pjasper.galleryScale=2`; `RunWindowRenderTest` writes the `run-window-*` renders under `jasper-app/build/run-window/`, and
+  `EnterpriseKitRenderTest` the `enterprise-light-*` and `enterprise-dark-*` ones under `jasper-app/build/enterprise-kit/`.
 
 The `dock-*` pairs compare the Enterprise dock chrome's crops that `DockMockTest` writes under
 `jasper-app/build/dock-renders/` (run `./gradlew :jasper-app:test --tests '*DockMockTest'` first).

@@ -2,6 +2,7 @@ package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -13,6 +14,10 @@ interface ButtonFace extends Face {
     void paintFace(Buttons.KitButton button, Graphics2D g, boolean hover, boolean focused);
     /** The button's label colour. */
     Color text(Buttons.KitButton button, boolean hover);
+    /** The role of {@code button}'s glyph where neither a selected row, a severity nor a panel decides it. */
+    SemanticColor iconRole(Buttons.KitButton button, boolean hover);
+    /** Whether {@code button}'s named glyph is recoloured in its role even where its artwork is authored. */
+    boolean recolours(Buttons.KitButton button);
     /** Whether disabled {@code button} is its whole face faded as one layer; otherwise the face draws its own disabled state. */
     boolean fades(Buttons.KitButton button);
     /** The label's type role for a {@code kind} button whose label would take {@code role}. */
@@ -33,4 +38,9 @@ interface ButtonFace extends Face {
     boolean tiles();
     /** The rule above a picker menu's footer row. */
     Color menuDivider(KitContext context);
+    /**
+     * How far each later button of a {@code JOINED_ACTIONS} pair overlaps the one before it: none where the buttons stand
+     * side by side inside the pair's outline, one border where the halves share it.
+     */
+    int joinedOverlap();
 }

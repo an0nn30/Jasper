@@ -48,16 +48,19 @@ final class StripeLabels {
     /** The labels' face: the kit's label role. */
     Font font() { return styles.font(Typography.Role.LABEL); }
 
-    /** A label's length along its stripe: the padding at both ends and the text, then a badge's gap and pill. */
+    /**
+     * A label's length along its stripe: the padding at both ends and the text's set advance (its kerned fractional
+     * advance, rounded, as the mocks set the labels), then a badge's gap and pill.
+     */
     int length(String text, Optional<PanelBadge> badge) {
-        int length = 2 * styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING) + painter.measureText(font(), text);
+        int length = 2 * styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING) + painter.setAdvance(font(), text);
         if (badge.isPresent())
             length += styles.metric(DesignMetrics.Role.STRIPE_PILL_GAP) + painter.countPill(Integer.toString(badge.get().count())).width;
         return length;
     }
 
     /**
-     * How deep every stripe stands, its 1 px rule included (Rulings 4): {@code window.rail_width}, or the label's line and
+     * How deep a side stripe stands, its 1 px rule included (Rulings 4): {@code window.rail_width}, or the label's line and
      * the rail's two edges when a large interface font needs more.
      */
     int thickness(int railWidth, Component reference) {
@@ -67,8 +70,20 @@ final class StripeLabels {
     }
 
     /**
-     * Paints a label in text space, from its start, centred across {@code across}: its text, held on the stripe, a hovered
-     * tile or an open tile, then its badge's pill.
+     * How deep the bottom strip stands, its 1 px rule included (Rulings 4 as ruled on 2026-10-17): the mocks'
+     * {@code BOTTOM_STRIP_HEIGHT} (24) above its rule, or the label's line and the rail's two edges when a large interface
+     * font needs more; {@code window.rail_width} does not move it.
+     */
+    int stripThickness(Component reference) {
+        int line = reference.getFontMetrics(font()).getHeight();
+        return Math.max(styles.metric(DesignMetrics.Role.BOTTOM_STRIP_HEIGHT), line + 2 * styles.metric(DesignMetrics.Role.RAIL_EDGE))
+            + styles.metric(DesignMetrics.Role.DOCK_RULE);
+    }
+
+    /**
+     * Paints a label in text space, from its start, centred across {@code across} on a whole-pixel baseline (the mocks'
+     * bottom strip sets its 24 px line's at 17): its text, held on the stripe, a hovered tile or an open tile, then its
+     * badge's pill.
      */
     void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, GeneratedTheme theme, boolean open, boolean hover) {
         painter.prepareText(g);
@@ -77,7 +92,7 @@ final class StripeLabels {
         FontMetrics metrics = g.getFontMetrics(font);
         int x = styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING);
         g.setColor(painter.stripeLabel(theme, open, hover));
-        g.drawString(text, (float) x, (across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent());
+        g.drawString(text, (float) x, (float) Math.round((across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent()));
         if (badge.isEmpty()) return;
         String count = Integer.toString(badge.get().count());
         Dimension pill = painter.countPill(count);

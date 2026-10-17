@@ -82,9 +82,10 @@ Terminal › Shell's Profile lists the shells Jasper detected, including each WS
 ("Ubuntu (WSL 1)"); ↻ detects them again. Program and Arguments apply only to Custom.
 
 Changes wait until **Apply** or **OK**; **Cancel** (or Escape) discards them, asking first. A page with unsaved
-changes shows its name in blue, and a setting that differs from its default has a Reset button, which removes
-the key from the file. Settings writes `config.toml` in place and keeps your comments; a value the file would
-reject is refused with the same message the file would produce. If `config.toml` has errors, Settings shows a
+changes shows its name in blue, and a setting that differs from its default has a Reset button (under the
+Enterprise look, Reset to Default in the row's context menu), which removes the key from the file. Settings writes
+`config.toml` in place and keeps your comments; a value the file would reject is refused with the same message the
+file would produce. If `config.toml` has errors, Settings shows a
 banner and saves nothing until the file is fixed; if it uses old setting names, the banner offers Migrate Config.
 System Settings shows the file's location with Open in Editor, Reveal, Reload from Disk and Migrate Config, and a
 Java Virtual Machine section for the [custom VM options](#custom-vm-options).
@@ -185,7 +186,7 @@ family = "system"
 | Key | Default | Accepted values | When applied |
 |---|---|---|---|
 | `window.tab_height` | `30` | Integer 20–72 logical pixels; out-of-range values use the nearest limit with a warning | Live |
-| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it (under the Enterprise look, the least thickness of the labelled stripes and the bottom strip); out-of-range values use the nearest limit with a warning | Live |
+| `window.rail_width` | `28` | Integer 28–64 logical pixels; both tool window stripes and their buttons scale with it (under the Enterprise look, the least thickness of the labelled side stripes); out-of-range values use the nearest limit with a warning | Live |
 | `window.toolbar` | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live |
 | `window.toolbar_height` | `30` | Integer 28–64 logical pixels; also sets the unified macOS title-bar height; buttons are the height minus 6 and icon-only buttons stay square; out-of-range values use the nearest limit with a warning; the default depends on the active look | Live |
 | `window.status_bar` | `true` | Boolean | Live |
@@ -194,7 +195,7 @@ family = "system"
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
-| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says | Next start |
+| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says, and Settings hides it | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |
@@ -222,7 +223,7 @@ family = "system"
 | `terminal.scheme` | `"match"` | `"match"` or a scheme id such as `"slate-cobalt/high-contrast"`: the terminal panes' colors ([Themes](themes.md)) | Live |
 | `terminal.on_exit` | `"keep_open"` | `"keep_open"`, `"close_on_success"`, `"close"` | Live for future shell exits |
 | `terminal.shell_integration` | `"auto"` | `"auto"`, `"manual"`, `"off"` | New pane requests |
-| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately; a look without motion keeps everything still whatever this says | Live |
+| `ui.animations.enabled` | `true` | Enable app animations; disabling finishes active transitions immediately; a look without motion keeps everything still whatever this says, and Settings hides it | Live |
 | `ui.appearance` | `"system"` | `"system"` (the operating system's light or dark), `"dark"`, `"light"` | Live |
 | `ui.theme.dark` | `"slate-cobalt"` | A theme id: the theme the Dark appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
 | `ui.theme.light` | `"slate-cobalt"` | A theme id: the theme the Light appearance shows ([Themes](themes.md)); the default depends on the active look | Live |
@@ -848,8 +849,10 @@ family = "system"
 size = 14
 ```
 
-`family = "system"` (the default) selects the current platform UI font. You can
-choose any installed family; an unavailable family falls back to the platform font. This
+`family = "system"` (the default) selects the look's UI font: the platform font under the default look, IBM Plex
+Sans under Enterprise; a named family overrides it. An unset `size` uses the look's size (the platform size, or 12 under
+Enterprise); a set size scales every role. You can
+choose any installed family; an unavailable family falls back to the look's UI font. This
 works on macOS, Linux and Windows without a downloaded font. An explicit family overrides
 that selection.
 

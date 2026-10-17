@@ -133,4 +133,13 @@ class AppearanceSelectionTest {
         assertThat(editor.event("ui.appearance", new UiEvent.Selected("ui.appearance:dark-theme", java.util.Set.of("slate-cobalt")))).isTrue();
         assertThat(editor.companionValues()).containsEntry(CoreSettings.UI_THEME_DARK, Optional.of("slate-cobalt"));
     }
+
+    /** Spec 7.4: a plugin's theme is captioned with its provider. */
+    @Test void aPluginThemeIsCaptionedWithItsProvider() {
+        var themes = new InstalledThemes(List.of(THEMES.dark().getFirst(), new InstalledThemes.ThemeOption("enterprise", "Enterprise", OCEAN, "Enterprise")),
+            THEMES.light(), THEMES.schemes(), java.util.Map.of("slate-cobalt", "Slate Cobalt", "enterprise", "Enterprise"));
+        var editor = new AppearanceSelection(new AppearanceChoices(100f, false, () -> Optional.of(false),
+            ignored -> new dev.jasper.app.lifecycle.Subscription(() -> {}), () -> themes, Optional.empty()), PageKit.context(draft(""), id -> { }, () -> { }));
+        assertThat(pick(editor, 1).options()).extracting(Option::description).containsExactly("", "From the Enterprise plugin");
+    }
 }

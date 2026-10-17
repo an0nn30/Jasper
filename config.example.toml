@@ -141,10 +141,11 @@ light = "slate-cobalt"
 
 [ui.font]
 # Live UI font for app chrome and plugin controls, independent of [terminal.font].
-# "system" uses the platform font on macOS, Linux and Windows.
-# A missing named font falls back to that platform font.
+# "system" uses the look's UI font: the platform font under the default look, IBM Plex Sans under Enterprise.
+# A missing named font falls back to the look's UI font.
 family = "system"
-# Optional size: 8-32 points, including fractional values. Omit to keep platform sizing.
+# Optional size: 8-32 points, including fractional values. Omit to keep the look's size (the platform size, or 12
+# under Enterprise); a set size scales every role.
 # size = 14.0
 
 [ui.workspace]

@@ -35,6 +35,8 @@ final class Stacks {
             if(!joined)return;var g=(Graphics2D)graphics.create();
             try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
         }
+        /** Overlapping halves of a joined pair (a face's {@code joinedOverlap}) repaint through this surface, the first on top. */
+        @Override public boolean isOptimizedDrawingEnabled(){return !(joined&&context.faces().buttons.joinedOverlap()>0)&&super.isOptimizedDrawingEnabled();}
         /** The route strip: the input surface inside the input outline, and the connecting arrow before each later step. */
         void paintRoute(Graphics graphics){
             var g=(Graphics2D)graphics.create();
@@ -521,13 +523,14 @@ final class Stacks {
     /** The final action owns a stable slot even when no override currently makes it visible. */
     static final class SettingsTrailingLayout implements Composition.WidthLayout {
         final KitContext context;SettingsTrailingLayout(KitContext context){this.context=context;}
-        int gap(){return ThemePainting.metric(context,DesignMetrics.Role.COLUMN_GAP);}
+        /** The gap before the row's action; a control without one takes the catalog's empty gap (none where Reset is in the row's menu, spec 12.1). */
+        int gap(Container p){return ThemePainting.metric(context,p.getComponentCount()>1?DesignMetrics.Role.COLUMN_GAP:DesignMetrics.Role.SETTINGS_TRAILING_EMPTY_GAP);}
         int action(Container p){return p.getComponentCount()>1?p.getComponent(1).getPreferredSize().width:0;}
-        @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap()+action(p),c.height);}
-        @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap()-action(p)));}
+        @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap(p)+action(p),c.height);}
+        @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap(p)-action(p)));}
         /** A switch's track aligns with the column's other controls; its focus halo lies in the gap before the action. */
         int halo(Container p){return p.getComponent(0) instanceof Switches.SwitchButton?ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING):0;}
-        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap()-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(),0,a,p.getHeight());}
+        @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap(p)-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(p),0,a,p.getHeight());}
         @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
     }
     /** A Settings group card's heading row: owner tile and name at the leading edge, its count at the trailing edge. */
@@ -599,7 +602,7 @@ final class Stacks {
         }
 
         int gap() {
-            if(role==Nodes.LayoutRole.JOINED_ACTIONS)return 0;
+            if(role==Nodes.LayoutRole.JOINED_ACTIONS)return -context.faces().buttons.joinedOverlap();
             return ThemePainting.metric(
                     context,
                     role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.DETAIL_SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP

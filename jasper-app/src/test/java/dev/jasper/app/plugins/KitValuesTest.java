@@ -39,7 +39,7 @@ class KitValuesTest {
     new PropertyRow("Credentials","Vault locked",false,Optional.of(Severity.WARNING)))),
    new Custom("custom",READY,"document",CustomKind.EDITOR,"Document"));
   assertThat(classes(nodes)).hasSize(Node.class.getPermittedSubclasses().length);
-  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
  }
  /** Plan 3b: a read-only field crosses the projection unchanged. */
  @Test void readOnlyFieldsProjectWithoutLoss(){
@@ -118,7 +118,7 @@ class KitValuesTest {
    new SettingRow("setting",READY,"Title","",toggle,false,true),
    new FormRow("row",READY,"Label","",new Text("c",READY,"x",TextRole.BODY),Optional.empty(),true),
    new Tree("tree",READY,List.of(new TreeItem("a","A",Optional.empty(),false,List.of(new TreeItem("b","B",Optional.empty(),true,List.of(),OptionalInt.of(4),true)),OptionalInt.of(0),false)),Set.of("a"),Set.of("b"),""));
-  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
   assertThat(Arrays.stream(ChoiceKind.values()).map(Enum::name)).hasSize(dev.jasper.ui.model.Nodes.ChoiceKind.values().length);
   assertThat(Arrays.stream(FieldKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.FieldKind.values()).map(Enum::name).toArray(String[]::new));
   assertThat(Arrays.stream(ChoiceKind.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ChoiceKind.values()).map(Enum::name).toArray(String[]::new));
@@ -131,7 +131,7 @@ class KitValuesTest {
     Set.of("docs","notes"),"open",pin,SelectionMode.MULTIPLE,ScrollPolicy.OVERLAY),
    new Tree("keys",READY,List.of(new TreeItem("tabs","Tabs",Optional.of("folder"),false,List.of(new TreeItem("new","New tab",Optional.empty(),true,List.of(),OptionalInt.empty(),true,"Context",Optional.of(StatusKind.SUCCESS),List.of("Global","Cmd+T"),Optional.of(pin))),OptionalInt.of(1),false)),Set.of("tabs"),Set.of("new"),"edit"),
    new Breadcrumbs("path",READY,List.of(new Crumb("home","Home",List.of()),new Crumb("docs","docs",pin)),"Location",false,"","edit","go","done"));
-  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
   assertThat(Arrays.stream(ScrollPolicy.values()).map(Enum::name)).containsExactly(Arrays.stream(dev.jasper.ui.model.Nodes.ScrollPolicy.values()).map(Enum::name).toArray(String[]::new));
   assertThat(KitValues.toSdk(new dev.jasper.ui.model.UiEvent.Sorted("files","size"))).isEqualTo(new UiEvent.Sorted("files","size"));
  }
@@ -143,7 +143,7 @@ class KitValuesTest {
   var none=new ListItem("b",Optional.empty(),List.of(new Text("b.name",READY,"B",TextRole.BODY)),List.of(),List.of(),false,Optional.of(List.of()));
   List<Node> nodes=List.of(new ItemList("plugins",READY,ListKind.DOUBLE,List.of(row,none),Set.of("a"),"",List.of(),SelectionMode.SINGLE,Optional.empty()),
    new Icon("e",READY,"error",Hue.NONE,IconSize.RAIL,"Error",Optional.of(Severity.DANGER)),new Toggle("t",READY,"T",false,"t",false,"Why"));
-  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString()).isEqualTo(spec.toString());}
+  for(var node:nodes){var spec=new ViewSpec(node);assertThat(KitValues.toModule(spec).toString().replace("titleNote=, contextActions=[]", "titleNote=")).isEqualTo(spec.toString());}
   var module=(dev.jasper.ui.model.Nodes.ItemList)KitValues.toModule(new ViewSpec(nodes.getFirst())).root();
   assertThat(module.items().getFirst().contextActions()).hasValueSatisfying(items -> assertThat(items).hasSize(2));
   assertThat(module.items().get(1).contextActions()).hasValue(List.of());

@@ -17,10 +17,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Spec 16.1.4 for the dock chrome: each surface plan 7 builds, rendered at 2x under the Enterprise kit and theme (plan
- * 6a's {@link EnterpriseLook} fixtures until plan 5b ships the plugin, Plex and the theme), against its crop of the
- * Workstation (Light), Dark Mode and Unlock Vault mocks. Probes that follow the UI face's glyphs are printed until then
- * ({@link MockProfile#fonts}). Renders, crops and their differences are written under
+ * Spec 16.1.4 for the dock chrome: each surface plan 7 builds, rendered at 2x under the shipped Enterprise kit, IBM Plex and
+ * theme ({@link EnterpriseLook}), against its crop of the Workstation (Light), Dark Mode and Unlock Vault mocks. Probes that
+ * follow the UI face's glyphs are asserted under IBM Plex and printed only where an installed IBM Plex hides the plugin's
+ * files ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). Renders, crops and their differences are written under
  * {@code jasper-app/build/dock-renders/}. Mock data (titles, numbers, counts) are fixtures.
  */
 @ExtendWith(EdtTestExtension.class)
@@ -42,8 +42,8 @@ class DockMockTest {
         /** A render as this mock shows it: under its scrim. */
         BufferedImage seen(BufferedImage render) { return scrim > 0 ? MockCrops.scrim(render, scrim) : render; }
 
-        /** The open tile is Enterprise Light's #D3D9E1 (6a's fixture theme) against the mock's #CFD4DC (Rulings 6); Dark's is exact. */
-        int tileTolerance() { return dark ? 3 : 10; }
+        /** The open tile is Enterprise Light's #D7D9DC against the mock's #CFD4DC, 8 apart (Rulings 6); Dark's is exact. */
+        int tileTolerance() { return dark ? 3 : 8; }
 
         /**
          * How near a fill or rule must be: 3, or 5 under the Unlock Vault mock's scrim, which has a cool cast (white reads
@@ -73,8 +73,21 @@ class DockMockTest {
     static final int GLYPH_EXTENT = 4;
     /** The header strips' agreement floor over their text, left of their icons. */
     static final double HEADER_FLOOR = 0.94;
-    /** Agreement floors (spec 16.1.4): the share of pixels within 24 per channel of the mock. */
-    static final double STRIPE_FLOOR = 0.92;
+    /** Agreement floors (spec 16.1.4): the share of pixels within 24 per channel of the mock. The bottom strip's. */
+    static final double STRIP_FLOOR = 0.92;
+    /**
+     * The side stripes' floor: the plan's 0.92 less 0.01, measured under IBM Plex at the merge with plan 5b: the Light left
+     * stripe's glyphs agree at 0.9197, their antialiased edges on the open tile, Enterprise Light's #D7D9DC against the
+     * mock's #CFD4DC (Rulings 6); the other side stripes 0.925 to 0.935.
+     */
+    static final double STRIPE_FLOOR = 0.91;
+    /**
+     * The mocks set a side label's line at the stripe's outer edge (its caps 3 to 12 px from it in their 22 px fill), where
+     * a labelled stripe centres it across its wider fill (Rulings 21): across, at 2x, the render's labels lie this far
+     * nearer the stripe's rule than the mock's, a measured residual. The agreeing share compares the glyphs on the mock's
+     * label line.
+     */
+    static final int LABEL_LINE = 7;
 
     @Test void theLeftStripeMatchesTheMocks() throws Exception {
         for (Variant variant : VARIANTS) {
@@ -107,9 +120,9 @@ class DockMockTest {
 
     /**
      * A side stripe against its mock crop (the mock's 22 px fill at 2x): the stripe and open-tile fills, one ink run per
-     * label with the mock's ink, the first label's leading ink within 2 px, and (printed until plan 5b) the other run
-     * edges and the share of agreeing pixels over the render's middle 44 columns of its fill, where the centred labels
-     * line up with the mock's.
+     * label with the mock's ink, the first label's leading ink within 2 px, the labels' ink across {@link #LABEL_LINE}
+     * nearer the rule than the mock's, and under IBM Plex the other run edges within 2 and the share of agreeing pixels
+     * over the render's middle 44 columns of its fill, its glyphs aligned on the mock's label line.
      */
     static void compareStripe(Variant variant, String name, BufferedImage render, BufferedImage mock, int thickness, Side side,
                               List<Integer> expectedRuns) {
@@ -129,8 +142,8 @@ class DockMockTest {
         }
         assertThat(mine).as(where + ": one ink run per label").hasSameSizeAs(theirs);
         // The first label's leading ink lies RAIL_GAP and STRIPE_LABEL_PADDING below the stripe's top whatever the face;
-        // every later edge follows the labels' advance widths, and the agreeing share their glyphs: printed until plan
-        // 5b's Plex (Execution notes R5), then asserted within 2 px and against STRIPE_FLOOR.
+        // every later edge follows the labels' advance widths, and the agreeing share their glyphs: asserted under IBM
+        // Plex within 2 px and against STRIPE_FLOOR.
         assertThat(mine.getFirst().start()).as(where + " label 0 starts")
             .isBetween(theirs.getFirst().start() - 2, theirs.getFirst().start() + 2);
         for (int i = 0; i < theirs.size(); i++) {
@@ -138,19 +151,26 @@ class DockMockTest {
             MockProfile.fonts(where + " label " + i + " end", mine.get(i).end(), theirs.get(i).end(), 2);
             assertThat(MockCrops.near(mine.get(i).ink(), theirs.get(i).ink(), 24)).as(where + " label " + i + " ink").isTrue();
         }
-        MockCrops.fontsFloor(where + ": agreeing pixels",
-            MockCrops.agreement(MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), mock, 24), STRIPE_FLOOR);
+        // Across: the render centres its labels, LABEL_LINE (2x) nearer the rule than the mocks' outer-edge line.
+        var theirLine = MockCrops.runs(mock, false, 120, 40, stripeFill, tile);
+        var myLine = MockCrops.runs(MockCrops.crop(window, 0, 0, mock.getWidth(), mock.getHeight()), false, 120, 40, stripeFill, tile);
+        assertThat(theirLine).as(where + ": the mock's label line").hasSize(1);
+        assertThat(myLine).as(where + ": the label line").hasSize(1);
+        int toward = side == Side.LEFT ? 1 : -1, dx = toward * LABEL_LINE, columns = mock.getWidth() - LABEL_LINE;
+        assertThat(toward * (myLine.getFirst().start() - theirLine.getFirst().start())).as(where + ": the label line across")
+            .isBetween(LABEL_LINE - 1, LABEL_LINE + 1);
+        MockCrops.fontsFloor(where + ": agreeing pixels", MockCrops.agreement(MockCrops.crop(window, Math.max(dx, 0), 0, columns, mock.getHeight()),
+            MockCrops.crop(mock, Math.max(-dx, 0), 0, columns, mock.getHeight()), 24), STRIPE_FLOOR);
     }
 
     /**
      * The bottom strip's three closed labels, "Event Log", "Transfers" and "Problems" with a count pill (a fixture: the
      * mock's amber pill is the deferred Problems panel; this one is the error tone), against the mocks' bottom strip: the
-     * strip is 28 thick against the mock's 24 and its labels start at the side stripes' 28 against 23 (Rulings 4 and 8),
-     * so the render is cropped on its fill's middle rows and its ink is compared 10 px (2x) to the right of the mock's.
-     * Asserted: the surface, three dividers in the mock's colour, the first label's leading ink and the pill's width;
-     * the later edges, the pill's start and the agreeing share follow the labels' advance widths and glyphs and are
-     * printed until plan 5b's Plex (Execution notes R5). The render is 330 wide, past the mock's 270, so the platform
-     * face's wider labels still show their third divider.
+     * strip is the mocks' 24 and its rule (Rulings 4 as ruled on 2026-10-17) and its labels start at the side stripes'
+     * fill, 27 against the mock's 22 (Rulings 8), so the render's ink is compared 10 px (2x, the stripes' extra
+     * thickness) to the right of the mock's. Asserted: the surface, three dividers in the mock's colour and place, the
+     * labels' edges, the pill's start and width, and the share of agreeing pixels under IBM Plex
+     * ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). The render is 330 wide, past the mock's 270.
      */
     @Test void theBottomStripMatchesTheMocks() throws Exception {
         for (Variant variant : VARIANTS) {
@@ -162,19 +182,23 @@ class DockMockTest {
                     java.util.OptionalInt.empty());
                 strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false),
                     new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
-                int thickness = strip.getPreferredSize().height, shift = 2 * (thickness - 23);
+                int thickness = strip.getPreferredSize().height;
+                assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
+                int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit()).getPreferredSize().width - 23);
                 var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
+                // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708).
+                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
                 var mock = variant.crop(2, 1708, 520, 48);
-                // The render's fill (below its 2 px rule at 2x), its middle 48 rows; the mock crop is the mock's fill.
-                int fill = 2 * thickness - 2, top = 2 + (fill - 48) / 2;
-                var rows = MockCrops.crop(render, shift, top, 600, 48);
-                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(rows, 0, 0, 520, 48), mock);
+                // The render's fill (below its 2 px rule at 2x), 48 rows as the mock crop is the mock's fill.
+                var rows = MockCrops.crop(render, shift, 2, 600, 48);
                 String where = variant.name() + " bottom strip";
-                Color surface = MockCrops.at(mock, 10, 4), divider = MockCrops.at(mock, 188, 24);
+                Color surface = MockCrops.at(mock, 10, 4), divider = MockCrops.at(mock, 188, 24), rule = MockCrops.at(variant.crop(2, 1706, 20, 2), 10, 0);
                 assertThat(MockCrops.near(MockCrops.at(rows, 10, 4), surface, variant.fillTolerance())).as(where + ": its surface").isTrue();
+                for (int y = 0; y < 2; y++)
+                    assertThat(MockCrops.near(MockCrops.at(render, shift + 10, y), rule, variant.fillTolerance())).as(where + ": its top rule, row " + y).isTrue();
                 // The dividers, found as runs in the fill's top 6 rows (2x), where no text or pill has ink (adjacent
                 // columns join: gap 1): the mock's are 2 px wide at 188, 332 and 518 of this crop. border.divider is the
-                // fixture theme's #D3D6DA and #4A4D53 (6b's override), the mock's.
+                // shipped theme's #D3D6DA and #4A4D53 (6b's override), the mock's.
                 var theirDividers = MockCrops.runs(variant.crop(2, 1708, 525, 6), false, 20, 1, surface);
                 var myDividers = MockCrops.runs(MockCrops.crop(rows, 0, 0, 600, 6), false, 20, 1, surface);
                 assertThat(theirDividers).as(where + ": the mock's dividers").hasSize(3);
@@ -208,7 +232,7 @@ class DockMockTest {
                     MockProfile.fonts(where + " label " + i + " end", mine.get(i).end(), theirs.get(i).end(), 2);
                 }
                 MockCrops.fontsFloor(where + ": agreeing pixels",
-                    MockCrops.agreement(MockCrops.crop(rows, 0, 0, 460, 48), MockCrops.crop(mock, 0, 0, 460, 48), 24), STRIPE_FLOOR);
+                    MockCrops.agreement(MockCrops.crop(rows, 0, 0, 460, 48), MockCrops.crop(mock, 0, 0, 460, 48), 24), STRIP_FLOOR);
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -268,7 +292,7 @@ class DockMockTest {
      * stand from the trailing edge, whatever the face), each icon's extent within {@link #GLYPH_EXTENT} and its ink within
      * {@link Variant#glyphInkTolerance} (one glyph box and one ink for every action), and each text run's ink; the other
      * text edges (a text run's end within 3, a later run's start within 2) and the agreeing pixels of the text, left of the
-     * icons, follow the title's advance width and glyphs and are printed until plan 5b's Plex (Execution notes R5).
+     * icons, follow the title's advance width and glyphs and are asserted under IBM Plex.
      */
     static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth) {
         String where = variant.name() + " " + name;
@@ -347,6 +371,8 @@ class DockMockTest {
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
+
+    private static String where(Variant variant) { return variant.name() + " bottom strip"; }
 
     /** A header strip's place in the fixture at 2x against the mock's, and its width. */
     private static void assertPlaced(String where, Rectangle header, int x, int y, int width) {

@@ -79,13 +79,18 @@ public final class PluginJars {
 
         /** Rewrites {@code jar} with one more entry, for plugins that ship a resource beside {@code plugin.toml}. */
         public static void addResource(Path jar, String name, String text) throws IOException {
+            addResource(jar, name, text.getBytes(StandardCharsets.UTF_8));
+        }
+
+        /** As above, for a binary resource such as an icon. */
+        public static void addResource(Path jar, String name, byte[] bytes) throws IOException {
             Path rewritten = Files.createTempFile(jar.getParent(), "with-resource-", ".jar");
             try (var in = new java.util.jar.JarInputStream(Files.newInputStream(jar));
                  var out = new JarOutputStream(Files.newOutputStream(rewritten), in.getManifest() == null ? new Manifest() : in.getManifest())) {
                 for (JarEntry entry = in.getNextJarEntry(); entry != null; entry = in.getNextJarEntry()) {
                     out.putNextEntry(new JarEntry(entry.getName())); in.transferTo(out); out.closeEntry();
                 }
-                out.putNextEntry(new JarEntry(name)); out.write(text.getBytes(StandardCharsets.UTF_8)); out.closeEntry();
+                out.putNextEntry(new JarEntry(name)); out.write(bytes); out.closeEntry();
             }
             Files.move(rewritten, jar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }

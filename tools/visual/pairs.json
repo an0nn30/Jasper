@@ -719,6 +719,149 @@
     ]
   },
   {
+    "name": "enterprise-light-sessions",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sessions@2x.png",
+    "min_agreement": 0.26,
+    "colours": [
+      "#FFFFFF",
+      "#2F65CA",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-light-tunnels",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/tunnels-added@2x.png",
+    "min_agreement": 0.25,
+    "colours": [
+      "#ECEDEF",
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "enterprise-light-sftp",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/sftp-connected@2x.png",
+    "min_agreement": 0.12,
+    "colours": [
+      "#FFFFFF",
+      "#2F65CA",
+      "#ECEDEF",
+      "#F0F1F3",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "enterprise-light-fileservers",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/light/fileservers@2x.png",
+    "min_agreement": 0.27,
+    "colours": [
+      "#FFFFFF",
+      "#ECEDEF",
+      "#F0F1F3"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sessions",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      184,
+      697,
+      516
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sessions@2x.png",
+    "min_agreement": 0.27,
+    "colours": [
+      "#2E3135",
+      "#3D74D6",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-tunnels",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2134,
+      1014,
+      697,
+      268
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/tunnels-added@2x.png",
+    "min_agreement": 0.23,
+    "colours": [
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-sftp",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      184,
+      598,
+      759
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/sftp-connected@2x.png",
+    "min_agreement": 0.1,
+    "colours": [
+      "#3D74D6",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "enterprise-dark-fileservers",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      49,
+      945,
+      598,
+      150
+    ],
+    "render": "jasper-app/build/enterprise-kit/dark/fileservers@2x.png",
+    "min_agreement": 0.26,
+    "colours": [
+      "#2E3135",
+      "#3C3F44",
+      "#393C41",
+      "#383B40"
+    ]
+  },
+  {
     "name": "chrome-toolbar-light",
     "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
     "crop": [
@@ -967,6 +1110,400 @@
     ]
   },
   {
+    "name": "enterprise-splash-01",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 01 - Starting Java runtime.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/01.png"
+  },
+  {
+    "name": "enterprise-splash-04",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 04 - Loading plugin File Server.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/04.png"
+  },
+  {
+    "name": "enterprise-splash-10",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 10 - Starting Workstation.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/10.png"
+  },
+  {
+    "name": "enterprise-settings-01",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 01 - Appearance & Behavior - Appearance.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/01.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-02",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 02 - Appearance & Behavior - Window.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/02.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-03",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 03 - Appearance & Behavior - Notifications.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1654
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/03.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-04",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 04 - Appearance & Behavior - Command Palette.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/04.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-05",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 05 - Appearance & Behavior - Desk Buddy.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/05.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-06",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 06 - Appearance & Behavior - System Settings.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/06.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-07",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07 - Keymap.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/07.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-08",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 08 - Plugins.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/08.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-09",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 09 - Terminal - Font & Colors.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/09.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-10",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 10 - Terminal - Cursor.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/10.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-11",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 11 - Terminal - Shell.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/11.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-12",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 12 - Tools - Credential Vault.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/12.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-13",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 13 - Tools - Editor.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1462
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/13.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-14",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 14 - Tools - File Server.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/14.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-15",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 15 - Tools - Project Index.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1898
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/15.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ],
+    "note": "Plan 9a: the crop is the whole page, and Project Index is the tallest (949 px) with the most body content, so its agreement waits on plan 9b's Project Index composition. Edge agreement 0.379 at plan 9a in the platform face, 0.428 in IBM Plex since the merge with plan 5b."
+  },
+  {
+    "name": "enterprise-settings-16",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 16 - Tools - Remote.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/16.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-17",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 17 - Tools - Sample.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/17.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
+    "name": "enterprise-settings-18",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 18 - Tools - Shell History.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1382
+    ],
+    "render": "jasper-app/build/enterprise-settings/light/18.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
     "name": "dock-light-kit-sftp-header",
     "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
     "crop": [
@@ -1046,7 +1583,7 @@
     "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
     "min_agreement": 0.85,
     "colours": [
-      "#D3D9E1",
+      "#D7D9DC",
       "#1E1F22",
       "#E4E6E9"
     ]
@@ -1063,7 +1600,7 @@
     "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
     "min_agreement": 0.9,
     "colours": [
-      "#D3D9E1",
+      "#D7D9DC",
       "#1E1F22",
       "#E4E6E9"
     ]
@@ -1073,9 +1610,9 @@
     "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
     "crop": [
       2,
-      1708,
+      1706,
       520,
-      48
+      50
     ],
     "render": "jasper-app/build/dock-renders/light-bottom-strip-render.png",
     "min_agreement": 0.8,
@@ -1260,9 +1797,9 @@
     "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
     "crop": [
       2,
-      1708,
+      1706,
       520,
-      48
+      50
     ],
     "render": "jasper-app/build/dock-renders/dark-bottom-strip-render.png",
     "min_agreement": 0.8,
@@ -1352,7 +1889,7 @@
     "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
     "min_agreement": 0.85,
     "colours": [
-      "#A7ABB2",
+      "#AAABAE",
       "#18181B",
       "#B4B6B8"
     ]
@@ -1369,7 +1906,7 @@
     "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
     "min_agreement": 0.9,
     "colours": [
-      "#A7ABB2",
+      "#AAABAE",
       "#B4B6B8"
     ]
   },
@@ -1378,9 +1915,9 @@
     "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
     "crop": [
       66,
-      1772,
+      1770,
       520,
-      48
+      50
     ],
     "render": "jasper-app/build/dock-renders/vault-bottom-strip-render.png",
     "min_agreement": 0.8,

@@ -16,7 +16,7 @@ class PluginZipsTest {
     @Test void everyInRepoPluginZipStagesWithItsDescriptorAndBundledLibraries() throws Exception {
         List<Path> zips;
         try (var files = Files.list(Path.of(System.getProperty("jasper.pluginZips")))) { zips = files.filter(file -> file.toString().endsWith(".zip")).toList(); }
-        assertThat(zips).as("one zip per plugins/ directory").hasSize(8);
+        assertThat(zips).as("one zip per plugins/ directory").hasSize(9);
         var ids = new ArrayList<String>();
         for (Path zip : zips) {
             PluginInstaller.Staged staged = PluginInstaller.stage(zip, userDirectory, Version.parse(JasperSdk.VERSION));
@@ -39,6 +39,6 @@ class PluginZipsTest {
                 assertThat(jars).as("tomlj travels with Project Index").contains("tomlj-1.1.1.jar");
             else assertThat(jars).as(descriptor.id() + " bundles nothing").hasSize(1);
         }
-        assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault", "dev.jasper.remote", "dev.jasper.editor", "dev.jasper.fileserver", "dev.jasper.indexer");
+        assertThat(ids).containsExactlyInAnyOrder("dev.jasper.sample", "dev.jasper.snippets", "dev.jasper.history", "dev.jasper.vault", "dev.jasper.remote", "dev.jasper.editor", "dev.jasper.fileserver", "dev.jasper.indexer", "dev.jasper.enterprise");
     }
 }

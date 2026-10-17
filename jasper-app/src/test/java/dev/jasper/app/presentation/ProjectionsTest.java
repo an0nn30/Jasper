@@ -147,4 +147,30 @@ class ProjectionsTest {
         assertThat(standard.panels()).isEqualTo(new AppPanels("Notifications", Slot.RIGHT_TOP));
         assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
     }
+
+    /** Plan 9a: the Settings group has landed, so the kit file's Settings chrome and composition reach the projection. */
+    @Test void theSettingsGroupHasLanded() {
+        assertThat(Presentation.LANDED).as("plan 9 lands the Settings group").contains(Presentation.Landed.SETTINGS);
+        var none = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Set.of());
+        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Set.of());
+        assertThat(none.settings()).as("not landed").isEqualTo(standard.settings());
+        assertThat(none.composition()).as("not landed").isEqualTo(standard.composition());
+        var settingsOnly = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, EnumSet.of(Presentation.Landed.SETTINGS));
+        assertThat(settingsOnly.settings()).isEqualTo(new SettingsChrome(false, true, false,
+            Set.of("window.native_decorations", "ui.animations.enabled"), "Use the default font size"));
+        assertThat(settingsOnly.composition()).isEqualTo(Composition.CLASSIC);
+        assertThat(settingsOnly.workspace().stripes()).as("the dock group is its own").isEqualTo(WorkspaceLook.Stripes.RAILS);
+        var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
+        assertThat(shipped.settings()).isEqualTo(settingsOnly.settings());
+        assertThat(shipped.composition()).isEqualTo(Composition.CLASSIC);
+    }
+
+    /** Plan 9a: the default look's projections, for pages and dialogs made without a presentation. */
+    @Test void theStandardProjectionsAreTheDefaultLooks() {
+        for (var host : new Projections.Host[] {MAC, LINUX})
+            assertThat(Projections.standard(host)).isEqualTo(Projections.of(ChromeSpec.DEFAULT, false, false, "", host, Presentation.LANDED));
+        assertThat(Projections.standard(LINUX).settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of(), "Use platform font size"));
+        assertThat(Projections.standard(MAC).settings().hiddenKeys()).containsExactly("window.native_decorations");
+        assertThat(Projections.standard(LINUX).composition()).isEqualTo(Composition.ROWS);
+    }
 }

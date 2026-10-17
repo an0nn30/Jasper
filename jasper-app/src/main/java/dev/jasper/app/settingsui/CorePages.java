@@ -121,7 +121,7 @@ public final class CorePages {
                 .row(WINDOW_STATUS_BAR)
                 .row(WINDOW_STATUS_BAR_HEIGHT, Editors.dependentHeight()).enabledWhen(draft -> draft.value(WINDOW_STATUS_BAR))
                 .row(WINDOW_MEMORY_INDICATOR).enabledWhen(draft -> draft.value(WINDOW_STATUS_BAR))
-                .row(WINDOW_NATIVE_DECORATIONS).shownWhen(!com.formdev.flatlaf.util.SystemInfo.isMacOS)
+                .row(WINDOW_NATIVE_DECORATIONS)
                 .section("Tabs & Panels")
                 .row(WINDOW_TAB_HEIGHT, Editors.stepper("px"))
                 .row(WINDOW_RAIL_WIDTH, Editors.stepper("px"))

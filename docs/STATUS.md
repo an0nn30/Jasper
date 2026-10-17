@@ -38,8 +38,8 @@ default look: the headless gallery's files for Slate Cobalt Dark and Light and `
 byte-identical to the base. Rulings (plan, "Rulings"): (1) one plan of 14 tasks; (2) plan 6's names were assumptions,
 re-anchored to 6a/6b's merged code; (3) `DockChrome(labelledStripes, flushFrames)` is the dock's one value, `StripeSet`
 sealed over `IconRails` and `LabelledStripes`, `DockStripe` an abstract panel with three subclasses; (4) a stripe's
-thickness is `max(window.rail_width, the label's line + 2 × RAIL_EDGE + DOCK_RULE)`, the bottom strip the same (4 px
-taller than the mock's 24); (5) labels from `RAIL_GAP`, edge to edge, `STRIPE_LABEL_PADDING` 9; (6) a closed label has no
+thickness is `max(window.rail_width, the label's line + 2 × RAIL_EDGE + DOCK_RULE)`, the bottom strip (as approved on
+2026-10-17) the mocks' 24 px and its rule; (5) labels from `RAIL_GAP`, edge to edge, `STRIPE_LABEL_PADDING` 9; (6) a closed label has no
 fill, a hovered one `surface.control.hover`, an open one `surface.control.selected`; (7) rail actions are labels after
 the second group; (8) the bottom strip's Bottom Left labels from the side stripes' thickness, Bottom Right's mirrored,
 a `border.divider` after each, a top rule only; (9) every badge is a count pill (ACCENT on `info.ground`, ERROR on
@@ -83,8 +83,199 @@ context actions draws taller than the strip, and labels past a stripe's end are 
 **11,121 tests, 0 failures, 0 errors, 25 skipped** (the base, `main` at `759b2b7d9`, had 11,052), with the final
 review's fixes. GUI checks for the user (spec 16.2): stripe drag and drop including the
 bottom strip, the labelled stripes' numbers after a Keymap change, the focused header strip (Catppuccin included), the header action glyphs, and Enterprise Dark's dock
-against the Dark Mode mock; the user's ruling on Rulings 4 for the bottom strip (28 px with its rule against the
-mock's 24 + 1). Not merged, not pushed.
+against the Dark Mode mock. Rulings 4 for the bottom strip, approved on 2026-10-17 by the orchestrator under the user's
+overnight authority (the mock wins on layout): the bottom strip is the Workstation mocks' 24 px plus its 1 px rule,
+independent of `window.rail_width` (spec 10.7 amended); the side stripes keep their thickness. Not merged, not pushed.
+
+**Enterprise presentation, plan 9a: the Settings chrome — 2026-10-17** (`claude/enterprise-settings`, worktree
+`.claude/worktrees/enterprise-9`, `87e894a99..82633dd6c`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-9a-settings-chrome.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec 12.1 under the Enterprise look,
+measured on the eighteen `05 Settings` mocks. `Presentation.Landed.SETTINGS` lands, so `SettingsChrome` and
+`Composition` follow the kit file; `SettingsDialog.Hooks` carries both from the application's presentation and every
+page's `PageContext` carries both (without a presentation, `Projections.standard`), and 6a's `ProjectionReadTest` keeps
+`Composition` reads in spec 9.1's six roots. jasper-ui receives values: `SettingsShell.Frame(integratedTitle,
+collapsibleNavigation)` draws the classic dialog when the header is not the title row (a search strip on
+`surface.sidebar` ruled in `border.row`, the navigation on the `navigation_surface` slot, `border.window` rules through
+the structural guard, a `surface.footer` band); `Nodes.SettingRow.contextActions` (model only) is the row's own menu,
+shown by the popup trigger, Shift+F10 or the menu key; the collapsible navigation uses the tree face's triangles with the
+navigation's own measured geometry (rows 22, side 9, triangle 6 + 6, children 15 deeper, the selection across the
+sidebar). Under `inlineReset = false` every schema and editor row with a Reset offers Reset to Default in its menu; `hiddenKeys` decides the
+built rows (the title-bar row's macOS rule is the default look's hidden key now); the interface font row takes
+`fontRowCopy` and starts its stepper at the look's size (12). New roles `SETTINGS_HEADER_INSET` (20; classic 14),
+`SETTINGS_NAV_CHILD_INDENT` (0; 15), `SETTINGS_NAV_TEXT_GAP` (6), `SETTINGS_TRAILING_EMPTY_GAP` (10; 0), held by
+`SettingsRolesTest`; classic Settings values in
+`DesignMetrics.CLASSIC` (header 34, footer 45, buttons 98, "?" 22, page inset 16, dropdowns 220, page top 11, section gap
+13, crumb gap 6; the joined history pair's halves 26, overlapping one border through `ButtonFace.joinedOverlap`).
+`EnterpriseSettings` opens the real dialog under plan 6a's `EnterpriseLook` (the fixture kit and theme
+in the platform faces until plan 5b) over the bundled plugins; `SettingsChromeMockTest` compares each page's sidebar,
+header and footer with its mock: frame probes on every OS; the three page-geometry probes and the pixel shares, which
+follow the UI face, printed until plan 5b's merge turns them into assertions (lowest printed shares: sidebar 0.963,
+header 0.958, footer 0.991); the
+fixture restores the default look when it closes, and its comparison helper is the package-private
+`settingsui.SettingsMockMatch` on 6a's `MockProfile`. Its ink probes hold the history pair's glyphs and the footer's
+"?": the classic buttons face (`ButtonFace.iconRole` and `recolours`) draws a joined half's glyph in `text.primary`, the
+disabled half's in `text.strong.secondary` at the disabled alpha, and the "?" in `text.strong.secondary` on a classic
+gradient circle inside the standard edge.
+`ChromeRenderTest.everyLookBuildsItsSettingsFrame` (through the test bridge `settingsui.SettingsFrameRenders`) opens the
+real dialog under every look 6a's chrome renders cover and checks the frame its `SettingsChrome` names;
+`PaintedContrastTest` samples the classic frame's three guarded rules over every palette. Zero pixel change in the default
+look: the gallery and the Settings preview are byte-identical to the base (no skipped files). Rulings (plan, "Rulings"): (1) spec row 9 is two
+plans, 9a the chrome and 9b the compositions; (2) `Landed.SETTINGS` lands in 9a's first task, so Enterprise shows the
+classic chrome over today's pages until 9b; (3) the projections reach Settings through `SettingsDialog.Hooks` and
+`PageContext`, the former constructors meaning `Projections.standard(Host)`; (4) carrying `Composition` is not reading
+it; (5) the frame is jasper-ui's `SettingsShell.Frame`, and a frame that is not the title row draws the classic dialog;
+(6) both frames paint the body on `dialog_surface` and the navigation on `navigation_surface`; (7) the strip rule is
+`border.row`, unguarded, the other three `border.window` through the structural guard; (8) the row menu is jasper-ui's
+model only, so a plugin's composed page keeps its inline Reset; (9) Reset to Default is always offered under the classic
+rows, disabled at the default, on the popup trigger, Shift+F10 or the menu key; (10) a row without a Reset button
+reserves no gap after its control (classic `SETTINGS_TRAILING_EMPTY_GAP` 0); (11) the font row copy and the stepper's start at the look's standard size; (12) the
+hidden keys replace the title-bar row's `shownWhen`; (13) the classic navigation is measured, not the tree face's; (14)
+collapsed sections last one opening, a search shows every section, navigating into one opens it, Left and Right close
+and open; (15) the classic frame's roles are classic values plus three new roles, and the classic HELP button is 22;
+(16) titled boxes fill the body and the page roles are calibrated in Task 6; (17) probes on every OS, shares on macOS
+only; (18) the renders use the mocks' content sizes and close fixture data; (19) the dialog stays 1000 × 700. Execution
+notes (2026-10-17): E1 no rebase, the ancestor is checked; E2 6a's `EnterpriseLook` stands in for 5b's fixtures; E3
+`Composition`'s readers are a `ProjectionReadTest` entry, no `CompositionReadTest`; E4 the roles live in
+`SettingsRolesTest`, `NewRolesTest` and `ClassicCatalogTest` untouched; E5 `PlatformFontSize.standardSize` keys on the
+copy, not 5b's `namesUiFaces()`; E6 `LookRowsTest`'s Enterprise context is the fixture kit; E7 `SettingRow`'s old doc
+comment is folded into the new one; E8 `KitValuesTest` drops the empty `contextActions` after the title note; E9 Task 5
+adds no boxed state: 4c's `ClassicHeaders.Box` already draws nothing around the navigation; E10 probes that follow the UI face are printed until 5b; E11 the page roles are calibrated on
+printed probes and re-checked at 5b; E12 `pairs.json` is written with `ensure_ascii=False`; E13 the `LANDED` edit only
+appends; E14 `JasperApplication` passes the `projections()` field; E15 each `package-info` names the edge in its own
+words; E16 the pixel base is proven deterministic first (nothing skipped); E17 Task 7's loop closes owners first; E18
+the configuration guide says Settings hides the two rows; E19 shared files are appended for the parallel plans; E20 the
+hand-off to 9b's refresh; E21 the Tools rows' order is data; E22 this entry names the fixture and the 5b items; E23 two
+probe points move to what they name; E24 `SettingsNavigationTest` lays the view out first; E25 the two Appearance probes
+are printed for 9b; E26 the dry run; E27 a pre-existing `PaintedContrastTest` order dependence; E28 the font row's search
+words follow the look (`Editors.Factory.lookTerms`), keeping the default look's search previews byte-identical; E29
+Rulings 10's zero gap widened the gallery's one-child `stack-SETTINGS_TRAILING` label from 590 to 600, which the final
+review withdrew: the empty gap is the catalog's `SETTINGS_TRAILING_EMPTY_GAP` (default 10 as `COLUMN_GAP`, classic 0), so
+the default look keeps its gap. Deviations from the plan's text: E28 and E29 (withdrawn); Task 6's review made the classic joined pair two
+26 px halves overlapping one border (`JOINED_ACTION_WIDTH` 26 in the classic table, `ButtonFace.joinedOverlap`) so the
+parent crumb starts at body x 75.5 as the mock, and the fixture comes back to Appearance from Window so page 01 shows
+Back enabled; this entry is dated 2026-10-17, the day it ran. Residuals: the platform face for Plex; the history buttons'
+chevrons where the mocks draw arrows. Final review: the Settings dialog spec's banner gains its section 19.2 amendment
+line; classic `SETTING_CHOICE_WIDTH` 220 is dropped (no 05 mock measures a bare dropdown row outside Settings); a setting
+row publishes `KitOwnership.CONTEXT_MENU` only while it has a menu; the font row searches only its shown copy; a
+triangle's click during a search changes nothing; the classic footer band keeps a taller footer's height below its rule.
+`tools/visual/check_pairs.py <out> enterprise-settings` on `SettingsChromeMockTest`'s renders passes all eighteen (edge
+agreement 01 0.607, 02 0.581, 03 0.491, 04 0.873, 05 0.876, 06 0.539, 07 0.536, 08 0.551, 09 0.553, 10 0.828, 11 0.616,
+12 0.814, 13 0.488, 14 0.830, 15 0.379, 16 0.578, 17 0.631, 18 0.569); pair 15's floor is 0.35, its `note` naming 9b's
+Project Index composition and the platform face, and the others keep 0.40. At the merge with plan 5b: `PLEX` turns the printed probes and
+shares into assertions (re-check the calibrated page roles), and `PlatformFontSize.standardSize` may read
+`FaceSet.namesUiFaces()` (E5). `./gradlew check --continue` before the final review: **11,085 tests, 0 failures, 0 errors, 25
+skipped**; the final review adds five tests and ran the touched classes (jasper-ui's metrics, Settings shell, Settings
+controls, classic buttons, setting row menu and kit view tests; jasper-app's `settingsui` package) and the pixel proof.
+`./gradlew check --continue` after the final review fixes: **11,090 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: Settings under Enterprise on macOS (the native "Settings" title, the strip, the
+triangles, a right-click on a modified row) and on Windows or Linux (no title-bar or animations rows). Hand-off to plan
+10a: the mock helpers are 6a's `testsupport.MockProfile`, plan 7's `testsupport.MockCrops` (arriving at its merge) and 9a's package-private
+`settingsui.SettingsMockMatch`; 10a's `testsupport.MockMatch` takes a path none of them uses and reads mocks and ΔE through
+`MockProfile` rather than adding another Lab conversion. Not merged, not pushed. Merged with main (plans 5b and 11) as `4f7df0caa`: the fixture draws the shipped kit, IBM Plex and theme (its config read under the kit file's defaults), so `SettingsChromeMockTest` asserts the page-geometry probes and shares, gated as 5b's mock tests on `EnterpriseResources.plexResolves()` (lowest shares sidebar 0.986, header 0.976, footer 0.993; the two Appearance probes stay printed for 9b), and the settings roles are calibrated on the Plex probes (classic `SETTINGS_PAGE_TOP` 10 for Command Palette's first box top at 53, `SETTINGS_SECTION_GAP` 12 for Appearance's boxes 21 apart, `SETTINGS_CRUMB_GAP` 6 kept for the separator at 212, and `SETTINGS_HEADER_TITLE_GAP` 30 for a lone page title at 96; residual: the crumb's page title at 226 against 225, the separator's whole-pixel advance), E5's copy condition stays (`FaceSet.namesUiFaces()` would read the kit under the default look, where the 5- and 6-argument contexts have none), no 9a code constructs `Presentation` or `KitParser.Parsed`, so plan 11's `Branding` needed no edit, pair 15 is back at the 0.40 floor (0.428; all 50 `check_pairs.py` pairs pass) and the default look is byte-identical to `main`'s (gallery and Settings preview); merged counts **11,171 tests, 0 failures, 0 errors, 25 skipped**.
+
+**Enterprise presentation, plan 11: branding — 2026-10-17** (`claude/enterprise-branding`, worktree
+`.claude/worktrees/enterprise-11`, `0b3ab7cd5..15b190c0d`, then the documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-11-branding.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look with `[branding]` brands Jasper's
+start-up and windows. `KitParser` reads the table (`product`, `icons`, `splash_art`) into `Branding`, the files' bytes,
+checking each icon's PNG header size and the art with jasper-ui's receiving SVG rules on the XML alone
+(`EncodedArtwork.checkSvg`, the rules moved unchanged into `SvgPreflight`), so the pre-pass touches no AWT; the look's
+digest covers the files and `Presentation` carries the branding (`Branding.NONE` for the default look and the
+fallback). The Enterprise plugin ships the reference icon set (16 to 1024 px) and the Boot Splash art byte for byte,
+pinned by the conformance test. `ApplicationIcon.useLook` makes a branded look's icons every new window's icon list and
+the taskbar and Dock icon, in packaged macOS launches too. Once the desktop properties and title-bar style are
+committed, a start that will open a window (not `--background`, `--no-window`, safe mode or headless) decodes the
+splash off the EDT and posts its window (`dev.jasper.app.splash`: `SplashPainter`, `Splash`, `SplashColors`) with the
+Dock icon; `StartupSteps` shows "Starting Java runtime…", "Reading configuration…", "Loading plugin: <name>" per
+plugin, "Restoring workspace…" and "Starting JasperOps Workstation…", filled as step over count with no motion, and
+the splash closes when the first window shows or start-up fails. `BootSplashMockTest` compares the render with all ten
+frames (renders under `jasper-app/build/enterprise-splash/`, three pairs in `tools/visual/pairs.json`). The default
+look is unchanged (the headless gallery is byte-identical to `main`'s). Rulings (plan, "Rulings"): (1) one plan; (2)
+bytes, checked without decoding; (3) `presentation → dev.jasper.ui.icons` for the art's check; (4) all three keys
+required, the art's aspect unchecked; (5) the digest covers the branding; (6) `Branding` is a `Presentation`
+component; (7) icons on every branded launch, About's icon follows, the tray and menu-bar glyph keep Jasper's; (8) a
+look that falls back gives Jasper's icons back and closes the splash; (9) the splash opens after the desktop
+properties, not at the selection; (10) step timing and count; (11) faces from the kit's files, not registered; (12)
+`BuildInfo.buildLine` and `BuildInfo.COPYRIGHT`; (13) fixed colours in `SplashColors`, exempt from the scan; (14)
+measured window-pixel geometry and baselines; (15) the comparison's tolerances; (16) a plain AWT window with the
+look's icons, centred on the main screen; (17) 1x pairs; (18) the text compared with the frames on macOS only.
+Deviations from the plan's text: the app architecture's `startup` row also gains `splash` in its list of dependent packages, since `dev.jasper.app.splash` depends on `dev.jasper.app.startup`; Task 6's `SplashPainterTest.theSplashIgnoresTheTheme` restored `Label.foreground` and `defaultFont` by putting back the values it had read, which left them as overrides of every later look and feel and failed `WorkspaceThemeTest` in the full build, so `15b190c0d` removes the overrides instead; otherwise none beyond the plan's Rulings. The final review's fixes (beyond the plan): each switch into the macOS Dock sets the look's icon again (`ApplicationBootstrap.dockShow`), since a new Dock item shows the bundle's icon; `StartupSteps.done()` and `PluginRuntime` let go of the splash, so a resident holds none of its images or fonts; the splash window's first fill is the splash's top colour. `./gradlew check --continue` after those fixes: **11,133 tests, 0 failures, 0 errors, 25 skipped**. GUI
+checks for the user (spec 16.2): on a cold start with Enterprise on, the splash appears centred, unfocused, with the
+JasperOps art, icon, version line, steps and bar, crisp on a Retina screen, with no light flash as it opens, and closes
+as the first window shows; the Dock icon (packaged and development builds) and the window icons on Windows and Linux
+are the Enterprise icon from the splash on; in a packaged Enterprise build, the Dock icon is the Enterprise icon when
+a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
+`--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
+Jasper's icon. Not merged, not pushed.
+
+**Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
+`.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-16-enterprise-5b-enterprise.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Turning Enterprise on gives classic
+controls, metrics and fonts. `FaceSet` names UI and data faces by registered full name and `Typography` draws a role in
+its face when it is registered, else the platform's; the application registers a look's font files after the bundled
+fonts, refusing a file of another family, and a look missing files posts one Warning. Plugin themes are a library tier
+between the built-ins and the folder (`PluginThemes`): a discovered plugin's ids are reserved, a disabled plugin's are
+dormant (a pick falls back silently and is kept), and Settings cannot remove or replace them. `plugins/enterprise` is
+bundled and off by default: its descriptor (spec 4.1 plus an icon), the kit file of 5.1 without `[branding]`, IBM Plex
+Sans and Mono 1.1.0 (IBM's release files, checked by SHA-256, with their OFL notice; `verifyThirdPartyNotices` now
+requires every bundled font file in a component's `files`), the Enterprise theme in Light and Dark (7.6) and
+`EnterprisePlugin`, which only publishes `dev.jasper.enterprise.api.Workstation`. `PresentationConformanceTest`,
+`EnterpriseFixtureTest`, `EnterpriseKitRenderTest` (images in `jasper-app/build/enterprise-kit/`, with
+`tools/visual/pairs.json` crops of the Workstation and Dark Mode mocks that `check_pairs.py` holds to measured floors:
+all eight pass, Light sessions 0.310 (floor 0.26), tunnels 0.301 (0.25), SFTP 0.170 (0.12), File Servers 0.320 (0.27),
+Dark 0.322 (0.27), 0.284 (0.23), 0.155 (0.10), 0.317 (0.26); the pairs compare controls, metrics and type only, and what
+differs is the classic compositions the mocks show there, the Sessions tree, Properties, the tunnels table, the header
+strips and the workspace chrome, which are plans 6, 7 and 10's) and `EnterpriseHomeTest` prove it; `KitFixtures.themes()`
+gains Enterprise Light and Dark. Plan 6a's chrome
+tests (`EnterpriseLook`, whose fixture theme is gone) and plan 8a's Run window render now draw the shipped kit, Plex and
+theme, and the Run window's FONTS probes are checked (menu row edge agreement Light 0.999, Dark 0.751, floor 0.50, every
+title starting within 1 px of the mock, Help at 0, and Transfer's ink 3 px wider in Light, 2 in Dark; Run window edge
+agreement just opened 0.965 top, 0.888 bottom, typing 0.980 and 0.894; help text top 84 against the mock's 85; the
+FOOTER lines printed for plan 8b: primary button left 428 just opened and 436 typing against 454, cancel 596 against
+606). Plan 6b's chrome targets and `border.divider` came in at the merge with plan 6b (the last sentence). Found: spec
+7.6 gave Enterprise Dark `text.onAccent` #FFFFFF on `accent` #3D74D6, 4.499:1, so the TEXT guard painted guarded text
+on the accent black (the Run window's selected row, every primary button label) where the Dark Mode mock draws white;
+approved on 2026-10-17 by the orchestrator under the user's overnight authority: `accent`, `selection.bg` and
+`hue.blue` (and 6b's Dark `tab.indicator`) are #3C74D6, one red step, 4.505:1, so that text stays white (spec 7.6
+amended; `EnterpriseThemeTest` locks it). Found at the merge with plan 6b: the mocks set the status bar's text at 11 px
+(IBM Plex at 11 matches their ink exactly) where spec 5.6 gave the classic `STATUS_TEXT` 12; approved on 2026-10-17 by the orchestrator under the user's overnight authority (the mock
+wins on layout): it is 11/400 (spec 5.6 amended, `classic-type.tsv` follows; the default scale is unchanged).
+The default look is unchanged (gallery byte-identical: 85 PNGs each for Dark and Light, all 322 files equal to
+`e502e102b`'s). Rulings
+(plan, "Rulings"): (1) faces by full name, degrading per face; (2) the look's UI font reaches FlatLaf unless
+`ui.font` is set; (3) one Warning for missing files; (4) the theme tier's order and messages; (5) plugin themes are fixed
+in Settings and captioned; (6) the descriptor has an icon; (7) the theme's unnamed roles; (8) the apart direction is plan
+7's; (9) the mock comparison pairs the four gallery panels; (10) the family is name ID 16; (11) the icons and splash
+art of 14.1 are plan 11's; Execution notes (2026-10-17) rulings 1 to 26. Deviations from the plan's text:
+Task 4 renders hold FlatLaf's user scale at 1 and assert it (Execution notes 18); the fact-12 colours the mock crops show but the renders lack are left out of the pairs' `colours` — Light `#D9DFEA` and Dark `#3D4658` (the focused header strips, plan 7's), Dark's card `#2E3135` under the tunnels table and file list, Light `#E4E6E9` in File Servers (anti-aliased glyph pixels only) and Light tunnels' `#FFFFFF` and `#E4E6E9` — approved on 2026-10-17 by the orchestrator under the user's overnight authority, since those colours belong to the surfaces plans 7 (the focused header strips) and 10 (the populated panels) draw (19, 25); the classic menu row keeps a bar's own layout and `CollapsingMenuBar` folds by `ClassicMenuRow.titleWidth` (22); titles are measured kerned (23); a new role, `RUN_WINDOW_HELP_TEXT_TOP` (1), in both role tables (24); the Tunnels and SFTP pairs compare the populated `tunnels-added` and `sftp-connected` panels (25); three face defects the mock comparisons found under Plex are fixed (a text with a glyph the kit's UI face lacks, such as the macOS modifier symbols, draws in the platform face; the Run window's detail label takes the mocks' 11 px semibold and its shortcut ends at its box; the classic menu row sets its titles at their fractional widths), with `TypographyTest` covering the fallback (26); plan 6b is not on the branch, so Task 3 step 5's chrome targets and `border.divider` and Task 4 step 4's 6b part are left to 6b's merge (done there); Task 5 step 1 changes five files (`docs/STATUS.md`, the sixth, in step 4). `./gradlew check --continue`: **11,027 tests, 0 failures, 0 errors, 25 skipped**.
+The final review's fixes: under a kit with its own UI face, FlatLaf's component text takes that face at the body size
+times FlatLaf's user scale while `defaultFont` stays FlatLaf's, so unset font settings are no user override, FlatLaf
+still derives its scale from the platform font and the kit's roles take that scale once; menu accelerators keep the
+platform face (which has the macOS modifier symbols) at the same size; a text a kit face cannot draw switches to the
+platform face for data roles too (`Font.MONOSPACED`), and menu shortcuts, keycaps, Run window details, property values
+and technical fields (as typed) take that path; a disabled plugin's terminal scheme falls back silently; a font file of
+another family keeps the platform face; plugin theme problems name the declared jar path and the plugin's directory,
+and a provided id is reserved for its provider; the Plex render, menu and probe tests skip when an installed IBM Plex
+hides the files. Deviation: `RunWindowRenderTest`'s FACES-owned "primary" sample moved from y 800 to 782, because
+Plex's wider "Connect" reaches the button's middle row only there; `EnterpriseMenuRowMockTest` now holds every title
+start within 1 px. After these fixes, `./gradlew check --continue`:
+**11,033 tests, 0 failures, 0 errors, 25 skipped**.
+GUI checks for the user: turn Enterprise on in Settings › Plugins, restart, and compare Enterprise Light and Dark with
+the Workstation and Dark Mode mocks (controls, metrics and fonts; the window chrome is plans 6 to 9's); turn it off and
+check that Slate Cobalt returns without a warning; with IBM Plex installed on macOS, check the look's Warning names the
+hidden files (Execution notes, ruling 3); narrow an Enterprise window until its menus fold into "…", then into ☰ (ruling 22). Not merged into main, not
+pushed. Merged with main (plan 6b) as `b318feae0`: 6b's R47 values are in `enterprise.json` (Light `surface.tabstrip`
+#E8E9EB, `tab.indicator` #2F65CA, `surface.scrim` #00000036, `border.divider` #D3D6DA; Dark #3A3D42, #3C74D6, #00000036,
+#4A4D53) with `derived-roles-enterprise.tsv` regenerated, Enterprise Dark's accent is #3C74D6 (the ruling above), 6b's
+face-width probes are asserted under IBM Plex (at 2×: "New Session" 134 for the mock's 134, the search field's left
+2114 for 2116, "Settings…" 2744 for 2742, the titles Unlock Vault 139 for 138, Add Login 108 for 108 and Add SSH Key 144
+for 143, and, with the status text at 11 px (the ruling above), the status bar's rules before UTF-8 and the warning 2468
+and 2570 for 2470 and 2574 and the run item 122 wide for 122), Add SSH Key's swatch stays `#2C8B48` (ΔE 9.7, R39), the
+warning cell paints its ▲ and the search keycap, classic tab titles and the session and folder cells take the platform
+face where IBM Plex has no glyph (the first three drew boxes), all 32 `check_pairs.py` pairs pass (the status bar
+0.728 Light and 0.732 Dark at 11 px) and the default gallery is byte-identical (322 files);
+`./gradlew check --continue`: **11,093 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 6b: the window content — 2026-10-17** (`claude/enterprise-window-chrome`, worktree
 `.claude/worktrees/enterprise-6`, `b83e02461..aecccf5ae`, then this documentation commit;

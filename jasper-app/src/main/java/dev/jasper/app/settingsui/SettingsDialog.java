@@ -3,6 +3,8 @@ package dev.jasper.app.settingsui;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.SettingsEdit;
 import dev.jasper.app.lifecycle.Subscription;
+import dev.jasper.app.presentation.Composition;
+import dev.jasper.app.presentation.SettingsChrome;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import java.awt.Component;
@@ -50,14 +52,26 @@ public final class SettingsDialog {
      * @param browse opens a web page
      * @param confirmDiscard asks, over a component, whether to discard that many unsaved changes
      * @param kit the application's chrome kit context, read on the EDT each time the dialog opens
+     * @param chrome the look's Settings projection (spec 12.1)
+     * @param composition how the look composes the app's pages (spec 12.2), handed to every page
      */
     public record Hooks(Function<SettingsEdit, CompletableFuture<ConfigService.State>> save, Supplier<ConfigService.State> state,
                         Function<Consumer<ConfigService.State>, Subscription> onState, Runnable openConfigFile, Runnable migrate,
-                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit) {
+                        Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit,
+                        SettingsChrome chrome, Composition composition) {
         public Hooks {
             Objects.requireNonNull(save); Objects.requireNonNull(state); Objects.requireNonNull(onState);
             Objects.requireNonNull(openConfigFile); Objects.requireNonNull(migrate); Objects.requireNonNull(browse);
             Objects.requireNonNull(confirmDiscard); Objects.requireNonNull(kit);
+            Objects.requireNonNull(chrome); Objects.requireNonNull(composition);
+        }
+
+        /** Hooks under the default look on this host ({@link PageContext#standard()}). */
+        public Hooks(Function<SettingsEdit, CompletableFuture<ConfigService.State>> save, Supplier<ConfigService.State> state,
+                     Function<Consumer<ConfigService.State>, Subscription> onState, Runnable openConfigFile, Runnable migrate,
+                     Consumer<URI> browse, BiPredicate<Component, Integer> confirmDiscard, Supplier<KitContext> kit) {
+            this(save, state, onState, openConfigFile, migrate, browse, confirmDiscard, kit,
+                PageContext.standard().settings(), PageContext.standard().composition());
         }
     }
 
@@ -163,23 +177,26 @@ public final class SettingsDialog {
         ConfigService.State state = hooks.state().get();
         draft = new SettingsDraft(state.values(), state.defaults());
         kit = hooks.kit().get();
-        view = new SettingsView(kit, this::event, this::cancel);
+        view = new SettingsView(kit, new dev.jasper.ui.swing.SettingsShell.Frame(hooks.chrome().integratedTitle(), hooks.chrome().collapsibleNav()),
+            this::event, this::cancel);
         view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
-            () -> isOpen() ? surface : null, this::kit)));
+            () -> isOpen() ? surface : null, this::kit, hooks.chrome(), hooks.composition())));
         backStack.clear();
         forwardStack.clear();
         current = null;
         query = "";
         surface = windows.modalDialog("app.settings", "Settings", new Dimension(1000, 700), ownerOrNull);
         surface.setContent(view);
-        // The shell's sidebar and header reach the window's top: they are its title row, as in the Settings mocks.
-        surface.integratedTitle(view::titleRowHeight);
+        // The shell's sidebar and header reach the window's top and are its title row; a look with a native title (spec
+        // 12.1) keeps the window's "Settings" title above the shell.
+        if (hooks.chrome().integratedTitle()) surface.integratedTitle(view::titleRowHeight);
         surface.onClosing(this::mayClose);
         surface.onClosed(this::closed);
         draftListening = draft.onChanged(this::refreshNow);
         stateListening = hooks.onState().apply(this::accept);
         accept(state);
+        view.tree.collapsible(hooks.chrome().collapsibleNav());
         view.tree.show(pages, page -> true, Map.of());
         view.tree();
         select(pageOrNull != null ? pageOrNull : lastPage != null ? lastPage : CorePages.DEFAULT_PAGE);
@@ -192,6 +209,7 @@ public final class SettingsDialog {
         switch (event) {
             case UiEvent.Edited edited when edited.id().equals(SettingsView.SEARCH) -> search(edited.text());
             case UiEvent.Selected selected when selected.id().equals(PageTree.ID) -> selected.ids().stream().findFirst().ifPresent(this::select);
+            case UiEvent.Expanded expanded when expanded.id().equals(PageTree.ID) -> { view.tree.expanded(expanded.itemId(), expanded.expanded()); view.tree(); }
             case UiEvent.Action action -> {
                 switch (action.id()) {
                     case SettingsView.BACK -> back();
@@ -209,6 +227,8 @@ public final class SettingsDialog {
     }
 
     SettingsView view() { return view; }
+    /** The look's Settings projection this dialog runs with. */
+    SettingsChrome chrome() { return hooks.chrome(); }
     private KitContext kit() { return kit; }
     SettingsDraft draft() { return draft; }
     List<SettingsPage> pages() { return pages; }
@@ -254,6 +274,7 @@ public final class SettingsDialog {
         lastPage = page.id();
         view.page(page.component());
         view.breadcrumb(breadcrumb(page));
+        view.tree.reveal(page.id());
         view.tree.select(page.id());
         view.tree();
         highlight(page);

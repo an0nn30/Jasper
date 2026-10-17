@@ -124,7 +124,12 @@ final class ToolWindowHeader extends JPanel {
                 int titleWidth = Math.min(title.getPreferredSize().width, getWidth());
                 int height = getHeight();
                 title.setBounds(0, 0, titleWidth, height);
-                int x = titleWidth + styles.metric(flush ? DesignMetrics.Role.HEADER_STRIP_TITLE_GAP : DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
+                // A header strip sets its detail from the title's set advance (the mocks' kerned fractional one, which a
+                // label's whole-pixel width overruns), a count HEADER_STRIP_COUNT_GAP after it, a dot or word the title gap.
+                int x = flush
+                    ? Math.min(titleWidth, painter.setAdvance(title.getFont(), title.getText())) + styles.metric(presentation.detail().matches("\\d+")
+                        ? DesignMetrics.Role.HEADER_STRIP_COUNT_GAP : DesignMetrics.Role.HEADER_STRIP_TITLE_GAP)
+                    : titleWidth + styles.metric(DesignMetrics.Role.TOOL_HEADER_DETAIL_GAP);
                 detail.setBounds(x, 0, Math.max(0, getWidth() - x), height);
             }
             @Override public Dimension getMinimumSize() { return new Dimension(0, 0); }

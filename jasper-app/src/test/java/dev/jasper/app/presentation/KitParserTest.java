@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 /** Spec 5.1 to 5.9: the kit file, its values and every way it can be invalid. */
 class KitParserTest {
     static final String PLEX_SANS = "IBM Plex Sans", PLEX_MONO = "IBM Plex Mono";
-    /** Spec 5.1's shipped kit without [branding] (plan 11's). */
+    /** Spec 5.1's shipped kit without [branding] (KitBrandingTest covers it). */
     static final String FULL = """
         kit = 1
         base = "classic"
@@ -164,6 +164,8 @@ class KitParserTest {
         assertThat(parsed.kit().type()).isEqualTo(Kit.CLASSIC.type().withBody(12));
         assertThat(parsed.kit().colors().dialogSurface()).isEqualTo(SemanticColor.SURFACE_APP);
         assertThat(parsed.kit().colors().navigationSurface()).isEqualTo(SemanticColor.SURFACE_CARD);
+        assertThat(parsed.kit().faces()).isEqualTo(dev.jasper.ui.metrics.FaceSet.of(PLEX_SANS, "IBM Plex Sans Medm", "IBM Plex Sans SmBld",
+            PLEX_MONO, "IBM Plex Mono Medm"));
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("look");
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("look");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
@@ -175,6 +177,16 @@ class KitParserTest {
         assertThat(parsed.faces().data().orElseThrow().medium().family()).isEqualTo(PLEX_MONO);
         assertThat(parsed.faces().files()).extracting(FontFile::path).containsExactly("fonts/ibm-plex-sans-regular.ttf",
             "fonts/ibm-plex-sans-medium.ttf", "fonts/ibm-plex-sans-semibold.ttf", "fonts/ibm-plex-mono-regular.ttf", "fonts/ibm-plex-mono-medium.ttf");
+    }
+
+    /** A file of another family is not registered (LookFonts), so its role keeps the platform face whatever its name. */
+    @Test void aFileOfAnotherFamilyKeepsThePlatformFace() throws Exception {
+        var files = fonts();
+        files.put("presentation/fonts/ibm-plex-sans-medium.ttf", FontFileTest.face("Helvetica Neue", "Helvetica Neue"));
+        var parsed = KitParser.parse(FULL.getBytes(StandardCharsets.UTF_8), context(files, Map.of("look", Optional.of(look()))));
+        assertThat(parsed.kit().faces()).isEqualTo(dev.jasper.ui.metrics.FaceSet.of(PLEX_SANS, "", "IBM Plex Sans SmBld",
+            PLEX_MONO, "IBM Plex Mono Medm"));
+        assertThat(parsed.faces().ui().orElseThrow().medium().fullName()).as("the file itself is kept for the notice").isEqualTo("Helvetica Neue");
     }
 
     /** Plan 4a's MetricTokens.of reads each token's first role, so a token left out keeps its base's value exactly. */
@@ -228,7 +240,7 @@ class KitParserTest {
         String head = "kit = 1\nbase = \"default\"\n";
         String ui = "[type.ui]\nfamily = \"F\"\nmedium = \"fonts/ibm-plex-sans-medium.ttf\"\nsemibold = \"fonts/ibm-plex-sans-semibold.ttf\"\n";
         var cases = new java.util.LinkedHashMap<String, String>();
-        cases.put(head + "[branding]\nproduct = \"JasperOps\"\n", "[branding]: unknown table");
+        cases.put(head + "[branding]\nproduct = \"JasperOps\"\n", "[branding].icons: missing");
         cases.put(head + "colour = 1\n", "colour: unknown key");
         cases.put(head + "[chrome]\ntitle = \"x\"\n", "[chrome].title: unknown key");
         cases.put(head + "chrome = 1\n", "chrome: expected a table");

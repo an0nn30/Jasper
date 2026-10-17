@@ -28,7 +28,8 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * The installed themes: the built-in themes, Slate Cobalt first, and every valid {@code <home>/themes/<id>.json}.
+ * The installed themes: the built-in themes, Slate Cobalt first, then the themes plugins provide (spec 7.4), then every
+ * valid {@code <home>/themes/<id>.json}; a folder file never replaces a built-in or plugin theme id.
  * Imported themes are ordered by display name (ignoring case), then id. A file that cannot be used is skipped and kept as a problem.
  * Immutable and thread-safe; {@link #read} builds a new library, reusing the parsed themes of unchanged files.
  */
@@ -40,20 +41,25 @@ public final class ThemeLibrary {
 
     /** Theme files are at most 1 MiB. */
     public static final int MAX_BYTES = 1 << 20;
-    private static final ThemeLibrary BUNDLED = new ThemeLibrary(List.of(), Map.of(), List.of());
+    private static final ThemeLibrary BUNDLED = new ThemeLibrary(List.of(), Map.of(), List.of(), PluginThemes.NONE);
 
+    private final PluginThemes plugins;
     private final List<JasperTheme> imported, themes;
     private final Map<String, String> texts;
     private final List<Problem> problems;
     private final List<TerminalScheme> schemes;
     private final Map<String, String> themeLabels = new HashMap<>(), schemeLabels = new HashMap<>();
 
-    private ThemeLibrary(List<JasperTheme> imported, Map<String, String> texts, List<Problem> problems) {
+    private ThemeLibrary(List<JasperTheme> imported, Map<String, String> texts, List<Problem> problems, PluginThemes plugins) {
+        this.plugins = plugins;
         this.imported = List.copyOf(imported);
         this.texts = Map.copyOf(texts);
-        this.problems = List.copyOf(problems);
+        var allProblems = new ArrayList<>(plugins.problems());
+        allProblems.addAll(problems);
+        this.problems = List.copyOf(allProblems);
         var all = new ArrayList<JasperTheme>();
         all.addAll(JasperTheme.builtIns());
+        plugins.provided().forEach(provided -> all.add(provided.theme()));
         all.addAll(this.imported);
         themes = List.copyOf(all);
         var allSchemes = new ArrayList<TerminalScheme>();
@@ -73,17 +79,32 @@ public final class ThemeLibrary {
     /** Only the built-in themes. */
     public static ThemeLibrary bundledOnly() { return BUNDLED; }
 
+    /** The built-in themes and {@code plugins}' tier, with no folder. */
+    public static ThemeLibrary of(PluginThemes plugins) {
+        return plugins.equals(PluginThemes.NONE) ? BUNDLED : new ThemeLibrary(List.of(), Map.of(), List.of(), plugins);
+    }
+
     /**
      * The themes in {@code folder}: every regular {@code *.json} file directly in it (a missing folder has none).
      * {@code previous}'s parsed theme is reused for a file whose text is unchanged, and {@code previous} itself is
      * returned when nothing changed, so an unchanged folder never reinstalls a theme. Never throws for a bad file.
      */
-    public static ThemeLibrary read(Path folder, ThemeLibrary previous) { return read(folder, previous, JasperTheme::parse); }
+    public static ThemeLibrary read(Path folder, ThemeLibrary previous) { return read(folder, previous, previous.plugins); }
+
+    /** As {@link #read(Path, ThemeLibrary)}, with {@code plugins}' tier between the built-ins and the folder (spec 7.4). */
+    public static ThemeLibrary read(Path folder, ThemeLibrary previous, PluginThemes plugins) {
+        return read(folder, previous, plugins, JasperTheme::parse);
+    }
 
     /** {@link #read(Path, ThemeLibrary)} with the function that turns a file's text and id into a theme. */
     static ThemeLibrary read(Path folder, ThemeLibrary previous, BiFunction<String, String, JasperTheme> parser) {
+        return read(folder, previous, previous.plugins, parser);
+    }
+
+    static ThemeLibrary read(Path folder, ThemeLibrary previous, PluginThemes plugins, BiFunction<String, String, JasperTheme> parser) {
         Objects.requireNonNull(folder, "folder");
         Objects.requireNonNull(previous, "previous");
+        Objects.requireNonNull(plugins, "plugins");
         var files = new ArrayList<Path>();
         var problems = new ArrayList<Problem>();
         if (Files.isDirectory(folder)) {
@@ -106,6 +127,12 @@ public final class ThemeLibrary {
                 problems.add(new Problem(file, 0, builtIn.get().name() + " is built in; this file is ignored."));
                 continue;
             }
+            String provider = plugins.reserved().get(id);
+            if (provider != null) {
+                String name = plugins.provided(id).map(provided -> provided.theme().name()).orElse(id);
+                problems.add(new Problem(file, 0, name + " is provided by the " + provider + " plugin; this file is ignored."));
+                continue;
+            }
             if (!JasperTheme.validId(id)) {
                 problems.add(new Problem(file, 0, "A theme file is named after its id: lowercase letters, digits and dashes, at most 64 characters."));
                 continue;
@@ -125,8 +152,8 @@ public final class ThemeLibrary {
             }
         }
         imported.sort(Comparator.comparing((JasperTheme theme) -> theme.name().toLowerCase(Locale.ROOT)).thenComparing(JasperTheme::id));
-        if (sameThemes(imported, previous.imported) && problems.equals(previous.problems)) return previous;
-        return new ThemeLibrary(imported, texts, problems);
+        if (plugins == previous.plugins && sameThemes(imported, previous.imported) && problems.equals(previous.folderProblems())) return previous;
+        return new ThemeLibrary(imported, texts, problems, plugins);
     }
 
     private static boolean sameThemes(List<JasperTheme> next, List<JasperTheme> previous) {
@@ -171,8 +198,19 @@ public final class ThemeLibrary {
     public List<TerminalScheme> schemes() { return schemes; }
     /** The scheme with this id. */
     public Optional<TerminalScheme> scheme(SchemeId id) { return schemes.stream().filter(scheme -> scheme.id().equals(id)).findFirst(); }
-    /** The files that were skipped, in file-name order. */
+    /** The files that were skipped: plugin files first, then the folder's in file-name order. */
     public List<Problem> problems() { return problems; }
+
+    private List<Problem> folderProblems() { return problems.subList(plugins.problems().size(), problems.size()); }
+
+    /** The name of the plugin that provides the theme {@code id}; empty for a built-in or folder theme. */
+    public Optional<String> provider(String id) { return plugins.provided(id).map(PluginThemes.Provided::pluginName); }
+
+    /** The name of the discovered plugin whose theme ids include {@code id}, which no folder file may take. */
+    public Optional<String> reservedBy(String id) { return Optional.ofNullable(plugins.reserved().get(id)); }
+
+    /** The theme ids only plugins that are not loadable declare: a saved pick of one falls back silently (spec 7.5). */
+    public java.util.Set<String> dormant() { return plugins.dormant(); }
     /** A theme's name, followed by its id in parentheses when another theme has the same name. */
     public String label(JasperTheme theme) { return themeLabels.getOrDefault(theme.id(), theme.name()); }
     /** A scheme's name, followed by its id in parentheses when another scheme has the same name. */

@@ -222,11 +222,11 @@ public final class SchemaPage implements SettingsPage {
         var terms = new ArrayList<String>();
         terms.add(spec.title);
         for (Item item : spec.items) {
-            if (item instanceof RowItem row && row.shown()) {
+            if (item instanceof RowItem row && built(row)) {
                 terms.add(row.setting().label());
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
-                terms.addAll(row.editor().terms());
+                terms.addAll(row.editor().terms(context));
             } else if (item instanceof ExternalItem external) {
                 terms.add(external.value().label());
                 terms.add(String.join(" ", external.value().keywords()));
@@ -245,12 +245,15 @@ public final class SchemaPage implements SettingsPage {
             if (!after) { after = item == section; continue; }
             if (item instanceof SectionItem) break;
             if (item instanceof ActionItem || item instanceof ExternalItem || item instanceof NoticeItem) return true;
-            if (item instanceof RowItem row) { if (row.shown()) return true; anyRow = true; }
+            if (item instanceof RowItem row) { if (built(row)) return true; anyRow = true; }
         }
         return !anyRow;
     }
 
     List<Row<?>> rows() { return rows; }
+
+    /** Whether a row is built: shown on this platform, and not a setting the look implies (spec 12.1's hidden keys). */
+    private boolean built(RowItem row) { return row.shown() && !context.chrome().hiddenKeys().contains(row.setting().name()); }
     /** The action buttons' node ids, in page order; for tests. */
     List<String> actionButtons() {
         var ids = new ArrayList<String>();
@@ -268,7 +271,7 @@ public final class SchemaPage implements SettingsPage {
         if (body != null) return body;
         int actionIndex = 0;
         for (Item item : spec.items) {
-            if (item instanceof RowItem row && row.shown()) addRow(row);
+            if (item instanceof RowItem row && built(row)) addRow(row);
             else if (item instanceof ActionItem action) actions.add(new ActionRow(action, actionIndex++));
             else if (item instanceof ExternalItem external) externals.add(new ExternalRow(external.value()));
         }
@@ -286,7 +289,7 @@ public final class SchemaPage implements SettingsPage {
         var setting = (Setting<T>) item.setting();
         var factory = (Editors.Factory<T>) item.editor();
         ValueEditor<T> editor = factory.build().apply(setting, context);
-        rows.add(new Row<>(setting, editor, item.note(), factory.terms(), item.enabled()));
+        rows.add(new Row<>(setting, editor, item.note(), factory.terms(context), item.enabled()));
         editor.onChanged(this::render);
     }
 
@@ -304,7 +307,7 @@ public final class SchemaPage implements SettingsPage {
                     title = section.title();
                 }
                 case RowItem row -> {
-                    if(row.shown()) {
+                    if(built(row)) {
                         var owner=rows.get(rowIndex++);
                         if(owner.editor.cardRows())group.addAll(((Nodes.Stack)row(owner)).children());
                         else if(owner.editor.fullSpan()) {
@@ -342,11 +345,28 @@ public final class SchemaPage implements SettingsPage {
     private Nodes.Node row(Row<?> row) {
         boolean enabled = row.enabled.test(context.draft());
         var state = new ControlState(true, enabled, false, row.error);
-        var reset = new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "reset",
-            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default");
         if (row.editor.fullSpan()) return row.editor.node(row.id(), state, row.highlighted);
-        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, List.of(row.editor.node(row.id(), state), reset));
-        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control, row.editor.dependent(), row.highlighted);
+        var controls = new ArrayList<Nodes.Node>(List.of(row.editor.node(row.id(), state)));
+        if (context.chrome().inlineReset())
+            controls.add(new Nodes.Button(row.resetId(), new ControlState(row.resettable, true, false, ""), "", "reset",
+                Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.setting.label() + " to default"));
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, controls);
+        return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.editor.rowLabel(row.setting.label()), row.comment, control,
+            row.editor.dependent(), row.highlighted, "", resetMenu(context, row.resetId(), row.resettable));
+    }
+
+    /**
+     * Spec 12.1: a look without an inline Reset offers "Reset to Default" in the row's own menu, enabled while the value
+     * differs from its effective default; {@code action} is what the row's Reset button would report.
+     */
+    static List<dev.jasper.ui.model.MenuItem> resetMenu(PageContext context, String action, boolean resettable) {
+        return resetMenu(context.chrome().inlineReset(), action, resettable);
+    }
+
+    /** {@link #resetMenu(PageContext, String, boolean)} for an editor that holds only the chrome's {@code inlineReset}. */
+    static List<dev.jasper.ui.model.MenuItem> resetMenu(boolean inlineReset, String action, boolean resettable) {
+        return inlineReset ? List.of()
+            : List.of(new dev.jasper.ui.model.MenuItem(action, "Reset to Default", "", action, resettable, false));
     }
 
     private Nodes.Node actionNode(ActionRow action) {
@@ -365,12 +385,13 @@ public final class SchemaPage implements SettingsPage {
         boolean enabled = row.value.enabled().getAsBoolean();
         var state = new ControlState(true, enabled, false, row.error);
         boolean resettable = enabled && row.shown() != row.value.defaultValue().getAsInt();
-        var reset = new Nodes.Button(row.resetId(), new ControlState(resettable, true, false, ""), "", "reset",
-            Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.value.label() + " to default");
-        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING,
-            List.of(row.editor.node(row.id(), state), reset));
+        var controls = new ArrayList<Nodes.Node>(List.of(row.editor.node(row.id(), state)));
+        if (context.chrome().inlineReset())
+            controls.add(new Nodes.Button(row.resetId(), new ControlState(resettable, true, false, ""), "", "reset",
+                Nodes.ButtonKind.GHOST, row.resetId(), "Reset " + row.value.label() + " to default"));
+        var control = new Nodes.Stack(row.id() + ":controls", ControlState.READY, Nodes.LayoutRole.SETTINGS_TRAILING, controls);
         return new Nodes.SettingRow(row.rowId(), ControlState.READY, row.value.label(), row.value.comment().apply(row.shown()),
-            control, false, row.highlighted);
+            control, false, row.highlighted, "", resetMenu(context, row.resetId(), resettable));
     }
 
     /** A notice row: hidden, with its buttons, while its supplier has nothing to say. */

@@ -15,7 +15,8 @@ import java.util.function.Predicate;
 
 /**
  * The Settings category tree as a kit tree descriptor: page titles with their ancestors, search counts at the row ends, and
- * pages holding unsaved changes emphasized. Every group stays open. EDT only.
+ * pages holding unsaved changes emphasized. Every group stays open, unless the look's navigation collapses (spec 12.1):
+ * then a section the user closed stays closed for this opening, except while a search runs. EDT only.
  */
 final class PageTree {
     static final String ID = "pages";
@@ -24,6 +25,27 @@ final class PageTree {
     private Map<String, Integer> counts = Map.of();
     private Predicate<String> modified = id -> false;
     private String selected;
+    private boolean collapsible;
+    private final Set<String> collapsed = new HashSet<>();
+
+    /** Whether sections collapse (spec 12.1). */
+    void collapsible(boolean value) { collapsible = value; if (!value) collapsed.clear(); }
+
+    /**
+     * The user opened or closed a section; the state lives as long as this tree (spec 12.1: it is not saved). While a
+     * search runs every section shows, so a triangle's click there changes nothing.
+     */
+    void expanded(String id, boolean open) {
+        if (!collapsible || !counts.isEmpty()) return;
+        if (open) collapsed.remove(id); else collapsed.add(id);
+    }
+
+    /** Opens the sections above {@code id}, so a page navigated to is in view. */
+    void reveal(String id) {
+        for (var at = find(id).flatMap(SettingsPage::parent); at.isPresent(); at = find(at.get()).flatMap(SettingsPage::parent)) collapsed.remove(at.get());
+    }
+
+    boolean isCollapsed(String id) { return collapsed.contains(id); }
 
     /**
      * Shows the pages {@code visible} accepts, with their ancestors; a page that hides while childless never shows
@@ -80,12 +102,13 @@ final class PageTree {
             matches > 0 ? OptionalInt.of(matches) : OptionalInt.empty(), isModified(page.id()));
     }
 
-    /** The kit tree: every branch open, the selection, counts while searching and emphasis for unsaved pages. */
+    /** The kit tree: every branch open but the collapsed ones (all while searching), the selection, counts and emphasis. */
     Nodes.Tree node() {
         var roots = shown.values().stream().filter(page -> page.parent().isEmpty() || !shown.containsKey(page.parent().get()))
             .map(this::item).toList();
         var open = new HashSet<String>();
-        for (var page : shown.values()) if (!children(page.id()).isEmpty()) open.add(page.id());
+        for (var page : shown.values())
+            if (!children(page.id()).isEmpty() && (!counts.isEmpty() || !collapsed.contains(page.id()))) open.add(page.id());
         return new Nodes.Tree(ID, ControlState.READY, roots, open, selectedId().map(Set::of).orElse(Set.of()), "");
     }
 }

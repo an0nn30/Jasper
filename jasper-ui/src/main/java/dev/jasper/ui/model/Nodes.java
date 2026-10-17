@@ -432,13 +432,24 @@ public final class Nodes {
         }
     }
 
-    /** {@code highlighted} marks a row matching the host's current search. */
-    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote) implements Node {
+    /**
+     * A settings row: title, description and its control; {@code highlighted} marks a row matching the host's current
+     * search. {@code contextActions} is the row's own menu (Enterprise presentation spec 12.1: Reset to Default when the
+     * look has no inline Reset); empty means none. Host-only: the SDK's rows have no menu.
+     */
+    public record SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote,
+                             List<MenuItem> contextActions) implements Node {
         public SettingRow {
             ModelChecks.id(id); Objects.requireNonNull(state);
             ModelChecks.label(title, "title");
             Objects.requireNonNull(description); Objects.requireNonNull(titleNote);
             Objects.requireNonNull(control);
+            contextActions = List.copyOf(contextActions);
+            ModelChecks.unique(contextActions, MenuItem::id);
+        }
+        /** A row without a menu of its own. */
+        public SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted, String titleNote) {
+            this(id, state, title, description, control, dependent, highlighted, titleNote, List.of());
         }
         /** An ordinary setting row without a trailing title annotation. */
         public SettingRow(String id, ControlState state, String title, String description, Node control, boolean dependent, boolean highlighted) {

@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.ClassicMenuRow;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -16,7 +17,9 @@ import javax.swing.event.MenuListener;
  * The window's menu bar. As its room shrinks the trailing menus fold into a "…" menu (File always stays), then every
  * menu folds into one ☰ menu. Folded menus are the same {@code JMenu} objects: they move into the fold menu while it is
  * open and back when it closes. With a header (the Windows and Linux title bar) the header spans the bar under the
- * menus and decides their room, so the search field stays centred on the window.
+ * menus and decides their room, so the search field stays centred on the window. In a classic row
+ * ({@link ClassicMenuRow#styled}) the menus stand at their {@link ClassicMenuRow#titleWidth}, each edge rounded from the
+ * running total.
  */
 final class CollapsingMenuBar extends JMenuBar {
     enum Fold { NONE, MORE, ALL }
@@ -99,29 +102,36 @@ final class CollapsingMenuBar extends JMenuBar {
     /** Shows as many menus as fit in {@code space} and returns the width they take. */
     int fit(int space) {
         if (!opened.isEmpty()) return shownWidth();
-        int all = 0;
+        double all = 0;
         for (JMenu menu : menus) all += width(menu);
-        if (menus.isEmpty() || all <= space) { apply(Fold.NONE, menus.size()); return all; }
-        int used = 0, keep = 0;
+        if (menus.isEmpty() || pixels(all) <= space) { apply(Fold.NONE, menus.size()); return pixels(all); }
+        double used = 0;
+        int keep = 0;
         for (JMenu menu : menus) {
-            if (used + width(menu) + width(more) > space) break;
+            if (pixels(used + width(menu) + width(more)) > space) break;
             used += width(menu); keep++;
         }
-        if (keep >= 1) { apply(Fold.MORE, keep); return used + width(more); }
+        if (keep >= 1) { apply(Fold.MORE, keep); return pixels(used + width(more)); }
         apply(Fold.ALL, 0);
-        return width(hamburger);
+        return pixels(width(hamburger));
     }
 
-    int minimumMenusWidth() { return menus.isEmpty() ? 0 : width(hamburger); }
+    int minimumMenusWidth() { return menus.isEmpty() ? 0 : pixels(width(hamburger)); }
 
     private int shownWidth() {
-        int width = 0;
+        double total = 0;
         for (Component child : getComponents())
-            if (child != header && child != glue && child.isVisible()) width += child.getPreferredSize().width;
-        return width;
+            if (child != header && child != glue && child.isVisible()) total += width(child);
+        return pixels(total);
     }
 
-    private static int width(Component component) { return component.getPreferredSize().width; }
+    /** {@code component}'s width in the bar: its title width in a classic row, else its preferred width. */
+    private double width(Component component) {
+        return ClassicMenuRow.styled(this) ? ClassicMenuRow.titleWidth(component) : component.getPreferredSize().width;
+    }
+
+    /** The pixels a run of widths takes: their total, rounded, as every edge is placed. */
+    private static int pixels(double width) { return (int) Math.round(width); }
 
     private void apply(Fold next, int keep) {
         fold = next; kept = keep;
@@ -163,12 +173,13 @@ final class CollapsingMenuBar extends JMenuBar {
         @Override public void removeLayoutComponent(Component component) { }
 
         @Override public Dimension preferredLayoutSize(Container parent) {
-            int width = 0, height = 0;
+            double run = 0;
+            int height = 0;
             for (Component child : getComponents()) {
                 if (child == glue || child == header || !child.isVisible()) continue;
-                Dimension size = child.getPreferredSize();
-                width += size.width; height = Math.max(height, size.height);
+                run += width(child); height = Math.max(height, child.getPreferredSize().height);
             }
+            int width = pixels(run);
             if (header != null) {
                 Dimension size = header.getPreferredSize();
                 width = Math.max(width, size.width); height = Math.max(height, size.height);
@@ -187,12 +198,12 @@ final class CollapsingMenuBar extends JMenuBar {
             int height = getHeight() - insets.top - insets.bottom;
             if (header != null) { header.setBounds(0, 0, getWidth(), getHeight()); header.doLayout(); }
             else fit(getWidth() - insets.left - insets.right);
-            int x = insets.left;
+            double run = 0;
             for (Component child : getComponents()) {
                 if (child == header || child == glue || !child.isVisible()) continue;
-                int width = child.getPreferredSize().width;
-                child.setBounds(x, insets.top, width, height);
-                x += width;
+                int x = insets.left + pixels(run);
+                run += width(child);
+                child.setBounds(x, insets.top, insets.left + pixels(run) - x, height);
             }
             glue.setBounds(getWidth(), 0, 0, 0);
         }

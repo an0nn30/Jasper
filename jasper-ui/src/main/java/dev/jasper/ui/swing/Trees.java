@@ -165,6 +165,8 @@ final class Trees {
             int width=Math.max(1,scroll.getViewport().getExtentSize().width-detailLeading()-detailTrailing());
             return detail.body.getComponentCount()==0?0:Composition.height(detail.body.getComponent(0),width)+detailTop()+detailBottom()+detailAfter();
         }
+        /** The Settings navigation's sections collapse behind a disclosure triangle (Enterprise presentation spec 12.1). */
+        boolean collapsibleNavigation;
         @Override int minimumRowHeight(){return settingsNavigation?ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_ROW,dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY):presentation.isEmpty()?0:ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_ROW_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY);}
         @Override boolean uniformRows(){return !settingsNavigation && !rail() && detail==null && presentation.isEmpty();}
         @Override java.awt.Color hoverFill(){return context().faces().tree.hover(context());}
@@ -392,9 +394,9 @@ final class Trees {
             item.children().forEach(child -> flatten(child, depth + 1, childrenShown));
         }
 
-        /** Settings navigation's headings stay open. */
+        /** Settings navigation's headings stay open unless the navigation collapses (Enterprise presentation spec 12.1). */
         void expandFocused(boolean expanded) {
-            if (settingsNavigation) return;
+            if (settingsNavigation && !collapsibleNavigation) return;
             int i = indexOf(focusItem);
             if (i >= 0 && !visible.get(i).item().leaf())
                 emit(new UiEvent.Expanded(node.id(), focusItem, expanded));
@@ -407,9 +409,9 @@ final class Trees {
             row.begin();
             var entry = visible.get(index);
             var item = entry.item();
-            row.indent = settingsNavigation || rail()?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):context().faces().tree.indent(context(), entry.depth());
+            row.indent = settingsNavigation?entry.depth()*ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_CHILD_INDENT):rail()?0:!presentation.isEmpty() && item.leaf()?ThemePainting.metric(context(),dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_LEAF_INDENT):context().faces().tree.indent(context(), entry.depth());
             var leading = new ArrayList<Nodes.Node>();
-            if (!item.leaf() && !settingsNavigation && !rail())
+            if (!item.leaf() && (!settingsNavigation || collapsibleNavigation) && !rail())
                 leading.add(
                         new Nodes.Button(
                                 "@tree/" + node.id() + "/" + item.id() + "/expand",
@@ -438,6 +440,9 @@ final class Trees {
             row.slot(row.leading, leading);
             if (!item.leaf() && presentation.isEmpty() && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl expand)
                 context().faces().tree.styleDisclosure(expand.button, context(), value().expandedIds().contains(item.id()));
+            // The navigation's triangle stands alone; its title follows at the navigation's text gap (plan 9a Rulings 13).
+            if (settingsNavigation && row.controls.get("@tree/" + node.id() + "/" + item.id() + "/expand") instanceof Buttons.ButtonControl navigationExpand)
+                navigationExpand.button.disclosureWidth = navigationExpand.button.disclosure ? ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.DISCLOSURE_GLYPH) : 0;
             for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon") && presentation.isEmpty())icon.tile(0,false);
             if(!presentation.isEmpty())for(var control:row.controls.values())if(control instanceof Labels.IconControl icon && control.node.id().endsWith("/icon")){int tile=context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ICON_TILE);icon.tile(tile,tile,context().icons().size(context().metrics(), Nodes.IconSize.CONTROL),selected.contains(item.id()));}
             String titleId = "@tree/" + node.id() + "/" + item.id() + "/title";
@@ -454,6 +459,9 @@ final class Trees {
                 var role=settingsNavigation && item.leaf() ? dev.jasper.ui.metrics.Typography.Role.SETTINGS_BODY : null;
                 if(titleText.override!=role){titleText.override=role;titleText.refresh();}
             }
+            // A collapsible navigation's sections read as category rows in the strong secondary text (plan 9a Rulings 13).
+            if (settingsNavigation && collapsibleNavigation && !item.leaf() && !row.inked)
+                row.controls.get(titleId).component.setForeground(ThemePainting.color(context(), dev.jasper.ui.theme.SemanticColor.TEXT_STRONG_SECONDARY));
             // Emphasis is strong text in the link color (a keycap tree marks a section with its modified dot instead); the text
             // control's own refresh picks its role color first.
             if (!row.inked && item.emphasized() && (presentation.isEmpty() || item.leaf()))

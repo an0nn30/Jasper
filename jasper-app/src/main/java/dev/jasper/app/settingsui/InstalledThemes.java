@@ -17,9 +17,14 @@ import java.util.Objects;
 public record InstalledThemes(List<ThemeOption> dark, List<ThemeOption> light, List<SchemeOption> schemes, Map<String, String> names) {
     public InstalledThemes { dark = List.copyOf(dark); light = List.copyOf(light); schemes = List.copyOf(schemes); names = Map.copyOf(names); }
 
-    /** A theme for one appearance: its id, its label and its tile preview. */
-    public record ThemeOption(String id, String label, Option.Palette preview) {
-        public ThemeOption { Objects.requireNonNull(id, "id"); Objects.requireNonNull(label, "label"); Objects.requireNonNull(preview, "preview"); }
+    /** A theme for one appearance: its id, its label, its tile preview and the plugin that provides it ({@code ""} for none). */
+    public record ThemeOption(String id, String label, Option.Palette preview, String provider) {
+        public ThemeOption {
+            Objects.requireNonNull(id, "id"); Objects.requireNonNull(label, "label"); Objects.requireNonNull(preview, "preview");
+            Objects.requireNonNull(provider, "provider");
+        }
+        /** A built-in or imported theme. */
+        public ThemeOption(String id, String label, Option.Palette preview) { this(id, label, preview, ""); }
     }
 
     /** A terminal scheme: its value in config.toml and its label. */

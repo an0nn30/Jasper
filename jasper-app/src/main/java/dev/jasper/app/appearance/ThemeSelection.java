@@ -9,7 +9,8 @@ import java.util.stream.Collectors;
 
 /**
  * The themes shown with the Dark and Light appearances and the terminal scheme, all from {@code library}. Every pick
- * is one the library can honour: {@link #of} replaces any other by its default and reports it. Immutable; a selection
+ * is one the library can honour: {@link #of} replaces any other by its default and reports it, silently for a disabled
+ * plugin's theme or scheme (spec 7.5). Immutable; a selection
  * from a refreshed library is a different selection, even when its picks are the same.
  */
 public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme light, TerminalSchemeChoice scheme) {
@@ -38,7 +39,8 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
         var lightTheme = pick(library, light, false, problems);
         var choice = scheme;
         if (scheme.scheme().isPresent() && library.scheme(scheme.scheme().get()).isEmpty()) {
-            problems.accept("terminal.scheme", "\"" + scheme.key() + "\" is not an installed scheme. Use \"match\" or one of "
+            // Spec 7.5: a scheme of a theme whose plugin is off falls back silently too.
+            if (!library.dormant().contains(scheme.scheme().get().theme())) problems.accept("terminal.scheme", "\"" + scheme.key() + "\" is not an installed scheme. Use \"match\" or one of "
                 + library.schemes().stream().map(found -> "\"" + found.id() + "\"").collect(Collectors.joining(", ")) + "; using the default.");
             choice = TerminalSchemeChoice.MATCH;
         }
@@ -48,6 +50,8 @@ public record ThemeSelection(ThemeLibrary library, JasperTheme dark, JasperTheme
     private static JasperTheme pick(ThemeLibrary library, String id, boolean dark, BiConsumer<String, String> problems) {
         var theme = library.theme(id);
         if (theme.isPresent() && theme.get().has(dark)) return theme.get();
+        // Spec 7.5: the pick of a theme whose plugin is off is kept, and shows the default without a warning.
+        if (theme.isEmpty() && library.dormant().contains(id)) return JasperTheme.bundled();
         String reason = theme.isPresent() ? "\"" + id + "\" has no " + (dark ? "Dark" : "Light") + " variant."
             : "\"" + id + "\" is not an installed theme.";
         problems.accept(dark ? "ui.theme.dark" : "ui.theme.light", reason + " Use one of "

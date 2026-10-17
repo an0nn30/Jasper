@@ -26,11 +26,12 @@ import javax.swing.AbstractButton;
 import javax.swing.Action;
 
 /**
- * The classic look's bottom strip (spec 10.7): the Bottom Left windows' labels from the side stripes' thickness rightward,
- * each followed by a 1 px {@code border.divider}, and the Bottom Right windows' labels ending at that thickness from the
- * right, each preceded by one; a 1 px rule along its top; as thick as the side stripes. Labels read across, an open
- * window's on its tile, a badge as a count pill. Its two groups meet midway between them and lie across, for the drag.
- * It shows no rail actions. EDT only.
+ * The classic look's bottom strip (spec 10.7): the Bottom Left windows' labels rightward from the side stripes' fill (their
+ * thickness less their rule, where the mocks start them), each followed by a 1 px {@code border.divider}, and the Bottom
+ * Right windows' labels ending that far from the right, each preceded by one; a 1 px rule along its top; 24 px above its
+ * rule, as the mocks draw it, whatever {@code window.rail_width}. Labels read across, an open window's on its tile, a badge
+ * as a count pill. Its two groups meet midway between them and lie across, for the drag. It shows no rail actions. EDT
+ * only.
  */
 final class BottomStrip extends DockStripe {
     /** Where the last layout put everything: the labels, the dividers, each group's drop bounds and the gap. */
@@ -164,7 +165,7 @@ final class BottomStrip extends DockStripe {
 
     @Override void refreshTheme() { repaint(); }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(0, labels.thickness(railWidth, this)); }
+    @Override public Dimension getMinimumSize() { return new Dimension(0, labels.stripThickness(this)); }
 
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
@@ -194,7 +195,7 @@ final class BottomStrip extends DockStripe {
     private Placement place(boolean withGap) {
         var placement = new Placement();
         int rule = labels.styles().metric(DesignMetrics.Role.DOCK_RULE), across = Math.max(0, getHeight() - rule);
-        int lead = labels.thickness(railWidth, this);
+        int lead = labels.thickness(railWidth, this) - rule;
         int x = lead;
         var left = new ArrayList<Rectangle>();
         for (Item item : items(Slot.BOTTOM_LEFT, withGap)) {

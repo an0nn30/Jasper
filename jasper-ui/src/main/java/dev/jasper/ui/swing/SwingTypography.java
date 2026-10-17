@@ -22,6 +22,8 @@ final class SwingTypography {
         });
         return result;
     }
+    /** Whether the host applied a user font (a developer {@code defaultFont}). */
+    static boolean userFont() { return overrides()[0] != null; }
     static Typography typography(Kit kit) {
         return Typography.of(kit.type(), kit.faces(), user());
     }

@@ -456,6 +456,35 @@ class PaintedContrastTest {
         return false;
     }
 
+    /** Spec 16.1.2 for plan 9a's classic Settings frame: each window rule it declares is painted as its guard makes it, everywhere. */
+    @Test void theClassicSettingsFramePaintsEachRuleAsItsGuardMakesItOverEveryPalette() {
+        var palettes = palettes();
+        palettes.add(KitFixtures.enterpriseLight());
+        for (var theme : palettes) {
+            var context = KitFixtures.context(theme, KitFixtures.enterprise());
+            var parts = new JComponent[6];
+            for (int i = 0; i < parts.length; i++) { parts[i] = new JPanel(); parts[i].setOpaque(false); }
+            parts[3].setVisible(false);
+            var shell = new SettingsShell(context, new SettingsShell.Frame(false, true), parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+            try {
+                shell.setSize(760, 600);
+                shell.doLayout();
+                var image = paint(shell);
+                var pairs = SettingsShell.framePairs(context);
+                assertThat(pairs).as("the sidebar, header and footer rules").hasSize(3);
+                // Beside the navigation, under the header (above the body), over the footer band.
+                int[][] at = {{parts[1].getWidth(), parts[1].getY() + 20}, {parts[4].getX() + 40, parts[4].getY() - 1}, {300, parts[5].getY() - 1}};
+                for (int i = 0; i < pairs.size(); i++) {
+                    var pair = pairs.get(i);
+                    String where = name(theme) + ", " + pair.slot().key() + " on " + pair.against().key();
+                    Color expected = SurfaceContrast.painted(theme, pair);
+                    assertThat(pair.guard().holds(expected, pair.against().color(theme))).as(where + " meets its guard").isTrue();
+                    assertThat(image.getRGB(at[i][0], at[i][1])).as(where + " is painted " + ColorMath.hex(expected)).isEqualTo(expected.getRGB());
+                }
+            } finally { shell.close(); context.icons().close(); context.binding().close(); }
+        }
+    }
+
     private static boolean searchHint(GeneratedTheme theme, Color expected) {
         var blank = new Icon() {
             public int getIconWidth() { return 16; } public int getIconHeight() { return 16; }

@@ -8,16 +8,10 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Locale;
-import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
-import org.w3c.dom.Node;
 
 /** One bounded decode, with no resource lookup or raster allocation in receiving paint. */
 final class DecodedArtwork {
-    private static final Pattern URL=Pattern.compile("url\\s*\\(([^)]*)\\)",Pattern.CASE_INSENSITIVE);
     final BufferedImage image;
     private final double aspect;
     private final com.github.weisj.jsvg.SVGDocument vector;
@@ -39,7 +33,7 @@ final class DecodedArtwork {
                     } finally {reader.dispose();}
                 }
             } else {
-                preflight(data);
+                SvgPreflight.check(data);
                 var context=LoaderContext.builder().externalResourcePolicy(ResourcePolicy.DENY_ALL)
                     .resourceLoader((document,uri)->{throw new IOException("External artwork resource denied");}).build();
                 var document=new SVGLoader().load(new ByteArrayInputStream(data),null,context);
@@ -108,38 +102,20 @@ final class DecodedArtwork {
     private static void dimensions(double width,double height)throws IOException {
         if(!Double.isFinite(width)||!Double.isFinite(height)||width<=0||height<=0||width>4096||height>4096||width*height>4_194_304)throw new IOException("Artwork dimensions exceed limits");
     }
-    private static void preflight(byte[] data)throws Exception {
-        var factory=DocumentBuilderFactory.newInstance();factory.setNamespaceAware(true);
-        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,true);
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
-        factory.setFeature("http://xml.org/sax/features/external-general-entities",false);
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD,"");factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA,"");
-        factory.setXIncludeAware(false);factory.setExpandEntityReferences(false);
-        var builder=factory.newDocumentBuilder();
-        builder.setErrorHandler(new org.xml.sax.helpers.DefaultHandler(){@Override public void fatalError(org.xml.sax.SAXParseException e)throws org.xml.sax.SAXException{throw e;}});
-        var document=builder.parse(new ByteArrayInputStream(data));
-        if(!"svg".equals(document.getDocumentElement().getLocalName()))throw new IOException("Not SVG");
-        inspect(document,0);
-    }
-    private static void inspect(Node node,int depth)throws IOException {
-        if(depth>128)throw new IOException("Artwork nesting exceeds limit");
-        if(node.getNodeType()==Node.PROCESSING_INSTRUCTION_NODE)throw new IOException("Processing instruction denied");
-        String name=node.getLocalName();
-        if(name!=null && java.util.Set.of("script","foreignobject","animate","animatetransform","set").contains(name.toLowerCase(Locale.ROOT)))throw new IOException("Active SVG denied");
-        var attributes=node.getAttributes();
-        if(attributes!=null)for(int i=0;i<attributes.getLength();i++) {
-            var attribute=attributes.item(i);String key=attribute.getLocalName();String value=attribute.getNodeValue().trim();
-            if(key!=null && (key.toLowerCase(Locale.ROOT).startsWith("on") || key.equals("base")))throw new IOException("Active SVG attribute denied");
-            if("href".equals(key) && !value.matches("#[A-Za-z_][A-Za-z0-9_.:-]*"))throw new IOException("Nonlocal resource denied");
-            css(value);
-        }
-        if("style".equals(name))css(node.getTextContent());
-        for(Node child=node.getFirstChild();child!=null;child=child.getNextSibling())inspect(child,depth+1);
-    }
-    private static void css(String value)throws IOException {
-        if(value.indexOf('\\')>=0 || value.indexOf('@')>=0)throw new IOException("External or escaped CSS denied");
-        var urls=URL.matcher(value);
-        while(urls.find())if(!urls.group(1).trim().replace("\"","").replace("'","").matches("#[A-Za-z_][A-Za-z0-9_.:-]*"))throw new IOException("Nonlocal paint resource denied");
+    /** A new image of the artwork at {@code width} by {@code height}: the vector drawn to fit, or the PNG scaled; never cached. */
+    BufferedImage raster(int width, int height) {
+        if (width < 1 || height < 1 || width > 8192 || height > 8192)
+            throw new IllegalArgumentException("A raster needs 1 to 8192 pixels a side, not " + width + " by " + height);
+        var result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        var g = result.createGraphics();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            if (vector != null) vector.render(null, g, new ViewBox(0, 0, width, height));
+            else {
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(image, 0, 0, width, height, null);
+            }
+        } finally { g.dispose(); }
+        return result;
     }
 }

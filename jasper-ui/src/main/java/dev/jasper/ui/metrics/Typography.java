@@ -70,11 +70,28 @@ public final class Typography {
     public float bodySize() { return bodySize; }
     public Font font(Role role) { return font(role, false); }
     /** Selected labels use medium weight. Size settings enlarge every role proportionally. */
-    public Font font(Role role, boolean selected) {
+    public Font font(Role role, boolean selected) { return font(role, selected, null); }
+    /**
+     * {@code role}'s font for {@code text}: {@link #font(Role)}, unless that is a kit's own face with no glyph for a
+     * character of {@code text} (IBM Plex has no macOS modifier symbols and no CJK); the whole text then switches to the
+     * role's platform face, {@link Font#MONOSPACED} for a data role, which the platform fills in glyph by glyph.
+     */
+    public Font font(Role role, String text) { return font(role, false, Objects.requireNonNull(text, "text")); }
+
+    private Font font(Role role, boolean selected, String text) {
         Objects.requireNonNull(role);
         int weight = selected && role == Role.LABEL ? 500 : scale.weight(role);
-        String resolved = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO || role == Role.RUN_DETAIL
-            ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : family;
+        boolean data = role == Role.MONO || role == Role.MONO_SMALL || role == Role.MONO_CAPTION || role == Role.PANEL_DETAIL_MONO
+            || role == Role.RUN_DETAIL;
+        String face = data ? weight >= 500 ? faces.dataMedium() : faces.dataRegular() : platformDefault ? faces.uiFace(weight) : "";
+        if (!face.isEmpty() && !face.equals(Font.MONOSPACED)) {
+            // A kit's own face is a whole weight: drawn as it is, at the role's size. One that is not registered draws in
+            // the platform face for this role (spec 5.9); nothing is cached, so registration order cannot matter.
+            Font named = new Font(face, Font.PLAIN, 1);
+            if (named.getFontName(Locale.ROOT).equals(face) && (text == null || named.canDisplayUpTo(text) < 0))
+                return named.deriveFont(scale.size(role) * bodySize / scale.base());
+        }
+        String resolved = data ? Font.MONOSPACED : family;
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && role != Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)
             resolved = ".AppleSystemUIFont";

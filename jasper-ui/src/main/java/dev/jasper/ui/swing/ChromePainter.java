@@ -44,6 +44,11 @@ public final class ChromePainter {
     public void prepareText(Graphics2D graphics) { ThemePainting.antialias(graphics); }
     /** Literal advance measured with the same fractional context used by engine labels and native text. */
     public int measureText(Font font, String text) { return ThemePainting.measureText(font, text); }
+    /**
+     * The text's kerned fractional advance, rounded: where the Enterprise mocks set what follows a stripe label's text or a
+     * header strip's title (a label's whole-pixel width can run past it by more than a pixel).
+     */
+    public int setAdvance(Font font, String text) { return ThemePainting.setAdvance(font, text); }
 
     public void action(AbstractButton button, Graphics graphics, GeneratedTheme theme, boolean labels, Icon arrow) {
         var g = (Graphics2D) graphics.create();

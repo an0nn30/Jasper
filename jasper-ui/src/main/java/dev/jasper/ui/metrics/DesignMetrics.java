@@ -133,11 +133,13 @@ public final class DesignMetrics {
         // (CONTROL_RADIUS before), then roles only the classic faces and chrome read, measured on the Enterprise mocks.
         ROW_HEIGHT(24), FIELD_RADIUS(4),
         RUN_WINDOW_WIDTH(460), CHECKBOX_BOX(13), CHECKBOX_RADIUS(2), CHECKBOX_LABEL_GAP(7), RADIO_RING(14), RADIO_DOT(6), RADIO_LABEL_GAP(6), RADIO_GAP(18), OPTION_SWATCH(7), GROUP_TITLE_INSET(9), GROUP_TITLE_PADDING(4), GROUP_TITLE_GAP(4), SPINNER_WIDTH(82), SPINNER_ARROW_WIDTH(16), SPINNER_GLYPH(7), DROPDOWN_GLYPH(6), DROPDOWN_GLYPH_INSET(7),
-        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(9), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
+        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(10), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
         // Plan 4c: a grouped table's data rows under their heading (Settings, Notifications mock); classic faces only.
         GROUP_ROW_INDENT(14),
         // The Run window (Enterprise presentation plan 8a), measured on the 06 Run Dialog mocks; read only by the Run window.
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
+        // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
+        RUN_WINDOW_HELP_TEXT_TOP(1),
         // Enterprise presentation plan 6: the classic chrome's menu row, toolbar, tabs, status cells and dialogs,
         // measured on the Enterprise mocks and read only by classic chrome.
         MENU_BAR_SIDE(5), MENU_BAR_ITEM_PADDING(9), MENU_BAR_HEIGHT(24), CHROME_BUTTON_PADDING(8), CHROME_BUTTON_GAP(8), CHROME_SEPARATOR_GAP(10),
@@ -145,10 +147,18 @@ public final class DesignMetrics {
         TOOLBAR_SEARCH_WIDTH(300), TOOLBAR_SEARCH_PADDING(8), HINT_KEYCAP_HEIGHT(16), HINT_KEYCAP_PADDING(4), CLASSIC_TAB_LEADING(12), CLASSIC_TAB_GAP(9),
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
         DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
-        // Enterprise plan 7: the count pill, the native header's actions and the header strips' gaps (Workstation mock);
-        // only the classic dock chrome reads them.
+        // Enterprise plan 7: the count pill, the native header's actions, the header strips' gaps and the bottom strip's
+        // height above its rule (Workstation mock); only the classic dock chrome reads them.
         STRIPE_PILL_HEIGHT(14), STRIPE_PILL_WIDTH(16), STRIPE_PILL_PADDING(5), STRIPE_PILL_GAP(5), TOOL_HEADER_ACTION(16),
-        HEADER_STRIP_TITLE_GAP(8), HEADER_STRIP_DOT_GAP(6);
+        HEADER_STRIP_TITLE_GAP(8), HEADER_STRIP_DOT_GAP(6), HEADER_STRIP_COUNT_GAP(6), BOTTOM_STRIP_HEIGHT(24),
+        // Plan 9a: the Settings header's inset from the body (today the page inset); its classic value is the mocks' 14.
+        SETTINGS_HEADER_INSET(20),
+        // Plan 9a: a page's indent under its section in the Settings navigation (the classic navigation's 15), and the gap
+        // from a navigation row's leading slot (the classic triangle) to its title.
+        SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6),
+        // Plan 9a: the gap a SETTINGS_TRAILING stack without its action keeps after the control (today COLUMN_GAP's 10;
+        // the classic rows, whose Reset is in the row's menu, keep none).
+        SETTINGS_TRAILING_EMPTY_GAP(10);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -237,6 +247,29 @@ public final class DesignMetrics {
         values.put(Role.PANEL_HEADER_CONTRIBUTED_GLYPH, 10);
         values.put(Role.PANEL_HEADER_ACTION_VERTICAL, 0);
         values.put(Role.PANEL_HEADER_TRAILING_PADDING, 7);
+        // Plan 9a: the classic Settings frame (Mock measurements).
+        values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
+        values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);
+        values.put(Role.SETTINGS_FOOTER_SIDE, 14);
+        values.put(Role.SETTINGS_ACTION_MIN_WIDTH, 98);
+        values.put(Role.CIRCULAR_ACTION_SIZE, 22);
+        values.put(Role.JOINED_ACTION_WIDTH, 26);
+        values.put(Role.SETTINGS_HEADER_GAP, 10);
+        values.put(Role.SETTINGS_HEADER_TITLE_GAP, 30);
+        values.put(Role.SETTINGS_CRUMB_GAP, 6);
+        values.put(Role.SETTINGS_PAGE_INSET, 16);
+        values.put(Role.SETTINGS_PAGE_TOP, 10);
+        values.put(Role.SETTINGS_CARD_WIDTH, 4000);
+        values.put(Role.SETTINGS_SECTION_GAP, 12);
+        values.put(Role.SETTINGS_CHOICE_WIDTH, 220);
+        values.put(Role.SETTINGS_RICH_CHOICE_WIDTH, 220);
+        values.put(Role.SETTINGS_HEADER_INSET, 14);
+        values.put(Role.SETTINGS_NAV_INSET, 0);
+        values.put(Role.SETTINGS_NAV_ROW_SIDE, 9);
+        values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
+        values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
+        values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
+        values.put(Role.SETTINGS_TRAILING_EMPTY_GAP, 0);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

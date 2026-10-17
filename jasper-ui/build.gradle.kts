@@ -24,6 +24,12 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/expected")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(rootProject.file("tools/themes/testdata/intellij/loose")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // EncodedArtworkRasterTest checks the Boot Splash art (Enterprise plan 11).
+    inputs.file(rootProject.file("docs/design/enterprise/reference/10 Boot Splash/extracted/art.svg")).withPathSensitivity(PathSensitivity.RELATIVE)
+    // KitFixtures.themes() includes the Enterprise plugin's theme (spec 16.1.2); TypographyTest registers its IBM Plex Sans.
+    inputs.file(rootProject.file("plugins/enterprise/src/main/resources/themes/enterprise.json")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(rootProject.file("plugins/enterprise/src/main/resources/presentation/fonts/ibm-plex-sans-regular.ttf"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 tasks.register<JavaExec>("gallery") {
     dependsOn(tasks.testClasses)

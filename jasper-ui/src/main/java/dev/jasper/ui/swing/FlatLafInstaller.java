@@ -108,5 +108,45 @@ public final class FlatLafInstaller {
             Map.entry("Button.background", SemanticColor.BUTTON_SECONDARY_BG), Map.entry("Button.foreground", SemanticColor.TEXT_STRONG_SECONDARY),
             Map.entry("List.selectionBackground", SemanticColor.SELECTION_BG), Map.entry("List.selectionForeground", SemanticColor.TEXT_ONSELECTION));
         roles.forEach((key, role) -> defaults.put(key, new ColorUIResource(palette.color(role))));
+        lookFonts(defaults, kit);
+    }
+
+    /**
+     * Under a kit whose regular UI face is registered, FlatLaf's component text takes that face at the kit's body size
+     * times the user scale (spec 5.6). {@code defaultFont} stays FlatLaf's platform font, so FlatLaf derives its user
+     * scale as under the default kit, and menu accelerators keep the platform face, which has the modifier symbols a kit's
+     * face may lack, at the same size. A user font (a developer {@code defaultFont}) still reaches every key, as before.
+     */
+    private static void lookFonts(javax.swing.UIDefaults defaults, Kit kit) {
+        String face = kit.faces().uiFace(400);
+        if (face.isEmpty() || !new java.awt.Font(face, java.awt.Font.PLAIN, 1).getFontName(java.util.Locale.ROOT).equals(face)) return;
+        // FlatLaf gives every component font one shared value that follows defaultFont; only those keys change.
+        Object shared = null;
+        for (var entry : defaults.entrySet()) if ("Label.font".equals(entry.getKey())) shared = entry.getValue();
+        if (!(shared instanceof javax.swing.UIDefaults.ActiveValue platform)) return;
+        var keys = new java.util.ArrayList<String>();
+        for (var entry : defaults.entrySet())
+            if (entry.getValue() == shared && entry.getKey() instanceof String key) keys.add(key);
+        float body = kit.type().body();
+        var look = new LookFont(platform, body, size -> new java.awt.Font(face, java.awt.Font.PLAIN, 1).deriveFont(size));
+        var accelerator = new LookFont(platform, body, size -> UIManager.getFont("defaultFont").deriveFont(size));
+        for (String key : keys) defaults.put(key, key.endsWith("acceleratorFont") ? accelerator : look);
+    }
+
+    /** A look's font at {@code body} times the user scale, or FlatLaf's shared value under a user font. */
+    private static final class LookFont implements javax.swing.UIDefaults.ActiveValue {
+        private final javax.swing.UIDefaults.ActiveValue platform;
+        private final float body;
+        private final java.util.function.Function<Float, java.awt.Font> sized;
+        private javax.swing.plaf.FontUIResource last;
+        LookFont(javax.swing.UIDefaults.ActiveValue platform, float body, java.util.function.Function<Float, java.awt.Font> sized) {
+            this.platform = platform; this.body = body; this.sized = sized;
+        }
+        @Override public synchronized Object createValue(javax.swing.UIDefaults table) {
+            if (SwingTypography.userFont()) return platform.createValue(table);
+            var next = new javax.swing.plaf.FontUIResource(sized.apply(com.formdev.flatlaf.util.UIScale.scale(body)));
+            if (!next.equals(last)) last = next;
+            return last;
+        }
     }
 }

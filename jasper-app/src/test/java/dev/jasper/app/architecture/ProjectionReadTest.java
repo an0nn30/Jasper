@@ -29,7 +29,10 @@ class ProjectionReadTest {
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/application/LookMotion"),
         Pattern.compile("dev/jasper/app/presentation/DialogMapping\\$Kind(?=[;$.]|$)"),
-            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"));
+            type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"),
+        // Plan 9a (spec 9.1 and 16.1.7): naming Composition's class (a constant, a method, a switch) is a read, which only
+        // the composition roots make; a class that only carries the value names it in descriptors, which this does not match.
+        Pattern.compile("^dev/jasper/app/presentation/Composition$"), ProjectionReadTest::compositionRoot);
 
     /**
      * A class's internal name and every string in its constant pool.
@@ -80,5 +83,34 @@ class ProjectionReadTest {
             .withField("motion", ClassDesc.of("dev.jasper.app.presentation.Motion"), ClassFile.ACC_PRIVATE)
             .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE));
         assertThat(projectionReaders(List.of(probe))).hasSize(3);
+    }
+
+    /** Plan 9a: spec 9.1's composition roots, the only classes besides the presentation package that read Composition. */
+    static final Set<String> COMPOSITION_ROOTS = Set.of("dev/jasper/app/settingsui/CorePages", "dev/jasper/app/settingsui/AppearanceSelection",
+        "dev/jasper/app/settingsui/NotificationGroupsEditor", "dev/jasper/app/settingsui/Editors",
+        "dev/jasper/app/shortcuthelp/KeymapPage", "dev/jasper/app/pluginmanager/PluginsPage");
+
+    /** Whether the class {@code type} (an internal name) may read Composition: the presentation package, a root or a class nested in one. */
+    static boolean compositionRoot(String type) {
+        if (type.startsWith("dev/jasper/app/presentation/")) return true;
+        int nested = type.indexOf('$');
+        return COMPOSITION_ROOTS.contains(nested < 0 ? type : type.substring(0, nested));
+    }
+
+    /** Plan 9a: the Composition scan is live, a read elsewhere is reported, and a class that only carries the value is not. */
+    @Test void compositionIsReadOnlyByItsRoots() throws Exception {
+        var files = StaticDefaultTest.classFiles(Path.of(System.getProperty("jasper.appJar")), 400);
+        var read = Pattern.compile("^dev/jasper/app/presentation/Composition$");
+        assertThat(files.stream().map(Scanned::of).filter(scanned -> scanned.strings().stream().anyMatch(s -> read.matcher(s).find()))
+                .map(Scanned::name))
+            .as("the composition scan is live").contains("dev/jasper/app/presentation/Projections");
+        var composition = ClassDesc.of("dev.jasper.app.presentation.Composition");
+        byte[] probe = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.CompositionProbe"), builder -> builder
+            .withMethodBody("probe", java.lang.constant.MethodTypeDesc.of(composition), ClassFile.ACC_STATIC,
+                code -> code.getstatic(composition, "CLASSIC", composition).areturn()));
+        byte[] carrier = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.CompositionCarrier"), builder -> builder
+            .withField("composition", composition, ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(probe, carrier)))
+            .containsExactly("dev/jasper/app/workspace/CompositionProbe reads " + read.pattern());
     }
 }

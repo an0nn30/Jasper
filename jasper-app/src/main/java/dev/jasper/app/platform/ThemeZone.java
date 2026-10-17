@@ -45,6 +45,11 @@ public final class ThemeZone {
         return NativeStyles.installed().font(role);
     }
 
+    /** {@code role}'s font for {@code text}: the platform face when the kit's own face has no glyph for a character of it. */
+    public static java.awt.Font font(Typography.Role role, String text) {
+        return NativeStyles.installed().font(role, text);
+    }
+
     public static boolean workspace(Component component) {
         JComponent root = root(component);
         return root != null && !TITLE_BAR.equals(root.getClientProperty(ZONE));

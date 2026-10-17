@@ -56,7 +56,7 @@ final class PropertyLists {
                 Composition.style(label, context(), Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
                 value.setText(row.value());
                 value.setToolTipText(row.value().isEmpty() ? null : row.value());
-                value.setFont(ThemePainting.font(context(), row.technical() ? Typography.Role.MONO : Typography.Role.BODY));
+                value.setFont(ThemePainting.font(context(), row.technical() ? Typography.Role.MONO : Typography.Role.BODY, row.value()));
                 value.setForeground(row.severity().map(severity -> SurfaceContrast.painted(theme, valuePair(severity)))
                     .orElseGet(() -> ThemePainting.color(context(), SemanticColor.TEXT_PRIMARY)));
                 // A data value keeps its end in view when it is shortened, as monospaced text does.

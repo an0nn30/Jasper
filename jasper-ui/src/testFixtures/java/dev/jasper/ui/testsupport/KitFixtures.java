@@ -128,8 +128,9 @@ public final class KitFixtures {
     }
 
     /**
-     * The theme set every look is checked over (spec 16.1.2): Slate Cobalt Dark and Light, the four Catppuccin flavours and
-     * the converter goldens' UI variants (ocean, ocean-dawn, stray), in that order.
+     * The theme set every look is checked over (spec 16.1.2): Slate Cobalt Dark and Light, the four Catppuccin flavours,
+     * the converter goldens' UI variants (ocean, ocean-dawn, stray) and Enterprise Dark and Light (the Enterprise plugin's
+     * theme file), in that order.
      */
     public static java.util.List<GeneratedTheme> themes() {
         var themes = new java.util.ArrayList<GeneratedTheme>();
@@ -143,6 +144,11 @@ public final class KitFixtures {
                 for (boolean dark : new boolean[] {true, false}) if (theme.has(dark)) themes.add(theme.generated(dark));
             } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         }
+        var enterprise = expected.getParent().getParent().getParent().getParent().resolve("plugins/enterprise/src/main/resources/themes/enterprise.json");
+        try {
+            var theme = JasperTheme.parse(java.nio.file.Files.readString(enterprise), "enterprise");
+            for (boolean dark : new boolean[] {true, false}) themes.add(theme.generated(dark));
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
         return java.util.List.copyOf(themes);
     }
 

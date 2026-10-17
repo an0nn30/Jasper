@@ -87,6 +87,17 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
     }
 
     /**
+     * The default look's projections on {@code host}: what a Settings page made outside a dialog, or a dialog made without
+     * a presentation, runs with.
+     *
+     * @param host the host's facts
+     * @return the projections of {@link ChromeSpec#DEFAULT} under the default kit
+     */
+    public static Projections standard(Host host) {
+        return of(ChromeSpec.DEFAULT, false, false, "", host, Presentation.LANDED);
+    }
+
+    /**
      * Spec 4.7's fallback: the default kit's chrome under the title and menus {@code committed} before AWT. A committed native
      * title keeps the native-title values; a unified one gives the default look's values on {@code host}.
      *

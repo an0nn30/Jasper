@@ -120,7 +120,8 @@ final class ClassicHeader implements HeaderComposition {
             int pad = metric(DesignMetrics.Role.TOOLBAR_SEARCH_PADDING), hint = 0;
             String shortcut = field.shortcutText();
             if (!shortcut.isEmpty()) {
-                g.setFont(ThemeZone.font(Typography.Role.MONO_SMALL));
+                // IBM Plex Mono has no modifier symbols: the keycap then takes the platform face (plan 5b, ruling 26).
+                g.setFont(ThemeZone.font(Typography.Role.MONO_SMALL, shortcut));
                 FontMetrics mono = g.getFontMetrics();
                 int keyPad = metric(DesignMetrics.Role.HINT_KEYCAP_PADDING), keyHeight = metric(DesignMetrics.Role.HINT_KEYCAP_HEIGHT);
                 hint = mono.stringWidth(shortcut) + 2 * keyPad;

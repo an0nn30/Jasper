@@ -183,7 +183,7 @@ final class ViewReconciler implements AutoCloseable {
     private void applySettingsNavigation(Nodes.Node node,Map<String,ControlRegistry.Control> next,boolean inherited) {
         boolean navigation=inherited||node instanceof Nodes.Stack stack&&stack.role()==Nodes.LayoutRole.SETTINGS_NAVIGATION;
         // The Settings navigation's side inset is its rows' gutter, so a selected row fills the sidebar edge to edge (spec 2).
-        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.gutter(navigation?tree.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_INSET):0);}
+        if(next.get(node.id()) instanceof Trees.TreeControl tree){tree.settingsNavigation=navigation;tree.collapsibleNavigation=navigation&&view.collapsibleNavigation();tree.gutter(navigation?tree.context().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_INSET):0);}
         ControlRegistry.children(node).forEach(child->applySettingsNavigation(child,next,navigation));
     }
     /**
@@ -362,6 +362,7 @@ final class ViewReconciler implements AutoCloseable {
         for(var owner:mounted.values()) if(owner instanceof InteractiveRows.RowsControl rows) dismissed |= rows.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Menus.MenuControl menu) dismissed |= menu.dismiss();
         for (var owner : mounted.values()) if (owner instanceof BreadcrumbControls.BreadcrumbsControl crumbs) dismissed |= crumbs.dismiss();
+        for (var owner : mounted.values()) if (owner instanceof SettingRows.RowControl row) dismissed |= row.dismiss();
         for (var owner : mounted.values()) if (owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible()) { combo.hidePopup(); dismissed = true; }
         for(var owner:mounted.values())if(owner instanceof Choices.ChoiceControl choice && choice.input.getClientProperty("Jasper.pickerDismiss") instanceof Runnable dismiss){dismiss.run();dismissed=true;}
         return dismissed;
@@ -371,6 +372,7 @@ final class ViewReconciler implements AutoCloseable {
         if(mounted.values().stream().anyMatch(owner -> owner instanceof PanelHeaders.HeaderControl header && header.popupOpen()))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof InteractiveRows.RowsControl rows && rows.popupOpen()))return true;
         if(mounted.values().stream().anyMatch(owner -> owner instanceof BreadcrumbControls.BreadcrumbsControl crumbs && crumbs.popup.isVisible()))return true;
+        if(mounted.values().stream().anyMatch(owner -> owner instanceof SettingRows.RowControl row && row.popup.isVisible()))return true;
         return mounted.values().stream().anyMatch(owner -> owner instanceof Menus.MenuControl menu && menu.popup.isVisible()
             || owner instanceof Choices.ChoiceControl choice && choice.input instanceof javax.swing.JComboBox<?> combo && combo.isPopupVisible());
     }

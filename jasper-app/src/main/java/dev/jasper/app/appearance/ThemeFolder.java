@@ -28,8 +28,16 @@ public final class ThemeFolder {
     }
 
     private final Path folder;
+    private final java.util.function.Supplier<ThemeLibrary> library;
 
-    public ThemeFolder(Path folder) { this.folder = Objects.requireNonNull(folder, "folder"); }
+    /** A folder with no plugin themes to keep out. */
+    public ThemeFolder(Path folder) { this(folder, ThemeLibrary::bundledOnly); }
+
+    /** A folder that refuses the theme ids {@code library}'s plugins reserve (spec 7.4). */
+    public ThemeFolder(Path folder, java.util.function.Supplier<ThemeLibrary> library) {
+        this.folder = Objects.requireNonNull(folder, "folder");
+        this.library = Objects.requireNonNull(library, "library");
+    }
 
     /** The folder's path. */
     public Path folder() { return folder; }
@@ -65,6 +73,8 @@ public final class ThemeFolder {
         if (id.isEmpty()) throw new ImportFailure("The theme's name has no letters or digits Jasper can use for a file name");
         var builtIn = JasperTheme.builtIn(id);
         if (builtIn.isPresent()) throw new ImportFailure(builtIn.get().name() + " is built in and can't be replaced");
+        var provider = library.get().reservedBy(id);
+        if (provider.isPresent()) throw new ImportFailure(theme.name() + " is provided by the " + provider.get() + " plugin and can't be replaced");
         return new Candidate(id, theme.name(), Files.exists(file(id)), bytes);
     }
 
@@ -89,6 +99,9 @@ public final class ThemeFolder {
         if (!JasperTheme.validId(id) || builtIn(id)) throw new IllegalArgumentException("Not an imported theme: " + id);
         Files.delete(file(id));
     }
+
+    /** Whether {@code id} is a built-in theme's or a plugin's, which Settings neither replaces nor removes. */
+    public boolean fixed(String id) { return builtIn(id) || library.get().reservedBy(id).isPresent(); }
 
     /** Whether {@code id} is a built-in theme's, which no file in the folder replaces or removes. */
     public static boolean builtIn(String id) { return JasperTheme.builtIn(id).isPresent(); }

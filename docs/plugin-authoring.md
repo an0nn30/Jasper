@@ -22,6 +22,7 @@ exports = []                       # packages other plugins may use
 icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
 homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
 presentation = "presentation/look.kit.toml"  # optional, SDK 0.18.0: a kit file in your jars; needs presentation.provide
+themes = ["themes/look.json"]      # optional, SDK 0.18.0: Jasper theme files in your jars, offered in Settings › Appearance
 enabled_by_default = true          # optional, SDK 0.18.0: false keeps a bundled plugin off until the user turns it on
 
 [[requires]]
@@ -39,13 +40,34 @@ manifest with keys it does not know. An icon that is missing, too large or not a
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
 A presentation provider names its kit file with `presentation` and declares `presentation.provide`; the file's format is
-section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md),
-except that its `[branding]` table is not accepted yet.
+section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md).
 Jasper reads it before the first window, so a change applies after a restart, and one look is active at a time: a
 `--plugin-dir` provider wins over a bundled one, which wins over an installed one, then the lowest id. A kit file that is
 invalid skips the plugin with one message naming the key, a look that did not finish starting is skipped at the next
 start until the user tries again, and `--safe-mode` uses the standard look. `enabled_by_default = false` keeps a bundled
 plugin off until the user turns it on in Settings › Plugins; development and installed plugins ignore it.
+
+`[branding]` (optional) brands the look's start-up and windows: `product` is the name its splash shows (1 to 32
+characters), `icons` a folder in the kit's folder holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`,
+`icon-128.png`, `icon-256.png` and `icon-1024.png` (each a PNG of that size, at most 512 KiB), and `splash_art` a
+718 × 250 SVG of at most 256 KiB that follows the plugin artwork rules (no scripts, animation or outside resources).
+All three keys are required. A look with it replaces Jasper's icon in its windows and on the taskbar and Dock, and
+shows a splash on a start that opens a window; a look without it keeps Jasper's icon and shows none.
+
+`themes` lists [Jasper theme files](themes.md#the-jasper-theme-format) in your jars; a file's name is its theme's id
+(`themes/look.json` is `look`). While the plugin is enabled, its themes are listed in Settings › Appearance after the
+built-in ones, captioned "From the <name> plugin", and cannot be removed or replaced there; while it is off, a setting
+that names one uses Slate Cobalt without a warning and keeps the name. A built-in id is ignored with a configuration
+warning, and when two plugins ship the same id the development copy wins, then the bundled one, then the installed one,
+then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
+
+The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked presentation provider: its look is the
+kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
+`dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
+declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
+package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
+`try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
+the package is visible only while Enterprise is loaded.
 
 A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
 file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with

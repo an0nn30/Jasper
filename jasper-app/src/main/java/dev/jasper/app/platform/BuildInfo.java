@@ -42,6 +42,9 @@ public record BuildInfo(boolean release, Optional<String> version, int commitsSi
         .thenComparingInt(version -> part(version, 1)).thenComparingInt(version -> part(version, 2));
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
 
+    /** Jasper's copyright line, as About and a branded look's splash show it. */
+    public static final String COPYRIGHT = "Copyright 2026 Dustin McKenna-Watts";
+
     /** A build nothing is known about. */
     public static final BuildInfo UNKNOWN = new BuildInfo(false, Optional.empty(), 0, "", "", false, Optional.empty());
 
@@ -113,6 +116,17 @@ public record BuildInfo(boolean release, Optional<String> version, int commitsSi
         if (version.isEmpty()) return "";
         if (commitsSince == 0) return version.get();
         return version.get() + " + " + commitsSince + (commitsSince == 1 ? " commit" : " commits");
+    }
+
+    /**
+     * A branded look's splash line (spec 10.11): the version line and the short commit as About shows them,
+     * "1.2.0 + 14 commits · Build 8ba67ed3"; the version line alone when the commit is unknown, "Build 8ba67ed3" when no
+     * version is known, and "Development build" when neither is.
+     */
+    public String buildLine() {
+        String line = versionLine();
+        if (!known()) return line.isEmpty() ? "Development build" : line;
+        return (line.isEmpty() ? "" : line + " · ") + "Build " + shortCommit();
     }
 
     /** "main @ 8ba67ed3, modified"; the hash alone when detached; "commit unknown" when nothing is known. */

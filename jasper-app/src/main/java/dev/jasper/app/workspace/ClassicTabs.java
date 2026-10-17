@@ -248,7 +248,8 @@ final class ClassicTabs extends JPanel implements TabStrip {
             setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             getAccessibleContext().setAccessibleName(title);
             getAccessibleContext().setAccessibleDescription(running() ? "Session running" : null);
-            setFont(ThemeZone.font(Typography.Role.BODY));
+            // A title IBM Plex cannot draw (a dirty tab's "●", CJK) takes the platform face (plan 5b, ruling 26).
+            setFont(ThemeZone.font(Typography.Role.BODY, label()));
             repaint();
         }
 

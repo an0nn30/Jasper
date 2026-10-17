@@ -12,7 +12,8 @@ class DockRolesTest {
     static final Map<String, Integer> ROLES = new LinkedHashMap<>();
     static {
         Object[][] rows = {{"STRIPE_PILL_HEIGHT", 14}, {"STRIPE_PILL_WIDTH", 16}, {"STRIPE_PILL_PADDING", 5}, {"STRIPE_PILL_GAP", 5},
-            {"TOOL_HEADER_ACTION", 16}, {"HEADER_STRIP_TITLE_GAP", 8}, {"HEADER_STRIP_DOT_GAP", 6}};
+            {"TOOL_HEADER_ACTION", 16}, {"HEADER_STRIP_TITLE_GAP", 8}, {"HEADER_STRIP_DOT_GAP", 6}, {"HEADER_STRIP_COUNT_GAP", 6},
+            {"BOTTOM_STRIP_HEIGHT", 24}};
         for (Object[] row : rows) ROLES.put((String) row[0], (Integer) row[1]);
     }
 

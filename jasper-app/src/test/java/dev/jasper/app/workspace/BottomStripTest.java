@@ -25,7 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 /** Spec 10.7: the bottom strip's labels, dividers, groups and place in the window. */
 @ExtendWith(EdtTestExtension.class)
 class BottomStripTest {
-    @Test void bottomLeftStartsAtTheStripesThicknessAndBottomRightEndsAtItWithDividers() throws Exception {
+    @Test void bottomLeftStartsAtTheStripesFillAndBottomRightEndsAtItWithDividers() throws Exception {
         try {
             EnterpriseLook.install(false);
             var kit = EnterpriseLook.kit();
@@ -35,14 +35,15 @@ class BottomStripTest {
                 LabelledStripeTest.window("terminal", "Terminal", Slot.BOTTOM_RIGHT, 0),
                 LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 2)), List.of());
             int thickness = strip.getPreferredSize().height;
-            assertThat(thickness).as("as thick as the side stripes").isEqualTo(new LabelledStripe(Side.LEFT, kit).getPreferredSize().width);
+            assertThat(thickness).as("the mocks' 24 and the rule (Rulings 4 as ruled)").isEqualTo(25);
+            int fill = new LabelledStripe(Side.LEFT, kit).getPreferredSize().width - 1;
             var image = MockCrops.render(strip, 900, thickness, 1);
             assertThat(strip.buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Event Log", "3: Transfers", "Terminal");
             Rectangle log = strip.buttons().get(0).getBounds(), transfers = strip.buttons().get(1).getBounds(), terminal = strip.buttons().get(2).getBounds();
-            assertThat(log.x).as("aligned with the left stripe").isEqualTo(thickness);
+            assertThat(log.x).as("from the left stripe's fill").isEqualTo(fill);
             assertThat(log.y).as("under the top rule").isEqualTo(1);
             assertThat(transfers.x).as("after the divider").isEqualTo(log.x + log.width + 1);
-            assertThat(terminal.x + terminal.width).as("aligned with the right stripe").isEqualTo(900 - thickness);
+            assertThat(terminal.x + terminal.width).as("to the right stripe's fill").isEqualTo(900 - fill);
             var painter = new ChromePainter(kit);
             var theme = EnterpriseLook.theme(false);
             assertThat(new Color(image.getRGB(log.x + log.width, thickness / 2))).as("a divider after each label").isEqualTo(painter.stripDivider(theme));
@@ -54,6 +55,12 @@ class BottomStripTest {
             assertThat(groups).extracting(DockDropResolver.Group::axis).containsOnly(DockDropResolver.Axis.HORIZONTAL);
             assertThat(groups.get(0).bounds().x + groups.get(0).bounds().width).isEqualTo(groups.get(1).bounds().x);
             assertThat(groups.get(0).buttons()).hasSize(2);
+            // A wider Panel rail moves the labels with the side stripes, not the strip's height.
+            strip.setRailWidth(40);
+            strip.setSize(900, strip.getPreferredSize().height);
+            strip.doLayout();
+            assertThat(strip.getPreferredSize().height).as("independent of window.rail_width").isEqualTo(25);
+            assertThat(strip.buttons().get(0).getX()).as("the wider stripes' fill").isEqualTo(39);
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

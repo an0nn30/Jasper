@@ -358,6 +358,20 @@ final class PanelHeaders {
             return owner.flush() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HEADER_STRIP_TITLE_GAP) : gap();
         }
 
+        /** Before a count: the text gap, or on a header strip the mocks' title-to-count gap. */
+        int countGap() {
+            return owner.flush() ? ThemePainting.metric(owner.context(), DesignMetrics.Role.HEADER_STRIP_COUNT_GAP) : textGap();
+        }
+
+        /**
+         * How far the title's {@code width} wide label moves what follows it: the width, or on a header strip the title's
+         * set advance (the mocks' kerned fractional one, which a label's whole-pixel width overruns).
+         */
+        int titleAdvance(int width) {
+            if (!owner.flush() || owner.title.getText() == null || owner.title.getFont() == null) return width;
+            return Math.min(width, ThemePainting.setAdvance(owner.title.getFont(), owner.title.getText()));
+        }
+
         /** What lies under the content: the bottom gap, or a header strip's rule. */
         int bottom() {
             return ThemePainting.metric(owner.context(), owner.flush() ? DesignMetrics.Role.DOCK_RULE : DesignMetrics.Role.PANEL_HEADER_BOTTOM_GAP);
@@ -400,7 +414,7 @@ final class PanelHeaders {
         @Override
         public void layoutContainer(Container p) {
             Insets i = p.getInsets();
-            int left = i.left, right = Math.max(left, p.getWidth() - i.right), g = trailingGap(), t = textGap();
+            int left = i.left, right = Math.max(left, p.getWidth() - i.right), g = trailingGap(), t = textGap(), counting = countGap();
             int contentHeight = Math.max(0, p.getHeight() - bottom());
             // Reserve trailing controls first. Only the title's text lane may compress.
             for (var c : trailing()) {
@@ -417,9 +431,11 @@ final class PanelHeaders {
             int tw =
                     Math.min(
                             owner.title.getPreferredSize().width,
-                            Math.max(0, right - left - cw - (cw > 0 ? t : 0)));
+                            Math.max(0, right - left - cw - (cw > 0 ? counting : 0)));
             place(owner.title, left, tw, contentHeight);
-            left += tw + t;
+            // A count, or a detail that is one ("(1)"), follows the title by the count gap; a dot or word by the text gap.
+            boolean counted = cw > 0 || owner.flush() && owner.detail.getText() != null && owner.detail.getText().matches("\\(\\d+\\)");
+            left += titleAdvance(tw) + (counted ? counting : t);
             if (cw > 0) {
                 place(owner.count, left, cw, contentHeight);
                 left += cw + t;

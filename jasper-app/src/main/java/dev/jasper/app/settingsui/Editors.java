@@ -38,9 +38,32 @@ public final class Editors {
      *
      * @param build creates the editor
      * @param terms extra words the search should match, such as choice names
+     * @param lookTerms further words that depend on the page's context, such as the look's copy for a row
      */
-    public record Factory<T>(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms) {
-        public Factory { terms = List.copyOf(terms); }
+    public record Factory<T>(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms,
+                             Function<PageContext, List<String>> lookTerms) {
+        public Factory { terms = List.copyOf(terms); java.util.Objects.requireNonNull(lookTerms); }
+
+        /**
+         * A factory whose search words do not depend on the page's context.
+         *
+         * @param build creates the editor
+         * @param terms extra words the search should match, such as choice names
+         */
+        public Factory(BiFunction<Setting<T>, PageContext, ValueEditor<T>> build, List<String> terms) { this(build, terms, context -> List.of()); }
+
+        /**
+         * The words the search matches on a page with {@code context}: {@link #terms()} and then {@link #lookTerms()}.
+         *
+         * @param context the page's context
+         * @return the search words
+         */
+        public List<String> terms(PageContext context) {
+            var extra = lookTerms.apply(context);
+            if (extra.isEmpty()) return terms;
+            var all = new ArrayList<String>(terms); all.addAll(extra);
+            return List.copyOf(all);
+        }
     }
 
     /** The editor a setting's kind implies. */
@@ -194,7 +217,7 @@ public final class Editors {
 
     /** The {@code notifications.groups} editor: one line per group {@code choices} lists. */
     public static Factory<Map<String, String>> notificationGroups(NotificationGroupChoices choices) {
-        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit()),
+        return new Factory<>((setting, context) -> new NotificationGroupsEditor(choices, context.kit(), context.chrome().inlineReset()),
             List.of("group", "card", "sticky", "history only", "off", "mute"));
     }
 

@@ -138,6 +138,8 @@ final class Buttons {
         boolean sideColumn;
         /** A classic tree's expand button: its drawn triangle alone, as wide as the glyph and its gap to the title (plan 4c). */
         boolean disclosure;
+        /** A disclosure's width when its owner sets one (the Settings navigation, plan 9a); 0 keeps the glyph and its gap. */
+        int disclosureWidth;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
         boolean windowFooter;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
@@ -232,16 +234,16 @@ final class Buttons {
         KitContext context() { return context; }
         /** The component standing in its parent's layout for this button: itself, or a menu button's surface for its parts and face. */
         Component placement() { return this; }
-        /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the text colour. */
+        /** The glyph's colour: the severity's (as on a kit Icon) when present, otherwise the face's (by default the text colour). */
         SemanticColor iconRole(boolean hover) {
             if (onSelection) return ink.text;
-            return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : textRole(hover) : Labels.tint(iconSeverity);
+            return iconSeverity == null ? panel || panelDetail ? SemanticColor.HUE_NEUTRAL : context.faces().buttons.iconRole(this, hover) : Labels.tint(iconSeverity);
         }
         @Override public Dimension getPreferredSize() {
             Dimension size = super.getPreferredSize();
             if(getText()==null || getText().isEmpty()) {
                 if(disclosure) {int glyph=ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GLYPH);
-                    return new Dimension(Math.max(glyph,glyph+ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GAP)-ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP)),ThemePainting.metric(context,DesignMetrics.Role.ROW_HEIGHT));}
+                    return new Dimension(disclosureWidth>0?disclosureWidth:Math.max(glyph,glyph+ThemePainting.metric(context,DesignMetrics.Role.DISCLOSURE_GAP)-ThemePainting.metric(context,DesignMetrics.Role.ICON_GAP)),ThemePainting.metric(context,DesignMetrics.Role.ROW_HEIGHT));}
                 if(orderedCommand) {int extent=ThemePainting.metric(context,DesignMetrics.Role.ORDERED_ACTION);return new Dimension(extent,extent);}
                 if(circular) {int extent=ThemePainting.metric(context,DesignMetrics.Role.CIRCULAR_ACTION_SIZE);return new Dimension(extent,extent);}
                 if(getParent() instanceof Stacks.StackSurface surface && surface.joined)
@@ -411,9 +413,11 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                 // Re-tint the same named icon for hover without altering component identity.
                 String name = null;
                 if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                // On a selected row the glyph takes the fill's ink whatever its artwork (the palette overload recolours built-ins).
+                // On a header strip the glyph takes the strip's action ink; on a selected row, or where the face recolours it,
+                // it takes its role whatever its artwork (the palette overload recolours built-ins).
                 javax.swing.Icon artwork = name != null && stripInk != null ? context.icons().panel(name, context.theme().semantic(), stripInk, getIcon().getIconWidth())
-                    : name != null && onSelection ? context.icons().icon(name, context.theme().semantic(), ink.text, getIcon().getIconWidth())
+                    : name != null && (onSelection || context.faces().buttons.recolours(this))
+                    ? context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth())
                     : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
                     ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())
                     : context.icons().icon(name, context.theme(), iconRole(hover), getIcon().getIconWidth());

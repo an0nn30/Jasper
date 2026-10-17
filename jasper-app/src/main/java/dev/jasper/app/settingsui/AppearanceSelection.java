@@ -24,6 +24,7 @@ import java.util.Optional;
 final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private final AppearanceChoices choices;
     private final SettingsDraft draft;
+    private final PageContext context;
     private final Subscription listening;
     private final Optional<ThemeMenu> darkMenu, lightMenu;
     private InstalledThemes themes;
@@ -34,6 +35,7 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     AppearanceSelection(AppearanceChoices choices, PageContext context) {
         this.choices = choices;
         this.draft = context.draft();
+        this.context = context;
         darkMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.DARK, () -> render.run()));
         lightMenu = choices.imports().map(hooks -> new ThemeMenu(hooks, choices.themes(), context, ThemeMenu.Target.LIGHT, () -> render.run()));
         themes = choices.themes().get();
@@ -66,13 +68,16 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
         // The Light row holds a hidden copy of Reset, so its dropdown and gear line up with the Dark row's and the Terminal scheme row's.
         var lane = new Nodes.Button(id + ":light-reset", new ControlState(false, true, false, ""), "", "reset", Nodes.ButtonKind.GHOST,
             id + ":reset", reset.tooltip());
+        boolean inline = context.chrome().inlineReset();
         var darkControls = new Nodes.Stack(id + ":dark-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING,
-            List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark), reset));
+            inline ? List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark), reset) : List.of(withGear(id + ":dark", plain, darkPick, darkMenu, dark)));
         var lightControls = new Nodes.Stack(id + ":light-controls", plain, Nodes.LayoutRole.SETTINGS_TRAILING,
-            List.of(withGear(id + ":light", plain, lightPick, lightMenu, light), lane));
+            inline ? List.of(withGear(id + ":light", plain, lightPick, lightMenu, light), lane) : List.of(withGear(id + ":light", plain, lightPick, lightMenu, light)));
+        // Spec 12.1: without an inline Reset, both theme rows offer Reset to Default for the policy and its two themes.
+        var menu = SchemaPage.resetMenu(context, id + ":reset", modified);
         return new Nodes.Stack(id + ":selection", plain, Nodes.LayoutRole.VERTICAL, List.of(tiles,
-            new Nodes.SettingRow("row:" + id, plain, UI_THEME_DARK.label(), "", darkControls, false, highlighted),
-            new Nodes.SettingRow("row:" + id + ":light", plain, UI_THEME_LIGHT.label(), "", lightControls, false, highlighted)));
+            new Nodes.SettingRow("row:" + id, plain, UI_THEME_DARK.label(), "", darkControls, false, highlighted, "", menu),
+            new Nodes.SettingRow("row:" + id + ":light", plain, UI_THEME_LIGHT.label(), "", lightControls, false, highlighted, "", menu)));
     }
 
     /** {@code pick}, followed by its gear {@code id + "-gear"} when there is one. */
@@ -89,7 +94,8 @@ final class AppearanceSelection implements ValueEditor<AppearanceMode> {
     private List<Option> options(boolean dark, String picked) {
         var installed = dark ? themes.dark() : themes.light();
         var options = new ArrayList<Option>();
-        for (var theme : installed) options.add(new Option(theme.id(), theme.label(), Optional.empty()));
+        for (var theme : installed) options.add(new Option(theme.id(), theme.label(), Optional.empty(), "",
+            theme.provider().isEmpty() ? "" : "From the " + theme.provider() + " plugin", Optional.empty()));
         if (installed.stream().noneMatch(theme -> theme.id().equals(picked))) options.add(new Option(picked, unavailable(dark, picked), Optional.empty()));
         return options;
     }

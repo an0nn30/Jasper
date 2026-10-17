@@ -52,7 +52,7 @@ final class SettingsAppearance {
     /** What the Appearance page offers from {@code library}: its themes for each appearance and its schemes, with their labels. */
     static InstalledThemes themeChoices(ThemeLibrary library) {
         java.util.function.Function<Boolean, java.util.List<InstalledThemes.ThemeOption>> themes = dark -> library.themes(dark).stream()
-            .map(theme -> new InstalledThemes.ThemeOption(theme.id(), library.label(theme), preview(theme, dark))).toList();
+            .map(theme -> new InstalledThemes.ThemeOption(theme.id(), library.label(theme), preview(theme, dark), library.provider(theme.id()).orElse(""))).toList();
         return new InstalledThemes(themes.apply(true), themes.apply(false), library.schemes().stream()
             .map(scheme -> new InstalledThemes.SchemeOption(scheme.id().toString(), library.label(scheme))).toList(),
             library.themes().stream().collect(java.util.stream.Collectors.toMap(JasperTheme::id, library::label)));

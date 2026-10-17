@@ -71,12 +71,17 @@ public final class MockCrops {
     public static Color at(BufferedImage image, int x, int y) { return new Color(image.getRGB(x, y)); }
 
     /**
-     * An agreeing share that follows the UI face's glyphs: until plan 5b ships IBM Plex the fixture kit draws the platform
-     * face, so it is printed as a residual, as {@link MockProfile#fonts} prints a face-width probe; the merge with plan 5b
-     * asserts it at least {@code floor}.
+     * An agreeing share that follows the UI face's glyphs, asserted at least {@code floor} under the shipped kit's IBM
+     * Plex; printed, not asserted, where an installed IBM Plex hides the plugin's files, as {@link MockProfile#fonts}
+     * treats a face-width probe.
      */
     public static void fontsFloor(String what, double actual, double floor) {
-        System.out.printf("FONTS residual until plan 5b: %s %.3f, floor %.2f%n", what, actual, floor);
+        if (!EnterpriseResources.plexResolves()) {
+            System.out.printf("FONTS unchecked (an installed IBM Plex hides the plugin's files): %s %.3f, floor %.2f%n", what, actual, floor);
+            return;
+        }
+        System.out.printf("FONTS %s %.3f, floor %.2f%n", what, actual, floor);
+        org.assertj.core.api.Assertions.assertThat(actual).as(what + " under IBM Plex").isGreaterThanOrEqualTo(floor);
     }
 
     /** Whether every channel of {@code a} is within {@code tolerance} of {@code b}'s. */
