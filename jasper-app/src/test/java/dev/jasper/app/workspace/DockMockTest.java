@@ -195,5 +195,30 @@ class DockMockTest {
         }
     }
 
+    /** The 1 px rules between flush frames against the mocks' rules at 2x: the colour and the two-pixel width. */
+    @Test void theRulesBetweenFramesMatchTheMocks() throws Exception {
+        for (Variant variant : VARIANTS) {
+            try {
+                EnterpriseLook.install(variant.dark());
+                var area = new ToolWindowArea(new javax.swing.JPanel(), new dev.jasper.app.dock.DockState(), EnterpriseLook.kit(), true);
+                DockTestSupport.show(area, Slot.LEFT_TOP, new javax.swing.JLabel("SFTP"), 300);
+                DockTestSupport.show(area, Slot.LEFT_BOTTOM, new javax.swing.JLabel("File Servers"), 300);
+                var render = variant.seen(MockCrops.render(area, 1000, 763, 2));
+                var mock = variant.crop(0, 0, 2884, 1804);
+                String where = variant.name() + " rules";
+                // The mock's left rule is at x 648-649 and its rule between the left frames at y 942-943 (2x).
+                Color theirs = MockCrops.at(mock, 648, 1000);
+                assertThat(MockCrops.near(MockCrops.at(mock, 649, 1000), theirs, 0)).isTrue();
+                assertThat(MockCrops.near(MockCrops.at(mock, 500, 942), theirs, 3)).isTrue();
+                java.awt.Rectangle top = area.content(Slot.LEFT_TOP).getParent().getBounds();
+                int x = 2 * (top.x + top.width), y = 2 * (top.y + top.height);
+                assertThat(MockCrops.near(MockCrops.at(render, x, 600), theirs, variant.fillTolerance())).as(where + ": the colour").isTrue();
+                assertThat(MockCrops.near(MockCrops.at(render, x + 1, 600), theirs, variant.fillTolerance())).as(where + ": two pixels at 2x").isTrue();
+                assertThat(MockCrops.near(MockCrops.at(render, x + 2, 600), theirs, variant.fillTolerance())).as(where + ": not three").isFalse();
+                assertThat(MockCrops.near(MockCrops.at(render, 200, y), theirs, variant.fillTolerance())).as(where + ": between the left frames").isTrue();
+            } finally { EnterpriseLook.restoreDefault(); }
+        }
+    }
+
     // Later tasks add their surfaces above this line.
 }

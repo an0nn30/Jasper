@@ -131,6 +131,18 @@ final class ToolWindowHeader extends JPanel {
         return button;
     }
 
+    /** Whether this header strip shows its frame as focused (flush frames, spec 10.7). */
+    private boolean focused;
+
+    /** Shows the frame as focused or not; only a flush header strip paints it. */
+    void setFocused(boolean value) {
+        if (focused == value) return;
+        focused = value;
+        repaint();
+    }
+
+    boolean focused() { return focused; }
+
     void presentation(dev.jasper.app.contributions.PanelHeaderState state) {
         presentation = java.util.Objects.requireNonNull(state);
         detail.setText(state.detail());

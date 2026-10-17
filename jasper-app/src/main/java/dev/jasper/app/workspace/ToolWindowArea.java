@@ -75,6 +75,16 @@ final class ToolWindowArea extends JPanel {
         private String id;
         /** Shows per-window header metadata on this frame's header, native or borrowed; inert once released. */
         private Consumer<dev.jasper.app.contributions.PanelHeaderState> header = state -> { };
+        /** Whether this frame holds the focus owner (flush frames only). */
+        private boolean focused;
+        /** Shows the focus on this frame's header strip, native or borrowed; inert once released. */
+        private Consumer<Boolean> focusedHeader = value -> { };
+
+        void focused(boolean value) {
+            if (focused == value) return;
+            focused = value;
+            focusedHeader.accept(value);
+        }
 
         Host(boolean toolWindow) {
             super(new BorderLayout());
@@ -167,6 +177,7 @@ final class ToolWindowArea extends JPanel {
         private DockGeometry.Divider dragging;
         /** Whether a drag event arrived since the press; a plain click must not rewrite a squeezed size. */
         private boolean moved;
+        /** Where in the handle the press was, less how far the divider's leading edge lies into the handle. */
         private int grab;
 
         DividerHandle(DockGeometry.Handle handle) {
@@ -177,7 +188,9 @@ final class ToolWindowArea extends JPanel {
                     if (!SwingUtilities.isLeftMouseButton(event) || placed == null) return;
                     dragging = placed;
                     moved = false;
-                    grab = handle.vertical() ? event.getX() : event.getY();
+                    // A flush rule's drag area is wider than the rule: the rule's leading edge lies inside it.
+                    int offset = handle.vertical() ? placed.bounds().x - getX() : placed.bounds().y - getY();
+                    grab = (handle.vertical() ? event.getX() : event.getY()) - offset;
                 }
 
                 @Override public void mouseDragged(MouseEvent event) {
@@ -227,7 +240,7 @@ final class ToolWindowArea extends JPanel {
             hosts.forEach((slot, host) -> host.setBounds(layout.slot(slot).orElseGet(Rectangle::new)));
             dividers.values().forEach(divider -> {
                 divider.placed = layout.divider(divider.handle).orElse(null);
-                divider.setBounds(divider.placed == null ? new Rectangle() : divider.placed.bounds());
+                divider.setBounds(divider.placed == null ? new Rectangle() : hitArea(divider.placed));
             });
         }
     }
@@ -293,6 +306,8 @@ final class ToolWindowArea extends JPanel {
             dividers.put(handle, divider);
             add(divider);
         }
+        // A flush rule's drag area overlaps the frames beside it: the handles stay above them.
+        if (flush) for (DividerHandle divider : dividers.values()) setComponentZOrder(divider, 0);
         refreshTheme();
         sync();
     }
@@ -378,8 +393,9 @@ final class ToolWindowArea extends JPanel {
                     var surfaces = header.dragSurfaces();
                     for (JComponent surface : surfaces) dragSource.accept(surface, id);
                     host.header = header::presentation;
+                    host.focusedHeader = header::setFocused;
                     Host mounted = host;
-                    host.releaseHeader = () -> { mounted.header = state -> { }; surfaces.forEach(releaseDragSource); };
+                    host.releaseHeader = () -> { mounted.header = state -> { }; mounted.focusedHeader = value -> { }; surfaces.forEach(releaseDragSource); };
                 }
                 if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
                     var release = host.releaseHeader;
@@ -399,6 +415,58 @@ final class ToolWindowArea extends JPanel {
         refreshGutters();
         revalidate(); repaint();
         onMinimumSizeChanged.run();
+        if (flush) focusMoved(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner());
+    }
+
+    /** The frame holding the permanent focus owner, under flush frames. */
+    private Slot focused;
+    /** Follows the permanent focus owner while the area is showing, under flush frames. */
+    private final java.beans.PropertyChangeListener focusListener = event -> focusMoved(event.getNewValue() instanceof Component owner ? owner : null);
+
+    @Override public void addNotify() {
+        super.addNotify();
+        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", focusListener);
+    }
+
+    @Override public void removeNotify() {
+        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", focusListener);
+        super.removeNotify();
+    }
+
+    /** Spec 10.7: the frame holding {@code owner} shows its header strip as focused, the others not; standard frames ignore it. */
+    void focusMoved(Component owner) {
+        if (!flush) return;
+        Slot now = null;
+        for (var entry : hosts.entrySet())
+            if (owner != null && SwingUtilities.isDescendingFrom(owner, entry.getValue())) now = entry.getKey();
+        focused = now;
+        for (var entry : hosts.entrySet()) entry.getValue().focused(entry.getKey() == focused);
+    }
+
+    /** The frame showing its header strip as focused, if any. */
+    java.util.Optional<Slot> focusedSlot() { return java.util.Optional.ofNullable(focused); }
+
+    /** A divider's drag area: the divider itself, or under flush frames {@code DOCK_RULE_HIT} across, centred on its rule. */
+    private Rectangle hitArea(DockGeometry.Divider divider) {
+        Rectangle bounds = divider.bounds();
+        if (!flush) return bounds;
+        int hit = UIScale.scale(kit.metrics().value(DesignMetrics.Role.DOCK_RULE_HIT));
+        int grow = Math.max(0, hit - (divider.handle().vertical() ? bounds.width : bounds.height));
+        if (divider.handle().vertical()) { bounds.x -= grow / 2; bounds.width += grow; }
+        else { bounds.y -= grow / 2; bounds.height += grow; }
+        return bounds;
+    }
+
+    /** Under flush frames, each laid out divider is a painted rule (spec 10.7). */
+    @Override protected void paintComponent(Graphics graphics) {
+        super.paintComponent(graphics);
+        if (!flush) return;
+        graphics.setColor(new dev.jasper.ui.swing.ChromePainter(kit).dockRule(ThemeZone.theme(this)));
+        for (DividerHandle divider : dividers.values()) {
+            if (divider.placed == null) continue;
+            Rectangle rule = divider.placed.bounds();
+            graphics.fillRect(rule.x, rule.y, rule.width, rule.height);
+        }
     }
 
     /** What the slot's frame should show: its active window's content, or null for none or a closed kit view. */
@@ -586,5 +654,8 @@ final class ToolWindowArea extends JPanel {
     }
 
     /** The dock metrics at the current UI scale; the drag's preview uses the same. */
-    DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
+    DockGeometry.Metrics metrics() {
+        double scale = UIScale.getUserScaleFactor();
+        return flush ? DockGeometry.Metrics.at(scale, kit.metrics().value(DesignMetrics.Role.DOCK_RULE)) : DockGeometry.Metrics.at(scale);
+    }
 }
