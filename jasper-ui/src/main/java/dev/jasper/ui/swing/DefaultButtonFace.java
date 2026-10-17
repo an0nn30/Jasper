@@ -29,6 +29,7 @@ final class DefaultButtonFace implements ButtonFace {
         PickerMenus.paintRichFace(owner, graphics, context, face, empty, focus, hover, expanded);
     }
     @Override public boolean tiles() { return true; }
+    @Override public int joinedOverlap() { return 0; }
     @Override public Color menuDivider(KitContext context) { return ThemePainting.color(context, SemanticColor.BORDER_MENU); }
     @Override public List<PaintPair> pairs() { return List.of(); }
 }

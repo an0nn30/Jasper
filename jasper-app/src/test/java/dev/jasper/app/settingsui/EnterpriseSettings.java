@@ -172,15 +172,16 @@ final class EnterpriseSettings implements AutoCloseable {
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
                         uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
                 dialog[0].open(null, "appearance");
+                // Every mock shows Back enabled, Appearance's too: the dialog comes back to Appearance from Window.
+                dialog[0].select("window");
+                dialog[0].select("appearance");
             });
             var ready = new CompletableFuture<Void>();
             runtime[0].snapshot(outcome -> ready.complete(null));
             ready.get(10, TimeUnit.SECONDS);
         } catch (Exception | Error failure) {
-            // A failed opening leaves no Enterprise look behind for the tests that follow.
-            SwingUtilities.invokeAndWait(() -> {
-                try { if (dialog[0] != null) dialog[0].cancel(); if (themes[0] != null) themes[0].close(); } finally { EnterpriseLook.restoreDefault(); }
-            });
+            // A failed opening leaves no Enterprise look, plugin thread or temporary home behind for the tests that follow.
+            try { release(home, windows, themes[0], runtime[0], dialog[0]); } catch (Exception | Error cleanup) { failure.addSuppressed(cleanup); }
             throw failure;
         }
         return new EnterpriseSettings(home, windows, holder, themes[0], runtime[0], dialog[0]);
@@ -199,13 +200,21 @@ final class EnterpriseSettings implements AutoCloseable {
     }
 
     /** Closes the dialog, stops the plugins and installs the default look again for the tests that follow (6a's restoreDefault). */
-    @Override public void close() throws Exception {
+    @Override public void close() throws Exception { release(home, windows, themes, runtime, dialog); }
+
+    /**
+     * Cancels {@code dialog}, stops {@code runtime}, closes the windows and {@code themes}, then installs the default look and
+     * deletes {@code home} whatever failed; a part a failed {@link #open} never made is null.
+     */
+    private static void release(Path home, AuxiliaryWindows windows, ThemeController themes, PluginRuntime runtime, SettingsDialog dialog) throws Exception {
         try {
-            SwingUtilities.invokeAndWait(dialog::cancel);
-            var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
-            SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
-            CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
-            SwingUtilities.invokeAndWait(() -> { windows.close(); themes.close(); });
+            if (dialog != null) SwingUtilities.invokeAndWait(dialog::cancel);
+            if (runtime != null) {
+                var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
+                SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
+                CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            }
+            SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes != null) themes.close(); });
         } finally {
             try { SwingUtilities.invokeAndWait(EnterpriseLook::restoreDefault); }
             finally { try (var paths = Files.walk(home)) { for (var path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); } }

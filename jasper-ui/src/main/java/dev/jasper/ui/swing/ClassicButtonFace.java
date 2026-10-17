@@ -6,6 +6,8 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.*;
 import java.awt.*;
+import java.awt.geom.Area;
+import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.util.List;
 import javax.swing.JComponent;
@@ -64,12 +66,15 @@ final class ClassicButtonFace implements ButtonFace {
         int inset = b.panelDetail ? ThemePainting.metric(c, DesignMetrics.Role.FOCUS_RING) : 0;
         double trim = b.panelDetail ? UIScale.scale((float) c.metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_BOTTOM_TRIM)) : 0;
         double radius = ThemePainting.metric(c, DesignMetrics.Role.CONTROL_RADIUS);
-        var face = new RoundRectangle2D.Double(inset, inset, b.getWidth() - 2.0 * inset, b.getHeight() - trim - 2.0 * inset, 2 * radius, 2 * radius);
+        var pair = b.placement().getParent() instanceof Stacks.StackSurface stack && stack.joined ? stack : null;
+        Shape face = pair == null ? new RoundRectangle2D.Double(inset, inset, b.getWidth() - 2.0 * inset, b.getHeight() - trim - 2.0 * inset, 2 * radius, 2 * radius)
+            : joined(pair, b.placement(), 0, b.getWidth(), b.getHeight(), radius);
         boolean primary = b.kind == Nodes.ButtonKind.PRIMARY;
         Color border;
         if (!b.isEnabled()) {
             g.setColor(ThemePainting.role(c, primary ? DerivedColor.SURFACE_HEADER : DerivedColor.SURFACE_TABLE_HEADER)); g.fill(face);
-            border = ThemePainting.role(c, DerivedColor.BORDER_DIVIDER);
+            // A joined pair keeps one outline: its disabled half takes the standard edge (the mocks' history pair).
+            border = pair != null ? ThemePainting.painted(c, edge) : ThemePainting.role(c, DerivedColor.BORDER_DIVIDER);
         } else if (selected || flat) {
             g.setColor(ThemePainting.color(c, selected ? SemanticColor.SURFACE_CONTROL_SELECTED : SemanticColor.SURFACE_CONTROL_HOVER)); g.fill(face);
             border = ThemePainting.painted(c, hoverEdge);
@@ -81,7 +86,28 @@ final class ClassicButtonFace implements ButtonFace {
             border = ThemePainting.painted(c, hover ? hoverEdge : edge);
         }
         // A borderless face (a strip's icon-only menu) keeps its fill without the outline, as by default.
-        ThemePainting.rounded(g, b, c, null, b.borderless ? null : border, focused, false, radius, inset, trim);
+        if (pair == null) { ThemePainting.rounded(g, b, c, null, b.borderless ? null : border, focused, false, radius, inset, trim); return; }
+        ThemePainting.rounded(g, b, c, null, null, focused, false, radius, 0, 0);
+        if (b.borderless) return;
+        var line = (Graphics2D) g.create();
+        try {
+            line.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            line.setColor(border); line.setStroke(new BasicStroke(UIScale.scale(1f)));
+            line.draw(joined(pair, b.placement(), .5, b.getWidth() - 1, b.getHeight() - 1, radius));
+        } finally { line.dispose(); }
+    }
+
+    /**
+     * A joined pair's half at {@code offset}, {@code width} by {@code height}: rounded on the pair's outer side only, so the
+     * halves meet square at the border they share.
+     */
+    private static Shape joined(Stacks.StackSurface pair, Component half, double offset, double width, double height, double radius) {
+        var shape = new Area(new RoundRectangle2D.Double(offset, offset, width, height, 2 * radius, 2 * radius));
+        double square = Math.min(radius, width / 2);
+        if (pair.getComponentCount() > 1 && pair.getComponent(0) != half) shape.add(new Area(new Rectangle2D.Double(offset, offset, square, height)));
+        if (pair.getComponentCount() > 1 && pair.getComponent(pair.getComponentCount() - 1) != half)
+            shape.add(new Area(new Rectangle2D.Double(offset + width - square, offset, square, height)));
+        return shape;
     }
 
     @Override public Color text(Buttons.KitButton b, boolean hover) {
@@ -162,5 +188,7 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     @Override public boolean tiles() { return false; }
+    /** The classic pair's halves share one border, as the Settings mocks' history pair does (51 wide for two 26 px halves). */
+    @Override public int joinedOverlap() { return UIScale.scale(1); }
     @Override public Color menuDivider(KitContext context) { return ThemePainting.role(context, DerivedColor.BORDER_ROW); }
 }

@@ -3,8 +3,13 @@
 > **Status (2026-10-17):** executing; deviations so far: Execution notes E28 and E29. Task 6 (platform faces, `PLEX`
 > false): classic `SETTINGS_PAGE_TOP` calibrated 10 to 11 (Command Palette's first box top 52, now 53 as the mock);
 > `SETTINGS_SECTION_GAP` 13 and `SETTINGS_CRUMB_GAP` 6 kept (Appearance's boxes 307 and 328, 21 apart as the mock's 313
-> and 334; the crumbs' gaps within a pixel of the face's side bearings); all three re-checked when the 5b merge turns
-> `PLEX` on. Lowest printed shares: sidebar 0.963, header 0.957, footer 0.991; every frame probe passes; box edges 247
+> and 334); all three re-checked when the 5b merge turns `PLEX` on. Review round 1: the joined history pair drew 50 wide
+> with two borders at the join (the disabled half's `#D3D6DA`) against the mock's 51 with one shared `#B4B8BF` divider, so
+> the crumbs started 1 px early; the classic pair now has 26 px halves (`JOINED_ACTION_WIDTH` 26 in the classic table)
+> overlapping one border (`ButtonFace.joinedOverlap`), square at the join, its disabled half in the standard edge, and the
+> parent crumb starts at body x 75.5 as the mock; the separator and page (220 and 234 against 212 and 225) follow the
+> platform face's wider parent text. The fixture comes back to Appearance from Window, so page 01 shows Back enabled as
+> its mock. Lowest printed shares: sidebar 0.963, header 0.958, footer 0.991; every frame probe passes; box edges 247
 > and 1023 as measured. Residuals: the platform face for Plex; the history buttons' chevrons where the mocks draw
 > arrows. No pixel-proof file skipped.
 

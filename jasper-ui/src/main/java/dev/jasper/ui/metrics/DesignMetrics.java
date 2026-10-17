@@ -163,6 +163,7 @@ public final class DesignMetrics {
         values.put(Role.PICKER_DEFAULT_HEIGHT, 22);
         values.put(Role.FULL_FOOTER_BUTTON_HEIGHT, 24);
         values.put(Role.JOINED_ACTION_HEIGHT, 24);
+        values.put(Role.JOINED_ACTION_WIDTH, 26);
         values.put(Role.PANEL_EMPTY_ACTION_HEIGHT, 24);
         values.put(Role.PANEL_SEARCH_HEIGHT, 22);
         values.put(Role.COLUMN_SEARCH_HEIGHT, 22);

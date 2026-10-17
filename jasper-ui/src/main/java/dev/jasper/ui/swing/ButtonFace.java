@@ -33,4 +33,9 @@ interface ButtonFace extends Face {
     boolean tiles();
     /** The rule above a picker menu's footer row. */
     Color menuDivider(KitContext context);
+    /**
+     * How far each later button of a {@code JOINED_ACTIONS} pair overlaps the one before it: none where the buttons stand
+     * side by side inside the pair's outline, one border where the halves share it.
+     */
+    int joinedOverlap();
 }

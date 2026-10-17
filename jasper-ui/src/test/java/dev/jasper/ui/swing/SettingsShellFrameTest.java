@@ -92,7 +92,16 @@ class SettingsShellFrameTest {
                 assertThat(ok.getY()).as("centred below the rule").isEqualTo(10);
                 assertThat(cancel.getWidth()).isEqualTo(98);
                 assertThat(KitViewTest.find(views.get(4), "help", JComponent.class).getWidth()).isEqualTo(22);
+                var back = KitViewTest.find(views.get(2), "back", JComponent.class);
+                var forward = KitViewTest.find(views.get(2), "forward", JComponent.class);
+                assertThat(back.getParent().getWidth()).as("the mocks' 51 px history pair").isEqualTo(51);
+                assertThat(forward.getX() - back.getX()).as("the halves share one border").isEqualTo(back.getWidth() - 1);
                 var image = render(shell);
+                var pair = javax.swing.SwingUtilities.convertPoint(back.getParent(), 0, back.getHeight() / 2, shell);
+                int outline = image.getRGB(pair.x, pair.y) & 0xFFFFFF;
+                assertThat(image.getRGB(pair.x + 25, pair.y) & 0xFFFFFF).as("one shared divider in the pair's outline").isEqualTo(outline);
+                assertThat(image.getRGB(pair.x + 26, pair.y) & 0xFFFFFF).as("the disabled half's face beside it").isNotEqualTo(outline);
+                assertThat(image.getRGB(pair.x + 50, pair.y) & 0xFFFFFF).as("the disabled half keeps the outline").isEqualTo(outline);
                 var theme = context.theme();
                 assertThat(image.getRGB(115, 4) & 0xFFFFFF).as("strip").isEqualTo(SemanticColor.SURFACE_SIDEBAR.color(theme).getRGB() & 0xFFFFFF);
                 assertThat(image.getRGB(115, 38) & 0xFFFFFF).as("strip rule").isEqualTo(DerivedColor.BORDER_ROW.color(theme).getRGB() & 0xFFFFFF);

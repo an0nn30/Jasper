@@ -35,6 +35,8 @@ final class Stacks {
             if(!joined)return;var g=(Graphics2D)graphics.create();
             try{ThemePainting.antialias(g);int radius=ThemePainting.metric(context,DesignMetrics.Role.CONTROL_RADIUS);g.setColor(ThemePainting.color(context,dev.jasper.ui.theme.SemanticColor.BORDER_CONTROL));g.drawRoundRect(0,0,getWidth()-1,getHeight()-1,radius*2,radius*2);if(getComponentCount()>1)g.drawLine(getComponent(1).getX(),0,getComponent(1).getX(),getHeight());}finally{g.dispose();}
         }
+        /** Overlapping halves of a joined pair (a face's {@code joinedOverlap}) repaint through this surface, the first on top. */
+        @Override public boolean isOptimizedDrawingEnabled(){return !(joined&&context.faces().buttons.joinedOverlap()>0)&&super.isOptimizedDrawingEnabled();}
         /** The route strip: the input surface inside the input outline, and the connecting arrow before each later step. */
         void paintRoute(Graphics graphics){
             var g=(Graphics2D)graphics.create();
@@ -600,7 +602,7 @@ final class Stacks {
         }
 
         int gap() {
-            if(role==Nodes.LayoutRole.JOINED_ACTIONS)return 0;
+            if(role==Nodes.LayoutRole.JOINED_ACTIONS)return -context.faces().buttons.joinedOverlap();
             return ThemePainting.metric(
                     context,
                     role == Nodes.LayoutRole.DETAIL ? DesignMetrics.Role.DETAIL_SECTION_GAP : role == Nodes.LayoutRole.INLINE ? DesignMetrics.Role.INLINE_GAP
