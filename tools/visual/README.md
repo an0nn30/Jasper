@@ -13,10 +13,10 @@ geometry check compares luminance edges, not RGB values.
 - `compare_all.py OUT_DIR [FILTER]` runs every pair in `pairs.json` (mock path, content crop, render path
   under `*/build/`, and an optional `note` naming a deliberate difference, which it prints). Regenerate the renders first (`:jasper-app:themeSurfacePreview`,
   `:jasper-app:settings9bPreview`, the staged render evidence tests and the workspace preview).
-- `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*` pairs)
+- `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*`, the `run-window-*` and the `chrome-*` pairs)
   and prints PASS or FAIL: the edge agreement must reach the floor and each listed colour must fill a 2×2 block within
-  ΔE76 6 in the mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. Render first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise
-  -Pjasper.galleryTheme=light -Pjasper.galleryScale=2`.
+  ΔE76 6 in the mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. Render the `classic-*` pairs first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise
+  -Pjasper.galleryTheme=light -Pjasper.galleryScale=2`; `RunWindowRenderTest` writes the `run-window-*` renders under `jasper-app/build/run-window/`.
 
 Run with `python3 -I`; the tools need Pillow and NumPy. A high edge agreement is not acceptance: inspect the
 region crops, and record native font rasterization and platform title-bar differences separately.
