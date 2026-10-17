@@ -33,7 +33,10 @@ public final class KitFaces {
             case SEGMENTS -> new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL, DefaultChoiceFace.SELECTED_CAPTION));
             case RADIOS -> new ClassicRadiosFace(colors.dialogSurface());
         };
-        tabs = new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL));
+        tabs = switch (controls.tabs()) {
+            case SEGMENTS -> new DefaultChoiceFace(List.of(DefaultChoiceFace.SELECTED_LABEL));
+            case FOLDER -> new ClassicFolderTabsFace(colors.dialogSurface());
+        };
     }
 
     /** The faces {@code kit} draws with. */

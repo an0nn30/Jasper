@@ -16,7 +16,9 @@ classic	ClassicRadiosFace	hue.green	surface.app	CONTRAST:3.0
 classic	ClassicRadiosFace	hue.amber	surface.app	CONTRAST:3.0
 classic	ClassicRadiosFace	hue.purple	surface.app	CONTRAST:3.0
 classic	ClassicRadiosFace	hue.neutral	surface.app	CONTRAST:3.0
-classic	DefaultChoiceFace	text.primary	segment.selected.bg	CONTRAST:4.5
+classic	ClassicFolderTabsFace	text.primary	surface.card	CONTRAST:4.5
+classic	ClassicFolderTabsFace	text.primary	surface.stripe	CONTRAST:4.5
+classic	ClassicFolderTabsFace	border.control	surface.app	CONTRAST:1.5
 classic	ClassicButtonFace	text.onAccent	accent	CONTRAST:4.5
 classic	ClassicButtonFace	text.primary	button.secondary.bg	CONTRAST:4.5
 classic	ClassicButtonFace	button.secondary.border	surface.app	CONTRAST:1.5
