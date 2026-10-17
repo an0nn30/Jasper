@@ -17,7 +17,6 @@ import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.DockState;
-import dev.jasper.app.dock.Side;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.launch.ShellLauncher;
@@ -90,7 +89,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Where this window's tool windows dock: its contributions change it, its area lays it out. */
     private final DockState dock = new DockState();
     private final ToolWindowArea area;
-    private final ToolStripe leftStripe = new ToolStripe(Side.LEFT), rightStripe = new ToolStripe(Side.RIGHT);
+    /** The window's stripes: icon rails, or labelled stripes and the bottom strip (spec 10.7). */
+    private final StripeSet stripes;
+    private final DockStripe leftStripe, rightStripe;
     /** Drags a tool window from its stripe button or its header to another slot. */
     private final DockDrag dockDrag;
     private UiState uiState = UiState.inMemory();
@@ -257,7 +258,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
-            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.palette(), look.paletteHome());
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             this::ownsKeySource);
         addHierarchyListener(event -> {
@@ -269,17 +270,19 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
         terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
-        area = new ToolWindowArea(terminalColumn, dock);
+        stripes = look().dock().stripes(themes.kit());
+        leftStripe = stripes.left();
+        rightStripe = stripes.right();
+        area = new ToolWindowArea(terminalColumn, dock, themes.kit(), look().dock().flushFrames());
         area.setStatusVisible(chrome.status().isVisible());
         area.setHeaderVisible(true);
-        leftStripe.setVisible(false);
-        rightStripe.setVisible(false);
+        for (DockStripe stripe : stripes.all()) stripe.setVisible(false);
 
         body.add(leftStripe, BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(rightStripe, BorderLayout.EAST);
-        dockDrag = new DockDrag(this, dock, area, leftStripe, rightStripe);
+        stripes.bottom().ifPresent(strip -> body.add(strip, BorderLayout.SOUTH));
+        dockDrag = new DockDrag(this, dock, area, stripes);
         dockDrag.railsEnabled = this::railsEnabled;
-        leftStripe.dragSource = dockDrag::install;
-        rightStripe.dragSource = dockDrag::install;
+        for (DockStripe stripe : stripes.all()) stripe.dragSource = dockDrag::install;
         area.dragSource = dockDrag::install;
         area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
@@ -288,7 +291,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.dismiss();
+                if (commandPalette != null) commandPalette.tabChanged();
                 update();
                 focusSelected();
             }
@@ -754,6 +757,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
         return SwingUtilities.convertRectangle(header, row, target);
     }
+    /**
+     * The dock work area in {@code target}'s coordinates: between the stripes, above the bottom strip and the status bar
+     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root. Plan 7 mounts the bottom
+     * strip under the area, so the area's own bounds end above it.
+     */
+    java.awt.Rectangle paletteWorkArea(Component target) {
+        if (area.getParent() == null || SwingUtilities.getRootPane(area) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
+    }
     WindowChrome chrome() { return chrome; }
     WorkspaceChrome look() { return look; }
     /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
@@ -905,8 +917,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
-    ToolStripe leftStripe() { return leftStripe; }
-    ToolStripe rightStripe() { return rightStripe; }
+    DockStripe leftStripe() { return leftStripe; }
+    DockStripe rightStripe() { return rightStripe; }
+    /** The bottom strip of labelled stripes; empty under the icon rails. */
+    java.util.Optional<DockStripe> bottomStrip() { return stripes.bottom(); }
+    /** The window's stripes. */
+    StripeSet stripes() { return stripes; }
     DockDrag dockDrag() { return dockDrag; }
     boolean railVisible() { return railVisible; }
 
@@ -927,10 +943,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     void syncRailVisibility() {
         boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
+        boolean bottom = stripes.bottom().map(strip -> railsEnabled() && !strip.empty()).orElse(false);
         area.setStripesVisible(left, right);
-        if (leftStripe.isVisible() != left || rightStripe.isVisible() != right) {
+        boolean bottomChanged = stripes.bottom().map(strip -> strip.isVisible() != bottom).orElse(false);
+        if (leftStripe.isVisible() != left || rightStripe.isVisible() != right || bottomChanged) {
             leftStripe.setVisible(left);
             rightStripe.setVisible(right);
+            stripes.bottom().ifPresent(strip -> strip.setVisible(bottom));
             revalidate(); repaint();
             // The stripes' own width, and the area's lower inset, are part of the window's minimum size.
             onMinimumSizeChanged.run();
@@ -1035,7 +1054,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
+        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
         pane.applyTheme(themes.current());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
@@ -1129,7 +1148,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Side-effect free apart from refreshing enablement: whether {@link #dispatchShortcut} would take the key. */
     boolean claimsShortcut(KeyStroke stroke, Component source) {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
-        if (paletteKeys.claimsShortcut(stroke)) return true;
+        if (paletteKeys.claimsShortcut(stroke, source == null ? this : source)) return true;
         var document = selectedContent();
         if (document != null) {
             if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
@@ -1312,8 +1331,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         try {
             if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
             if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            leftStripe.refreshTheme();
-            rightStripe.refreshTheme();
+            for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
             area.refreshTheme();
             area.setTerminalBackground(theme.surface());
             WorkspaceTheme.apply(windowTabs.component(), theme);
@@ -1447,8 +1465,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Rail width", width, ConfigSnapshot.MIN_RAIL_WIDTH, ConfigSnapshot.MAX_RAIL_WIDTH);
         if (closed || railWidth == width) return;
         railWidth = width;
-        leftStripe.setRailWidth(width);
-        rightStripe.setRailWidth(width);
+        for (DockStripe stripe : stripes.all()) stripe.setRailWidth(width);
         revalidate(); repaint();
         onMinimumSizeChanged.run();
     }
@@ -1472,7 +1489,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setActive(boolean value) {
-        if (!value && commandPalette != null) commandPalette.dismiss();
+        if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();

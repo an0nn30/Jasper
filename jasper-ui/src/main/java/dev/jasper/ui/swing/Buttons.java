@@ -32,9 +32,13 @@ final class Buttons {
                 return snapshot;
             } catch (Throwable failure) { snapshot.close(); throw failure; }
         }
-        javax.swing.Icon icon(KitContext context, SemanticColor tint) {
-            return semantic == null ? raw : icons.panel(semantic.name(), context.theme(), tint,
-                ThemePainting.metric(context, DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH));
+        javax.swing.Icon icon(KitContext context, SemanticColor tint) { return icon(context, tint, null); }
+        /** As {@link #icon(KitContext, SemanticColor)}, or on a header strip in the strip's action ink when {@code stripInk} is set. */
+        javax.swing.Icon icon(KitContext context, SemanticColor tint, Color stripInk) {
+            int glyph = ThemePainting.metric(context, DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH);
+            if (semantic == null) return raw;
+            return stripInk != null ? icons.panel(semantic.name(), context.theme().semantic(), stripInk, glyph)
+                : icons.panel(semantic.name(), context.theme(), tint, glyph);
         }
         @Override public void close() { if (!closed) { closed = true; if (icons != null) icons.close(); } }
     }
@@ -76,10 +80,11 @@ final class Buttons {
             button.circular=value.presentation()==Nodes.ButtonPresentation.HELP;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
-            if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false))); button.putClientProperty("Jasper.button.icon", null); }
+            if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false), button.stripInk)); button.putClientProperty("Jasper.button.icon", null); }
             else {
-                int extent=UIScale.scale(button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), (embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
-                button.setIcon(value.icon().isEmpty() ? null : button.panel || button.panelDetail || button.panelRow
+                int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), (embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                button.setIcon(value.icon().isEmpty() ? null : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
+                    : button.panel || button.panelDetail || button.panelRow
                     ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
                     : context().icons().icon(value.icon(), context().theme(), button.iconRole(false),extent));
                 button.putClientProperty("Jasper.button.icon", value.icon().isEmpty() ? null : value.icon());
@@ -92,7 +97,7 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(keycaps!=null?keycaps.accessibleName():value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int horizontal = ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -125,6 +130,8 @@ final class Buttons {
             return Math.max(getPreferredSize().height,content+insets.top+insets.bottom);
         }
         boolean prompt, panel, fullFooter, orderedAction, panelDetail, circular, hint;
+        /** On a header strip (spec 10.7): the strip's action ink, its glyph drawn at the strip's glyph size; null elsewhere. */
+        Color stripInk;
         /** An ORDERED row's compact up/down/remove command. */
         boolean orderedCommand;
         /** A classic ordered list's side-column button: a standard button without its glyph, whatever its kind (plan 4c). */
@@ -406,9 +413,10 @@ if(circular)ThemePainting.rounded(g,this,context,fill,ThemePainting.color(contex
                 // Re-tint the same named icon for hover without altering component identity.
                 String name = null;
                 if (getClientProperty("Jasper.button.icon") instanceof String value) name = value;
-                // On a selected row, or where the face recolours it, the glyph takes its role whatever its artwork (the palette
-                // overload recolours built-ins).
-                javax.swing.Icon artwork = name != null && (onSelection || context.faces().buttons.recolours(this))
+                // On a header strip the glyph takes the strip's action ink; on a selected row, or where the face recolours it,
+                // it takes its role whatever its artwork (the palette overload recolours built-ins).
+                javax.swing.Icon artwork = name != null && stripInk != null ? context.icons().panel(name, context.theme().semantic(), stripInk, getIcon().getIconWidth())
+                    : name != null && (onSelection || context.faces().buttons.recolours(this))
                     ? context.icons().icon(name, context.theme().semantic(), iconRole(hover), getIcon().getIconWidth())
                     : name == null || context.icons().authored(name,panel || panelDetail || panelRow) ? getIcon() : panel || panelDetail || panelRow
                     ? context.icons().panel(name, context.theme().semantic(), iconRole(hover), panelRow ? ThemePainting.metric(context,DesignMetrics.Role.PANEL_ROW_ACTION_GLYPH) : getIcon().getIconWidth())

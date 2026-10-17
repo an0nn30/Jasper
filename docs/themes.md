@@ -138,7 +138,8 @@ A Jasper theme is one UTF-8 JSON file; `slate-cobalt.json` is the complete examp
   a light theme; left out, they are `surface.app` and `text.primary`.
 - A variant may also list nine derived roles, each as `#RRGGBB`: `surface.header`, `surface.header.active`,
   `surface.stripe`, `surface.tableHeader`, `surface.zebra`, `surface.rowHover`, `warning.ground`, `warning.border` and
-  `border.divider`. Jasper otherwise computes them from the variant's roles; a listed one is used as given.
+  `border.divider`. Jasper otherwise computes them from the variant's roles, the surfaces leaning toward the variant's
+  text (lighter than the window in a dark variant, darker in a light one); a listed one is used as given.
 - `terminal` holds one or more schemes, keyed by lowercase words with dashes (at most 32 characters). Each has a
   `name` and exactly 21 colours: `bg`, `fg`, `fg.bold`, `cursor`, `selection`, `black`, `red`, `green`, `yellow`,
   `blue`, `magenta`, `cyan`, `white` and their `bright.` forms. A scheme's id is `<theme id>/<key>`.

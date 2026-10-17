@@ -32,7 +32,15 @@ class ProjectionReadTest {
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/windows/AuxiliaryWindows"),
         // Plan 9a (spec 9.1 and 16.1.7): naming Composition's class (a constant, a method, a switch) is a read, which only
         // the composition roots make; a class that only carries the value names it in descriptors, which this does not match.
-        Pattern.compile("^dev/jasper/app/presentation/Composition$"), ProjectionReadTest::compositionRoot);
+        Pattern.compile("^dev/jasper/app/presentation/Composition$"), ProjectionReadTest::compositionRoot,
+        // Plan 8b (spec 3.3 and 16.1.7): the palette's view is read only by PaletteViews, its home only by WorkspaceChrome.
+        Pattern.compile("dev/jasper/app/presentation/PaletteLook\\$View(?=[;$.]|$)"), type -> owns(type, "dev/jasper/app/palette/PaletteViews"),
+        Pattern.compile("dev/jasper/app/presentation/PaletteLook\\$Home(?=[;$.]|$)"), type -> owns(type, "dev/jasper/app/workspace/WorkspaceChrome"));
+
+    /** Whether {@code type} (an internal name) is the presentation package's, {@code owner} or a class nested in it. */
+    static boolean owns(String type, String owner) {
+        return type.startsWith("dev/jasper/app/presentation/") || type.equals(owner) || type.startsWith(owner + "$");
+    }
 
     /**
      * A class's internal name and every string in its constant pool.
@@ -74,6 +82,15 @@ class ProjectionReadTest {
                 .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/DialogMapping$Kind")))
                 .map(Scanned::name))
             .as("the dialog mapping's scan is live").contains("dev/jasper/app/windows/AuxiliaryWindows");
+        // Plan 8b: the palette's two scans are live.
+        assertThat(files.stream().map(Scanned::of)
+                .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/PaletteLook$View")))
+                .map(Scanned::name))
+            .as("the palette view's scan is live").anyMatch(name -> name.startsWith("dev/jasper/app/palette/PaletteViews"));
+        assertThat(files.stream().map(Scanned::of)
+                .filter(scanned -> scanned.strings().stream().anyMatch(s -> s.contains("dev/jasper/app/presentation/PaletteLook$Home")))
+                .map(Scanned::name))
+            .as("the palette home's scan is live").anyMatch(name -> name.startsWith("dev/jasper/app/workspace/WorkspaceChrome"));
         assertThat(projectionReaders(files)).isEmpty();
     }
 
@@ -81,8 +98,28 @@ class ProjectionReadTest {
         byte[] probe = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowChromeProbe"), builder -> builder
             .withField("menus", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Menus"), ClassFile.ACC_PRIVATE)
             .withField("motion", ClassDesc.of("dev.jasper.app.presentation.Motion"), ClassFile.ACC_PRIVATE)
-            .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE));
-        assertThat(projectionReaders(List.of(probe))).hasSize(3);
+            .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE)
+            .withField("view", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$View"), ClassFile.ACC_PRIVATE)
+            .withField("home", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$Home"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(probe))).hasSize(5);
+    }
+
+    /** Plan 8b (spec 16.1.8): the palette's strategies, its two views and two homes. */
+    static final List<String> PALETTE_STRATEGIES = List.of("dev/jasper/app/palette/CardView", "dev/jasper/app/palette/RunWindowView",
+        "dev/jasper/app/workspace/TitleFieldHome", "dev/jasper/app/workspace/CornerHome");
+
+    /** Plan 8b (spec 3.3): the palette's strategies never name the kit, its variants or ChromeSpec. */
+    @Test void thePalettesStrategiesNeverNameTheKit() throws Exception {
+        var seen = new ArrayList<String>();
+        var found = new ArrayList<String>();
+        for (var bytes : StaticDefaultTest.classFiles(Path.of(System.getProperty("jasper.appJar")), 400)) {
+            var scanned = Scanned.of(bytes);
+            if (PALETTE_STRATEGIES.stream().noneMatch(strategy -> scanned.name().equals(strategy) || scanned.name().startsWith(strategy + "$"))) continue;
+            seen.add(scanned.name());
+            for (String s : scanned.strings()) if (StrategyIsolationTest.FORBIDDEN.matcher(s).find()) found.add(scanned.name() + " names " + s);
+        }
+        assertThat(seen).as("the scan is live").containsAll(PALETTE_STRATEGIES);
+        assertThat(found).isEmpty();
     }
 
     /** Plan 9a: spec 9.1's composition roots, the only classes besides the presentation package that read Composition. */

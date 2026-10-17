@@ -32,7 +32,7 @@ that window is focused.
 ## The Notifications panel
 
 The Notifications button on the right stripe opens the panel, which starts in the upper half of the window's right
-side; drag the button or the panel's header to move it, or use **Move to** on the button's right-click menu or the
+side (under the Enterprise look the panel is titled Event Log and starts in the bottom strip, on its left); drag the button or the panel's header to move it, or use **Move to** on the button's right-click menu or the
 header's ⋮ menu. **Notifications: Show History** in the command palette also opens and closes it. The button shows a
 dot while anything is unread: red when an error is unread. Its tooltip gives the count.
 

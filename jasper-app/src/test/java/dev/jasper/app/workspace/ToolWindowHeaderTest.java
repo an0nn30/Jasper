@@ -127,7 +127,7 @@ class ToolWindowHeaderTest {
         assertThat(header.optionsButton().getToolTipText()).isEqualTo("Options");
         assertThat(header.hideButton().getAccessibleContext().getAccessibleName()).isEqualTo("Hide");
         assertThat(header.optionsButton().isFocusable()).isFalse();
-        assertThat(header.getPreferredSize().height).isEqualTo(UIScale.scale(ToolWindowHeader.logicalHeight()));
+        assertThat(header.getPreferredSize().height).isEqualTo(UIScale.scale(header.logicalHeight()));
 
         header.hideButton().doClick();
         header.optionsButton().doClick();

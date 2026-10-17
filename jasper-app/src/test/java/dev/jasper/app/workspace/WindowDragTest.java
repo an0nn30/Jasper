@@ -70,7 +70,7 @@ class WindowDragTest {
         void layout() { LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root); }
 
         AbstractButton button(String title) {
-            for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe()))
+            for (DockStripe stripe : List.of(owner.leftStripe(), owner.rightStripe()))
                 for (AbstractButton button : stripe.buttons()) if (title.equals(button.getToolTipText())) return button;
             throw new AssertionError("No stripe button " + title);
         }

@@ -144,6 +144,14 @@ public final class IconRegistry implements AutoCloseable {
     public synchronized Icon panel(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return painted(name, palette.color(tint), null, logicalSize, logicalSize, false, false, 0, artworks.get(name) == BUILT_INS.get(name),select(name,null,palette,false),false);
     }
+    /**
+     * {@link #panel(String, SemanticPalette, SemanticColor, int)} in {@code foreground}, a tint a contrast guard has
+     * painted (a header strip's action glyphs).
+     */
+    public synchronized Icon panel(String name, SemanticPalette palette, Color foreground, int logicalSize) {
+        return painted(name, Objects.requireNonNull(foreground), null, logicalSize, logicalSize, false, false, 0,
+            artworks.get(name) == BUILT_INS.get(name), select(name, null, palette, false), false);
+    }
     /** Explicit semantic text tint for hover, accent fills and status indications. */
     public Icon icon(String name, SemanticPalette palette, SemanticColor tint, int logicalSize) {
         return ordinary(name, null, palette, palette.color(tint), logicalSize);

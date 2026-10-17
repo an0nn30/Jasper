@@ -1,12 +1,9 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.ui.metrics.DesignMetrics;
-
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.DockGeometry;
 import dev.jasper.app.dock.DockState;
-import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import java.awt.Component;
 import java.awt.Container;
@@ -33,10 +30,10 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 
 /**
- * One window's dock drag: press on a stripe button or a tool window header and move more than 5px. It uses plain mouse
- * events, not AWT drag and drop, so it stays inside the window, needs no OS drag image and can be driven with
- * synthetic events. While it runs, both stripes show all three groups with the dragged button lifted out, the target
- * group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}, except for
+ * One window's dock drag: press on a stripe button or a tool window header and move past the window's kit's drag
+ * threshold (5px by default). It uses plain mouse events, not AWT drag and drop, so it stays inside the window, needs no
+ * OS drag image and can be driven with synthetic events. While it runs, every stripe (the two rails, or the labelled
+ * stripes and the bottom strip) shows all its groups with the dragged button lifted out, the target group opens a gap, and the overlay shows where the window would land, from {@link DockGeometry#landing}, except for
  * a stripe drop of a hidden window, which stays hidden and so lands in no frame; the real layout does not change. A
  * stripe hidden because it is empty takes part unseen while {@link #railsEnabled}: it stands over the workspace's edge
  * where it would show, so only the overlay's placeholder marks it, and it shows once a drop gives it a window.
@@ -50,17 +47,14 @@ import javax.swing.SwingUtilities;
  * old place and resolves the target again. EDT only.
  */
 final class DockDrag {
-    /** How far, in logical pixels, a press must move before it becomes a drag: the installed kit's threshold. */
-    static int threshold() {
-        return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.DOCK_DRAG_THRESHOLD);
-    }
-
     private final JComponent root;
     private final DockState state;
     private final ToolWindowArea area;
-    private final List<ToolStripe> stripes;
+    /** The window's stripes, which say which stripe shows a slot. */
+    private final StripeSet set;
+    private final List<DockStripe> stripes;
     /** The stripes this drag shows its groups on: the visible ones and, while the rails may show, the hidden ones. */
-    private final List<ToolStripe> targets = new ArrayList<>();
+    private final List<DockStripe> targets = new ArrayList<>();
     private final DockDropOverlay overlay = new DockDropOverlay();
     private final KeyEventDispatcher escape = this::dispatchKeyEvent;
 
@@ -70,6 +64,8 @@ final class DockDrag {
     Function<String, Icon> icons = id -> null;
     /** Whether the stripes may show; while they may, a hidden (empty) stripe still takes drops at its edge. */
     BooleanSupplier railsEnabled = () -> false;
+    /** The dragged window's stripe label, which a labelled stripe's gap is as long as. */
+    Function<String, String> labels = id -> "";
 
     private String pressedId;
     private JComponent source;
@@ -90,10 +86,21 @@ final class DockDrag {
      * @param area the tool window area, which shares its parent with both stripes: a hidden stripe stands over its edge
      */
     DockDrag(JComponent root, DockState state, ToolWindowArea area, ToolStripe left, ToolStripe right) {
+        this(root, state, area, new StripeSet.IconRails(left, right));
+    }
+
+    /**
+     * @param root the window content that holds the stripes and the area; drag coordinates are in its space
+     * @param state the window's dock state
+     * @param area the tool window area, which shares its parent with every stripe: a hidden stripe stands over its edge
+     * @param stripes the window's stripes
+     */
+    DockDrag(JComponent root, DockState state, ToolWindowArea area, StripeSet stripes) {
         this.root = root;
         this.state = state;
         this.area = area;
-        this.stripes = List.of(left, right);
+        this.set = stripes;
+        this.stripes = stripes.all();
         root.addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent event) {
                 forgetHome();
@@ -175,7 +182,7 @@ final class DockDrag {
         if (pressedId == null || component != source) return;
         Point at = toRoot(component, event.getPoint());
         if (!active()) {
-            if (at.distance(pressedAt) <= UIScale.scale(threshold())) return;
+            if (at.distance(pressedAt) <= UIScale.scale(area.dragThreshold())) return;
             start();
         }
         update(at);
@@ -204,13 +211,13 @@ final class DockDrag {
             button.getModel().setArmed(false);
             button.getModel().setPressed(false);
         }
-        for (ToolStripe stripe : stripes) {
+        for (DockStripe stripe : stripes) {
             if (!stripe.isVisible()) {
                 if (!railsEnabled.getAsBoolean()) continue;
                 standAtEdge(stripe);
             }
             targets.add(stripe);
-            stripe.beginDrag(dragging);
+            stripe.beginDrag(dragging, labels.apply(dragging));
         }
         JLayeredPane layers = layers();
         if (layers != null) layers.add(overlay, JLayeredPane.DRAG_LAYER);
@@ -221,16 +228,16 @@ final class DockDrag {
     private void update(Point at) {
         last = at;
         // The area may have changed size since the drag began (a resize, the status bar, the toolbar).
-        for (ToolStripe stripe : targets) if (!stripe.isVisible()) standAtEdge(stripe);
+        for (DockStripe stripe : targets) if (!stripe.isVisible()) standAtEdge(stripe);
         List<DockDropResolver.Group> groups = new ArrayList<>();
-        for (ToolStripe stripe : targets)
+        for (DockStripe stripe : targets)
             for (DockDropResolver.Group group : stripe.dropGroups()) groups.add(inRoot(stripe, group));
         Rectangle workspace = SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), root);
         if (home != null && !nearHome(at)) forgetHome();
         Optional<DockDropResolver.Target> resolved = DockDropResolver.resolve(at, groups, workspace, sideSplit(workspace));
         boolean otherGroup = resolved.filter(where -> where.onStripe() && where.slot() != homeSlot).isPresent();
         target = home != null && !otherGroup ? Optional.of(DockDropResolver.Target.stripe(homeSlot, homeIndex)) : resolved;
-        for (ToolStripe stripe : stripes)
+        for (DockStripe stripe : stripes)
             stripe.showGap(target.filter(DockDropResolver.Target::onStripe).map(DockDropResolver.Target::slot).orElse(null),
                 target.map(where -> where.index().orElse(0)).orElse(0));
         JLayeredPane layers = layers();
@@ -238,10 +245,10 @@ final class DockDrag {
         // A stripe drop keeps the window's visibility, so a hidden window stays hidden: no frame would appear to preview.
         boolean staysHidden = target.filter(DockDropResolver.Target::onStripe).isPresent() && !state.visible(dragging);
         Rectangle highlight = staysHidden ? null
-            : target.flatMap(where -> DockGeometry.landing(areaAfter(where.slot()), state, dragging, where.slot(), ToolWindowArea.metrics()))
+            : target.flatMap(where -> DockGeometry.landing(areaAfter(where.slot()), state, dragging, where.slot(), area.metrics()))
                 .map(landing -> SwingUtilities.convertRectangle(area, landing, layers)).orElse(null);
         Rectangle placeholder = null;
-        for (ToolStripe stripe : stripes) {
+        for (DockStripe stripe : stripes) {
             Optional<Rectangle> gap = stripe.gapBounds();
             if (gap.isPresent()) placeholder = SwingUtilities.convertRectangle(stripe, gap.get(), layers);
         }
@@ -258,13 +265,16 @@ final class DockDrag {
         Rectangle bounds = new Rectangle(0, 0, area.getWidth(), area.getHeight());
         if (!railsEnabled.getAsBoolean()) return bounds;
         // WindowContent.syncRailVisibility's rule: with the rails enabled, a stripe shows exactly while it is not empty.
-        for (ToolStripe stripe : stripes) {
-            boolean showsAfter = slot.stripe() == stripe.side() || !stripe.emptyWithout(dragging);
+        for (DockStripe stripe : stripes) {
+            boolean showsAfter = set.of(slot) == stripe || !stripe.emptyWithout(dragging);
             int change = (showsAfter ? 1 : 0) - (stripe.isVisible() ? 1 : 0);
             if (change == 0) continue;
-            int width = change * stripe.getPreferredSize().width;
-            if (stripe.side() == Side.LEFT) bounds.x += width;
-            bounds.width -= width;
+            int size = change * stripe.thickness();
+            switch (stripe.side()) {
+                case LEFT -> { bounds.x += size; bounds.width -= size; }
+                case RIGHT -> bounds.width -= size;
+                case BOTTOM -> bounds.height -= size;
+            }
         }
         return bounds;
     }
@@ -275,7 +285,7 @@ final class DockDrag {
      * above the workspace's; otherwise it is the workspace's half.
      */
     private int sideSplit(Rectangle workspace) {
-        DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, ToolWindowArea.metrics());
+        DockGeometry.Layout layout = DockGeometry.compute(new Rectangle(0, 0, area.getWidth(), area.getHeight()), state, area.metrics());
         // The side panels are as tall as the terminal column: the area above the bottom area, or all of it.
         int visibleHeight = layout.terminal().height;
         return workspace.y + (visibleHeight + 1) / 2;
@@ -290,9 +300,9 @@ final class DockDrag {
         forgetHome();
         if (!wasActive) return;
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(escape);
-        for (ToolStripe stripe : stripes) stripe.endDrag();
+        for (DockStripe stripe : stripes) stripe.endDrag();
         // A hidden stripe's place lasted for the drag; the layout places it again when it shows.
-        for (ToolStripe stripe : targets) if (!stripe.isVisible()) stripe.setBounds(0, 0, 0, 0);
+        for (DockStripe stripe : targets) if (!stripe.isVisible()) stripe.setBounds(0, 0, 0, 0);
         targets.clear();
         overlay.clear();
         Container parent = overlay.getParent();
@@ -308,7 +318,7 @@ final class DockDrag {
      * and bottom edges the grown square reaches exactly that far past the button's last pixel on all four sides.
      */
     private boolean nearHome(Point at) {
-        int reach = UIScale.scale(threshold()) + 1;
+        int reach = UIScale.scale(area.dragThreshold()) + 1;
         Rectangle around = new Rectangle(home);
         around.grow(reach, reach);
         return around.contains(at);
@@ -323,10 +333,14 @@ final class DockDrag {
      * Puts a hidden stripe where it would show, over the workspace's outer edge on its side and as tall as the
      * workspace, without showing it: the layout skips a hidden component, so the place holds until the drag ends.
      */
-    private void standAtEdge(ToolStripe stripe) {
-        int width = stripe.getPreferredSize().width;
-        int x = stripe.side() == Side.LEFT ? area.getX() : area.getX() + area.getWidth() - width;
-        Rectangle place = new Rectangle(x, area.getY(), width, area.getHeight());
+    private void standAtEdge(DockStripe stripe) {
+        int thickness = stripe.thickness();
+        Rectangle place = switch (stripe.side()) {
+            case LEFT -> new Rectangle(area.getX(), area.getY(), thickness, area.getHeight());
+            case RIGHT -> new Rectangle(area.getX() + area.getWidth() - thickness, area.getY(), thickness, area.getHeight());
+            case BOTTOM -> new Rectangle(0, area.getY() + area.getHeight() - thickness,
+                area.getParent() == null ? area.getWidth() : area.getParent().getWidth(), thickness);
+        };
         if (place.equals(stripe.getBounds())) return;
         stripe.setBounds(place);
         stripe.doLayout();
@@ -339,8 +353,8 @@ final class DockDrag {
 
     private Point toRoot(Component component, Point point) { return SwingUtilities.convertPoint(component, point, root); }
 
-    private DockDropResolver.Group inRoot(ToolStripe stripe, DockDropResolver.Group group) {
+    private DockDropResolver.Group inRoot(DockStripe stripe, DockDropResolver.Group group) {
         List<Rectangle> buttons = group.buttons().stream().map(button -> SwingUtilities.convertRectangle(stripe, button, root)).toList();
-        return new DockDropResolver.Group(group.slot(), SwingUtilities.convertRectangle(stripe, group.bounds(), root), buttons);
+        return new DockDropResolver.Group(group.slot(), SwingUtilities.convertRectangle(stripe, group.bounds(), root), buttons, group.axis());
     }
 }

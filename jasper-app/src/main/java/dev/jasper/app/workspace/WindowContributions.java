@@ -76,7 +76,7 @@ final class WindowContributions implements AutoCloseable {
         owner.chrome().connect(this);
         renderStatus();
         restoreSizes();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+        for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = this::togglePanel;
             stripe.onMove = this::movePanel;
             stripe.onHide = this::hidePanel;
@@ -85,6 +85,7 @@ final class WindowContributions implements AutoCloseable {
         owner.area().onHide = this::hidePanel;
         owner.dockDrag().onDrop = this::dropped;
         owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+        owner.dockDrag().labels = this::stripeLabel;
         dock.addListener(docked);
         panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
@@ -109,12 +110,42 @@ final class WindowContributions implements AutoCloseable {
 
     void applyAccelerators() {
         actions.forEach((id, action) -> action.putValue(Action.ACCELERATOR_KEY, owner.bindings().strokeFor(id).orElse(null)));
+        // A rebind that changes a toggle's digit renames its labelled stripe's label at once (spec 10.7); under the
+        // icon rails every number is empty, so this never re-renders them.
+        if (!numbers().equals(numbers)) renderStripes();
+    }
+
+    /** The digits the stripes last showed, by panel id. */
+    private Map<String, java.util.OptionalInt> numbers = Map.of();
+
+    /** Each docked panel's stripe digit under the window's keymap now. */
+    private Map<String, java.util.OptionalInt> numbers() {
+        var current = new LinkedHashMap<String, java.util.OptionalInt>();
+        for (PanelInstance panel : panels.values()) current.put(panel.entry.id(), number(panel));
+        return current;
+    }
+
+    /**
+     * The digit a panel's label shows: its toggle's under the window's keymap, on labelled stripes only. The icon rails
+     * show no digit, so under them every number is empty and a rebind never re-renders (and so never cancels a drag).
+     */
+    private java.util.OptionalInt number(PanelInstance panel) {
+        if (!(owner.stripes() instanceof StripeSet.LabelledStripes)) return java.util.OptionalInt.empty();
+        return StripeNumbers.of(owner.bindings().strokeFor(panel.entry.toggleActionId()));
+    }
+
+    /** A panel's stripe label, as a drag's gap measures it. */
+    private String stripeLabel(String id) {
+        PanelInstance panel = panels.get(id);
+        if (panel == null) return "";
+        return StripeLabels.text(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), Slot.LEFT_TOP, false,
+            panel.entry.badge(), number(panel)));
     }
 
     /** From a shortcut, the palette, a menu, the toolbar or a status item. */
     void invoke(String id) {
         if (dev.jasper.app.platform.WindowInput.blocked(owner)) return;
-        if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().isOpen()) return;
+        if (owner.closed() || owner.commandPalette() != null && owner.commandPalette().blocksActions()) return;
         Optional<java.util.UUID> pane = Optional.ofNullable(owner.currentPane()).map(TerminalPane::id);
         model.action(id).ifPresent(entry -> entry.invoke(new Contributions.Invocation(owner.id(), pane)));
     }
@@ -328,19 +359,21 @@ final class WindowContributions implements AutoCloseable {
 
     private void renderStripes() {
         owner.dockDrag().cancel();
-        List<ToolStripe.Button> left = new ArrayList<>(), right = new ArrayList<>();
+        List<ToolStripe.Button> windows = new ArrayList<>();
         for (Slot slot : Slot.values())
             for (String id : dock.ids(slot)) {
                 PanelInstance panel = panels.get(id);
                 if (panel == null) continue;
-                var button = new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
-                    panel.entry.badge());
-                (slot.stripe() == Side.LEFT ? left : right).add(button);
+                windows.add(new ToolStripe.Button(id, panel.entry.title(), panel.entry.icon(), slot, dock.visible(id),
+                    panel.entry.badge(), number(panel)));
             }
         List<Action> railActions = new ArrayList<>();
         for (String id : model.railActions()) if (actions.get(id) != null) railActions.add(actions.get(id));
-        owner.leftStripe().render(left, railActions);
-        owner.rightStripe().render(right, List.of());
+        // Every stripe keeps the windows of the slots it shows.
+        owner.leftStripe().render(windows, railActions);
+        owner.rightStripe().render(windows, List.of());
+        owner.bottomStrip().ifPresent(strip -> strip.render(windows, List.of()));
+        numbers = numbers();
         owner.syncRailVisibility();
     }
 
@@ -351,8 +384,7 @@ final class WindowContributions implements AutoCloseable {
      */
     private void updateBadges() {
         for (PanelInstance panel : panels.values()) {
-            owner.leftStripe().updateBadge(panel.entry.id(), panel.entry.badge());
-            owner.rightStripe().updateBadge(panel.entry.id(), panel.entry.badge());
+            for (DockStripe stripe : owner.stripes().all()) stripe.updateBadge(panel.entry.id(), panel.entry.badge());
         }
     }
 
@@ -374,7 +406,7 @@ final class WindowContributions implements AutoCloseable {
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
                 if (structural) renderStripes();
-                else for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) stripe.refreshActions();
+                else for (DockStripe stripe : owner.stripes().all()) stripe.refreshActions();
             }
             case PANELS -> { syncPanels(); renderStripes(); }
             case RAIL -> renderStripes();
@@ -437,6 +469,7 @@ final class WindowContributions implements AutoCloseable {
         owner.dockDrag().cancel();
         owner.dockDrag().onDrop = (id, target) -> { };
         owner.dockDrag().icons = id -> null;
+        owner.dockDrag().labels = id -> "";
         dock.removeListener(docked);
         commands.values().forEach(Subscription::close);
         commands.clear();
@@ -447,7 +480,7 @@ final class WindowContributions implements AutoCloseable {
         if (panelRequests != null) { panelRequests.close(); panelRequests = null; }
         for (PanelInstance panel : panels.values()) if (panel.site != null) panel.site.notifyClosed();
         panels.clear();
-        for (ToolStripe stripe : List.of(owner.leftStripe(), owner.rightStripe())) {
+        for (DockStripe stripe : owner.stripes().all()) {
             stripe.onToggle = id -> { };
             stripe.onMove = (id, slot) -> { };
             stripe.onHide = id -> { };

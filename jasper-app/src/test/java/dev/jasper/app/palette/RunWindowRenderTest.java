@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * device pixels lower (plan 8a Rulings 5). Images go to {@code jasper-app/build/run-window/}. Every comparison runs on
  * the EDT inside {@code KitGallery.installed}, while the context that drew the render is open (installed closes its
  * binding when its action returns). Plan 4b's classic checkbox and buttons and plan 5b's IBM Plex text are held to the
- * mock; the footer buttons' left edges are measured and printed until plan 8b sizes them ({@link #CHECKED}, plan 8a R9).
+ * mock, and so are plan 8b's footer buttons, each the mocks' 70 px ({@link #CHECKED}, plan 8a R9).
  */
 public class RunWindowRenderTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
@@ -42,8 +42,8 @@ public class RunWindowRenderTest {
      * Plex text, or plan 8b's footer buttons (the mocks draw every one 70 px wide).
      */
     enum Owner { RUN_WINDOW, FACES, FONTS, FOOTER }
-    /** The owners whose parts are held to the mock now: FACES since the merge with plan 4b, FONTS since plan 5b; FOOTER joins with plan 8b. */
-    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.of(Owner.RUN_WINDOW, Owner.FACES, Owner.FONTS);
+    /** The owners whose parts are held to the mock: every one (FACES since the merge with plan 4b, FONTS since plan 5b, FOOTER since plan 8b). */
+    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.allOf(Owner.class);
 
     /** A probe: from (x, y) step (dx, dy) to the first pixel off {@code background}; {@code lower} probes under the list. */
     record Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance, Owner owner) {
@@ -86,9 +86,8 @@ public class RunWindowRenderTest {
         new Feature("checkbox top", 36, 696, 0, 1, RunWindowRenderTest::dialog, true, 1, Owner.FACES),
         new Feature("checkbox label", 56, 721, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FACES),
         new Feature("footer rule", 200, 740, 0, 1, RunWindowRenderTest::dialog, true, 1),
-        // The buttons are right-packed, each RUN_WINDOW_BUTTON_WIDTH or its label plus the classic 14 px padding if wider, so
-        // these left edges follow the labels' face: IBM Plex makes "Connect" 74 where the mock draws every button 70, which
-        // plan 8b rules (FOOTER).
+        // The buttons are right-packed, each RUN_WINDOW_BUTTON_WIDTH or its label plus RUN_WINDOW_BUTTON_PADDING if wider
+        // (plan 8b, FOOTER): every label the mocks show fits, so each is the mocks' 70.
         new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
         new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
         new Feature("browse button right", 920, 796, -1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
@@ -111,8 +110,7 @@ public class RunWindowRenderTest {
         new Sample("list edge", 26, 300, false), new Sample("heading band", 300, 250, false), new Sample("selected row", 600, 290, false),
         new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false),
         new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true),
-        // Above the label: in Plex "Connect" makes the button wider than the mocks' 70 px (FOOTER), so its first letter
-        // reaches the button's middle row at this x.
+        // Inside the primary button's left end, above its label.
         new Sample("primary", 462, 782, true, Owner.FACES));
     /**
      * A only: the checkbox's inside. B selects a snippet, whose scope has no SPLIT verb, so spec 11.2 disables the box the B

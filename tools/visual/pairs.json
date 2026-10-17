@@ -1522,5 +1522,429 @@
       "#E6E7EA",
       "#2F65CA"
     ]
+  },
+  {
+    "name": "dock-light-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-sftp-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-servers-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#E1E3E6",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-kit-tunnels-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#E1E3E6",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-left-stripe",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      330
+    ],
+    "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#D7D9DC",
+      "#1E1F22",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "dock-light-right-stripe",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      270
+    ],
+    "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#D7D9DC",
+      "#1E1F22",
+      "#E4E6E9"
+    ]
+  },
+  {
+    "name": "dock-light-bottom-strip",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-bottom-strip-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#E4E6E9",
+      "#1E1F22",
+      "#D3D6DA"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-sftp-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-servers-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#E1E3E6",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#D9DFEA",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-light-disconnected-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/01 Workstation/Workstation - Disconnected.png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/light-disconnected-kit-tunnels-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#E1E3E6",
+      "#C4C7CC",
+      "#1E1F22"
+    ]
+  },
+  {
+    "name": "dock-dark-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      180,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-sftp-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#3D4658",
+      "#2A2C30",
+      "#DFE1E5"
+    ]
+  },
+  {
+    "name": "dock-dark-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      48,
+      944,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-servers-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#36393E",
+      "#2A2C30",
+      "#DFE1E5"
+    ]
+  },
+  {
+    "name": "dock-dark-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      180,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#3D4658",
+      "#2A2C30",
+      "#DFE1E5"
+    ]
+  },
+  {
+    "name": "dock-dark-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2136,
+      1014,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-kit-tunnels-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#36393E",
+      "#2A2C30",
+      "#DFE1E5"
+    ]
+  },
+  {
+    "name": "dock-dark-left-stripe",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      180,
+      44,
+      330
+    ],
+    "render": "jasper-app/build/dock-renders/dark-left-stripe-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#50545B",
+      "#DFE1E5",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "dock-dark-right-stripe",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2838,
+      180,
+      44,
+      270
+    ],
+    "render": "jasper-app/build/dock-renders/dark-right-stripe-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#50545B",
+      "#DFE1E5",
+      "#383B40"
+    ]
+  },
+  {
+    "name": "dock-dark-bottom-strip",
+    "mock": "docs/design/enterprise/reference/08 Dark Mode/Workstation Dark - Connected (plugins in use).png",
+    "crop": [
+      2,
+      1706,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/dark-bottom-strip-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#383B40",
+      "#DFE1E5",
+      "#4A4D53"
+    ]
+  },
+  {
+    "name": "dock-vault-kit-sftp-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      112,
+      244,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-sftp-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#ABB0B9",
+      "#9B9DA1",
+      "#18181B"
+    ]
+  },
+  {
+    "name": "dock-vault-kit-servers-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      112,
+      1008,
+      600,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-servers-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#B2B3B6",
+      "#9B9DA1",
+      "#18181B"
+    ]
+  },
+  {
+    "name": "dock-vault-kit-sessions-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2200,
+      244,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-sessions-header-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#ABB0B9",
+      "#9B9DA1",
+      "#18181B"
+    ]
+  },
+  {
+    "name": "dock-vault-kit-tunnels-header",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2200,
+      1078,
+      700,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-kit-tunnels-header-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#B2B3B6",
+      "#9B9DA1",
+      "#18181B"
+    ]
+  },
+  {
+    "name": "dock-vault-left-stripe",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      244,
+      44,
+      330
+    ],
+    "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
+    "min_agreement": 0.85,
+    "colours": [
+      "#AAABAE",
+      "#18181B",
+      "#B4B6B8"
+    ]
+  },
+  {
+    "name": "dock-vault-right-stripe",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      2902,
+      244,
+      44,
+      270
+    ],
+    "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
+    "min_agreement": 0.9,
+    "colours": [
+      "#AAABAE",
+      "#B4B6B8"
+    ]
+  },
+  {
+    "name": "dock-vault-bottom-strip",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      66,
+      1770,
+      520,
+      50
+    ],
+    "render": "jasper-app/build/dock-renders/vault-bottom-strip-render.png",
+    "min_agreement": 0.8,
+    "colours": [
+      "#B4B6B8",
+      "#18181B",
+      "#A7A9AC"
+    ]
   }
 ]

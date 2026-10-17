@@ -133,13 +133,19 @@ public final class DesignMetrics {
         // (CONTROL_RADIUS before), then roles only the classic faces and chrome read, measured on the Enterprise mocks.
         ROW_HEIGHT(24), FIELD_RADIUS(4),
         RUN_WINDOW_WIDTH(460), CHECKBOX_BOX(13), CHECKBOX_RADIUS(2), CHECKBOX_LABEL_GAP(7), RADIO_RING(14), RADIO_DOT(6), RADIO_LABEL_GAP(6), RADIO_GAP(18), OPTION_SWATCH(7), GROUP_TITLE_INSET(9), GROUP_TITLE_PADDING(4), GROUP_TITLE_GAP(4), SPINNER_WIDTH(82), SPINNER_ARROW_WIDTH(16), SPINNER_GLYPH(7), DROPDOWN_GLYPH(6), DROPDOWN_GLYPH_INSET(7),
-        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(92), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(8), STRIPE_LABEL_GAP(1), DOCK_RULE(1), DOCK_RULE_HIT(6),
+        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(92), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(10), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
         // Plan 4c: a grouped table's data rows under their heading (Settings, Notifications mock); classic faces only.
         GROUP_ROW_INDENT(14),
         // The Run window (Enterprise presentation plan 8a), measured on the 06 Run Dialog mocks; read only by the Run window.
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
         // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
         RUN_WINDOW_HELP_TEXT_TOP(1),
+        // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
+        // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
+        RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
+        // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
+        // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
+        RUN_WINDOW_BUTTON_PADDING(8),
         // Enterprise presentation plan 6: the classic chrome's menu row, toolbar, tabs, status cells and dialogs,
         // measured on the Enterprise mocks and read only by classic chrome.
         MENU_BAR_SIDE(5), MENU_BAR_ITEM_PADDING(9), MENU_BAR_HEIGHT(24), CHROME_BUTTON_PADDING(8), CHROME_BUTTON_GAP(8), CHROME_SEPARATOR_GAP(10),
@@ -147,6 +153,10 @@ public final class DesignMetrics {
         TOOLBAR_SEARCH_WIDTH(300), TOOLBAR_SEARCH_PADDING(8), HINT_KEYCAP_HEIGHT(16), HINT_KEYCAP_PADDING(4), CLASSIC_TAB_LEADING(12), CLASSIC_TAB_GAP(9),
         CLASSIC_TAB_TRAILING(10), CLASSIC_TAB_PLUS_INSET(11), CLASSIC_TAB_MIN_LABEL(24), STATUS_CELL_PADDING(10), STATUS_CELL_DOT_GAP(7), RUN_GLYPH_GAP(5),
         DIALOG_RADIUS(4), DIALOG_HEADER_HEIGHT(26), DIALOG_HEADER_INSET(10), DIALOG_SWATCH(8), DIALOG_SWATCH_GAP(7), DIALOG_FOOTER_VERTICAL(8),
+        // Enterprise plan 7: the count pill, the native header's actions, the header strips' gaps and the bottom strip's
+        // height above its rule (Workstation mock); only the classic dock chrome reads them.
+        STRIPE_PILL_HEIGHT(14), STRIPE_PILL_WIDTH(16), STRIPE_PILL_PADDING(5), STRIPE_PILL_GAP(5), TOOL_HEADER_ACTION(16),
+        HEADER_STRIP_TITLE_GAP(8), HEADER_STRIP_DOT_GAP(6), HEADER_STRIP_COUNT_GAP(6), BOTTOM_STRIP_HEIGHT(24),
         // Plan 9a: the Settings header's inset from the body (today the page inset); its classic value is the mocks' 14.
         SETTINGS_HEADER_INSET(20),
         // Plan 9a: a page's indent under its section in the Settings navigation (the classic navigation's 15), and the gap
@@ -243,6 +253,14 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_GAP, 20);
         // Plan 9b Task 1: mock 01's radios sit 7 below their tiles.
         values.put(Role.THEME_PREVIEW_CAPTION_GAP, 7);
+        // Enterprise plan 7: the header strips' paddings and 16 px actions, 18 apart, each glyph in a 10 px box (Workstation
+        // mock); a strip draws its own, the host's and contributed actions at the contributed glyph size.
+        values.put(Role.TOOL_HEADER_LEADING_PADDING, 8);
+        values.put(Role.TOOL_HEADER_TRAILING_PADDING, 7);
+        values.put(Role.PANEL_HEADER_ACTION, 16);
+        values.put(Role.PANEL_HEADER_CONTRIBUTED_GLYPH, 10);
+        values.put(Role.PANEL_HEADER_ACTION_VERTICAL, 0);
+        values.put(Role.PANEL_HEADER_TRAILING_PADDING, 7);
         // Plan 9a: the classic Settings frame (Mock measurements).
         values.put(Role.SETTINGS_HEADER_HEIGHT, 34);
         values.put(Role.SETTINGS_FOOTER_HEIGHT, 45);

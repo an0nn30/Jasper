@@ -14,19 +14,27 @@ import java.util.OptionalInt;
 public final class DockDropResolver {
     private DockDropResolver() { }
 
+    /** How a group's buttons line up: down a side stripe, or across the bottom strip (spec 10.7). */
+    public enum Axis { VERTICAL, HORIZONTAL }
+
     /**
      * One stripe group as a drag sees it.
      *
      * @param slot the slot the group shows
      * @param bounds the part of the stripe that drops into this group
-     * @param buttons the group's buttons top to bottom, without the dragged window's own
+     * @param buttons the group's buttons in order along its axis, without the dragged window's own
+     * @param axis whether the buttons run down (a side stripe) or across (the bottom strip)
      */
-    public record Group(Slot slot, Rectangle bounds, List<Rectangle> buttons) {
+    public record Group(Slot slot, Rectangle bounds, List<Rectangle> buttons, Axis axis) {
         public Group {
             Objects.requireNonNull(slot, "slot");
+            Objects.requireNonNull(axis, "axis");
             bounds = new Rectangle(bounds);
             buttons = buttons.stream().map(Rectangle::new).toList();
         }
+
+        /** A group down a side stripe. */
+        public Group(Slot slot, Rectangle bounds, List<Rectangle> buttons) { this(slot, bounds, buttons, Axis.VERTICAL); }
 
         @Override public Rectangle bounds() { return new Rectangle(bounds); }
 
@@ -61,10 +69,10 @@ public final class DockDropResolver {
     }
 
     /**
-     * Over a stripe group: that group, at the number of its buttons whose middle is above the cursor; the stripes win
-     * over the workspace. Over the workspace: the zone of the nearest of its left, right and bottom edges, each
-     * distance taken as a share of the workspace's own width (left, right) or height (bottom), so a wide or a tall
-     * workspace splits the same way as any other. The top edge is no target, as there are no top slots. The left
+     * Over a stripe group: that group, at the number of its buttons whose middle is above the cursor (left of it, across
+     * the bottom strip); the stripes win over the workspace. Over the workspace: the zone of the nearest of its left,
+     * right and bottom edges, each distance taken as a share of the workspace's own width (left, right) or height
+     * (bottom), so a wide or a tall workspace splits the same way as any other. The top edge is no target, as there are no top slots. The left
      * edge's zone is {@link Slot#LEFT_TOP} above {@code splitY} and {@link Slot#LEFT_BOTTOM} from it down; the right
      * edge's zone splits the same way; the bottom edge's is {@link Slot#BOTTOM_LEFT} left of the workspace's half
      * width and {@link Slot#BOTTOM_RIGHT} from it on. The zones meet at the middle, along a diagonal from each lower
@@ -80,7 +88,8 @@ public final class DockDropResolver {
         for (Group group : groups) {
             if (!group.bounds.contains(cursor)) continue;
             int index = 0;
-            for (Rectangle button : group.buttons) if (button.y + button.height / 2.0 < cursor.y) index++;
+            for (Rectangle button : group.buttons)
+                if (group.axis == Axis.VERTICAL ? button.y + button.height / 2.0 < cursor.y : button.x + button.width / 2.0 < cursor.x) index++;
             return Optional.of(Target.stripe(group.slot, index));
         }
         if (workspace.isEmpty() || !workspace.contains(cursor)) return Optional.empty();

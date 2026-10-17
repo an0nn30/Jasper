@@ -26,7 +26,7 @@ class Task9cNoticeEvidenceTest {
                     var center=new NotificationCenter(Runnable::run,clock,()->Delivery.Presence.FOCUSED);
                     var group=new NotificationGroup("fixture.cards","Synthetic fixture","jasper",DisplayMode.CARD);center.register(group);
                     var site=new PanelSite(UUID.randomUUID(),()->{},()->{},()->true);
-                    var history=new HistoryPanel(kit,center,site,false);
+                    var history=new HistoryPanel(kit,center,site,false,"Notifications");
                     try {
                         site.notifyVisibility(true);save(history,family,"history-empty",360,420);
                         for(var severity:Severity.values()) {

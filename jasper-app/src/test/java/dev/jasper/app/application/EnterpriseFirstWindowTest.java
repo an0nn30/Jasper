@@ -15,7 +15,11 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Spec 5.8 and 16.1.8: the first window of a fresh home under Enterprise opens with the kit's defaults. */
+/**
+ * Spec 5.8 and 16.1.8: the first window of a fresh home under Enterprise opens with the kit's defaults; under the landed
+ * dock (plan 7, spec 10.7) the application titles the Notifications panel Event Log at Bottom Left and loads its dock
+ * layout under the look's id.
+ */
 class EnterpriseFirstWindowTest {
     @TempDir Path home;
 
@@ -38,6 +42,12 @@ class EnterpriseFirstWindowTest {
                 assertThat(first.darkTheme()).isEqualTo("enterprise");
                 assertThat(application[0].themes().current().chrome().name()).as("the window's theme is the kit's pick").startsWith("Enterprise");
                 assertThat(application[0].themes().kit()).isSameAs(selection.presentation().kit());
+                var log = application[0].contributions().panels().stream()
+                    .filter(entry -> entry.id().equals(NotificationsFeature.PANEL_ID)).findFirst().orElseThrow();
+                assertThat(log.title()).as("the Notifications panel under Enterprise").isEqualTo("Event Log");
+                assertThat(log.defaultSlot()).isEqualTo(dev.jasper.app.dock.Slot.BOTTOM_LEFT);
+                assertThat(application[0].presentation().projections().dockLayout().key()).as("the key UiState loads the dock under")
+                    .isEqualTo("dev.jasper.enterprise");
             });
         } finally {
             if (application[0] != null) { edt(application[0]::quit); assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue(); }

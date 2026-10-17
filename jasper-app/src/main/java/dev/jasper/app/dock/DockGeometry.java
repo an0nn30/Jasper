@@ -34,10 +34,14 @@ public final class DockGeometry {
 
         public Metrics {
             if (!(scale > 0)) throw new IllegalArgumentException("The scale must be positive: " + scale);
+            if (divider < 0) throw new IllegalArgumentException("The divider cannot be negative: " + divider);
         }
 
         /** Jasper's metrics at a UI scale: 6px dividers, 120px tool windows, a 200 x 120 px terminal column. */
-        public static Metrics at(double scale) { return new Metrics(scale, 6, 120, 200, 120); }
+        public static Metrics at(double scale) { return at(scale, 6); }
+
+        /** The same with {@code divider}-pixel dividers: flush frames' 1 px rules (spec 10.7). */
+        public static Metrics at(double scale, int divider) { return new Metrics(scale, divider, 120, 200, 120); }
 
         public int scaled(int unscaled) { return scale == 1 ? unscaled : (int) Math.round(unscaled * scale); }
 

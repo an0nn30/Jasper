@@ -161,6 +161,9 @@ public final class CardView extends dev.jasper.ui.swing.SurfacePanel implements 
 
     @Override protected int surfaceHeight() { return revealedHeight(); }
 
+    /** The card keeps its own height; the window clamps it. */
+    @Override public void fitHeight(int available) { }
+
     private KitView view(ViewSpec spec) {
         var view = new KitView(kit, spec, this::event);
         views.add(view);

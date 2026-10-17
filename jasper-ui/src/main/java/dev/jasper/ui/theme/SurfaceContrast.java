@@ -29,7 +29,8 @@ public final class SurfaceContrast {
 
     /**
      * A repair applied where a pair is painted: a contrast floor ({@link #TEXT}, {@link #INDICATOR}, {@link #STRUCTURAL},
-     * {@link #CONTROL}) or a CIE L* distance ({@link #apart(double)}). Every guard terminates on any opaque colours.
+     * {@link #CONTROL}) or a CIE L* distance, on either side ({@link #apart(double)}) or toward the text
+     * ({@link #beyond(double)}). Every guard terminates on any opaque colours.
      *
      * @param kind whether {@code floor} is a contrast ratio or a lightness distance
      * @param floor the ratio (1 to {@link SurfaceContrast#REACHABLE}) or the distance (0 to
@@ -41,7 +42,9 @@ public final class SurfaceContrast {
             /** The WCAG contrast ratio of the painted colour and the colour it stands on. */
             CONTRAST,
             /** The CIE L* distance between the painted surface and the one it stands apart from. */
-            APART
+            APART,
+            /** The CIE L* distance of the painted surface past the one it stands beyond, on the text's side. */
+            BEYOND
         }
 
         /** Text and status text. */
@@ -64,23 +67,37 @@ public final class SurfaceContrast {
         /** Surfaces kept {@code lightness} CIE L* apart, as an {@code apart} recipe names. */
         public static Guard apart(double lightness) { return new Guard(Kind.APART, lightness); }
 
+        /** A surface kept {@code lightness} CIE L* past another on the text's side, as {@link SurfaceContrast#beyond} keeps it. */
+        public static Guard beyond(double lightness) { return new Guard(Kind.BEYOND, lightness); }
+
         /**
          * {@code color} as painted against {@code against}: unchanged when it holds; otherwise a contrast guard moves it
-         * toward {@code toward}, then black or white, and an apart guard moves it as {@link SurfaceContrast#apart} does.
+         * toward {@code toward}, then black or white, an apart guard moves it as {@link SurfaceContrast#apart} does, and a
+         * beyond guard as {@link SurfaceContrast#beyond} does, {@code toward} being the text.
          */
         public Color apply(Color color, Color against, Color toward) {
-            if (holds(color, against)) return color;
+            if (holds(color, against, toward)) return color;
             return switch (kind) {
                 case CONTRAST -> readable(color, against, floor, toward);
                 case APART -> SurfaceContrast.apart(color, against, floor);
+                case BEYOND -> SurfaceContrast.beyond(color, against, floor, toward);
             };
         }
 
-        /** Whether {@code color} meets this guard against {@code against}. */
-        public boolean holds(Color color, Color against) {
+        /** Whether {@code color} meets this guard against {@code against}; a beyond guard's distance on either side. */
+        public boolean holds(Color color, Color against) { return holds(color, against, null); }
+
+        /**
+         * Whether {@code color} meets this guard against {@code against}, a beyond guard's distance on the side of
+         * {@code toward}'s lightness (either side when it is null).
+         */
+        public boolean holds(Color color, Color against, Color toward) {
+            double distance = ColorMath.lightness(color) - ColorMath.lightness(against);
             return switch (kind) {
                 case CONTRAST -> ColorMath.contrast(color, against) >= floor;
-                case APART -> Math.abs(ColorMath.lightness(color) - ColorMath.lightness(against)) >= floor;
+                case APART -> Math.abs(distance) >= floor;
+                case BEYOND -> (toward == null ? Math.abs(distance)
+                    : ColorMath.lightness(toward) > ColorMath.lightness(against) ? distance : -distance) >= floor;
             };
         }
     }
@@ -91,11 +108,16 @@ public final class SurfaceContrast {
      * translucent {@code against} first over {@code surface.app}); while that holds the slot keeps its alpha, and a
      * repair is opaque. The roles themselves are never changed.
      */
-    public static Color painted(GeneratedTheme theme, PaintPair pair) {
-        Color under = flat(pair.against().color(theme), theme.semantic().color(SemanticColor.SURFACE_APP));
-        Color slot = pair.slot().color(theme), shown = flat(slot, under);
-        return pair.guard().holds(shown, under) ? slot
-            : pair.guard().apply(shown, under, theme.semantic().color(SemanticColor.TEXT_PRIMARY));
+    public static Color painted(GeneratedTheme theme, PaintPair pair) { return painted(theme, pair, pair.against().color(theme)); }
+
+    /**
+     * As {@link #painted(GeneratedTheme, PaintPair)}, on {@code against}: the colour the face paints for the pair's other
+     * role, when it paints that role through a pair of its own.
+     */
+    public static Color painted(GeneratedTheme theme, PaintPair pair, Color against) {
+        Color under = flat(Objects.requireNonNull(against, "against"), theme.semantic().color(SemanticColor.SURFACE_APP));
+        Color slot = pair.slot().color(theme), shown = flat(slot, under), text = theme.semantic().color(SemanticColor.TEXT_PRIMARY);
+        return pair.guard().holds(shown, under, text) ? slot : pair.guard().apply(shown, under, text);
     }
 
     /** {@code color} as it shows over {@code under} (taken as opaque): itself when opaque, else laid over it. */
@@ -129,6 +151,26 @@ public final class SurfaceContrast {
             if (Math.abs(target - ColorMath.lightness(candidate)) >= minimum) return candidate;
         }
         return toward;
+    }
+
+    /**
+     * {@code surface} kept at least {@code minimum} CIE L* beyond {@code from} on the side of {@code text}'s lightness
+     * (lighter when the text is lighter than {@code from}, darker otherwise): unchanged when it already is; otherwise
+     * moved toward white or black in 1% steps just until it is, or toward the other end when that side has no room. The
+     * derived surfaces use it, so a dark variant's header strips stand lighter than its window surface.
+     */
+    public static Color beyond(Color surface, Color from, double minimum, Color text) {
+        double target = ColorMath.lightness(from);
+        boolean lighter = ColorMath.lightness(text) > target;
+        if ((lighter ? ColorMath.lightness(surface) - target : target - ColorMath.lightness(surface)) >= minimum) return surface;
+        for (Color end : lighter ? java.util.List.of(Color.WHITE, Color.BLACK) : java.util.List.of(Color.BLACK, Color.WHITE)) {
+            boolean up = end.equals(Color.WHITE);
+            for (int step = 1; step <= 100; step++) {
+                Color candidate = ColorMath.mix(end, surface, step / 100.0);
+                if ((up ? ColorMath.lightness(candidate) - target : target - ColorMath.lightness(candidate)) >= minimum) return candidate;
+            }
+        }
+        return lighter ? Color.WHITE : Color.BLACK;
     }
 
     /** White or black, whichever contrasts more with {@code fill}. */

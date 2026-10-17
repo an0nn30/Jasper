@@ -51,15 +51,19 @@ final class WindowCommandPalette implements AutoCloseable {
     };
 
     private final dev.jasper.app.commands.CommandHistory history;
+    /** Where the view lives and how a drag attaches it (spec 11.5). */
+    private final PaletteHome home;
 
     /** {@code kit} is the chrome context the palette's kit views mount on; the palette owns its focus cycle. */
     WindowCommandPalette(WindowContent owner, ScopeRegistry scopes, dev.jasper.app.commands.CommandHistory history,
-                         String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit) {
+                         String defaultScopeId, boolean macOs, dev.jasper.ui.swing.KitContext kit,
+                         dev.jasper.app.presentation.PaletteLook look, PaletteHome home) {
         this.history = history;
+        this.home = java.util.Objects.requireNonNull(home);
         this.owner = owner; this.defaultScopeId = defaultScopeId;
-        controller = new PaletteController(kit, dev.jasper.app.presentation.PaletteLook.DEFAULT, scopes, history, macOs, this::layoutOverlay,
+        controller = new PaletteController(kit, look, scopes, history, macOs, this::layoutOverlay,
             this::restoreAndHide, owner::updatingActions, owner::updateActions,
-            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, owner::openFile);
+            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, this::browse);
         view = controller.view();
         palette = view.component();
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
@@ -73,10 +77,18 @@ final class WindowCommandPalette implements AutoCloseable {
         root.getLayeredPane().add(overlay, JLayeredPane.MODAL_LAYER);
         root.addComponentListener(resize); root.getLayeredPane().addComponentListener(resize);
         owner.addComponentListener(resize); owner.tabStrip().addComponentListener(resize);
+        // The corner home measures the dock work area, which can move without the tab strip resizing.
+        owner.area().addComponentListener(resize);
         layoutOverlay();
     }
 
     PaletteController controller() { return controller; }
+
+    /** Browse… (spec 11.7): File, Open File…'s chooser and route; the Run window stays open and its field takes focus back. */
+    private void browse() {
+        owner.openFile();
+        if (controller.isOpen()) view.focusQuery();
+    }
     dev.jasper.app.commands.CommandHistory history() { return history; }
     void toggle() { open(defaultScopeId); }
     boolean hasScope(String id) { return controller.hasScope(id); }
@@ -92,8 +104,18 @@ final class WindowCommandPalette implements AutoCloseable {
                 owner.updateActions();
                 originTab = owner.currentTab(); originPane = owner.currentPane();
                 priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+            } else if (view.modeless()) {
+                // An opener focusing the open Run window from elsewhere: Escape then returns where the person was now.
+                Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                if (focus != null && !controller.owns(focus) && SwingUtilities.isDescendingFrom(focus, owner)) {
+                    originTab = owner.currentTab(); originPane = owner.currentPane(); priorFocus = focus;
+                }
             }
-            if (controller.open(id, originPane == null ? PaletteTarget.window(owner.id()) : target(originPane), this::validOrigin, queryOrNull, rowIdOrNull)) {
+            boolean modeless = view.modeless();
+            PaletteTarget target = modeless ? currentTarget() : originPane == null ? PaletteTarget.window(owner.id()) : target(originPane);
+            if (controller.open(id, target, modeless ? this::attached : this::validOrigin, queryOrNull, rowIdOrNull)) {
+                // The Run window runs a row where the person last worked (plan 8b Rulings 4).
+                if (modeless && !wasOpen) controller.follow(this::currentTarget);
                 if (!wasOpen) overlay.swallowing = false;
                 overlay.setVisible(true); layoutOverlay();
                 if (!wasOpen) startReveal();
@@ -110,6 +132,24 @@ final class WindowCommandPalette implements AutoCloseable {
             () -> pane.session() == null ? java.util.Optional.empty() : pane.session().workingDirectory(),
             pane::running, java.util.Optional.of(owner.id()), java.util.Optional.of(pane.id()));
     }
+
+    /** The window's current pane, or the window when it has none. */
+    private PaletteTarget currentTarget() {
+        TerminalPane pane = owner.currentPane();
+        return pane == null ? PaletteTarget.window(owner.id()) : target(pane);
+    }
+
+    /** The Run window lives as long as its window is open and attached (spec 11.6: "it goes with its window"). */
+    private boolean attached() { return !closed && root != null && SwingUtilities.isDescendingFrom(owner, root.getLayeredPane()); }
+
+    /** A tab switch dismisses the card and refreshes the Run window. */
+    void tabChanged() { if (view.modeless()) controller.refresh(); else dismiss(); }
+
+    /** The window losing focus dismisses the card; the Run window stays. */
+    void windowDeactivated() { if (!view.modeless()) dismiss(); }
+
+    /** Whether the palette holds the window's input: the open card does; the Run window never does (plan 8b Rulings 5). */
+    boolean blocksActions() { return isOpen() && !view.modeless(); }
 
     private boolean validOrigin() {
         return owner.isActiveAndOpen() && owner.currentTab() == originTab
@@ -139,7 +179,8 @@ final class WindowCommandPalette implements AutoCloseable {
     /** The card drops open vertically: its bottom edge leaves the field fast and settles slowly. */
     private void startReveal() {
         stopReveal();
-        if (!animations.enabled() || !owner.lookAnimates()) return;
+        // The Run window has no reveal or other motion (spec 11.6).
+        if (!animations.enabled() || !owner.lookAnimates() || view.modeless()) return;
         revealStart = clock.getAsLong();
         view.setReveal(0); overlay.repaint();
         reveal = new Timer(8, event -> animate(clock.getAsLong()));
@@ -218,14 +259,14 @@ final class WindowCommandPalette implements AutoCloseable {
         return inside(new Rectangle(x, y, size.width, size.height), available, margin);
     }
 
-    private static Dimension fitted(Rectangle available, Dimension preferred, int margin) {
+    static Dimension fitted(Rectangle available, Dimension preferred, int margin) {
         int insetX = Math.min(margin, Math.max(0, available.width / 2));
         int insetY = Math.min(margin, Math.max(0, available.height / 2));
         return new Dimension(Math.min(preferred.width, Math.max(0, available.width - 2 * insetX)),
             Math.min(preferred.height, Math.max(0, available.height - 2 * insetY)));
     }
 
-    private static Rectangle inside(Rectangle card, Rectangle available, int margin) {
+    static Rectangle inside(Rectangle card, Rectangle available, int margin) {
         int insetX = Math.min(margin, Math.max(0, available.width / 2));
         int insetY = Math.min(margin, Math.max(0, available.height / 2));
         card.x = Math.max(available.x + insetX, Math.min(card.x, available.x + available.width - insetX - card.width));
@@ -252,6 +293,7 @@ final class WindowCommandPalette implements AutoCloseable {
         if (root == null) return;
         root.removeComponentListener(resize); root.getLayeredPane().removeComponentListener(resize);
         owner.removeComponentListener(resize); owner.tabStrip().removeComponentListener(resize);
+        owner.area().removeComponentListener(resize);
         root.getLayeredPane().remove(overlay); root.repaint(); root = null;
     }
 
@@ -260,11 +302,17 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean snappedToTop() { return drag.location != null && drag.snappedY; }
     boolean snappedHome() { return drag.location != null && drag.snappedHome; }
 
-    /** The card's size once dragged: the activated width in either view mode, inside the window. */
-    private Dimension detachedSize(Rectangle window) {
-        Dimension preferred = palette.getPreferredSize();
-        preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
-        return fitted(window, preferred, margin());
+    /** What the home reads of this window, in the overlay's coordinates. */
+    private PaletteHome.Geometry geometry() {
+        return new PaletteHome.Geometry(new Rectangle(0, 0, overlay.getWidth(), overlay.getHeight()), overlay.workspace(),
+            owner.paletteAnchor(overlay), owner.titleRowClear(overlay), owner.paletteWorkArea(overlay), margin(),
+            owner.viewMode() == ViewMode.COMPACT);
+    }
+
+    /** The view's preferred size once it fits the height its home offers. */
+    private Dimension preferred(PaletteHome.Geometry geometry) {
+        view.fitHeight(home.available(geometry));
+        return palette.getPreferredSize();
     }
 
     /**
@@ -292,21 +340,21 @@ final class WindowCommandPalette implements AutoCloseable {
             if (window.width <= 0 || window.height <= 0) return;
             if (location == null) { stopReveal(); palette.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)); }
             int x = origin.x + dx, y = origin.y + dy, snap = UIScale.scale(SNAP_DISTANCE);
-            // Back at (or above) its home under the title field, the card re-attaches there.
-            Rectangle home = overlay.home();
-            int reach = UIScale.scale(HOME_DISTANCE);
-            snappedHome = home != null && Math.abs(x - home.x) <= reach && y <= home.y + reach;
+            var geometry = geometry();
+            Dimension preferred = preferred(geometry), size = home.detachedSize(geometry, preferred);
+            // Back at its home (the title field's: at or above it; the corner's: at or below it), the view re-attaches there.
+            Rectangle homeAt = home.home(geometry, preferred);
+            snappedHome = homeAt != null && home.attaches(homeAt, new Rectangle(x, y, size.width, size.height), UIScale.scale(HOME_DISTANCE));
             if (snappedHome) {
                 snappedX = false; snappedY = false;
-                location = home.getLocation();
+                location = homeAt.getLocation();
                 overlay.doLayout(); overlay.repaint();
                 return;
             }
-            Dimension size = detachedSize(window);
             int guideX = guideX(window), guideY = guideY(window);
-            snappedX = Math.abs(x + size.width / 2 - guideX) <= snap;
+            snappedX = home.guides() && Math.abs(x + size.width / 2 - guideX) <= snap;
             if (snappedX) x = guideX - size.width / 2;
-            snappedY = Math.abs(y - guideY) <= snap;
+            snappedY = home.guides() && Math.abs(y - guideY) <= snap;
             if (snappedY) y = guideY;
             Rectangle card = inside(new Rectangle(x, y, size.width, size.height), window, margin());
             snappedX &= card.x == x; snappedY &= card.y == y;
@@ -316,14 +364,12 @@ final class WindowCommandPalette implements AutoCloseable {
 
         @Override public void mouseReleased(MouseEvent event) {
             if (location != null && snappedHome) {
-                owner.uiState().setPalettePosition(null);
+                home.forget(owner.uiState());
                 owner.uiState().save();
             } else if (location != null) {
-                Rectangle window = overlay.workspace();
-                Dimension size = detachedSize(window);
-                double centerX = snappedX ? GUIDE_CENTER : fraction((location.x + size.width / 2.0 - window.x) / window.width);
-                double top = snappedY ? GUIDE_TOP : fraction((location.y - window.y) / (double) window.height);
-                owner.uiState().setPalettePosition(new UiState.PalettePosition(centerX, top));
+                var geometry = geometry();
+                Dimension size = home.detachedSize(geometry, preferred(geometry));
+                home.save(owner.uiState(), geometry, new Rectangle(location, size), snappedX, snappedY);
                 owner.uiState().save();
             }
             cancel();
@@ -331,7 +377,7 @@ final class WindowCommandPalette implements AutoCloseable {
 
         @Override public void mouseClicked(MouseEvent event) {
             if (!SwingUtilities.isLeftMouseButton(event) || event.getClickCount() != 2 || !controller.isOpen()) return;
-            owner.uiState().setPalettePosition(null);
+            home.forget(owner.uiState());
             owner.uiState().save();
             layoutOverlay();
         }
@@ -342,7 +388,6 @@ final class WindowCommandPalette implements AutoCloseable {
             if (moved) { palette.setCursor(null); layoutOverlay(); }
         }
 
-        private static double fraction(double value) { return Math.max(0, Math.min(1, value)); }
     }
 
     /** The card's inset from the window's edges. */
@@ -374,41 +419,28 @@ final class WindowCommandPalette implements AutoCloseable {
             addMouseListener(mouse); addMouseMotionListener(mouse);
             addMouseWheelListener(MouseEvent::consume);
         }
+        /** The card's overlay takes every press; the Run window's passes every press outside the window through (spec 11.6). */
+        @Override public boolean contains(int x, int y) {
+            return view.modeless() ? palette.isVisible() && palette.getBounds().contains(x, y) : super.contains(x, y);
+        }
         /** The workspace, which spans the window including its rail and tool panels. */
         Rectangle workspace() { return SwingUtilities.convertRectangle(owner.getParent(), owner.getBounds(), this); }
 
-        /** The card's default place, dropped from the title field; null in Compact mode or without a usable field. */
-        Rectangle home() {
-            Rectangle field = owner.paletteAnchor(this);
-            return field == null ? null : anchored(field, new Rectangle(0, 0, getWidth(), getHeight()), owner.titleRowClear(this),
-                palette.getPreferredSize(), UIScale.scale(ANCHORED_MINIMUM_WIDTH), margin());
-        }
-
         @Override public void doLayout() {
             if (root == null || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
+            var geometry = geometry();
+            Dimension preferred = preferred(geometry);
             if (drag.location != null) {
-                Rectangle home = drag.snappedHome ? home() : null;
-                palette.setBounds(home != null ? home : new Rectangle(drag.location, detachedSize(workspace())));
+                Rectangle at = drag.snappedHome ? home.home(geometry, preferred) : null;
+                palette.setBounds(at != null ? at : new Rectangle(drag.location, home.detachedSize(geometry, preferred)));
                 return;
             }
-            var saved = owner.uiState().palettePosition();
-            if (saved.isPresent()) {
-                Rectangle window = workspace();
-                palette.setBounds(placed(window, detachedSize(window), saved.get(), margin()));
-                return;
-            }
-            Rectangle home = home();
-            if (home != null) {
-                palette.setBounds(home);
-                return;
-            }
-            // No usable field: centre across the workspace, which spans the window including its rail and
-            // tool panels. Panel dividers must not move or narrow the palette.
-            Rectangle window = workspace();
-            Dimension preferred = palette.getPreferredSize();
-            // Compact changes placement while retaining the title-anchored card's activated width.
-            if (owner.viewMode() == ViewMode.COMPACT) preferred.width = UIScale.scale(ANCHORED_MINIMUM_WIDTH);
-            palette.setBounds(positioned(window, preferred, margin()));
+            var saved = home.saved(owner.uiState(), geometry, home.detachedSize(geometry, preferred));
+            if (saved.isPresent()) { palette.setBounds(saved.get()); return; }
+            Rectangle at = home.home(geometry, preferred);
+            // No home here: the home's fallback (the card centred across the workspace, which spans the window including
+            // its rail and tool panels, so panel dividers never move or narrow it).
+            palette.setBounds(at != null ? at : home.fallback(geometry, preferred));
         }
         @Override protected void paintComponent(Graphics graphics) {
             if (!controller.isOpen()) return;

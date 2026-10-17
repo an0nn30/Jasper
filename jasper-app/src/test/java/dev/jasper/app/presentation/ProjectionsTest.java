@@ -132,6 +132,22 @@ class ProjectionsTest {
         assertThat(fallback.look()).isEqualTo("default");
     }
 
+    /** Plan 7: the dock group has landed: the shipped kit's dock is labelled and flush, saved under its id, with Event Log. */
+    @Test void theDockGroupHasLanded() {
+        assertThat(Presentation.LANDED).contains(Presentation.Landed.WINDOW_CHROME, Presentation.Landed.WINDOW_CONTENT, Presentation.Landed.DOCK_CHROME);
+        var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
+        assertThat(shipped.workspace().stripes()).isEqualTo(WorkspaceLook.Stripes.LABELLED);
+        assertThat(shipped.workspace().frames()).isEqualTo(WorkspaceLook.FrameStyle.FLUSH);
+        assertThat(shipped.dockLayout()).isEqualTo(new DockLayoutKey("dev.jasper.enterprise"));
+        assertThat(shipped.panels()).isEqualTo(new AppPanels("Event Log", Slot.BOTTOM_LEFT));
+        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Presentation.LANDED);
+        assertThat(standard.workspace().stripes()).isEqualTo(WorkspaceLook.Stripes.RAILS);
+        assertThat(standard.workspace().frames()).isEqualTo(WorkspaceLook.FrameStyle.STANDARD);
+        assertThat(standard.dockLayout().key()).isEmpty();
+        assertThat(standard.panels()).isEqualTo(new AppPanels("Notifications", Slot.RIGHT_TOP));
+        assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
+    }
+
     /** Plan 9a: the Settings group has landed, so the kit file's Settings chrome and composition reach the projection. */
     @Test void theSettingsGroupHasLanded() {
         assertThat(Presentation.LANDED).as("plan 9 lands the Settings group").contains(Presentation.Landed.SETTINGS);
@@ -156,5 +172,13 @@ class ProjectionsTest {
         assertThat(Projections.standard(LINUX).settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of(), "Use platform font size"));
         assertThat(Projections.standard(MAC).settings().hiddenKeys()).containsExactly("window.native_decorations");
         assertThat(Projections.standard(LINUX).composition()).isEqualTo(Composition.ROWS);
+    }
+
+    /** Plan 8b: the Run window has landed, so the kit's run_window palette reaches the projection. */
+    @Test void theRunWindowHasLanded() {
+        assertThat(Presentation.LANDED).contains(Presentation.Landed.RUN_WINDOW);
+        var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Presentation.LANDED).palette()).isEqualTo(PaletteLook.DEFAULT);
     }
 }

@@ -81,12 +81,12 @@ public final class DerivedPalette {
     /** {@code role}'s recipe (spec 7.1), reading its inputs through {@code in}. */
     private static Color recipe(DerivedColor role, Function<ColorRole, Color> in) {
         return switch (role) {
-            case SURFACE_HEADER -> SurfaceContrast.apart(mix(in, TEXT_PRIMARY, SURFACE_APP, .05), in.apply(SURFACE_APP), 3);
-            case SURFACE_HEADER_ACTIVE -> SurfaceContrast.apart(mix(in, ACCENT, SURFACE_APP, .10),
-                in.apply(DerivedColor.SURFACE_HEADER), 2);
-            case SURFACE_STRIPE -> SurfaceContrast.apart(mix(in, TEXT_PRIMARY, SURFACE_APP, .035), in.apply(SURFACE_APP), 1.5);
-            case SURFACE_TABLE_HEADER -> SurfaceContrast.apart(mix(in, TEXT_PRIMARY, SURFACE_CARD, .06), in.apply(SURFACE_CARD), 3);
-            case SURFACE_ZEBRA -> closer(SurfaceContrast.apart(mix(in, TEXT_PRIMARY, SURFACE_CARD, .025), in.apply(SURFACE_CARD), 1.5),
+            case SURFACE_HEADER -> SurfaceContrast.beyond(mix(in, TEXT_PRIMARY, SURFACE_APP, .05), in.apply(SURFACE_APP), 3, in.apply(TEXT_PRIMARY));
+            case SURFACE_HEADER_ACTIVE -> SurfaceContrast.beyond(mix(in, ACCENT, SURFACE_APP, .10),
+                in.apply(DerivedColor.SURFACE_HEADER), 2, in.apply(TEXT_PRIMARY));
+            case SURFACE_STRIPE -> SurfaceContrast.beyond(mix(in, TEXT_PRIMARY, SURFACE_APP, .035), in.apply(SURFACE_APP), 1.5, in.apply(TEXT_PRIMARY));
+            case SURFACE_TABLE_HEADER -> SurfaceContrast.beyond(mix(in, TEXT_PRIMARY, SURFACE_CARD, .06), in.apply(SURFACE_CARD), 3, in.apply(TEXT_PRIMARY));
+            case SURFACE_ZEBRA -> closer(SurfaceContrast.beyond(mix(in, TEXT_PRIMARY, SURFACE_CARD, .025), in.apply(SURFACE_CARD), 1.5, in.apply(TEXT_PRIMARY)),
                 in.apply(DerivedColor.SURFACE_TABLE_HEADER), in.apply(SURFACE_CARD));
             case SURFACE_ROW_HOVER -> mix(in, ACCENT, SURFACE_CARD, .08);
             case WARNING_GROUND -> mix(in, STATUS_WARNING, SURFACE_CARD, GROUND);
@@ -95,7 +95,7 @@ public final class DerivedPalette {
             case DANGER_BORDER -> mix(in, STATUS_DANGER, SURFACE_CARD, EDGE);
             case INFO_GROUND -> mix(in, ACCENT, SURFACE_CARD, GROUND);
             case INFO_BORDER -> mix(in, ACCENT, SURFACE_CARD, EDGE);
-            case SURFACE_FOOTER -> SurfaceContrast.apart(mix(in, TEXT_PRIMARY, SURFACE_DIALOG, .03), in.apply(SURFACE_DIALOG), 2);
+            case SURFACE_FOOTER -> SurfaceContrast.beyond(mix(in, TEXT_PRIMARY, SURFACE_DIALOG, .03), in.apply(SURFACE_DIALOG), 2, in.apply(TEXT_PRIMARY));
             case BORDER_DIVIDER -> ColorMath.mix(boundary(in, BORDER_WINDOW, SurfaceContrast.Guard.STRUCTURAL), in.apply(SURFACE_CARD), .73);
             case BORDER_ROW -> ColorMath.mix(boundary(in, BORDER_WINDOW, SurfaceContrast.Guard.STRUCTURAL), in.apply(SURFACE_CARD), .46);
             case BORDER_HOVER -> {

@@ -338,7 +338,7 @@ public final class JasperApplication {
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
-            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels());
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
         incidents = new Incidents(notificationCenter.clock());
@@ -953,7 +953,7 @@ public final class JasperApplication {
             selection = scanned;
         }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
-        uiState = UiState.load(dirs.uiState());
+        uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());

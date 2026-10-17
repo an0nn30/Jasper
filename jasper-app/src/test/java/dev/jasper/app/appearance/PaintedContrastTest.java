@@ -296,6 +296,166 @@ class PaintedContrastTest {
         return image;
     }
 
+    /**
+     * Spec 10.7 and 16.1.2: the classic dock chrome paints each declared pair as its guard makes it, over every palette;
+     * the focused strip's text, dot and glyphs are held on the focused surface as it is painted.
+     */
+    @Test void theClassicDockPaintsEachPairAsItsGuardMakesItOverEveryPalette() {
+        var painter = new ChromePainter(Kit.CLASSIC);
+        var declared = List.of(
+            new Declared("dock rule", ChromePainter.DOCK_RULE, (theme, expected) -> painter.dockRule(theme).equals(expected)
+                && strip(painter, theme, false).getRGB(5, 24) == expected.getRGB() && strip(painter, theme, true).getRGB(5, 24) == expected.getRGB()),
+            new Declared("stripe label", ChromePainter.STRIPE_LABEL, (theme, expected) -> painter.stripeLabel(theme, false, false).equals(expected)),
+            new Declared("hovered stripe label", ChromePainter.HOVERED_STRIPE_LABEL, (theme, expected) -> painter.stripeLabel(theme, false, true).equals(expected)),
+            new Declared("open stripe label", ChromePainter.OPEN_STRIPE_LABEL, (theme, expected) -> painter.stripeLabel(theme, true, false).equals(expected)
+                && painter.stripeLabel(theme, true, true).equals(expected)),
+            new Declared("accent count pill", ChromePainter.ACCENT_PILL, (theme, expected) -> pill(painter, theme, expected, false)),
+            new Declared("error count pill", ChromePainter.ERROR_PILL, (theme, expected) -> pill(painter, theme, expected, true)),
+            new Declared("focused header surface", ChromePainter.FOCUSED_HEADER, (theme, expected) -> painter.headerSurface(theme, true).equals(expected)
+                && strip(painter, theme, true).getRGB(5, 5) == expected.getRGB()),
+            new Declared("header title", ChromePainter.HEADER_TITLE, (theme, expected) -> painter.headerTitle(theme, false).equals(expected)),
+            new Declared("focused header title", ChromePainter.FOCUSED_HEADER_TITLE, (theme, expected) -> painter.headerTitle(theme, true).equals(expected)),
+            new Declared("header detail", ChromePainter.HEADER_DETAIL, (theme, expected) -> painter.headerDetail(theme, false, false).equals(expected)),
+            new Declared("focused header detail", ChromePainter.FOCUSED_HEADER_DETAIL, (theme, expected) -> painter.headerDetail(theme, true, false).equals(expected)),
+            new Declared("header count", ChromePainter.HEADER_COUNT, (theme, expected) -> painter.headerDetail(theme, false, true).equals(expected)),
+            new Declared("focused header count", ChromePainter.FOCUSED_HEADER_COUNT, (theme, expected) -> painter.headerDetail(theme, true, true).equals(expected)),
+            new Declared("header connected dot", ChromePainter.HEADER_DOT, (theme, expected) -> dot(painter, theme, false).getRGB(9, 9) == expected.getRGB()),
+            new Declared("focused header connected dot", ChromePainter.FOCUSED_HEADER_DOT, (theme, expected) -> dot(painter, theme, true).getRGB(9, 9) == expected.getRGB()),
+            new Declared("header action glyphs", ChromePainter.HEADER_ACTION, (theme, expected) -> painter.headerAction(theme, false).equals(expected)),
+            new Declared("focused header action glyphs", ChromePainter.FOCUSED_HEADER_ACTION, (theme, expected) -> painter.headerAction(theme, true).equals(expected)));
+        assertThat(declared).extracting(Declared::pair).as("every declared dock pair is sampled").containsExactlyElementsOf(ChromePainter.DOCK_PAIRS);
+        var onFocused = List.of(ChromePainter.FOCUSED_HEADER_TITLE, ChromePainter.FOCUSED_HEADER_DETAIL, ChromePainter.FOCUSED_HEADER_COUNT,
+            ChromePainter.FOCUSED_HEADER_DOT, ChromePainter.FOCUSED_HEADER_ACTION);
+        for (var theme : palettes()) {
+            Color text = theme.semantic().color(TEXT_PRIMARY);
+            for (var each : declared) {
+                String where = name(theme) + ", " + each.name();
+                Color against = onFocused.contains(each.pair()) ? painter.headerSurface(theme, true) : each.pair().against().color(theme);
+                Color expected = SurfaceContrast.painted(theme, each.pair(), against);
+                assertThat(each.pair().guard().holds(expected, against, text)).as(where + " meets its guard").isTrue();
+                assertThat(each.painter().paints(theme, expected)).as(where + " is painted " + ColorMath.hex(expected)).isTrue();
+            }
+        }
+    }
+
+    /** A 40 x 25 header strip: 24 px of surface over its 1 px rule. */
+    private static BufferedImage strip(ChromePainter painter, GeneratedTheme theme, boolean focused) {
+        var image = new BufferedImage(40, 25, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { painter.headerStrip(graphics, 40, 25, theme, focused); } finally { graphics.dispose(); }
+        return image;
+    }
+
+    /** A count pill at four times its size, so its text has fully covered pixels. */
+    private static boolean pill(ChromePainter painter, GeneratedTheme theme, Color expected, boolean error) {
+        var image = new BufferedImage(160, 80, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.scale(4, 4); painter.countPill(graphics, 2, 2, "8", theme, error); } finally { graphics.dispose(); }
+        return anywhere(image, expected);
+    }
+
+    /** Whether any pixel of {@code image} is exactly {@code color}; {@code hasColor} scans only the right half, the off switch's. */
+    private static boolean anywhere(BufferedImage image, Color color) {
+        for (int y = 0; y < image.getHeight(); y++)
+            for (int x = 0; x < image.getWidth(); x++) if (image.getRGB(x, y) == color.getRGB()) return true;
+        return false;
+    }
+
+    /** A 14 px connected dot at (2, 2). */
+    private static BufferedImage dot(ChromePainter painter, GeneratedTheme theme, boolean focused) {
+        var image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { painter.headerDot(graphics, 2, 2, 14, theme, focused); } finally { graphics.dispose(); }
+        return image;
+    }
+
+    /** 4a's hand-off: a borrowed kit header's connected dot is held to 3:1 on the surface it sits on, over every palette. */
+    @Test void theBorrowedHeadersConnectedDotIsHeldOnItsSurfaceOverEveryPalette() throws Exception {
+        var initial = ThemeTestSupport.generated(true);
+        var original = UIManager.getLookAndFeel();
+        var spec = new ViewSpec(new Nodes.Panel("panel", ControlState.READY,
+            new Nodes.Header("panel.header", ControlState.READY, "Sessions", java.util.OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), new Nodes.Text("panel.body", ControlState.READY, "Body", Nodes.TextRole.BODY), Optional.empty()));
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            for (Kit kit : List.of(Kit.DEFAULT, Kit.CLASSIC)) {
+                var context = KitContext.of(kit, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+                try (var view = new KitView(context, spec, event -> { })) {
+                    for (var frame : PanelHostHeader.Frame.values()) {
+                        view.setPanelHostHeader("panel", new PanelHostHeader("Mac", true, List.of(), frame));
+                        var header = view.panelHeader("panel");
+                        for (var theme : palettes()) {
+                            FlatLafInstaller.install(theme, kit); binding.publish(new ThemePair(theme, theme)); SwingUtilities.updateComponentTreeUI(view);
+                            view.setPanelHostHeader("panel", new PanelHostHeader("Mac", true, List.of(), frame));
+                            header.setSize(400, header.getPreferredSize().height);
+                            KitTestSupport.layout(header);
+                            var pair = switch (frame) {
+                                case STANDARD -> new PaintPair(STATUS_SUCCESS, SURFACE_PANEL, SurfaceContrast.Guard.INDICATOR);
+                                case FLUSH -> ChromePainter.HEADER_DOT;
+                                case FLUSH_FOCUSED -> ChromePainter.FOCUSED_HEADER_DOT;
+                            };
+                            Color expected = frame == PanelHostHeader.Frame.STANDARD ? SurfaceContrast.painted(theme, pair)
+                                : SurfaceContrast.painted(theme, pair, new ChromePainter(kit).headerSurface(theme, frame == PanelHostHeader.Frame.FLUSH_FOCUSED));
+                            assertThat(anywhere(paint(header), expected)).as(name(theme) + " " + kit.id() + " " + frame + " dot " + ColorMath.hex(expected)).isTrue();
+                        }
+                    }
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /**
+     * Spec 16.1.2: a borrowed kit header's strip, focused and not, paints its title, count and word detail in their declared
+     * pairs on the strip's painted surface, sampled from a 4x render inside each label, over every palette.
+     */
+    @Test void theBorrowedHeaderStripsTextIsHeldOnItsSurfaceOverEveryPalette() throws Exception {
+        var initial = ThemeTestSupport.generated(true);
+        var original = UIManager.getLookAndFeel();
+        var spec = new ViewSpec(new Nodes.Panel("panel", ControlState.READY,
+            new Nodes.Header("panel.header", ControlState.READY, "Sessions", java.util.OptionalInt.of(2), Optional.empty(), Optional.empty(), List.of()),
+            Optional.empty(), new Nodes.Text("panel.body", ControlState.READY, "Body", Nodes.TextRole.BODY), Optional.empty()));
+        var painter = new ChromePainter(Kit.CLASSIC);
+        try (var binding = new ThemeBinding(new ThemePair(initial, initial), failure -> { throw new AssertionError(failure); });
+             var icons = new IconRegistry()) {
+            var context = KitContext.of(Kit.CLASSIC, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
+            try (var view = new KitView(context, spec, event -> { })) {
+                var header = view.panelHeader("panel");
+                for (var theme : palettes()) {
+                    FlatLafInstaller.install(theme, Kit.CLASSIC); binding.publish(new ThemePair(theme, theme)); SwingUtilities.updateComponentTreeUI(view);
+                    for (boolean focused : List.of(false, true)) {
+                        view.setPanelHostHeader("panel", new PanelHostHeader("Mac", false, List.of(),
+                            focused ? PanelHostHeader.Frame.FLUSH_FOCUSED : PanelHostHeader.Frame.FLUSH));
+                        header.setSize(400, header.getPreferredSize().height);
+                        KitTestSupport.layout(header);
+                        var image = new BufferedImage(4 * header.getWidth(), 4 * header.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                        var graphics = image.createGraphics();
+                        try { graphics.scale(4, 4); header.paint(graphics); } finally { graphics.dispose(); }
+                        String where = name(theme) + (focused ? ", focused" : "");
+                        Color surface = painter.headerSurface(theme, focused);
+                        assertThat(new Color(image.getRGB(8, 8), true)).as(where + " surface").isEqualTo(surface);
+                        for (var label : List.of(
+                                java.util.Map.entry("panel.header.title", focused ? ChromePainter.FOCUSED_HEADER_TITLE : ChromePainter.HEADER_TITLE),
+                                java.util.Map.entry("panel.header.count", focused ? ChromePainter.FOCUSED_HEADER_COUNT : ChromePainter.HEADER_COUNT),
+                                java.util.Map.entry("panel.header.host-detail", focused ? ChromePainter.FOCUSED_HEADER_DETAIL : ChromePainter.HEADER_DETAIL))) {
+                            var component = KitTestSupport.find(header, label.getKey(), JLabel.class);
+                            Color expected = SurfaceContrast.painted(theme, label.getValue(), surface);
+                            var bounds = SwingUtilities.convertRectangle(component.getParent(), component.getBounds(), header);
+                            assertThat(inks(image, bounds, expected)).as(where + " " + label.getKey() + " " + ColorMath.hex(expected)).isTrue();
+                        }
+                    }
+                }
+            }
+        } finally { UIManager.setLookAndFeel(original); }
+    }
+
+    /** Whether {@code bounds}, in a 4x render's logical pixels, hold {@code color}. */
+    private static boolean inks(BufferedImage image, Rectangle bounds, Color color) {
+        for (int y = 4 * bounds.y; y < Math.min(image.getHeight(), 4 * (bounds.y + bounds.height)); y++)
+            for (int x = 4 * bounds.x; x < Math.min(image.getWidth(), 4 * (bounds.x + bounds.width)); x++)
+                if (image.getRGB(x, y) == color.getRGB()) return true;
+        return false;
+    }
+
     /** Spec 16.1.2 for plan 9a's classic Settings frame: each window rule it declares is painted as its guard makes it, everywhere. */
     @Test void theClassicSettingsFramePaintsEachRuleAsItsGuardMakesItOverEveryPalette() {
         var palettes = palettes();

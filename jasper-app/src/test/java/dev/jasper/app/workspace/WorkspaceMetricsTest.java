@@ -71,6 +71,26 @@ class WorkspaceMetricsTest {
             assertThat(Files.readString(workspace.resolve(entry.getKey()))).as(entry.getKey()).contains(entry.getValue());
     }
 
+    /** Enterprise presentation plan 7 (spec 6.6): a window's dock reads the kit it was built with, not the installed one. */
+    @Test void aWindowsDockReadsItsOwnKit() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            dev.jasper.app.appearance.ThemeTestSupport.install(true);
+            var kit = dev.jasper.ui.testsupport.KitFixtures.kit(dev.jasper.ui.kit.Kit.DEFAULT.metrics()
+                .with(DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT, 40).with(DesignMetrics.Role.DOCK_DRAG_THRESHOLD, 9)
+                .with(DesignMetrics.Role.WORKSPACE_SURFACE_ARC, 0));
+            var header = new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { }, kit, false);
+            assertThat(header.logicalHeight()).isEqualTo(40);
+            assertThat(header.getPreferredSize().height).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+            var area = new ToolWindowArea(new javax.swing.JPanel(), new dev.jasper.app.dock.DockState(), kit, false);
+            assertThat(area.dragThreshold()).isEqualTo(9);
+            assertThat(area.surfaceArc()).isZero();
+            assertThat(area.kit()).isSameAs(kit);
+            assertThat(area.flush()).isFalse();
+            assertThat(new ToolWindowArea(new javax.swing.JPanel(), new dev.jasper.app.dock.DockState()).surfaceArc())
+                .as("the convenience reads the installed kit").isEqualTo(16);
+        });
+    }
+
     /** Enterprise presentation plan 1: geometry that static finals fixed at class load follows the installed kit. */
     @Test void formerStaticMetricsFollowTheInstalledKit() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> {
@@ -82,17 +102,19 @@ class WorkspaceMetricsTest {
             var original = javax.swing.UIManager.getLookAndFeel();
             try {
                 dev.jasper.ui.swing.FlatLafInstaller.install(dev.jasper.app.appearance.ThemeTestSupport.generated(true), kit);
-                assertThat(ToolWindowHeader.logicalHeight()).isEqualTo(40);
-                assertThat(new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { }).getPreferredSize().height)
-                    .isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
-                assertThat(DockDrag.threshold()).isEqualTo(9);
-                assertThat(ToolWindowArea.surfaceArc()).isZero();
+                var header = new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { });
+                assertThat(header.logicalHeight()).isEqualTo(40);
+                assertThat(header.getPreferredSize().height).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(40));
+                var area = new ToolWindowArea(new javax.swing.JPanel(), new dev.jasper.app.dock.DockState());
+                assertThat(area.dragThreshold()).isEqualTo(9);
+                assertThat(area.surfaceArc()).isZero();
                 assertThat(TitleSearchField.preferredWidth()).isEqualTo(300);
                 assertThat(WindowToolbar.buttonSide(34)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(24));
                 dev.jasper.ui.swing.FlatLafInstaller.install(dev.jasper.app.appearance.ThemeTestSupport.generated(true), base);
-                assertThat(ToolWindowHeader.logicalHeight()).isEqualTo(32);
-                assertThat(DockDrag.threshold()).isEqualTo(5);
-                assertThat(ToolWindowArea.surfaceArc()).isEqualTo(16);
+                assertThat(new ToolWindowHeader("Sessions", javax.swing.JPopupMenu::new, () -> { }).logicalHeight()).isEqualTo(32);
+                var standard = new ToolWindowArea(new javax.swing.JPanel(), new dev.jasper.app.dock.DockState());
+                assertThat(standard.dragThreshold()).isEqualTo(5);
+                assertThat(standard.surfaceArc()).isEqualTo(16);
                 assertThat(TitleSearchField.preferredWidth()).isEqualTo(400);
                 assertThat(WindowToolbar.buttonSide(34)).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
             } finally {

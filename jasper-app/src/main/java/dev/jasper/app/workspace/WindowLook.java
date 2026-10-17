@@ -23,7 +23,7 @@ public record WindowLook(WorkspaceChrome chrome, boolean unifiedTitle, boolean f
      * @return the windows' look
      */
     public static WindowLook of(Projections projections) {
-        return new WindowLook(WorkspaceChrome.of(projections.workspace(), projections.title()), projections.shell().unifiedTitle(),
+        return new WindowLook(WorkspaceChrome.of(projections.workspace(), projections.title(), projections.palette()), projections.shell().unifiedTitle(),
             projections.shell().followThemeAppearance());
     }
 

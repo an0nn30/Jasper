@@ -118,6 +118,88 @@ class RunWindowViewTest {
         });
     }
 
+    /** Plan 8b (the orchestrator's footer ruling): each footer button is the mocks' 70 px; a label that needs more grows it, never cut. */
+    @Test void theFooterButtonsAreSeventyUnlessALabelNeedsMore() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var context = enterprise();
+            int padding = m(context, DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING);
+            var wide = RunWindowFixtures.scope("test.wide", "Wide", "host", Nodes.Hue.GREEN, "A host with a long verb",
+                List.of(new PaletteVerb("go", "Connect in a new window over SSH")));
+            try (var view = RunWindowFixtures.view(context, new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+                layout(view);
+                for (String id : List.of(RunWindowView.PRIMARY, RunWindowView.CANCEL, RunWindowView.BROWSE)) {
+                    var region = view.viewFor(id);
+                    var button = CardView.find(region, id, javax.swing.AbstractButton.class);
+                    assertThat(button.getInsets().left).as(id + ": the Run window's label padding").isEqualTo(padding);
+                    assertThat(region.getWidth()).as(id).isEqualTo(Math.max(70, region.getPreferredSize().width));
+                }
+                view.setEntries(List.of(RunWindowFixtures.item(wide, "w", "Wide host", "wide.example:22", null)), null, "Nothing found");
+                layout(view);
+                var primary = view.viewFor(RunWindowView.PRIMARY);
+                var button = CardView.find(primary, RunWindowView.PRIMARY, javax.swing.AbstractButton.class);
+                int text = button.getFontMetrics(button.getFont()).stringWidth(button.getText());
+                assertThat(button.getText()).isEqualTo("Connect in a new window over SSH");
+                assertThat(primary.getWidth()).as("the long label grows its button").isGreaterThan(70).isGreaterThanOrEqualTo(text + 2 * padding);
+                assertThat(primary.getX() + primary.getWidth() + 6).as("still packed against Cancel").isEqualTo(view.viewFor(RunWindowView.CANCEL).getX());
+            }
+        });
+    }
+
+    /**
+     * Review Focus 6: under the shipped kit's IBM Plex each footer button of the just-opened window is exactly the mocks'
+     * 70 px, its label fitting inside; the test above holds the layout's rule for any face.
+     */
+    @Test void underTheShippedKitTheJustOpenedFooterButtonsAreExactlySeventy() throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
+        var kitValue = dev.jasper.app.testsupport.EnterpriseResources.kit();
+        var theme = dev.jasper.app.testsupport.EnterpriseResources.theme().generated(false);
+        var widths = new ArrayList<Integer>();
+        SwingUtilities.invokeAndWait(() -> dev.jasper.ui.gallery.KitGallery.installed(theme, kitValue, (kit, focus) -> {
+            try (var view = RunWindowFixtures.view(kit, new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+                layout(view);
+                for (String id : List.of(RunWindowView.PRIMARY, RunWindowView.CANCEL, RunWindowView.BROWSE)) widths.add(view.viewFor(id).getWidth());
+            }
+        }));
+        int seventy = com.formdev.flatlaf.util.UIScale.scale(70);
+        assertThat(widths).as("Connect, Cancel and Browse…").containsExactly(seventy, seventy, seventy);
+    }
+
+    /**
+     * Spec decision 10 (the Windows Run dialog): a press anywhere on the window outside its controls, its texts included,
+     * brings the keyboard back from the pane the person clicked; a press on a control is the control's.
+     */
+    @Test void aPressOnTheWindowsTextsAndEmptyAreasBringsTheKeyboardBack() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {
+                view.setEntries(RunWindowFixtures.justOpened(), null, "Nothing found");
+                layout(view);
+                var pressed = new java.util.function.Consumer<java.awt.Component>() {
+                    @Override public void accept(java.awt.Component target) {
+                        int before = view.activations;
+                        target.dispatchEvent(new java.awt.event.MouseEvent(target, java.awt.event.MouseEvent.MOUSE_PRESSED,
+                            System.currentTimeMillis(), java.awt.event.InputEvent.BUTTON1_DOWN_MASK, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+                        assertThat(view.activations).as(target.getName()).isEqualTo(before + 1);
+                    }
+                };
+                // Panels without listeners (the field and list boxes, the gaps) pass a press on to the window itself.
+                pressed.accept(view);
+                for (String id : List.of(RunWindowView.TITLE, RunWindowView.SHORTCUT, RunWindowView.HELP_TEXT, RunWindowView.OPEN,
+                        RunWindowView.DETAIL_LABEL, RunWindowView.DETAIL_VALUE, RunWindowView.SPLIT_LABEL))
+                    pressed.accept(CardView.find(view, id, javax.swing.JLabel.class));
+                view.setEntries(List.of(RunWindowFixtures.justOpened().get(2)), null, "Nothing found");
+                layout(view);
+                pressed.accept(CardView.find(view, RunWindowView.DETAIL_VALUE, javax.swing.JLabel.class));
+                int before = view.activations;
+                var cancel = CardView.find(view, RunWindowView.CANCEL, javax.swing.AbstractButton.class);
+                cancel.dispatchEvent(new java.awt.event.MouseEvent(cancel, java.awt.event.MouseEvent.MOUSE_PRESSED,
+                    System.currentTimeMillis(), java.awt.event.InputEvent.BUTTON1_DOWN_MASK, 2, 2, 1, false, java.awt.event.MouseEvent.BUTTON1));
+                assertThat(view.activations).as("a button's press is the button's").isEqualTo(before);
+            }
+        });
+    }
+
     @Test void justOpenedReadsAsTheMock() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try (var view = RunWindowFixtures.view(enterprise(), new ArrayList<>())) {

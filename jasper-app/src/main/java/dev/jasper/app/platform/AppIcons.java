@@ -60,7 +60,35 @@ public final class AppIcons {
     public static java.util.Optional<String> kitName(Icon icon) {
         if (icon instanceof SemanticIcon named) return java.util.Optional.of(named.name());
         if (icon instanceof SurfaceIcon surface) return java.util.Optional.of(surface.icon().name());
+        if (icon instanceof StripGlyph strip) return strip.name();
         return java.util.Optional.empty();
+    }
+
+    /**
+     * A header strip's action glyph (spec 10.7): {@code icon}'s module glyph (a {@link #semantic}, {@link #named} or
+     * {@link PresentationIcon} glyph) drawn in a {@code logicalSize} box, in the ink {@code ink} gives for the receiving
+     * component; artwork without a module glyph is returned unchanged.
+     */
+    public static Icon stripGlyph(Icon icon, int logicalSize, java.util.function.Function<Component, Color> ink) {
+        Objects.requireNonNull(ink, "ink");
+        Icon source = icon instanceof StripGlyph strip ? strip.source() : icon;
+        return source instanceof PresentationIcon || kitName(source).isPresent() ? new StripGlyph(source, logicalSize, ink) : source;
+    }
+
+    /** A module glyph drawn at a header strip's size in its action ink; the ink is read at paint time. */
+    private record StripGlyph(Icon source, int size, java.util.function.Function<Component, Color> ink) implements Icon {
+        java.util.Optional<String> name() {
+            return source instanceof PresentationIcon presentation ? java.util.Optional.of(presentation.name()) : kitName(source);
+        }
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            Color color = ink.apply(component);
+            var palette = ThemeZone.theme(component).semantic();
+            Icon glyph = source instanceof PresentationIcon presentation ? presentation.glyph(palette, color, getIconWidth())
+                : NAMED.panel(name().orElseThrow(), palette, color, getIconWidth());
+            glyph.paintIcon(component, graphics, x, y);
+        }
     }
 
     /** Native macOS tray template artwork; not a standard-control icon catalog. */

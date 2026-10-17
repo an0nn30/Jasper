@@ -513,9 +513,9 @@ final class ItemLists {
                         && row.controls.get(text.id()).component instanceof JLabel label)
                     label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));
             if (results() && !item.heading() && selected.contains(item.id())) {
-                resultSelection(row, item.title(), true);
-                resultSelection(row, item.subtitle(), true);
-                resultSelection(row, item.trailing(), false);
+                resultSelection(row, item.title());
+                resultSelection(row, item.subtitle());
+                resultSelection(row, item.trailing());
             }
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             if (results() && view.runWindow()) RunWindowPresentation.row(context(), row, item, selected.contains(item.id()));
@@ -544,12 +544,14 @@ final class ItemLists {
                 label.setForeground(ThemePainting.color(context(), row.owner.ink().supporting));
         }
 
-        /** A selected result's strong face; its ink comes from the row (InteractiveRows.Row.inked). */
-        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, boolean strong) {
+        /**
+         * A selected result's face: its role's, for its text, so a kit face without one of the text's glyphs (IBM Plex has no
+         * macOS modifier symbols) gives way to the platform face; its ink comes from the row (InteractiveRows.Row.inked).
+         */
+        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes) {
             for (var node : nodes) if (node instanceof Nodes.Text text
                     && row.controls.get(text.id()).component instanceof JLabel label) {
-                label.setFont(SwingTypography.effective(context().typography().resultFont(
-                    Typography.Role.valueOf(text.role().name()), strong)));
+                label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name()), text.text()));
             }
         }
 

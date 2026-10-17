@@ -12,6 +12,7 @@ Amended on 2026-10-17 with plan 6b's rulings 10 and R44, made under the same aut
 4.9, 9.1 and 16.1 (the `DialogMapping` reader).
 Amended on 2026-10-17 with plan 5b's accent ruling, made under the same authority: 7.6 (Enterprise Dark's accent is #3C74D6).
 Amended on 2026-10-17 with plan 5b's status-text ruling, made under the same authority: 5.6 (classic status text is 11 px).
+Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same authority: 10.7 (the bottom strip is 24 px plus its rule).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -1265,8 +1266,8 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   at least `window.rail_width`. Left-stripe labels read bottom to top, right-stripe labels top to bottom. The mocks'
   22 px stripes are superseded by the 28 px floor of `window.rail_width` (the Panel rail width row).
 - **Bottom strip.** `LabelledStripes` adds a horizontal strip for the BOTTOM_LEFT and BOTTOM_RIGHT slots, with count
-  pills for badges that carry a number. `DockDrag` and the drop resolution gain horizontal group rectangles, as
-  `Rectangle` math; the six slots are unchanged.
+  pills for badges that carry a number. It is 24 px plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop
+  resolution gain horizontal group rectangles, as `Rectangle` math; the six slots are unchanged.
 - **Frames.** `FrameStyle`: arc 0, gutter 0, a painted `DOCK_RULE` with a `DOCK_RULE_HIT` drag area, a header strip of
   `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A header
   detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive it as a host

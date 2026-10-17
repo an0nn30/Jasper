@@ -42,21 +42,29 @@ import javax.swing.UIManager;
 
 /**
  * The terminal column with the tool windows docked around it, laid out by {@link DockGeometry} from the window's
- * {@link DockState}: a full-width bottom area under the left side, the terminal column and the right side. Each
- * showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the gaps between frames are this
- * area's dividers. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
+ * {@link DockState}: a full-width bottom area under the left side, the terminal column and the right side, sized and
+ * framed by the window's kit. Each showing tool window sits in a rounded frame under its {@link ToolWindowHeader}; the
+ * gaps between frames are this area's dividers. Under flush frames (spec 10.7) the frames are square and touch, each
+ * divider is a painted 1 px rule with a wider drag area, and every header is a header strip that shows which frame holds
+ * the focus. The terminal column has a rounded frame and exterior gutter while a stripe is visible, and is
  * borderless and square on the side of a hidden stripe; with neither stripe it fills its area edge to edge. The center frame is painted in the terminal palette's background, never
  * a theme's tool window colour. The area changes the state only when a divider drag ends; whoever changes the state
  * calls {@link #sync} afterwards. EDT only.
  */
 final class ToolWindowArea extends JPanel {
-    /** The installed kit's exterior gutter, in logical pixels. */
-    private static int gutter() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER); }
-    /** The installed kit's workspace frame arc, in logical pixels. */
-    static int surfaceArc() { return dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC); }
+    /** The window's kit's exterior gutter, in logical pixels. */
+    private int gutter() { return kit.metrics().value(DesignMetrics.Role.WORKSPACE_GUTTER); }
+    /** The window's kit's workspace frame arc, in logical pixels. */
+    int surfaceArc() { return kit.metrics().value(DesignMetrics.Role.WORKSPACE_SURFACE_ARC); }
+    /** How far, in logical pixels, a press must move before it becomes a dock drag: the window's kit's threshold. */
+    int dragThreshold() { return kit.metrics().value(DesignMetrics.Role.DOCK_DRAG_THRESHOLD); }
+    /** The window's kit. */
+    dev.jasper.ui.kit.Kit kit() { return kit; }
+    /** Whether frames are flush: divided by painted rules, with header strips (spec 10.7). */
+    boolean flush() { return flush; }
 
     /** A shared frame around plugin-owned content; gutters belong to the workspace chrome. */
-    private static final class Host extends JPanel {
+    private final class Host extends JPanel {
         private final int[] gutters = {-1, -1, -1, -1};
         /** Whether each side's corners are rounded; a side that meets the window edge directly is square. */
         private boolean roundLeft = true, roundRight = true;
@@ -69,6 +77,16 @@ final class ToolWindowArea extends JPanel {
         private String id;
         /** Shows per-window header metadata on this frame's header, native or borrowed; inert once released. */
         private Consumer<dev.jasper.app.contributions.PanelHeaderState> header = state -> { };
+        /** Whether this frame holds the focus owner (flush frames only). */
+        private boolean focused;
+        /** Shows the focus on this frame's header strip, native or borrowed; inert once released. */
+        private Consumer<Boolean> focusedHeader = value -> { };
+
+        void focused(boolean value) {
+            if (focused == value) return;
+            focused = value;
+            focusedHeader.accept(value);
+        }
 
         Host(boolean toolWindow) {
             super(new BorderLayout());
@@ -161,6 +179,7 @@ final class ToolWindowArea extends JPanel {
         private DockGeometry.Divider dragging;
         /** Whether a drag event arrived since the press; a plain click must not rewrite a squeezed size. */
         private boolean moved;
+        /** Where in the handle the press was, less how far the divider's leading edge lies into the handle. */
         private int grab;
 
         DividerHandle(DockGeometry.Handle handle) {
@@ -171,7 +190,9 @@ final class ToolWindowArea extends JPanel {
                     if (!SwingUtilities.isLeftMouseButton(event) || placed == null) return;
                     dragging = placed;
                     moved = false;
-                    grab = handle.vertical() ? event.getX() : event.getY();
+                    // A flush rule's drag area is wider than the rule: the rule's leading edge lies inside it.
+                    int offset = handle.vertical() ? placed.bounds().x - getX() : placed.bounds().y - getY();
+                    grab = (handle.vertical() ? event.getX() : event.getY()) - offset;
                 }
 
                 @Override public void mouseDragged(MouseEvent event) {
@@ -221,13 +242,19 @@ final class ToolWindowArea extends JPanel {
             hosts.forEach((slot, host) -> host.setBounds(layout.slot(slot).orElseGet(Rectangle::new)));
             dividers.values().forEach(divider -> {
                 divider.placed = layout.divider(divider.handle).orElse(null);
-                divider.setBounds(divider.placed == null ? new Rectangle() : divider.placed.bounds());
+                divider.setBounds(divider.placed == null ? new Rectangle() : hitArea(divider.placed));
             });
         }
     }
 
     private final DockState state;
-    private final Host center = new Host(false);
+    /** The window's kit: the frames' arc, gutter, rule and header sizes. */
+    private final dev.jasper.ui.kit.Kit kit;
+    /** Whether frames are flush (the classic look's frame style). */
+    private final boolean flush;
+    /** The window's kit's chrome painter: the rules under flush frames. */
+    private final dev.jasper.ui.swing.ChromePainter painter;
+    private final Host center;
     private final JPanel lowerInset = new JPanel() {
         @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(surfaceArc() / 2)); }
         @Override public Dimension getMinimumSize() { return getPreferredSize(); }
@@ -251,9 +278,29 @@ final class ToolWindowArea extends JPanel {
     BiConsumer<JComponent, String> dragSource = (component, id) -> { };
     Consumer<JComponent> releaseDragSource = component -> { };
 
+    /**
+     * An area of standard frames over the installed kit, as the default look's tests build it.
+     *
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     */
     ToolWindowArea(JComponent terminalColumn, DockState state) {
+        this(terminalColumn, state, dev.jasper.ui.swing.FlatLafInstaller.installedKit(), false);
+    }
+
+    /**
+     * @param terminalColumn the terminal column the frames dock around
+     * @param state the window's dock state
+     * @param kit the window's kit
+     * @param flush whether frames are flush: divided by painted rules, with header strips (spec 10.7)
+     */
+    ToolWindowArea(JComponent terminalColumn, DockState state, dev.jasper.ui.kit.Kit kit, boolean flush) {
         super(null);
         this.state = Objects.requireNonNull(state, "state");
+        this.kit = Objects.requireNonNull(kit, "kit");
+        this.flush = flush;
+        this.painter = new dev.jasper.ui.swing.ChromePainter(kit);
+        this.center = new Host(false);
         setLayout(new DockLayout());
         center.add(terminalColumn, BorderLayout.CENTER);
         lowerInset.setOpaque(false);
@@ -264,6 +311,8 @@ final class ToolWindowArea extends JPanel {
             dividers.put(handle, divider);
             add(divider);
         }
+        // A flush rule's drag area overlaps the frames beside it: the handles stay above them.
+        if (flush) for (DividerHandle divider : dividers.values()) setComponentZOrder(divider, 0);
         refreshTheme();
         sync();
     }
@@ -349,8 +398,9 @@ final class ToolWindowArea extends JPanel {
                     var surfaces = header.dragSurfaces();
                     for (JComponent surface : surfaces) dragSource.accept(surface, id);
                     host.header = header::presentation;
+                    host.focusedHeader = header::setFocused;
                     Host mounted = host;
-                    host.releaseHeader = () -> { mounted.header = state -> { }; surfaces.forEach(releaseDragSource); };
+                    host.releaseHeader = () -> { mounted.header = state -> { }; mounted.focusedHeader = value -> { }; surfaces.forEach(releaseDragSource); };
                 }
                 if (wanted.component() instanceof dev.jasper.ui.swing.KitView view) {
                     var release = host.releaseHeader;
@@ -370,6 +420,58 @@ final class ToolWindowArea extends JPanel {
         refreshGutters();
         revalidate(); repaint();
         onMinimumSizeChanged.run();
+        if (flush) focusMoved(java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner());
+    }
+
+    /** The frame holding the permanent focus owner, under flush frames. */
+    private Slot focused;
+    /** Follows the permanent focus owner while the area is showing, under flush frames. */
+    private final java.beans.PropertyChangeListener focusListener = event -> focusMoved(event.getNewValue() instanceof Component owner ? owner : null);
+
+    @Override public void addNotify() {
+        super.addNotify();
+        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", focusListener);
+    }
+
+    @Override public void removeNotify() {
+        if (flush) java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", focusListener);
+        super.removeNotify();
+    }
+
+    /** Spec 10.7: the frame holding {@code owner} shows its header strip as focused, the others not; standard frames ignore it. */
+    void focusMoved(Component owner) {
+        if (!flush) return;
+        Slot now = null;
+        for (var entry : hosts.entrySet())
+            if (owner != null && SwingUtilities.isDescendingFrom(owner, entry.getValue())) now = entry.getKey();
+        focused = now;
+        for (var entry : hosts.entrySet()) entry.getValue().focused(entry.getKey() == focused);
+    }
+
+    /** The frame showing its header strip as focused, if any. */
+    java.util.Optional<Slot> focusedSlot() { return java.util.Optional.ofNullable(focused); }
+
+    /** A divider's drag area: the divider itself, or under flush frames {@code DOCK_RULE_HIT} across, centred on its rule. */
+    private Rectangle hitArea(DockGeometry.Divider divider) {
+        Rectangle bounds = divider.bounds();
+        if (!flush) return bounds;
+        int hit = UIScale.scale(kit.metrics().value(DesignMetrics.Role.DOCK_RULE_HIT));
+        int grow = Math.max(0, hit - (divider.handle().vertical() ? bounds.width : bounds.height));
+        if (divider.handle().vertical()) { bounds.x -= grow / 2; bounds.width += grow; }
+        else { bounds.y -= grow / 2; bounds.height += grow; }
+        return bounds;
+    }
+
+    /** Under flush frames, each laid out divider is a painted rule (spec 10.7). */
+    @Override protected void paintComponent(Graphics graphics) {
+        super.paintComponent(graphics);
+        if (!flush) return;
+        graphics.setColor(painter.dockRule(ThemeZone.theme(this)));
+        for (DividerHandle divider : dividers.values()) {
+            if (divider.placed == null) continue;
+            Rectangle rule = divider.placed.bounds();
+            graphics.fillRect(rule.x, rule.y, rule.width, rule.height);
+        }
     }
 
     /** What the slot's frame should show: its active window's content, or null for none or a closed kit view. */
@@ -396,7 +498,7 @@ final class ToolWindowArea extends JPanel {
         var ghost = dev.jasper.ui.model.Nodes.ButtonKind.GHOST;
         view.setPanelHostActions(panel, List.of(
             new dev.jasper.ui.model.Nodes.Button("host.options", ready, "", "more", ghost, "host.options", "Options"),
-            new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", "collapse", ghost, "host.hide", "Hide")), event -> {
+            new dev.jasper.ui.model.Nodes.Button("host.hide", ready, "", flush ? "remove" : "collapse", ghost, "host.hide", "Hide")), event -> {
                 if (event instanceof dev.jasper.ui.model.UiEvent.Action action) {
                     if (action.id().equals("host.hide")) onHide.accept(id);
                     else if (action.id().equals("host.options"))
@@ -408,10 +510,14 @@ final class ToolWindowArea extends JPanel {
         java.util.function.BooleanSupplier borrowed = () -> !view.isClosed()
             && view.spec().root() instanceof dev.jasper.ui.model.Nodes.Panel current
             && current.id().equals(panel) && view.panelHeader(panel) == header;
-        host.header = state -> { if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(state)); };
-        host.header.accept(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
+        // The last metadata is kept, so a focus change can send the header again with its frame.
+        var shown = new java.util.concurrent.atomic.AtomicReference<>(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
+        host.header = state -> { shown.set(state); if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(state, frame(host))); };
+        host.focusedHeader = value -> { if (borrowed.getAsBoolean()) view.setPanelHostHeader(panel, hostHeader(shown.get(), frame(host))); };
+        host.header.accept(shown.get());
         return () -> {
             host.header = state -> { };
+            host.focusedHeader = value -> { };
             sources.forEach(releaseDragSource);
             // Plugin disposal can precede removing the dock frame. A closed view has already released its controls.
             if (borrowed.getAsBoolean()) {
@@ -421,11 +527,23 @@ final class ToolWindowArea extends JPanel {
         };
     }
 
-    /** The module's description of the same metadata; callbacks stay the plugin boundary's guarded, contained ones. */
-    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state) {
+    /** How a borrowed header is framed: as the view draws it, or as a flush frame's strip, focused or not. */
+    private dev.jasper.ui.swing.PanelHostHeader.Frame frame(Host host) {
+        if (!flush) return dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
+        return host.focused ? dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH_FOCUSED : dev.jasper.ui.swing.PanelHostHeader.Frame.FLUSH;
+    }
+
+    /**
+     * The module's description of the same metadata in its frame; callbacks stay the plugin boundary's guarded, contained
+     * ones. On a header strip a host module glyph is described too, so the strip draws it as its other actions (spec 10.7).
+     */
+    private static dev.jasper.ui.swing.PanelHostHeader hostHeader(dev.jasper.app.contributions.PanelHeaderState state,
+                                                                  dev.jasper.ui.swing.PanelHostHeader.Frame frame) {
+        boolean strip = frame != dev.jasper.ui.swing.PanelHostHeader.Frame.STANDARD;
         return new dev.jasper.ui.swing.PanelHostHeader(state.detail(), state.active(), state.actions().stream()
             .map(action -> new dev.jasper.ui.swing.PanelHostHeader.Action(action.label(), action.icon(), action.invoke(), action.icon() instanceof dev.jasper.app.platform.PresentationIcon named
-                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData()) : null)).toList());
+                ? new dev.jasper.ui.swing.PanelHostHeader.Artwork(named.name(), named.pathData())
+                : strip ? dev.jasper.app.platform.AppIcons.kitName(action.icon()).map(name -> new dev.jasper.ui.swing.PanelHostHeader.Artwork(name, null)).orElse(null) : null)).toList(), frame);
     }
 
     /** The host Options button inside a borrowed header, so the menu opens under it; the header itself otherwise. */
@@ -461,7 +579,7 @@ final class ToolWindowArea extends JPanel {
         var header = new ToolWindowHeader(title,
             () -> ToolWindowMenu.create(state.slot(id).orElse(Slot.LEFT_TOP), state.visible(id),
                 slot -> onMove.accept(id, slot), () -> onHide.accept(id)),
-            () -> onHide.accept(id));
+            () -> onHide.accept(id), kit, flush);
         header.presentation(headers.getOrDefault(id, dev.jasper.app.contributions.PanelHeaderState.EMPTY));
         return header;
     }
@@ -515,9 +633,9 @@ final class ToolWindowArea extends JPanel {
     }
 
     /**
-     * Exterior gutters are the installed kit's gutter (6px by default) on each edge of the area a frame touches,
-     * except where the header, a stripe or the status bar already supplies the spacing; facing edges have none,
-     * because the 6px divider is the gap.
+     * Exterior gutters are the window's kit's gutter (6px by default, none under the classic kit) on each edge of the area
+     * a frame touches, except where the header, a stripe or the status bar already supplies the spacing; facing edges have
+     * none, because the divider is the gap.
      */
     private void refreshGutters() {
         int gutter = gutter();
@@ -557,5 +675,8 @@ final class ToolWindowArea extends JPanel {
     }
 
     /** The dock metrics at the current UI scale; the drag's preview uses the same. */
-    static DockGeometry.Metrics metrics() { return DockGeometry.Metrics.at(UIScale.getUserScaleFactor()); }
+    DockGeometry.Metrics metrics() {
+        double scale = UIScale.getUserScaleFactor();
+        return flush ? DockGeometry.Metrics.at(scale, kit.metrics().value(DesignMetrics.Role.DOCK_RULE)) : DockGeometry.Metrics.at(scale);
+    }
 }

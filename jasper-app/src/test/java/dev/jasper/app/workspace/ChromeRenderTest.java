@@ -91,6 +91,12 @@ class ChromeRenderTest {
 
     /** The structure every look keeps; plans 6b to 9 add their surfaces' checks here. */
     static void check(Case look, WindowContent owner, JRootPane root, MacTitleBar bar) {
+        // Plan 7 (spec 10.7): the dock the look names.
+        boolean labelled = look.projections().workspace().stripes() == dev.jasper.app.presentation.WorkspaceLook.Stripes.LABELLED;
+        assertThat(owner.stripes() instanceof StripeSet.LabelledStripes).as(look.name() + ": labelled stripes where the look asks for them").isEqualTo(labelled);
+        assertThat(owner.bottomStrip().isPresent()).as(look.name() + ": the bottom strip").isEqualTo(labelled);
+        assertThat(owner.area().flush()).as(look.name() + ": flush frames")
+            .isEqualTo(look.projections().workspace().frames() == dev.jasper.app.presentation.WorkspaceLook.FrameStyle.FLUSH);
         var window = WindowLook.of(look.projections());
         assertThat(bar != null).as(look.name() + ": the unified bar where the look asks for it").isEqualTo(window.unifiedTitle());
         if (bar == null) {
@@ -123,6 +129,32 @@ class ChromeRenderTest {
         if (owner.status().cells() instanceof RuledCells)
             assertThat(WindowPairsTest.paints(owner.status(), dev.jasper.ui.theme.SurfaceContrast.painted(installed, WindowPairs.RULE)))
                 .as(look.name() + ": the ruled cells' rule pair").isTrue();
+        // Plan 8b (spec 11.5 and 16.1.4): the palette the look names opens at its home; the Run window inside the dock work
+        // area, clear of the bottom strip and the status bar. Its image joins the others.
+        owner.installRootBindings(root);
+        var palette = owner.commandPalette();
+        // The card's reveal starts at no height; with animations off the print shows it settled (the Run window has none).
+        palette.setAnimations(new dev.jasper.app.config.AnimationSettings(false, 0, 0, 0));
+        palette.toggle();
+        dev.jasper.app.testsupport.LayoutTestSupport.layoutTree(root);
+        boolean runWindow = look.projections().palette().view() == dev.jasper.app.presentation.PaletteLook.View.RUN_WINDOW;
+        assertThat(palette.isOpen()).as(look.name() + ": the palette opens").isTrue();
+        assertThat(palette.view() instanceof dev.jasper.app.palette.RunWindowView).as(look.name() + ": the palette's view").isEqualTo(runWindow);
+        if (runWindow) {
+            var shown = palette.component();
+            var overlay = (javax.swing.JComponent) shown.getParent();
+            var bounds = SwingUtilities.convertRectangle(overlay, shown.getBounds(), root);
+            var work = SwingUtilities.convertRectangle(overlay, owner.paletteWorkArea(overlay), root);
+            assertThat(work.contains(bounds)).as(look.name() + ": the Run window " + bounds + " inside the dock work area " + work).isTrue();
+            var status = owner.status();
+            if (status.isVisible() && status.getHeight() > 0)
+                assertThat(bounds.intersects(SwingUtilities.convertRectangle(status.getParent(), status.getBounds(), root)))
+                    .as(look.name() + ": clear of the status bar").isFalse();
+            owner.bottomStrip().ifPresent(strip -> assertThat(bounds.intersects(SwingUtilities.convertRectangle(strip.getParent(), strip.getBounds(), root)))
+                .as(look.name() + ": clear of the bottom strip").isFalse());
+        }
+        MockProfile.write(MockProfile.print(root, 1200, 700), "chrome-" + look.name() + "-palette");
+        palette.dismiss();
     }
 
     @Test void everyLookBuildsItsChromeFlush() throws Exception {

@@ -178,7 +178,7 @@ class DockDragTest {
     }
 
     /** The first drag event is at least the threshold and one more pixel from the press. */
-    private static int firstDragEvent() { return UIScale.scale(DockDrag.threshold()) + 1; }
+    private static int firstDragEvent() { return UIScale.scale(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.DOCK_DRAG_THRESHOLD)) + 1; }
 
     @Test void aWobbleOutOfTheLastRowAndBackStaysHome() {
         var w = window();
@@ -388,7 +388,7 @@ class DockDragTest {
         w.dragTo(w.button(w.left, "b"), w.zone(Slot.BOTTOM_LEFT));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
-            DockGeometry.landing(area, w.state, "b", Slot.BOTTOM_LEFT, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
+            DockGeometry.landing(area, w.state, "b", Slot.BOTTOM_LEFT, w.area.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
         assertThat(w.drag.overlay().highlight()).isEqualTo(expected);
         assertThat(expected.width).as("the bottom area spans stripe to stripe").isEqualTo(w.area.getWidth());
         assertThat(w.area.content(Slot.BOTTOM_LEFT)).as("the real layout does not reflow").isNull();
@@ -463,7 +463,7 @@ class DockDragTest {
         assertThat(w.drag.target()).hasValue(DockDropResolver.Target.stripe(Slot.RIGHT_TOP, 0));
         Rectangle area = new Rectangle(0, 0, w.area.getWidth(), w.area.getHeight());
         Rectangle expected = SwingUtilities.convertRectangle(w.area,
-            DockGeometry.landing(area, w.state, "a", Slot.RIGHT_TOP, ToolWindowArea.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
+            DockGeometry.landing(area, w.state, "a", Slot.RIGHT_TOP, w.area.metrics()).orElseThrow(), w.rootPane.getLayeredPane());
         assertThat(w.drag.overlay().highlight()).as("a visible window keeps its visibility, so its frame moves with it").isEqualTo(expected);
         assertThat(w.drag.overlay().placeholder()).isNotNull();
     }

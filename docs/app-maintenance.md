@@ -564,15 +564,19 @@ bounds over the workspace's edge for the drag without showing it, and `DockDrag.
 the stripes that show or hide after the drop, so it follows `syncRailVisibility`'s rule. Change the zones in the resolver and its tests first; the window tests aim with
 `DockTestSupport.zone(workspace, slot)`.
 Dock drags use plain mouse events (`DockDrag`), never AWT drag and drop. Drag sources are the
-components `DockDrag.install` was given: stripe window buttons (`ToolStripe.dragSource`) and
-headers with their titles (`ToolWindowArea.dragSource`); rail actions are not sources. The dragged
+components `DockDrag.install` was given: stripe window buttons and labels (`DockStripe.dragSource`, on
+`ToolStripe`, `LabelledStripe` and `BottomStrip`) and headers with their titles (`ToolWindowArea.dragSource`); rail
+actions are not sources. The dragged
 button is lifted out by giving it empty bounds, not by hiding it, so the mouse events Swing sends
 to the pressed component keep arriving. Any dock change or stripe render, View › Rail and the window
 being deactivated (`WindowContent.setActive(false)`) cancel a running drag, and its Esc dispatcher
 claims only an Esc from its own window. A panel badge change is not a render: it fires
 `Contributions.Kind.BADGES`, and `WindowContributions` applies it to the existing stripe buttons with
-`ToolStripe.updateBadge` (the icon's size is the base icon's, so nothing is laid out), so a notification
-arriving mid-drag leaves the drag alone. An action's enable or title change is not a render either:
+`DockStripe.updateBadge` (on a rail the icon's size is the base icon's, so nothing is laid out; on a labelled stripe
+or the bottom strip the pill changes the label's length, so the stripe lays out again and a lifted label stays
+lifted), so a notification arriving mid-drag leaves the drag alone. A Keymap change that renumbers a labelled
+stripe's label ("N: ") renders the stripes again, so it cancels a running drag; under the icon rails it renders
+nothing. An action's enable or title change is not a render either:
 `WindowContributions` calls `ToolStripe.refreshActions`, which renames the existing rail action buttons
 (a button follows the action's enabled state itself) and repaints them. Only adding or removing an
 action or a rail placement, or a dock or panel change, renders the stripes again. Keep the layout-only terminal

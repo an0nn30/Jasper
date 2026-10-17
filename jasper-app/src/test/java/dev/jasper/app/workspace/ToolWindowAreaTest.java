@@ -69,7 +69,7 @@ class ToolWindowAreaTest {
         layout(area);
         assertThat(area.content(Slot.LEFT_TOP)).isSameAs(left);
         assertThat(in(area, left.getParent())).as("the frame").isEqualTo(new Rectangle(0, 0, 250, 600));
-        int header = UIScale.scale(ToolWindowHeader.logicalHeight());
+        int header = UIScale.scale(dev.jasper.ui.swing.FlatLafInstaller.installedKit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.NATIVE_TOOL_HEADER_HEIGHT));
         assertThat(in(area, area.headerOf(Slot.LEFT_TOP))).isEqualTo(new Rectangle(0, 6, 250, header));
         assertThat(in(area, left)).as("content under the header, inside the gutters").isEqualTo(new Rectangle(0, 6 + header, 250, 588 - header));
         assertThat(in(area, deck)).isEqualTo(new Rectangle(256, 6, 744, 580));
