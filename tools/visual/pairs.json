@@ -87,7 +87,7 @@
       1464
     ],
     "render": "jasper-app/build/theme-migration-evidence/add-host/actual/source-depicted-keys-natural.png",
-    "note": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case. Edge agreement 0.191 before, 0.190 after."
+    "note": "Spec 13 (plan 3e): the label \"Jump host\" is sentence case. Edge agreement 0.191 before, 0.190 after; the two managed keys' rows also swap run to run (the import returns them in a Map.copyOf's order)."
   },
   {
     "name": "fileserver-add",

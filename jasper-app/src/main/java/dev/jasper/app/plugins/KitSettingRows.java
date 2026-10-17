@@ -75,16 +75,21 @@ final class KitSettingRows {
     }
     /**
      * An ordered list's entry, Add, Remove and reorder, as the generated pages' editor: the entry's text is kept until an
-     * Add stages it; a value the kind rejects keeps the entry and shows the row's error; a stale row changes nothing.
+     * Add stages it; a value the kind rejects keeps the entry and shows the row's error until the entry changes; a stale
+     * row or a row selection changes nothing.
      */
     @SuppressWarnings({"unchecked","rawtypes"})
     private boolean listEvent(UiEvent event){
-        String id=event.id().endsWith(ENTRY)||event.id().endsWith(ADD)?event.id().substring(0,event.id().length()-ENTRY.length()):event.id();
+        String id=event.id().endsWith(ENTRY)?event.id().substring(0,event.id().length()-ENTRY.length())
+            :event.id().endsWith(ADD)?event.id().substring(0,event.id().length()-ADD.length()):event.id();
         var setting=controls.get(id);
         if(setting==null||!(specs.apply(setting).kind() instanceof SettingKind.StringList))return false;
         var items=new ArrayList<Object>((List<?>)host.pending(setting));
         switch(event){
-            case UiEvent.Edited edited when edited.id().equals(id+ENTRY) -> { entries.put(id,edited.text()); return true; }
+            // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
+            case UiEvent.Edited edited when edited.id().equals(id+ENTRY) -> { entries.put(id,edited.text()); if(errors.remove(id)!=null)host.changed(); return true; }
+            // The list's own row selection stages nothing, as the generated pages' editor ignores it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
             case UiEvent.Action action when action.id().equals(id+ADD) -> {
                 String text=entries.getOrDefault(id,"");
                 if(text.isBlank())return true;

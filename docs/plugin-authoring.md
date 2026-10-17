@@ -562,8 +562,8 @@ SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.18.0, <0.19"` when you use them.
   entry is logged. A `[terminal.env]` entry still wins, and when two plugins set one name the first by plugin id wins.
   WSL tabs and provided sessions get none.
 - `context.platform().editor(fileEditor)` (needs `editor.provide`) makes your plugin the editor Jasper opens files with:
-  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`, and a
-  Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
+  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`,
+  File › Open File… (a file the person chose, with no line), and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
   clicked window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown,
   so edit the file and never run it.
   `FileEditor.edit(file, line, window)` runs on the UI thread and returns whether it opened the file; `false`, or a

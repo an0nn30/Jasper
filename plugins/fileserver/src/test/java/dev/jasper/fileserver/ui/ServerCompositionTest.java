@@ -92,6 +92,24 @@ class ServerCompositionTest {
             }
         });
     }
+    @Test void editingASavedServerShowsItsFolderReadOnlyAndACancelledChooseKeepsIt() throws Exception {
+        var saved = java.nio.file.Files.createDirectories(root.resolve("saved"));
+        UiTestAccess.edt(() -> {
+            var initial = new ServerDefinition(UUID.randomUUID(), "files", Protocol.HTTP, saved, Bind.LOOPBACK, 8080,
+                Optional.empty(), false, Login.SESSION, List.of(), false, false, false);
+            try (var editor = editor(Optional.of(initial))) {
+                assertThat(node(editor, ServerEditor.FOLDER)).isInstanceOfSatisfying(Nodes.Field.class, folder -> {
+                    assertThat(folder.value()).isEqualTo(initial.folder().toString());
+                    assertThat(folder.readOnly()).isTrue();
+                });
+                nextFolder = null;
+                emit(editor, new UiEvent.Action(ServerEditor.CHOOSE_FOLDER));
+                assertThat(((Nodes.Field) node(editor, ServerEditor.FOLDER)).value()).as("a cancelled Choose… keeps the saved folder")
+                    .isEqualTo(initial.folder().toString());
+                assertThat(editor.build().folder()).isEqualTo(saved);
+            }
+        });
+    }
     private ServerEditor editor(Optional<ServerDefinition> initial) {
         return new ServerEditor(new FakeKit("dev.jasper.fileserver"), List.of(),initial,initial.isPresent(),EnumSet.allOf(Protocol.class),List.of(),true,
             id -> Optional.empty(), () -> CompletableFuture.completedFuture(Optional.empty()),()->Optional.ofNullable(nextFolder),ServerEditor.KeySources.NONE,false,d -> {},() -> {});

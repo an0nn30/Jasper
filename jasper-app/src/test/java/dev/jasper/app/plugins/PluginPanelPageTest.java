@@ -686,6 +686,7 @@ class PluginPanelPageTest {
         var view = new AtomicReference<HostedKitView>();
         var rows = new AtomicReference<SettingsPanelHost>();
         var words = new AtomicReference<Setting<List<String>>>();
+        var leaked = new java.util.ArrayList<dev.jasper.sdk.ui.UiEvent>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID, "Panel", "1.0.0", Set.of()), Set.of(), Set.of(), Set.of(),
             getClass().getClassLoader(), () -> plugin -> {
                 words.set(plugin.settings().declare(SettingSpec.of("words", SettingKind.stringList(word -> !word.contains("/")), List.of("a", "b"))
@@ -693,7 +694,7 @@ class PluginPanelPageTest {
                 plugin.settings().page((SettingsPanel) panelHost -> {
                     rows.set(panelHost);
                     var made = (HostedKitView) plugin.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("page",
-                        dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(panelHost.row(words.get())))), event -> { });
+                        dev.jasper.sdk.ui.ControlState.READY, dev.jasper.sdk.ui.Nodes.LayoutRole.VERTICAL, List.of(panelHost.row(words.get())))), leaked::add);
                     view.set(made);
                     return made;
                 });
@@ -710,7 +711,13 @@ class PluginPanelPageTest {
             assertThat(rows.get().pending(words.get())).containsExactly("b", "a");
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Removed("settings:words", "item-9"));
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Reordered("settings:words", "item-0", 7));
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Removed("settings:words", "item-x"));
             assertThat(rows.get().pending(words.get())).as("a row that is gone moves nothing").containsExactly("b", "a");
+            assertThat(listError(view.get())).as("a stale row shows no error").isEmpty();
+            assertThat(page.valid()).isTrue();
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Selected("settings:words", Set.of("item-1")));
+            assertThat(rows.get().pending(words.get())).as("selecting a row stages nothing").containsExactly("b", "a");
+            assertThat(listError(view.get())).as("selecting a row shows no error").isEmpty();
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", "x/y"));
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:words:add"));
             assertThat(rows.get().pending(words.get())).as("a rejected value is not staged").containsExactly("b", "a");
@@ -718,13 +725,23 @@ class PluginPanelPageTest {
             var editor = (dev.jasper.sdk.ui.Nodes.Stack) hostControl(view.get(), 0);
             var entry = (dev.jasper.sdk.ui.Nodes.Field) ((dev.jasper.sdk.ui.Nodes.Stack) editor.children().get(1)).children().getFirst();
             assertThat(entry.value()).as("the entry keeps the text to correct").isEqualTo("x/y");
+            view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", ""));
+            assertThat(listError(view.get())).as("the error goes with the text that caused it").isEmpty();
+            assertThat(page.valid()).isTrue();
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Edited("settings:words:new", "c"));
             view.get().dispatch(new dev.jasper.sdk.ui.UiEvent.Action("settings:words:add"));
             assertThat(rows.get().pending(words.get())).containsExactly("b", "a", "c");
             assertThat(page.valid()).isTrue();
             assertThat(page.modified()).isTrue();
+            assertThat(leaked).as("the host consumes every event of its ordered list").isEmpty();
         });
         onEdt(page::dispose);
+    }
+
+    /** The error the hosted ordered-list row's list shows. */
+    private static String listError(HostedKitView view) {
+        var editor = (dev.jasper.sdk.ui.Nodes.Stack) hostControl(view, 0);
+        return ((dev.jasper.sdk.ui.Nodes.ItemList) editor.children().getFirst()).state().error();
     }
 
     /** An application string-list setting labelled as a declared one, to build the generated page's editor beside it. */

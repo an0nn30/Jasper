@@ -39,8 +39,8 @@ button. It stays centered on resize and blocks underlying input; Escape and outs
 dismiss it. The tab or split appears once the SSH shell is ready. Failures offer **Retry** and
 **Close**. Reconnect uses the overlay while preserving the existing pane. Host-key and Vault prompts
 remain native dialogs above it. A second connection request in that window focuses the current attempt.
-The **Session** menu carries the connection commands, the tunnel commands and **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
-panel's **+** without opening the panel; unbound by default) and **Import from ~/.ssh/config...**; the **Transfer**
+The **Session** menu carries the connection commands, **New Host...** (`dev.jasper.remote.hosts.new`, the Sessions
+panel's **+** without opening the panel; unbound by default), **Import from ~/.ssh/config...** and the tunnel commands; the **Transfer**
 menu carries **Open SFTP here** and **Transfers**.
 
 A host is a name, hostname, port, username, group, an optional jump host and how it authenticates:

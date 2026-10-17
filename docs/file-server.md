@@ -11,7 +11,7 @@ row is one server: a dot for its state, its name, protocol and port, and ▶ or 
 address the server answers on (each with **Copy**), warnings, and its activity: logins, failed logins, downloads
 and uploads with their sizes, and errors. The activity stays in memory; **Clear** empties it.
 
-Press **+** (or **Transfer › Share Folder…** or **New File Server…**) to add a server; **Choose…** picks its folder. Right-click a row for Start/Stop, Edit…, Duplicate, Delete…,
+Press **+** (or **Transfer › Share Folder…** or **Transfer › New File Server…**) to add a server; **Choose…** picks its folder. Right-click a row for Start/Stop, Edit…, Duplicate, Delete…,
 Reveal Folder, Copy Address and Copy Password. The status bar shows "⇅ 2 servers" while servers run; click it to toggle
 the panel.
 

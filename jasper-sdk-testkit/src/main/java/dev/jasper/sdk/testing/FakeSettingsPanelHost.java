@@ -132,7 +132,15 @@ final class FakeSettingsPanelHost implements SettingsPanelHost {
         String id = "settings:" + row.setting.key();
         var items = new java.util.ArrayList<Object>((java.util.List<?>) pending(row.setting));
         switch (event) {
-            case UiEvent.Edited edited when edited.id().equals(id + ":new") -> { row.entry = edited.text(); refresh(); return true; }
+            // A refused Add's error lasts only while its text is unchanged: the entry is never part of the value.
+            case UiEvent.Edited edited when edited.id().equals(id + ":new") -> {
+                row.entry = edited.text();
+                if (!row.error.isEmpty()) { row.error = ""; changed(); }
+                refresh();
+                return true;
+            }
+            // The list's own row selection stages nothing, as the host's row ignores it.
+            case UiEvent.Selected selected when selected.id().equals(id) -> { return true; }
             case UiEvent.Action action when action.id().equals(id + ":add") -> {
                 if (row.entry.isBlank()) return true;
                 items.add(row.entry);
