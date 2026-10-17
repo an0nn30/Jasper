@@ -170,6 +170,7 @@ final class ViewReconciler implements AutoCloseable {
         if (next.get(node.id()) instanceof Cards.CardControl card) card.settings = settings;
         if (next.get(node.id()) instanceof Labels.TextControl text) text.settings = settings;
         if (next.get(node.id()) instanceof TextFields.FieldControl field) field.settings = settings;
+        if (next.get(node.id()) instanceof Tables.TableControl table) table.settings = settings;
         ControlRegistry.children(node).forEach(child -> applySettings(child, next, settings));
     }
     /** The Settings header's root row: history buttons, then the breadcrumb, whose ancestors use the Settings body face. */
@@ -389,7 +390,7 @@ final class ViewReconciler implements AutoCloseable {
         boolean group=node instanceof Nodes.Stack stack && stack.role()==Nodes.LayoutRole.VERTICAL && !stack.children().isEmpty() && identityHead(stack.children().getFirst());
         var control=controls.get(node.id());
         if(control instanceof Stacks.StackControl stack){stack.identityHeader=identityHead(node);stack.identityGroup=group;}
-        if(control instanceof Choices.ChoiceControl choice)choice.identitySection=identity && ((Nodes.Choice)node).kind()==Nodes.ChoiceKind.EXCLUSIVE;
+        if(control instanceof Choices.ChoiceControl choice)choice.identitySection=identity && (((Nodes.Choice)node).kind()==Nodes.ChoiceKind.EXCLUSIVE || ((Nodes.Choice)node).kind()==Nodes.ChoiceKind.TABS);
         var children=ControlRegistry.children(node);
         children.forEach(child->applyArtworkComposition(child,controls,identity||group));
         for(int i=0;i<children.size();i++)if(controls.get(children.get(i).id()) instanceof Labels.TextControl text) {

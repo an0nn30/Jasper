@@ -55,4 +55,24 @@ final class ClassicTreeFace implements TreeFace {
             else ClassicGlyphs.right(g2, x + size * .1, y + size / 2.0, size, color);
         }
     }
+    /**
+     * Plan 9b Rulings 10: the band below the edited row, across the tree, on {@code surface.rowHover}, with 1 px edges of
+     * {@code border.focus} at the catalog's edge alpha over it.
+     */
+    @Override public void paintDetail(Trees.TreeControl tree, java.awt.Graphics2D g, int index, int width) {
+        var context = tree.context();
+        int top = tree.top(index) + tree.rowShellHeight(index), height = Math.max(0, tree.heightAt(index) - tree.rowShellHeight(index) - tree.detailAfter());
+        g.setColor(ThemePainting.role(context, dev.jasper.ui.theme.DerivedColor.SURFACE_ROW_HOVER));
+        g.fillRect(0, top, width, height);
+        var focus = ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.BORDER_FOCUS);
+        // An alpha, not a length: read unscaled.
+        int alpha = context.metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_EDGE_ALPHA);
+        g.setColor(new java.awt.Color(focus.getRed(), focus.getGreen(), focus.getBlue(), Math.max(0, Math.min(255, alpha))));
+        int line = ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.HAIRLINE);
+        g.fillRect(0, top, width, line);
+        g.fillRect(0, top + height - line, width, line);
+    }
+    @Override public boolean fillsDetailRow() { return true; }
+    /** Mock 07b: the edited row keeps its accent fill, and its keycaps stand in light boxes on it. */
+    @Override public boolean boxesSelectedKeycaps() { return true; }
 }

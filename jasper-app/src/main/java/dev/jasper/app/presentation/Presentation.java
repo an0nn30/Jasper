@@ -43,7 +43,7 @@ public record Presentation(Optional<Provider> provider, Kit kit, ChromeSpec chro
     public enum Landed { WINDOW_CHROME, WINDOW_CONTENT, DOCK_CHROME, RUN_WINDOW, SETTINGS }
 
     /** The groups that have landed; every other group's values map to the default projection. */
-    public static final Set<Landed> LANDED = Set.of(Landed.WINDOW_CHROME, Landed.WINDOW_CONTENT, Landed.SETTINGS, Landed.DOCK_CHROME);
+    public static final Set<Landed> LANDED = Set.of(Landed.WINDOW_CHROME, Landed.WINDOW_CONTENT, Landed.SETTINGS, Landed.DOCK_CHROME, Landed.RUN_WINDOW);
 
     /** Every part is required. */
     public Presentation {

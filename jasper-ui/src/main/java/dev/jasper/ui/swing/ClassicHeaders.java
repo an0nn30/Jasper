@@ -14,9 +14,12 @@ import javax.swing.border.Border;
 final class ClassicHeaders {
     private ClassicHeaders() {}
 
-    /** How far a title or cell after a column separator sits from its column's start: the separator and the icon gap. */
+    /**
+     * How far a title or cell after a column separator sits from its column's start: the separator, then a field's text
+     * padding (the Notifications mock's titles and cells 9.5 to 11 after a separator; plan 9b Task 2, plan 4c's residual).
+     */
     static int inset(KitContext context) {
-        return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
+        return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
     }
 
     /** Title {@code index} in {@code ink}'s guarded colour, inset after its separator unless it is the first. */

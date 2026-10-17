@@ -25,15 +25,24 @@ import java.util.function.Supplier;
  * @param chrome the look's Settings projection (spec 12.1): Reset inline or in the row's menu, the rows it hides, the font
  *     row's copy
  * @param composition how the look composes the app's pages (spec 12.2); only the composition roots read it
+ * @param sheets asks a small form in a sheet over the dialog
  */
 public record PageContext(SettingsDraft draft, Consumer<String> navigate, Consumer<Runnable> closeThen,
                           BiFunction<String, Optional<Path>, Optional<Path>> chooseFile, Runnable changed,
                           Supplier<AuxiliarySurface> surface, Supplier<KitContext> kit, SettingsChrome chrome,
-                          Composition composition) {
+                          Composition composition, Sheets sheets) {
     public PageContext {
+        Objects.requireNonNull(sheets, "sheets");
         Objects.requireNonNull(kit, "kit");
         Objects.requireNonNull(chrome, "chrome");
         Objects.requireNonNull(composition, "composition");
+    }
+
+    /** A context that asks no sheets ({@link Sheets#NONE}). */
+    public PageContext(SettingsDraft draft, Consumer<String> navigate, Consumer<Runnable> closeThen,
+                       BiFunction<String, Optional<Path>, Optional<Path>> chooseFile, Runnable changed,
+                       Supplier<AuxiliarySurface> surface, Supplier<KitContext> kit, SettingsChrome chrome, Composition composition) {
+        this(draft, navigate, closeThen, chooseFile, changed, surface, kit, chrome, composition, Sheets.NONE);
     }
 
     /** A context under the default look on this host ({@link #standard()}). */
@@ -64,7 +73,7 @@ public record PageContext(SettingsDraft draft, Consumer<String> navigate, Consum
 
     /** The same dialog over another draft, as a plugin's own settings page keeps one. */
     public PageContext withDraft(SettingsDraft other) {
-        return new PageContext(other, navigate, closeThen, chooseFile, changed, surface, kit, chrome, composition);
+        return new PageContext(other, navigate, closeThen, chooseFile, changed, surface, kit, chrome, composition, sheets);
     }
 
     private static KitContext noKit() {

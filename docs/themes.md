@@ -37,7 +37,7 @@ scheme, such as `gruvbox-dark/dark`.
 
 Settings › Appearance & Behavior › Appearance has the Dark, Light and Match System tiles, each previewing the theme
 picked for it, the **Dark theme** and **Light theme** dropdowns, and the **Terminal scheme** dropdown, whose first
-entry, **Same as UI theme**, is `match`. A gear beside each dropdown imports and removes themes (below). Terminal › Font & Colors links there, and the command palette's **Themes…**
+entry, **Same as UI theme**, is `match`. A gear beside each dropdown (a ⋯ under the Enterprise look) imports and removes themes (below). Terminal › Font & Colors links there, and the command palette's **Themes…**
 opens it; the palette's **Terminal: …** commands choose a scheme. Choices stay staged until Apply or OK.
 
 ## Installed themes
@@ -64,7 +64,7 @@ editor scheme.
 
 ## Importing and removing themes
 
-The gear beside the **Dark theme**, **Light theme** and **Terminal scheme** dropdowns on Settings › Appearance &
+The gear (a ⋯ under the Enterprise look) beside the **Dark theme**, **Light theme** and **Terminal scheme** dropdowns on Settings › Appearance &
 Behavior › Appearance has **Import Theme…** and **Remove** for the theme that dropdown shows. Both act at once, outside
 Apply; a failure is shown in a sheet.
 

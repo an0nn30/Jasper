@@ -39,9 +39,12 @@ final class ThemeMenu {
     private final PageContext context;
     private final Target target;
     private final Runnable render;
+    private final String icon;
     private boolean busy;
 
-    ThemeMenu(ThemeImports hooks, Supplier<InstalledThemes> themes, PageContext context, Target target, Runnable render) {
+    /** A menu whose button shows {@code icon}: the gear, or the ⋯ of the classic composition (spec 12.2). */
+    ThemeMenu(ThemeImports hooks, Supplier<InstalledThemes> themes, PageContext context, Target target, Runnable render, String icon) {
+        this.icon = icon;
         this.hooks = hooks;
         this.themes = themes;
         this.context = context;
@@ -57,7 +60,7 @@ final class ThemeMenu {
             new MenuItem(id + ":separator", "", "", "", false, true),
             new MenuItem(id + ":remove", removable.map(theme -> "Remove " + label(theme)).orElse("Remove Theme"), "", id + ":remove",
                 removable.isPresent() && !busy, false));
-        return new Nodes.MenuButton(id, new ControlState(true, !busy, busy, ""), "", "settings", Nodes.ButtonKind.GHOST, "", items,
+        return new Nodes.MenuButton(id, new ControlState(true, !busy, busy, ""), "", icon, Nodes.ButtonKind.GHOST, "", items,
             "Import or remove themes");
     }
 

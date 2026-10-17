@@ -19,4 +19,10 @@ interface GroupFace extends Face {
     void styleTitle(JLabel title, KitContext context);
     /** A {@code kind} card's padding, {@code standard} being the default look's. */
     Border cardBorder(KitContext context, Nodes.CardKind kind, boolean page, EmptyBorder standard);
+    /** The rule a Settings page's card paints on each row's first line, which the row's content keeps clear; 0 for none. */
+    int rowRule(KitContext context);
+    /** The gap between a {@code kind} card's children, {@code standard} being the default look's. */
+    int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard);
+    /** Whether a Settings page row lays its list or table control across the row below its title and description, not beside them. */
+    boolean listUnderTitle(KitContext context);
 }

@@ -24,7 +24,10 @@ final class PluginCard {
         return item(row, busy, "plugin");
     }
 
-    static ListItem item(PluginRuntime.Row row, boolean busy, String artwork) {
+    static ListItem item(PluginRuntime.Row row, boolean busy, String artwork) { return item(row, busy, artwork, PluginShape.ROWS); }
+
+    /** The row in {@code shape}: under checkbox rows, the checkbox leads the name and there is no icon (spec 12.2). */
+    static ListItem item(PluginRuntime.Row row, boolean busy, String artwork, PluginShape shape) {
         String id = row.id();
         var subtitle = new ArrayList<Nodes.Node>();
         subtitle.add(new Nodes.Text("meta:" + id, ControlState.READY, meta(row), Nodes.TextRole.CAPTION));
@@ -39,6 +42,10 @@ final class PluginCard {
             checked(row), TOGGLE + id, true, toggleable(row) ? "" : why(row));
         var icon = new Nodes.Icon("icon:" + id, new ControlState(true, !greyed(row), false, ""), artwork, Nodes.Hue.NEUTRAL,
             Nodes.IconSize.RAIL, row.name());
+        if (shape.checkboxRows())
+            return new ListItem(id, Optional.of(toggle), List.of(new Nodes.Text("name:" + id, ControlState.READY, row.name(), Nodes.TextRole.BODY)),
+                List.of(new Nodes.Stack("second:" + id, ControlState.READY, Nodes.LayoutRole.INLINE, subtitle)), List.of(), false,
+                Optional.of(menu(row, busy)));
         return new ListItem(id, Optional.of(icon), List.of(new Nodes.Text("name:" + id, ControlState.READY, row.name(), Nodes.TextRole.BODY_STRONG)),
             List.of(new Nodes.Stack("second:" + id, ControlState.READY, Nodes.LayoutRole.INLINE, subtitle)), List.of(toggle), false,
             Optional.of(menu(row, busy)));

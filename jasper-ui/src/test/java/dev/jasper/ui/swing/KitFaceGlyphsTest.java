@@ -69,4 +69,36 @@ class KitFaceGlyphsTest {
             } finally { release(context); }
         });
     }
+
+    /**
+     * A selected result keeps a face that draws its text: the Run window's first suggestion is a selected command with a
+     * shortcut tag, and its title and tag both take the platform face when the kit's face lacks a modifier symbol.
+     */
+    @Test void aSelectedResultsTitleAndTagDrawTheirSymbols() throws Exception {
+        String face = TypographyTest.registeredWithoutModifierSymbols();
+        var items = List.of(
+            new ListItem("a", java.util.Optional.empty(), List.of(new Text("a.title", ControlState.READY, "Copy ⌘C", TextRole.BODY)),
+                List.of(), List.of(new Text("a.tag", ControlState.READY, "⌘T", TextRole.CAPTION))),
+            new ListItem("b", java.util.Optional.empty(), List.of(new Text("b.title", ControlState.READY, "New Window", TextRole.BODY)),
+                List.of(), List.of(new Text("b.tag", ControlState.READY, "N", TextRole.CAPTION))));
+        java.util.function.Function<String, ViewSpec> selecting = id -> new ViewSpec(new ItemList("results", ControlState.READY,
+            ListKind.RESULTS, items, java.util.Set.of(id), "run", List.of(), SelectionMode.SINGLE, java.util.Optional.empty(),
+            java.util.OptionalInt.of(2)));
+        Edt.run(() -> {
+            var context = glyphless(face);
+            try (var view = new KitView(context, selecting.apply("a"), event -> {})) {
+                for (boolean runWindow : new boolean[] {false, true}) {
+                    view.runWindow(runWindow);
+                    view.update(selecting.apply("a"));
+                    KitFixtures.render(view, 436, 80, 1);
+                    assertThat(find(view, "a.title", JLabel.class).getFont().canDisplayUpTo("Copy ⌘C")).as("the title, run window %s", runWindow).isEqualTo(-1);
+                    assertThat(find(view, "a.tag", JLabel.class).getFont().canDisplayUpTo("⌘T")).as("the tag, run window %s", runWindow).isEqualTo(-1);
+                    view.update(selecting.apply("b"));
+                    KitFixtures.render(view, 436, 80, 1);
+                    assertThat(find(view, "b.title", JLabel.class).getFont().getFontName(Locale.ROOT)).as("a selected text the face draws keeps it").isEqualTo(face);
+                    assertThat(find(view, "b.tag", JLabel.class).getFont().getFontName(Locale.ROOT)).isEqualTo(face);
+                }
+            } finally { release(context); }
+        });
+    }
 }

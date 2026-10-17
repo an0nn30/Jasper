@@ -38,9 +38,13 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
     private final boolean inlineReset;
     NotificationGroupsEditor(NotificationGroupChoices choices) {this(choices,null);}
     NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {this(choices,kit,true);}
-    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit, boolean inlineReset) {
+    /** Spec 12.2's classic composition: one grouped table rather than a card per owner. */
+    private final boolean table;
+    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit, boolean inlineReset) {this(choices,kit,inlineReset,false);}
+    NotificationGroupsEditor(NotificationGroupChoices choices, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit, boolean inlineReset, boolean table) {
         this.kit=kit;
         this.inlineReset=inlineReset;
+        this.table=table;
         this.choices = Objects.requireNonNull(choices, "choices");
         groups = List.copyOf(choices.groups().get());
     }
@@ -64,6 +68,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         if (groups.isEmpty())
             return new Nodes.Stack(id, plain, Nodes.LayoutRole.VERTICAL, List.of(
                 new Nodes.SettingRow(id + ":empty-row", plain, "No notification groups yet.", "", new Nodes.Stack(id + ":empty", plain, Nodes.LayoutRole.INLINE, List.of()), false, highlighted)));
+        if(table)return table(id,plain);
         Map<String,String> value=value();
         var owners=new LinkedHashMap<String,List<Integer>>();
         for(int i=0;i<groups.size();i++)owners.computeIfAbsent(groups.get(i).ownerId(),ignored->new ArrayList<>()).add(i);
@@ -95,9 +100,48 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
         }
         return new Nodes.Stack(id,plain,Nodes.LayoutRole.VERTICAL,sections);
     }
+    /**
+     * Spec 12.2 (CLASSIC): the description, then one table of Group, Display and Source; a heading row per owner with its
+     * count; a group's Display is a borderless dropdown of the modes, its Source "Default" or "Custom", and its menu Reset
+     * to Default (plan 9b Rulings 4 and 6).
+     */
+    private Nodes.Node table(String id, ControlState plain) {
+        // The mock's separators at 755 and 902 over the classic table's column span (267 to 1004 in a 751-wide box).
+        var columns = List.of(new dev.jasper.ui.model.Column("group", "Group", Nodes.TextRole.BODY, false, 488, Optional.empty()),
+            new dev.jasper.ui.model.Column("display", "Display", Nodes.TextRole.BODY, false, 147, Optional.empty()),
+            // Source reads muted, as the mock's "Default" (the classic table sets it at the cells' size on a Settings page).
+            new dev.jasper.ui.model.Column("source", "Source", Nodes.TextRole.DESCRIPTION, false, 102, Optional.empty()));
+        Map<String, String> value = value();
+        var owners = new LinkedHashMap<String, List<Integer>>();
+        for (int i = 0; i < groups.size(); i++) owners.computeIfAbsent(groups.get(i).ownerId(), ignored -> new ArrayList<>()).add(i);
+        var rows = new ArrayList<dev.jasper.ui.model.TableRow>();
+        int section = 0;
+        for (var indices : owners.values()) {
+            rows.add(dev.jasper.ui.model.TableRow.heading(id + ":owner-" + section++, groups.get(indices.getFirst()).owner(),
+                java.util.OptionalInt.of(indices.size()), "group"));
+            for (int i : indices) {
+                var group = groups.get(i);
+                var options = new ArrayList<Option>();
+                for (var mode : MODES.entrySet()) options.add(new Option(mode.getKey(), mode.getValue(), Optional.empty()));
+                var display = new Nodes.Choice(modeId(id, i), plain, Nodes.ChoiceKind.DROPDOWN, options, mode(group.id()),
+                    group.name() + ": how its notifications appear", "");
+                // An unknown saved mode shows the group's default, so Source reads Default; Reset to Default still clears the entry.
+                boolean saved = value.containsKey(group.id()), custom = saved && MODES.containsKey(value.get(group.id()));
+                var menu = List.of(new dev.jasper.ui.model.MenuItem(resetId(id, i), "Reset to Default", "", resetId(id, i), plain.enabled() && saved, false));
+                rows.add(new dev.jasper.ui.model.TableRow(id + ":row-" + i, Map.of("group", group.name(), "source", custom ? "Custom" : "Default"),
+                    Optional.empty(), false, Optional.of(menu), group.owner() + " · " + group.id(), Map.of("display", display), Optional.empty()));
+            }
+        }
+        var description = new Nodes.Text(id + ":description", plain, "How each kind of notification appears. A plugin's groups are listed once it has run.",
+            Nodes.TextRole.SUPPORTING);
+        // A FORM card pads its content inside the Groups box, as the mock sets the description and the table.
+        return new Nodes.Card(id, plain, Nodes.CardKind.FORM, List.of(description,
+            new Nodes.Table(id + ":table", plain, columns, rows, java.util.Set.of(), "", List.of(), Nodes.SelectionMode.SINGLE)));
+    }
+
     private static String modeIcon(String mode) {return switch(mode){case "card"->"notification.card";case "sticky"->"notification.sticky";case "history"->"notification.history";default->"notification.off";};}
     @Override public boolean fullSpan(){return true;}
-    @Override public String revealTarget(String id) { return id + (groups.isEmpty() ? ":empty-row" : ":row-0"); }
+    @Override public String revealTarget(String id) { return id + (groups.isEmpty() ? ":empty-row" : table ? ":table" : ":row-0"); }
 
     @Override public Map<String, String> value() {
         var value = new LinkedHashMap<>(shown);

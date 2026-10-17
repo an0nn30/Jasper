@@ -173,4 +173,12 @@ class ProjectionsTest {
         assertThat(Projections.standard(MAC).settings().hiddenKeys()).containsExactly("window.native_decorations");
         assertThat(Projections.standard(LINUX).composition()).isEqualTo(Composition.ROWS);
     }
+
+    /** Plan 8b: the Run window has landed, so the kit's run_window palette reaches the projection. */
+    @Test void theRunWindowHasLanded() {
+        assertThat(Presentation.LANDED).contains(Presentation.Landed.RUN_WINDOW);
+        var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Presentation.LANDED).palette()).isEqualTo(PaletteLook.DEFAULT);
+    }
 }

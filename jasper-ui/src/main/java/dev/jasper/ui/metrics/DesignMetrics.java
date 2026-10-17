@@ -133,13 +133,19 @@ public final class DesignMetrics {
         // (CONTROL_RADIUS before), then roles only the classic faces and chrome read, measured on the Enterprise mocks.
         ROW_HEIGHT(24), FIELD_RADIUS(4),
         RUN_WINDOW_WIDTH(460), CHECKBOX_BOX(13), CHECKBOX_RADIUS(2), CHECKBOX_LABEL_GAP(7), RADIO_RING(14), RADIO_DOT(6), RADIO_LABEL_GAP(6), RADIO_GAP(18), OPTION_SWATCH(7), GROUP_TITLE_INSET(9), GROUP_TITLE_PADDING(4), GROUP_TITLE_GAP(4), SPINNER_WIDTH(82), SPINNER_ARROW_WIDTH(16), SPINNER_GLYPH(7), DROPDOWN_GLYPH(6), DROPDOWN_GLYPH_INSET(7),
-        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(90), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(10), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
+        TABLE_HEADER_HEIGHT(20), TREE_INDENT(24), DISCLOSURE_GLYPH(6), DISCLOSURE_GAP(10), FOLDER_TAB_HEIGHT(26), FOLDER_TAB_PADDING(14), FOLDER_TAB_RADIUS(2), ROUTE_EDGE(3), SIDE_COLUMN_WIDTH(92), SIDE_COLUMN_GAP(6), SIDE_BUTTON_GAP(4), STRIPE_LABEL_PADDING(10), STRIPE_LABEL_GAP(0), DOCK_RULE(1), DOCK_RULE_HIT(6),
         // Plan 4c: a grouped table's data rows under their heading (Settings, Notifications mock); classic faces only.
         GROUP_ROW_INDENT(14),
         // The Run window (Enterprise presentation plan 8a), measured on the 06 Run Dialog mocks; read only by the Run window.
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
         // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
         RUN_WINDOW_HELP_TEXT_TOP(1),
+        // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
+        // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
+        RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
+        // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
+        // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
+        RUN_WINDOW_BUTTON_PADDING(8),
         // Enterprise presentation plan 6: the classic chrome's menu row, toolbar, tabs, status cells and dialogs,
         // measured on the Enterprise mocks and read only by classic chrome.
         MENU_BAR_SIDE(5), MENU_BAR_ITEM_PADDING(9), MENU_BAR_HEIGHT(24), CHROME_BUTTON_PADDING(8), CHROME_BUTTON_GAP(8), CHROME_SEPARATOR_GAP(10),
@@ -161,7 +167,14 @@ public final class DesignMetrics {
         SETTINGS_NAV_CHILD_INDENT(0), SETTINGS_NAV_TEXT_GAP(6),
         // Plan 9a: the gap a SETTINGS_TRAILING stack without its action keeps after the control (today COLUMN_GAP's 10;
         // the classic rows, whose Reset is in the row's menu, keep none).
-        SETTINGS_TRAILING_EMPTY_GAP(10);
+        SETTINGS_TRAILING_EMPTY_GAP(10),
+        // Plan 9b: the lanes of a keycap tree with columns (the classic Keymap mock), read only there; equal in both catalogs.
+        KEYMAP_SCOPE_COLUMN(107), KEYMAP_SHORTCUT_COLUMN(137), KEYMAP_KEYS_INSET(25), KEYMAP_SCOPE_GAP(30),
+        // Plan 9b: the alpha of the classic recording band's edges over its fill; 0 draws none (today's card has its own edge).
+        KEYCAP_DETAIL_EDGE_ALPHA(0),
+        // Plan 9b: an item list's heading row with its two rules where the table face bands list headings, and a two-line
+        // item list's row; 0 keeps a heading as tall as the rows and measures a row from its lines (the classic Plugins list).
+        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
@@ -244,7 +257,8 @@ public final class DesignMetrics {
         values.put(Role.THEME_PREVIEW_WIDTH, 150);
         values.put(Role.THEME_PREVIEW_HEIGHT, 78);
         values.put(Role.THEME_PREVIEW_GAP, 20);
-        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 8);
+        // Plan 9b Task 1: mock 01's radios sit 7 below their tiles.
+        values.put(Role.THEME_PREVIEW_CAPTION_GAP, 7);
         // Enterprise plan 7: the header strips' paddings and 16 px actions, 18 apart, each glyph in a 10 px box (Workstation
         // mock); a strip draws its own, the host's and contributed actions at the contributed glyph size.
         values.put(Role.TOOL_HEADER_LEADING_PADDING, 8);
@@ -290,7 +304,57 @@ public final class DesignMetrics {
         values.put(Role.SETTINGS_NAV_HEADING_GAP, 0);
         values.put(Role.SETTINGS_NAV_GROUP_GAP, 0);
         values.put(Role.SETTINGS_NAV_CHILD_INDENT, 15);
+        // Plan 9b: the classic Keymap (Mock measurements).
+        values.put(Role.KEYMAP_PAGE_TOP_PADDING, 18);
+        values.put(Role.KEYMAP_PAGE_PADDING, 16);
+        values.put(Role.KEYMAP_SECTION_GAP, 6);
+        values.put(Role.KEYCAP_GROUP_SIDE, 8);
+        values.put(Role.KEYCAP_TREE_LEAF_INDENT, 26);
+        values.put(Role.KEYCAP_DETAIL_INSET, 4);
+        // Plan 9b: the classic recording band, measured from mock 07b: 60 tall from the row's bottom with #C9D7F2 edges; the
+        // field 22 tall at the canvas's 34 and 7 below the band's top (centred on the 24 px Cancel and Set, which therefore
+        // stand 1 px above the mock's), the hint line 4 below them, Set ending 8 before the box; the armed dot 8 px at 9
+        // into the field and the prompt 9 after it (a halo at alpha 0 keeps that room).
+        values.put(Role.KEYCAP_DETAIL_EDGE_ALPHA, 49);
+        values.put(Role.KEYCAP_DETAIL_TOP, 6);
+        values.put(Role.KEYCAP_DETAIL_BOTTOM, 10);
+        values.put(Role.KEYCAP_DETAIL_GAP, 5);
+        values.put(Role.KEYCAP_DETAIL_LEADING, 34);
+        values.put(Role.KEYCAP_CONTENT_TRAILING, 8);
+        values.put(Role.KEYCAP_DETAIL_AFTER, 0);
+        values.put(Role.KEYCAP_RECORDER_PADDING, 7);
+        values.put(Role.KEYCAP_RECORDER_HALO, 2);
+        values.put(Role.KEYCAP_RECORDER_HALO_ALPHA, 0);
+        values.put(Role.KEYCAP_RECORDER_HEIGHT, 22);
+        // Plan 9b Task 3: the mock's rows from the header rule, 16 px square keycaps 3 apart in #B4B8BF on #F7F8F9, and buttons
+        // with 11 px sides (Find by Shortcut 110 wide; Shell's Add Variable… and Browse… keep the same sides).
+        values.put(Role.KEYCAP_TREE_INSET, 0);
+        values.put(Role.KEYCAP_VERTICAL_PADDING, 2);
+        values.put(Role.KEYCAP_SQUARE_EXTRA, 0);
+        values.put(Role.KEYCAP_GAP, 3);
+        values.put(Role.KEYCAP_PADDING, 3);
+        values.put(Role.KEYCAP_EDGE_ALPHA, 116);
+        values.put(Role.KEYCAP_FACE_ALPHA, 8);
+        values.put(Role.BUTTON_HORIZONTAL_PADDING, 11);
+        values.put(Role.KEYMAP_STATUS_GAP, 5);
+        // Plan 9b Task 1: the classic Settings rows as mocks 01 and 02 draw them (39 apart; 47 with a description).
+        values.put(Role.SETTINGS_ROW_HEIGHT, 39);
+        values.put(Role.SETTINGS_DESCRIPTION_HEIGHT, 47);
         values.put(Role.SETTINGS_TRAILING_EMPTY_GAP, 0);
+        // Plan 9b Task 5: the classic Plugins list as mock 08 draws it (headings 24 with their rules, rows 36).
+        values.put(Role.LIST_HEADING_HEIGHT, 24);
+        values.put(Role.LIST_TWO_LINE_ROW_HEIGHT, 36);
+        // Plan 9b Task 5: mock 08's list box 292 wide, 16 from the body's sides and bottom and level with the details' top
+        // (18 below the header rule), the details 12 right of it and Disable ending 16 from the body's right.
+        values.put(Role.PLUGIN_MANAGER_PADDING, 16);
+        values.put(Role.PLUGIN_MANAGER_SIDE_PADDING, 16);
+        values.put(Role.PLUGIN_LIST_WIDTH, 292);
+        values.put(Role.PLUGIN_DETAILS_LEADING_PADDING, 12);
+        values.put(Role.PLUGIN_DETAILS_TRAILING_PADDING, 0);
+        values.put(Role.PLUGIN_DETAILS_EDGE_PADDING, 2);
+        // The overview 14 below the folder tabs, its lines 17.5 apart.
+        values.put(Role.PLUGIN_DETAILS_GAP, 4);
+        values.put(Role.PLUGIN_TEXT_LINE_SPACING, 3);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

@@ -30,6 +30,9 @@ final class ClassicFieldPolicy implements FieldPolicy {
             s.focus.visible(), s.error, s.radiusRole);
     }
 
+    /** A Settings text field is as wide as the page's dropdowns (the Credential Vault and File Server mocks' 220, plan 9b Task 7). */
+    @Override public int settingsWidth(KitContext context) { return ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_CHOICE_WIDTH); }
+
     /** Muted on the grey face; a transparent field keeps its default surface ({@code paintField}), so its text keeps text.primary. */
     @Override public Color readOnlyText(TextFields.FieldSurface s) {
         return s.transparent ? ThemePainting.color(s.context, SemanticColor.TEXT_PRIMARY) : ThemePainting.painted(s.context, readOnlyLabel);

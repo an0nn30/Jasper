@@ -45,8 +45,8 @@ final class Cards {
                             : new Composition.Vertical(
                                     ((Nodes.Card) node).kind() == Nodes.CardKind.SETTINGS
                                             ? 0
-                                            : ThemePainting.metric(
-                                                    context(), DesignMetrics.Role.ROW_GAP)));
+                                            : context().faces().group.cardGap(context(), ((Nodes.Card) node).kind(), settings,
+                                                    ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP))));
         }
 
         @Override

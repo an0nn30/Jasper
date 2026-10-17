@@ -12,4 +12,6 @@ interface FieldPolicy extends Face {
     void paintField(TextFields.FieldSurface surface, Graphics2D g);
     /** The text colour of a read-only field painted on {@code surface}. */
     Color readOnlyText(TextFields.FieldSurface surface);
+    /** The least width of a text field on a Settings page (a setting row's text value); 0 keeps its columns' width. */
+    int settingsWidth(KitContext context);
 }

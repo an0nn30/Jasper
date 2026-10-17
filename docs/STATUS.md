@@ -61,6 +61,174 @@ Sessions tree's star and Properties, the Tunnels and File Servers tables' activa
 the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
 not pushed.
 
+**Enterprise presentation, plan 9b: the Settings page compositions — 2026-10-17** (`claude/enterprise-settings`, worktree
+`.claude/worktrees/enterprise-9`, `4d9b76a3d..b463f56d0`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-9b-settings-pages.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Spec 12.2 under `Composition.CLASSIC`,
+each composition branching once at its root: the Appearance theme gears are ⋯ menus; Notifications' groups are one table
+(Group, Display, Source; a heading per owner with "N groups", a borderless Display dropdown, Default or Custom, Reset to
+Default in each row's menu), the classic table face putting a heading's count under the last column; Keymap has Action,
+Scope and Shortcut columns on lanes measured from the mock (`KEYMAP_*`), the text tools Find by Shortcut, Expand All and
+Collapse All, and an inline recording band the tree face paints (rowHover, faint accent edges) with the recorder drawn as
+a field by the classic button face; Plugins is a boxed list of checkbox rows under banded headings (the table face's list
+headings), with the plugin's ⋯ beside Disable and Overview | Details as TABS in both looks; Shell's environment variables
+are a Name / Value table with Add Variable… and a sheet (`PageContext.sheets()`), Edit… and Remove in the row menu, and
+the ordered lists read "Empty". The classic Settings rows take the mocks' geometry: a checkbox leads its label also in
+a one-child `SETTINGS_TRAILING` stack (`SettingRows.RowLayout.toggle`), the row rules stop the rows' side inset short of
+the box, and the calibrated classic values: `SETTINGS_ROW_HEIGHT` 39, `SETTINGS_DESCRIPTION_HEIGHT` 47 (the mocks' 47.5
+a half-pixel residual, held by `SettingsPagesMockTest.HALF`), `THEME_PREVIEW_CAPTION_GAP` 7; the Keymap's
+`KEYMAP_PAGE_TOP_PADDING` 18, `KEYMAP_PAGE_PADDING` 16, `KEYMAP_SECTION_GAP` 6, `KEYMAP_STATUS_GAP` 5, `KEYCAP_GROUP_SIDE`
+8, `KEYCAP_TREE_LEAF_INDENT` 26, `KEYCAP_TREE_INSET` 0, `KEYCAP_VERTICAL_PADDING` 2, `KEYCAP_SQUARE_EXTRA` 0,
+`KEYCAP_PADDING` 3, `KEYCAP_GAP` 3, `KEYCAP_EDGE_ALPHA` 116, `KEYCAP_FACE_ALPHA` 8 and `BUTTON_HORIZONTAL_PADDING` 11 (it
+also sets FlatLaf's classic `Button.margin`); the band's `KEYCAP_DETAIL_INSET` 4, `KEYCAP_DETAIL_EDGE_ALPHA` 49,
+`KEYCAP_DETAIL_TOP` 6, `KEYCAP_DETAIL_BOTTOM` 10, `KEYCAP_DETAIL_GAP` 5, `KEYCAP_DETAIL_LEADING` 34,
+`KEYCAP_CONTENT_TRAILING` 8, `KEYCAP_DETAIL_AFTER` 0, `KEYCAP_RECORDER_PADDING` 7, `KEYCAP_RECORDER_HALO` 2 at
+`KEYCAP_RECORDER_HALO_ALPHA` 0 and `KEYCAP_RECORDER_HEIGHT` 22; Plugins' `PLUGIN_MANAGER_PADDING` 16,
+`PLUGIN_MANAGER_SIDE_PADDING` 16, `PLUGIN_LIST_WIDTH` 292, `PLUGIN_DETAILS_LEADING_PADDING` 12,
+`PLUGIN_DETAILS_TRAILING_PADDING` 0, `PLUGIN_DETAILS_EDGE_PADDING` 2, `PLUGIN_DETAILS_GAP` 4 and `PLUGIN_TEXT_LINE_SPACING`
+3; `SIDE_COLUMN_WIDTH` 92 in both catalogs (was 90). New roles, appended after 9a's and held by `SettingsRolesTest`:
+`KEYMAP_SCOPE_COLUMN` (107), `KEYMAP_SHORTCUT_COLUMN` (137), `KEYMAP_KEYS_INSET` (25), `KEYMAP_SCOPE_GAP` (30), equal in
+both catalogs; `KEYCAP_DETAIL_EDGE_ALPHA` (0; classic 49), `LIST_HEADING_HEIGHT` (0; 24) and `LIST_TWO_LINE_ROW_HEIGHT`
+(0; 36). jasper-ui face behaviours, each defaulting to today's value: `ChoiceFace.previewPadding`, `GroupFace.rowRule`,
+`cardGap` and `listUnderTitle`, `ClassicGroupFace.cardBorder` padding a Settings page's card, `TableFace.everyRowOnPage`
+and `cellType`, `ButtonFace.cellChevronLane` and `titleLine`, `ClassicStepperFace.valueWidth` (the classic spinner 82
+wide) and `FieldPolicy.settingsWidth` (a classic Settings text field at least 220 wide). Beyond the Settings pages, these
+classic-wide changes reach every Enterprise surface: `BUTTON_HORIZONTAL_PADDING` 14 to 11 (and FlatLaf's classic
+`Button.margin`: every classic button); `ClassicHeaders.inset` 7 to 9 (every classic table and tree header title and cell
+after a separator); `LIST_TWO_LINE_ROW_HEIGHT`, `LIST_HEADING_HEIGHT` and the heading bands (every classic plain list: the
+Vault picker and key import, Errors, Licenses); `ORDERED_ROW_HEIGHT` (every classic side-column list);
+`ClassicStepperFace.valueWidth` (every spinner); `ClassicTableFace.styleCount`'s semibold count; `ButtonFace.titleLine`
+(also About › Licenses' detail heading link); `Navigation.InlineLayout.flexible`, in both looks (a menu button in a
+NAVIGATION line keeps its preferred width while the texts shrink; main's flush panel header strips use
+`Navigation.InlineLayout`); and under the classic button face the buttons of a NAVIGATION line led by a DETAIL_TITLE over
+further lines without a tile stand at the line's top (`NavigationLinesTest` pins the last two for plan 7's merge). Merge
+checklist: main has merged plans 7 and 8b after `1dcc8fe61`, and `git merge-tree` shows textual conflicts only in
+STATUS.md, migration.csv and `DesignMetrics.java`, but main's dock and Run window mock tests were calibrated before these
+values changed; after merging main, re-run `DockMockTest`, `DockChromeMatrixTest`, `DefaultDockPixelsTest`,
+`RunWindowRenderTest`, `RunWindowWorkspaceRenderTest`, `EnterpriseDialogMockTest` and `tools/visual/check_pairs.py`, and
+attribute any movement to the 9b value that caused it. `SettingsPagesMockTest` compares all
+eighteen pages and 07b with their mocks (probes on every OS, the body's share on macOS: Appearance 0.968, Window 0.987,
+Notifications 0.955, Keymap 0.986, Keymap recording (07b) 0.975, Plugins 0.974, Shell 0.978, Command Palette 0.999, Desk
+Buddy 0.999,
+System Settings 0.959, Font & Colors 0.985, Cursor 0.998, Credential Vault 0.982, Editor 0.941, File Server 0.981,
+Remote 0.960, Sample
+0.970, Shell History 0.961, Project Index 0.930; every floor 0.93 but Project Index's 0.92, lowered because the fixture
+indexes
+no project and the plugin shows its empty state in place of the mock's four projects) and checks the composed pages under
+Enterprise Dark; plan 9a's `SettingsFrameRenders` also checks the page composition under every look of 6a's chrome
+renders. Default look: byte-identical, no file changed (`changed: none`; Rulings 2: today's render
+showed no "Plugin information" label, so no `plugins*` file moved). Rulings (plan, "Rulings"): (1) each composition root maps `Composition` to a value once (a ⋯ icon
+name, `KeymapShape`, `PluginShape`, a classic flag); (2) Overview | Details is `ChoiceKind.TABS` in both looks; (3) the
+theme ⋯ is the gear's own menu with the "more" glyph; (4) the grouped table's columns are weighted 10 : 3 : 2.2; (5) a
+grouped table's heading count stands under the last column's title; (6) the Display dropdown lists modes without icons,
+Source reads Default or Custom, each row's menu holds Reset to Default; (7) the classic Keymap tree is a keycap tree on
+three lanes measured from the tree's right edge; (8) a section row reads "N shortcuts" (1 shortcut), its modified mark
+follows its title, and the lanes show no lock glyph; (9) the Keymap tools are Find by Shortcut, Expand All and Collapse
+All, with Clear while there is something to clear; (10) the recording band is the tree face's, with the recorder drawn as
+a classic field; (11) the band's hint line holds the message and the ⋯ without the Record text action; (12) the classic
+Plugins list is one boxed lane of checkbox rows under banded headings with the plugin's ⋯ beside Disable; (13) the
+environment table is a Name / Value table with Add Variable…, the sheet opened by double-click or Edit…, Remove in the row
+menu; (14) a sheet is asked through `PageContext.sheets()`, `Sheets.NONE` answering Cancel; (15) the ordered lists show
+"Empty" under Enterprise; (16) the page comparison crops each mock's body, probes on every OS, shares on macOS from a 0.93
+floor lowered only with a recorded cause. Execution notes (2026-10-17): N1 the base is `1dcc8fe61`, checked as an
+ancestor; N2 the Composition scan is 6a's `ProjectionReadTest`; N3 new roles follow `SETTINGS_TRAILING_EMPTY_GAP` with
+`SettingsRolesTest` entries, `NewRolesTest` and `ClassicCatalogTest` untouched; N4 every probe lies on what it names,
+read from the mocks' pixels, and 9a's two Appearance probes move here; N5 near-surround probes are `TIGHT` (ΔE 1) and
+face-following probes and the share assert under `PLEX`; N6 a classic checkbox leads its label in a one-child
+`SETTINGS_TRAILING` stack; N7 the classic row rules stop `SETTINGS_ROW_SIDE` short of the box; N8 Task 1 calibrates the
+classic row values and Task 7 re-checks every page; N9 `ShortcutPanel`'s `event`, `activate` and `render` are
+package-private for the test helpers; N10 `selectionShown` honours `fillsDetailRow`; N11 the Plugins headings paint
+through 4c's `paintBands` with their rules as their own lines; N12 `Editors.Items` keeps 4b's selection and the classic
+table opens its sheet on `id:activate`; N13 ledger rows for `KeymapBandTest` and `ResetMenuTestAccess`; N14 Task 2's
+`Tables` anchor includes the `@Override`; N15 the dry run's test fixes; N16 `ClassicButtonFace`'s 4b lines as merged; N17
+the dry run; N18 plan 7's shared files are appended and reconciled at merge; N19 where a mock and spec 12.2 differ the
+spec wins (07b's ⋯, "1 shortcut", 08's ⋯s). Deviations from the plan's text (each recorded with its cause in the task's
+banner): Task 1 pads a classic Settings page's card in `ClassicGroupFace.cardBorder`, lays the tiles through
+`ChoiceFace.previewPadding`, keeps a row's first line for its rule (`GroupFace.rowRule`), centres a leading checkbox on its
+title's x-height middle and renames two Appearance probes; Task 2 makes the classic composition a FORM card
+(`GroupFace.cardGap`), shows every row on a Settings page (`TableFace.everyRowOnPage`, at most 40), weights the columns
+488 : 147 : 102 between the header's insets, sets plan 4c's classic cell inset after a separator to 9 (it also moves the
+classic tree headers' titles), adds `ButtonFace.cellChevronLane`, `TableFace.cellType` and ink boxes; Task 3 gives a laned
+tree the tree face's disclosure and title role, puts scope and count in their columns' roles, lays the classic panel with
+`ShortcutPanel.FittedLayout` and moves one probe 3 px into its button; Task 4 keeps the recorder's error edge and its
+fill, adds no `ClassicButtonFace.text` line, reads the band's edge alpha unscaled and writes its share to
+`pages-keymap-recording.txt`; Task 5 adds `LIST_HEADING_HEIGHT` and `LIST_TWO_LINE_ROW_HEIGHT`, bands plain lists only,
+boxes the lane with a compound border, drops the details' section card and puts the ⋯ before Disable, stops a menu button
+taking a navigation line's spare width (`Navigation.InlineLayout.flexible`), adds `ButtonFace.titleLine`, moves two tab
+probes inside the tabs and, in review, `ItemLists.ListControl.headingRule`; Task 6 adds `GroupFace.listUnderTitle`
+(`SettingRows.RowLayout.underTitle`), `ClassicOrderedFace.EntryLayout`, `ORDERED_ROW_HEIGHT` rows through
+`ItemLists.ListControl.fixedRowHeight`, `SIDE_COLUMN_WIDTH` 92, an Add without a glyph and the table's `afterRemoval`;
+Task 7 fixes `ClassicStepperFace.valueWidth` and adds `FieldPolicy.settingsWidth`, gives the plugin runtime the look's
+kit and theme in `EnterpriseSettings` and the System page's fixture its two sections, moves two probes and adds three,
+and adds `HALF` for Task 1's half pixel; Task 8 places the configuration guide's sentence after the Keymap and Plugins
+sentences, not right after the Keymap one. Residuals (printed, not asserted, with their causes in the test and the
+banners): Task 1's checkbox label gap and description offset; the Keymap fixture's counts and the ⌘ glyph's platform face;
+Cancel and Set 3 and 1 px narrower than 07b's; the Plugins fixture's Enterprise plugin and the folder tabs' baseline rule;
+Shell's "Empty" placement and the fixture's Custom profile; Project Index's empty state; Shell History's list; File
+Server's port description wrapping one word later. Final review
+fixes ("Plan 9b: final review fixes"): with variables, the classic environment table is the row's control laid under its
+title (`listUnderTitle`, as the ordered lists) with Add Variable… below it, so its box spans the rows' text inset (260 to
+1010) and the row's padding keeps the next rule off it
+(`SettingsPagesMockTest.shellWithVariablesKeepsItsTableInsideTheRows`);
+its selection follows an edited variable and clears on a new value; a classic selected row's keycaps are opaque light caps
+(`TreeFace.boxesSelectedKeycaps`, `Keycaps` boxed; 07b's "Copy keycap face" probe); a group whose saved mode is unknown
+reads Source "Default" and keeps Reset to Default enabled; `SettingsDialogTest` answers the real Add Variable sheet; plugin
+pages follow `inlineReset`: `KitSettingRows` builds a one-child `SETTINGS_TRAILING` stack and, through
+`HostedKitView.hostModule`, gives each host row Reset to Default in its own menu, so Sample's checkboxes lead and its two
+probes are asserted (Editor 0.941, Project Index 0.930); the classic Plugins split divider paints nothing (a probe between
+the list and the details); ink boxes are asserted on macOS only; a heading's title ends before a count under the last
+column; the unused overloads and `ShortcutEditPanel.specForTests()` are gone (`spec()` is package-private);
+`AppearanceSelection` takes `Editors.menuIcon` and leaves `ProjectionReadTest.COMPOSITION_ROOTS`; and
+`tools/visual/pairs.json` gains `enterprise-settings-07b` (0.933 against its 0.4 floor). `./gradlew check --continue`:
+**11,221 tests, 0 failures, 0 errors, 25 skipped**. Merged with main (plans 7 and 8b) as `3252ba404` (each side's role values kept: `SIDE_COLUMN_WIDTH` 92 and the classic `THEME_PREVIEW_CAPTION_GAP` 7 from 9b, the stripe label padding and gap from plan 7): **11,315 tests, 0 failures, 0 errors, 25 skipped**. GUI
+checks for the user: under Enterprise, the Keymap's recording band and Find by Shortcut, the Plugins page's checkboxes and
+⋯, Add Variable… and its sheet with a variable or two in the table, a right-click on a Notifications row and on a plugin
+page's
+setting row. Hand-off to plans 10a, 10b and any later plan
+that changes a face, a `SETTINGS_*` role or a bundled plugin's Settings page: re-run `SettingsPagesMockTest`, and
+re-baseline the seven Tools pages' probes and floors it records (`PROBES`, `FLOORS`) when the change moves them, with the
+cause in that plan's banner. Not pushed.
+
+**Enterprise presentation, plan 8b: the Run window in the workspace — 2026-10-17** (`claude/enterprise-run-window`, worktree
+`.claude/worktrees/enterprise-8`, `3ce462b60..52978884f`, then this documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-16-enterprise-8b-run-window.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Turning Enterprise on makes the palette
+the Run window: `Presentation.LANDED` gains `RUN_WINDOW`, so the kit's `palette = "run_window"` gives every window
+`PaletteLook(RUN_WINDOW, CORNER)`. `PaletteHome` places the view: `TitleFieldHome` is the card's (today's arithmetic and
+`[palette] center_x/top`), `CornerHome` the Run window's at the bottom-left of the dock work area, inset by
+the mocks' 6 across and 5 up (`RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM`; spec 11.5 says `PALETTE_WINDOW_MARGIN`; the
+mocks' 6 and 5 under the orchestrator's mock-wins ruling, plan R3), attaching a drag that ends at or below
+it, with no guides, `[palette.run_window] left/bottom` and a list that drops rows to fit a short window;
+`WorkspaceChrome.of` reads `PaletteLook.home()` and keeps the palette look and its home (both in `equals`), which plan
+6a's `WindowLook` carries to every window (no new window constructor). The footer buttons are the mocks' 70 px
+(`RUN_WINDOW_BUTTON_PADDING` 8 under the Run window; a longer label grows its button) and `RunWindowRenderTest` checks
+every owner, FOOTER included: the primary's and Cancel's left edges at the mock's 454 and 606 within a device pixel at
+2x in both states, edge agreement 0.965 / 0.972 ("Just opened", top / bottom) and 0.980 / 0.981 ("Typing auth"). The Run
+window is modeless: a tab switch, focus leaving the window and presses outside it leave it open, the window's actions
+run, a clicked pane gets its keys, an opener focuses it and rebuilds its list for the current pane, a press on its title,
+texts or empty areas brings the keyboard back to it, a row runs in the current pane, and it closes on Escape inside
+it, ×, Cancel or running a row; it has no reveal. Browse… runs File › Open File… and the window stays open.
+Plan 6b's `WindowContent.paletteOpen()` and `paletteChanged()` serve "▶ Run…"'s active look. The in-workspace render, an
+Enterprise window built through `WindowLook.of` over the shipped kit's chrome and mounted as `TerminalWindow` mounts it,
+passes 8a's comparison: "Just opened" edge agreement 0.965 / 0.972 in place, every probe and fill as for the window
+alone, the window 6 right of the left stripe and 5 above the bottom strip; `ChromeRenderTest` opens every look's palette. `ProjectionReadTest` holds
+`PaletteLook.view()` to `PaletteViews` and `home()` to `WorkspaceChrome`. Rulings (plan, "Rulings"): (1) the homes are
+the workspace's; (2) the Run window's place is fractions of the workspace; (3) `PALETTE_WINDOW_MARGIN` stays 8 for the
+card and clamping, the Run window's home takes the mocks' 6 and 5; (4) the target follows the window; (5) modeless means
+no capture; (6) an opener focuses; (7) "▶ Run…"'s look is plan 6's; (8) the list fits the home; (9) the rehearsal takes
+the look; (10) the footer buttons are the mocks' 70 px; Execution notes R1 to R16. `[palette.run_window]` is in `docs/configuration.md`; the command palette and
+palette scopes specifications carry spec 19.2's banners. Deviations: (a) Task 2: `WindowCommandPalette`'s drag names the home's rectangle `homeAt`, since `at` already names the drag point in `mouseDragged`; (b) Task 2: `CornerHomeTest.aShortWindowShrinksTheListToFitTheHome` sets eight visible rows before its first layout, as Review Focus 3 states; (c) Task 7: `RunWindowWorkspaceRenderTest` registers the mocks' tool windows (SFTP and File Servers left, Sessions and Tunnels right, Event Log and Transfers in the bottom strip) so the stripes and the bottom strip the home measures from show, and asserts the home in place: 6 right of the left stripe, 5 above the bottom strip, at 2x the strip's rule at the mock's y 1706, the frame's bottom at 1696 and its left edge at the mock's x 60 less its 2 px border plus plan 7's extra stripe thickness (28 against the mock's 23); (d) Task 7: `ChromeRenderTest.check` turns animations off before opening the palette, so the card's print shows it settled; (e) Task 8: the base count is plan 7's merged count at `9c6351e07` (11,240 tests, 25 skipped), and the gallery base was rendered from an export of `9c6351e07`. Default look unchanged: every card test passes as
+before, and the headless gallery's files for Slate Cobalt Dark and Light (322) are byte-identical to the base. `./gradlew check --continue` after the final review fixes: **11,265 tests, 0 failures, 0 errors, 25 skipped**
+(the base's 11,240, this plan's 20 and the final review's 5). A
+selected result's title and tag take the text-aware face (Plex has no ⌘): the Enterprise print's selected row reads ⌘T.
+Open for the orchestrator: the 06 mocks paint the active "▶ Run…" status cell #D9DFEA, the code spec 10.6's
+`surface.control.selected` (#D7D9DC in Enterprise Light). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
+window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
+re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
+and type (the pane takes the keys, the window stays); click the Run window's title row or help text and type (the keys go to
+the Open field); switch tabs and focus another application (it stays); Escape in
+it, ×, Cancel and running a row close it; Browse… opens a file and the window stays; "▶ Run…" shows active while it is
+open. Not merged, not pushed.
+
 **Enterprise presentation, plan 7: dock chrome — 2026-10-17** (`claude/enterprise-dock-chrome`, worktree
 `.claude/worktrees/enterprise-7`, `947b3d9e1..deb7ea3c1`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-7-dock-chrome.md),

@@ -258,7 +258,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandsScope = new CommandsScope(commands, history, macOs, this::dispatchCommand);
         scopes.register(commandsScope);
         commandPalette = new WindowCommandPalette(this, scopes, history, PaletteScope.ALL_ID, macOs,
-            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), look.palette(), look.paletteHome());
         paletteKeys = new PaletteKeyRouter(commandPalette.controller(), commandPalette::open, () -> this.bindings, macOs,
             this::ownsKeySource);
         addHierarchyListener(event -> {
@@ -291,7 +291,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         tabs.addChangeListener(event -> {
             if (!rearranging) {
                 if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.dismiss();
+                if (commandPalette != null) commandPalette.tabChanged();
                 update();
                 focusSelected();
             }
@@ -757,6 +757,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var row = new java.awt.Rectangle(insets.left, 0, Math.max(0, header.getWidth() - insets.left - insets.right), header.getHeight());
         return SwingUtilities.convertRectangle(header, row, target);
     }
+    /**
+     * The dock work area in {@code target}'s coordinates: between the stripes, above the bottom strip and the status bar
+     * (spec 11.5, the Run window's home); null while the area is not in {@code target}'s root. Plan 7 mounts the bottom
+     * strip under the area, so the area's own bounds end above it.
+     */
+    java.awt.Rectangle paletteWorkArea(Component target) {
+        if (area.getParent() == null || SwingUtilities.getRootPane(area) != SwingUtilities.getRootPane(target)) return null;
+        return SwingUtilities.convertRectangle(area.getParent(), area.getBounds(), target);
+    }
     WindowChrome chrome() { return chrome; }
     WorkspaceChrome look() { return look; }
     /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
@@ -1045,7 +1054,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
     private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.isOpen();
+        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
         pane.applyTheme(themes.current());
         ConfigSnapshot configured = workspaceConfiguration.snapshot();
         float configuredFontSize = workspaceConfiguration.configuredFontSize();
@@ -1139,7 +1148,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Side-effect free apart from refreshing enablement: whether {@link #dispatchShortcut} would take the key. */
     boolean claimsShortcut(KeyStroke stroke, Component source) {
         if (dev.jasper.app.platform.WindowInput.blocked(source == null ? this : source)) return true;
-        if (paletteKeys.claimsShortcut(stroke)) return true;
+        if (paletteKeys.claimsShortcut(stroke, source == null ? this : source)) return true;
         var document = selectedContent();
         if (document != null) {
             if (source instanceof JTextComponent && nativeContentClipboard(document, stroke)) return false;
@@ -1480,7 +1489,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     void setActive(boolean value) {
-        if (!value && commandPalette != null) commandPalette.dismiss();
+        if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
         active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();

@@ -96,8 +96,9 @@ final class Choices {
             if(option!=null&&(!option.icon().isBlank()||!option.description().isBlank()))return new RichOptions(context(),option,selected,popup,option.id().equals(((Nodes.Choice)node).selectedId()),base-(input instanceof ChoiceCombo combo?popup?(combo.popup==null?0:combo.popup.getInsets().left+combo.popup.getInsets().right):combo.arrowWidth():ThemePainting.metric(context(),DesignMetrics.Role.CHOICE_ARROW_WIDTH)),settings);
             var label = Choices.optionLabel(context(), option == null ? "Choose…" : option.label(), option == null ? Optional.empty() : option.hue(), selected,
                 option == null ? SemanticColor.TEXT_PLACEHOLDER : null);
-            // A Settings dropdown shows its value, and its menu's rows, at label size, as its row title.
-            if (settings) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
+            // A Settings dropdown shows its value, and its menu's rows, at label size, as its row title; a table cell's at the
+            // cells' body size, as its width measures it.
+            if (settings && !(input instanceof ChoiceCombo combo && combo.cell)) label.setFont(ThemePainting.font(context(), Typography.Role.LABEL));
             return label;
         }
         private void closeOptions() {
@@ -391,7 +392,17 @@ final class Choices {
                 @Override protected void installDefaults() { super.installDefaults(); padding = new Insets(0,0,0,0); }
                 @Override protected ComboPopup createPopup() { return createKitPopup(comboBox); }
                 private boolean rich(){for(int i=0;i<getItemCount();i++){var option=getItemAt(i);if(!option.icon().isBlank()||!option.description().isBlank())return true;}return false;}
-                @Override protected Rectangle rectangleForCurrentValue() { var bounds=super.rectangleForCurrentValue();if(rich())bounds.width=comboBox.getWidth()-comboBox.getInsets().left-comboBox.getInsets().right-arrowWidth();return bounds; }
+                @Override protected Rectangle rectangleForCurrentValue() {
+                    var bounds=super.rectangleForCurrentValue();var i=comboBox.getInsets();
+                    if(rich())bounds.width=comboBox.getWidth()-i.left-i.right-arrowWidth();
+                    // A cell's chevron lane may be narrower than Swing's square arrow button: its value may run under the
+                    // button, its text up to the lane (the renderer's trailing padding inside it, and the pixel fractional
+                    // painting may need beyond the width cellWidth measures), which keeps the chevron clear of it (a longer
+                    // value ends in an ellipsis there); never narrower than Swing's own rectangle.
+                    else if(cell)bounds.width=Math.max(bounds.width,comboBox.getWidth()-i.left-i.right-context.faces().buttons.cellChevronLane(context)
+                        +ThemePainting.metric(context,DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)+paintedExcess());
+                    return bounds;
+                }
                 @Override protected LayoutManager createLayoutManager(){return new ComboBoxLayoutManager(){@Override public void layoutContainer(Container parent){super.layoutContainer(parent);if(arrowButton!=null&&rich()){int width=arrowWidth();var i=comboBox.getInsets();arrowButton.setBounds(comboBox.getWidth()-i.right-width,i.top,width,comboBox.getHeight()-i.top-i.bottom);}}};}
                 @Override protected JButton createArrowButton() { return new JButton() {
                     { setBorder(new EmptyBorder(0, 0, 0, 0)); setContentAreaFilled(false); setOpaque(false); setFocusable(false); addMouseListener(ChoiceCombo.this.rollover); }
@@ -447,8 +458,14 @@ final class Choices {
             var metrics = getFontMetrics(ThemePainting.font(context, Typography.Role.BODY));
             String value = getSelectedItem() instanceof Option selected ? selected.label() : "Choose…";
             var insets = getInsets();
-            return insets.left + insets.right + metrics.stringWidth(value) + 2 * ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
-                + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_ARROW_WIDTH) + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
+            return insets.left + insets.right + metrics.stringWidth(value) + ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING)
+                + context.faces().buttons.cellChevronLane(context);
+        }
+        /** How much wider the value paints in fractional metrics than {@link #cellWidth} measures it, as a literal label allows. */
+        int paintedExcess() {
+            var font = ThemePainting.font(context, Typography.Role.BODY);
+            String value = getSelectedItem() instanceof Option selected ? selected.label() : "Choose…";
+            return Math.max(0, ThemePainting.measureText(font, value) - getFontMetrics(font).stringWidth(value));
         }
         /** Where the closed value's text starts inside the combo: its border inset, then the renderer's padding. */
         int textLead() {

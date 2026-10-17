@@ -1283,6 +1283,26 @@
     ]
   },
   {
+    "name": "enterprise-settings-07b",
+    "mock": "docs/design/enterprise/reference/05 Settings/Settings 07b - Keymap - Recording shortcut.png",
+    "crop": [
+      2,
+      60,
+      2080,
+      1426
+    ],
+    "render": "jasper-app/build/enterprise-settings/pages/07b.png",
+    "min_agreement": 0.4,
+    "colours": [
+      "#F7F7F8",
+      "#FFFFFF",
+      "#ECEDEF",
+      "#C4C7CC",
+      "#E6E7EA",
+      "#2F65CA"
+    ]
+  },
+  {
     "name": "enterprise-settings-08",
     "mock": "docs/design/enterprise/reference/05 Settings/Settings 08 - Plugins.png",
     "crop": [

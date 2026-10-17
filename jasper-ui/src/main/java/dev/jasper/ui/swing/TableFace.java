@@ -1,5 +1,7 @@
 package dev.jasper.ui.swing;
 
+import dev.jasper.ui.metrics.Typography;
+import dev.jasper.ui.model.Nodes;
 import java.awt.Graphics2D;
 import javax.swing.JLabel;
 
@@ -15,4 +17,15 @@ interface TableFace extends HeaderFace {
     int groupIndent(KitContext context);
     /** Styles a heading row's count after it refreshes. */
     void styleCount(JLabel count, KitContext context);
+    /** Whether a heading row's count stands under the last column's title (the classic table); otherwise at the row's end. */
+    boolean countUnderLastColumn();
+    /**
+     * Whether a table on a Settings page shows every row (up to {@code Tables.TableControl.PAGE_ROWS} data rows), the page
+     * scrolling instead of the table; otherwise eight.
+     */
+    boolean everyRowOnPage();
+    /** The type a {@code role} column's text cells take in place of the role's own, {@code settings} on a Settings page; null keeps it. */
+    Typography.Role cellType(Nodes.TextRole role, boolean settings);
+    /** Paints behind an item list's heading rows across {@code width}: nothing, or the classic heading bands (plan 9b Rulings 12). */
+    void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width);
 }

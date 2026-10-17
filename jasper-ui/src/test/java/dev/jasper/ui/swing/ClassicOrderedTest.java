@@ -233,6 +233,33 @@ class ClassicOrderedTest {
         });
     }
 
+    /**
+     * Plan 9b Task 6 (the Shell, Font &amp; Colors and Project Index mocks): an empty list over an entry row keeps a box two
+     * rows tall with a focus ring's room under them, the entry row 6 below it with its Add as wide as the side column at
+     * its end and the field filling the rest; the side column, taller here, does not stretch the box.
+     */
+    @Test void anEntryRowSitsUnderItsBoxWithItsAddAsWideAsTheSideColumn() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, withEntry(List.of()), e -> {})) {
+                KitFixtures.render(view, 600, 200, 1);
+                var list = (ItemLists.ListControl) view.control("markers");
+                var entry = find(view, "entry", JComponent.class);
+                var field = find(view, "marker", JComponent.class);
+                var add = find(view, "marker-add", JComponent.class);
+                int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), gap = ThemePainting.metric(context, DesignMetrics.Role.SIDE_COLUMN_GAP);
+                int box = 2 * line + 2 * ThemePainting.metric(context, DesignMetrics.Role.ORDERED_ROW_HEIGHT) + ThemePainting.metric(context, DesignMetrics.Role.FOCUS_RING);
+                assertThat(ClassicOrderedFace.box(list, list.scroll.getHeight())).isEqualTo(box);
+                assertThat(list.scroll.getViewport().getHeight()).isEqualTo(box - 2 * line);
+                assertThat(entry.getY()).isEqualTo(box + gap);
+                assertThat(list.scroll.getHeight()).as("the side column sets the pane's height").isEqualTo(list.side.getPreferredSize().height);
+                assertThat(add.getWidth()).isEqualTo(list.side.getWidth());
+                assertThat(add.getX() + add.getWidth()).isEqualTo(entry.getWidth());
+                assertThat(field.getX() + field.getWidth()).isEqualTo(add.getX() - gap);
+            } finally { release(context); }
+        });
+    }
+
     /** Rulings 15: a LINK add action leads the side column as a standard button, without its glyph. */
     @Test void aLinkAddActionLeadsTheSideColumnAsAStandardButton() {
         Edt.run(() -> {

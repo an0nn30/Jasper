@@ -92,6 +92,12 @@ public final class SettingsFrameRenders {
                 .as(name + ": section triangles exactly when the navigation collapses").isEqualTo(chrome.collapsibleNav());
             assertThat(KitTestSupport.find(view, "palette.visible_rows:reset", JComponent.class) != null)
                 .as(name + ": a Reset button exactly when Reset is inline").isEqualTo(chrome.inlineReset());
+            // Plan 9b (spec 12.2): the composition the look names, on the Shell page's environment variables.
+            boolean classic = projections.composition() == dev.jasper.app.presentation.Composition.CLASSIC;
+            dialog.select("terminal.shell");
+            var add = KitTestSupport.require(view, "terminal.env:add", AbstractButton.class);
+            assertThat(add.getText()).as(name + ": the environment's add action").isEqualTo(classic ? "Add Variable…" : "Add variable");
+            assertThat(KitTestSupport.find(view, "terminal.env:name-0", JComponent.class)).as(name + ": no field rows").isNull();
             return image;
         } finally {
             dialog.cancel();

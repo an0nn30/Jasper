@@ -23,6 +23,8 @@ final class HostedKitView implements UiView {
  private Consumer<UiEvent> events;
  java.util.function.Predicate<UiEvent> hostEvents = event -> false;
  java.util.function.UnaryOperator<ViewSpec> hostSpec = value -> value;
+ /** Host-only: completes the converted view with what the SDK cannot say (a host row's own menu, spec 12.1). */
+ java.util.function.UnaryOperator<dev.jasper.ui.model.ViewSpec> hostModule = value -> value;
  /** Runs after each descriptor update; a host-packed dialog uses it to follow the view's size (DialogFit). */
  Runnable updated = () -> { };
 
@@ -34,7 +36,7 @@ final class HostedKitView implements UiView {
  void guard(){owner.guard();if(closed.get())throw new IllegalStateException("View is closed");}
  KitView component(){guard();return view;}
  void dispatch(UiEvent event){if(closed.get()||!owner.live())return;try{if(hostEvents.test(event))return;events.accept(event);}catch(Throwable failure){owner.failed();}}
- @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var projected=hostSpec.apply(next);if(projected!=next)owner.validateIcons(projected);view.update(KitValues.toModule(projected));sourceSpec=next;spec=projected;}finally{updating=false;}checkAnchors();updated.run();}
+ @Override public void update(ViewSpec next){guard();if(updating)throw new IllegalStateException("Reentrant view update");updating=true;try{owner.validateIcons(next);var projected=hostSpec.apply(next);if(projected!=next)owner.validateIcons(projected);view.update(hostModule.apply(KitValues.toModule(projected)));sourceSpec=next;spec=projected;}finally{updating=false;}checkAnchors();updated.run();}
  @Override public UiAnchor anchor(String id){guard();if(mount==null || owner.anchorHost==null)throw new IllegalArgumentException("Unmounted view");var anchor=new HostedAnchor(this,id);anchors.add(anchor);anchor.onClosed(() -> anchors.remove(anchor));return anchor;}
  @Override public ViewSpec spec(){guard();return spec;}
  /** Host-only original plugin descriptor, before draft/search row projection. */
@@ -56,5 +58,5 @@ final class HostedKitView implements UiView {
  /** Host-only: moves the view to a theme slot (a workspace content tab, or back to chrome) with or without the opaque
   * surface, and refreshes its registered specialized content at once rather than at its next reparent. */
  void route(dev.jasper.ui.theme.ThemeRoute route,boolean surface){guard();view.route(route);view.paintsSurface(surface);contents.removeIf(KitContent::closed);for(var content:List.copyOf(contents))content.refresh();}
- @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;updated=() -> { };mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
+ @Override public void close(){if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {invalidateAnchors();view.close();events=e -> {};hostEvents=e -> false;hostSpec=v -> v;hostModule=v -> v;updated=() -> { };mount=null;owner.removed(this);};if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup);}
 }

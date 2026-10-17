@@ -57,9 +57,13 @@ public final class PaletteKeyRouter implements AutoCloseable {
     /** Root-map fallback shares the policy, but has no physical key sequence to retain. */
     public boolean dispatchShortcut(KeyStroke stroke, Component source) { return route(stroke, source, code -> {}); }
 
-    /** Side-effect free: whether {@link #dispatchShortcut} would take this stroke (an opening shortcut, or any while open). */
-    public boolean claimsShortcut(KeyStroke stroke) {
-        return !closed && (palette.isOpen() || scopeFor(bindings.get().actionFor(stroke).orElse(null)) != null);
+    /** Side-effect free: whether {@link #dispatchShortcut} would take this stroke (an opening shortcut, or any while the card is open; with the Run window open, only the openers). */
+    public boolean claimsShortcut(KeyStroke stroke) { return claimsShortcut(stroke, null); }
+
+    /** As {@link #claimsShortcut(KeyStroke)} for a key from {@code source}: the Run window claims only its own keys and openers. */
+    public boolean claimsShortcut(KeyStroke stroke, Component source) {
+        return !closed && (palette.isOpen() && (!palette.modeless() || palette.owns(source))
+            || scopeFor(bindings.get().actionFor(stroke).orElse(null)) != null);
     }
 
     private boolean route(KeyStroke stroke, Component source, IntConsumer claim) {
@@ -79,6 +83,8 @@ public final class PaletteKeyRouter implements AutoCloseable {
             return true;
         }
         if (!palette.isOpen()) return false;
+        // The Run window is modeless (spec 11.6): a key from outside it is the window's.
+        if (palette.modeless() && !palette.owns(source)) return false;
         // KeyStroke carries legacy bits as well as extended modifiers.
         int modifiers = stroke.getModifiers() & (InputEvent.SHIFT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK
             | InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK | InputEvent.ALT_GRAPH_DOWN_MASK);

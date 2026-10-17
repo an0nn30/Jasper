@@ -80,6 +80,8 @@ final class Stacks {
          * the reconciler does not clear it, so its next detach pass leaves an adopted row where it is.
          */
         java.util.Map<String, Container> adopted = java.util.Map.of();
+        /** The classic ordered list that last adopted this INLINE row as its entry row ({@link ClassicOrderedFace#span}), or null. */
+        ItemLists.ListControl entryOf;
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -143,11 +145,22 @@ final class Stacks {
                                     return super.verticalGap(previous, child);
                                 }
                             });
+            if (component.getLayout() instanceof Navigation.InlineLayout inline) inline.titleLine = titleLine(stack);
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
             if (panelRow && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new PanelRowLayout(context()));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
+            // An entry row a classic ordered list holds keeps the face's layout across refreshes (plan 9b Task 6).
+            if (entryOf != null && entryOf.entry == component) component.setLayout(new ClassicOrderedFace.EntryLayout(entryOf));
             component.revalidate();
             component.repaint();
+        }
+
+        /** Whether {@code stack} is a line led by a title over a further line, without a tile, whose buttons the face stands on the title's line. */
+        private boolean titleLine(Nodes.Stack stack) {
+            return context().faces().buttons.titleLine() && stack.role() == Nodes.LayoutRole.NAVIGATION
+                && !stack.children().isEmpty() && stack.children().stream().noneMatch(Nodes.Icon.class::isInstance)
+                && stack.children().getFirst() instanceof Nodes.Stack first && first.role() == Nodes.LayoutRole.VERTICAL && first.children().size() > 1
+                && first.children().getFirst() instanceof Nodes.Text title && title.role() == Nodes.TextRole.DETAIL_TITLE;
         }
 
         @Override
@@ -569,7 +582,7 @@ final class Stacks {
         @Override public Dimension preferredLayoutSize(Container p){if(p.getComponentCount()==0)return new Dimension();var c=p.getComponent(0).getPreferredSize();return new Dimension(c.width+gap(p)+action(p),c.height);}
         @Override public int height(Container p,int width){return p.getComponentCount()==0?0:Composition.height(p.getComponent(0),Math.max(0,width-gap(p)-action(p)));}
         /** A switch's track aligns with the column's other controls; its focus halo lies in the gap before the action. */
-        int halo(Container p){return p.getComponent(0) instanceof Switches.SwitchButton?ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING):0;}
+        int halo(Container p){return p.getComponent(0) instanceof Switches.SwitchButton button && !button.face.leads()?ThemePainting.metric(context,DesignMetrics.Role.FOCUS_RING):0;}
         @Override public void layoutContainer(Container p){if(p.getComponentCount()==0)return;int a=action(p),w=Math.max(0,p.getWidth()-gap(p)-a);p.getComponent(0).setBounds(halo(p),0,w,p.getHeight());if(p.getComponentCount()>1)p.getComponent(1).setBounds(w+gap(p),0,a,p.getHeight());}
         @Override public void addLayoutComponent(String n,Component c){} @Override public void removeLayoutComponent(Component c){}
     }

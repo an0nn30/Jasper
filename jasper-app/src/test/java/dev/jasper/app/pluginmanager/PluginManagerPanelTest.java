@@ -256,7 +256,7 @@ class PluginManagerPanelTest {
     @Test void theOverviewAndDetailsChoiceSwapsTheOneTextArea() {
         panel.show(snapshot(TestRows.plugin("a.quiet", "Quiet").description("").row()));
         var choice = (Nodes.Choice) find(panel.detailsPane().header().spec().root(), PluginDetails.SECTION);
-        assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.EXCLUSIVE);
+        assertThat(choice.kind()).isEqualTo(Nodes.ChoiceKind.TABS);
         assertThat(choice.options()).extracting(dev.jasper.ui.model.Option::label).containsExactly("Overview", "Details");
         assertThat(choice.selectedId()).isEqualTo(PluginDetails.OVERVIEW);
         assertThat(panel.detailsPane().shownText()).isEqualTo("No description.");

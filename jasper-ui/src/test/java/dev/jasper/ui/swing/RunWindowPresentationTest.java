@@ -233,6 +233,31 @@ class RunWindowPresentationTest {
         });
     }
 
+    /** Plan 8b (the mocks' 70 px footer buttons): under runWindow a button's label padding is RUN_WINDOW_BUTTON_PADDING. */
+    @Test void runWindowButtonsTakeTheRunWindowsLabelPadding() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var spec = new ViewSpec(new Nodes.Stack("footer", READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Button("primary", READY, "Connect", "", Nodes.ButtonKind.PRIMARY, "primary", "", Nodes.ButtonPresentation.STANDARD),
+                new Nodes.Button("browse", READY, "Browse\u2026", "", Nodes.ButtonKind.SECONDARY, "browse", "", Nodes.ButtonPresentation.STANDARD),
+                new Nodes.Button("close", READY, "", "close", Nodes.ButtonKind.GHOST, "close", "Close", Nodes.ButtonPresentation.EMBEDDED)), ""));
+            try (var view = new KitView(context, spec, event -> { })) {
+                var primary = ((Buttons.ButtonControl) view.control("primary")).button;
+                var browse = ((Buttons.ButtonControl) view.control("browse")).button;
+                var close = ((Buttons.ButtonControl) view.control("close")).button;
+                int kit = ThemePainting.metric(context, DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+                int run = ThemePainting.metric(context, DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING);
+                assertThat(browse.getInsets().left).as("the kit's padding outside the Run window").isEqualTo(kit);
+                view.runWindow(true);
+                assertThat(List.of(primary.getInsets().left, primary.getInsets().right, browse.getInsets().left, browse.getInsets().right))
+                    .as("the Run window's padding").containsOnly(run);
+                assertThat(close.getInsets().left).as("an embedded button keeps no padding").isZero();
+                view.runWindow(false);
+                assertThat(browse.getInsets().left).as("and back").isEqualTo(kit);
+            }
+        });
+    }
+
     @Test void runWindowTextAndTheQuietQueryTakeTheMocksFacesAndColours() {
         Edt.run(() -> {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());

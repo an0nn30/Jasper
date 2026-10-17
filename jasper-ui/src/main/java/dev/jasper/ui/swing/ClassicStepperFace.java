@@ -57,8 +57,13 @@ final class ClassicStepperFace implements StepperFace {
         label.setFont(value.getFont()); label.setForeground(ThemePainting.painted(context, unit));
     }
 
+    /**
+     * The value's share of the spinner's {@code SPINNER_WIDTH}, which spans both outline strokes (the mocks' 82): the arrow
+     * column and the trailing stroke of {@link #surfaceInsets} take the rest (plan 9b Task 7).
+     */
     @Override public int valueWidth(KitContext context) {
-        return ThemePainting.metric(context, DesignMetrics.Role.SPINNER_WIDTH) - ThemePainting.metric(context, DesignMetrics.Role.SPINNER_ARROW_WIDTH);
+        return ThemePainting.metric(context, DesignMetrics.Role.SPINNER_WIDTH) - ThemePainting.metric(context, DesignMetrics.Role.SPINNER_ARROW_WIDTH)
+            - surfaceInsets(context).right;
     }
 
     /** The arrow column stays inside the field's 1 px outline on its top, bottom and trailing sides. */

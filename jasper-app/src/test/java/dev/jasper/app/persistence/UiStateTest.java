@@ -425,4 +425,38 @@ class UiStateTest {
         assertThat(UiState.load(file).palettePosition()).as("whole numbers are fractions too").hasValue(new UiState.PalettePosition(0, 1));
         assertThatIllegalArgumentException().isThrownBy(() -> new UiState.PalettePosition(-0.1, 0.5));
     }
+
+    /** Spec 11.5 and Review Focus 4: the Run window's place is its own table; a bad value is ignored alone. */
+    @Test void theRunWindowsPlaceIsItsOwnTableAndBadValuesAreIgnored() throws Exception {
+        Path file = dir.resolve("ui-state.toml");
+        UiState state = UiState.load(file);
+        assertThat(state.runWindowPosition()).isEmpty();
+        state.setRunWindowPosition(new UiState.RunWindowPosition(0.0, 1.0));
+        state.save();
+        assertThat(Files.readString(file)).contains("\n[palette.run_window]\nleft = 0.0\nbottom = 1.0\n").doesNotContain("center_x");
+        assertThat(UiState.load(file).runWindowPosition()).hasValue(new UiState.RunWindowPosition(0.0, 1.0));
+        assertThat(UiState.load(file).palettePosition()).as("the card's place is another table").isEmpty();
+
+        state.setPalettePosition(new UiState.PalettePosition(0.5, 0.2));
+        state.save();
+        var both = UiState.load(file);
+        assertThat(both.palettePosition()).hasValue(new UiState.PalettePosition(0.5, 0.2));
+        assertThat(both.runWindowPosition()).hasValue(new UiState.RunWindowPosition(0.0, 1.0));
+
+        state.setRunWindowPosition(null);
+        state.save();
+        assertThat(Files.readString(file)).doesNotContain("run_window");
+        assertThat(UiState.load(file).palettePosition()).as("forgetting one keeps the other").hasValue(new UiState.PalettePosition(0.5, 0.2));
+
+        Files.writeString(file, "version = 2\n\n[palette.run_window]\nleft = 0.25\nbottom = 0.75\n");
+        assertThat(UiState.load(file).runWindowPosition()).as("spec 11.5's table alone").hasValue(new UiState.RunWindowPosition(0.25, 0.75));
+        for (String bad : List.of("left = 1.5\nbottom = 0.2", "left = 0.5", "left = 0.5\nbottom = -1", "left = \"a\"\nbottom = 0.2")) {
+            Files.writeString(file, "version = 2\nrail_visible = false\n\n[palette]\ncenter_x = 0.5\ntop = 0.2\n\n[palette.run_window]\n" + bad + "\n");
+            UiState loaded = UiState.load(file);
+            assertThat(loaded.runWindowPosition()).as(bad).isEmpty();
+            assertThat(loaded.palettePosition()).as("%s leaves the card's place alone", bad).hasValue(new UiState.PalettePosition(0.5, 0.2));
+            assertThat(loaded.railVisible()).isFalse();
+        }
+        assertThatIllegalArgumentException().isThrownBy(() -> new UiState.RunWindowPosition(0.5, 1.1));
+    }
 }

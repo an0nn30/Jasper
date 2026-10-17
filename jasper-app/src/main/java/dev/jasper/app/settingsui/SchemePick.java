@@ -23,10 +23,10 @@ final class SchemePick implements ValueEditor<String> {
     private String value = "match";
     private Runnable render = () -> { };
 
-    SchemePick(String label, Supplier<InstalledThemes> themes, Optional<ThemeImports> imports, PageContext context) {
+    SchemePick(String label, Supplier<InstalledThemes> themes, Optional<ThemeImports> imports, PageContext context, String icon) {
         this.label = label;
         this.themes = themes;
-        menu = imports.map(hooks -> new ThemeMenu(hooks, themes, context, ThemeMenu.Target.TERMINAL, () -> render.run()));
+        menu = imports.map(hooks -> new ThemeMenu(hooks, themes, context, ThemeMenu.Target.TERMINAL, () -> render.run(), icon));
         refresh();
     }
 

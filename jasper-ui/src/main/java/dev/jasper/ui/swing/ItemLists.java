@@ -167,6 +167,28 @@ final class ItemLists {
             return value().kind() == Nodes.ListKind.RESULTS;
         }
 
+        /** A list of plain rows: not results, identity rows, or a panel's compact or manager column rows (plan 9b Task 5). */
+        boolean plainRows() { return !results() && !identityRows() && !panelCompact && column < 0; }
+
+        /** Plan 9b Rulings 12: a plain list's heading bands from the table face (none by default), under the rows' fills. */
+        @Override
+        void paintBands(java.awt.Graphics2D g, int width) { if (plainRows()) context().faces().table.paintListHeadings(this, g, width); }
+
+        /** A plain list's heading opens with the row hairline only where the table face rules it (the classic band draws its own rules). */
+        @Override
+        boolean headingRule() { return !plainRows() || context().faces().table.headingRule(); }
+
+        /** A plain list's heading height with its rules ({@code LIST_HEADING_HEIGHT}), or 0 when headings are as tall as the rows. */
+        int headingHeight() { return plainRows() ? ThemePainting.metric(context(), DesignMetrics.Role.LIST_HEADING_HEIGHT) : 0; }
+
+        /** A plain two-line list's {@code LIST_TWO_LINE_ROW_HEIGHT}, or 0 to measure its rows. */
+        @Override
+        int fixedRowHeight() {
+            // A classic ordered list's rows are ORDERED_ROW_HEIGHT tall (the Shell, Font & Colors and Project Index mocks' 20, plan 9b Task 6).
+            if (sideColumn()) return ThemePainting.metric(context(), DesignMetrics.Role.ORDERED_ROW_HEIGHT);
+            return lines() == 2 && plainRows() ? ThemePainting.metric(context(), DesignMetrics.Role.LIST_TWO_LINE_ROW_HEIGHT) : 0;
+        }
+
         @Override
         boolean dataRow(int index) {
             return index < 0 || index >= size() || !value().items().get(index).heading();
@@ -175,11 +197,12 @@ final class ItemLists {
         /** RESULTS rows and headings keep measured minimum heights; headings elsewhere are as tall as the rows. */
         @Override
         boolean uniformRows() {
-            return !results() && !identityRows();
+            return !results() && !identityRows() && headingHeight() == 0;
         }
 
         @Override
         int rowHeightAt(int index) {
+            if (headingHeight() > 0) return value().items().get(index).heading() ? headingHeight() : rowHeight;
             if(identityRows())return value().items().get(index).heading()?ThemePainting.height(context(),DesignMetrics.Role.IDENTITY_HEADING_HEIGHT,Typography.Role.CAPTION):rowHeight;
             if (results() && view.runWindow()) return RunWindowPresentation.rowHeight(context(), value().items().get(index).heading());
             return ResultMetrics.height(context(), value().items().get(index).heading());
@@ -490,9 +513,9 @@ final class ItemLists {
                         && row.controls.get(text.id()).component instanceof JLabel label)
                     label.setForeground(ThemePainting.color(context(),SemanticColor.TEXT_TERTIARY));
             if (results() && !item.heading() && selected.contains(item.id())) {
-                resultSelection(row, item.title(), true);
-                resultSelection(row, item.subtitle(), true);
-                resultSelection(row, item.trailing(), false);
+                resultSelection(row, item.title());
+                resultSelection(row, item.subtitle());
+                resultSelection(row, item.trailing());
             }
             for(var control:row.controls.values())if(control instanceof Buttons.ButtonControl button)button.button.panelRow=panelSingle;
             if (results() && view.runWindow()) RunWindowPresentation.row(context(), row, item, selected.contains(item.id()));
@@ -521,12 +544,14 @@ final class ItemLists {
                 label.setForeground(ThemePainting.color(context(), row.owner.ink().supporting));
         }
 
-        /** A selected result's strong face; its ink comes from the row (InteractiveRows.Row.inked). */
-        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes, boolean strong) {
+        /**
+         * A selected result's face: its role's, for its text, so a kit face without one of the text's glyphs (IBM Plex has no
+         * macOS modifier symbols) gives way to the platform face; its ink comes from the row (InteractiveRows.Row.inked).
+         */
+        private void resultSelection(InteractiveRows.Row row, List<Nodes.Node> nodes) {
             for (var node : nodes) if (node instanceof Nodes.Text text
                     && row.controls.get(text.id()).component instanceof JLabel label) {
-                label.setFont(SwingTypography.effective(context().typography().resultFont(
-                    Typography.Role.valueOf(text.role().name()), strong)));
+                label.setFont(ThemePainting.font(context(), Typography.Role.valueOf(text.role().name()), text.text()));
             }
         }
 

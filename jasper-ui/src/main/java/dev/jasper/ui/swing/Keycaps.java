@@ -13,8 +13,12 @@ final class Keycaps implements Icon {
     private final Font font;
     private final int[] widths;
     private final int width,height,pad,gap;
-    Keycaps(KitContext context,KeycapSequence sequence) {
-        this.context=context;this.sequence=sequence;font=ThemePainting.font(context,Typography.Role.CAPTION,String.join("",sequence.keys()));
+    /** Opaque light caps (a classic selected row's, DESIGN_LANGUAGE §6 "in a light box"), not the passive translucent ones. */
+    private final boolean boxed;
+    Keycaps(KitContext context,KeycapSequence sequence) { this(context,sequence,false); }
+    /** {@code boxed}: each cap is an opaque {@code surface.card} face (no hover tint) inside its edge, so its glyphs read on an accent fill. */
+    Keycaps(KitContext context,KeycapSequence sequence,boolean boxed) {
+        this.context=context;this.sequence=sequence;this.boxed=boxed;font=ThemePainting.font(context,Typography.Role.CAPTION,String.join("",sequence.keys()));
         pad=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_PADDING);gap=ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_GAP);
         var metrics=new javax.swing.JLabel().getFontMetrics(font);
         height=metrics.getHeight()+ThemePainting.metric(context,DesignMetrics.Role.KEYCAP_VERTICAL_PADDING);
@@ -53,8 +57,10 @@ final class Keycaps implements Icon {
                 var outer=new java.awt.geom.RoundRectangle2D.Double(x,y,widths[i],height,radius*2,radius*2);
                 var face=new java.awt.geom.RoundRectangle2D.Double(x+stroke,y+stroke,Math.max(0,widths[i]-2*stroke),Math.max(0,height-stroke-base),Math.max(0,radius-stroke)*2,Math.max(0,radius-stroke)*2);
                 var edge=new java.awt.geom.Area(outer);edge.subtract(new java.awt.geom.Area(face));
+                // A boxed cap lays the light face under its whole outline first, so the translucent edge and face read as on a card.
+                if(boxed){g.setColor(ThemePainting.color(context,SemanticColor.SURFACE_CARD));g.fill(outer);}
                 g.setColor(translucent(SemanticColor.TEXT_TERTIARY,DesignMetrics.Role.KEYCAP_EDGE_ALPHA));g.fill(edge);
-                g.setColor(translucent(SemanticColor.HOVER_OVERLAY,DesignMetrics.Role.KEYCAP_FACE_ALPHA));g.fill(face);
+                if(!boxed){g.setColor(translucent(SemanticColor.HOVER_OVERLAY,DesignMetrics.Role.KEYCAP_FACE_ALPHA));g.fill(face);}
                 g.setColor(ThemePainting.color(context,SemanticColor.TEXT_PRIMARY));
                 var metrics=g.getFontMetrics();String key=sequence.keys().get(i);
                 g.drawString(key,x+(widths[i]-metrics.stringWidth(key))/2,y+(height-base+stroke-metrics.getHeight())/2+metrics.getAscent());

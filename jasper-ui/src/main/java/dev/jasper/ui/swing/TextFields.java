@@ -292,6 +292,7 @@ final class TextFields {
             var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || (field.presentation() == Nodes.FieldPresentation.TECHNICAL || view.runWindow() && field.presentation() == Nodes.FieldPresentation.TRANSPARENT) ? Typography.Role.MONO : Typography.Role.BODY;
             inputRole = role; fitFont();
             surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
+            surface.least = settings && field.kind() == Nodes.FieldKind.TEXT && !surface.transparent ? context().faces().fields.settingsWidth(context()) : 0;
             surface.quiet = surface.transparent && view.runWindow();
             surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;
             surface.panelSearch=panelSearch; surface.role=role; surface.heightRole=panelSearch ? DesignMetrics.Role.PANEL_SEARCH_HEIGHT : columnSearch ? DesignMetrics.Role.COLUMN_SEARCH_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT;
@@ -408,6 +409,8 @@ final class TextFields {
         boolean port;
         /** Shows a value as a fact (Field.readOnly): the field policy may give it its own surface. */
         boolean readOnly;
+        /** The least width the field policy gives a Settings page's text field ({@link FieldPolicy#settingsWidth}); 0 for none. */
+        int least;
         ThemePainting.Focus focus;
         FieldSurface(KitContext context, JTextComponent input, boolean multiline) {
             super(new BorderLayout()); this.context = context; this.input = input; this.multiline = multiline; setOpaque(false);
@@ -415,7 +418,7 @@ final class TextFields {
         @Override public Dimension getPreferredSize() {
             var size = super.getPreferredSize();
             int height = ThemePainting.height(context, prompt ? DesignMetrics.Role.PROMPT_FIELD_HEIGHT : heightRole, role);
-            int width = port ? Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.PORT_FIELD_WIDTH)) : size.width;
+            int width = Math.max(least, port ? Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.PORT_FIELD_WIDTH)) : size.width);
             return new Dimension(width, multiline ? Math.max(size.height, height) : height);
         }
         /**

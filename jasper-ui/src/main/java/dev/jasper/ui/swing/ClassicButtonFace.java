@@ -58,7 +58,8 @@ final class ClassicButtonFace implements ButtonFace {
     }
 
     @Override public void paintFace(Buttons.KitButton b, Graphics2D g, boolean hover, boolean focused) {
-        if (b.embedded || b.recorder() || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
+        if (b.recorder()) { recorder(b, g, focused); return; }
+        if (b.embedded || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) { b.paintRaised(g, hover, focused); return; }
         var c = b.context();
         boolean flat = ghost(b) && flat(b), selected = b.toggle && b.isSelected(), pressed = b.isEnabled() && b.getModel().isPressed();
         if (flat && !hover && !selected) { ThemePainting.rounded(g, b, c, null, null, focused, false); return; }
@@ -167,13 +168,17 @@ final class ClassicButtonFace implements ButtonFace {
             : !combo.isEnabled() ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, hover ? hoverEdge : edge), focused, false);
     }
 
-    /** The guarded ▼ in text.secondary; a bare cell dropdown on a selected row takes the row's supporting ink, as by default. */
+    /**
+     * The guarded ▼ in text.secondary; a bare cell dropdown's in text.placeholder (the Notifications mock's #7A808A, plan
+     * 9b Task 2), or on a selected row in the row's supporting ink, as by default.
+     */
     @Override public void paintArrow(Choices.ChoiceCombo combo, JComponent owner, Graphics2D g, int beyond, boolean settings) {
         var c = combo.context;
-        down(owner, g, c, beyond, combo.bare() && combo.cellInk != null ? ThemePainting.color(c, combo.cellInk.supporting) : ThemePainting.painted(c, arrow));
+        down(owner, g, c, beyond, !combo.bare() ? ThemePainting.painted(c, arrow)
+            : ThemePainting.color(c, combo.cellInk != null ? combo.cellInk.supporting : SemanticColor.TEXT_PLACEHOLDER));
     }
 
-    /** The drawn ▼ in {@code colour}, centred {@code DROPDOWN_GLYPH_INSET} in from a trailing edge {@code beyond} past {@code owner}'s. */
+    /** The drawn ▼ in {@code colour}, ending {@code DROPDOWN_GLYPH_INSET} in from a trailing edge {@code beyond} past {@code owner}'s. */
     static void down(JComponent owner, Graphics2D g, KitContext c, int beyond, Color colour) {
         int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
         double right = owner.getWidth() + beyond - ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH_INSET);
@@ -210,4 +215,24 @@ final class ClassicButtonFace implements ButtonFace {
     /** The classic pair's halves share one border, as the Settings mocks' history pair does (51 wide for two 26 px halves). */
     @Override public int joinedOverlap() { return UIScale.scale(1); }
     @Override public Color menuDivider(KitContext context) { return ThemePainting.role(context, DerivedColor.BORDER_ROW); }
+    /**
+     * The drawn ▼ follows a cell dropdown's value: as far after the text as it ends before the trailing edge (the
+     * Notifications mock's "Card ▼", plan 9b Task 2).
+     */
+    @Override public int cellChevronLane(KitContext context) {
+        return 2 * ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH_INSET) + ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH);
+    }
+
+    /**
+     * A recorder value drawn as a classic field (plan 9b Rulings 10): the input surface, its edge (the error edge while it
+     * reports one), and the focus ring while focused or armed.
+     */
+    private static void recorder(Buttons.KitButton b, Graphics2D g, boolean focused) {
+        var c = b.context();
+        boolean ring = focused || b.armed();
+        ThemePainting.rounded(g, b, c, b.fill(false), ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS) : b.border(),
+            ring, false, DesignMetrics.Role.FIELD_RADIUS);
+    }
+    /** Plan 9b Task 5: the Plugins mock's Disable stands on the plugin name's line, above its metadata. */
+    @Override public boolean titleLine() { return true; }
 }

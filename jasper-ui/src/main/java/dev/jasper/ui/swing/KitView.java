@@ -391,7 +391,8 @@ public final class KitView extends JPanel implements AutoCloseable {
     /**
      * App-only: this view is part of the Run window (Enterprise presentation spec 11.2). Its RESULTS lists take the Run
      * window's rows, heading bands and counts, its PROMPT_HEADER tile the Run window's tile, its transparent fields the
-     * data face and no ring of their own (the host's field box shows focus), and its text the Run window's colours.
+     * data face and no ring of their own (the host's field box shows focus), its buttons the Run window's label padding
+     * ({@code RUN_WINDOW_BUTTON_PADDING}), and its text the Run window's colours.
      * Re-reconciles the current descriptor. EDT confined.
      */
     public void runWindow(boolean value) {

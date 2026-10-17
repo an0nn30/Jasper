@@ -162,6 +162,40 @@ public final class SettingsDialog {
         return confirmed[0];
     }
 
+    /**
+     * Asks {@code request} in a modal sheet over the dialog (plan 9b Rulings 14): the fields' values in order on its
+     * primary button, empty on Cancel, Escape or a closed sheet, or while the dialog is closed.
+     */
+    Optional<List<String>> sheet(Sheets.Request request) {
+        if (!isOpen() || kit == null) return Optional.empty();
+        var values = new java.util.ArrayList<String>();
+        for (var field : request.fields()) values.add(field.value());
+        boolean[] confirmed = {false};
+        var sheet = windows.dialog(request.title(), true, surface);
+        var fields = new java.util.ArrayList<Nodes.Node>();
+        for (var field : request.fields())
+            fields.add(new Nodes.FormRow("sheet-row-" + field.id(), ControlState.READY, field.label(), "",
+                new Nodes.Field("sheet-" + field.id(), ControlState.READY, Nodes.FieldKind.TEXT, field.value(), "", field.label(), ""), Optional.empty()));
+        var sheetView = new KitView(kit, new ViewSpec(new Nodes.Form("value-sheet", ControlState.READY, Nodes.FormKind.SHEET, request.heading(),
+            Optional.empty(), List.of(new Nodes.Card("sheet-card", ControlState.READY, Nodes.CardKind.FORM, fields)), Optional.empty(),
+            List.of(new Nodes.Button("cancel", ControlState.READY, "Cancel", "", Nodes.ButtonKind.SECONDARY, "cancel", ""),
+                new Nodes.Button("confirm", ControlState.READY, request.confirm(), "", Nodes.ButtonKind.PRIMARY, "confirm", "")), "cancel")),
+            event -> {
+                if (event instanceof UiEvent.Edited edited)
+                    for (int i = 0; i < request.fields().size(); i++)
+                        if (edited.id().equals("sheet-" + request.fields().get(i).id())) values.set(i, edited.text());
+                if (!(event instanceof UiEvent.Action action)) return;
+                if (action.id().equals("confirm")) confirmed[0] = true;
+                if (action.id().equals("confirm") || action.id().equals("cancel")) sheet.close();
+            });
+        sheet.onClosed(sheetView::close);
+        sheet.setContent(sheetView);
+        sheet.show();
+        sheet.close();
+        if (isOpen()) surface.toFront();
+        return confirmed[0] ? Optional.of(List.copyOf(values)) : Optional.empty();
+    }
+
     public boolean isOpen() { return surface != null && !surface.closed(); }
 
     /**
@@ -181,7 +215,7 @@ public final class SettingsDialog {
             this::event, this::cancel);
         view.onEnter(this::ok);
         pages = List.copyOf(pageFactory.apply(new PageContext(draft, this::select, this::closeThen, this::chooseFile, this::refreshNow,
-            () -> isOpen() ? surface : null, this::kit, hooks.chrome(), hooks.composition())));
+            () -> isOpen() ? surface : null, this::kit, hooks.chrome(), hooks.composition(), new Sheets(this::sheet))));
         backStack.clear();
         forwardStack.clear();
         current = null;

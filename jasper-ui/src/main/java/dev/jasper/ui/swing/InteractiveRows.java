@@ -33,7 +33,7 @@ final class InteractiveRows {
         boolean selectionShown(int index) {
             String id = itemId(index);
             if (!dataRow(index) || passive() || !selected.contains(id)) return false;
-            if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return false;
+            if (this instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id) && !context().faces().tree.fillsDetailRow()) return false;
             // A classic side column takes focus from the rows to act on them, so its list shows the selection unfocused.
             return !(node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) || canvas.isFocusOwner()
                 || !context().faces().ordered.rowCommands();
@@ -172,6 +172,8 @@ final class InteractiveRows {
         abstract String activation();
 
         abstract List<MenuItem> contextActions();
+        /** Where a heading row's count starts, in row coordinates; -1 puts it at the row's end (plan 9b Rulings 5). */
+        int headingCountStart() { return -1; }
 
         /** Whether Enter with no focused row stays with the rows (doing nothing) instead of passing on; tables only. */
         boolean keepsEnterWithoutFocus() {
@@ -336,6 +338,9 @@ final class InteractiveRows {
 
         boolean identityRows() { return false; }
 
+        /** A row height that replaces the measured one's padding (a plain two-line list's role), or 0 to measure the rows. */
+        int fixedRowHeight() { return 0; }
+
         /** Paints bands under the rows' fills (a classic table's zebra and heading bands); none by default. */
         void paintBands(Graphics2D g, int width) { }
 
@@ -389,6 +394,9 @@ final class InteractiveRows {
             if (column == 0 || column == 1) rowHeight = Math.max(rowHeight,
                 ThemePainting.metric(context(), column == 0 || lines() < 2 ? DesignMetrics.Role.COLUMN_RAIL_ROW : DesignMetrics.Role.COLUMN_ITEM_ROW));
             rowHeight = Math.max(rowHeight, minimumRowHeight());
+            // A fixed row height replaces the measured padding; the row still holds its lines whole.
+            int fixed = fixedRowHeight();
+            if (fixed > 0) rowHeight = Math.max(fixed, line * lines());
             if (documentLines) rowHeight = Math.max(line, canvas.getFontMetrics(ThemePainting.font(context(), Typography.Role.MONO)).getHeight())
                 + ThemePainting.metric(context(), DesignMetrics.Role.DOCUMENT_BAR_LINE_GAP);
             if (panelCompact) rowHeight = Math.max(ThemePainting.metric(context(), DesignMetrics.Role.PANEL_COMPACT_ROW_HEIGHT), compactRowHeight());
@@ -789,15 +797,7 @@ final class InteractiveRows {
                 int index=tree.indexOf(tree.detail.itemId);
                 if(index>=0) {
                     var g=(Graphics2D)graphics.create();
-                    try {
-                        ThemePainting.antialias(g);
-                        int inset=ThemePainting.metric(owner.context(),DesignMetrics.Role.KEYCAP_DETAIL_INSET),radius=ThemePainting.metric(owner.context(),DesignMetrics.Role.CONTROL_RADIUS)*2;
-                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.SURFACE_CONTROL));
-                        int card=Math.max(0,tree.heightAt(index)-tree.detailAfter());
-                        g.fillRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset),card,radius,radius);
-                        g.setColor(ThemePainting.color(owner.context(),SemanticColor.BORDER_FOCUS));
-                        g.drawRoundRect(inset,tree.top(index),Math.max(0,getWidth()-2*inset-1),Math.max(0,card-1),radius,radius);
-                    }finally{g.dispose();}
+                    try { tree.context().faces().tree.paintDetail(tree, g, index, getWidth()); } finally { g.dispose(); }
                 }
             }
             if (owner.node instanceof Nodes.ItemList list && list.kind() == Nodes.ListKind.ORDERED) owner.context().faces().ordered.paintCanvas(this, graphics);
@@ -870,7 +870,7 @@ final class InteractiveRows {
         /** This row's selection or hover fill across the list's full {@code width}, in the canvas's coordinates. */
         void paintFill(Graphics graphics, int width) {
             if (!owner.dataRow(index) || owner.passive()) return;
-            if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id)) return;
+            if (owner instanceof Trees.TreeControl tree && tree.detail != null && tree.detail.itemId.equals(id) && !tree.context().faces().tree.fillsDetailRow()) return;
             boolean focusedOnly = Objects.equals(id, owner.focusItem) && owner.canvas.isFocusOwner() && !owner.selected.contains(id);
             Color fill = owner.selectionShown(index)
                 ? ThemePainting.color(owner.context(), owner.ink().fill)
@@ -1212,9 +1212,13 @@ final class InteractiveRows {
             int top = owner.identityRows() ? Math.max(0, getHeight() - line - ThemePainting.metric(owner.context(), DesignMetrics.Role.IDENTITY_HEADING_BOTTOM)) : 0;
             // Only a table heading has trailing content (its count); a list heading has a title only.
             int tw = trailing.getComponentCount() == 0 ? 0 : Math.min(trailing.getPreferredSize().width, Math.max(0, getWidth() - 2 * pad));
+            int countAt = owner.headingCountStart();
             if (tw == 0) trailing.setBounds(0, 0, 0, 0);
+            else if (countAt >= 0) trailing.setBounds(Math.min(countAt, Math.max(0, getWidth() - pad - tw)), top, tw, line);
             else trailing.setBounds(getWidth() - pad - tw, top, tw, line);
-            title.setBounds(pad, top, Math.max(0, getWidth() - 2 * pad - (tw > 0 ? tw + pad : 0)), line);
+            // A count under the last column ends the title a pad before it, so a long owner name never runs under it.
+            int titleEnd = tw > 0 ? trailing.getX() - pad : getWidth() - pad;
+            title.setBounds(pad, top, Math.max(0, titleEnd - pad), line);
             title.doLayout();
             trailing.doLayout();
         }

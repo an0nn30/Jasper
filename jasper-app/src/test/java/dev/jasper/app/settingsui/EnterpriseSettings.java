@@ -119,6 +119,19 @@ final class EnterpriseSettings implements AutoCloseable {
         return rows.stream().map(g -> new NotificationGroupChoices.Group(g.id(), g.name(), g.owner(), g.mode(), g.ownerId(), "")).toList();
     }
 
+    /** The mock's Java Virtual Machine section (Settings 06): a 512 MiB heap and the custom VM options file, no notices. */
+    static VmOptionsHooks vm() {
+        var heap = new SchemaPage.External("vm.heap", "Maximum heap size", "MiB", List.of("memory"), new dev.jasper.ui.model.Nodes.Numeric(256, 1_048_576, 256, 0),
+            () -> 512, () -> 512, value -> "", value -> "Current: 512 MiB.", value -> CompletableFuture.completedFuture(null), () -> true);
+        return new VmOptionsHooks(heap, () -> "/Users/RQ7RQVF/.config/jasper/jasper.vmoptions", () -> { }, () -> { }, () -> true,
+            Optional::empty, Optional::empty, Optional::empty, () -> { }, listener -> new Subscription(() -> { }));
+    }
+
+    /** The mock's Command line section (Settings 06): the command installed, so Install is disabled and Uninstall enabled. */
+    static CorePages.CommandLineActions commandLine() {
+        return new CorePages.CommandLineActions(() -> "Installed at /usr/local/bin/jasper", () -> { }, () -> false, () -> { }, () -> true);
+    }
+
     /** Opens the dialog at Appearance under Enterprise Light ({@code dark} false) or Dark. */
     static EnterpriseSettings open(boolean dark) throws Exception {
         var enterprise = EnterpriseLook.theme();
@@ -154,7 +167,20 @@ final class EnterpriseSettings implements AutoCloseable {
                 runtime[0] = new PluginRuntime(new PluginRuntime.Options(Path.of(System.getProperty("jasper.stagedPlugins")), home.resolve("plugins"), null, false,
                     home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                     PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
+                // As JasperApplication gives its runtime before the plugins start: the look's kit and the current theme, so a
+                // plugin's own page paints the Enterprise theme (plan 9b Task 7: without them, the bundled theme's #C6CCD5 boxes).
+                runtime[0].presentation(themes[0].kit());
+                runtime[0].appearance(themes[0]::current, handler -> themes[0].subscribe((value, changed) -> handler.accept(value)));
                 runtime[0].start(Map.of(), dark);
+                // The application's own actions, as it registers them at start (the mock's config, commandline and
+                // notifications sections); the core sections come from ActionId, the plugins' from the staged plugins.
+                for (String[] action : new String[][] {{"plugins.manage", "Manage Plugins…"}, {"app.shortcuts", "Keyboard Shortcuts…"},
+                        {"app.about", "About Jasper"}, {"app.memory", "Change Memory Settings…"}, {"app.vmoptions", "Edit Custom VM Options…"},
+                        {"app.memory.gc", "Run Garbage Collection"}, {"config.migrate", "Migrate Config"},
+                        {"commandline.install", "Install 'jasper' Command in PATH"}, {"commandline.uninstall", "Uninstall 'jasper' Command from PATH"},
+                        {"notifications.errors", "Notifications: Show Errors"}, {"notifications.history", "Notifications: Show History"},
+                        {"notifications.dismiss", "Notifications: Dismiss Cards"}})
+                    contributions.addAction(action[0], action[1], null, List.of(), Optional.empty(), invocation -> { });
                 var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
                 var manager = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
                     ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
@@ -169,7 +195,7 @@ final class EnterpriseSettings implements AutoCloseable {
                     edits -> CompletableFuture.completedFuture(null));
                 var pages = new CorePages.Pages(context -> new KeymapPage(keymapHooks, context), context -> manager.page(context), context -> runtime[0].settingsPages(context));
                 dialog[0] = new SettingsDialog(windows, CorePages.pages(choices, new CorePages.SystemActions(() -> Path.of("/Users/RQ7RQVF/.config/jasper/config.toml"),
-                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages),
+                        () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.of(vm()), Optional.of(commandLine())), ShellChoices.NONE, new NotificationGroupChoices(EnterpriseSettings::groups), pages),
                     new SettingsDialog.Hooks(edit -> CompletableFuture.completedFuture(state), () -> state, listener -> new Subscription(() -> { }), () -> { }, () -> { },
                         uri -> { }, (parent, count) -> true, () -> themes[0].appearance().context(ThemeRoute.CHROME), projections.settings(), projections.composition()));
                 dialog[0].open(null, "appearance");
@@ -187,6 +213,9 @@ final class EnterpriseSettings implements AutoCloseable {
         }
         return new EnterpriseSettings(home, windows, holder, themes[0], runtime[0], dialog[0]);
     }
+
+    /** The dialog's content, which {@link #render} paints from its origin; EDT. */
+    JComponent content() { return holder[0]; }
 
     /** Selects {@code pageId} and paints the dialog's content, {@code width} by {@code height}, at 2x; EDT. */
     BufferedImage render(String pageId, int width, int height) {

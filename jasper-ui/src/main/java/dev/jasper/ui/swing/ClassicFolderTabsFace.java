@@ -94,6 +94,7 @@ final class ClassicFolderTabsFace implements ChoiceFace {
     }
 
     @Override public Color selectedText(KitContext context) { return ThemePainting.painted(context, active); }
+    @Override public Insets previewPadding(KitContext context) { return previews.previewPadding(context); }
     @Override public LayoutManager previewLayout(KitContext context, int count) { return previews.previewLayout(context, count); }
     @Override public Dimension previewSize(PreviewChoices.Tile tile) { return previews.previewSize(tile); }
     @Override public void paintPreview(PreviewChoices.Tile tile, Graphics2D g) { previews.paintPreview(tile, g); }

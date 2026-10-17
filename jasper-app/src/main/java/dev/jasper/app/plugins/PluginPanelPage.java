@@ -39,7 +39,7 @@ final class PluginPanelPage implements SettingsPage {
     private HostedKit kit;
     private HostedKitView view;
     private final Host rowHost = new Host();
-    private final KitSettingRows kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset, this::chooseFile);
+    private final KitSettingRows kitRows;
     /** The dialog's file chooser, for a host row's Browse. */
     private Optional<java.nio.file.Path> chooseFile(String title, Optional<java.nio.file.Path> initial) { return context.chooseFile().apply(title, initial); }
     private dev.jasper.sdk.settings.SettingSpec<?> settingSpec(dev.jasper.sdk.settings.Setting<?> setting){return declared.handle(setting).spec();}
@@ -51,6 +51,7 @@ final class PluginPanelPage implements SettingsPage {
                     PageContext context) {
         this.pluginId = pluginId; this.title = title; this.declared = declared; this.panel = panel;
         this.containment = containment; this.context = context;
+        kitRows = new KitSettingRows(rowHost, this::settingSpec, rowHost::unset, this::chooseFile, context.chrome().inlineReset());
         draft = new SettingsDraft(declared.values());
         stopListening = declared.onReloaded(() -> {
             draft.rebase(declared.values());
@@ -93,8 +94,10 @@ final class PluginPanelPage implements SettingsPage {
         message = PluginPageBody.message(context.kit().get());
         var made = new AtomicReference<JComponent>();
         Throwable failure = containment.attempt(pluginId, "settings page", () -> { var owned=java.util.Objects.requireNonNull(panel.create(rowHost),"Settings view");
-            var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;
+            var next=kit.requireOwned(owned);next.mount(this);view=next;view.hostSpec=kitRows::refresh;view.hostModule=kitRows::menus;
                 view.hostEvents=event -> {boolean handled=kitRows.event(event);if(handled)refreshRows();return handled;};
+                // The plugin's first view has no host menus yet (spec 12.1): project it once now.
+                if(!context.chrome().inlineReset())refreshRows();
                 made.set(view.component());
             return null; });
         content = failure == null && made.get() != null ? made.get() : failed(failure);

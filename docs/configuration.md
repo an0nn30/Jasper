@@ -93,6 +93,11 @@ Keymap lists every shortcut, grouped as in the menus; shortcuts that differ from
 sections holding them, are blue. Click one, press the new keys and click Set; Apply or OK saves every change
 at once. Plugins lists the installed plugins: installing, enabling, disabling and removing apply at once and
 take effect after a restart. Help › Keyboard Shortcuts… and File › Manage Plugins… open these pages.
+Under the Enterprise look the Keymap shows Action, Scope and Shortcut columns, with Find by Shortcut, Expand All
+and Collapse All; Plugins lists checkbox rows, with each plugin's actions in its ⋯; Terminal › Shell lists
+environment variables in a table with Add Variable…, and Edit… and Remove in a variable's context menu;
+Notifications › Groups is one table with Display and Source columns, Reset to Default in a group's context menu;
+and the Appearance dropdowns' menu that imports and removes themes is a ⋯ in place of the gear.
 Appearance holds View mode (Normal or Compact, applied after restart), the Dark, Light and Match System tiles,
 the Dark theme and Light theme dropdowns and the Terminal scheme dropdown, each with a gear that imports and removes themes; Terminal › Font & Colors links there. See
 [Themes](themes.md).
@@ -326,7 +331,8 @@ line; the lines are never drawn, only felt. Releasing saves the place, as fracti
 560-pixel activated width in both view modes. In Normal mode, dragging the palette back to the title-bar field
 (near its usual place across, at or above its usual height) snaps it home, and releasing there re-attaches it.
 Double-clicking a draggable area also forgets the place: Normal mode hangs the palette from the title-bar field
-again and Compact mode centres it.
+again and Compact mode centres it. Under the Enterprise look the palette is the Run window, which keeps its own place in
+`[palette.run_window]` (`left`, `bottom`: its left and bottom edges as fractions of the window).
 
 ### Finished-command notifications
 

@@ -83,12 +83,12 @@ public final class PluginManager {
      * builds its kit views (and its sheets') with {@code kit}, the Settings dialog's chrome context.
      */
     PluginManagerPanel attach(Supplier<AuxiliarySurface> host, java.util.function.Consumer<String> navigate,
-                              Supplier<dev.jasper.ui.swing.KitContext> kit) {
+                              Supplier<dev.jasper.ui.swing.KitContext> kit, PluginShape shape) {
         this.host = Objects.requireNonNull(host);
         this.navigate = Objects.requireNonNull(navigate);
         this.kit = Objects.requireNonNull(kit);
         panel = new PluginManagerPanel(kit.get(), new PluginManagerPanel.Handlers(this::toggle, this::review, this::remove, this::discardInstall,
-            this::install, this::openSettings, this::openFolder, this::openData, hooks.browse()));
+            this::install, this::openSettings, this::openFolder, this::openData, hooks.browse()), shape);
         panel.show(snapshot);
         renderBanner();
         return panel;

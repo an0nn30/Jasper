@@ -99,6 +99,20 @@ public final class UiState {
         static boolean fraction(double value) { return value >= 0 && value <= 1; }
     }
 
+    /**
+     * Where the Run window was dragged (Enterprise presentation spec 11.5), as fractions of the workspace: its left edge
+     * across and its bottom edge down. The card's place is {@link PalettePosition}.
+     *
+     * @param left the window's left edge, 0 (left) to 1 (right)
+     * @param bottom the window's bottom edge, 0 (top) to 1 (bottom)
+     */
+    public record RunWindowPosition(double left, double bottom) {
+        public RunWindowPosition {
+            if (!PalettePosition.fraction(left) || !PalettePosition.fraction(bottom))
+                throw new IllegalArgumentException("Run window position must be 0 to 1: " + left + ", " + bottom);
+        }
+    }
+
     private static final System.Logger LOG = System.getLogger(UiState.class.getName());
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_.-]{0,127}");
     private static final int MAX_BYTES = 256 * 1024;
@@ -120,6 +134,7 @@ public final class UiState {
     private static final int MAX_CHOOSER_PATHS = 50;
     private Chooser chooser = Chooser.DEFAULT;
     private PalettePosition palettePosition;
+    private RunWindowPosition runWindowPosition;
 
     private UiState(Path file, String look) {
         this.file = file;
@@ -149,7 +164,7 @@ public final class UiState {
         } catch (IOException | RuntimeException invalid) {
             LOG.log(System.Logger.Level.WARNING, "Ignoring unreadable UI state " + file, invalid);
             state.layouts.clear(); state.layout(""); state.windows.clear(); state.railVisible = true;
-            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false; state.palettePosition = null;
+            state.chooser = Chooser.DEFAULT; state.mainWindow = null; state.zenMode = false; state.palettePosition = null; state.runWindowPosition = null;
         }
         return state;
     }
@@ -176,6 +191,10 @@ public final class UiState {
                 && table.get(List.of("center_x")) instanceof Number x && PalettePosition.fraction(x.doubleValue())
                 && table.get(List.of("top")) instanceof Number top && PalettePosition.fraction(top.doubleValue()))
             palettePosition = new PalettePosition(x.doubleValue(), top.doubleValue());
+        if (toml.get(List.of("palette", "run_window")) instanceof TomlTable table
+                && table.get(List.of("left")) instanceof Number left && PalettePosition.fraction(left.doubleValue())
+                && table.get(List.of("bottom")) instanceof Number bottom && PalettePosition.fraction(bottom.doubleValue()))
+            runWindowPosition = new RunWindowPosition(left.doubleValue(), bottom.doubleValue());
         if (toml.get(List.of("chooser")) instanceof TomlTable table)
             chooser = new Chooser(strings(table, "recent"), strings(table, "pinned"),
                 Boolean.TRUE.equals(table.get(List.of("preview"))), !Boolean.FALSE.equals(table.get(List.of("show_hidden"))));
@@ -297,6 +316,10 @@ public final class UiState {
     public Optional<PalettePosition> palettePosition() { return Optional.ofNullable(palettePosition); }
     /** Null forgets the dragged place. */
     public void setPalettePosition(PalettePosition value) { palettePosition = value; }
+    /** Where the Run window was dragged; empty while it keeps its home. */
+    public Optional<RunWindowPosition> runWindowPosition() { return Optional.ofNullable(runWindowPosition); }
+    /** Null forgets the Run window's dragged place. */
+    public void setRunWindowPosition(RunWindowPosition value) { runWindowPosition = value; }
     public void setChooser(Chooser value) { chooser = Objects.requireNonNull(value); }
 
     /** Writes version 2. Ids are restricted to characters that need no TOML escaping. */
@@ -316,6 +339,8 @@ public final class UiState {
         }
         if (palettePosition != null)
             text.append("\n[palette]\ncenter_x = ").append(palettePosition.centerX()).append("\ntop = ").append(palettePosition.top()).append('\n');
+        if (runWindowPosition != null)
+            text.append("\n[palette.run_window]\nleft = ").append(runWindowPosition.left()).append("\nbottom = ").append(runWindowPosition.bottom()).append('\n');
         if (!chooser.equals(Chooser.DEFAULT))
             text.append("\n[chooser]\nrecent = ").append(array(chooser.recent())).append("\npinned = ").append(array(chooser.pinned()))
                 .append("\npreview = ").append(chooser.preview()).append("\nshow_hidden = ").append(chooser.showHidden()).append('\n');

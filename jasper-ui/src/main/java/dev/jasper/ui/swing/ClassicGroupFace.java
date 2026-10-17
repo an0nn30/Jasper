@@ -16,7 +16,8 @@ import javax.swing.border.EmptyBorder;
  * The classic group (spec 6.4, DESIGN_LANGUAGE §6, New File Server mock): a Section and its Card as one titled box, a
  * 1 px {@code border.window} edge whose top line the semibold title breaks; the card inside is transparent, a SETTINGS
  * card pads its rows 8 above and below, a MIXED card draws one {@code border.row} divider where its content gives way to
- * its settings, and a Settings page's card divides every row.
+ * its settings, and a Settings page's card pads its rows 6 above and below and divides every row with a rule that stops
+ * short of the box.
  */
 final class ClassicGroupFace implements GroupFace {
     private final PaintPair box, title;
@@ -54,11 +55,14 @@ final class ClassicGroupFace implements GroupFace {
     @Override public void paintCard(Cards.CardSurface card, Graphics2D g) {
         var c = card.context;
         int line = ThemePainting.metric(c, DesignMetrics.Role.HAIRLINE), pad = ThemePainting.metric(c, DesignMetrics.Role.CARD_PADDING);
+        int rule = ThemePainting.metric(c, DesignMetrics.Role.SETTINGS_ROW_SIDE);
         g.setColor(ThemePainting.role(c, DerivedColor.BORDER_ROW));
         Component previous = null; boolean divided = false;
         for (var child : card.getComponents()) if (child.isVisible()) {
             boolean setting = card.settings.contains(child), before = previous != null && card.settings.contains(previous);
-            if (previous != null && card.page) g.fillRect(0, child.getY(), card.getWidth(), line);
+            // The mocks' row rules stop short of the box on both sides, by the rows' side inset inside the stroke (plan 9b
+            // Execution notes N7; mock 02 draws them from 260 to 1010 in a box from 247 to 1023).
+            if (previous != null && card.page) g.fillRect(child.getX() + rule, child.getY(), Math.max(0, child.getWidth() - 2 * rule), line);
             else if (previous != null && !divided && card.kind == Nodes.CardKind.MIXED && setting && !before) {
                 g.fillRect(pad, child.getY(), Math.max(0, card.getWidth() - 2 * pad), line);
                 divided = true;
@@ -68,10 +72,35 @@ final class ClassicGroupFace implements GroupFace {
     }
 
     @Override public Border cardBorder(KitContext context, Nodes.CardKind kind, boolean page, EmptyBorder standard) {
-        if (kind != Nodes.CardKind.SETTINGS || page) return standard;
+        if (kind != Nodes.CardKind.SETTINGS) return standard;
+        // A Settings page's box holds its rows inside its stroke, padded by their own vertical padding above the first and
+        // below the last (plan 9b Task 1: mocks 01 and 02 draw the first row rule 49 below the box line, the box line 45
+        // below the last rule, and the rows' rules, text and controls 13 inside the box's outer edge).
+        if (page) {
+            int pad = ThemePainting.metric(context, DesignMetrics.Role.SETTING_VERTICAL_PADDING), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            var insets = standard.getBorderInsets();
+            return new EmptyBorder(insets.top + pad, insets.left + line, insets.bottom + pad, insets.right + line);
+        }
         int gap = ThemePainting.metric(context, DesignMetrics.Role.ROW_GAP);
         return new EmptyBorder(gap, 0, gap, 0);
     }
+
+    /**
+     * A FORM card on a Settings page spaces its content by the rows' vertical padding (the Notifications mock's description
+     * 6 above its groups table, plan 9b Task 2).
+     */
+    @Override public int cardGap(KitContext context, Nodes.CardKind kind, boolean page, int standard) {
+        return page && kind == Nodes.CardKind.FORM ? ThemePainting.metric(context, DesignMetrics.Role.SETTING_VERTICAL_PADDING) : standard;
+    }
+
+    /**
+     * A Settings page's list (an ordered list with its side column and entry row) spans the row below its title and
+     * description, as the Shell, Font &amp; Colors and Project Index mocks draw it (plan 9b Task 6).
+     */
+    @Override public boolean listUnderTitle(KitContext context) { return true; }
+
+    /** A Settings page's rows keep their first line clear for the rule {@link #paintCard} draws there. */
+    @Override public int rowRule(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE); }
 
     /** The title at the box's title inset; the body from just below the title's middle, where the box's top line runs. */
     static final class TitledBoxLayout implements Composition.WidthLayout {

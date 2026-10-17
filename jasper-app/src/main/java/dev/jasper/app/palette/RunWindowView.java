@@ -60,6 +60,8 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     private final StepForm step;
     private final AutoCloseable themeSubscription;
     private int visibleRows = dev.jasper.app.config.PaletteSettings.DEFAULT_VISIBLE_ROWS;
+    /** The list rows that fit the window's home: {@code visibleRows} unless the window is too short (plan 8b Rulings 8). */
+    private int shownRows = visibleRows;
     private String query = "", emptyText = "", listCard = NONE;
     private PaletteScope chip;
     private List<PaletteEntry> entries = List.of();
@@ -73,8 +75,11 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         this.host = Objects.requireNonNull(host);
         this.edits = new QueryEdits(host.prefixes());
         setOpaque(false);
-        // Presses that no control takes stop here, so the overlay behind never sees them; the host drags by them.
-        var swallow = new MouseAdapter() { };
+        // Presses that no control takes stop here, so the overlay behind never sees them; the host drags by them. Each one
+        // also brings the keyboard back to the window, as a click anywhere on the Windows Run dialog does (spec decision 10).
+        var swallow = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent event) { activate(); }
+        };
         addMouseListener(swallow);
         addMouseMotionListener(swallow);
         setFocusCycleRoot(true);
@@ -115,13 +120,15 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         add(listBox);
         // The checkbox's label is its click target too, as a desktop checkbox's is.
         var toggleByLabel = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent event) { activate(); }
             @Override public void mouseClicked(MouseEvent event) { if (splitAvailable()) setSplit(!split); }
         };
         view(SPLIT_LABEL).addMouseListener(toggleByLabel);
         var label = CardView.find(view(SPLIT_LABEL), SPLIT_LABEL, javax.swing.JLabel.class);
         if (label != null) label.addMouseListener(toggleByLabel);
         // The title row drags the window (spec 11.2), its text included: the title and shortcut labels carry tooltips, so a
-        // press stops at them; they hand their mouse events to the view, where the host's drag listens (Rulings 14).
+        // press stops at them; they hand their mouse events to the view, where the host's drag listens (Rulings 14). The
+        // other texts hand theirs over too, so a press on any of them brings the keyboard back as an empty area's does.
         var toView = new MouseAdapter() {
             private void pass(MouseEvent event) { dispatchEvent(javax.swing.SwingUtilities.convertMouseEvent(event.getComponent(), event, RunWindowView.this)); }
             @Override public void mousePressed(MouseEvent event) { pass(event); }
@@ -129,11 +136,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             @Override public void mouseClicked(MouseEvent event) { pass(event); }
             @Override public void mouseDragged(MouseEvent event) { pass(event); }
         };
-        for (String id : List.of(TITLE, SHORTCUT)) {
-            view(id).addMouseListener(toView); view(id).addMouseMotionListener(toView);
-            var text = CardView.find(view(id), id, javax.swing.JLabel.class);
-            if (text != null) { text.addMouseListener(toView); text.addMouseMotionListener(toView); }
-        }
+        for (String id : List.of(TITLE, SHORTCUT, HELP, OPEN, DETAIL_LABEL, DETAIL_VALUE, EMPTY)) handOver(view(id), toView);
         // The shortcut's text ends where its box does, a gap before the close button, as the mocks align it: its label is
         // up to two pixels wider than the text it draws (whole-pixel width, fractional advances).
         var shortcut = CardView.find(view(SHORTCUT), SHORTCUT, javax.swing.JLabel.class);
@@ -142,6 +145,27 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     }
 
     private KitView view(String id) { return views.get(id); }
+
+    /** {@code component} and every component in it hand their mouse events to {@code toView}. */
+    private static void handOver(Component component, MouseAdapter toView) {
+        component.addMouseListener(toView); component.addMouseMotionListener(toView);
+        if (component instanceof Container container) for (Component child : container.getComponents()) handOver(child, toView);
+    }
+
+    /** Presses that brought the keyboard back, for headless tests (no window takes focus there). */
+    int activations;
+
+    /**
+     * A press on the window with the keyboard elsewhere (a pane the person clicked) brings it back: to the step's field
+     * when a step shows, else to the Open field. A press with the keyboard already inside the window leaves it there.
+     */
+    private void activate() {
+        var owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        if (closed || owner != null && javax.swing.SwingUtilities.isDescendingFrom(owner, this)) return;
+        activations++;
+        if (step.showing()) step.focusField(0);
+        else focusQuery();
+    }
 
     /** The kit view of region {@code id}, for headless tests. */
     KitView viewFor(String id) { return view(id); }
@@ -170,7 +194,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             case SCOPES -> new Nodes.MenuButton(SCOPES, ControlState.READY, "", "triangle.down", Nodes.ButtonKind.GHOST, "", scopeItems(),
                 "Choose what to open", Nodes.ButtonPresentation.EMBEDDED);
             case RESULTS -> new Nodes.ItemList(RESULTS, ControlState.READY, Nodes.ListKind.RESULTS, items(),
-                selected < 0 ? Set.of() : Set.of(entryId(selected)), RUN, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(visibleRows));
+                selected < 0 ? Set.of() : Set.of(entryId(selected)), RUN, List.of(), Nodes.SelectionMode.SINGLE, Optional.empty(), OptionalInt.of(shownRows));
             case EMPTY -> text(EMPTY, emptyText, Nodes.TextRole.DESCRIPTION);
             case DETAIL_LABEL -> text(DETAIL_LABEL, RunCopy.detailLabel(selection), Nodes.TextRole.BODY_STRONG);
             case DETAIL_VALUE -> text(DETAIL_VALUE, RunCopy.detailValue(selection), Nodes.TextRole.MONO);
@@ -379,7 +403,23 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
         host.execute().accept(entry, index);
     }
 
-    @Override public void setVisibleRows(int rows) { visibleRows = rows; render(RESULTS); }
+    @Override public void setVisibleRows(int rows) { visibleRows = rows; shownRows = rows; render(RESULTS); }
+
+    /** Drops list rows, never below one, until the window's height fits {@code available}; restores them as room returns. */
+    @Override public void fitHeight(int available) {
+        int rows = visibleRows;
+        while (rows > 1 && heightWith(rows) > available) rows--;
+        if (rows != shownRows) { shownRows = rows; render(RESULTS); }
+    }
+
+    private int heightWith(int rows) {
+        int saved = shownRows;
+        shownRows = rows;
+        try { return getPreferredSize().height; } finally { shownRows = saved; }
+    }
+
+    /** The list rows shown. */
+    public int shownRows() { return shownRows; }
     @Override public int visibleRows() { return visibleRows; }
 
     @Override public void showStep(String title, List<PaletteStep.Field> fields) {
@@ -420,7 +460,7 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
     /** The list box's height: {@code visible_rows} rows and two heading bands inside its edge (spec 11.2, Rulings 5). */
     int listHeight() {
         int hair = s(DesignMetrics.Role.HAIRLINE);
-        return 2 * hair + visibleRows * s(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT) + 2 * (s(DesignMetrics.Role.RUN_WINDOW_HEADING_HEIGHT) + hair);
+        return 2 * hair + shownRows * s(DesignMetrics.Role.RUN_WINDOW_ROW_HEIGHT) + 2 * (s(DesignMetrics.Role.RUN_WINDOW_HEADING_HEIGHT) + hair);
     }
 
     // ---- Package-private access for headless tests ------------------------------------------------------------------

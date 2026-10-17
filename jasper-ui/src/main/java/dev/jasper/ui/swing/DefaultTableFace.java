@@ -28,4 +28,8 @@ final class DefaultTableFace implements TableFace {
     @Override public int cellInset(KitContext context) { return 0; }
     @Override public int groupIndent(KitContext context) { return 0; }
     @Override public void styleCount(JLabel count, KitContext context) { }
+    @Override public boolean countUnderLastColumn() { return false; }
+    @Override public boolean everyRowOnPage() { return false; }
+    @Override public dev.jasper.ui.metrics.Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) { return null; }
+    @Override public void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width) { }
 }
