@@ -209,6 +209,21 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
+    /** The steps a branded look's splash shows (spec 10.11); none until the bootstrap hands them over. EDT. */
+    private dev.jasper.app.startup.StartupSteps startupSteps = dev.jasper.app.startup.StartupSteps.NONE;
+
+    /**
+     * The steps this application reports to a branded look's splash (spec 10.11): each plugin as it starts, then the
+     * first window as it is composed and shown. A presentation without branding, as a look that fell back at start has
+     * (spec 4.7), ends them at once. Before {@link #startPlugins(AppDirs)}. EDT.
+     *
+     * @param steps the bootstrap's steps
+     */
+    public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
+        startupSteps = java.util.Objects.requireNonNull(steps, "steps");
+        if (!presentation.branding().present()) steps.done();
+    }
+
     /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
     /** What terminal windows and the rehearsal's are made of under this process's presentation. */
     dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
@@ -516,7 +531,7 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.restoreLayout(uiState); window.show();
+            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation(); window.show();
             memoryIndicator.windows(windows.size());
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
@@ -529,6 +544,7 @@ public final class JasperApplication {
         }
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
+        startupSteps.done();
         return window;
     }
 
@@ -998,6 +1014,7 @@ public final class JasperApplication {
             return created.content().id();
         });
         if (subcommandList != null) plugins.subcommandList(subcommandList);
+        plugins.starting(startupSteps::plugin);
         plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());

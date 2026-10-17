@@ -153,6 +153,9 @@ public final class PluginSelection {
     /** Whether this is {@link #none()}. */
     public boolean isNone() { return options == null; }
 
+    /** The names of the plugins this selection starts, in start order: the splash's plugin steps (spec 10.11). */
+    public List<String> loading() { return resolution.load().stream().map(candidate -> candidate.descriptor().name()).toList(); }
+
     /**
      * Spec 4.7: this selection after the kit was blamed at start: the provider is skipped, so no service of it is
      * published, and the presentation is the fallback, which keeps the defaults read at start. The attempt is the same.
