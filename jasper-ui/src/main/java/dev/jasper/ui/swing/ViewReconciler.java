@@ -292,6 +292,9 @@ final class ViewReconciler implements AutoCloseable {
                 }
                 owner.footer.separators = java.util.List.copyOf(separated);
                 owner.footer.arranged = arranged;
+                owner.footer.flush = arranged && footer instanceof Nodes.Stack lines && lines.children().stream().findFirst()
+                    .filter(first -> first instanceof Nodes.Properties properties && next.get(properties.id()) instanceof PropertyLists.PropertiesControl grid
+                        && grid.flush(properties)).isPresent();
             }
             for (var child : ControlRegistry.children(node)) applyPanelBody(child, next, child == panel.body());
             return;

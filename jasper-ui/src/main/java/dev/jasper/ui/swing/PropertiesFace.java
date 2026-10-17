@@ -27,4 +27,10 @@ interface PropertiesFace extends Face {
 
     /** Paints the rows' container under its labels and values. */
     void paint(PropertyLists.PropertiesControl control, Graphics2D g, int width, int height);
+
+    /**
+     * Whether {@code node}, leading a panel's footer stack, stands flush with the footer's edges, its actions after it at
+     * the trailing edge (the classic grid, as the Workstation mock draws the Sessions Properties).
+     */
+    boolean flush(Nodes.Properties node);
 }

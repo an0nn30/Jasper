@@ -4,7 +4,6 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.ColorRole;
-import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
@@ -20,9 +19,9 @@ import javax.swing.border.EmptyBorder;
 
 /**
  * The classic Properties of the Enterprise mocks (plan 10a Rulings 4). Titled: the Workstation grid, a {@code ROW_HEIGHT}
- * title band on {@code surface.panel} between a {@code border.window} and a {@code border.row} rule, then rows of a
- * label column ({@code PROPERTY_LABEL_WIDTH}, {@code surface.panel}) and a value cell ({@code surface.card}), each row and
- * the column closed by a {@code border.row} rule. Untitled: label-colon lines on the dialog surface, the values at
+ * title band on {@code surface.panel} between a {@code border.window} rule and a panel rule, then rows of a label column
+ * ({@code PROPERTY_LABEL_WIDTH}, {@code surface.panel}) and a value cell ({@code surface.card}), each row and the column
+ * closed by a panel rule. Untitled: label-colon lines on the dialog surface, the values at
  * {@code PROPERTY_PLAIN_LABEL_WIDTH}.
  */
 final class ClassicPropertiesFace implements PropertiesFace {
@@ -42,10 +41,11 @@ final class ClassicPropertiesFace implements PropertiesFace {
     private static final PaintPair WINDOW_RULE = new PaintPair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_PANEL, SurfaceContrast.Guard.STRUCTURAL);
 
     /**
-     * The grid's rules under the title, under each row and after the label column: {@code border.row} as the theme
-     * gives it, as the classic group box and menu dividers paint it; the mock's faint rules sit under the structural floor.
+     * The grid's rules under the title, under each row and after the label column: the panel rule
+     * ({@link ThemePainting#panelRule}), which matches the mocks' faint rules in Light and Dark; they sit under the
+     * structural floor.
      */
-    private static Color rule(KitContext context) { return ThemePainting.role(context, DerivedColor.BORDER_ROW); }
+    private static Color rule(KitContext context) { return ThemePainting.panelRule(context); }
 
     static boolean titled(PropertyLists.PropertiesControl control) { return !((Nodes.Properties) control.node()).title().isBlank(); }
 
@@ -54,6 +54,9 @@ final class ClassicPropertiesFace implements PropertiesFace {
     @Override public JComponent container(PropertyLists.PropertiesControl control) { return new PropertyLists.GridSurface(control); }
 
     @Override public String labelText(Nodes.Properties node, String label) { return node.title().isBlank() ? label + ":" : label; }
+
+    /** The titled grid stands flush in a panel's footer; label-colon lines keep the footer's padding. */
+    @Override public boolean flush(Nodes.Properties node) { return !node.title().isBlank(); }
 
     private int metric(PropertyLists.PropertiesControl control, DesignMetrics.Role role) { return ThemePainting.metric(control.context(), role); }
 

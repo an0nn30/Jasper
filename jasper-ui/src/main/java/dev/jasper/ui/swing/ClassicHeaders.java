@@ -50,7 +50,8 @@ final class ClassicHeaders {
      * around the rows' {@code surface.card} (the mocks' white list). A border paints before the pane's children, so the
      * fill lies under the header band and the rows. The Settings navigation tree, a manager's rail and a table in a
      * manager's rail or list column stand unboxed on their surface, as the Settings and Vault mocks draw them; a table in
-     * the detail column keeps its box.
+     * the detail column keeps its box. In a panel's body the rows stand on {@code surface.card} without the box, edge to
+     * edge, as the Workstation mock's Sessions and Tunnels panels draw them (plan 10a).
      */
     static final class Box implements Border {
         final InteractiveRows.RowsControl owner;
@@ -63,10 +64,13 @@ final class ClassicHeaders {
          * Whether the box shows around {@code c}, asked at every measure and paint because the reconciler sets a tree's
          * navigation and a control's column after it is built; a panel body draws its own rules around the rows.
          */
-        boolean drawn(Component c) {
-            if (owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.rail() : owner.column == 0 || owner.column == 1) return false;
-            return SwingUtilities.getAncestorOfClass(Panels.Body.class, c) == null;
-        }
+        boolean drawn(Component c) { return !unboxed() && SwingUtilities.getAncestorOfClass(Panels.Body.class, c) == null; }
+
+        /** Whether {@code c} is a panel's body, whose rows stand on {@code surface.card} without the box. */
+        boolean panelBody(Component c) { return !unboxed() && SwingUtilities.getAncestorOfClass(Panels.Body.class, c) != null; }
+
+        /** The Settings navigation tree, a manager's rail and a rail or list column's table stand on their own surface. */
+        private boolean unboxed() { return owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.rail() : owner.column == 0 || owner.column == 1; }
 
         @Override public Insets getBorderInsets(Component c) {
             int line = drawn(c) ? ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) : 0;
@@ -76,6 +80,11 @@ final class ClassicHeaders {
         @Override public boolean isBorderOpaque() { return false; }
 
         @Override public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            if (panelBody(c)) {
+                g.setColor(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));
+                g.fillRect(x, y, width, height);
+                return;
+            }
             if (!drawn(c)) return;
             int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
             g.setColor(ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_CARD));

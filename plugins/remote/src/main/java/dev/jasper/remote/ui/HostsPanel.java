@@ -1,13 +1,17 @@
 package dev.jasper.remote.ui;
 
+import dev.jasper.remote.hosts.Auth;
 import dev.jasper.remote.hosts.RemoteHost;
+import dev.jasper.remote.workstation.Layout;
 import dev.jasper.sdk.Subscription;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
+import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PanelHeader;
+import dev.jasper.sdk.ui.TreeItem;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
@@ -37,6 +41,10 @@ import java.util.function.ToIntFunction;
  * whose actions name that row, so a menu acts on the row it opened on whatever is selected. The count and the New and
  * Import actions are the window's: {@link #onHeaderChanged} feeds {@code PanelHost.setHeader}. UI thread only; after
  * {@link #close()} nothing touches the view.
+ *
+ * <p>Under {@link Layout#CLASSIC} (Enterprise presentation spec 14.4) the same rows are a Name, Host and Port column tree,
+ * whose disclosure collapses a group, over the selected row's Properties and Edit… and Connect; the header detail is the
+ * count.
  */
 public final class HostsPanel implements AutoCloseable {
     public record Actions(Consumer<RemoteHost> connect, Consumer<RemoteHost> connectSplit, Consumer<Optional<RemoteHost>> edit, Consumer<RemoteHost> duplicate,
@@ -51,6 +59,9 @@ public final class HostsPanel implements AutoCloseable {
     private static final String WSL_GROUP = "group.wsl", ERROR = "error";
 
     private final Actions actions;
+    /** Which composition this panel takes, fixed at construction (spec 3.6). */
+    private final Layout layout;
+    private Consumer<Optional<String>> selectionChanged = row -> { };
     private final UiView view;
     private final Set<String> collapsed = new HashSet<>();
     private boolean wslCollapsed;
@@ -82,11 +93,19 @@ public final class HostsPanel implements AutoCloseable {
         this(kit, actions, System::nanoTime, multiClickNanos());
     }
 
+    /** The panel in {@code layout}'s composition. */
+    public HostsPanel(UiKit kit, Actions actions, Layout layout) {
+        this(kit, actions, System::nanoTime, multiClickNanos(), layout);
+    }
+
     /**
      * {@code clock} (nanoseconds) and {@code multiClickNanos} (the desktop's double-click interval) tell a double click on a
      * star from two separate clicks.
      */
-    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos) {
+    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos) { this(kit, actions, clock, multiClickNanos, Layout.ROWS); }
+
+    HostsPanel(UiKit kit, Actions actions, LongSupplier clock, long multiClickNanos, Layout layout) {
+        this.layout = Objects.requireNonNull(layout);
         this.clock = Objects.requireNonNull(clock);
         if (multiClickNanos < 0) throw new IllegalArgumentException("multiClickNanos must not be negative");
         this.multiClickNanos = multiClickNanos;
@@ -180,9 +199,13 @@ public final class HostsPanel implements AutoCloseable {
             case UiEvent.Selected selected when selected.id().equals(ROWS) -> {
                 selectedRow = selected.ids().stream().findFirst().filter(id -> rows.stream().anyMatch(row -> rowId(row).equals(id))).orElse(null);
                 render();
+                selectionChanged.accept(Optional.ofNullable(selectedRow));
             }
             case UiEvent.Clicked clicked when clicked.id().equals(ROWS) -> rowById(clicked.itemId()).ifPresent(row -> {
-                if (row instanceof HostRows.Group group) toggle(group);
+                if (layout == Layout.ROWS && row instanceof HostRows.Group group) toggle(group);
+            });
+            case UiEvent.Expanded expanded when expanded.id().equals(ROWS) -> rowById(expanded.itemId()).ifPresent(row -> {
+                if (row instanceof HostRows.Group group && expanded.expanded() == collapsedGroup(group)) toggle(group);
             });
             case UiEvent.Action action -> act(action.id());
             default -> { }
@@ -272,7 +295,9 @@ public final class HostsPanel implements AutoCloseable {
             .map(profile -> new HostRows.Distro(profile, distroSessions.applyAsInt(profile))).toList();
         var next = new ArrayList<HostRows.Row>();
         error.ifPresent(message -> next.add(new HostRows.Error(message)));
-        next.addAll(HostRows.rows(matching, "", needle.isEmpty() ? collapsed : Set.of(), defaultGroup, distroRows, needle.isEmpty() && wslCollapsed));
+        // The classic tree keeps every row and shows the collapsed groups through its expanded ids.
+        boolean flat = layout == Layout.CLASSIC;
+        next.addAll(HostRows.rows(matching, "", flat || !needle.isEmpty() ? Set.of() : collapsed, defaultGroup, distroRows, !flat && needle.isEmpty() && wslCollapsed));
         rows = List.copyOf(next);
         // A refresh keeps the selected row (a host, distribution or group by identity); otherwise the first host.
         if (selectedRow == null || rows.stream().noneMatch(row -> rowId(row).equals(selectedRow))) selectFirstHost();
@@ -291,14 +316,16 @@ public final class HostsPanel implements AutoCloseable {
         int count = hosts.size() + distros.size();
         if (count == headerCount) return;
         headerCount = count;
-        headerChanged.accept(new PanelHeader("", false, List.of(
+        headerChanged.accept(new PanelHeader(layout == Layout.CLASSIC ? String.valueOf(count) : "", false, List.of(
             new PanelHeader.Action("New session", "add", () -> { if (!closed) actions.edit().accept(Optional.empty()); }),
             new PanelHeader.Action("Import sessions", "import", () -> { if (!closed) actions.importConfig().run(); }))));
     }
 
     private static ControlState state(boolean visible) { return new ControlState(visible, true, false, ""); }
 
-    private Nodes.Panel node() {
+    private Nodes.Panel node() { return layout == Layout.CLASSIC ? classicNode() : rowsNode(); }
+
+    private Nodes.Panel rowsNode() {
         var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
         var search = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Search sessions", "Search sessions", "");
         var items = rows.stream().map(this::item).toList();
@@ -353,12 +380,7 @@ public final class HostsPanel implements AutoCloseable {
                 int sessions = sessionCount.applyAsInt(host);
                 String facts = metadata.apply(host);
                 String via = via(host);
-                var menu = new ArrayList<MenuItem>(List.of(menu("connect", id, "Connect in new tab"), menu("split", id, "Connect in split")));
-                if (browseFiles != null) menu.add(menu("browse", id, "Browse files"));
-                menu.addAll(List.of(menu("edit", id, "Edit…"), menu("duplicate", id, "Duplicate"), menu("delete", id, "Delete…"),
-                    menu("favorite", id, host.favorite() ? "Remove from favorites" : "Add to favorites")));
-                if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
-                    menu.add(menu("rename", id, "Rename group…"));
+                var menu = hostMenu(id, host);
                 var star = new Nodes.Button("row." + id + ".star", ControlState.READY, "", host.favorite() ? "star.filled" : "star", Nodes.ButtonKind.GHOST,
                     FAVORITE + host.id(), host.favorite() ? "Remove from favorites" : "Add to favorites", host.favorite() ? Nodes.ButtonPresentation.EMBEDDED : Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED,
                     host.favorite() ? Optional.of(Nodes.Severity.WARNING) : Optional.empty());
@@ -371,6 +393,17 @@ public final class HostsPanel implements AutoCloseable {
                         + ", " + sessions + (sessions == 1 ? " session" : " sessions"));
             }
         };
+    }
+
+    /** A host row's menu, the same in both compositions. */
+    private List<MenuItem> hostMenu(String id, RemoteHost host) {
+        var menu = new ArrayList<MenuItem>(List.of(menu("connect", id, "Connect in new tab"), menu("split", id, "Connect in split")));
+        if (browseFiles != null) menu.add(menu("browse", id, "Browse files"));
+        menu.addAll(List.of(menu("edit", id, "Edit…"), menu("duplicate", id, "Duplicate"), menu("delete", id, "Delete…"),
+            menu("favorite", id, host.favorite() ? "Remove from favorites" : "Add to favorites")));
+        if (host.group().isEmpty() && defaultGroup.equals(HostRows.OTHER) && hosts.stream().allMatch(h -> h.group().isEmpty()))
+            menu.add(menu("rename", id, "Rename group…"));
+        return menu;
     }
 
     private static MenuItem menu(String verb, String rowId, String label) {
@@ -419,6 +452,117 @@ public final class HostsPanel implements AutoCloseable {
         // NAVIGATION reserves fixed actions, lets the credential caption elide and wraps at genuinely narrow widths.
         var actionsRow = new Nodes.Stack("card.actions", ControlState.READY, Nodes.LayoutRole.NAVIGATION, status);
         return Optional.of(new Nodes.Stack(CARD, ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(identity, actionsRow)));
+    }
+
+    // ---- the classic composition (Enterprise presentation spec 14.4)
+
+    /** The classic tree's columns: the title, then a host's address and port (its trailing values). */
+    static final List<Column> COLUMNS = List.of(new Column("name", "Name", Nodes.TextRole.BODY, false, 3, Optional.empty()),
+        new Column("host", "Host", Nodes.TextRole.MONO, false, 2.3, Optional.empty()), new Column("port", "Port", Nodes.TextRole.MONO, true, 1, Optional.empty()));
+    public static final String PROPERTIES = "sessions.properties", PROPERTY_ACTIONS = "sessions.properties.actions";
+
+    /** Selects a row by its id ({@link #rowId}), as the window's toolbar view does; an unknown row changes nothing. */
+    public void selectRow(String rowId) {
+        if (closed || rowId.equals(selectedRow) || rows.stream().noneMatch(row -> rowId(row).equals(rowId))) return;
+        selectedRow = rowId; render();
+    }
+
+    /** Hears every selection the user makes in the panel, as the row id, or empty for none. */
+    public void onSelectionChanged(Consumer<Optional<String>> listener) { selectionChanged = Objects.requireNonNull(listener); }
+
+    private boolean collapsedGroup(HostRows.Group group) { return group.wsl() ? wslCollapsed : collapsed.contains(group.name()); }
+
+    private Nodes.Panel classicNode() {
+        var header = new Nodes.Header(HEADER, ControlState.READY, "Sessions", OptionalInt.of(hosts.size() + distros.size()), Optional.empty(), Optional.empty(), List.of());
+        var filter = new Nodes.Field(SEARCH, ControlState.READY, Nodes.FieldKind.SEARCH, query, "Filter sessions", "Filter sessions", "");
+        boolean searching = !query.strip().isEmpty();
+        var roots = new ArrayList<TreeItem>();
+        var expanded = new HashSet<String>();
+        HostRows.Group group = null;
+        var children = new ArrayList<TreeItem>();
+        for (HostRows.Row row : rows) {
+            if (row instanceof HostRows.Group next) {
+                if (group != null) roots.add(groupItem(group, children));
+                group = next; children = new ArrayList<>();
+                if (searching || !collapsedGroup(next)) expanded.add(rowId(next));
+            } else if (group != null && !(row instanceof HostRows.Error)) children.add(treeItem(row));
+            else roots.add(treeItem(row));
+        }
+        if (group != null) roots.add(groupItem(group, children));
+        var tree = new Nodes.Tree(ROWS, ControlState.READY, roots, expanded, selectedRow == null ? Set.of() : Set.of(selectedRow), ACTIVATE, COLUMNS);
+        var footer = new ArrayList<Nodes.Node>();
+        if (hosts.isEmpty() || (searching && rows.size() == (error.isPresent() ? 1 : 0))) {
+            String hint = hosts.isEmpty() ? (distros.isEmpty() ? "No hosts yet" : "No SSH hosts yet") + " — Add or Import from ~/.ssh/config"
+                : distros.isEmpty() ? "No hosts match" : "No sessions match";
+            footer.add(new Nodes.Text(HINT, ControlState.READY, hint, Nodes.TextRole.DESCRIPTION));
+        }
+        footer.addAll(classicDetails());
+        Optional<Nodes.Node> bottom = footer.isEmpty() ? Optional.empty()
+            : Optional.of(new Nodes.Stack(FOOTER, ControlState.READY, Nodes.LayoutRole.VERTICAL, footer));
+        return new Nodes.Panel(ROOT, ControlState.READY, header, Optional.of(filter), tree, bottom);
+    }
+
+    private TreeItem groupItem(HostRows.Group group, List<TreeItem> children) {
+        String id = rowId(group);
+        boolean renamable = !group.wsl() && group.name().equals(defaultGroup);
+        return new TreeItem(id, group.name(), Optional.empty(), false, children, OptionalInt.empty(), false,
+            renamable ? "Right-click to rename this group" : "", Optional.empty(), List.of(),
+            renamable ? Optional.of(List.of(menu("rename", id, "Rename group…"))) : Optional.empty());
+    }
+
+    private TreeItem treeItem(HostRows.Row row) {
+        String id = rowId(row);
+        return switch (row) {
+            case HostRows.Error failure -> new TreeItem(id, failure.message(), Optional.empty(), true, List.of(), OptionalInt.empty(), true,
+                failure.message(), Optional.of(Nodes.StatusKind.DANGER), List.of(), Optional.of(List.of()));
+            case HostRows.Group group -> groupItem(group, List.of());
+            case HostRows.Distro distro -> {
+                int sessions = distro.sessions();
+                String badge = distro.profile().detail().orElse(HostRows.WSL);
+                yield new TreeItem(id, distro.profile().name(), Optional.empty(), true, List.of(), OptionalInt.empty(), false,
+                    distro.profile().name() + ", " + badge + ", " + sessions + (sessions == 1 ? " session" : " sessions"),
+                    Optional.of(sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE), List.of(badge),
+                    Optional.of(List.of(menu("open", id, "Open in new tab"), menu("open-split", id, "Open in split"))));
+            }
+            case HostRows.Host entry -> {
+                RemoteHost host = entry.host();
+                int sessions = sessionCount.applyAsInt(host);
+                String facts = metadata.apply(host), via = via(host);
+                yield new TreeItem(id, host.favorite() ? host.name() + " ★" : host.name(), Optional.empty(), true, List.of(), OptionalInt.empty(), false,
+                    host.name() + ", " + host.label() + (facts.isBlank() ? "" : ", " + facts) + (via == null ? "" : ", via " + via)
+                        + ", " + sessions + (sessions == 1 ? " session" : " sessions"),
+                    Optional.of(sessions > 0 ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE), List.of(host.hostname(), String.valueOf(host.port())),
+                    Optional.of(hostMenu(id, host)));
+            }
+        };
+    }
+
+    /** The selected host's or distribution's Properties and actions; nothing while no session is selected. */
+    private List<Nodes.Node> classicDetails() {
+        Optional<RemoteHost> host = selectedHost();
+        if (host.isPresent()) {
+            RemoteHost h = host.get();
+            String credential = credentialLabels.apply(h);
+            boolean locked = credential.equals("Vault locked");
+            boolean named = h.auth() instanceof Auth.Vault && !locked && !credential.equals("needs Credential Vault") && !credential.equals("credential missing");
+            boolean connected = sessionCount.applyAsInt(h) > 0;
+            return List.of(new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + h.name(), List.of(
+                    new Nodes.PropertyRow("Host", h.hostname(), true), new Nodes.PropertyRow("User", h.username(), true),
+                    new Nodes.PropertyRow("Port", String.valueOf(h.port()), true),
+                    new Nodes.PropertyRow("Credentials", named ? "Vault: " + credential : credential, false,
+                        locked ? Optional.of(Nodes.Severity.WARNING) : Optional.empty()))),
+                new Nodes.Stack(PROPERTY_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                    new Nodes.Button(EDIT, ControlState.READY, "Edit…", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit session"),
+                    new Nodes.Button(CONNECT, ControlState.READY, connected ? "Open Shell" : "Connect", "", Nodes.ButtonKind.PRIMARY, CONNECT, ""))));
+        }
+        Optional<ShellProfileInfo> distro = selectedDistro();
+        if (distro.isEmpty()) return List.of();
+        var profile = distro.get();
+        return List.of(new Nodes.Properties(PROPERTIES, ControlState.READY, "Properties — " + profile.name(), List.of(
+                new Nodes.PropertyRow("Distribution", profile.name(), false), new Nodes.PropertyRow("Version", profile.detail().orElse(HostRows.WSL), false),
+                new Nodes.PropertyRow("Command", "wsl.exe -d " + profile.name(), true))),
+            new Nodes.Stack(PROPERTY_ACTIONS, ControlState.READY, Nodes.LayoutRole.ACTIONS, List.of(
+                new Nodes.Button(CONNECT, ControlState.READY, "Open", "", Nodes.ButtonKind.PRIMARY, CONNECT, ""))));
     }
 
     @Override public void close() {

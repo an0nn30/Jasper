@@ -150,15 +150,29 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         Class<?> hostType = loader.loadClass("dev.jasper.remote.hosts.RemoteHost");
         Class<?> auth = loader.loadClass("dev.jasper.remote.hosts.Auth");
         Object agent = auth.getField("AGENT").get(null);
+        // Plan 10a: a fifth value "favorite" stars the host; a sixth "vault" gives it a Vault credential (locked here).
+        var vaultAuth = loader.loadClass("dev.jasper.remote.hosts.Auth$Vault").getConstructor(UUID.class);
         var ids = new ArrayList<UUID>();
         for (int i = 0; i < values.length; i++) {
             UUID id = new UUID(0x4000L, 0x8000000000000101L + i); ids.add(id);
             Object host = hostType.getConstructor(UUID.class, String.class, String.class, int.class, String.class, auth, String.class, boolean.class, Optional.class, Instant.class, Instant.class)
-                .newInstance(id, values[i][0], values[i][1], 22, values[i][2], agent, values[i].length > 3 ? values[i][3] : "", false, Optional.empty(), Instant.EPOCH, Instant.EPOCH);
+                .newInstance(id, values[i][0], values[i][1], 22, values[i][2], values[i].length > 5 && values[i][5].equals("vault") ? vaultAuth.newInstance(new UUID(0x4100L, i)) : agent,
+                    values[i].length > 3 ? values[i][3] : "", values[i].length > 4 && values[i][4].equals("favorite"), Optional.empty(), Instant.EPOCH, Instant.EPOCH);
             ((CompletableFuture<?>) store.getClass().getMethod("put", hostType).invoke(store, host)).join();
         }
         StagedVaultHost.settle();
         return ids;
+    }
+
+    /** Selects a host in the window's Sessions panel, as a click does (plan 10a). */
+    public void selectSession(UUID host) throws InterruptedException {
+        onEdt(() -> {
+            try {
+                Object panel = ((Map<?, ?>) field(plugin, "panels")).get(vault.window);
+                panel.getClass().getMethod("select", UUID.class).invoke(panel, host);
+            } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+        });
+        StagedVaultHost.settle();
     }
 
     /** Puts a saved tunnel through the plugin's own tunnel store; returns its id. */

@@ -69,6 +69,9 @@ final class PropertyLists {
 
         Nodes.Node node() { return node; }
         JComponent component() { return component; }
+
+        /** Whether {@code next}, leading a panel's footer stack, stands flush there (its face decides). */
+        boolean flush(Nodes.Properties next) { return face.flush(next); }
     }
 
     /** The classic heading: a literal label that fills its background when the face makes it opaque (the title band). */

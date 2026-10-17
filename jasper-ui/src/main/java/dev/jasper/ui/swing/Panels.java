@@ -77,12 +77,16 @@ final class Panels {
             contentInsets();
             boolean search=((Nodes.Panel)node).searchOrNavigation().filter(n -> n instanceof Nodes.Field f && f.kind()==Nodes.FieldKind.SEARCH).isPresent();
             int pad = ThemePainting.metric(context(), search && column<0 ? DesignMetrics.Role.PANEL_SEARCH_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
-            navigation.setBorder(
-                    new EmptyBorder(
-                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_TOP) : 0,
-                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad,
-                            ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : search ? DesignMetrics.Role.PANEL_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
-                            column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad));
+            boolean panelSearch = search && column < 0;
+            var padding = new EmptyBorder(
+                    column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_TOP) : panelSearch ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_SEARCH_TOP) : 0,
+                    column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad,
+                    ThemePainting.metric(context(), column == 1 ? DesignMetrics.Role.COLUMN_SEARCH_BOTTOM : search ? DesignMetrics.Role.PANEL_SEARCH_BOTTOM : DesignMetrics.Role.ICON_GAP),
+                    column == 1 ? ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_SEARCH_SIDE) : pad);
+            // A classic panel's search row closes with a full-width rule (plan 10a, the Workstation mock).
+            int rule = panelSearch ? ThemePainting.metric(context(), DesignMetrics.Role.PANEL_SEARCH_RULE) : 0;
+            navigation.setBorder(rule == 0 ? padding : BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, rule, 0, ThemePainting.panelRule(context())), padding));
             component.revalidate();
             component.repaint();
         }

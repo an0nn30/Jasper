@@ -40,4 +40,6 @@ final class DefaultPropertiesFace implements PropertiesFace {
     @Override public Composition.WidthLayout grid(PropertyLists.PropertiesControl control) { return new PropertyLists.Grid(control); }
 
     @Override public void paint(PropertyLists.PropertiesControl control, Graphics2D g, int width, int height) { }
+
+    @Override public boolean flush(Nodes.Properties node) { return false; }
 }

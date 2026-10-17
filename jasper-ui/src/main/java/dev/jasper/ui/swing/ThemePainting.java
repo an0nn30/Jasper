@@ -36,6 +36,14 @@ final class ThemePainting {
     static Color role(KitContext context, ColorRole role) { return role.color(context.theme()); }
     /** {@code pair}'s slot as its guard paints it in the context's theme (spec 7.3). */
     static Color painted(KitContext context, PaintPair pair) { return SurfaceContrast.painted(context.theme(), pair); }
+    /**
+     * A classic panel's faint rule, under its search row and in its Properties grid: {@code border.subtle} laid over
+     * {@code surface.panel}, opaque, as the Workstation and Dark Mode mocks draw them (plan 10a).
+     */
+    static Color panelRule(KitContext context) {
+        Color subtle = color(context, SemanticColor.BORDER_SUBTLE);
+        return dev.jasper.ui.theme.ColorMath.mix(subtle, color(context, SemanticColor.SURFACE_PANEL), subtle.getAlpha() / 255.0);
+    }
     /** A mask's face size and treatment; a hollow mask has the face, {@code cutout} above the shadow, cut out. */
     private record ShadowKey(int width, int height, double radius, int blur, double strength, boolean hollow, int cutout) { }
     /** Blurred shadow masks by face size and treatment; a few faces are on screen at once. EDT only. */

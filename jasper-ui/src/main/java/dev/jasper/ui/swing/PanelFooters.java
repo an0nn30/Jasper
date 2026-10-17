@@ -1,6 +1,7 @@
 package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.SemanticColor;
 
 import java.awt.*;
@@ -25,6 +26,11 @@ final class PanelFooters {
         boolean arranged;
         /** The footer's persistent setting rows; each has the full-width rule along its top edge. */
         List<Component> separators = List.of();
+        /**
+         * The footer stack leads with Properties its face stands flush ({@link PropertiesFace#flush}): the footer keeps no
+         * padding and its stack places each line itself.
+         */
+        boolean flush;
 
         Footer(KitContext context, String id) {
             this.context = context;
@@ -38,7 +44,7 @@ final class PanelFooters {
             // any other footer content keeps the ordinary footer padding.
             int side = ThemePainting.metric(context, arranged ? DesignMetrics.Role.PANEL_FOOTER_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING),
                     vertical = arranged ? 0 : ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
-            setBorder(detail ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(vertical, side, vertical, side));
+            setBorder(detail || flush ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(vertical, side, vertical, side));
             setLayout(new Composition.Vertical(0));
         }
 
@@ -103,7 +109,10 @@ final class PanelFooters {
 
     /**
      * A vertical stack that is a panel's footer: status lines stacked with the footer gap, a persistent setting row a
-     * short separator gap below them and flush with the footer's bottom when it is last.
+     * short separator gap below them and flush with the footer's bottom when it is last. In a {@link Footer#flush} footer
+     * the leading Properties span the footer from its top, and each later line follows {@code PROPERTY_ACTIONS_PADDING}
+     * below, inset by it at the sides, an ACTIONS row at its natural width against the trailing inset, as a dialog's
+     * buttons stand (the Workstation mock's Edit… and Connect).
      */
     static final class StackLayout implements Composition.WidthLayout {
         final Stacks.StackControl owner;
@@ -112,6 +121,7 @@ final class PanelFooters {
         int metric(DesignMetrics.Role role) { return ThemePainting.metric(owner.context(), role); }
         boolean separated(Component c) { return footer.separators.contains(c); }
         int arrange(Container parent, int width, boolean layout) {
+            if (footer.flush) return flush(parent, width, layout);
             Insets insets = parent.getInsets();
             int y = insets.top, w = Math.max(0, width - insets.left - insets.right);
             Component previous = null;
@@ -127,6 +137,27 @@ final class PanelFooters {
             }
             if (previous != null && !separated(previous)) y += metric(DesignMetrics.Role.PANEL_FOOTER_TOP);
             return y + insets.bottom;
+        }
+        int flush(Container parent, int width, boolean layout) {
+            Insets insets = parent.getInsets();
+            int pad = metric(DesignMetrics.Role.PROPERTY_ACTIONS_PADDING), y = insets.top, w = Math.max(0, width - insets.left - insets.right);
+            boolean first = true;
+            for (var child : parent.getComponents()) {
+                if (!child.isVisible()) continue;
+                int x = insets.left, span = w;
+                if (!first) {
+                    y += pad; x += pad; span = Math.max(0, w - 2 * pad);
+                    if (child instanceof Container row && row.getLayout() instanceof Stacks.StackLayout stack && stack.role == Nodes.LayoutRole.ACTIONS) {
+                        int natural = Math.min(span, child.getPreferredSize().width);
+                        x += span - natural; span = natural;
+                    }
+                }
+                int h = Composition.height(child, span);
+                if (layout) child.setBounds(x, y, span, h);
+                y += h;
+                first = false;
+            }
+            return y + (first ? 0 : pad) + insets.bottom;
         }
         @Override public void addLayoutComponent(String name, Component component) {}
         @Override public void removeLayoutComponent(Component component) {}
