@@ -63,7 +63,7 @@ final class WindowCommandPalette implements AutoCloseable {
         this.owner = owner; this.defaultScopeId = defaultScopeId;
         controller = new PaletteController(kit, look, scopes, history, macOs, this::layoutOverlay,
             this::restoreAndHide, owner::updatingActions, owner::updateActions,
-            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, owner::openFile);
+            message -> owner.onError.accept("Command failed", message), this::open, owner::paletteShortcut, this::browse);
         view = controller.view();
         palette = view.component();
         overlay.setLayout(null); overlay.setOpaque(false); overlay.add(palette); overlay.setVisible(false);
@@ -81,6 +81,12 @@ final class WindowCommandPalette implements AutoCloseable {
     }
 
     PaletteController controller() { return controller; }
+
+    /** Browse… (spec 11.7): File, Open File…'s chooser and route; the Run window stays open and its field takes focus back. */
+    private void browse() {
+        owner.openFile();
+        if (controller.isOpen()) view.focusQuery();
+    }
     dev.jasper.app.commands.CommandHistory history() { return history; }
     void toggle() { open(defaultScopeId); }
     boolean hasScope(String id) { return controller.hasScope(id); }
