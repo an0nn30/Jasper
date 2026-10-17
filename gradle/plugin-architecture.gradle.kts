@@ -7,9 +7,12 @@ import org.gradle.jvm.toolchain.JvmVendorSpec
 // its own packages, libraries it bundles, and the exported packages of plugins it requires.
 // Every plugins/<name>/ module (settings.gradle.kts discovers them) is checked; a plugin that requires
 // another plugin lists that plugin's exported packages here, and nothing else may be imported.
-val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"))
+val declaredImports = mapOf(":jasper-plugin-history" to listOf("dev.jasper.snippets.api"), ":jasper-plugin-remote" to listOf("dev.jasper.vault.api", "dev.jasper.editor.api", "dev.jasper.enterprise.api"), ":jasper-plugin-fileserver" to listOf("dev.jasper.vault.api", "dev.jasper.enterprise.api"), ":jasper-plugin-indexer" to listOf("dev.jasper.editor.api", "dev.jasper.remote.api"), ":jasper-plugin-vault" to listOf("dev.jasper.enterprise.api"))
 val pluginProjects = subprojects.filter { it.projectDir.parentFile == file("plugins") }.associateBy { it.path }
 val pluginImports = pluginProjects.keys.associateWith { declaredImports[it] ?: listOf<String>() }
+// Enterprise presentation spec 14.3: a consumer names the Enterprise API only in its own workstation package.
+val workstationPackages = mapOf(":jasper-plugin-remote" to "dev.jasper.remote.workstation",
+    ":jasper-plugin-fileserver" to "dev.jasper.fileserver.workstation", ":jasper-plugin-vault" to "dev.jasper.vault.workstation")
 val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
     pluginImports.keys.forEach { dependsOn("$it:classes") }
     doLast {
@@ -46,6 +49,9 @@ val verifyPluginArchitecture = tasks.register("verifyPluginArchitecture") {
                 val (from, to, where) = match.destructured
                 if (from.substringBeforeLast('.') !in own) return@forEach
                 val target = to.substringBeforeLast('.')
+                if (target == "dev.jasper.enterprise.api" && target !in own)
+                    check(from.substringBeforeLast('.') == workstationPackages[path]) {
+                        "$path references dev.jasper.enterprise.api outside ${workstationPackages[path] ?: "a workstation package"}: $line" }
                 val allowed = jdk(to) || target in own || imports.any { target == it }
                     || (to.startsWith("dev.jasper.sdk.") && !to.startsWith("dev.jasper.sdk.testing."))
                     || (bundled.isNotEmpty() && where.isNotBlank() && !where.contains("not found"))

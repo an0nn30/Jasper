@@ -54,6 +54,23 @@ class RemotePluginTest {
         }
     }
 
+    @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce(@TempDir Path dir) {
+        try (var host = new FakePluginHost()) {
+            dev.jasper.remote.workstation.FakeEnterprise.start(host);
+            var plugin = plugin(dir.resolve("ssh"));
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin);
+            settle(host);
+            assertThat(host.failures()).isEmpty();
+            assertThat(plugin.layout()).isEqualTo(dev.jasper.remote.workstation.Layout.CLASSIC);
+        }
+        try (var host = new FakePluginHost()) {
+            var plugin = plugin(dir.resolve("ssh-default"));
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.editor", "dev.jasper.enterprise"), plugin);
+            settle(host);
+            assertThat(plugin.layout()).isEqualTo(dev.jasper.remote.workstation.Layout.ROWS);
+        }
+    }
+
     @Test void navigationActionsCarryTheirDefaultsAndAnOldShortcutsTableIsUnknown(@TempDir Path dir) {
         try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.remote", "shortcuts.toggle_panel", "cmd+alt+p");

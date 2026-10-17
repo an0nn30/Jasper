@@ -50,6 +50,16 @@ class VaultPluginTest {
         }
     }); }
 
+    @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        try (var host = new FakePluginHost()) {
+            dev.jasper.vault.workstation.FakeEnterprise.start(host);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of("dev.jasper.enterprise"), plugin);
+            assertThat(host.failures()).isEmpty();
+            assertThat(plugin.layout()).isEqualTo(dev.jasper.vault.workstation.Layout.CLASSIC);
+        }
+    }); }
+
     @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         var plugin = plugin();
         try (var host = new FakePluginHost()) {

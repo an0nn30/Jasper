@@ -65,6 +65,16 @@ class FileServerPluginTest {
             "Mac OS X", ZoneOffset.UTC, (interval, task) -> () -> { }));
     }
 
+    @Test void aStartUnderEnterpriseReadsTheClassicLayoutOnce() {
+        try (var host = new FakePluginHost()) {
+            dev.jasper.fileserver.workstation.FakeEnterprise.start(host);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of("dev.jasper.vault", "dev.jasper.enterprise"), plugin);
+            assertThat(host.failures()).isEmpty();
+            assertThat(plugin.layout()).isEqualTo(dev.jasper.fileserver.workstation.Layout.CLASSIC);
+        }
+    }
+
     static boolean requestQuit(FakePluginHost host) {
         var result = new java.util.concurrent.atomic.AtomicBoolean();
         UiTestAccess.edt(() -> result.set(host.requestQuit()));

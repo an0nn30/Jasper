@@ -90,6 +90,10 @@ public class RemotePlugin implements Plugin {
     private final BiFunction<Duration, Runnable, Runnable> schedule;
     private final Path sshDir;
     private PluginContext context;
+    /** Which composition this run takes (Enterprise presentation spec 14.3), read once in {@link #start}. */
+    private dev.jasper.remote.workstation.Layout layout = dev.jasper.remote.workstation.Layout.ROWS;
+    /** The composition this run takes. */
+    dev.jasper.remote.workstation.Layout layout() { return layout; }
     private RemoteSettings.Declared settings;
     private HostStore store;
     private PanelState panelState;
@@ -146,6 +150,7 @@ public class RemotePlugin implements Plugin {
         context.background().execute(() -> { hostInfo.load(); ui.execute(() -> { if (!stopped) refreshPanels(); }); });
         trust = new KnownHosts(context.dataDirectory().resolve("known_hosts"), () -> settings.connection().readUserKnownHosts() ? Optional.of(sshDir.resolve("known_hosts")) : Optional.empty());
         try { vault = context.services().find(VaultApi.class); } catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
+        layout = dev.jasper.remote.workstation.Layout.of(context.services());
         Optional<java.util.function.BiFunction<WindowHandle, UUID, CompletableFuture<Optional<dev.jasper.vault.api.Credential>>>> credentialSource = Optional.empty();
         if (vault.isPresent()) credentialSource = Optional.of((owner, id) -> vault.get().credential(owner, id));
         connections = new Connections(settings::connection, trust, agentFactory.apply(context), store::host,

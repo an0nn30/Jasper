@@ -63,6 +63,10 @@ public class VaultPlugin implements Plugin {
     private final Function<PluginContext, DeviceSecrets> secretsFactory;
     private final Executor ui;
     private PluginContext context;
+    /** Which composition this run takes (Enterprise presentation spec 14.3), read once in {@link #start}. */
+    private dev.jasper.vault.workstation.Layout layout = dev.jasper.vault.workstation.Layout.ROWS;
+    /** The composition this run takes. */
+    dev.jasper.vault.workstation.Layout layout() { return layout; }
     private LockManager lock;
     private VaultService service;
     private InactivityTimer timer;
@@ -103,6 +107,7 @@ public class VaultPlugin implements Plugin {
 
     @Override public void start(PluginContext context) throws Exception {
         this.context = context;
+        layout = dev.jasper.vault.workstation.Layout.of(context.services());
         stopped = false;
         Files.createDirectories(context.dataDirectory());
         declared = new VaultSettings.Declared(context.settings());
