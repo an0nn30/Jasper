@@ -44,7 +44,15 @@ with plan 5b, `EnterpriseLook` takes the shipped kit, faces and theme, `enterpri
 or run now under a development plugin whose kit says `title_bar = "native"`, `menu_bar = "window"`, `motion = "none"`
 (`--plugin-dir`): the macOS in-window menu bar and native title (⌘W in a plugin window, its classic File row, About in
 Help), Windows and Linux NATIVE and what the Windows caption shows under a dark theme (Rulings 32), Compact keeping the
-menu row, nothing moving with animations on. Not merged, not pushed.
+menu row, nothing moving with animations on. Not pushed.
+Merged with main (plans 4b and 8a) as `bff0edae2`: the `Role` enum, `compact-roles.tsv` and `classic-roles.tsv` take
+8a's thirty `RUN_WINDOW_*` roles after `DOCK_RULE_HIT`, then this plan's thirty chrome roles, so `NewRolesTest.ADDED`,
+`RunWindowRolesTest` and `ChromeRolesTest` hold unchanged (8a R14, Rulings 15); `ProjectionReadTest` stays beside 4b's
+`VariantReadTest` (Rulings 16) and both pass, 8a's `PaletteLook` constants and `PaletteViews.of` naming none of its
+patterns, so `PROJECTION_READERS` is unchanged; the chrome renders and `EnterpriseMenuRowMockTest` pass over 4b's classic
+faces (`compare_all.py` still 0.988 and 0.732); `WindowCommandPaletteTest`'s still-look case reads `revealedHeight`
+through 8a's `view()`; the default gallery's PNGs match this branch's, the JSON differing only in 4b's
+`Cards$SectionSurface`; `./gradlew check --continue`: **10,914 tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 8a: the Run window view — 2026-10-17** (`claude/enterprise-run-window`, worktree
 `.claude/worktrees/enterprise-8`, `b6baeeab3..720b22d27`, then this documentation commit;
