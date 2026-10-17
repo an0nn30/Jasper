@@ -356,7 +356,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 Path.of(System.getProperty("user.home")), pane == null ? "" : pane.programTitle(),
                 pane == null ? "" : pane.commandLabel());
             if (document != null) context = new WindowHeaderContext(document.title() + (document.host().isEmpty() ? "" : " — " + document.host()), document.location(), document.host().isEmpty() ? "FILE" : "SERVER");
-            nativeTitle.accept(context.label());
+            // The frame title follows the look's template (spec 10.4); the title field keeps the context.
+            var snapshot = pane == null ? null : pane.snapshot();
+            Path home = Path.of(System.getProperty("user.home"));
+            nativeTitle.accept(WindowTitle.format(content.look().title(), context.label(),
+                document != null ? document.title() : WindowTitle.session(snapshot),
+                document != null ? document.location() : WindowTitle.directory(snapshot, home)));
             content.chrome.search().setContext(context.label(), context.tooltip(), dev.jasper.app.platform.AppIcons.named(context.icon()));
         };
         if (bar != null) {
