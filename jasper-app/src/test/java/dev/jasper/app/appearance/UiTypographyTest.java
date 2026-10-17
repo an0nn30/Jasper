@@ -64,6 +64,48 @@ class UiTypographyTest {
         });
     }
 
+    /**
+     * Under Enterprise, unset font settings are the look's, not a user's: the kit's roles and FlatLaf's component text take
+     * IBM Plex Sans at the 12-point body times the user scale, which FlatLaf still derives from its platform font, and menu
+     * accelerators keep the platform face, which has the macOS modifier symbols, at the same size.
+     */
+    @Test void enterpriseTextTakesTheUserScaleOnceAndAcceleratorsKeepTheirSymbols() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            String previousScale = System.getProperty("flatlaf.uiScale");
+            try {
+                for (String scale : new String[]{null, "2"}) {
+                    if (scale == null) System.clearProperty("flatlaf.uiScale"); else System.setProperty("flatlaf.uiScale", scale);
+                    var themes = dev.jasper.app.testsupport.EnterpriseLook.controller(false);
+                    try {
+                        float user = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+                        if (scale != null) assertThat(user).as("metrics follow flatlaf.uiScale").isEqualTo(2f);
+                        float expected = 12 * user;
+                        var context = themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME);
+                        var body = new dev.jasper.ui.swing.NativeStyles(themes.kit()).font(context, dev.jasper.ui.metrics.Typography.Role.BODY);
+                        assertThat(body.getSize2D()).as("BODY scale=%s", scale).isEqualTo(expected);
+                        assertThat(body.getFontName(java.util.Locale.ROOT)).isEqualTo("IBM Plex Sans");
+                        for (var component : new JComponent[]{new JLabel(), new JMenuItem(), new JButton(), new JTable()}) {
+                            assertThat(component.getFont().getSize2D()).as("%s scale=%s", component.getClass().getSimpleName(), scale).isEqualTo(expected);
+                            assertThat(component.getFont().getFontName(java.util.Locale.ROOT)).isEqualTo("IBM Plex Sans");
+                        }
+                        var accelerator = UIManager.getFont("MenuItem.acceleratorFont");
+                        assertThat(accelerator.getSize2D()).isEqualTo(expected);
+                        assertThat(accelerator.canDisplayUpTo("\u21E7\u2318\u2325\u2303P")).as("the modifier symbols").isEqualTo(-1);
+                        var configured = new UiFontConfig("Serif", 18);
+                        themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, configured);
+                        assertThat(new JMenuItem().getFont().getFamily()).as("a user font still reaches FlatLaf").isEqualTo(Font.SERIF);
+                        assertThat(UIManager.getFont("MenuItem.acceleratorFont").getFamily()).isEqualTo(Font.SERIF);
+                        themes.configure(false, dev.jasper.app.config.TerminalSchemeChoice.MATCH, UiFontConfig.defaults());
+                        assertThat(new JMenuItem().getFont().getFontName(java.util.Locale.ROOT)).isEqualTo("IBM Plex Sans");
+                    } finally { themes.close(); }
+                }
+            } finally {
+                if (previousScale == null) System.clearProperty("flatlaf.uiScale"); else System.setProperty("flatlaf.uiScale", previousScale);
+                dev.jasper.app.testsupport.EnterpriseLook.restoreDefault();
+            }
+        });
+    }
+
     @Test void sizeOnlySystemSettingsKeepSharedRoleFacesAndExplicitFamiliesRemainExplicit() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             var themes = ThemeTestSupport.controller(true);

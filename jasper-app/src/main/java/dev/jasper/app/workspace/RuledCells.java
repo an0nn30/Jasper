@@ -11,9 +11,13 @@ import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.Box;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -23,7 +27,7 @@ import javax.swing.JToolTip;
  * Ruled status cells (spec 10.6; the Workstation mocks): on {@code surface.app} under a 1 px {@code border.window}
  * rule, cells divided by 1 px {@code border.divider} rules: the run item, the session (its dot and name) and the
  * folder on the left; contributed items as cells; then the grid size in the data face, "UTF-8" and, while there is a
- * problem, the configuration on {@code warning.ground} or {@code danger.ground} with "▲" to the right edge.
+ * problem, the configuration on {@code warning.ground} or {@code danger.ground} after a painted "▲" to the right edge.
  */
 final class RuledCells implements StatusCells {
     private final JLabel session = label("statusSession"), folder = label("statusFolder"), grid = label("statusGrid"), encoding = label("statusEncoding");
@@ -39,6 +43,23 @@ final class RuledCells implements StatusCells {
         label.setName(name); label.putClientProperty("html.disable", true); return label;
     }
     private static int metric(DesignMetrics.Role role) { return UIScale.scale(FlatLafInstaller.installedKit().metrics().value(role)); }
+
+    /** The configuration cell's "▲", {@code CHROME_GLYPH} square, in the cell's text colour. */
+    private static final Icon WARNING = new Icon() {
+        @Override public int getIconWidth() { return metric(DesignMetrics.Role.CHROME_GLYPH); }
+        @Override public int getIconHeight() { return metric(DesignMetrics.Role.CHROME_GLYPH); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(component.getForeground());
+                double size = getIconWidth();
+                var triangle = new Path2D.Double();
+                triangle.moveTo(x, y + size); triangle.lineTo(x + size / 2, y); triangle.lineTo(x + size, y + size); triangle.closePath();
+                g.fill(triangle);
+            } finally { g.dispose(); }
+        }
+    };
 
     @Override public void install(WindowStatusBar bar) {
         encoding.setText("UTF-8");
@@ -56,7 +77,11 @@ final class RuledCells implements StatusCells {
         folder.setText(bar.folder());
         folder.setToolTipText(bar.folder().isEmpty() ? null : bar.showingContent() ? bar.folder() : bar.directory());
         grid.setText(bar.dimensions());
-        for (JLabel label : List.of(session, folder, encoding)) { label.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT)); label.setForeground(text); }
+        // A session or folder name IBM Plex cannot draw (CJK, say) takes the platform face (plan 5b, ruling 26).
+        for (JLabel label : List.of(session, folder, encoding)) {
+            label.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT, java.util.Objects.toString(label.getText(), "")));
+            label.setForeground(text);
+        }
         grid.setFont(ThemeZone.font(Typography.Role.MONO)); grid.setForeground(text);
         for (var row : new JComponent[] {bar.leftItems, bar.rightItems, bar.contentItems})
             for (Component child : row.getComponents()) if (child instanceof JButton item) { item.setForeground(text); item.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT)); }
@@ -64,9 +89,12 @@ final class RuledCells implements StatusCells {
         boolean problem = bar.configurationProblem() != null;
         config.setVisible(problem);
         if (problem) {
-            config.setText("▲ " + bar.configurationText());
+            config.setText(bar.configurationText());
             config.setForeground(SurfaceContrast.painted(theme, WindowPairs.configuration(bar.configurationProblem())));
             config.setFont(ThemeZone.font(Typography.Role.STATUS_TEXT));
+            // "▲ " before the text: the triangle painted, as the run item paints its "▶" (IBM Plex has no such glyph).
+            config.setIcon(WARNING); config.setDisabledIcon(WARNING);
+            config.setIconTextGap(config.getFontMetrics(config.getFont()).charWidth(' '));
         }
         bar.revalidate(); bar.repaint();
     }

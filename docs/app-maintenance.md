@@ -342,7 +342,8 @@ development build named after the latest release tag at or behind it.
 Every external jar Jasper or a bundled plugin ships needs its exact `group:artifact:version` in a component of
 `jasper-app/src/main/resources/dev/jasper/app/about/licenses/notices.toml`, with its license text (and its NOTICE, when
 the project publishes one) beside it; `verifyThirdPartyNotices` (part of `check`) names any jar without one and any
-entry that no longer ships. Read the new version's license before updating the entry, and look inside the jar for bundled
+entry that no longer ships. A font file a bundled plugin ships is listed in its component's `files` as
+`<plugin id>/<path in its jar>`, and the check names any that is not. Read the new version's license before updating the entry, and look inside the jar for bundled
 native binaries (DLLs, executables, shared libraries): their own licenses need components too. When `stagePackage`
 logs that it unsealed a jar, record the change in that component's notice, as `jbr-api.NOTICE.txt` does.
 

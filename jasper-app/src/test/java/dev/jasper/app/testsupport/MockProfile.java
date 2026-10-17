@@ -102,9 +102,9 @@ public final class MockProfile {
     }
 
     /**
-     * A probe that follows the UI face's advance widths: the fixture kit draws the platform face where the mocks draw
-     * IBM Plex, so until plan 5b ships Plex it is printed as a residual, not asserted (plan 6a Rulings 26 and 29; plan 6b
-     * Execution notes). The merge with plan 5b turns each into an assertion within {@code tolerance}.
+     * A probe that follows the UI face's advance widths (plan 6b Execution notes R36 and R47), asserted within
+     * {@code tolerance} under the shipped kit's IBM Plex; printed, not asserted, where an installed IBM Plex hides the
+     * plugin's files, so that the render draws the platform face (plan 5b Execution notes, ruling 3).
      *
      * @param what the probe
      * @param actual the render's value, in the mock's pixels
@@ -112,7 +112,12 @@ public final class MockProfile {
      * @param tolerance the tolerance it is asserted within under Plex
      */
     public static void fonts(String what, int actual, int expected, int tolerance) {
-        System.out.printf("FONTS residual until plan 5b: %s %d, mock %d (tolerance %d)%n", what, actual, expected, tolerance);
+        if (!EnterpriseResources.plexResolves()) {
+            System.out.printf("FONTS unchecked (an installed IBM Plex hides the plugin's files): %s %d, mock %d (tolerance %d)%n", what, actual, expected, tolerance);
+            return;
+        }
+        org.assertj.core.api.Assertions.assertThat(actual).as(what + " under IBM Plex, mock " + expected)
+            .isCloseTo(expected, org.assertj.core.api.Assertions.within(tolerance));
     }
 
     /** CIE76 ΔE between two opaque sRGB colours. */

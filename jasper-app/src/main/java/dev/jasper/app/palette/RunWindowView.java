@@ -134,6 +134,10 @@ public final class RunWindowView extends SurfacePanel implements PaletteView {
             var text = CardView.find(view(id), id, javax.swing.JLabel.class);
             if (text != null) { text.addMouseListener(toView); text.addMouseMotionListener(toView); }
         }
+        // The shortcut's text ends where its box does, a gap before the close button, as the mocks align it: its label is
+        // up to two pixels wider than the text it draws (whole-pixel width, fractional advances).
+        var shortcut = CardView.find(view(SHORTCUT), SHORTCUT, javax.swing.JLabel.class);
+        if (shortcut != null) shortcut.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
         themeSubscription = kit.binding().subscribe(pair -> refreshTheme());
     }
 

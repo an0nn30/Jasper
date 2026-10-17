@@ -58,6 +58,13 @@ public final class NativeStyles {
     public Font font(Typography.Role role) {
         return SwingTypography.effective(SwingTypography.typography(kit).font(role));
     }
+    /**
+     * {@link #font(Typography.Role)} for {@code text}: the role's platform face when the kit's own face has no glyph for a
+     * character of it ({@link Typography#font(Typography.Role, String)}).
+     */
+    public Font font(Typography.Role role, String text) {
+        return SwingTypography.effective(SwingTypography.typography(kit).font(role, text));
+    }
     /** Context role font, in the context's kit, with the same exactly-once host/user scaling policy as descriptor controls. */
     public Font font(KitContext context,Typography.Role role) { return ThemePainting.font(context,role); }
     /** Observes the engine's supported font defaults and user scale for one native lifetime owner.

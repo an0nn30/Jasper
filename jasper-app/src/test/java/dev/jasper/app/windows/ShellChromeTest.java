@@ -35,12 +35,17 @@ class ShellChromeTest {
                 assertThat(classic.getClientProperty("FlatLaf.style")).isEqualTo(reference.getClientProperty("FlatLaf.style")).isNotNull();
                 assertThat(classic.getBackground()).isEqualTo(reference.getBackground());
                 assertThat(classic.getInsets()).isEqualTo(reference.getInsets());
+                assertThat(dev.jasper.app.platform.ClassicMenuRow.styled(classic)).isTrue();
+                assertThat(classic.getLayout()).as("a plain bar takes the row's layout in place of the look-and-feel's")
+                    .isNotInstanceOf(javax.swing.plaf.UIResource.class).hasSameClassAs(reference.getLayout());
                 var standard = new javax.swing.JMenuBar();
                 var border = standard.getBorder();
                 ShellChrome.of(new ShellLook(false, false, false), true).styleMenus(standard);
                 ShellChrome.standard().styleMenus(standard);
                 assertThat(standard.getClientProperty("FlatLaf.style")).isNull();
                 assertThat(standard.getBorder()).isSameAs(border);
+                assertThat(dev.jasper.app.platform.ClassicMenuRow.styled(standard)).isFalse();
+                assertThat(standard.getLayout()).isInstanceOf(javax.swing.plaf.UIResource.class);
             } finally { themes.close(); }
         });
     }

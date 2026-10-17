@@ -1,7 +1,13 @@
 package dev.jasper.ui.metrics;
 
 import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.awt.font.TextAttribute;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -10,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class TypographyTest {
+public class TypographyTest {
     /** Today's platform typography: the default scale and faces with no user setting. */
     static Typography platform() { return Typography.of(TypeScale.DEFAULT, FaceSet.PLATFORM, Typography.UserFont.NONE); }
     /** A size-only user setting, which keeps the platform family policy. */
@@ -132,6 +138,51 @@ class TypographyTest {
                     assertThat(mode.typography().font(role, selected)).as("%s %s selected=%s", mode.family(), role, selected)
                         .isEqualTo(former(role, selected, mode.family(), mode.body(), mode.platformDefault(), row.size(), row.weight()));
                 }
+    }
+
+    /**
+     * A kit's own UI face draws a text it has every glyph for; a text with a glyph it lacks (IBM Plex has no macOS modifier
+     * symbols, no CJK) draws wholly in the platform face for the role, {@link Font#MONOSPACED} for a data role.
+     */
+    @Test void aKitFaceMissingAGlyphGivesThatTextThePlatformFace() throws Exception {
+        String face = registeredWithoutModifierSymbols();
+        var kit = Typography.of(TypeScale.DEFAULT, FaceSet.of(face, face, face, face, face), Typography.UserFont.NONE);
+        String shortcut = "\u21E7\u2318P";
+        assertThat(new Font(face, Font.PLAIN, 12).canDisplayUpTo(shortcut)).as("the test face has no modifier symbols").isZero();
+        for (var role : List.of(Typography.Role.BODY, Typography.Role.CAPTION, Typography.Role.SECTION_LABEL)) {
+            assertThat(kit.font(role, "Run").getFontName(Locale.ROOT)).as(role + ": a text the face draws").isEqualTo(face);
+            assertThat(kit.font(role, "Run")).as(role + ": as with no text").isEqualTo(kit.font(role));
+            assertThat(kit.font(role, shortcut)).as(role + ": the platform face draws the whole text").isEqualTo(platform().font(role));
+        }
+        String cjk = "\u5831\u544A.txt";
+        for (var role : List.of(Typography.Role.MONO, Typography.Role.MONO_SMALL, Typography.Role.RUN_DETAIL)) {
+            assertThat(kit.font(role, "a.txt").getFontName(Locale.ROOT)).as(role + ": a text the data face draws").isEqualTo(face);
+            assertThat(kit.font(role, shortcut)).as(role + ": the logical monospaced font").isEqualTo(platform().font(role));
+            assertThat(kit.font(role, cjk)).as(role + ": the logical monospaced font").isEqualTo(platform().font(role));
+            assertThat(kit.font(role, cjk).getFamily(Locale.ROOT)).isEqualTo(Font.MONOSPACED);
+        }
+        assertThatThrownBy(() -> kit.font(Typography.Role.BODY, (String) null)).isInstanceOf(NullPointerException.class);
+    }
+
+    /**
+     * The Enterprise plugin's IBM Plex Sans Regular, renamed in its name table (same lengths) so that no installed copy
+     * hides it, registered in this JVM; its registered full name.
+     */
+    public static String registeredWithoutModifierSymbols() throws Exception {
+        byte[] bytes = Files.readAllBytes(Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize()
+            .resolve("plugins/enterprise/src/main/resources/presentation/fonts/ibm-plex-sans-regular.ttf"));
+        for (var charset : List.of(StandardCharsets.UTF_16BE, StandardCharsets.ISO_8859_1))
+            for (String[] names : new String[][] {{"IBM Plex Sans", "Jasper Glyphs"}, {"IBMPlexSans", "JasperGlyph"}}) {
+                byte[] from = names[0].getBytes(charset), to = names[1].getBytes(charset);
+                for (int i = 0; i + from.length <= bytes.length; i++)
+                    if (Arrays.equals(bytes, i, i + from.length, from, 0, from.length)) System.arraycopy(to, 0, bytes, i, to.length);
+            }
+        Font font = Font.createFont(Font.TRUETYPE_FONT, new ByteArrayInputStream(bytes));
+        GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+        String name = font.getFontName(Locale.ROOT);
+        assertThat(name).isEqualTo("Jasper Glyphs");
+        assertThat(new Font(name, Font.PLAIN, 12).getFontName(Locale.ROOT)).as("the test face resolves by its full name").isEqualTo(name);
+        return name;
     }
 
     private static final boolean APPLE_TEXT = !new Font(".AppleSystemUIFont", Font.PLAIN, 1).getFamily(Locale.ROOT).equals(Font.DIALOG);

@@ -12,9 +12,12 @@ import dev.jasper.app.contributions.ContentRegistry;
 import dev.jasper.app.contributions.ContentStatus;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.terminals.PaneSnapshot;
+import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.swing.FlatLafInstaller;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
@@ -69,13 +72,70 @@ class RuledCellsTest {
                     .filter(run -> run.length() == 2 && run.color().equals(DerivedColor.BORDER_DIVIDER.color(theme))).map(MockProfile.Run::start).toList();
                 assertThat(rules).as("a rule after the run, session and folder cells and before each right cell").hasSize(3 + 5);
                 assertThat(MockProfile.at(image, 2860, 30)).as("the warning cell reaches the edge").isEqualTo(DerivedColor.WARNING_GROUND.color(theme));
-                assertThat(bar.configButton().getText()).isEqualTo("▲ Config warnings (line 12)");
+                assertThat(bar.configButton().getText()).isEqualTo("Config warnings (line 12)");
+                assertThat(bar.configButton().getIcon()).as("its painted ▲").isNotNull();
                 bar.runItem().click();
                 assertThat(opened).as("the run item opens the palette").hasValue(1);
                 bar.setConfiguration(state(null));
                 assertThat(bar.configButton().isVisible()).as("no problem, no cell").isFalse();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
+    }
+
+    /**
+     * IBM Plex has no "▲" and no macOS modifier symbols: the warning cell paints its triangle and keeps Plex for its text,
+     * and the search field's keycap takes the platform face (plan 5b, ruling 26), so neither draws a missing glyph.
+     */
+    @Test void noCellOrKeycapDrawsAGlyphIbmPlexLacks() throws Exception {
+        EnterpriseResources.assumePlexResolves();
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var bar = new WindowStatusBar(new RuledCells(), null);
+                bar.setMetadata(local("Mac"), "130 × 69", true);
+                bar.setConfiguration(state(ConfigDiagnostic.Severity.WARNING));
+                var config = bar.configButton();
+                assertThat(config.getFont().getFontName(java.util.Locale.ROOT)).as("the warning cell's text").startsWith("IBM Plex Sans");
+                assertThat(config.getFont().canDisplayUpTo(config.getText())).as("every glyph of it").isEqualTo(-1);
+                assertThat(config.getIcon().getIconWidth()).as("the painted ▲").isPositive();
+                String shortcut = "\u21E7\u2318P";
+                assertThat(ThemeZone.font(Typography.Role.MONO_SMALL, shortcut)).as("the keycap's face")
+                    .isNotEqualTo(ThemeZone.font(Typography.Role.MONO_SMALL));
+                assertThat(ThemeZone.font(Typography.Role.MONO_SMALL, shortcut).getFamily(java.util.Locale.ROOT)).isEqualTo(java.awt.Font.MONOSPACED);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** A session or folder name IBM Plex cannot draw takes the platform face (plan 5b, ruling 26); a Latin one keeps Plex. */
+    @Test void aSessionOrFolderNameIbmPlexCannotDrawTakesThePlatformFace() throws Exception {
+        EnterpriseResources.assumePlexResolves();
+        String name = "\u5831\u544A";
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var bar = new WindowStatusBar(new RuledCells(), null);
+                bar.setMetadata(local("Mac"), "130 × 69", true);
+                var session = cell(bar, "statusSession");
+                assertThat(session.getText()).isEqualTo("Mac");
+                assertThat(session.getFont().getFontName(java.util.Locale.ROOT)).as("a Latin session name").startsWith("IBM Plex Sans");
+                bar.setMetadata(local(name), "130 × 69", true);
+                assertThat(session.getText()).isEqualTo(name);
+                assertThat(session.getFont()).as("the session cell").isEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT, name))
+                    .isNotEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT));
+                var folder = cell(bar, "statusFolder");
+                assertThat(folder.getFont().canDisplayUpTo(folder.getText())).as("the folder cell draws " + folder.getText()).isEqualTo(-1);
+                String path = DesktopTestSupport.HOME.resolve(name).toString();
+                bar.setMetadata(new PaneSnapshot("", Optional.of(DesktopTestSupport.HOME.resolve(name)), 130, 69, true, PaneSnapshot.State.RUNNING,
+                    OptionalInt.empty(), Optional.empty(), Optional.empty(), "Mac"), "130 × 69", true);
+                assertThat(folder.getText()).as("the folder " + path).contains(name);
+                assertThat(folder.getFont()).as("the folder cell").isEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT, folder.getText()))
+                    .isNotEqualTo(ThemeZone.font(Typography.Role.STATUS_TEXT));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    static javax.swing.JLabel cell(WindowStatusBar bar, String name) {
+        return (javax.swing.JLabel) java.util.Arrays.stream(bar.getComponents()).filter(c -> name.equals(c.getName())).findFirst().orElseThrow();
     }
 
     @Test void theConfigurationCellShowsOnlyWhileThereIsAProblem() throws Exception {
@@ -87,13 +147,13 @@ class RuledCellsTest {
                 bar.onConfigurationDetails = details::incrementAndGet;
                 bar.setConfiguration(state(ConfigDiagnostic.Severity.ERROR));
                 assertThat(bar.configButton().isVisible()).isTrue();
-                assertThat(bar.configButton().getText()).startsWith("▲ Config error");
+                assertThat(bar.configButton().getText()).startsWith("Config error");
                 assertThat(MockProfile.at(MockProfile.print(bar, 1440, 24), 2860, 30)).as("the error cell is on danger.ground")
                     .isEqualTo(DerivedColor.DANGER_GROUND.color(themes.current().chrome()));
                 bar.configButton().doClick();
                 assertThat(details).hasValue(1);
                 bar.setConfiguration(state(ConfigDiagnostic.Severity.WARNING));
-                assertThat(bar.configButton().getText()).startsWith("▲ Config warnings");
+                assertThat(bar.configButton().getText()).startsWith("Config warnings");
                 bar.setConfiguration(state(null));
                 assertThat(bar.configButton().isVisible()).isFalse();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }

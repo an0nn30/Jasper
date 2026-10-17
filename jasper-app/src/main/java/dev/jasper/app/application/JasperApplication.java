@@ -201,11 +201,28 @@ public final class JasperApplication {
 
     /** The plugin selection this process starts, fixed at construction. */
     private volatile dev.jasper.app.plugins.PluginSelection selection;
+    /** The look's font files that could not be registered, for its notice. */
+    private List<String> lookFontProblems = List.of();
     /** The presentation every surface of this process receives (spec 4.9). */
     private volatile dev.jasper.app.presentation.Presentation presentation;
 
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
+
+    /** The steps a branded look's splash shows (spec 10.11); none until the bootstrap hands them over. EDT. */
+    private dev.jasper.app.startup.StartupSteps startupSteps = dev.jasper.app.startup.StartupSteps.NONE;
+
+    /**
+     * The steps this application reports to a branded look's splash (spec 10.11): each plugin as it starts, then the
+     * first window as it is composed and shown. A presentation without branding, as a look that fell back at start has
+     * (spec 4.7), ends them at once. Before {@link #startPlugins(AppDirs)}. EDT.
+     *
+     * @param steps the bootstrap's steps
+     */
+    public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
+        startupSteps = java.util.Objects.requireNonNull(steps, "steps");
+        if (!presentation.branding().present()) steps.done();
+    }
 
     /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
     /** What terminal windows and the rehearsal's are made of under this process's presentation. */
@@ -289,6 +306,8 @@ public final class JasperApplication {
         this.selection = Objects.requireNonNull(bootstrapSelection, "bootstrapSelection");
         presentation = this.selection.presentation();
         dev.jasper.app.platform.BundledFonts.register();
+        // The look's own faces, before any font list is cached (spec 4.9).
+        lookFontProblems = LookFonts.register(presentation.faces());
         ConfigSnapshot startup = service == null ? ConfigSnapshot.defaults() : service.initialState().snapshot();
         startupViewMode = startup.viewMode();
         systemAppearance = dev.jasper.app.platform.SystemAppearance.open();
@@ -296,8 +315,8 @@ public final class JasperApplication {
         boolean dark = AppearancePolicy.dark(startup.appearance(), systemAppearance.current());
         // First Swing work: every later component may read the installed snapshot. A variant that cannot be installed
         // never stops start-up; the configuration reports it.
-        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.bundledOnly()
-            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly());
+        var library = themesFolder == null ? dev.jasper.app.appearance.ThemeLibrary.of(selection.themes())
+            : dev.jasper.app.appearance.ThemeLibrary.read(themesFolder, dev.jasper.app.appearance.ThemeLibrary.bundledOnly(), selection.themes());
         // The configuration reports unusable picks; start-up only replaces them.
         var picks = dev.jasper.app.appearance.ThemeSelection.of(library, startup.darkTheme(), startup.lightTheme(),
             startup.terminalScheme(), (key, message) -> { });
@@ -512,7 +531,7 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.restoreLayout(uiState); window.show();
+            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation(); window.show();
             memoryIndicator.windows(windows.size());
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
@@ -525,6 +544,7 @@ public final class JasperApplication {
         }
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
+        startupSteps.done();
         return window;
     }
 
@@ -994,6 +1014,7 @@ public final class JasperApplication {
             return created.content().id();
         });
         if (subcommandList != null) plugins.subcommandList(subcommandList);
+        plugins.starting(startupSteps::plugin);
         plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
         new PluginProblemNotices(notificationCenter, incidentNotices,
             () -> openSettings(null, dev.jasper.app.pluginmanager.PluginsPage.ID)).announce(plugins.problems());
@@ -1009,6 +1030,12 @@ public final class JasperApplication {
                             .withContent("Jasper could not work out how it was started. Quit and reopen it to start with the " + skipped.name() + " look."));
                 });
             }), false))));
+        // Spec 5.8 and 5.9: a look that starts without some of its files says so once.
+        var missing = new ArrayList<String>(lookFontProblems);
+        presentation.droppedDefaults().forEach(key -> missing.add("[defaults].\"" + key + "\": its theme did not load, so the setting keeps its core default"));
+        presentation.provider().filter(provider -> !missing.isEmpty()).ifPresent(provider -> notificationCenter.post(NotificationRequest.of(
+            IncidentNotices.PLUGINS.id(), Severity.WARNING, "The " + provider.name() + " look is missing some of its files")
+            .withContent(String.join("\n", missing))));
         // Spec 4.6: the first window's first paint proves the look, off the EDT.
         trace.when(StartupTrace.Milestone.FIRST_PAINT, task -> Thread.ofVirtual().name("jasper-presentation-proven").start(task),
             () -> presentationAttempt().proven());
@@ -1065,8 +1092,11 @@ public final class JasperApplication {
             var shells = new dev.jasper.app.settingsui.ShellChoices(() -> shellProfiles.current().stream()
                     .map(profile -> new dev.jasper.app.settingsui.ShellChoices.Choice(profile.id(), profile.label())).toList(),
                 shellProfiles::refresh, shellProfiles::onChanged);
+            // ThemeFolder.prepare runs on the import worker (ThemeMenu.chooseAndImport), so the folder reads the session's
+            // fixed plugin tier, never ThemeController.library(), which requires the EDT.
+            var pluginThemes = dev.jasper.app.appearance.ThemeLibrary.of(selection.themes());
             Optional<dev.jasper.app.settingsui.ThemeImports> imports = themesFolder == null ? Optional.empty()
-                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder),
+                : Optional.of(SettingsAppearance.imports(new dev.jasper.app.appearance.ThemeFolder(themesFolder, () -> pluginThemes),
                     surface -> surface == null ? Optional.empty() : this.shells.chooseFile(surface, "Import Theme", ".json"),
                     this::confirmOver, this::informOver, configuration::save, configuration::reload));
             var appearanceChoices = SettingsAppearance.choices(systemAppearance, themes::library, imports);

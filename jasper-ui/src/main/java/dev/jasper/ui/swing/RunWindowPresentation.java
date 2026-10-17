@@ -131,10 +131,10 @@ public final class RunWindowPresentation {
     /**
      * {@code text}'s Run window face and colour, after its control set the role's own: WINDOW_TITLE and the title row's
      * CAPTION through {@link #TITLE} and {@link #SHORTCUT}; LABEL, DESCRIPTION and BODY_STRONG through the label pair,
-     * DESCRIPTION at BODY's size on the help's line, BODY_STRONG semibold; MONO in the small data face through the value
-     * pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by {@link #row}. A selected row's ink and a
-     * severity keep their colour. A DESCRIPTION's lines sit centred in their line box, as the mocks' CSS centres them, and
-     * it shows at most {@link #HELP_LINES} lines, the last cut with an ellipsis.
+     * DESCRIPTION at BODY's size on the help's line, BODY_STRONG in the headings' semibold (the mocks' 11 px "Session:");
+     * MONO in the small data face through the value pair. A list's CAPTION, DESCRIPTION and MONO texts are repainted by
+     * {@link #row}. A selected row's ink and a severity keep their colour. A DESCRIPTION's lines sit centred in their line
+     * box, as the mocks' CSS centres them, and it shows at most {@link #HELP_LINES} lines, the last cut with an ellipsis.
      */
     static void text(KitContext context, Nodes.Text text, Labels.LiteralLabel label, boolean inked) {
         if (text.severity().isPresent()) return;
@@ -153,11 +153,11 @@ public final class RunWindowPresentation {
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case BODY_STRONG -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.PANEL_TITLE));
+                label.setFont(ThemePainting.font(context, Typography.Role.RUN_HEADING));
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, labelPair(kit)));
             }
             case MONO -> {
-                label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
+                label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL, text.text()));
                 if (!inked) label.setForeground(SurfaceContrast.painted(theme, valuePair(kit)));
             }
             default -> { }
@@ -197,7 +197,7 @@ public final class RunWindowPresentation {
         });
         var faint = SurfaceContrast.painted(theme, selected ? SELECTED_DETAIL : ROW_DETAIL);
         for (var node : item.subtitle()) label(row, node).ifPresent(label -> {
-            label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL));
+            label.setFont(ThemePainting.font(context, Typography.Role.RUN_DETAIL, label.getText()));
             label.setForeground(faint);
             // The mocks cut a long detail at its end, as the row's title is cut.
             label.putClientProperty("Jasper.leadingEllipsis", false);
@@ -311,7 +311,8 @@ public final class RunWindowPresentation {
 
     /**
      * The help row: the tile, then the text beside it; the text block centred on the tile when shorter, and the reverse,
-     * and the two centred in a taller row.
+     * and the two centred in a taller row. The text block then sits {@code RUN_WINDOW_HELP_TEXT_TOP} lower, where the
+     * mocks set its first line.
      */
     private static final class HelpLayout implements Composition.WidthLayout {
         private final Stacks.StackControl owner;
@@ -345,7 +346,8 @@ public final class RunWindowPresentation {
             var size = owner.tile.getPreferredSize();
             // The row's content centred in a taller row (the Run window's fixed help height).
             int textHeight = text(parent, parent.getWidth()), top = Math.max(0, (parent.getHeight() - height(parent, parent.getWidth())) / 2);
-            int y = top + Math.max(0, (size.height - textHeight) / 2), width = room(parent.getWidth());
+            int y = top + Math.max(0, (size.height - textHeight) / 2) + ThemePainting.metric(owner.context(), DesignMetrics.Role.RUN_WINDOW_HELP_TEXT_TOP);
+            int width = room(parent.getWidth());
             owner.tile.setBounds(0, top + Math.max(0, (textHeight - size.height) / 2), size.width, size.height);
             for (var line : lines(parent)) {
                 int height = Composition.height(line, width);

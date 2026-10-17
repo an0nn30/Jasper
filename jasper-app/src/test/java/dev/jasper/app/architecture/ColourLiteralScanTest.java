@@ -12,8 +12,36 @@ import org.junit.jupiter.api.Test;
 /** Spec 3.1 and 11: no colour value lives in production code or resources outside the built-in theme files. */
 class ColourLiteralScanTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot"));
-    static final Set<Path> THEMES = dev.jasper.ui.theme.JasperTheme.builtIns().stream()
-        .map(theme -> ROOT.resolve("jasper-ui/src/main/resources/dev/jasper/ui/theme/" + theme.id() + ".json")).collect(java.util.stream.Collectors.toSet());
+    /** Spec 7.4: the files named by in-repo plugin.toml themes entries, which the production loader must read. */
+    static final Set<Path> PLUGIN_THEMES = pluginThemes();
+    static final Set<Path> THEMES = java.util.stream.Stream.concat(dev.jasper.ui.theme.JasperTheme.builtIns().stream()
+        .map(theme -> ROOT.resolve("jasper-ui/src/main/resources/dev/jasper/ui/theme/" + theme.id() + ".json")), PLUGIN_THEMES.stream())
+        .collect(java.util.stream.Collectors.toSet());
+
+    static Set<Path> pluginThemes() {
+        var files = new java.util.TreeSet<Path>();
+        try (var plugins = Files.list(ROOT.resolve("plugins"))) {
+            for (Path plugin : plugins.toList()) {
+                Path resources = plugin.resolve("src/main/resources"), descriptor = resources.resolve("plugin.toml");
+                if (!Files.isRegularFile(descriptor)) continue;
+                var toml = org.tomlj.Toml.parse(Files.readString(descriptor));
+                var themes = toml.getArrayOrEmpty("themes");
+                for (int i = 0; i < themes.size(); i++) files.add(resources.resolve(themes.getString(i)));
+            }
+        } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        return Set.copyOf(files);
+    }
+
+    @Test void everyInRepoPluginThemeLoadsWithTheProductionLoader() throws IOException {
+        assertThat(PLUGIN_THEMES).contains(ROOT.resolve("plugins/enterprise/src/main/resources/themes/enterprise.json"));
+        for (Path file : PLUGIN_THEMES) {
+            String name = file.getFileName().toString();
+            var theme = dev.jasper.ui.theme.JasperTheme.parse(Files.readString(file), name.substring(0, name.length() - ".json".length()));
+            assertThat(theme.has(true) || theme.has(false)).as(file.toString()).isTrue();
+        }
+    }
+    /** Spec 10.11 fixes the boot splash's colours for every theme; this one source holds them. */
+    static final Set<Path> FIXED = Set.of(ROOT.resolve("jasper-app/src/main/java/dev/jasper/app/splash/SplashColors.java"));
     static final Pattern STRING_HEX = Pattern.compile("\"[^\"\\n]*#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?(?![0-9A-Za-z])[^\"\\n]*\"");
     // A constructor or decode call, simple or fully qualified (new java.awt.Color(0x…)), given a hex literal.
     static final Pattern CONSTRUCTED = Pattern.compile("(?:\\bColor(?:UIResource)?|\\bColor\\.decode)\\(\\s*\"?(?:0x|#)[0-9A-Fa-f]{6}");
@@ -39,7 +67,7 @@ class ColourLiteralScanTest {
         for (Path root : roots) try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 String name = file.getFileName().toString(), extension = name.substring(name.lastIndexOf('.') + 1);
-                if (THEMES.contains(file)) continue;
+                if (FIXED.contains(file) || THEMES.contains(file)) continue;
                 String text;
                 if (extension.equals("java")) text = Files.readString(file);
                 else if (TEXT_RESOURCES.contains(extension)) text = Files.readString(file);

@@ -8,6 +8,7 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuTarget;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.platform.ClassicMenuRow;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -111,6 +112,7 @@ class WindowChromeMenusTest {
 
     /** Mock measurements: a 24 px row on surface.app over a 1 px border.divider rule, the first title 15 from the edge. */
     @Test void theClassicMenuRowIsTheMocksRow() throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
             try {
@@ -132,6 +134,7 @@ class WindowChromeMenusTest {
                 assertThat(file.getInsets().left).isEqualTo(9);
                 assertThat(file.getFont()).as("the kit's body face").isEqualTo(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.BODY));
                 assertThat(file.getFont().getSize()).as("the Enterprise kit's 12 px body").isEqualTo(12);
+                assertThat(file.getFont().getFontName(java.util.Locale.ROOT)).as("plan 6a Rulings 20: the kit's own face").isEqualTo("IBM Plex Sans");
                 // Rulings 6: a hovered closed title on surface.control.hover, an open one on the accent in text.onAccent, square.
                 var palette = themes.current().chrome().semantic();
                 @SuppressWarnings("unchecked") var style = (java.util.Map<String, Object>) bar.getClientProperty("FlatLaf.style");
@@ -149,6 +152,49 @@ class WindowChromeMenusTest {
                 assertThat(new java.awt.Color(image.getRGB(file.getX() + 2, file.getY() + 2), true))
                     .as("the open title's background").isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.ACCENT));
                 assertThat(file.getForeground()).as("the titles' ink").isEqualTo(palette.color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /**
+     * The classic row keeps the window bar's own folding layout: its titles stand at their {@link ClassicMenuRow#titleWidth},
+     * and a narrow window folds the trailing titles into "…", then every title into ☰ (spec 10.2).
+     */
+    @Test void aNarrowClassicWindowStillFoldsItsMenus() throws Exception {
+        dev.jasper.app.testsupport.EnterpriseResources.assumePlexResolves();
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.connectContributions(model(false));
+                var root = new JRootPane();
+                root.setJMenuBar(owner.menuBar());
+                root.setContentPane(owner);
+                var bar = owner.chrome().menuBar();
+                assertThat(ClassicMenuRow.styled(bar)).isTrue();
+                assertThat(bar.getLayout().getClass().getEnclosingClass()).as("the bar's own folding layout").isEqualTo(CollapsingMenuBar.class);
+                root.setSize(1440, 600);
+                LayoutTestSupport.layoutTree(root);
+                assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
+                double run = bar.getInsets().left;
+                for (JMenu menu : bar.menus()) {
+                    assertThat(menu.getX()).as(menu.getText() + " starts at the rounded running total").isEqualTo((int) Math.round(run));
+                    run += ClassicMenuRow.titleWidth(menu);
+                }
+                root.setSize(300, 600);
+                LayoutTestSupport.layoutTree(root);
+                assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.MORE);
+                var shown = bar.menus().stream().filter(JMenu::isVisible).toList();
+                assertThat(shown).as("File always stays; the trailing titles fold").isNotEmpty().hasSizeLessThan(bar.menus().size());
+                assertThat(shown.getFirst().getText()).isEqualTo("File");
+                var more = bar.overflowMenu();
+                assertThat(more.isVisible()).isTrue();
+                assertThat(more.getX() + more.getWidth()).as("the folded row fits the window").isLessThanOrEqualTo(300 - bar.getInsets().right);
+                root.setSize(60, 600);
+                LayoutTestSupport.layoutTree(root);
+                assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.ALL);
+                assertThat(bar.hamburgerMenu().isVisible()).isTrue();
+                assertThat(bar.menus()).noneMatch(JMenu::isVisible);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

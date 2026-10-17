@@ -30,9 +30,9 @@ class ClassicTypeTest {
     @Test void theSpecsTableHolds() {
         var groups = new LinkedHashMap<String, java.util.List<String>>();
         groups.put("12/400", java.util.List.of("BODY", "LABEL", "SETTINGS_BODY", "PANEL_SEARCH", "TITLE_CONTEXT", "TOOLBAR_LABEL",
-            "STATUS_TEXT", "STATUS_PATH", "MONO"));
+            "STATUS_PATH", "MONO"));
         groups.put("11/400", java.util.List.of("DESCRIPTION", "SUPPORTING", "CAPTION", "SETTING_DESCRIPTION", "COUNT", "RESULTS_HEADING",
-            "PALETTE_HINT", "PANEL_HEADER_COUNT", "MONO_SMALL", "MONO_CAPTION"));
+            "PALETTE_HINT", "PANEL_HEADER_COUNT", "STATUS_TEXT", "MONO_SMALL", "MONO_CAPTION"));
         groups.put("12/600", java.util.List.of("PANEL_TITLE", "PANEL_HEADER_TITLE", "WINDOW_TITLE", "SECTION_LABEL"));
         groups.put("12/500", java.util.List.of("BODY_STRONG", "PANEL_ROW_SELECTED"));
         groups.put("15/600", java.util.List.of("DETAIL_TITLE", "PROMPT_TITLE"));

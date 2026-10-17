@@ -15,7 +15,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Enterprise presentation spec 12.1 and 16.1.4: the Settings chrome against the eighteen 05 Settings mocks (plan 9a's
  * "Mock measurements"): probes on every OS, pixel shares of the sidebar, header and footer on macOS (Rulings 17); the
- * probes that follow the UI face and the shares are printed until the fixture draws the shipped faces (Execution notes E10).
+ * probes that follow the UI face and the shares are asserted under the shipped kit's IBM Plex and printed where an
+ * installed IBM Plex hides the plugin's files (Execution notes E10; plan 5b Execution notes, ruling 3).
  */
 class SettingsChromeMockTest {
     /**
@@ -51,10 +52,12 @@ class SettingsChromeMockTest {
     static final double TOLERANCE = 12, PROBE = 3;
     static final boolean MAC = com.formdev.flatlaf.util.SystemInfo.isMacOS;
     /**
-     * Whether the Enterprise fixture draws the shipped UI faces: false until plan 5b's merge switches 6a's EnterpriseLook to
-     * the shipped kit, which turns the printed checks into assertions with no edit (Execution notes E10).
+     * Whether the render draws the shipped kit's IBM Plex: false only where an installed IBM Plex hides the plugin's files
+     * (plan 5b Execution notes, ruling 3), which leaves the probes that follow the face and the shares printed.
      */
-    static final boolean PLEX = dev.jasper.app.testsupport.EnterpriseLook.kit().faces() != dev.jasper.ui.metrics.FaceSet.PLATFORM;
+    static final boolean PLEX = dev.jasper.app.testsupport.EnterpriseResources.plexResolves();
+    /** How a check that follows the face is printed when {@link #PLEX} is false, as {@code MockProfile.fonts} prints it. */
+    static final String UNCHECKED = "FONTS unchecked (an installed IBM Plex hides the plugin's files): ";
     /** The probes whose place follows the UI face's line: a titled box's border sits at its title line's middle. */
     static final java.util.Set<String> FONTS = java.util.Set.of("first box top", "Theme box bottom", "Workspace box top");
     /** The probes whose place follows plan 9b's Appearance composition (the Theme box's height): printed here, 9b's to assert. */
@@ -93,7 +96,7 @@ class SettingsChromeMockTest {
             String failure = String.format("%s %s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", page.id(), probe.name(),
                 probe.x(), probe.y(), render.getRGB(x, y) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
             if (COMPOSED.contains(probe.name())) System.out.println("Plan 9b's composition: " + failure);
-            else if (FONTS.contains(probe.name()) && !PLEX) System.out.println("FONTS residual until plan 5b: " + failure);
+            else if (FONTS.contains(probe.name()) && !PLEX) System.out.println(UNCHECKED + failure);
             else failures.add(failure);
         }
         return failures;
@@ -157,7 +160,7 @@ class SettingsChromeMockTest {
                         SettingsMockMatch.inspect(EnterpriseSettings.OUT.resolve("compare"), page.mock().substring(9, 11) + "-" + names.get(i), ours, theirs, TOLERANCE);
                         String below = String.format("%s %s: %.3f below %.2f", page.id(), names.get(i), result.matching(), floors.get(i));
                         if (MAC && PLEX) failures.add(below);
-                        else System.out.println((MAC ? "FONTS residual until plan 5b: " : "Not asserted off macOS (Rulings 17): ") + below);
+                        else System.out.println((MAC ? UNCHECKED : "Not asserted off macOS (Rulings 17): ") + below);
                     }
                 }
             }

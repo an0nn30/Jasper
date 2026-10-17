@@ -41,8 +41,8 @@ import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 
 /**
- * The real Settings dialog under the Enterprise look, headless: plan 6a's {@link EnterpriseLook} (the fixture kit and theme
- * until plan 5b ships the kit, Plex and the theme), spec 9.1's projections and the dialog mapping the application gives
+ * The real Settings dialog under the Enterprise look, headless: plan 6a's {@link EnterpriseLook} (the shipped kit with IBM
+ * Plex and the shipped theme), the kit file's defaults, spec 9.1's projections and the dialog mapping the application gives
  * its windows, over the bundled plugins and a fixture user plugin (plan 9a Rulings 18). The look is installed for the
  * whole JVM, so {@link #close} (and a failed {@link #open}) installs the default look again. Never creates a native
  * window. Open on any thread; every method but {@link #open} and {@link #close} runs on the EDT.
@@ -131,10 +131,11 @@ final class EnterpriseSettings implements AutoCloseable {
         Files.writeString(home.resolve("plugins.toml"), "version = 1\n\n[plugins.\"com.homedepot.sourcing.crypto\"]\nenabled = true\nconsented = []\n");
         Path file = home.resolve("config.toml");
         Files.writeString(file, CONFIG);
-        // The core defaults until plan 5b's kit file supplies the look's own (Execution notes E2); CONFIG sets every shown value.
-        var loaded = ConfigLoader.parse(file, CONFIG, true);
+        // Read under the kit file's defaults, as the application reads it under the look; CONFIG sets every shown value.
+        var defaults = dev.jasper.app.testsupport.EnterpriseResources.facts().parsed().orElseThrow().defaults();
+        var loaded = ConfigLoader.parse(file, CONFIG, true, defaults);
         var state = new ConfigService.State(loaded.snapshot(), loaded.diagnostics(), file, true, loaded.legacyKeys(), loaded.deadTables(),
-            loaded.values(), false);
+            loaded.values(), false, defaults);
         // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
         // named UI face, on the macOS host the mocks were drawn on.
         var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true),

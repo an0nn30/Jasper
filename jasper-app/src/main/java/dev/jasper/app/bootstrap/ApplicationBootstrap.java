@@ -19,7 +19,13 @@ import dev.jasper.app.platform.WindowsProcess;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.MemoryReading;
+import dev.jasper.app.startup.StartupSteps;
 import dev.jasper.app.startup.StartupTrace;
+import dev.jasper.app.splash.Splash;
+import dev.jasper.app.splash.SplashPainter;
+import dev.jasper.app.platform.BuildInfo;
+import dev.jasper.app.presentation.Branding;
+import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.bootstrap.StartupResources;
 import java.awt.GraphicsEnvironment;
 import java.nio.file.Path;
@@ -79,6 +85,7 @@ public final class ApplicationBootstrap {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         var acquired = new StartupResources();
         acquired.own(service);
+        var opened = new AtomicReference<StartupSteps>(StartupSteps.NONE);
         try {
             AppDirs dirs = startup.dirs();
             AppLog log = acquired.own(Objects.requireNonNull(startup.log(), "the desktop needs the pre-pass's log"));
@@ -98,15 +105,93 @@ public final class ApplicationBootstrap {
             Runtime.getRuntime().addShutdownHook(shutdown);
             acquired.own((AutoCloseable) () -> removeShutdownHook(shutdown));
             applyDesktop(startup.selection().presentation(), service.initialState().snapshot(), System.getProperty("os.name").startsWith("Mac"));
+            // Spec 10.11, as soon as AWT may start: the look's icons and, on a start that will open a window, its splash.
+            opened.set(openSplash(startup, GraphicsEnvironment.isHeadless()));
             // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
-            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
+            StartupSteps steps = opened.get();
+            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands, steps));
             // The posted EDT composition owns service; the process hook owns logging, the endpoint and the command
             // listener.
             acquired.transfer();
         } catch (RuntimeException | Error failure) {
             acquired.rollback(failure);
+            // A splash already posted opens first, then closes: start-up failed (spec 10.11). Nothing without one.
+            abandon(opened.get(), SwingUtilities::invokeLater);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+        }
+    }
+
+    /**
+     * Spec 10.11, once the desktop properties and the title-bar style are committed: a branded look's icons become the
+     * application's on every launch (so a window a resident opens later carries them too), and on a start that will
+     * open a window the splash's files are decoded here, off the EDT, and its window is posted ahead of the composition,
+     * with the Dock or taskbar icon. Returns the steps start-up reports to the splash, or {@link StartupSteps#NONE}. A
+     * splash whose files cannot be drawn is skipped and logged; start-up goes on.
+     */
+    static StartupSteps openSplash(Startup startup, boolean headless) {
+        Presentation presentation = startup.selection().presentation();
+        Branding branding = presentation.branding();
+        if (!branding.present()) return StartupSteps.NONE;
+        long began = System.nanoTime();
+        ApplicationIcon.useLook(branding.iconFiles());
+        if (!splashWanted(startup.options(), headless, true)) return StartupSteps.NONE;
+        SplashPainter painter;
+        try { painter = SplashPainter.of(splashContent(presentation, BuildInfo.current()), screenScale()); }
+        catch (RuntimeException undrawable) {
+            LOG.log(System.Logger.Level.WARNING, "The " + branding.product() + " splash cannot be drawn; starting without it", undrawable);
+            return StartupSteps.NONE;
+        }
+        var splash = new Splash(painter, ApplicationIcon.images());
+        var steps = StartupSteps.of(branding.product(), startup.selection().loading().size(), splash::show, splash::close);
+        SwingUtilities.invokeLater(() -> {
+            ApplicationIcon.installTaskbarIcon();
+            splash.open(steps.current());
+        });
+        StartupTrace.current().phase("splash", began);
+        return steps;
+    }
+
+    /**
+     * Whether this start shows a branded look's splash: one that will open a window, so not headless,
+     * {@code --background}, {@code --no-window} or {@code --safe-mode} (a handed-off launch never gets here).
+     */
+    static boolean splashWanted(AppArguments options, boolean headless, boolean branded) {
+        return branded && !headless && !options.background() && !options.noWindow() && !options.safeMode();
+    }
+
+    /** What the splash draws: the look's branding and faces, the version line and About's copyright line (spec 10.11). */
+    static SplashPainter.Content splashContent(Presentation presentation, BuildInfo build) {
+        Branding branding = presentation.branding();
+        var faces = presentation.faces();
+        return new SplashPainter.Content(branding.product(), build.buildLine(), BuildInfo.COPYRIGHT, branding.icon(64), branding.icon(128),
+            branding.splashArt(), faces.ui().map(ui -> ui.semibold().bytes()), faces.ui().map(ui -> ui.regular().bytes()),
+            faces.data().map(data -> data.regular().bytes()));
+    }
+
+    /**
+     * Ends the steps of a start that failed (spec 10.11) through {@code edt}, the event thread: a splash already posted
+     * opens first, then closes. Without a splash nothing is posted, so a failure before anything touched AWT does not
+     * start the toolkit. {@code active()} only ever turns false, so a stale read off the EDT at worst posts a second,
+     * harmless {@code done()}.
+     */
+    static void abandon(StartupSteps steps, java.util.concurrent.Executor edt) {
+        if (steps.active()) edt.execute(steps::done);
+    }
+
+    /** Runs {@code start}, then ends {@code steps} whatever happened: a splash never outlives the start that opened it. EDT. */
+    static void presenting(StartupSteps steps, Runnable start) {
+        try { start.run(); }
+        finally { steps.done(); }
+    }
+
+    /** The main screen's device scale, for the splash art's first raster; 1 without a screen. */
+    private static int screenScale() {
+        try {
+            return (int) Math.ceil(GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice()
+                .getDefaultConfiguration().getDefaultTransform().getScaleX() - 1e-6);
+        } catch (RuntimeException | Error noScreen) {
+            return 1;
         }
     }
 
@@ -164,7 +249,7 @@ public final class ApplicationBootstrap {
 
     private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
                                      UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint,
-                                     AtomicReference<CommandListener> commands) {
+                                     AtomicReference<CommandListener> commands, StartupSteps steps) {
         ConfigService service = startup.service(); AppArguments options = startup.options();
         try {
             StartupTrace.current().mark(StartupTrace.Milestone.TOOLKIT_READY);
@@ -178,9 +263,9 @@ public final class ApplicationBootstrap {
                     "Started with --background while system.run_in_background is off; exiting");
                 service.close(); System.exit(0); return;
             }
-            compose(service, () -> new CommandHistory(dirs.commandHistory()),
+            presenting(steps, () -> compose(service, () -> new CommandHistory(dirs.commandHistory()),
                 history -> {
-                    JasperApplication application = createApplication(service, history, dirs, options, commands, startup.selection());
+                    JasperApplication application = createApplication(service, history, dirs, options, commands, startup.selection(), steps);
                     exceptions.forwardTo(application::unexpected);
                     return application;
                 }, application -> {
@@ -200,6 +285,7 @@ public final class ApplicationBootstrap {
                     if (!options.background()) {
                         if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
                             application.presentationAttempt().pending();
+                        steps.workspace();
                         long window = System.nanoTime();
                         application.newWindow();
                         StartupTrace.current().phase("first window", window);
@@ -215,8 +301,9 @@ public final class ApplicationBootstrap {
                             application.presentationAttempt().pending();
                         application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
                     }
-                });
+                }));
         } catch (RuntimeException | Error failure) {
+            abandon(steps, Runnable::run);
             // Also covers failure before composition took ownership (for example initial role resolution).
             var remaining = new StartupResources(); remaining.own(service); remaining.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
@@ -226,7 +313,7 @@ public final class ApplicationBootstrap {
 
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
                                                        AppArguments options, AtomicReference<CommandListener> commands,
-                                                       dev.jasper.app.plugins.PluginSelection selection) {
+                                                       dev.jasper.app.plugins.PluginSelection selection, StartupSteps steps) {
         long began = System.nanoTime();
         var acquired = new StartupResources();
         try {
@@ -237,8 +324,13 @@ public final class ApplicationBootstrap {
                 LOG.log(System.Logger.Level.WARNING,
                     "Shell integration scripts could not be installed; integration is off", failure);
             }
+            steps.configuration();
             var application = new JasperApplication(service, null, history, dirs.buddyState(),
                 () -> System.exit(0), integrationDir, dirs.themes(), selection);
+            // A look that fell back at start runs without its branding (spec 4.7 and 9.1): Jasper's icons, and no splash.
+            ApplicationIcon.useLook(application.presentation().branding().iconFiles());
+            ApplicationIcon.installTaskbarIcon();
+            application.startupSteps(steps);
             Path source = HandoffSocket.codeLocation();
             application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
                 () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
@@ -265,7 +357,8 @@ public final class ApplicationBootstrap {
             application.systemNotifier(SystemNotifier.forThisPlatform(System.getProperty("os.name"), dirs, tray));
             // A packaged macOS Jasper keeps running on Quit and leaves the Dock while it has no window.
             if (MacDock.available())
-                application.backgroundOnQuit(new DockControl(MacDock::show, MacDock::prepare, MacDock::poweringOff), !options.background());
+                application.backgroundOnQuit(new DockControl(dockShow(MacDock::show, ApplicationIcon::installTaskbarIcon),
+                    MacDock::prepare, MacDock::poweringOff), !options.background());
             if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
             application.startPlugins(dirs);
             // After the plugins started, so a call that arrives first finds its handler.
@@ -275,6 +368,20 @@ public final class ApplicationBootstrap {
             acquired.transfer();
             return application;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
+    }
+
+    /**
+     * Spec 10.11: switching the activation policy gives a packaged Jasper a new Dock item, which shows the bundle's icon,
+     * so each switch into the Dock sets the look's icon again ({@code reapply}). A {@code --background} resident's first
+     * window and a reopen after Quit both come back this way.
+     */
+    static Consumer<Boolean> dockShow(Consumer<Boolean> show, Runnable reapply) {
+        Objects.requireNonNull(show, "show");
+        Objects.requireNonNull(reapply, "reapply");
+        return visible -> {
+            show.accept(visible);
+            if (visible) reapply.run();
+        };
     }
 
     /** EDT acquisition transaction; factories keep resource creation explicit and rollback testable. */

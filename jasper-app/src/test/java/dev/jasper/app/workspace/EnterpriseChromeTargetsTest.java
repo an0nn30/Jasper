@@ -9,8 +9,8 @@ import dev.jasper.ui.theme.SemanticColor;
 import org.junit.jupiter.api.Test;
 
 /**
- * Plan 6b Rulings 2 and 3: the chrome roles the Workstation and Dark Mode mocks paint are the Enterprise theme's values
- * (the fixture theme until plan 5b, whose shipped theme takes the same eight values).
+ * Plan 6b Rulings 2 and 3: the chrome roles the Workstation and Dark Mode mocks paint are the Enterprise theme's values;
+ * Dark's tab indicator follows the accent, #3C74D6 (spec 7.6, amended with plan 5b's accent ruling).
  */
 class EnterpriseChromeTargetsTest {
     @Test void theChromeTargetsAreTheMocks() {
@@ -18,7 +18,7 @@ class EnterpriseChromeTargetsTest {
         assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#E8E9EB");
         assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#3A3D42");
         assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#2F65CA");
-        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#3D74D6");
+        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#3C74D6");
         for (boolean dark : new boolean[] {false, true}) {
             var scrim = theme.palette(dark).color(SemanticColor.SURFACE_SCRIM);
             assertThat(scrim.getRGB() & 0xFFFFFF).as("black").isZero();
@@ -26,7 +26,7 @@ class EnterpriseChromeTargetsTest {
         }
         assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(false)))).as("the override, not the recipe")
             .isEqualToIgnoringCase("#D3D6DA");
-        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(true)))).as("lighter than the recipe's #2B2D31")
+        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(true)))).as("lighter than the recipe's #3F4145")
             .isEqualToIgnoringCase("#4A4D53");
     }
 }

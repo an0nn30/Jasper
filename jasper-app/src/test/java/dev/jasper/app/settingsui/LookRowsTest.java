@@ -89,8 +89,8 @@ class LookRowsTest {
 
     @Test void theFontRowSpeaksForTheLookAndStartsAtItsStandardSize() throws Exception {
         edt(() -> {
-            // Plan 4a's Enterprise fixture kit (12-point body) until plan 5b's shipped kit (Execution notes E2, E6).
-            var enterprise = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            // The shipped Enterprise kit (12-point body).
+            var enterprise = KitFixtures.context(KitFixtures.enterpriseLight(), dev.jasper.app.testsupport.EnterpriseLook.kit());
             var standard = KitFixtures.context(KitFixtures.light());
             try {
                 var classic = context(SettingsChromeTest.CLASSIC, () -> enterprise);

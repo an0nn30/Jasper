@@ -15,7 +15,8 @@ import java.util.Optional;
 
 /**
  * What the resolver knows of one presentation provider (spec 4.4): the SHA-256 digest of its kit file, then each declared
- * theme file, then each font file, in declared order; its first problem; and, when valid, its parsed kit, so the winner is
+ * theme file, then each font file, in declared order, then its branding files (the icons from the smallest, then the
+ * splash art); its first problem; and, when valid, its parsed kit, so the winner is
  * not parsed twice.
  *
  * @param digest the look's identity, lower-case hex
@@ -67,6 +68,7 @@ public record PresentationFacts(String digest, Optional<String> problem, Optiona
         try {
             var parsed = KitParser.parse(kit.get(), new KitParser.Context(source.id(), directory, source.files(), themes));
             for (FontFile font : parsed.faces().files()) digest.update(font.bytes());
+            for (byte[] file : parsed.branding().files()) digest.update(file);
             return new PresentationFacts(hex(digest), Optional.empty(), Optional.of(parsed));
         } catch (KitParser.Invalid invalid) {
             return new PresentationFacts(hex(digest), Optional.of(invalid.getMessage()), Optional.empty());

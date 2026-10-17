@@ -397,6 +397,19 @@ public final class PluginRuntime {
         if(host!=null)throw new IllegalStateException("Plugins have already started");
         animations = Objects.requireNonNull(enabled);
     }
+    private Consumer<String> starting = plugin -> { };
+
+    /**
+     * Hears each selected plugin's name just before it loads, in start order: the splash's steps (spec 10.11). Before
+     * plugin startup.
+     *
+     * @param plugin receives the plugin's name
+     */
+    public void starting(Consumer<String> plugin) {
+        if (host != null) throw new IllegalStateException("Plugins have already started");
+        starting = Objects.requireNonNull(plugin, "plugin");
+    }
+
     private GlassSource glass = GlassSource.NONE;
 
     /** Supplies window opacity for plugins before they start. UI thread.
@@ -690,6 +703,7 @@ public final class PluginRuntime {
                 }, 1, 1, java.util.concurrent.TimeUnit.SECONDS);
         Map<String, PluginLoader.Loaded> loaded = new LinkedHashMap<>();
         for (PluginCandidate candidate : resolution.load()) {
+            starting.accept(candidate.descriptor().name());
             PluginLoader.Loaded unit;
             try { unit = PluginLoader.load(candidate, loaded, PluginRuntime.class.getClassLoader()); }
             catch (PluginLoader.LoadFailure failure) {
@@ -710,6 +724,8 @@ public final class PluginRuntime {
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(candidate.id()), Optional.of(candidate.descriptor().name()),
                     outcome.reason(), Optional.empty()));
         }
+        // The splash's steps are past the plugins: keep nothing of the splash.
+        starting = plugin -> { };
         // Spec 4.6: a provider that fails to load or start fails its look; this session keeps the chrome, without its services.
         resolution.presentation().ifPresent(provider -> {
             if (statuses.stream().anyMatch(status -> status.id().equals(provider.id()) && status.state() == PluginStatus.State.FAILED))

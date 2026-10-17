@@ -4,11 +4,14 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Component;
@@ -53,6 +56,26 @@ class ClassicTabsTest {
                     .isEqualTo(owner.tabHeight());
                 assertThat(strip.getWidth()).as("across the terminal column").isPositive();
                 assertThat(strip.entries().getFirst().getWidth()).as("its one tab laid out").isPositive();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** IBM Plex has no "●" and no CJK: such a title takes the platform face (plan 5b, ruling 26); a Latin one keeps Plex. */
+    @Test void aTitleIbmPlexCannotDrawTakesThePlatformFace() throws Exception {
+        EnterpriseResources.assumePlexResolves();
+        String title = "\u25CF \u5831\u544A";
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                owner.currentTab().rename("Local: ~");
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.currentTab().rename(title);
+                owner.update();
+                var strip = tabs(owner, 800);
+                assertThat(strip.entries().get(0).getFont().getFontName(java.util.Locale.ROOT)).as("a Latin title").startsWith("IBM Plex Sans");
+                assertThat(strip.entries().get(1).getFont()).as("the platform face")
+                    .isEqualTo(ThemeZone.font(Typography.Role.BODY, title)).isNotEqualTo(ThemeZone.font(Typography.Role.BODY));
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }

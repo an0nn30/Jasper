@@ -10,6 +10,8 @@ Amended on 2026-10-16 with plan 3e's chooser ruling: 11.7 and 13.
 Amended on 2026-10-17 with plan 6b's ruling 3: 7.1, 7.2 and 7.7 (border.divider is overridable).
 Amended on 2026-10-17 with plan 6b's rulings 10 and R44, made under the same authority: 10.8 (the overlay's placement),
 4.9, 9.1 and 16.1 (the `DialogMapping` reader).
+Amended on 2026-10-17 with plan 5b's accent ruling, made under the same authority: 7.6 (Enterprise Dark's accent is #3C74D6).
+Amended on 2026-10-17 with plan 5b's status-text ruling, made under the same authority: 5.6 (classic status text is 11 px).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -665,8 +667,8 @@ kit's standard body size (`[type].base`). A role's size is its scale value times
 
 | Roles | Classic size / weight |
 |---|---|
-| `BODY`, `LABEL`, `SETTINGS_BODY`, `PANEL_SEARCH`, `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_TEXT`, `STATUS_PATH`, `MONO` | 12 / 400 |
-| `DESCRIPTION`, `SUPPORTING`, `CAPTION`, `SETTING_DESCRIPTION`, `COUNT`, `RESULTS_HEADING`, `PALETTE_HINT`, `PANEL_HEADER_COUNT`, column headers, `MONO_SMALL`, `MONO_CAPTION` | 11 / 400 |
+| `BODY`, `LABEL`, `SETTINGS_BODY`, `PANEL_SEARCH`, `TITLE_CONTEXT`, `TOOLBAR_LABEL`, `STATUS_PATH`, `MONO` | 12 / 400 |
+| `DESCRIPTION`, `SUPPORTING`, `CAPTION`, `SETTING_DESCRIPTION`, `COUNT`, `RESULTS_HEADING`, `PALETTE_HINT`, `PANEL_HEADER_COUNT`, `STATUS_TEXT`, column headers, `MONO_SMALL`, `MONO_CAPTION` | 11 / 400 |
 | `PANEL_TITLE`, `PANEL_HEADER_TITLE`, `WINDOW_TITLE`, `SECTION_LABEL` (group titles, no tracking) | 12 / 600 |
 | `BODY_STRONG`, `PANEL_ROW_SELECTED`, the primary button label, tree category rows | 12 / 500 |
 | `DETAIL_TITLE`, `PROMPT_TITLE` | 15 / 600 |
@@ -986,7 +988,7 @@ keeps the ΔL* it has from `surface.card` in Light, on the lighter side; a hue o
 | `surface.titlebar` | #36393E | `border.control`, `border.input`, `button.secondary.border` | #5A5E65 |
 | `surface.panel`, `surface.sidebar` | #35383D | `text.primary` | #DFE1E5 |
 | `surface.card`, `surface.input`, `surface.terminal` | #2E3135 | `text.strong.secondary` | #C4C8CE |
-| `accent`, `selection.bg`, `hue.blue` | #3D74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
+| `accent`, `selection.bg`, `hue.blue` | #3C74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
 | `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #8E939B |
 | `button.secondary.bg` | #45484D | `status.success`, `hue.green` | #4CB86A |
 | `surface.control.selected` | #50545B | `status.warning` | #E3C27A |

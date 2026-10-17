@@ -28,6 +28,8 @@ final class TextFields {
         Buttons.ButtonControl trailing;
         boolean applying;
         boolean notifying;
+        /** The input's text role; {@link #fitFont()} keeps its font able to draw the text. */
+        Typography.Role inputRole = Typography.Role.BODY;
         /** An input method holds uncommitted (composed) text in the field. */
         boolean composing;
         long valueRevision;
@@ -74,6 +76,7 @@ final class TextFields {
                 @Override public void removeUpdate(DocumentEvent e) { changed(); }
                 @Override public void changedUpdate(DocumentEvent e) { changed(); }
                 private void changed() {
+                    fitFont();
                     if (applying) return;
                     notifying = true;
                     try { emit(new UiEvent.Edited(FieldControl.this.node.id(), input.getText())); }
@@ -270,6 +273,11 @@ final class TextFields {
             return Math.max(0, text.getEndIndex() - text.getBeginIndex() - event.getCommittedCharacterCount());
         }
         @Override JComponent focusTarget() { return input; }
+        /** The role's font for the input's text: a kit face lacking one of its glyphs gives way to the platform's. */
+        void fitFont() {
+            var next = ThemePainting.font(context(), inputRole, input.getText());
+            if (!next.equals(input.getFont())) input.setFont(next);
+        }
         @Override void refresh() {
             var field = (Nodes.Field)node; state(); label.setVisible(labelShown()); input.setEnabled(component.isEnabled());
             listKeys(!field.listId().isBlank() && field.kind() != Nodes.FieldKind.TEXTAREA && field.kind() != Nodes.FieldKind.NUMBER);
@@ -282,7 +290,7 @@ final class TextFields {
                 scroll.getVerticalScrollBar().setForeground(ThemePainting.color(context(), SemanticColor.BORDER_INPUT));
             }
             var role = panelSearch ? Typography.Role.PANEL_SEARCH : field.kind() == Nodes.FieldKind.PORT || field.kind() == Nodes.FieldKind.PATH || (field.presentation() == Nodes.FieldPresentation.TECHNICAL || view.runWindow() && field.presentation() == Nodes.FieldPresentation.TRANSPARENT) ? Typography.Role.MONO : Typography.Role.BODY;
-            input.setFont(ThemePainting.font(context(), role));
+            inputRole = role; fitFont();
             surface.transparent = field.presentation() == Nodes.FieldPresentation.TRANSPARENT;
             surface.quiet = surface.transparent && view.runWindow();
             surface.radiusRole = surface.transparent ? DesignMetrics.Role.TRANSPARENT_FIELD_RADIUS : DesignMetrics.Role.FIELD_RADIUS;

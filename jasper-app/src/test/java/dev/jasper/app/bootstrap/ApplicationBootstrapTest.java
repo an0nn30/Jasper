@@ -388,4 +388,118 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.attemptBeforePresenting(plain, false, true)).as("headless").isFalse();
         assertThat(ApplicationBootstrap.attemptBeforePresenting(background, true, true)).isFalse();
     }
+
+    /** Spec 10.11: only a branded start that will open a window shows the splash. */
+    @Test void onlyABrandedStartThatOpensAWindowShowsTheSplash() {
+        var plain = AppArguments.parse(new String[0], directory);
+        assertThat(ApplicationBootstrap.splashWanted(plain, false, true)).isTrue();
+        assertThat(ApplicationBootstrap.splashWanted(plain, false, false)).as("no branding").isFalse();
+        assertThat(ApplicationBootstrap.splashWanted(plain, true, true)).as("headless").isFalse();
+        for (String flag : java.util.List.of("--background", "--no-window", "--safe-mode"))
+            assertThat(ApplicationBootstrap.splashWanted(AppArguments.parse(new String[] {flag}, directory), false, true)).as(flag).isFalse();
+    }
+
+    /** Review Focus 5: the look's icons reach every branded launch, the splash only one that opens a window. */
+    @Test void aBrandedLookGivesTheApplicationItsIconsEvenWithoutASplash() throws Exception {
+        var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
+        var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
+            dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
+        try {
+            var background = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[] {"--background"}, directory), dirs, null, branded);
+            assertThat(ApplicationBootstrap.openSplash(background, false)).isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).isTrue();
+            assertThat(dev.jasper.app.platform.ApplicationIcon.images()).extracting(image -> image.getWidth(null))
+                .containsExactly(16, 32, 48, 64, 128, 256, 1024);
+            dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
+            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded);
+            assertThat(ApplicationBootstrap.openSplash(windowed, true)).as("headless: no splash").isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
+            var standard = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null,
+                dev.jasper.app.plugins.PluginSelection.none());
+            assertThat(ApplicationBootstrap.openSplash(standard, false)).isSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            assertThat(dev.jasper.app.platform.ApplicationIcon.branded()).as("the default look keeps Jasper's icons").isFalse();
+        } finally {
+            dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
+    /** Spec 10.11: a windowed branded start opens the splash on its first step, four steps plus one per plugin. */
+    @Test void aWindowedBrandedStartOpensTheSplashOnItsFirstStep() throws Exception {
+        var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
+        var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
+            dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
+        try {
+            var windowed = new ApplicationBootstrap.Startup(null, AppArguments.parse(new String[0], directory), dirs, null, branded);
+            // Headless here: the screen scale falls back to 1 and the posted window logs that it cannot open.
+            var steps = ApplicationBootstrap.openSplash(windowed, false);
+            assertThat(steps).isNotSameAs(dev.jasper.app.startup.StartupSteps.NONE);
+            assertThat(steps.active()).isTrue();
+            assertThat(steps.current()).isEqualTo(new dev.jasper.app.startup.StartupSteps.Step("Starting Java runtime…", 1,
+                4 + branded.loading().size()));
+            SwingUtilities.invokeAndWait(steps::workstation);
+            assertThat(steps.current().text()).as("the product name").isEqualTo("Starting JasperOps Workstation…");
+            SwingUtilities.invokeAndWait(steps::done);
+            assertThat(steps.active()).isFalse();
+        } finally {
+            dev.jasper.app.platform.ApplicationIcon.useLook(java.util.List.of());
+        }
+    }
+
+    /** Spec 10.11: each switch into the Dock sets the look's icon again; leaving the Dock does not. */
+    @Test void enteringTheDockSetsTheIconAgain() {
+        var calls = new java.util.ArrayList<String>();
+        var show = ApplicationBootstrap.dockShow(visible -> calls.add("show " + visible), () -> calls.add("icon"));
+        show.accept(false);
+        show.accept(true);
+        show.accept(false);
+        show.accept(true);
+        assertThat(calls).containsExactly("show false", "show true", "icon", "show false", "show true", "icon");
+    }
+
+    /** Spec 10.11: the splash shows the look's files, the version line and About's copyright. */
+    @Test void theSplashContentIsTheLooksBrandingWithAboutsVersionAndCopyright() throws Exception {
+        var dirs = new AppDirs(directory, directory.resolve("config.toml"), directory.resolve("logs"));
+        var branded = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "",
+            dev.jasper.app.testsupport.BrandingFixtures.plugin(directory.resolve("dev"), "dev.example.look", "Example"), false);
+        var build = dev.jasper.app.platform.BuildInfo.of(java.util.Map.of("commit", "8ba67ed3" + "0".repeat(32), "describe", "v1.2.0-14-g8ba67ed3"));
+        var content = ApplicationBootstrap.splashContent(branded.presentation(), build);
+        assertThat(content.product()).isEqualTo("JasperOps");
+        assertThat(content.version()).isEqualTo("1.2.0 + 14 commits · Build 8ba67ed3");
+        assertThat(content.copyright()).isEqualTo(dev.jasper.app.platform.BuildInfo.COPYRIGHT);
+        assertThat(content.icon64()).isEqualTo(branded.presentation().branding().icon(64));
+        assertThat(content.icon128()).isEqualTo(branded.presentation().branding().icon(128));
+        assertThat(content.art()).isEqualTo(branded.presentation().branding().splashArt());
+        assertThat(content.nameFace()).as("the fixture kit names no faces").isEmpty();
+        assertThat(content.versionFace()).isEmpty();
+    }
+
+    /** Review Focus 1: a splash never outlives the start that opened it. */
+    @Test void theStepsEndWhetherTheStartSucceedsOrFails() {
+        var closed = new java.util.concurrent.atomic.AtomicInteger();
+        var steps = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
+        ApplicationBootstrap.presenting(steps, () -> { });
+        assertThat(closed).hasValue(1);
+        var failing = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
+        assertThatThrownBy(() -> ApplicationBootstrap.presenting(failing, () -> { throw new IllegalStateException("composition failed"); }))
+            .hasMessage("composition failed");
+        assertThat(closed).hasValue(2);
+    }
+
+    /** Review Focus 1: a failed start closes a posted splash once, on the EDT; without a splash nothing is posted. */
+    @Test void aFailedStartClosesAPostedSplashOnceAndPostsNothingWithoutOne() {
+        var closed = new java.util.concurrent.atomic.AtomicInteger();
+        var posted = new java.util.ArrayList<Runnable>();
+        var steps = dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet);
+        ApplicationBootstrap.abandon(steps, posted::add);
+        assertThat(closed).as("closed on the EDT, not on the failing thread").hasValue(0);
+        assertThat(posted).hasSize(1);
+        posted.forEach(Runnable::run);
+        assertThat(closed).hasValue(1);
+        ApplicationBootstrap.abandon(steps, posted::add);
+        assertThat(posted).as("an ended splash posts nothing").hasSize(1);
+        ApplicationBootstrap.abandon(dev.jasper.app.startup.StartupSteps.NONE, posted::add);
+        assertThat(posted).as("no splash: nothing is posted, so AWT stays unstarted").hasSize(1);
+        ApplicationBootstrap.abandon(dev.jasper.app.startup.StartupSteps.of("JasperOps", 0, step -> { }, closed::incrementAndGet), Runnable::run);
+        assertThat(closed).as("startDesktop's catch, already on the EDT").hasValue(2);
+    }
 }
