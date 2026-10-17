@@ -59,7 +59,17 @@ re-measures `FORM_TOP` and `MIXED_ROW_GAP` against the 07 in-window sheets. The 
 Enterprise Workstation window against the Workstation and Dark Mode mocks (the toolbar view's combo and Connect, the
 Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the SFTP row,
 the Transfers panel and ⌘⌥3, the default slots on a fresh Enterprise start), Add Host and New File Server. Not merged,
-not pushed.
+not pushed. Merged with main (plans 8b and 9b) as `567ac7b2e` (textual conflicts only in STATUS.md and
+migration.csv; no classic value changed on both sides, so the role enum and both role tables keep 8b's
+`RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM` and `RUN_WINDOW_BUTTON_PADDING` and 9b's Keymap, keycap and list roles
+and values beside 10a's; every Enterprise mock comparison re-verified together: `SettingsPagesMockTest`,
+`SettingsChromeMockTest`, `DockMockTest`, `RunWindowRenderTest`, `RunWindowWorkspaceRenderTest` and
+`EnterpriseDialogMockTest` print and write what main's do, and `ClassicCompositionRenderTest` moves within its floors
+through 9b's classic `ClassicHeaders.inset` 9 and `BUTTON_HORIZONTAL_PADDING` 11: Sessions 0.857, 0.817 and 0.869,
+Tunnels 0.809, 0.809 and 0.914, SFTP 0.704, 0.704 and 0.737, File Servers 0.765, 0.764 and 0.819, Add Host 0.655, New
+Tunnel 0.534 over its 0.53, New File Server 0.658, 0.617, 0.568 and 0.628; `check_pairs.py` passes all 96 gated pairs,
+the composition pairs 0.534 to 0.962; the default gallery and Settings preview are byte-identical to main's): **11,383
+tests, 0 failures, 0 errors, 25 skipped**.
 
 **Enterprise presentation, plan 9b: the Settings page compositions — 2026-10-17** (`claude/enterprise-settings`, worktree
 `.claude/worktrees/enterprise-9`, `4d9b76a3d..b463f56d0`, then this documentation commit;
