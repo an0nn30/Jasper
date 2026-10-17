@@ -40,6 +40,8 @@ class ColourLiteralScanTest {
             assertThat(theme.has(true) || theme.has(false)).as(file.toString()).isTrue();
         }
     }
+    /** Spec 10.11 fixes the boot splash's colours for every theme; this one source holds them. */
+    static final Set<Path> FIXED = Set.of(ROOT.resolve("jasper-app/src/main/java/dev/jasper/app/splash/SplashColors.java"));
     static final Pattern STRING_HEX = Pattern.compile("\"[^\"\\n]*#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?(?![0-9A-Za-z])[^\"\\n]*\"");
     // A constructor or decode call, simple or fully qualified (new java.awt.Color(0x…)), given a hex literal.
     static final Pattern CONSTRUCTED = Pattern.compile("(?:\\bColor(?:UIResource)?|\\bColor\\.decode)\\(\\s*\"?(?:0x|#)[0-9A-Fa-f]{6}");
@@ -65,7 +67,7 @@ class ColourLiteralScanTest {
         for (Path root : roots) try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
                 String name = file.getFileName().toString(), extension = name.substring(name.lastIndexOf('.') + 1);
-                if (THEMES.contains(file)) continue;
+                if (FIXED.contains(file) || THEMES.contains(file)) continue;
                 String text;
                 if (extension.equals("java")) text = Files.readString(file);
                 else if (TEXT_RESOURCES.contains(extension)) text = Files.readString(file);

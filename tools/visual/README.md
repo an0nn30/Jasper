@@ -14,6 +14,8 @@ geometry check compares luminance edges, not RGB values.
   under `*/build/`, and an optional `note` naming a deliberate difference, which it prints). Regenerate the renders first (`:jasper-app:themeSurfacePreview`,
   `:jasper-app:settings9bPreview`, the staged render evidence tests, `EnterpriseKitRenderTest` and the
   workspace preview).
+- The Boot Splash frames are 1x (720 × 440), so their pairs (`enterprise-splash-*`) take the 1x renders
+  `BootSplashMockTest` writes under `jasper-app/build/enterprise-splash/`.
 - `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` (the classic look's `classic-*`, the `run-window-*`, the `chrome-*` and the `enterprise-*` pairs)
   and prints PASS or FAIL: the edge agreement must reach the floor and each listed colour must fill a 2×2 block within
   ΔE76 6 in the mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. Render the `classic-*` pairs first with `:jasper-ui:gallery -Pjasper.galleryKit=enterprise

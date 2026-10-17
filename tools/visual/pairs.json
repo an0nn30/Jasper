@@ -1108,5 +1108,38 @@
       "#E6E7EA",
       "#C4C7CC"
     ]
+  },
+  {
+    "name": "enterprise-splash-01",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 01 - Starting Java runtime.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/01.png"
+  },
+  {
+    "name": "enterprise-splash-04",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 04 - Loading plugin File Server.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/04.png"
+  },
+  {
+    "name": "enterprise-splash-10",
+    "mock": "docs/design/enterprise/reference/10 Boot Splash/Boot Splash 10 - Starting Workstation.png",
+    "crop": [
+      0,
+      0,
+      720,
+      440
+    ],
+    "render": "jasper-app/build/enterprise-splash/10.png"
   }
 ]
