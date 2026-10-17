@@ -73,6 +73,20 @@ class PresentationAttemptTest {
         } finally { quit(application, original); }
     }
 
+    @Test void aFailedProviderStaysFailedThroughTheWindowAndAnOrderlyQuit() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        var selection = PluginSelection.of(dirs(), null, "B", provider(LookFixtures.KIT), false);
+        var application = started(selection);
+        try {
+            // The bootstrap's order: the plugins started, then the first window is about to show.
+            edt(() -> application.presentationAttempt().pending());
+            assertThat(state()).as("the window does not overwrite the failure").contains(AttemptStore.State.FAILED);
+        } finally { quit(application, original); }
+        selection.attempt().exiting();
+        assertThat(state()).as("an orderly quit keeps the failure").contains(AttemptStore.State.FAILED);
+        assertThat(PluginSelection.of(dirs(), null, "B", home.resolve("dev").resolve(ID), false).skipped()).as("the next start skips it").isPresent();
+    }
+
     @Test void aSkippedLookPostsOneWarningWithTryAgain() throws Exception {
         LookAndFeel original = UIManager.getLookAndFeel();
         Path dev = provider(LookFixtures.KIT);
@@ -171,6 +185,31 @@ class PresentationAttemptTest {
         } finally {
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }
+    }
+
+    @Test void tryAgainThatCannotRestartSaysToReopen() throws Exception {
+        LookAndFeel original = UIManager.getLookAndFeel();
+        Path dev = provider(LookFixtures.KIT);
+        PluginSelection.of(dirs(), null, "B", dev, false).attempt().pending();
+        var selection = PluginSelection.of(dirs(), null, "B", dev, false);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            application[0].restartPlanner = mode -> Optional.empty();
+            application[0].startPlugins(dirs());
+        });
+        try {
+            NotificationAction[] tryAgain = new NotificationAction[1];
+            edt(() -> tryAgain[0] = application[0].notificationCenter().history().stream().map(entry -> entry.request())
+                .filter(request -> request.title().equals("Jasper started with its standard look")).findFirst().orElseThrow()
+                .actions().getFirst());
+            edt(() -> tryAgain[0].run().run());
+            // until polls on the EDT, where the notification history is read.
+            DesktopTestSupport.until(() -> application[0].notificationCenter().history().stream()
+                .anyMatch(entry -> entry.request().title().equals("Restart Jasper to try the look again")
+                    && entry.request().severity() == Severity.INFO));
+            assertThat(state()).as("the record is forgotten").isEmpty();
+        } finally { quit(application[0], original); }
     }
 
     @Test void anExitThatIsNotOrderlyBeforeProofKeepsPending() throws Exception {

@@ -89,6 +89,10 @@ class AttemptStoreTest {
         failing.failed();
         failing.proven();
         assertThat(store.read().of(ID).state()).as("a provider that failed stays failed when the window paints").contains(AttemptStore.State.FAILED);
+        failing.pending();
+        failing.orderlyQuit();
+        failing.exiting();
+        assertThat(store.read().of(ID).state()).as("a later window and an orderly quit keep the failure").contains(AttemptStore.State.FAILED);
         failing.clear();
         assertThat(store.read().of(ID).state()).as("Try Again").isEmpty();
         assertThat(PresentationAttempt.announce(store, ID, "d1")).isTrue();

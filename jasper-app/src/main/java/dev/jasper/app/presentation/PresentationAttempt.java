@@ -35,9 +35,13 @@ public final class PresentationAttempt {
     /** The provider's id; empty for {@link #NONE}. */
     public String id() { return id; }
 
-    /** A window is about to show, or a rehearsal to run: pending. Runs on the EDT, bounded by {@link AttemptStore#EDT_WAIT}. */
+    /**
+     * A window is about to show, or a rehearsal to run: pending, unless this look already failed. Runs on the EDT, bounded
+     * by {@link AttemptStore#EDT_WAIT}.
+     */
     public void pending() {
-        if (store != null) store.update(id, attempt -> attempt.tried(version, digest, build, AttemptStore.State.PENDING), AttemptStore.EDT_WAIT);
+        if (store == null || failed.get()) return;
+        store.update(id, attempt -> attempt.tried(version, digest, build, AttemptStore.State.PENDING), AttemptStore.EDT_WAIT);
     }
 
     /** The first window or the rehearsal painted: proven, unless this look already failed. Off the EDT; once. */
@@ -56,9 +60,12 @@ public final class PresentationAttempt {
     /** The quit under way is orderly (Quit, or a programmatic {@code quitNow}). */
     public void orderlyQuit() { orderly.set(true); }
 
-    /** The process is exiting (the shutdown hook): after an orderly quit before proof, the pending mark goes; otherwise it stays. */
+    /**
+     * The process is exiting (the shutdown hook): after an orderly quit before proof, the pending mark goes; otherwise it
+     * stays. A look that failed keeps its failed mark.
+     */
     public void exiting() {
-        if (store == null || !orderly.get() || proven.get()) return;
+        if (store == null || !orderly.get() || proven.get() || failed.get()) return;
         store.update(id, attempt -> attempt.state().equals(Optional.of(AttemptStore.State.PENDING)) && attempt.digest().equals(digest)
             ? attempt.cleared() : attempt, AttemptStore.EDT_WAIT);
     }

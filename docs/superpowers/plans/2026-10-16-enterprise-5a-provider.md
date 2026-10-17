@@ -270,6 +270,14 @@ this plan's status banner.
     DialogMapping dialogs)`; in this plan it is `presentation(Kit kit)`, because nothing in the runtime consumes the
     dialog mapping yet (Rulings 2). The `DialogMapping` parameter is added beside the kit when the dialog consumer lands.
     Cost if wrong: one parameter.
+21. **A failure sticks in the handle.** `PresentationAttempt.pending()` writes nothing once the handle recorded `failed`,
+    and `exiting()` leaves a failed record alone (Task 4's file, changed in Task 12's review). Why: the bootstrap starts
+    the plugins, where a provider that fails to load writes `failed`, and only then marks the first window `pending`;
+    without the guard the window overwrote `failed`, an orderly quit then cleared the record, and every start retried the
+    broken provider (spec 4.6). Cost if wrong: none; a look that fails at start is skipped next time, as the spec says.
+22. **Try Again without a restart.** When `restart(RestartMode.SAME)` returns false (the command line is unknown), Try
+    Again posts an Info "Restart Jasper to try the look again" after clearing the record. Why: otherwise the record is
+    cleared and nothing happens. Cost if wrong: one notice's wording.
 
 ## File structure
 
@@ -6449,7 +6457,8 @@ presentation check comes first and dependents of a skipped provider are unmet; (
 title and face rules; (15) the classic base's chrome is the Enterprise column; (16) a blamed kit posts the ordinary
 problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
 host facts without AWT; (20) `PluginRuntime.presentation` takes only the `Kit` (spec 4.9's `DialogMapping` parameter is
-added beside it when the dialog consumer lands). Deviations from the plan's text: <deviations>. Plan-5b entry conditions: register the fonts and
+added beside it when the dialog consumer lands); (21) a failed attempt stays failed through a later window and an orderly
+quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from the plan's text: <deviations>. Plan-5b entry conditions: register the fonts and
 name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
 --continue`: **<counts>**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
 ```

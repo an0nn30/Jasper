@@ -200,9 +200,9 @@ public final class JasperApplication {
     TerminalRegistry terminals() { return terminals; }
 
     /** The plugin selection this process starts, fixed at construction. */
-    private dev.jasper.app.plugins.PluginSelection selection;
+    private volatile dev.jasper.app.plugins.PluginSelection selection;
     /** The presentation every surface of this process receives (spec 4.9). */
-    private dev.jasper.app.presentation.Presentation presentation;
+    private volatile dev.jasper.app.presentation.Presentation presentation;
 
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
@@ -983,7 +983,11 @@ public final class JasperApplication {
             .withContent("The last start with the " + skipped.name() + " look did not finish, so Jasper uses its standard look until you try again.")
             .withAction(new dev.jasper.app.notifications.NotificationAction("Try Again", () -> Thread.ofVirtual().name("jasper-presentation-retry").start(() -> {
                 skipped.attempt().clear();
-                SwingUtilities.invokeLater(() -> restart(RestartMode.SAME));
+                SwingUtilities.invokeLater(() -> {
+                    if (!restart(RestartMode.SAME))
+                        notificationCenter.post(NotificationRequest.of(IncidentNotices.PLUGINS.id(), Severity.INFO, "Restart Jasper to try the look again")
+                            .withContent("Jasper could not work out how it was started. Quit and reopen it to start with the " + skipped.name() + " look."));
+                });
             }), false))));
         // Spec 4.6: the first window's first paint proves the look, off the EDT.
         trace.when(StartupTrace.Milestone.FIRST_PAINT, task -> Thread.ofVirtual().name("jasper-presentation-proven").start(task),
