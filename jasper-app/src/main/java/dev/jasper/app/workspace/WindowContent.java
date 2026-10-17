@@ -748,6 +748,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
     WindowChrome chrome() { return chrome; }
     WorkspaceChrome look() { return look; }
+    /** The application's one animations flag: the look's motion folded into the setting (spec 10.9). EDT. */
+    boolean lookAnimates() { return themes.animationsEnabled(); }
     UiState uiState() { return uiState; }
     WindowCommands windowCommands() { return windowCommands; }
     ToolbarMode toolbarMode() { return toolbarMode; }

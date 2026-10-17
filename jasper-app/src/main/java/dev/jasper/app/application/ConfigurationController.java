@@ -104,6 +104,16 @@ final class ConfigurationController implements AutoCloseable {
      */
     ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
                             dev.jasper.app.platform.SystemAppearance.Observation initialAppearance, Path themesFolder) {
+        this(themes, service, editor, initialAppearance, themesFolder, LookMotion.STANDARD);
+    }
+
+    /** The look's motion, folded into the animations setting (spec 10.9). */
+    private final LookMotion motion;
+
+    /** As above, under the look's {@code motion}: the animations flag is the setting only while the look moves. */
+    ConfigurationController(ThemeController themes, ConfigService service, Consumer<Path> editor,
+                            dev.jasper.app.platform.SystemAppearance.Observation initialAppearance, Path themesFolder, LookMotion motion) {
+        this.motion = Objects.requireNonNull(motion, "motion");
         this.systemAppearance = Objects.requireNonNull(initialAppearance);
         requireEdt();
         this.themes = themes; this.service = service; this.editor = editor;
@@ -270,7 +280,7 @@ final class ConfigurationController implements AutoCloseable {
     private void configureThemes(ConfigService.State next) {
         var snapshot = next.snapshot();
         boolean dark = AppearancePolicy.dark(snapshot.appearance(), systemAppearance);
-        themes.configureAnimations(snapshot.animations().enabled());
+        themes.configureAnimations(motion.allows(snapshot.animations().enabled()));
         var problems = new java.util.ArrayList<ConfigDiagnostic>();
         var installed = library;
         for (var problem : installed.problems())

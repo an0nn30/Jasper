@@ -332,7 +332,9 @@ public final class JasperApplication {
         notifications = new CommandNotifier(() -> java.time.Duration.ofSeconds(configuredLongCommandSeconds()),
             buddy.companion(), notificationCenter, buddy.companion()::setWorking, JasperApplication::afterDelay);
         configuration = service == null ? null : new ConfigurationController(themes, service, this::openForEditing,
-            systemAppearance.current(), themesFolder);
+            systemAppearance.current(), themesFolder, LookMotion.of(presentation.projections()));
+        // Without a configuration the setting is its default, on; the look still decides (spec 10.9).
+        if (configuration == null) themes.configureAnimations(LookMotion.of(presentation.projections()).allows(true));
         if (configuration != null) systemAppearanceListening = systemAppearance.subscribe(configuration::systemAppearanceChanged);
         Supplier<TerminalConfig.Shell> savedShell = () -> (configuration == null ? ConfigSnapshot.defaults() : configuration.snapshot()).terminal().shell();
         shellProfiles = ShellProfileCatalog.system(savedShell);

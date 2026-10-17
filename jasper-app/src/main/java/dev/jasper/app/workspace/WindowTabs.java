@@ -78,7 +78,7 @@ final class WindowTabs extends JPanel implements AutoCloseable {
             Curve curve = reveal ? Curve.REVEAL : added ? Curve.OPEN : Curve.CLOSE;
             int millis = reveal ? (int) Math.round(animations.tabOpenMillis() * 490.0 / 475)
                 : added ? animations.tabOpenMillis() : animations.tabCloseMillis();
-            if (order.size() <= 1 || !added && !removed || !animations.enabled() || layoutWidth <= 0) millis = 0;
+            if (order.size() <= 1 || !added && !removed || !animations.enabled() || !owner.lookAnimates() || layoutWidth <= 0) millis = 0;
             if (reveal) {
                 // The reference first exposes the full-height rail, then expands a compact group at 100 logical px.
                 for (Slot slot : slots) slot.width.set(0);

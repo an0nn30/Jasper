@@ -135,7 +135,7 @@ final class WindowCommandPalette implements AutoCloseable {
     /** The card drops open vertically: its bottom edge leaves the field fast and settles slowly. */
     private void startReveal() {
         stopReveal();
-        if (!animations.enabled()) return;
+        if (!animations.enabled() || !owner.lookAnimates()) return;
         revealStart = clock.getAsLong();
         palette.setReveal(0); overlay.repaint();
         reveal = new Timer(8, event -> animate(clock.getAsLong()));
