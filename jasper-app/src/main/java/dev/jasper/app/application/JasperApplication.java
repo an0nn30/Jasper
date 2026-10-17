@@ -933,7 +933,7 @@ public final class JasperApplication {
             selection = scanned;
         }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
-        uiState = UiState.load(dirs.uiState());
+        uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
             () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
