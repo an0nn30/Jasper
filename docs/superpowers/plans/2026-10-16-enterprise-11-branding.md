@@ -1,5 +1,7 @@
 # Enterprise presentation 11: branding Implementation Plan
 
+> **Status (2026-10-17): executed on `claude/enterprise-branding` (`0b3ab7cd5..15b190c0d`).** Deviations from this plan's text: the app architecture's `startup` row also gains `splash` in its list of dependent packages, since `dev.jasper.app.splash` depends on `dev.jasper.app.startup`; Task 6's `SplashPainterTest.theSplashIgnoresTheTheme` restored `Label.foreground` and `defaultFont` by putting back the values it had read, which left them as overrides of every later look and feel and failed `WorkspaceThemeTest` in the full build, so `15b190c0d` removes the overrides instead; otherwise none beyond the plan's Rulings.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A look with `[branding]` brands Jasper's start-up and windows: the kit file's `[branding]` table (product,

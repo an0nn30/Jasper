@@ -1,5 +1,39 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 11: branding — 2026-10-17** (`claude/enterprise-branding`, worktree
+`.claude/worktrees/enterprise-11`, `0b3ab7cd5..15b190c0d`, then this documentation commit;
+[plan](superpowers/plans/2026-10-16-enterprise-11-branding.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). A look with `[branding]` brands Jasper's
+start-up and windows. `KitParser` reads the table (`product`, `icons`, `splash_art`) into `Branding`, the files' bytes,
+checking each icon's PNG header size and the art with jasper-ui's receiving SVG rules on the XML alone
+(`EncodedArtwork.checkSvg`, the rules moved unchanged into `SvgPreflight`), so the pre-pass touches no AWT; the look's
+digest covers the files and `Presentation` carries the branding (`Branding.NONE` for the default look and the
+fallback). The Enterprise plugin ships the reference icon set (16 to 1024 px) and the Boot Splash art byte for byte,
+pinned by the conformance test. `ApplicationIcon.useLook` makes a branded look's icons every new window's icon list and
+the taskbar and Dock icon, in packaged macOS launches too. Once the desktop properties and title-bar style are
+committed, a start that will open a window (not `--background`, `--no-window`, safe mode or headless) decodes the
+splash off the EDT and posts its window (`dev.jasper.app.splash`: `SplashPainter`, `Splash`, `SplashColors`) with the
+Dock icon; `StartupSteps` shows "Starting Java runtime…", "Reading configuration…", "Loading plugin: <name>" per
+plugin, "Restoring workspace…" and "Starting JasperOps Workstation…", filled as step over count with no motion, and
+the splash closes when the first window shows or start-up fails. `BootSplashMockTest` compares the render with all ten
+frames (renders under `jasper-app/build/enterprise-splash/`, three pairs in `tools/visual/pairs.json`). The default
+look is unchanged (the headless gallery is byte-identical to `main`'s). Rulings (plan, "Rulings"): (1) one plan; (2)
+bytes, checked without decoding; (3) `presentation → dev.jasper.ui.icons` for the art's check; (4) all three keys
+required, the art's aspect unchecked; (5) the digest covers the branding; (6) `Branding` is a `Presentation`
+component; (7) icons on every branded launch, About's icon follows, the tray and menu-bar glyph keep Jasper's; (8) a
+look that falls back gives Jasper's icons back and closes the splash; (9) the splash opens after the desktop
+properties, not at the selection; (10) step timing and count; (11) faces from the kit's files, not registered; (12)
+`BuildInfo.buildLine` and `BuildInfo.COPYRIGHT`; (13) fixed colours in `SplashColors`, exempt from the scan; (14)
+measured window-pixel geometry and baselines; (15) the comparison's tolerances; (16) a plain AWT window with the
+look's icons, centred on the main screen; (17) 1x pairs; (18) the text compared with the frames on macOS only.
+Deviations from the plan's text: the app architecture's `startup` row also gains `splash` in its list of dependent packages, since `dev.jasper.app.splash` depends on `dev.jasper.app.startup`; Task 6's `SplashPainterTest.theSplashIgnoresTheTheme` restored `Label.foreground` and `defaultFont` by putting back the values it had read, which left them as overrides of every later look and feel and failed `WorkspaceThemeTest` in the full build, so `15b190c0d` removes the overrides instead; otherwise none beyond the plan's Rulings. `./gradlew check --continue`: **11,130 tests, 0 failures, 0 errors, 25 skipped**. GUI
+checks for the user (spec 16.2): on a cold start with Enterprise on, the splash appears centred, unfocused, with the
+JasperOps art, icon, version line, steps and bar, crisp on a Retina screen, and closes as the first window shows; the
+Dock icon (packaged and development builds) and the window icons on Windows and Linux are the Enterprise icon from the
+splash on; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
+`--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
+Jasper's icon. Not merged, not pushed.
+
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
 [plan](superpowers/plans/2026-10-16-enterprise-5b-enterprise.md),
