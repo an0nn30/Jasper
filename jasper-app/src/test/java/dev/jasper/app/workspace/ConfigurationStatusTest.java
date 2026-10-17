@@ -43,6 +43,31 @@ class ConfigurationStatusTest {
             }
         });
     }
+    /** 4a's hand-off (Enterprise plan 7): the configuration text's repair holds over the theme set and the degenerate palettes. */
+    @Test void theConfigurationTextKeepsItsContrastOverEveryPalette() throws Exception {
+        edt(() -> {
+            var palettes = new java.util.ArrayList<>(dev.jasper.ui.testsupport.KitFixtures.themes());
+            palettes.addAll(dev.jasper.ui.testsupport.KitFixtures.degenerate());
+            Path file = Path.of("fixture", "settings.toml");
+            try {
+                for (var theme : palettes) {
+                    dev.jasper.ui.swing.FlatLafInstaller.install(theme, dev.jasper.ui.kit.Kit.DEFAULT);
+                    var status = new WindowStatusBar();
+                    String name = theme.name() + (theme.dark() ? " Dark" : " Light");
+                    for (var severity : ConfigDiagnostic.Severity.values()) {
+                        status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(
+                            new ConfigDiagnostic(severity, file, 1234567, 1, "window.tab_height", "Check this key")), file, true));
+                        assertThat(contrast(status.configButton().getForeground(), status.getBackground()))
+                            .as(name + ", " + severity.name()).isGreaterThanOrEqualTo(4.5);
+                    }
+                    status.setConfiguration(new ConfigService.State(ConfigSnapshot.defaults(), List.of(), file, true));
+                    assertThat(contrast(status.configButton().getForeground(), status.getBackground()))
+                        .as(name + ", no diagnostics").isGreaterThanOrEqualTo(4.5);
+                }
+            } finally { dev.jasper.app.testsupport.EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void statusSurfaceFollowsChromeRatherThanTerminalPalette() throws Exception {
         edt(() -> {
             var themes = ThemeTestSupport.controller(true);

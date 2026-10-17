@@ -131,4 +131,20 @@ class ProjectionsTest {
         assertThat(fallback.projections()).isEqualTo(Projections.fallback(new DesktopFlags(false, true), MAC));
         assertThat(fallback.look()).isEqualTo("default");
     }
+
+    /** Plan 7: the dock group has landed: the shipped kit's dock is labelled and flush, saved under its id, with Event Log. */
+    @Test void theDockGroupHasLanded() {
+        assertThat(Presentation.LANDED).contains(Presentation.Landed.WINDOW_CHROME, Presentation.Landed.WINDOW_CONTENT, Presentation.Landed.DOCK_CHROME);
+        var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC, Presentation.LANDED);
+        assertThat(shipped.workspace().stripes()).isEqualTo(WorkspaceLook.Stripes.LABELLED);
+        assertThat(shipped.workspace().frames()).isEqualTo(WorkspaceLook.FrameStyle.FLUSH);
+        assertThat(shipped.dockLayout()).isEqualTo(new DockLayoutKey("dev.jasper.enterprise"));
+        assertThat(shipped.panels()).isEqualTo(new AppPanels("Event Log", Slot.BOTTOM_LEFT));
+        var standard = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC, Presentation.LANDED);
+        assertThat(standard.workspace().stripes()).isEqualTo(WorkspaceLook.Stripes.RAILS);
+        assertThat(standard.workspace().frames()).isEqualTo(WorkspaceLook.FrameStyle.STANDARD);
+        assertThat(standard.dockLayout().key()).isEmpty();
+        assertThat(standard.panels()).isEqualTo(new AppPanels("Notifications", Slot.RIGHT_TOP));
+        assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
+    }
 }

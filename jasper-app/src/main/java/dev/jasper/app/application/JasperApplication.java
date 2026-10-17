@@ -319,7 +319,7 @@ public final class JasperApplication {
         themes.appearance().shortcuts(this::shortcutLabel);
         notificationCenter = new NotificationCenter(SwingUtilities::invokeLater, java.time.Clock.systemDefaultZone(), this::presence);
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
-            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels());
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
             new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
         incidents = new Incidents(notificationCenter.clock());

@@ -91,6 +91,12 @@ class ChromeRenderTest {
 
     /** The structure every look keeps; plans 6b to 9 add their surfaces' checks here. */
     static void check(Case look, WindowContent owner, JRootPane root, MacTitleBar bar) {
+        // Plan 7 (spec 10.7): the dock the look names.
+        boolean labelled = look.projections().workspace().stripes() == dev.jasper.app.presentation.WorkspaceLook.Stripes.LABELLED;
+        assertThat(owner.stripes() instanceof StripeSet.LabelledStripes).as(look.name() + ": labelled stripes where the look asks for them").isEqualTo(labelled);
+        assertThat(owner.bottomStrip().isPresent()).as(look.name() + ": the bottom strip").isEqualTo(labelled);
+        assertThat(owner.area().flush()).as(look.name() + ": flush frames")
+            .isEqualTo(look.projections().workspace().frames() == dev.jasper.app.presentation.WorkspaceLook.FrameStyle.FLUSH);
         var window = WindowLook.of(look.projections());
         assertThat(bar != null).as(look.name() + ": the unified bar where the look asks for it").isEqualTo(window.unifiedTitle());
         if (bar == null) {

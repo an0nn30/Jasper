@@ -44,8 +44,14 @@ final class NotificationsFeature implements AutoCloseable {
     private UUID lastActive;
     private boolean closed;
 
-    /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with. */
+    /** {@code kit} supplies the chrome kit context the cards and the Notifications panel are built with: the default look's panel. */
     NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
+        this(center, contributions, kit, new dev.jasper.app.presentation.AppPanels("Notifications", Slot.RIGHT_TOP));
+    }
+
+    /** As the three-argument form, with the panel's title and default slot under the look: Event Log at Bottom Left under labelled stripes. */
+    NotificationsFeature(NotificationCenter center, Contributions contributions, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit,
+                         dev.jasper.app.presentation.AppPanels panels) {
         this.center = center;
         this.contributions = contributions;
         this.kit = java.util.Objects.requireNonNull(kit, "kit");
@@ -61,8 +67,8 @@ final class NotificationsFeature implements AutoCloseable {
                 Attached attached = windows.get(invocation.windowId());
                 if (attached != null) attached.layer().dismissAll();
             });
-        panel = contributions.addPanel(PANEL_ID, "Notifications", icon, Slot.RIGHT_TOP, Optional.of(SHOW_HISTORY),
-            site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId())));
+        panel = contributions.addPanel(PANEL_ID, panels.notificationsTitle(), icon, panels.notificationsSlot(), Optional.of(SHOW_HISTORY),
+            site -> new HistoryPanel(kit.get(), center, site, focused(site.windowId()), panels.notificationsTitle()));
         listening = center.onChange(this::changed);
         updateBadge();
     }

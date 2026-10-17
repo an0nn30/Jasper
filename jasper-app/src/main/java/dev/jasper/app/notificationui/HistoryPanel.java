@@ -72,13 +72,26 @@ public final class HistoryPanel extends JPanel {
      * @param focused whether the window is active
      */
     public HistoryPanel(KitContext kit, NotificationCenter center, PanelSite site, boolean focused) {
+        this(kit, center, site, focused, "Notifications");
+    }
+
+    /**
+     * As the four-argument form, named {@code title} for screen readers: Event Log under labelled stripes (spec 10.7).
+     *
+     * @param kit the kit the panel's views are built with
+     * @param center the notification store
+     * @param site the tool window site the panel lives in
+     * @param focused whether the window is active
+     * @param title the panel's title
+     */
+    public HistoryPanel(KitContext kit, NotificationCenter center, PanelSite site, boolean focused, String title) {
         super(new BorderLayout());
         this.kit = Objects.requireNonNull(kit, "kit");
         this.center = Objects.requireNonNull(center, "center");
         this.focused = focused;
         setOpaque(false);
         time = DateTimeFormatter.ofPattern("HH:mm").withZone(center.clock().getZone());
-        getAccessibleContext().setAccessibleName("Notifications");
+        getAccessibleContext().setAccessibleName(title);
         // The tool window header carries the title.
         header = new KitView(kit, headerSpec(false), event -> {
             if (event instanceof UiEvent.Action action && action.id().equals(CLEAR_ALL) && !closed) center.clear();

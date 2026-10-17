@@ -77,8 +77,11 @@ class NotificationCardTest {
             try (var card = card(kit, notification, false)) {
                 var count = Arrays.stream(card.getComponents()).filter(TextBlock.class::isInstance).map(TextBlock.class::cast)
                     .filter(text -> text.text().equals("×2")).findFirst().orElseThrow();
-                for (boolean dark : new boolean[]{true, false}) {
-                    var theme = ThemeTestSupport.generated(dark); String name = dark ? "Dark" : "Light";
+                // 4a's hand-off (Enterprise plan 7): the count's repair holds over the theme set and the degenerate palettes.
+                var palettes = new java.util.ArrayList<>(dev.jasper.ui.testsupport.KitFixtures.themes());
+                palettes.addAll(dev.jasper.ui.testsupport.KitFixtures.degenerate());
+                for (var theme : palettes) {
+                    String name = theme.name() + (theme.dark() ? " Dark" : " Light");
                     var raw = theme.semantic().color(SemanticColor.TEXT_SECONDARY);
                     binding.publish(new dev.jasper.ui.theme.ThemePair(theme, theme));
                     assertThat(dev.jasper.ui.theme.ColorMath.contrast(count.getForeground(), theme.semantic().color(SemanticColor.SURFACE_CARD)))
