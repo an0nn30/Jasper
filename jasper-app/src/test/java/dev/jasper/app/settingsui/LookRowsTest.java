@@ -71,6 +71,21 @@ class LookRowsTest {
         });
     }
 
+    @Test void theFontRowsSearchWordsFollowTheLook() throws Exception {
+        edt(() -> {
+            var spec = CorePages.specs(AppearanceFixtures.CHOICES, new CorePages.SystemActions(() -> Path.of("/fixture/config.toml"),
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> false, Optional.empty()), ShellChoices.NONE, id -> { }, true,
+                NotificationGroupChoices.NONE).stream().filter(page -> page.id().equals("appearance")).findFirst().orElseThrow();
+            var classic = spec.build(context(SettingsChromeTest.CLASSIC, KitTestSupport::context));
+            var linux = spec.build(context(LINUX_DEFAULT, KitTestSupport::context));
+            try {
+                assertThat(classic.searchTerms()).contains("Use the default font size");
+                assertThat(linux.searchTerms()).as("the default look's words stay as they were")
+                    .doesNotContain("Use the default font size").contains("Use platform size", "Use platform font size");
+            } finally { classic.dispose(); linux.dispose(); }
+        });
+    }
+
     @Test void theFontRowSpeaksForTheLookAndStartsAtItsStandardSize() throws Exception {
         edt(() -> {
             // Plan 4a's Enterprise fixture kit (12-point body) until plan 5b's shipped kit (Execution notes E2, E6).

@@ -77,4 +77,21 @@ class SettingRowMenuTest {
             } finally { release(context); }
         });
     }
+
+    @Test void aFocusedControlWithItsOwnMenuKeepsTheMenuKeyAndAHiddenMenuIsNotDismissed() {
+        Edt.run(() -> {
+            var context = KitFixtures.context();
+            try (var view = new KitView(context, row(List.of(RESET)), event -> { })) {
+                var control = (SettingRows.RowControl) view.control("row");
+                var field = view.control("rows").component;
+                assertThat(SettingRows.RowControl.focusKeepsMenuKey(null)).isFalse();
+                assertThat(SettingRows.RowControl.focusKeepsMenuKey(field)).as("a control without a menu of its own").isFalse();
+                field.setComponentPopupMenu(new javax.swing.JPopupMenu());
+                assertThat(SettingRows.RowControl.focusKeepsMenuKey(field)).as("the root pane's postPopup opens the control's menu").isTrue();
+                assertThat(control.component.getActionMap().get("settingRowMenu").isEnabled()).as("nothing focused").isTrue();
+                assertThat(control.dismiss()).isFalse();
+                assertThat(view.dismissPopup()).isFalse();
+            } finally { release(context); }
+        });
+    }
 }

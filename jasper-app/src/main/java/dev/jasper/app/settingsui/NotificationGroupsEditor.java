@@ -88,7 +88,7 @@ final class NotificationGroupsEditor implements ValueEditor<Map<String, String>>
                 var choice=new Nodes.Choice(modeId(id,i),plain,Nodes.ChoiceKind.DROPDOWN,options,mode(group.id()),group.name()+": how its notifications appear; "+group.owner()+" · "+group.id(),"");
                 var reset=new Nodes.Button(resetId(id,i),new ControlState(plain.visible()&&value.containsKey(group.id()),plain.enabled()&&value.containsKey(group.id()),plain.busy(),""),"","reset",Nodes.ButtonKind.GHOST,resetId(id,i),"Reset "+group.name()+" to its default");
                 var control=new Nodes.Stack(modeId(id,i)+":controls",plain,Nodes.LayoutRole.SETTINGS_TRAILING,inlineReset?List.of(choice,reset):List.of(choice));
-                var menu=inlineReset?List.<dev.jasper.ui.model.MenuItem>of():List.of(new dev.jasper.ui.model.MenuItem(resetId(id,i),"Reset to Default","",resetId(id,i),plain.enabled()&&value.containsKey(group.id()),false));
+                var menu=SchemaPage.resetMenu(inlineReset,resetId(id,i),plain.enabled()&&value.containsKey(group.id()));
                 lines.add(new Nodes.SettingRow(id+":row-"+i,plain,group.name(),"",control,false,highlighted,"",menu));
             }
             sections.add(new Nodes.Card(id+":owner-card-"+section++,plain,Nodes.CardKind.SETTINGS,lines));

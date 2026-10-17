@@ -1,5 +1,7 @@
 # Enterprise presentation 9a: the Settings chrome Implementation Plan
 
+> **Status (2026-10-17):** executing; deviations so far: Execution notes E28 and E29.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Under the Enterprise look the Settings dialog wears its classic chrome, measured against the eighteen
@@ -275,7 +277,8 @@ unmerged plans 5b, 7 and 8b cite the plan.
     (`:403-404`), which also serves full-span editors whose own Reset uses `<id>:reset`; built rows are those with
     `row.shown()` (`:225`, `:248`, `:271`, `:307`); 3e's `heading` reads no row.
 11. `Stacks.SettingsTrailingLayout` keeps `COLUMN_GAP` before the second child even when there is none
-    (`Stacks.java:522-531`); every `SETTINGS_TRAILING` stack in the code base has two children today; `SettingsFooterLayout`
+    (`Stacks.java:522-531`); every `SETTINGS_TRAILING` stack in the app has two children today, and the gallery's
+    `stack-SETTINGS_TRAILING` fixture (`StateFixtures.java:44`) has one (Execution notes E29); `SettingsFooterLayout`
     gives each trailing button at least `SETTINGS_ACTION_MIN_WIDTH`, `BUTTON_GAP` apart (`:448-478`);
     `SettingsHeaderLayout`'s gaps are `SETTINGS_HEADER_GAP` after the history buttons, `SETTINGS_HEADER_TITLE_GAP` for a
     page without ancestors and `SETTINGS_CRUMB_GAP` between crumbs (`:480-`); `SettingsLayout` places the page's sections
@@ -3937,3 +3940,16 @@ running `PluginPanelPageTest` (with `KitValuesTest` and `PluginSettingsPageTest`
 latter's `theRunWindowPaintsEachPairAsItsGuardMakesItOverEveryPalette` ("Enterprise Light, selected row"); alone, or in
 Gradle's class order (appearance before plugins), it passes — cost if wrong: should `check` show it, it is the existing
 leak (report it), not a 9a defect.
+
+E28. **The font row's search words follow the look: `Editors.Factory` gains a `lookTerms` component (a function of the
+`PageContext`; the two-argument form has none) and `SchemaPage` searches `terms(context)`; `PlatformFontSize.factory()`
+keeps Task 2's first two words and adds the look's copy only when it differs from `PLATFORM_COPY`** — Task 2's static
+third word "Use the default font size" gave Appearance an eighth match for "font" under the default look, so Task 3
+Step 6 found the four `search-{dark,light}-{0,18}.png` previews changed (Global Constraints' pixel rule) — cost if wrong:
+none; `LookRowsTest.theFontRowsSearchWordsFollowTheLook` checks both looks.
+
+E29. **Rulings 10's zero gap changes the gallery's one-child `stack-SETTINGS_TRAILING` fixture by design**: in
+`{dark,light}-1x/composition.json` its label is 600 wide instead of 590 (every PNG is byte-identical); fact 11 is
+corrected, both files in `build/plan9-base` are re-baselined from Task 3's head, and Task 8 records this in
+`docs/STATUS.md` — an SDK plugin's one-child `SETTINGS_TRAILING` stack (`LayoutRole` is SDK-visible) likewise loses its
+reserved gap — cost if wrong: none; the default look's Settings rows all keep two children.

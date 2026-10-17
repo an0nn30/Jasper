@@ -48,6 +48,10 @@ final class SettingRows {
             component.putClientProperty(KitOwnership.CONTEXT_MENU, popup);
             component.getActionMap().put("settingRowMenu", new AbstractAction() {
                 @Override public void actionPerformed(java.awt.event.ActionEvent event) { context(component, 0, component.getHeight()); }
+                // A focused control with its own popup menu keeps the menu key: the root pane's postPopup then opens that menu.
+                @Override public boolean isEnabled() {
+                    return !focusKeepsMenuKey(KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());
+                }
             });
             own(() -> { menu(false); popup.setVisible(false); clearPopup(); });
             refresh();
@@ -83,6 +87,18 @@ final class SettingRows {
                 popup.add(entry);
             }
             if (popup.getComponentCount() > 0 && invoker.isShowing()) popup.show(invoker, x, y);
+        }
+
+        /** Whether {@code focused} has its own popup menu, which Shift+F10 and the menu key open in place of the row's. */
+        static boolean focusKeepsMenuKey(Component focused) {
+            return focused instanceof JComponent owner && owner.getComponentPopupMenu() != null;
+        }
+
+        /** Hides the row's menu; whether it was showing. */
+        boolean dismiss() {
+            boolean visible = popup.isVisible();
+            popup.setVisible(false);
+            return visible;
         }
 
         void clearPopup() {

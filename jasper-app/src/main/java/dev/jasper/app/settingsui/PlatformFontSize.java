@@ -26,8 +26,9 @@ final class PlatformFontSize implements ValueEditor<Float> {
     private boolean inherited = true, chosen;
 
     static Editors.Factory<Float> factory() {
-        return new Editors.Factory<>((setting, context) -> new PlatformFontSize(context),
-            List.of("Use platform size", PLATFORM_COPY, "Use the default font size"));
+        // The look's own copy is searched only under that look, so the default look's matches stay as they were.
+        return new Editors.Factory<>((setting, context) -> new PlatformFontSize(context), List.of("Use platform size", PLATFORM_COPY),
+            context -> context.chrome().fontRowCopy().equals(PLATFORM_COPY) ? List.of() : List.of(context.chrome().fontRowCopy()));
     }
 
     /**

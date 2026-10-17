@@ -226,7 +226,7 @@ public final class SchemaPage implements SettingsPage {
                 terms.add(row.setting().label());
                 terms.add(row.setting().description());
                 terms.add(String.join(" ", row.setting().keywords()));
-                terms.addAll(row.editor().terms());
+                terms.addAll(row.editor().terms(context));
             } else if (item instanceof ExternalItem external) {
                 terms.add(external.value().label());
                 terms.add(String.join(" ", external.value().keywords()));
@@ -289,7 +289,7 @@ public final class SchemaPage implements SettingsPage {
         var setting = (Setting<T>) item.setting();
         var factory = (Editors.Factory<T>) item.editor();
         ValueEditor<T> editor = factory.build().apply(setting, context);
-        rows.add(new Row<>(setting, editor, item.note(), factory.terms(), item.enabled()));
+        rows.add(new Row<>(setting, editor, item.note(), factory.terms(context), item.enabled()));
         editor.onChanged(this::render);
     }
 
@@ -360,7 +360,12 @@ public final class SchemaPage implements SettingsPage {
      * differs from its effective default; {@code action} is what the row's Reset button would report.
      */
     static List<dev.jasper.ui.model.MenuItem> resetMenu(PageContext context, String action, boolean resettable) {
-        return context.chrome().inlineReset() ? List.of()
+        return resetMenu(context.chrome().inlineReset(), action, resettable);
+    }
+
+    /** {@link #resetMenu(PageContext, String, boolean)} for an editor that holds only the chrome's {@code inlineReset}. */
+    static List<dev.jasper.ui.model.MenuItem> resetMenu(boolean inlineReset, String action, boolean resettable) {
+        return inlineReset ? List.of()
             : List.of(new dev.jasper.ui.model.MenuItem(action, "Reset to Default", "", action, resettable, false));
     }
 
