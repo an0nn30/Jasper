@@ -4,7 +4,9 @@ import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.*;
 import java.awt.*;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JLabel;
 import javax.swing.ScrollPaneLayout;
 import javax.swing.border.Border;
@@ -57,12 +59,18 @@ final class ClassicOrderedFace implements OrderedFace {
         list.side.addAction(add);
     }
 
+    /** Each ORDERED list of a VERTICAL stack adopts the INLINE row right after it, which the stack records as placed there. */
     @Override public void span(Stacks.StackControl stack, List<ControlRegistry.Control> controls) {
         if (((Nodes.Stack) stack.node).role() != Nodes.LayoutRole.VERTICAL) return;
+        var adopted = new HashMap<String, Container>();
         for (int i = 0; i < controls.size(); i++)
-            if (controls.get(i) instanceof ItemLists.ListControl list && list.value().kind() == Nodes.ListKind.ORDERED)
-                list.entry(i + 1 < controls.size() && controls.get(i + 1) instanceof Stacks.StackControl row
-                    && ((Nodes.Stack) row.node).role() == Nodes.LayoutRole.INLINE ? row.component : null);
+            if (controls.get(i) instanceof ItemLists.ListControl list && list.value().kind() == Nodes.ListKind.ORDERED) {
+                var row = i + 1 < controls.size() && controls.get(i + 1) instanceof Stacks.StackControl next
+                    && ((Nodes.Stack) next.node).role() == Nodes.LayoutRole.INLINE ? next : null;
+                list.entry(row == null ? null : row.component);
+                if (row != null) adopted.put(row.node.id(), list.scroll);
+            }
+        stack.adopted = Map.copyOf(adopted);
     }
 
     /** The room right of the box: the side column and its gap. */

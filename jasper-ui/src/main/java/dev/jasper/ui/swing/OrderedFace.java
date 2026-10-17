@@ -20,6 +20,9 @@ interface OrderedFace extends Face {
     void paintPane(ItemLists.ListControl list, Graphics2D g);
     /** Mounts the list's add action, or null, when the rows carry no commands. */
     void mount(ItemLists.ListControl list, ControlRegistry.Control add);
-    /** Lets a side column span an entry row that follows its list in a VERTICAL stack. */
+    /**
+     * Lets a side column span an entry row that follows its list in a VERTICAL stack, recording the row in the stack's
+     * {@code adopted}; the stack calls it before it mounts its children.
+     */
     void span(Stacks.StackControl stack, List<ControlRegistry.Control> controls);
 }

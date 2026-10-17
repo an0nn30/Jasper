@@ -61,6 +61,12 @@ final class Stacks {
         PanelFooters.Footer panelFooter;
         /** A ROUTE strip's step: a tile beside its lines (set by the reconciler, cleared on every update). */
         boolean routeStep;
+        /**
+         * Children a classic face placed in another container on the last pass, by node id, with that container (an
+         * ordered list's entry row in the list's pane, plan 4c). The face's span sets it before the stack mounts the rest;
+         * the reconciler does not clear it, so its next detach pass leaves an adopted row where it is.
+         */
+        java.util.Map<String, Container> adopted = java.util.Map.of();
         List<ControlRegistry.Control> children = List.of();
         @Override void embeddedLabel(boolean value) { embedded = value; if (settings) children.forEach(c -> Composition.label(c, value)); }
         java.util.Set<Component> captions = java.util.Set.of();
@@ -129,6 +135,8 @@ final class Stacks {
 
         @Override
         Container childParent(Nodes.Node child) {
+            var adopter = adopted.get(child.id());
+            if (adopter != null) return adopter;
             return ((Nodes.Stack) node).role() == Nodes.LayoutRole.PROMPT_HEADER
                             && child instanceof Nodes.Icon
                     ? tile
@@ -146,12 +154,17 @@ final class Stacks {
             // label is its accessible name, not a caption stacked above the row.
             if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ACTIONS)
                 controls.forEach(c -> { if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.DROPDOWN) Composition.label(c, true); });
+            // The classic ordered face adopts an entry row into its list's pane (plan 4c) before the stack mounts the rest.
+            adopted = java.util.Map.of();
+            context().faces().ordered.span(this, controls);
             var wanted = new java.util.ArrayList<JComponent>();
-            for (var c : controls)
-                if (childParent(c.node) == tile) {
+            for (var c : controls) {
+                var parent = childParent(c.node);
+                if (parent == tile) {
                     mount(tile, List.of(c.component));
                     wanted.add(tile);
-                } else wanted.add(c.component);
+                } else if (parent == component) wanted.add(c.component);
+            }
             mount(component, wanted);
             Separators.settle(controls);
             captions = controls.stream().filter(c -> c.node instanceof Nodes.Text text && text.role() == Nodes.TextRole.CAPTION).map(c -> (Component)c.component).collect(java.util.stream.Collectors.toSet());
@@ -163,7 +176,6 @@ final class Stacks {
             // The classic faces adopt what they draw (plan 4c): a route strip's hues, a route step's captions.
             if (((Nodes.Stack) node).role() == Nodes.LayoutRole.ROUTE) context().faces().route.strip(this, controls);
             if (routeStep) context().faces().route.step(this, controls);
-            context().faces().ordered.span(this, controls);
         }
 
         /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */

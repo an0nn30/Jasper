@@ -27,6 +27,8 @@ final class ItemLists {
         SideColumn side;
         /** The entry row a classic side column spans with the rows (a VERTICAL parent's INLINE row after the list), or null. */
         JComponent entry;
+        /** Whether a VERTICAL parent decided this list's entry row on this pass; the reconciler clears it before every pass. */
+        boolean spanned;
 
         ListControl(KitView view, Nodes.ItemList node) {
             super(view, node, new ListPane());
@@ -382,14 +384,22 @@ final class ItemLists {
             return row == null ? null : row.controls.get(id);
         }
 
+        /** The add action's container: a classic side column, or the canvas that holds it under the rows. */
         @Override
         Container childParent(Nodes.Node child) {
-            return canvas;
+            return side != null && sideColumn() ? side : canvas;
+        }
+
+        /** Whether this is an ORDERED list whose face gives its rows no commands, so a side column holds them (plan 4c). */
+        boolean sideColumn() {
+            return value().kind() == Nodes.ListKind.ORDERED && !context().faces().ordered.rowCommands();
         }
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
-            if (value().kind() == Nodes.ListKind.ORDERED && !context().faces().ordered.rowCommands()) {
+            // An entry row stays adopted only while a VERTICAL parent adopts it again on this pass (ClassicOrderedFace.span).
+            if (!spanned && entry != null) entry(null);
+            if (sideColumn()) {
                 // The side column holds the add action; nothing sits under the rows.
                 if (footer != null && footer.getParent() == canvas) canvas.remove(footer);
                 footer = null;
@@ -502,8 +512,10 @@ final class ItemLists {
             }
         }
 
-        /** Adopts {@code next} as the entry row the side column spans, or gives up the current one for null. */
+        /** Adopts {@code next} as the entry row the side column spans, or gives up the current one for null; a held row stays put. */
         void entry(JComponent next) {
+            spanned = true;
+            if (entry == next && (next == null || next.getParent() == scroll)) return;
             if (entry != null && entry != next && entry.getParent() == scroll) scroll.remove(entry);
             entry = next;
             if (entry != null && entry.getParent() != scroll) scroll.add(entry);
@@ -629,7 +641,8 @@ final class ItemLists {
             return null;
         }
 
-        private void run(String suffix) {
+        /** A command's action: acts on {@link #target()}, and on nothing when no row is the target. */
+        void run(String suffix) {
             String row = target();
             if (row == null || !owner.interactive()) return;
             int index = owner.indexOf(row);

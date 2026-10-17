@@ -4813,3 +4813,16 @@ check`; the executor's runs are the evidence for those.
   `SideLayout`'s minimum is as tall as the side column** — the index painted `text.tertiary` on `selection.bg` (about
   1.0:1 in Slate Cobalt Light) and was guarded against the even rows' surface only, and a host sizing to the minimum
   clipped Move Down — cost if wrong: none (`ClassicOrderedTest` checks all three).
+- **E19. Task 3's second review: an update moves nothing the classic ordered face placed, and a list gives up an entry
+  row no VERTICAL parent adopts again** — `ListControl.childParent` names the side column for a classic ORDERED list
+  (`ListControl.sideColumn()`); `StackControl.adopted` (a child's id to the container a face placed it in) is what its
+  `childParent` reports, the reconciler's reset leaves it alone, and `StackControl.children` runs `ordered.span`, which
+  records it, before it mounts the rest, leaving an adopted row out; `ListControl.entry` returns when it holds the row
+  already and sets `spanned`, which `ViewReconciler.resetComposition` clears and `ListControl.children` reads to give up
+  an entry row its parent did not adopt again; `SideColumn.run` is package-private, so
+  `aRowTheHostRemovedIsNoLongerTheTarget` drives the action path (a disabled command's click fires nothing); with
+  `anUpdateMovesNeitherTheAdoptedEntryRowNorTheAddAction` and `aListThatLeavesItsVerticalParentGivesUpItsEntryRow`,
+  `ClassicOrderedTest` has 9 tests and the jasper-ui suite after Task 3 has 787 — every update took the entry row out
+  of the pane and the add action out of the side column and put them back, so a focused marker field or Add button
+  lost focus and its IME on each host echo, and a list moved out of its VERTICAL parent kept a closed entry row painted
+  in its pane — cost if wrong: none (both tests fail without the change).

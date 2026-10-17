@@ -97,6 +97,8 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof Choices.ChoiceControl choice && choice.node instanceof Nodes.Choice node && node.kind() == Nodes.ChoiceKind.EXCLUSIVE)
             choice.component.setBorder(null);
         if (control instanceof InteractiveRows.RowsControl rows) { rows.panelSingle = false; rows.panelCompact = false; }
+        // A list keeps an adopted entry row only if its VERTICAL parent adopts it again (ItemLists.ListControl.children).
+        if (control instanceof ItemLists.ListControl list) list.spanned = false;
         if (control instanceof Buttons.ButtonControl button) {
             button.button.panel = false;
             button.button.panelRow = false;

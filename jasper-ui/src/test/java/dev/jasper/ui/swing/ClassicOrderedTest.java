@@ -92,12 +92,84 @@ class ClassicOrderedTest {
                 KitFixtures.render(view, 600, 120, 1);
                 var list = (ItemLists.ListControl) view.control("markers");
                 list.select("flake", false);
+                events.clear();
+                list.side.run("remove");
+                assertThat(events).as("the commands' action path acts on the selection").containsExactly(new UiEvent.Removed("markers", "flake"));
                 view.update(withEntry(List.of(marker("csproj", "*.csproj"), marker("xcode", "*.xcodeproj"))));
                 KitFixtures.render(view, 600, 120, 1);
                 assertThat(list.side.target()).isNull();
+                assertThat(List.of(command(view, "remove").isEnabled(), command(view, "up").isEnabled(), command(view, "down").isEnabled()))
+                    .containsExactly(false, false, false);
                 events.clear();
-                command(view, "remove").doClick(0);
+                // A disabled command's click fires nothing, so the action path itself must find no row to act on.
+                for (var suffix : List.of("remove", "up", "down")) list.side.run(suffix);
                 assertThat(events).isEmpty();
+            } finally { release(context); }
+        });
+    }
+
+    /** The Project Index entry row and an add action together, the entry's Add enabled or not (a host echoing each edit). */
+    static ViewSpec withEntryAndAdd(boolean entryAdd) {
+        var add = new Nodes.Button("key-add", READY, "Add Stored Key…", "add", Nodes.ButtonKind.LINK, "key-add", "");
+        var entry = new Nodes.Stack("entry", READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Field("marker", READY, Nodes.FieldKind.TEXT, "", "Add…", "Marker", "", Optional.empty(), Nodes.FieldPresentation.EMBEDDED),
+            new Nodes.Button("marker-add", entryAdd ? READY : new ControlState(true, false, false, ""), "Add", "", Nodes.ButtonKind.SECONDARY, "marker-add", "")));
+        return new ViewSpec(new Nodes.Stack("group", READY, Nodes.LayoutRole.VERTICAL, List.of(markers(three(), Optional.of(add)), entry)));
+    }
+
+    /** An update leaves what the face placed where it is: a focused field or button that is detached loses focus and its IME. */
+    @Test void anUpdateMovesNeitherTheAdoptedEntryRowNorTheAddAction() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, withEntryAndAdd(false), e -> {})) {
+                KitFixtures.render(view, 600, 160, 1);
+                var list = (ItemLists.ListControl) view.control("markers");
+                var entry = find(view, "entry", JComponent.class);
+                var add = find(view, "key-add", Buttons.KitButton.class);
+                var field = editor(view, "marker");
+                assertThat(entry.getParent()).isSameAs(list.scroll);
+                assertThat(add.getParent()).isSameAs(list.side);
+                var removed = new ArrayList<java.awt.Component>();
+                var listener = new java.awt.event.ContainerAdapter() {
+                    @Override public void componentRemoved(java.awt.event.ContainerEvent event) { removed.add(event.getChild()); }
+                };
+                for (var container : List.of(list.scroll, list.side, find(view, "group", JComponent.class), entry)) container.addContainerListener(listener);
+                for (boolean enabled : List.of(false, true, true, false)) view.update(withEntryAndAdd(enabled));
+                KitFixtures.render(view, 600, 160, 1);
+                assertThat(removed).as("detaching a focused field or button transfers native focus and disrupts IME").isEmpty();
+                assertThat(entry.getParent()).isSameAs(list.scroll);
+                assertThat(list.side.getComponent(0)).isSameAs(add);
+                assertThat(editor(view, "marker")).isSameAs(field);
+            } finally { release(context); }
+        });
+    }
+
+    /** An entry row stays adopted only while a VERTICAL parent re-confirms it; the list alone, or in an INLINE stack, gives it up. */
+    @Test void aListThatLeavesItsVerticalParentGivesUpItsEntryRow() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.light(), KitFixtures.enterprise());
+            try (var view = new KitView(context, withEntry(three()), e -> {})) {
+                KitFixtures.render(view, 600, 120, 1);
+                var list = (ItemLists.ListControl) view.control("markers");
+                int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+                var entry = find(view, "entry", JComponent.class);
+                assertThat(entry.getParent()).isSameAs(list.scroll);
+                view.update(new ViewSpec(markers(three(), Optional.empty())));
+                KitFixtures.render(view, 600, 120, 1);
+                assertThat(view.control("markers")).as("the list is kept").isSameAs(list);
+                assertThat(entry.getParent()).as("the closed entry row left the pane").isNotSameAs(list.scroll);
+                assertThat(list.entry).isNull();
+                assertThat(list.scroll.getInsets().bottom).as("no room under the box").isEqualTo(line);
+                view.update(withEntry(three()));
+                KitFixtures.render(view, 600, 120, 1);
+                var again = find(view, "entry", JComponent.class);
+                assertThat(again.getParent()).isSameAs(list.scroll);
+                view.update(new ViewSpec(new Nodes.Stack("group", READY, Nodes.LayoutRole.INLINE, List.of(markers(three(), Optional.empty())))));
+                KitFixtures.render(view, 600, 120, 1);
+                assertThat(view.control("markers")).isSameAs(list);
+                assertThat(again.getParent()).as("an INLINE parent adopts nothing").isNotSameAs(list.scroll);
+                assertThat(list.entry).isNull();
+                assertThat(list.scroll.getInsets().bottom).isEqualTo(line);
             } finally { release(context); }
         });
     }
