@@ -54,7 +54,7 @@ class AttemptStoreTest {
     @Test void unreadableContentIsAbsent() throws Exception {
         var store = new AttemptStore(home);
         for (String text : java.util.List.of("version = 2\n", "not toml [", "version = 1\n[providers.\"a.b\"]\nstate = \"maybe\"\n",
-                "version = 1\nproviders = 3\n", "version = 1\n[providers.\"a.b\"]\ndigest = 4\n")) {
+                "version = 1\nproviders = 3\n", "version = 1\n[providers.\"a.b\"]\ndigest = 4\n", "x = " + "[".repeat(10_000))) {
             Files.writeString(home.resolve("presentation-attempt.toml"), text);
             assertThat(store.read()).as(text).isEqualTo(AttemptStore.Record.EMPTY);
         }

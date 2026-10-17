@@ -110,7 +110,8 @@ public final class AttemptStore {
     /** The record now; lock-free, because the file is only replaced atomically. Never throws. */
     public Record read() {
         try { return parse(TomlStateFile.readBounded(file, MAX_BYTES, "Presentation attempts")); }
-        catch (IOException | RuntimeException unreadable) {
+        catch (IOException | RuntimeException | StackOverflowError unreadable) {
+            // A file nested too deep for tomlj's parser overflows its stack; it is unreadable like any other.
             LOG.log(System.Logger.Level.WARNING, "The presentation attempt record is unreadable; every look gets a fresh try", unreadable);
             return Record.EMPTY;
         }

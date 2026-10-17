@@ -39,7 +39,8 @@ manifest with keys it does not know. An icon that is missing, too large or not a
 not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
 
 A presentation provider names its kit file with `presentation` and declares `presentation.provide`; the file's format is
-section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md).
+section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md),
+except that its `[branding]` table is not accepted yet.
 Jasper reads it before the first window, so a change applies after a restart, and one look is active at a time: a
 `--plugin-dir` provider wins over a bundled one, which wins over an installed one, then the lowest id. A kit file that is
 invalid skips the plugin with one message naming the key, a look that did not finish starting is skipped at the next

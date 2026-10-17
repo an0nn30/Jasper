@@ -50,6 +50,16 @@ final class PluginStateStore {
         return candidate.origin() != PluginCandidate.Origin.BUNDLED || candidate.descriptor().enabledByDefault();
     }
 
+    /**
+     * The entry once maintenance has carried out a pending removal: the entry itself when it is not marked, the bundled
+     * plugin's kept opt-in when it is marked and opted in, otherwise none. Maintenance and the Plugins page's prediction
+     * both use it (spec 4.4).
+     */
+    static java.util.Optional<Entry> afterRemoval(Entry entry) {
+        if (!entry.remove()) return java.util.Optional.of(entry);
+        return entry.optIn() ? java.util.Optional.of(new Entry(true, Set.of(), false, true)) : java.util.Optional.empty();
+    }
+
     private static final int MAX_BYTES = 256 * 1024;
     /** File locks are per process; this serializes editors inside one. */
     private static final ReentrantLock IN_PROCESS = new ReentrantLock();

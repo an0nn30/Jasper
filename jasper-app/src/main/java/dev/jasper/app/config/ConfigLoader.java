@@ -67,9 +67,10 @@ public final class ConfigLoader {
 
     private ConfigLoader(Path file, String text, boolean macOs, DefaultSource defaults) {
         this.file = Objects.requireNonNull(file, "file");
-        this.reader = new SchemaReader(CoreSettings.SCHEMA, text, (path, value) -> value);
-        this.macOs = macOs;
         this.defaults = Objects.requireNonNull(defaults, "defaults");
+        // An invalid value of an allowlisted key falls back to the look's default, not the core one (spec 5.8).
+        this.reader = new SchemaReader(CoreSettings.SCHEMA, text, (path, value) -> value, defaults::value);
+        this.macOs = macOs;
     }
 
     /** The core look's reading of {@code text}. */

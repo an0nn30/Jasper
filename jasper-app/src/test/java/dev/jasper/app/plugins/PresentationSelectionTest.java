@@ -203,4 +203,93 @@ class PresentationSelectionTest {
             assertThat(launched.presentation().isPresent()).isEqualTo(!skipped);
         }
     }
+
+    private PluginStateStore store() {
+        return new PluginStateStore(home.resolve("plugins.toml"), home.resolve("plugins.lock"), java.time.Duration.ofSeconds(2));
+    }
+
+    private PluginRuntime.Options options() {
+        return new PluginRuntime.Options(home.resolve("bundled"), home.resolve("plugins"), null, false, home.resolve("plugins.toml"),
+            home.resolve("plugins.lock"));
+    }
+
+    /** The launch a process makes from the disk as it is now: its resolution, every loaded plugin active. */
+    private PluginCatalog.Launch launchNow() {
+        var selection = PluginSelection.scan(options(), BUILD, SDK, PluginSelection.host());
+        List<PluginStatus> statuses = new java.util.ArrayList<>(selection.resolution().rejected());
+        selection.resolution().load().forEach(candidate -> statuses.add(PluginStatus.of(candidate, PluginStatus.State.ACTIVE, "")));
+        return new PluginCatalog.Launch(selection.candidates(), statuses, PluginCatalog.versions(selection.resolution().load()), false, BUILD);
+    }
+
+    private static Path bundledLook(Path root, String id, String name, boolean onByDefault) throws Exception {
+        return dev.jasper.app.testsupport.LookFixtures.plugin(root, id, look(id, name, onByDefault),
+            Map.of("look.kit.toml", dev.jasper.app.testsupport.LookFixtures.KIT));
+    }
+
+    @Test void removingAUserCopyBehindAnOptedInBundledProviderPredictsTheBundledLook() throws Exception {
+        bundledLook(home.resolve("bundled"), "dev.example.look", "Look", false);
+        bundledLook(home.resolve("plugins"), "dev.example.look", "Look", true);
+        store().transact(state -> { state.put("dev.example.look", new PluginStateStore.Entry(true, Set.of(), false, true)); return state; });
+        var launch = launchNow();
+        assertThat(launch.selected()).as("the user copy is not reviewed, and it supersedes the bundled one").isEmpty();
+        var removing = admin(launch).remove("dev.example.look", true);
+        assertThat(removing.restartNeeded()).as("the restart switches the look").isTrue();
+        PluginMaintenance.apply(home.resolve("plugins"), store(), null, SDK);
+        assertThat(store().read()).containsEntry("dev.example.look", new PluginStateStore.Entry(true, Set.of(), false, true));
+        var next = PluginSelection.scan(options(), BUILD, SDK, PluginSelection.host());
+        assertThat(next.presentation().look()).as("the launch runs what the page predicted").isEqualTo("dev.example.look");
+        assertThat(PluginStateStore.afterRemoval(new PluginStateStore.Entry(true, Set.of("x"), true, false))).isEmpty();
+    }
+
+    @Test void installingAProviderFromThePluginsPageTurnsTheOtherProvidersOff() throws Exception {
+        bundledLook(home.resolve("bundled"), "a.look", "Alpha", true);
+        Path built = bundledLook(java.nio.file.Files.createTempDirectory(home, "built"), "u.look", "User look", true);
+        Path zip = home.resolve("u.zip");
+        try (var out = new java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(zip))) {
+            out.putNextEntry(new java.util.zip.ZipEntry("u.look.jar"));
+            out.write(java.nio.file.Files.readAllBytes(built.resolve("jars/u.look.jar")));
+            out.closeEntry();
+        }
+        var admin = admin(launchNow());
+        var inspection = admin.inspect(zip);
+        var installed = admin.install(inspection.staged(), inspection.capabilities());
+        assertThat(store().read()).containsEntry("u.look", new PluginStateStore.Entry(true, Set.of("presentation.provide"), false, false))
+            .containsEntry("a.look", new PluginStateStore.Entry(false, Set.of(), false, false));
+        assertThat(installed.turnedOff()).contains("Alpha");
+        assertThat(installed.restartNeeded()).isTrue();
+    }
+
+    @Test void consentingToAUserProviderTurnsTheEnabledProviderOff() throws Exception {
+        bundledLook(home.resolve("bundled"), "a.look", "Alpha", true);
+        bundledLook(home.resolve("plugins"), "u.look", "User look", true);
+        var admin = admin(launchNow());
+        var consented = admin.consent("u.look", List.of("presentation.provide"));
+        assertThat(store().read()).containsEntry("u.look", new PluginStateStore.Entry(true, Set.of("presentation.provide"), false, false))
+            .containsEntry("a.look", new PluginStateStore.Entry(false, Set.of(), false, false));
+        assertThat(consented.turnedOff()).contains("Alpha");
+    }
+
+    @Test void aProviderThatFailedToStartNeedsNoRestartBanner() throws Exception {
+        bundledLook(home.resolve("bundled"), "a.look", "Alpha", true);
+        var selection = PluginSelection.scan(options(), BUILD, SDK, PluginSelection.host());
+        assertThat(selection.presentation().look()).isEqualTo("a.look");
+        List<PluginStatus> statuses = new java.util.ArrayList<>(selection.resolution().rejected());
+        selection.resolution().load().forEach(candidate -> statuses.add(PluginStatus.of(candidate, PluginStatus.State.FAILED, "boom")));
+        selection.attempt().failed();
+        var launch = new PluginCatalog.Launch(selection.candidates(), statuses, PluginCatalog.versions(selection.resolution().load()), false, BUILD);
+        var snapshot = admin(launch).snapshot();
+        assertThat(snapshot.restartNeeded()).as("it runs neither now nor after a restart").isFalse();
+        assertThat(snapshot.rows()).filteredOn(row -> row.id().equals("a.look")).singleElement()
+            .satisfies(row -> assertThat(row.pending()).startsWith("Will not load after restart"));
+    }
+
+    @Test void onlyAdmittedProvidersHaveTheirFilesRead() {
+        var on = provider("a.look", PluginCandidate.Origin.BUNDLED);
+        var disabled = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        var unreviewed = provider("c.look", PluginCandidate.Origin.USER);
+        var marked = provider("d.look", PluginCandidate.Origin.BUNDLED);
+        var state = Map.of("b.look", new PluginStateStore.Entry(false, Set.of(), false), "d.look", new PluginStateStore.Entry(true, Set.of(), true));
+        assertThat(PluginResolver.admitted(List.of(on, disabled, unreviewed, marked), state, SDK, false)).containsExactly(on);
+        assertThat(PluginResolver.admitted(List.of(on), Map.of(), SDK, true)).as("safe mode").isEmpty();
+    }
 }

@@ -8,7 +8,7 @@
 `presentation.provide` capability, bundled-but-off-by-default plugins with an explicit opt-in, one active provider chosen
 inside the pure resolver from validated kit facts, safe mode dropping presentations, the attempt record that skips a
 look that did not finish starting, the bootstrap pre-pass whose one `PluginSelection` feeds the configuration's kit
-defaults and the plugin runtime, the `Presentation` value with every projection of spec 9.1 (chrome values held at the
+defaults and the plugin runtime, the `Presentation` value with every projection of spec 9.1 but Branding (plan 11) (chrome values held at the
 default projection until their plans land), the kit reaching every `KitContext`, and the four-step fallback at start.
 
 **Architecture:** A new package `dev.jasper.app.presentation` holds the pure parts: `ChromeSpec`, `KitParser` (strict

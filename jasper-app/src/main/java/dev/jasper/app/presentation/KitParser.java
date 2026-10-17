@@ -421,7 +421,9 @@ public final class KitParser {
             if (setting == null) throw new Invalid(where + ": not a setting a look may default; use "
                 + DEFAULTS.keySet().stream().map(name -> "\"" + name + "\"").collect(Collectors.joining(", ")).replaceFirst(", ([^,]*)$", " or $1"));
             Reading<?> reading = read(setting, table.get(List.of(key)));
-            if (!reading.issues().isEmpty()) throw new Invalid(where + ": " + reading.issues().getFirst().message());
+            // The setting reader's "; using ..." promises a fallback; an invalid kit is refused whole instead.
+            if (!reading.issues().isEmpty())
+                throw new Invalid(where + ": " + reading.issues().getFirst().message().replaceFirst("; using [^;]*\\.$", "."));
             if (setting == CoreSettings.UI_THEME_LIGHT || setting == CoreSettings.UI_THEME_DARK) {
                 boolean dark = setting == CoreSettings.UI_THEME_DARK;
                 String id = (String) reading.value();

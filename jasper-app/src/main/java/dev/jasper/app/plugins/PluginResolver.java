@@ -33,6 +33,29 @@ final class PluginResolver {
     static Resolution resolve(List<PluginCandidate> candidates, Map<String, PluginStateStore.Entry> state,
                               Version sdk, boolean safeMode, Presentations presentations) {
         List<PluginStatus> rejected = new ArrayList<>();
+        Map<String, PluginCandidate> chosen = admitted(candidates, state, sdk, safeMode, rejected);
+        // Members of a cycle first, so their dependents are then explained by the missing dependency.
+        for (String id : cycleMembers(chosen)) {
+            rejected.add(PluginStatus.of(chosen.remove(id), PluginStatus.State.SKIPPED, "dependency cycle"));
+        }
+        dropUnmet(chosen, rejected);
+        var presentation = elect(chosen, rejected, presentations);
+        // A skipped provider's hard dependents are explained by the missing dependency, as any other's are.
+        dropUnmet(chosen, rejected);
+        return new Resolution(order(chosen), rejected, presentation);
+    }
+
+    /**
+     * The candidates that pass safe mode, the choice between copies and {@link #admit}: a superset of the providers that
+     * can reach the election, so only their presentation files need reading.
+     */
+    static List<PluginCandidate> admitted(List<PluginCandidate> candidates, Map<String, PluginStateStore.Entry> state,
+                                          Version sdk, boolean safeMode) {
+        return List.copyOf(admitted(candidates, state, sdk, safeMode, new ArrayList<>()).values());
+    }
+
+    private static Map<String, PluginCandidate> admitted(List<PluginCandidate> candidates, Map<String, PluginStateStore.Entry> state,
+                                                         Version sdk, boolean safeMode, List<PluginStatus> rejected) {
         Map<String, PluginCandidate> chosen = new TreeMap<>();
         for (PluginCandidate candidate : candidates) {
             if (safeMode && candidate.descriptor().declaresPresentation()) {
@@ -55,15 +78,7 @@ final class PluginResolver {
             PluginStatus status = admit(candidate, state.get(candidate.id()), sdk);
             if (status != null) { chosen.remove(candidate.id()); rejected.add(status); }
         }
-        // Members of a cycle first, so their dependents are then explained by the missing dependency.
-        for (String id : cycleMembers(chosen)) {
-            rejected.add(PluginStatus.of(chosen.remove(id), PluginStatus.State.SKIPPED, "dependency cycle"));
-        }
-        dropUnmet(chosen, rejected);
-        var presentation = elect(chosen, rejected, presentations);
-        // A skipped provider's hard dependents are explained by the missing dependency, as any other's are.
-        dropUnmet(chosen, rejected);
-        return new Resolution(order(chosen), rejected, presentation);
+        return chosen;
     }
 
     /** {@code resolution} without {@code dropped}, skipped for {@code reason}; its hard dependents are skipped as unmet. */

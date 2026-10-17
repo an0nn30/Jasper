@@ -51,6 +51,8 @@ class PresentationAttemptTest {
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
             application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            // A trace of its own: a FIRST_PAINT an earlier test marked on the process-wide one would prove the look at once.
+            application[0].trace(StartupTrace.detached());
             application[0].startPlugins(dirs());
         });
         return application[0];

@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The bootstrap pre-pass (spec 4.8): plugins discovered once, every declared presentation and the attempt record read,
+ * The bootstrap pre-pass (spec 4.8): plugins discovered once, every presentation that can be elected and the attempt record read,
  * resolved, and the winner's presentation built, before Swing and before the configuration is read. This one selection
  * feeds the configuration's kit defaults, the application and {@link PluginRuntime#start(PluginSelection, Map, boolean)},
  * so a {@code plugins.toml} edited during start-up cannot load a plugin set that disagrees with the chrome already
@@ -93,9 +93,9 @@ public final class PluginSelection {
             state = Map.of();
         }
         var store = new AttemptStore(options.stateFile().toAbsolutePath().getParent());
-        // Safe mode disables every presentation provider (spec 4.5), so it reads none of their files (Rulings 13).
+        // Only a provider that can reach the election has its files read; safe mode admits none (spec 4.5, Rulings 13).
         var attempts = store.read();
-        var presentations = options.safeMode() ? new Presentations(Map.of(), attempts, build) : Presentations.read(candidates, attempts, build);
+        var presentations = Presentations.read(PluginResolver.admitted(candidates, state, sdk, options.safeMode()), attempts, build);
         var resolution = PluginResolver.resolve(candidates, state, sdk, options.safeMode(), presentations);
         Presentation presentation = Presentation.standard(host);
         PresentationAttempt attempt = PresentationAttempt.NONE;

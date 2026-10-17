@@ -57,6 +57,23 @@ final class PluginCatalog {
         return next;
     }
 
+    /** The saved state once maintenance has carried out the pending removals. */
+    private static Map<String, PluginStateStore.Entry> nextState(Map<String, PluginStateStore.Entry> state) {
+        Map<String, PluginStateStore.Entry> next = new TreeMap<>();
+        state.forEach((id, entry) -> PluginStateStore.afterRemoval(entry).ifPresent(kept -> next.put(id, kept)));
+        return next;
+    }
+
+    /**
+     * The candidates whose presentation files the prediction needs: those the next launch admits, from the disk after
+     * maintenance, as {@link PluginResolver#admitted} decides at the launch.
+     */
+    static List<PluginCandidate> electable(List<PluginCandidate> candidates, Map<String, PluginCandidate> pending,
+                                           Map<String, PluginStateStore.Entry> state, Version sdk, boolean safeMode) {
+        Disk disk = new Disk(candidates, pending, state);
+        return PluginResolver.admitted(afterMaintenance(disk), nextState(state), sdk, safeMode);
+    }
+
     private static boolean removed(Disk disk, String id) {
         PluginStateStore.Entry entry = disk.state().get(id);
         return entry != null && entry.remove();
@@ -70,8 +87,7 @@ final class PluginCatalog {
 
     static PluginRuntime.Snapshot compute(Launch launch, Disk disk, Version sdk, ToIntFunction<String> errors, java.nio.file.Path userDirectory) {
         List<PluginCandidate> next = afterMaintenance(disk);
-        Map<String, PluginStateStore.Entry> nextState = new TreeMap<>(disk.state());
-        nextState.values().removeIf(PluginStateStore.Entry::remove);
+        Map<String, PluginStateStore.Entry> nextState = nextState(disk.state());
         PluginResolver.Resolution resolution = PluginResolver.resolve(next, nextState, sdk, launch.safeMode(), disk.presentations());
         Map<String, String> willRun = versions(resolution.load());
 
@@ -111,8 +127,12 @@ final class PluginCatalog {
                 PluginSettingsFiles.folder(userDirectory, id), PluginSettingsFiles.file(userDirectory, id), PluginSettingsFiles.data(userDirectory, id),
                 descriptor.homepage(), List.copyOf(new TreeSet<>(descriptor.exports())), PluginIconFiles.read(shown)));
         }
+        // A selected plugin that did not run (it failed, or a provider's failed look is skipped next) and will not run next is no change.
+        Map<String, String> ranAtLaunch = new TreeMap<>(launch.selected());
+        ranAtLaunch.keySet().removeIf(id -> !willRun.containsKey(id)
+            && status(launch.statuses(), id).filter(status -> status.state() != PluginStatus.State.ACTIVE).isPresent());
         boolean restartNeeded = !launch.safeMode()
-            && (!willRun.equals(launch.selected()) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));
+            && (!willRun.equals(ranAtLaunch) || disk.pending().keySet().stream().anyMatch(id -> !removed(disk, id)));
         return new PluginRuntime.Snapshot(rows, restartNeeded, launch.safeMode());
     }
 

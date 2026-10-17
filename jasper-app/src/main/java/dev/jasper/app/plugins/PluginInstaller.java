@@ -115,6 +115,14 @@ final class PluginInstaller {
 
     /** {@code consent}: whether the user reviewed the capabilities (a manager install) or not (a zip dropped into the directory). */
     static void commit(Staged staged, Path userDirectory, PluginStateStore store, boolean consent) throws IOException {
+        commit(staged, userDirectory, store, consent
+            ? PluginStateStore.consenting(staged.candidate().id(), staged.candidate().descriptor().capabilities())
+            : java.util.function.UnaryOperator.identity());
+    }
+
+    /** As {@link #commit(Staged, Path, PluginStateStore)}, with {@code edit} applied to the state in the same transaction. */
+    static void commit(Staged staged, Path userDirectory, PluginStateStore store,
+                       java.util.function.UnaryOperator<java.util.Map<String, PluginStateStore.Entry>> edit) throws IOException {
         String id = staged.candidate().id();
         Path pending = userDirectory.resolve(PluginMaintenance.PENDING).resolve(id);
         try {
@@ -124,7 +132,7 @@ final class PluginInstaller {
                     Files.createDirectories(pending.getParent());
                     PluginMaintenance.move(staged.directory(), pending);
                 } catch (IOException failure) { throw new UncheckedIOException(failure); }
-                return consent ? PluginStateStore.consenting(id, staged.candidate().descriptor().capabilities()).apply(state) : state;
+                return edit.apply(state);
             });
         } catch (UncheckedIOException failure) { throw failure.getCause(); }
     }

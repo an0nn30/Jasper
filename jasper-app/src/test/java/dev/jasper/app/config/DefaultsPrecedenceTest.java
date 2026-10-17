@@ -49,6 +49,15 @@ class DefaultsPrecedenceTest {
         assertThat(ConfigSnapshot.defaults(DefaultSource.CORE)).isEqualTo(ConfigSnapshot.defaults());
     }
 
+    @Test void anInvalidSavedValueFallsBackToTheKitsDefault() {
+        var read = ConfigLoader.parse(home.resolve("config.toml"), "[palette]\nvisible_rows = 40\n\n[ui.theme]\ndark = \"Not An Id\"\n", false, KIT);
+        assertThat(read.snapshot().visibleRows()).isEqualTo(8);
+        assertThat(read.snapshot().darkTheme()).isEqualTo("catppuccin-mocha");
+        assertThat(read.diagnostics()).isNotEmpty();
+        assertThat(ConfigLoader.parse(home.resolve("config.toml"), "[palette]\nvisible_rows = 40\n", false).snapshot().visibleRows())
+            .as("the core look").isEqualTo(CoreSettings.PALETTE_VISIBLE_ROWS.defaultValue());
+    }
+
     @Test void theDraftShowsAndResetsToTheEffectiveDefault() {
         var draft = new SettingsDraft(SettingValues.defaults(CoreSettings.SCHEMA), KIT);
         assertThat(draft.value(CoreSettings.PALETTE_VISIBLE_ROWS)).as("an unsaved allowlisted key").isEqualTo(8);

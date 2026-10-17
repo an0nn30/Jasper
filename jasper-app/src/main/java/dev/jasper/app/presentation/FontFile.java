@@ -50,14 +50,17 @@ public record FontFile(String path, byte[] bytes, String fullName, String family
                     int language = Short.toUnsignedInt(data.getShort(at + 4)), id = Short.toUnsignedInt(data.getShort(at + 6));
                     int length = Short.toUnsignedInt(data.getShort(at + 8)), start = strings + Short.toUnsignedInt(data.getShort(at + 10));
                     if (platform != 3 || encoding != 1 || language != 0x409) continue;
+                    // Only IDs 1, 4 and 16 are decoded, each once: a crafted table of many records costs a loop, not decodes.
+                    boolean wanted = switch (id) { case 1 -> family.isEmpty(); case 4 -> full.isEmpty(); case 16 -> typographic.isEmpty(); default -> false; };
+                    if (!wanted) continue;
                     if (start + length > bytes.length) throw new IndexOutOfBoundsException(start + length);
                     String value = new String(bytes, start, length, StandardCharsets.UTF_16BE);
                     switch (id) {
                         case 1 -> family = value;
                         case 4 -> full = value;
-                        case 16 -> typographic = value;
-                        default -> { }
+                        default -> typographic = value;
                     }
+                    if (!full.isEmpty() && !typographic.isEmpty()) break;
                 }
                 return new FontFile(path, bytes, full, typographic.isEmpty() ? family : typographic);
             }

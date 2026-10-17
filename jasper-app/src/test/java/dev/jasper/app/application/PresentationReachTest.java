@@ -88,13 +88,17 @@ class PresentationReachTest {
         var kit = selection.presentation().kit();
         assertThat(kit).isNotEqualTo(Kit.DEFAULT);
         JasperApplication[] application = new JasperApplication[1];
+        var trace = dev.jasper.app.startup.StartupTrace.current();
+        String look = trace.look();
         try {
             edt(() -> {
+                trace.look(selection.presentation().look());
                 application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null,
                     selection, chosen -> theme -> {
                         if (chosen == kit) throw new IllegalStateException("cannot install under " + chosen.id());
                         return ThemeController.INSTALLERS.apply(chosen).test(theme);
                     });
+                assertThat(trace.look()).as("the start-up line names the fallback's look").isEqualTo("default");
                 assertThat(application[0].presentation()).as("the fallback value").isEqualTo(selection.blamed().presentation());
                 assertThat(application[0].presentation().provider()).isEmpty();
                 assertThat(application[0].themes().kit()).isSameAs(Kit.DEFAULT);
@@ -110,6 +114,7 @@ class PresentationReachTest {
         } finally {
             edt(() -> { if (application[0] != null) application[0].quitNow(); });
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+            trace.look(look);
         }
     }
 }

@@ -64,6 +64,25 @@ class FontFileTest {
         }
     }
 
+    @Test void aTableOfManyRecordsDecodesEachNameOnce() {
+        // 65,535 full-name records that all share one 64 KiB string, which overlaps the records themselves.
+        int count = 0xFFFF, length = 0xFFFE;
+        var table = java.nio.ByteBuffer.allocate(6 + 12 * count + length);
+        table.putShort((short) 0).putShort((short) count).putShort((short) 6);
+        for (int n = 0; n < count; n++)
+            table.putShort((short) 3).putShort((short) 1).putShort((short) 0x409).putShort((short) 4).putShort((short) length).putShort((short) 0);
+        var file = java.nio.ByteBuffer.allocate(28 + table.capacity());
+        file.putInt(0x00010000).putShort((short) 1).putShort((short) 16).putShort((short) 0).putShort((short) 0)
+            .putInt(0x6E616D65).putInt(0).putInt(28).putInt(table.capacity()).put(table.array());
+        long began = System.nanoTime();
+        var read = FontFile.read("fonts/crafted.ttf", file.array());
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - began)).as("one decode, not 65,535").isLessThan(java.time.Duration.ofMillis(500));
+        assertThat(read.named()).isTrue();
+        assertThat(read.family()).isEmpty();
+        var named = FontFile.read("fonts/a.ttf", synthetic(new LinkedHashMap<>(Map.of(4, "First"))));
+        assertThat(named.fullName()).isEqualTo("First");
+    }
+
     @Test void filesCompareByContentAndCopyTheirBytes() {
         byte[] bytes = face("A", "A");
         var one = FontFile.read("fonts/a.ttf", bytes);

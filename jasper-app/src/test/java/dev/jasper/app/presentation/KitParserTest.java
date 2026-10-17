@@ -197,11 +197,21 @@ class KitParserTest {
             {"group", "card", "titled_box"}, {"form_label", "plain", "colon"}, {"empty", "tile", "text"}, {"table", "plain", "classic"},
             {"tree", "plain", "classic"}, {"stepper", "stepper", "spinner"}, {"ordered_list", "inline", "side_column"},
             {"buttons", "raised", "classic"}, {"tag", "tint", "boxed"}, {"route", "tiles", "edged"}, {"prompt", "tile", "plain"}};
-        for (String[] point : controls)
+        // Each point's own component, in the order of controls above: a substring of toString() could match another point.
+        List<java.util.function.Function<ControlVariants, ControlVariants.Variant>> components = List.of(
+            ControlVariants::toggle, ControlVariants::exclusive, ControlVariants::tabs,
+            ControlVariants::group, ControlVariants::formLabel, ControlVariants::empty,
+            ControlVariants::table, ControlVariants::tree, ControlVariants::stepper,
+            ControlVariants::orderedList, ControlVariants::buttons, ControlVariants::tag,
+            ControlVariants::route, ControlVariants::prompt);
+        assertThat(components).hasSameSizeAs(controls);
+        for (int index = 0; index < controls.length; index++) {
+            String[] point = controls[index];
             for (int value = 1; value <= 2; value++) {
                 var kit = parse("kit = 1\nbase = \"" + (value == 1 ? "classic" : "default") + "\"\n[controls]\n" + point[0] + " = \"" + point[value] + "\"\n").kit();
-                assertThat(kit.controls().toString().toLowerCase(java.util.Locale.ROOT)).as(point[0]).contains("=" + point[value]);
+                assertThat(components.get(index).apply(kit.controls()).key()).as(point[0]).isEqualTo(point[value]);
             }
+        }
     }
 
     @Test void aDefaultsThemeMayBeBuiltInOrDeclaredAndADeclaredThemeThatDidNotLoadIsDropped() throws Exception {
@@ -237,8 +247,8 @@ class KitParserTest {
         cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
             + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\" or \"window.toolbar_height\"");
-        cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20; using the default.");
-        cases.put(head + "[defaults]\n\"window.toolbar_height\" = 70\n", "[defaults].\"window.toolbar_height\": Use an integer from 28–64; using 64.");
+        cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");
+        cases.put(head + "[defaults]\n\"window.toolbar_height\" = 70\n", "[defaults].\"window.toolbar_height\": Use an integer from 28–64.");
         cases.put(head + "[defaults]\n\"ui.theme.dark\" = \"nope\"\n",
             "[defaults].\"ui.theme.dark\": \"nope\" is neither a built-in theme nor one of this plugin's themes");
         cases.put(head + "[defaults]\n\"ui.theme.dark\" = \"catppuccin-latte\"\n", "[defaults].\"ui.theme.dark\": \"catppuccin-latte\" has no Dark variant");

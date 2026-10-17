@@ -302,6 +302,8 @@ public final class JasperApplication {
             var attempt = this.selection.attempt();
             this.selection = this.selection.blamed();
             presentation = this.selection.presentation();
+            // The start-up line names the look this process runs: the fallback is the default look.
+            trace.look(presentation.look());
             Thread.ofVirtual().name("jasper-presentation-attempt").start(attempt::failed);
         }
         // App-native menus show each item's action binding from the live keymap.
@@ -911,7 +913,12 @@ public final class JasperApplication {
     /** Starts the selection's plugins once, before the first window, so their contributions are in place when windows appear. */
     public void startPlugins(AppDirs dirs) {
         if (plugins != null || quitting || stopped) return;
-        if (selection.isNone()) selection = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "", null, false);
+        if (selection.isNone()) {
+            var scanned = dev.jasper.app.plugins.PluginSelection.of(dirs, null, "", null, false);
+            if (scanned.presentation().provider().isPresent())
+                throw new IllegalStateException("A presentation provider needs the bootstrap's selection");
+            selection = scanned;
+        }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState());
         shells = new NativeShells(themes, uiState, this::nativeWindow,

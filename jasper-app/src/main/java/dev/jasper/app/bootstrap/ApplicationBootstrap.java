@@ -102,7 +102,7 @@ public final class ApplicationBootstrap {
             dev.jasper.app.platform.TitleBarStyle.choose(System.getProperty("os.name").startsWith("Mac"),
                 service.initialState().snapshot().nativeDecorations(),
                 service.initialState().snapshot().viewMode() == dev.jasper.app.config.ViewMode.COMPACT).configure();
-            // Before any plugin is discovered, and here rather than on the EDT: it may wait for the state lock.
+            // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands));
             // The posted EDT composition owns service; the process hook owns logging, the endpoint and the command

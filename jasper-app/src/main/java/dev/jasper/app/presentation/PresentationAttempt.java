@@ -36,11 +36,11 @@ public final class PresentationAttempt {
     public String id() { return id; }
 
     /**
-     * A window is about to show, or a rehearsal to run: pending, unless this look already failed. Runs on the EDT, bounded
-     * by {@link AttemptStore#EDT_WAIT}.
+     * A window is about to show, or a rehearsal to run: pending, unless this look already failed or was proven (a proven
+     * look stays proven within a process). Runs on the EDT, bounded by {@link AttemptStore#EDT_WAIT}.
      */
     public void pending() {
-        if (store == null || failed.get()) return;
+        if (store == null || failed.get() || proven.get()) return;
         store.update(id, attempt -> attempt.tried(version, digest, build, AttemptStore.State.PENDING), AttemptStore.EDT_WAIT);
     }
 

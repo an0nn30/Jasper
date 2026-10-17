@@ -10,7 +10,7 @@ bundled plugin with `enabled_by_default = false` is off until the user turns it 
 three prune paths keep the opt-in. `dev.jasper.app.presentation` holds `KitParser` (strict, one message naming the key;
 `[branding]` stays an unknown table until plan 11), `FontFile` (a face's full name and typographic family without AWT),
 `PresentationFacts` (digest and first problem), the attempt record (`presentation-attempt.toml`: pending, proven, failed,
-announced), every spec 9.1 projection and `Presentation`. `PluginResolver.resolve` elects one provider (DEV, BUNDLED,
+announced), every spec 9.1 projection but Branding (plan 11) and `Presentation`. `PluginResolver.resolve` elects one provider (DEV, BUNDLED,
 USER, then id; losers and the attempt skip post no problem; safe mode disables every provider), enabling or consenting
 to one turns the others off in one transaction, and the Plugins page predicts with the same facts. `PluginSelection`
 runs on the bootstrap thread before the `ConfigService`, which takes the kit's defaults for four keys (`DefaultSource`;
@@ -29,9 +29,9 @@ title and face rules; (15) the classic base's chrome is the Enterprise column; (
 problem; (17) the audited optional-value editors compare with the effective default through `Editors.effectiveDefault`; (18) `look=` in the trace's parenthesis; (19)
 host facts without AWT; (20) `PluginRuntime.presentation` takes only the `Kit` (spec 4.9's `DialogMapping` parameter is
 added beside it when the dialog consumer lands); (21) a failed attempt stays failed through a later window and an orderly
-quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from the plan's text: (a) Task 5's review added `PluginStatus.NEEDS_LOOK` and a trial election: a provider that can load only beside another provider (a hard dependency on it, directly or through a library) is skipped with "requires another look's plugin; one look can be active at a time" and the next provider wins, and dependents of an invalid provider are dropped as unmet before the election; (b) Task 12's review made the application's selection and presentation fields volatile; (c) Task 13 puts the new AGENTS.md sentence after "`verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.", so that sentence still refers to the SDK rule. Plan-5b entry conditions: register the fonts and
+quit; (22) Try Again that cannot restart says to reopen Jasper. Deviations from the plan's text: (a) Task 5's review added `PluginStatus.NEEDS_LOOK` and a trial election: a provider that can load only beside another provider (a hard dependency on it, directly or through a library) is skipped with "requires another look's plugin; one look can be active at a time" and the next provider wins, and dependents of an invalid provider are dropped as unmet before the election; (b) Task 12's review made the application's selection and presentation fields volatile; (c) Task 13 puts the new AGENTS.md sentence after "`verifySdkArchitecture` and `verifyPluginArchitecture` enforce this.", so that sentence still refers to the SDK rule; (d) the final review's fixes read presentation files only for candidates the resolver admits (spec 4.4 says every candidate; the election is unchanged), and the restart banner ignores a selected plugin that runs neither now nor after a restart (a provider that failed to start). Plan-5b entry conditions: register the fonts and
 name the UI faces (`FaceSet`), the plugin theme tier and dormant ids, the Enterprise plugin. `./gradlew check
---continue`: **10,719 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
+--continue`: **10,719 tests, 0 failures, 0 errors, 25 skipped** before the final review fixes, which add 9 tests (targeted runs pass; `check` not rerun). GUI checks for the user: none new (nothing visible changed). Not merged, not pushed.
 
 **Enterprise presentation, plan 4a: the classic catalog — 2026-10-16** (`claude/enterprise-classic-catalog`, worktree
 `.claude/worktrees/enterprise-4`, `7d8c189c3..485316ed2`, then this documentation commit

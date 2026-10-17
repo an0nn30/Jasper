@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * What the resolver needs to choose one presentation (spec 4.4): the facts of every candidate that declares one, by
+ * What the resolver needs to choose one presentation (spec 4.4): the facts of every admitted candidate that declares one, by
  * {@link #key}, the attempt record, and this build's identity, so the launch and the Plugins page's prediction run the
  * same rule on the same data.
  */

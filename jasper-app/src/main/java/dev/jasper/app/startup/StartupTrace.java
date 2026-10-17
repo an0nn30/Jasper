@@ -151,6 +151,9 @@ public final class StartupTrace {
     /** The look this process runs: its provider's id, or {@code default} (spec 4.10). */
     public void look(String id) { look = Objects.requireNonNull(id, "id"); }
 
+    /** The look {@link #look(String)} last recorded. */
+    public String look() { return look; }
+
     /** Records {@code milestone} now unless it was already recorded; settles once both settling milestones exist. */
     public void mark(Milestone milestone) {
         Objects.requireNonNull(milestone, "milestone");

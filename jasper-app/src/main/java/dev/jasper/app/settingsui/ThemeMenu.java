@@ -150,8 +150,11 @@ final class ThemeMenu {
     private void askRemove(String theme) {
         String label = label(theme);
         var uses = new ArrayList<String>();
-        if (names(UI_THEME_DARK, context.draft().value(UI_THEME_DARK), theme)) uses.add("It is your Dark theme; Slate Cobalt will be used instead.");
-        if (names(UI_THEME_LIGHT, context.draft().value(UI_THEME_LIGHT), theme)) uses.add("It is your Light theme; Slate Cobalt will be used instead.");
+        // Removal saves no value, so the effective default replaces it: the look's theme under a kit's defaults (spec 5.8).
+        if (names(UI_THEME_DARK, context.draft().value(UI_THEME_DARK), theme))
+            uses.add("It is your Dark theme; " + label(context.draft().defaultValue(UI_THEME_DARK)) + " will be used instead.");
+        if (names(UI_THEME_LIGHT, context.draft().value(UI_THEME_LIGHT), theme))
+            uses.add("It is your Light theme; " + label(context.draft().defaultValue(UI_THEME_LIGHT)) + " will be used instead.");
         if (names(TERMINAL_SCHEME, context.draft().value(TERMINAL_SCHEME), theme))
             uses.add("Its scheme is your terminal scheme; Same as UI theme will be used instead.");
         String consequence = "Its file, " + theme + ".json, is deleted from the themes folder."
