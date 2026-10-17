@@ -638,10 +638,12 @@ public final class PluginRuntime {
         }
         for (String problem : problems)
             startupProblems.add(new Problem(Problem.Kind.UNREADABLE, Optional.empty(), Optional.empty(), problem, Optional.empty()));
-        var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode());
+        var presentations = Presentations.read(candidates,
+            new dev.jasper.app.presentation.AttemptStore(options.stateFile().toAbsolutePath().getParent()).read(), "");
+        var resolution = PluginResolver.resolve(candidates, state, Version.parse(JasperSdk.VERSION), options.safeMode(), presentations);
         statuses.addAll(resolution.rejected());
         for (PluginStatus rejected : resolution.rejected())
-            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.superseded())
+            if (rejected.state() == PluginStatus.State.SKIPPED && !rejected.quiet())
                 startupProblems.add(new Problem(Problem.Kind.NOT_STARTED, Optional.of(rejected.id()), Optional.of(rejected.name()),
                     rejected.reason(), Optional.empty()));
         PluginHost created = new PluginHost(new PluginHost.Environment(SwingUtilities::invokeLater,

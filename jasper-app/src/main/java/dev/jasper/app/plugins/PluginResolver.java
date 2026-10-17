@@ -12,17 +12,29 @@ import java.util.TreeSet;
 
 /** Pure selection and ordering: no I/O, no class loading. */
 final class PluginResolver {
-    record Resolution(List<PluginCandidate> load, List<PluginStatus> rejected) {
-        Resolution { load = List.copyOf(load); rejected = List.copyOf(rejected); }
+    /** {@code presentation} is the elected presentation provider, which {@code load} holds. */
+    record Resolution(List<PluginCandidate> load, List<PluginStatus> rejected, java.util.Optional<PluginCandidate> presentation) {
+        Resolution { load = List.copyOf(load); rejected = List.copyOf(rejected); java.util.Objects.requireNonNull(presentation); }
+        Resolution(List<PluginCandidate> load, List<PluginStatus> rejected) { this(load, rejected, java.util.Optional.empty()); }
     }
 
     private PluginResolver() { }
 
+    /** The core look's resolution: no presentation data, so a presentation provider is skipped as unreadable. */
     static Resolution resolve(List<PluginCandidate> candidates, Map<String, PluginStateStore.Entry> state,
                               Version sdk, boolean safeMode) {
+        return resolve(candidates, state, sdk, safeMode, Presentations.NONE);
+    }
+
+    static Resolution resolve(List<PluginCandidate> candidates, Map<String, PluginStateStore.Entry> state,
+                              Version sdk, boolean safeMode, Presentations presentations) {
         List<PluginStatus> rejected = new ArrayList<>();
         Map<String, PluginCandidate> chosen = new TreeMap<>();
         for (PluginCandidate candidate : candidates) {
+            if (safeMode && candidate.descriptor().declaresPresentation()) {
+                rejected.add(PluginStatus.of(candidate, PluginStatus.State.DISABLED, PluginStatus.SAFE_MODE_LOOK));
+                continue;
+            }
             if (safeMode && candidate.origin() == PluginCandidate.Origin.USER) {
                 rejected.add(PluginStatus.of(candidate, PluginStatus.State.DISABLED, "safe mode"));
                 continue;
@@ -43,6 +55,14 @@ final class PluginResolver {
         for (String id : cycleMembers(chosen)) {
             rejected.add(PluginStatus.of(chosen.remove(id), PluginStatus.State.SKIPPED, "dependency cycle"));
         }
+        dropUnmet(chosen, rejected);
+        var presentation = elect(chosen, rejected, presentations);
+        // A skipped provider's hard dependents are explained by the missing dependency, as any other's are.
+        dropUnmet(chosen, rejected);
+        return new Resolution(order(chosen), rejected, presentation);
+    }
+
+    private static void dropUnmet(Map<String, PluginCandidate> chosen, List<PluginStatus> rejected) {
         boolean changed = true;
         while (changed) {
             changed = false;
@@ -54,7 +74,44 @@ final class PluginResolver {
                 changed = true;
             }
         }
-        return new Resolution(order(chosen), rejected);
+    }
+
+    /**
+     * Spec 4.4: of the loadable providers without a problem, DEV wins over BUNDLED over USER, then the lowest id; the
+     * losers are skipped whole, and a pending or failed attempt for exactly the winner's look skips it too.
+     */
+    private static java.util.Optional<PluginCandidate> elect(Map<String, PluginCandidate> chosen, List<PluginStatus> rejected,
+                                                             Presentations presentations) {
+        List<PluginCandidate> providers = new ArrayList<>();
+        for (PluginCandidate candidate : List.copyOf(chosen.values())) {
+            if (!candidate.descriptor().declaresPresentation()) continue;
+            java.util.Optional<String> problem = presentations.of(candidate).map(dev.jasper.app.presentation.PresentationFacts::problem)
+                .orElse(java.util.Optional.of("presentation: " + candidate.descriptor().presentation() + " could not be read"));
+            if (problem.isPresent()) {
+                chosen.remove(candidate.id());
+                rejected.add(PluginStatus.of(candidate, PluginStatus.State.SKIPPED, PluginStatus.INVALID + problem.get()));
+                continue;
+            }
+            providers.add(candidate);
+        }
+        if (providers.isEmpty()) return java.util.Optional.empty();
+        providers.sort(Comparator.comparingInt((PluginCandidate candidate) -> rank(candidate.origin())).thenComparing(PluginCandidate::id));
+        PluginCandidate winner = providers.getFirst();
+        for (PluginCandidate loser : providers.subList(1, providers.size())) {
+            chosen.remove(loser.id());
+            rejected.add(PluginStatus.of(loser, PluginStatus.State.SKIPPED, PluginStatus.lookActive(winner.descriptor().name())));
+        }
+        String digest = presentations.of(winner).orElseThrow().digest();
+        if (presentations.attempts().of(winner.id()).blocks(digest, presentations.build())) {
+            chosen.remove(winner.id());
+            rejected.add(PluginStatus.of(winner, PluginStatus.State.SKIPPED, PluginStatus.ATTEMPT_SKIP));
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(winner);
+    }
+
+    private static int rank(PluginCandidate.Origin origin) {
+        return switch (origin) { case DEV -> 0; case BUNDLED -> 1; case USER -> 2; };
     }
 
     /** Higher version wins; on a tie a development copy beats a user copy beats the bundled one. */

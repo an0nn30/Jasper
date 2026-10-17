@@ -1,0 +1,117 @@
+package dev.jasper.app.plugins;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import dev.jasper.app.presentation.AttemptStore;
+import dev.jasper.app.presentation.PresentationFacts;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+/** Spec 4.4 and 4.5: one presentation at a time, chosen inside the pure resolver. */
+class PresentationSelectionTest {
+    static final Version SDK = Version.parse("0.18.0");
+    static final String BUILD = "/app/jasper-app.jar@1";
+
+    static PluginCandidate provider(String id, PluginCandidate.Origin origin, PluginDescriptor.Requirement... requires) {
+        var descriptor = new PluginDescriptor(id, "Look " + id, Version.parse("0.1.0"), "x.Main", VersionRange.parse(">=0.18.0, <0.19"),
+            "", "", Set.of("presentation.provide"), Set.of(), List.of(requires), "", "", dev.jasper.ui.model.Nodes.Hue.NEUTRAL,
+            dev.jasper.ui.icons.IdentityArtwork.SelectedInk.AUTHORED, List.of(), "look.kit.toml", List.of(), true);
+        return new PluginCandidate(descriptor, Path.of(id), List.of(), origin);
+    }
+
+    static PluginCandidate plain(String id, PluginDescriptor.Requirement... requires) {
+        var descriptor = new PluginDescriptor(id, id, Version.parse("1.0.0"), "x.Main", VersionRange.parse(">=0.18.0, <0.19"), "", "",
+            Set.of(), Set.of(), List.of(requires), "", "");
+        return new PluginCandidate(descriptor, Path.of(id), List.of(), PluginCandidate.Origin.BUNDLED);
+    }
+
+    static Presentations facts(Map<PluginCandidate, PresentationFacts> facts, AttemptStore.Record attempts) {
+        var byKey = new java.util.HashMap<String, PresentationFacts>();
+        facts.forEach((candidate, value) -> byKey.put(Presentations.key(candidate), value));
+        return new Presentations(byKey, attempts, BUILD);
+    }
+
+    static PresentationFacts valid(String digest) { return new PresentationFacts(digest, Optional.empty(), Optional.empty()); }
+
+    static Map<String, String> reasons(PluginResolver.Resolution resolution) {
+        return resolution.rejected().stream().collect(java.util.stream.Collectors.toMap(PluginStatus::id, status -> status.state() + ": " + status.reason()));
+    }
+
+    @Test void aSingleValidProviderIsElectedAndLoads() {
+        var look = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        var resolution = PluginResolver.resolve(List.of(look, plain("a.other")), Map.of(), SDK, false,
+            facts(Map.of(look, valid("d1")), AttemptStore.Record.EMPTY));
+        assertThat(resolution.presentation()).contains(look);
+        assertThat(resolution.load()).extracting(PluginCandidate::id).containsExactly("a.other", "b.look");
+        assertThat(resolution.rejected()).isEmpty();
+    }
+
+    @Test void twoEnabledProvidersElectOneByOriginThenIdAndLosersPostNoProblem() {
+        PluginCandidate bundledB = provider("b.look", PluginCandidate.Origin.BUNDLED), bundledA = provider("a.look", PluginCandidate.Origin.BUNDLED);
+        PluginCandidate user = provider("0.look", PluginCandidate.Origin.USER), dev = provider("z.look", PluginCandidate.Origin.DEV);
+        var reviewed = new PluginStateStore.Entry(true, Set.of("presentation.provide"), false);
+        var all = facts(Map.of(bundledA, valid("a"), bundledB, valid("b"), user, valid("u"), dev, valid("z")), AttemptStore.Record.EMPTY);
+        var resolution = PluginResolver.resolve(List.of(bundledA, bundledB, user, dev), Map.of("0.look", reviewed), SDK, false, all);
+        assertThat(resolution.presentation()).contains(dev);
+        assertThat(reasons(resolution)).containsOnly(Map.entry("a.look", "SKIPPED: the Look z.look look is active"),
+            Map.entry("b.look", "SKIPPED: the Look z.look look is active"), Map.entry("0.look", "SKIPPED: the Look z.look look is active"));
+        assertThat(resolution.rejected()).allSatisfy(status -> assertThat(status.quiet()).as(status.id()).isTrue());
+        var withoutDev = PluginResolver.resolve(List.of(bundledB, user, bundledA), Map.of("0.look", reviewed), SDK, false, all);
+        assertThat(withoutDev.presentation()).as("BUNDLED before USER, then the lowest id").contains(bundledA);
+    }
+
+    @Test void aProviderWithAProblemIsSkippedWithItsMessageAndDoesNotWin() {
+        PluginCandidate broken = provider("a.look", PluginCandidate.Origin.DEV), good = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        var resolution = PluginResolver.resolve(List.of(broken, good), Map.of(), SDK, false, facts(Map.of(
+            broken, new PresentationFacts("x", Optional.of("[metrics].row_height: 40 is outside 18-28"), Optional.empty()), good, valid("g")),
+            AttemptStore.Record.EMPTY));
+        assertThat(resolution.presentation()).contains(good);
+        assertThat(reasons(resolution)).containsEntry("a.look", "SKIPPED: Presentation invalid: [metrics].row_height: 40 is outside 18-28");
+        assertThat(resolution.rejected()).singleElement().satisfies(status -> assertThat(status.quiet()).isFalse());
+        var unread = PluginResolver.resolve(List.of(good), Map.of(), SDK, false);
+        assertThat(reasons(unread)).containsEntry("b.look", "SKIPPED: Presentation invalid: presentation: look.kit.toml could not be read");
+    }
+
+    @Test void safeModeDisablesEveryPresentationWhateverItsOrigin() {
+        PluginCandidate bundled = provider("a.look", PluginCandidate.Origin.BUNDLED), dev = provider("b.look", PluginCandidate.Origin.DEV),
+            user = provider("c.look", PluginCandidate.Origin.USER);
+        var resolution = PluginResolver.resolve(List.of(bundled, dev, user, plain("d.other")), Map.of(), SDK, true,
+            facts(Map.of(bundled, valid("a"), dev, valid("b"), user, valid("c")), AttemptStore.Record.EMPTY));
+        assertThat(resolution.presentation()).isEmpty();
+        assertThat(reasons(resolution)).containsOnly(Map.entry("a.look", "DISABLED: safe mode uses the standard look"),
+            Map.entry("b.look", "DISABLED: safe mode uses the standard look"), Map.entry("c.look", "DISABLED: safe mode uses the standard look"));
+        assertThat(resolution.load()).extracting(PluginCandidate::id).containsExactly("d.other");
+    }
+
+    @Test void aMatchingPendingOrFailedAttemptSkipsTheWinnerAndLeavesTheOthersLosers() {
+        PluginCandidate winner = provider("a.look", PluginCandidate.Origin.BUNDLED), other = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        for (var state : List.of(AttemptStore.State.PENDING, AttemptStore.State.FAILED)) {
+            var record = new AttemptStore.Record(Map.of("a.look", AttemptStore.Attempt.NONE.tried("0.1.0", "d1", BUILD, state)));
+            var resolution = PluginResolver.resolve(List.of(winner, other), Map.of(), SDK, false,
+                facts(Map.of(winner, valid("d1"), other, valid("d2")), record));
+            assertThat(resolution.presentation()).as(state.name()).isEmpty();
+            assertThat(reasons(resolution)).containsOnly(Map.entry("a.look", "SKIPPED: did not finish starting with this look last time"),
+                Map.entry("b.look", "SKIPPED: the Look a.look look is active"));
+            assertThat(resolution.rejected()).allSatisfy(status -> assertThat(status.quiet()).isTrue());
+        }
+        var proven = new AttemptStore.Record(Map.of("a.look", AttemptStore.Attempt.NONE.tried("0.1.0", "d1", BUILD, AttemptStore.State.PROVEN)));
+        assertThat(PluginResolver.resolve(List.of(winner), Map.of(), SDK, false, facts(Map.of(winner, valid("d1")), proven)).presentation()).contains(winner);
+        var changed = new AttemptStore.Record(Map.of("a.look", AttemptStore.Attempt.NONE.tried("0.1.0", "old", BUILD, AttemptStore.State.PENDING)));
+        assertThat(PluginResolver.resolve(List.of(winner), Map.of(), SDK, false, facts(Map.of(winner, valid("d1")), changed)).presentation())
+            .as("a changed kit gets a fresh try").contains(winner);
+    }
+
+    @Test void hardDependentsOfASkippedProviderAreSkippedAsUnmetAndOptionalOnesLoad() {
+        PluginCandidate winner = provider("a.look", PluginCandidate.Origin.DEV), loser = provider("b.look", PluginCandidate.Origin.BUNDLED);
+        var hard = plain("c.hard", new PluginDescriptor.Requirement("b.look", VersionRange.ANY, false));
+        var optional = plain("d.soft", new PluginDescriptor.Requirement("b.look", VersionRange.ANY, true));
+        var resolution = PluginResolver.resolve(List.of(winner, loser, hard, optional), Map.of(), SDK, false,
+            facts(Map.of(winner, valid("a"), loser, valid("b")), AttemptStore.Record.EMPTY));
+        assertThat(reasons(resolution)).containsEntry("c.hard", "SKIPPED: requires b.look, which is not available");
+        assertThat(resolution.load()).extracting(PluginCandidate::id).contains("a.look", "d.soft").doesNotContain("b.look", "c.hard");
+    }
+}
