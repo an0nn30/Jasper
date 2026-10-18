@@ -200,7 +200,7 @@ family = "system"
 | `window.columns` | `100` | Integer 5–500 | New windows |
 | `window.lines` | `35` | Integer 2–200 | New windows |
 | `window.view_mode` | `"normal"` | `"normal"` or `"compact"`; Compact uses the native title bar, hides the workspace header and floats the command palette | After restart |
-| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says, and Settings hides it | Next start |
+| `window.native_decorations` | `false` | Boolean; Windows and Linux only; a look with the system title bar uses it whatever this says, and Settings hides it; the system title bar follows the operating system's light or dark setting | Next start |
 | `buddy.enabled` | `false` | Boolean | Live |
 | `notifications.long_command_seconds` | `10` | Integer 0–3600 | Live |
 | `notifications.system` | `true` | Boolean | Live |

@@ -1,7 +1,8 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation: the series — 2026-10-18** (`claude/enterprise-final`, worktree
-`.claude/worktrees/enterprise-final`, from `main` at `5d5e5fcf3`, where plans 1 to 11 are merged;
+`.claude/worktrees/enterprise-final`, from `5d5e5fcf3`, where plans 1 to 11 are merged; `main` has since been rewritten
+(plan 10b rebased onto the Ubuntu Yaru commits, `11e40192c`), so the branch needs a rebase onto it before it can merge;
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md), plans `2026-10-1*-enterprise-*.md` in
 `superpowers/plans/`). The series is complete; each plan's entry below keeps its rulings and measurements. What it
 delivered: (1) the kit seam, a `Kit` naming metrics, type scale, faces and FlatLaf keys, with `Kit.DEFAULT` today's look;
@@ -18,9 +19,15 @@ two: 8a its view and 8b its modeless place at the dock's bottom-left corner; (9)
 chrome and row menus, 9b the classic page compositions; (10) plugin compositions in two: 10a Remote's Workstation,
 Tunnels, SFTP and Transfers and File Server's panel, 10b the Credential Vault manager, sheets and Unlock Vault; (11)
 branding: the look's icons and the Boot Splash with its start-up steps. This branch adds the open Run item's header tint
-(`500adedfd`) and aligns the spec with the rulings made during execution (`19678cd50`). To turn Enterprise on: Settings ›
+(`500adedfd`) and aligns the spec with the rulings made during execution (`19678cd50`). The series review's fixes remove plan 5a's
+landing gate (`Presentation.Landed`), derive the font row's copy from `SettingsChrome.kitFontSize`, make
+`KitFixtures.enterpriseLight()` the shipped theme's Light variant (with `enterpriseDark()`, so the Enterprise gallery
+renders Dark too), route the mock helpers' ΔE through `MockComparison`, bump the bundled plugins whose SDK range or
+behaviour the series changed (Remote 0.13.0, File Server 0.5.0, Vault 0.6.0, Editor 0.10.0, Snippets, History, Indexer
+and Sample 0.3.0), and correct the guides. To turn Enterprise on: Settings ›
 Plugins, enable Enterprise (bundled, off by default), restart; turning it off and restarting brings Slate Cobalt back,
-and safe mode starts without it. `./gradlew check --continue`: **<counts>**.
+and safe mode starts without it. `./gradlew check --continue` (this branch, before the rebase): **11,424 tests, 0 failures, 0
+errors, 25 skipped**.
 Residuals against the mocks (logical px unless stated; plan that recorded each): the secondary ink `#3A3D42` that no SDK
 text role paints, so the box titles (4b), SFTP breadcrumbs (10a), Vault status cells (`text.tertiary` `#5C6370`) and
 Unlock's intro (`#1E1F22` at (59, 24) for (55, 18)) paint other inks (10b); `DESCRIPTION` and `SUPPORTING` at 11 px

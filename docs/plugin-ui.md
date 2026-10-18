@@ -195,7 +195,8 @@ confirms (set `pending` while a start or stop is in flight).
   `Button`, `MenuButton`s and `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
   [actions](plugin-authoring.md#actions-and-where-they-appear)). A choice's label is its accessible name, not a caption.
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
-  title (the macOS window title row); `Hue.NONE`, the default, draws none.
+  title (the macOS window title row, or the header strip of a dialog the Enterprise look draws in its window); `Hue.NONE`,
+  the default, draws none.
 - **Settings pages.** Declared settings render as the standard Settings page; a custom settings panel is a
   `Stack` with `LayoutRole.SETTINGS_PAGE` of `Section`s over SETTINGS cards (see
   [Declared settings](plugin-authoring.md#declared-settings)).

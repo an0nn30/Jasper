@@ -474,7 +474,7 @@ beside `startupViewMode` (`:240`), from the `PluginSelection` the bootstrap hand
   `Fonts.families` caches its list.
 - **Themes and FlatLaf:** `ThemeLibrary` is built with the plugin theme tier (7.4); `ThemeController.startup` passes
   the kit to `ThemeManager.install(theme, kit)`, which passes it to `FlatLafInstaller.install(theme, kit)` and sets
-  `TitlePane.centerTitle` only under a unified title bar.
+  `TitlePane.centerTitle`, which is inert under a native title bar.
 - **Kit contexts:** every context is built with `KitContext.of(kit, …)` (6.3). The kit reaches `AppearanceBindings`,
   `PresentationIcons` (from its source context) and `HostedKit`, through a new pre-start setter
   `PluginRuntime.presentation(Kit kit)` beside `appearance()`; plugin dialogs meet the `DialogMapping` in
@@ -825,6 +825,9 @@ control's construction. Faces never reference `Kit` or `ControlVariants`.
 | `TagFace` | borderless tint | uppercase, `tag.border` box on the hue tint |
 | `RouteFace` | icon tiles | edged cells with a hue left edge |
 | `PromptFace` | 54 px icon tile | 30 px accent tile beside the message; the title in the dialog's header strip |
+| `PropertiesFace` | section label over a card of label and value rows | titled: a title band and a label column on `surface.panel` beside `surface.card` values; untitled: label-colon lines |
+| `SeparatorFace` | control-tall `border.subtle` hairline | `SEPARATOR_HEIGHT` separators and manager rules in `border.window`; manager column headers as header strips |
+| `RevealFace` | glyph in the field, glyph buttons beside a stored value | "Show" checkbox after the input, "Show password" under a prompt's field, "Show" and "Copy" text buttons |
 
 Composition rules for classic forms: a non-Toggle `SettingRow` inside a Form renders under `LabelPolicy` like a
 `FormRow`; the classic ordered side column spans the list and any sibling entry row and is top-aligned; an unlabelled
@@ -1131,7 +1134,7 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle` | workspace: `WorkspaceChrome.of` |
 | `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance` | windows: `ShellChrome.of`, `NativeShells` |
 | `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
-| `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `fontRowCopy` | settingsui |
+| `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `kitFontSize` (from which `fontRowCopy` follows) | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
 | `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | windows (`AuxiliaryWindows`, which also hosts plugin dialogs) |
 | `Branding` | `product`, the icon images, the splash art; `Branding.NONE` for a look without `[branding]` | bootstrap: `Splash`; platform: `ApplicationIcon` (10.11) |
@@ -1181,7 +1184,7 @@ The `package-info` files gain these allowed dependencies:
   `presentation`;
 - `presentation` → `config`, `settings`, `persistence`, `dock`, `dev.jasper.ui.kit`, `dev.jasper.ui.metrics`,
   `dev.jasper.ui.theme`, `dev.jasper.ui.icons` (the splash art's check), tomlj;
-- `appearance` → `dev.jasper.ui.kit` (it receives the `Kit` and a `centerTitle` flag, not the presentation);
+- `appearance` → `dev.jasper.ui.kit` (it receives the `Kit`, not the presentation);
 - `plugins`' public-type sentence names `PluginRuntime`, `GlassSource` and `PluginSelection`.
 
 `config` and `persistence` gain no edge: `DefaultSource` lives in `config`, and `UiState` takes the dock layout key as a
@@ -1698,7 +1701,7 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    classic button states, the Run window's title row, the active "▶ Run…" item and the count pills.
 2. **Painted contrast.** `ShippedControlReadabilityTest` generalises into `PaintedContrastTest`: it renders every face
    and chrome painter under both shipped kits and samples the declared pairs as painted, over Slate Cobalt Dark and
-   Light, the four Catppuccin flavours, the converter fixtures (ocean, ocean-dawn, paper-light), Enterprise Light and
+   Light, the four Catppuccin flavours, the converter fixtures (ocean, ocean-dawn, stray), Enterprise Light and
    Dark, and eight seeded degenerate palettes (all roles one grey, all black, all white, accent equal to the surfaces,
    maximum chroma, each text equal to its surface, each border equal to its surface, light colours under the dark flag).
 3. **Kit matrix, as JUnit.** jasper-ui gains a `testFixtures` source set (`KitFixtures.context(theme, kit)`, the
@@ -1731,8 +1734,10 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    - The variant-read scan: `ChromeSpec` and `ControlVariants` only in `dev.jasper.app.presentation`,
      `dev.jasper.ui.kit` and `KitFaces`; the `WorkspaceLook`, `ShellLook` and `PaletteLook` variant enums only in
      `WorkspaceChrome.of`, `ShellChrome.of` and `PaletteViews.of`; `DialogMapping` only in `AuxiliaryWindows`; `Motion` only in the application's animations supplier; `Composition` only in the listed roots.
-   - `StrategyIsolationTest` (ASM): faces and strategies never reference `Kit`, `ControlVariants` or `ChromeSpec`, and
-     the reconciler references control classes only.
+   - `StrategyIsolationTest` (ASM): faces never reference `Kit`, `ControlVariants` or `ChromeSpec`, and the reconciler
+     references control classes only; `ProjectionReadTest` keeps the palette strategies off the kit. The app's workspace
+     strategies may read the installed kit's metrics; `VariantReadTest` and `ChromeSpecReachTest` keep variants out of
+     them.
    - `StaticDefaultTest`: no `DesignMetrics.DEFAULT` read or static metric final outside the default catalog, including
      `ThemeManager`'s split divider.
    - The package DAGs (`verifyUiArchitecture`: `kit` depends on `metrics` and `theme` only, `metrics` on `theme` only,

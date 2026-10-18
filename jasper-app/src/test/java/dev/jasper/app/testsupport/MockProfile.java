@@ -18,12 +18,8 @@ import javax.swing.JComponent;
  * differs is a chrome defect or a recorded residual.
  */
 public final class MockProfile {
-    /** The repository root, as the test task names it. */
-    public static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
-    /** The preserved Enterprise mocks. */
-    public static final Path REFERENCE = ROOT.resolve("docs/design/enterprise/reference");
     /** Where chrome renders are written for inspection and the opt-in pairs. */
-    public static final Path RENDERS = ROOT.resolve("jasper-app/build/chrome-renders");
+    public static final Path RENDERS = EnterpriseResources.ROOT.resolve("jasper-app/build/chrome-renders");
 
     private MockProfile() { }
 
@@ -49,9 +45,9 @@ public final class MockProfile {
         public int width() { return end - start; }
     }
 
-    /** The mock at {@code relative} under {@link #REFERENCE}. */
+    /** The mock at {@code relative} under {@link EnterpriseResources#REFERENCE}. */
     public static BufferedImage mock(String relative) {
-        try { return ImageIO.read(REFERENCE.resolve(relative).toFile()); }
+        try { return ImageIO.read(EnterpriseResources.REFERENCE.resolve(relative).toFile()); }
         catch (IOException failure) { throw new UncheckedIOException(failure); }
     }
 
@@ -120,22 +116,8 @@ public final class MockProfile {
             .isCloseTo(expected, org.assertj.core.api.Assertions.within(tolerance));
     }
 
-    /** CIE76 ΔE between two opaque sRGB colours. */
-    public static double deltaE(Color a, Color b) {
-        double[] p = lab(a), q = lab(b);
-        return Math.sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]));
-    }
-
-    private static double[] lab(Color color) {
-        double[] rgb = {color.getRed() / 255.0, color.getGreen() / 255.0, color.getBlue() / 255.0};
-        for (int i = 0; i < 3; i++) rgb[i] = rgb[i] <= .04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + .055) / 1.055, 2.4);
-        double x = (.4124 * rgb[0] + .3576 * rgb[1] + .1805 * rgb[2]) / .95047, y = .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2],
-            z = (.0193 * rgb[0] + .1192 * rgb[1] + .9505 * rgb[2]) / 1.08883;
-        double fx = f(x), fy = f(y), fz = f(z);
-        return new double[] {116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)};
-    }
-
-    private static double f(double t) { return t > .008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116.0; }
+    /** CIE76 ΔE between two opaque sRGB colours ({@link MockComparison#deltaE}). */
+    public static double deltaE(Color a, Color b) { return MockComparison.deltaE(a, b); }
 
     /** {@code root} laid out at {@code width} × {@code height} logical pixels and printed at 2×. EDT. */
     public static BufferedImage print(JComponent root, int width, int height) {

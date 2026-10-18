@@ -224,7 +224,6 @@ public final class JasperApplication {
         if (!presentation.branding().present()) steps.done();
     }
 
-    /** What every terminal window of this process is made of: the presentation's workspace chrome and title bar. */
     /** What terminal windows and the rehearsal's are made of under this process's presentation. */
     dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
     /** The auxiliary windows; null before {@link #startPlugins(AppDirs)}. Tests. */

@@ -4,7 +4,7 @@ Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
 split beside the current pane, Shift+Enter edits the host. The **Sessions** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
-Choose **View > SSH Hosts** or press **Cmd+Shift+S** (Ctrl+Shift+S elsewhere) to show or hide
+Choose **Session › Toggle SSH hosts** or press **Cmd+Alt+1** (Alt+1 elsewhere) to show or hide
 the panel in the current window. Opening the sidebar highlights the first visible host and focuses
 the list, ready for arrow keys and Enter. Both navigation shortcuts are configurable below.
 A small dot marks an active session; multiple sessions show a count. Selecting a host shows its
@@ -119,7 +119,7 @@ use_ssh_agent = true
 ```
 
 Connection settings apply to the next connection. A value out of range is reported and its default used.
-Toggle SSH Hosts (Cmd+Shift+S), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (no default) are bound in
+Toggle SSH Hosts (Cmd+Alt+1), Connect to SSH Host… (Cmd+Shift+H) and Toggle SFTP (Cmd+Alt+2) are bound in
 Settings › Keymap like any other action; `cmd` means Command on macOS and Ctrl+Shift elsewhere. A `[shortcuts]`
 table from an older Remote is reported as unknown; delete it and rebind in Keymap.
 

@@ -7,7 +7,6 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.presentation.ChromeSpec;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -34,7 +33,7 @@ class EnterpriseDockWindowTest {
     @Test void aWindowUnderTheShippedLookDocksTheClassicWay() throws Exception {
         var kit = EnterpriseLook.kit();
         ThemeController themes = EnterpriseLook.controller(false);
-        var look = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(false, false), Presentation.LANDED);
+        var look = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", new Projections.Host(false, false));
         var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, WorkspaceChrome.of(look.workspace(), look.title()));
         try {
             var state = UiState.inMemory(look.dockLayout().key());

@@ -7,14 +7,12 @@ import static org.assertj.core.api.Assertions.within;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.MenuEntry;
 import dev.jasper.app.contributions.MenuTarget;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockProfile;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import javax.swing.JRootPane;
@@ -71,8 +69,7 @@ class EnterpriseMenuRowMockTest {
     static Mounted mounted(boolean dark, String name, java.util.function.Consumer<WindowContent> fixture) {
         var themes = EnterpriseLook.controller(dark);
         try {
-            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false),
-                EnumSet.allOf(Presentation.Landed.class));
+            var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, false));
             var look = WindowLook.of(projections);
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look.chrome());
             owner.connectContributions(workstation());

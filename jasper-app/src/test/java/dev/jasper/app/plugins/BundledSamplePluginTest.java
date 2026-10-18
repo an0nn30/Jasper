@@ -77,7 +77,7 @@ class BundledSamplePluginTest {
         });
         assertThat(runtime.get().statusLines()).as("the sample, the seven bundled feature plugins and Enterprise, off by default").hasSize(9)
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.enterprise", "BUNDLED", "DISABLED", "off by default"))
-            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.2.1", "BUNDLED", "ACTIVE"))
+            .anySatisfy(line -> assertThat(line).contains("dev.jasper.sample", "0.3.0", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.history", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.snippets", "BUNDLED", "ACTIVE"))
             .anySatisfy(line -> assertThat(line).contains("dev.jasper.vault", "BUNDLED", "ACTIVE"))

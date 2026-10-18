@@ -17,8 +17,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Enterprise presentation spec 9.1 and 16.1.7 for the window chrome: each look projection's variants are read only by
- * the factory or supplier that owns them, besides the presentation package that computes them. Plans 6b to 9 add their
- * points to {@link #PROJECTION_READERS}.
+ * the factory or supplier that owns them, besides the presentation package that computes them.
  */
 class ProjectionReadTest {
     /** A variant pattern over internal names, and the classes that may read it. */

@@ -56,7 +56,7 @@ stays open.
 
 ## Commands
 
-Type to search available commands. The list shows `palette.visible_rows` rows (five by default;
+Type to search available commands. The list shows `palette.visible_rows` rows (five by default; the default depends on the active look;
 see [configuration](configuration.md#palette)) and scrolls to the rest. An empty search
 shows your last three distinct palette commands, newest first.
 Recents are shared across windows and saved in `command-history.toml` under

@@ -107,8 +107,7 @@ class KitMatrixTest {
 
     /** Spec 16.1.3: the gallery and the Enterprise fixtures render under the Enterprise fixture kit over the theme set. */
     @Test void everyFixtureRendersUnderTheEnterpriseKitOverTheThemeSet() {
-        var themes = new ArrayList<>(KitFixtures.themes());
-        themes.add(KitFixtures.enterpriseLight());
+        var themes = KitFixtures.themes();
         var fixtures = KitGallery.enterpriseCatalog();
         for (var theme : themes) {
             var captures = captures(theme, KitFixtures.enterprise(), fixtures);

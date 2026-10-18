@@ -9,15 +9,14 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.EnterpriseResources;
 import dev.jasper.app.testsupport.KitTestSupport;
-import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.app.testsupport.PluginJars;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.app.windows.AuxiliaryWindows;
@@ -49,7 +48,7 @@ import javax.swing.SwingUtilities;
  */
 final class EnterpriseSettings implements AutoCloseable {
     /** Where the renders go, under {@code light/} and {@code dark/}. */
-    static final Path OUT = MockProfile.ROOT.resolve("jasper-app/build/enterprise-settings");
+    static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/enterprise-settings");
     /** The values the mocks show, as a config file (plan 9a Rulings 18). */
     static final String CONFIG = """
         [ui]
@@ -151,8 +150,7 @@ final class EnterpriseSettings implements AutoCloseable {
             loaded.values(), false, defaults);
         // Spec 9.1's projections of the Enterprise kit file's chrome (6a's EnterpriseLook.CHROME) with its classic base and
         // named UI face, on the macOS host the mocks were drawn on.
-        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true),
-            Presentation.LANDED);
+        var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", new Projections.Host(true, true));
         var holder = new JComponent[1];
         // The application's mapping (plan 6b): under Enterprise the dialog's sheets and confirmations take the classic path.
         var windows = new AuxiliaryWindows(UiState.inMemory(), surface -> {

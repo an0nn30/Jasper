@@ -70,7 +70,7 @@ class PluginPanelPageTest {
     @Test void withoutAnInlineResetAHostRowHasResetToDefaultInItsMenu() throws Exception {
         var classic = new PageContext(null, id -> { }, Runnable::run, (title, initial) -> Optional.empty(), () -> changes[0]++, () -> null,
             dev.jasper.app.testsupport.KitTestSupport::context,
-            new dev.jasper.app.presentation.SettingsChrome(false, true, false, Set.of(), "Use the default font size"), dev.jasper.app.presentation.Composition.CLASSIC);
+            new dev.jasper.app.presentation.SettingsChrome(false, true, false, Set.of(), true), dev.jasper.app.presentation.Composition.CLASSIC);
         var view=new AtomicReference<HostedKitView>();var rows=new AtomicReference<SettingsPanelHost>();
         var wrap=new AtomicReference<Setting<Boolean>>();
         onEdt(() -> host.start(new HostedPlugin(new PluginInfo(ID,"Panel","1.0.0",Set.of()),Set.of(),Set.of(),Set.of(),getClass().getClassLoader(),() -> context -> {

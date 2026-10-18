@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 /** Spec 12.1 and 12.2: the rows the look implies are not built, and the interface font row speaks for the look. */
 class LookRowsTest {
-    static final SettingsChrome LINUX_DEFAULT = new SettingsChrome(true, false, true, Set.of(), "Use platform font size");
+    static final SettingsChrome LINUX_DEFAULT = new SettingsChrome(true, false, true, Set.of(), false);
 
     static PageContext context(SettingsChrome chrome, java.util.function.Supplier<dev.jasper.ui.swing.KitContext> kit) {
         var parsed = ConfigLoader.parse(Path.of("/fixture/config.toml"), "", true);

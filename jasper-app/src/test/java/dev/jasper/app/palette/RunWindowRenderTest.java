@@ -26,8 +26,8 @@ import org.junit.jupiter.api.Test;
  * the window's frame at x 60-983, y 854-1695; the render is the window alone. The part under the list is compared 12
  * device pixels lower (plan 8a Rulings 5). Images go to {@code jasper-app/build/run-window/}. Every comparison runs on
  * the EDT inside {@code KitGallery.installed}, while the context that drew the render is open (installed closes its
- * binding when its action returns). Plan 4b's classic checkbox and buttons and plan 5b's IBM Plex text are held to the
- * mock, and so are plan 8b's footer buttons, each the mocks' 70 px ({@link #CHECKED}, plan 8a R9).
+ * binding when its action returns). Plan 4b's classic checkbox and buttons, plan 5b's IBM Plex text and plan 8b's
+ * footer buttons, each the mocks' 70 px, are held to the mock (plan 8a R9).
  */
 public class RunWindowRenderTest {
     static final Path ROOT = Path.of(System.getProperty("jasper.repoRoot", "..")).toAbsolutePath().normalize();
@@ -37,20 +37,8 @@ public class RunWindowRenderTest {
     /** The scrollbar's column over the list, and the B mock's "1 of 11" (its fixture count), in window pixels. */
     static final Rectangle SCROLLBAR = new Rectangle(870, 228, 28, 406), COUNT = new Rectangle(800, 232, 98, 38);
 
-    /**
-     * Who draws a measured part: this plan's layout and surfaces, plan 4b's classic checkbox and buttons, plan 5b's IBM
-     * Plex text, or plan 8b's footer buttons (the mocks draw every one 70 px wide).
-     */
-    enum Owner { RUN_WINDOW, FACES, FONTS, FOOTER }
-    /** The owners whose parts are held to the mock: every one (FACES since the merge with plan 4b, FONTS since plan 5b, FOOTER since plan 8b). */
-    static final java.util.Set<Owner> CHECKED = java.util.EnumSet.allOf(Owner.class);
-
     /** A probe: from (x, y) step (dx, dy) to the first pixel off {@code background}; {@code lower} probes under the list. */
-    record Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance, Owner owner) {
-        Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance) {
-            this(name, x, y, dx, dy, background, lower, tolerance, Owner.RUN_WINDOW);
-        }
-    }
+    record Feature(String name, int x, int y, int dx, int dy, Function<KitContext, Color> background, boolean lower, int tolerance) { }
 
     static Color semantic(KitContext c, SemanticColor role) { return c.theme().semantic().color(role); }
     static Color derived(KitContext c, DerivedColor role) { return role.color(c.theme()); }
@@ -59,13 +47,13 @@ public class RunWindowRenderTest {
     static final List<Feature> FEATURES = List.of(
         new Feature("title band to its rule", 300, 10, 0, 1, c -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE), false, 1),
         new Feature("title text", 4, 26, 1, 0, c -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE), false, 3),
-        new Feature("shortcut text end", 880, 26, -1, 0, c -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE), false, 3, Owner.FONTS),
+        new Feature("shortcut text end", 880, 26, -1, 0, c -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE), false, 3),
         new Feature("close glyph", 860, 26, 1, 0, c -> derived(c, DerivedColor.SURFACE_HEADER_ACTIVE), false, 3),
         new Feature("help tile top", 58, 54, 0, 1, RunWindowRenderTest::dialog, false, 1),
         new Feature("help tile left", 4, 108, 1, 0, RunWindowRenderTest::dialog, false, 1),
         new Feature("help text", 92, 95, 1, 0, RunWindowRenderTest::dialog, false, 3),
         // The first line's ink top follows the face's ascent and RUN_WINDOW_HELP_TEXT_TOP: in IBM Plex 1 device px above the mock's.
-        new Feature("help text top", 120, 60, 0, 1, RunWindowRenderTest::dialog, false, 3, Owner.FONTS),
+        new Feature("help text top", 120, 60, 0, 1, RunWindowRenderTest::dialog, false, 3),
         new Feature("open label", 4, 190, 1, 0, RunWindowRenderTest::dialog, false, 3),
         new Feature("field box left", 92, 186, 1, 0, RunWindowRenderTest::dialog, false, 1),
         new Feature("field box top", 500, 120, 0, 1, RunWindowRenderTest::dialog, false, 1),
@@ -80,16 +68,16 @@ public class RunWindowRenderTest {
         new Feature("hue square left", 30, 290, 1, 0, c -> semantic(c, SemanticColor.ACCENT), false, 1),
         new Feature("hue square top", 47, 272, 0, 1, c -> semantic(c, SemanticColor.ACCENT), false, 1),
         new Feature("row title", 60, 290, 1, 0, c -> semantic(c, SemanticColor.ACCENT), false, 3),
-        new Feature("detail label", 4, 671, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FONTS),
-        new Feature("detail value", 120, 671, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FONTS),
-        new Feature("checkbox left", 4, 721, 1, 0, RunWindowRenderTest::dialog, true, 1, Owner.FACES),
-        new Feature("checkbox top", 36, 696, 0, 1, RunWindowRenderTest::dialog, true, 1, Owner.FACES),
-        new Feature("checkbox label", 56, 721, 1, 0, RunWindowRenderTest::dialog, true, 3, Owner.FACES),
+        new Feature("detail label", 4, 671, 1, 0, RunWindowRenderTest::dialog, true, 3),
+        new Feature("detail value", 120, 671, 1, 0, RunWindowRenderTest::dialog, true, 3),
+        new Feature("checkbox left", 4, 721, 1, 0, RunWindowRenderTest::dialog, true, 1),
+        new Feature("checkbox top", 36, 696, 0, 1, RunWindowRenderTest::dialog, true, 1),
+        new Feature("checkbox label", 56, 721, 1, 0, RunWindowRenderTest::dialog, true, 3),
         new Feature("footer rule", 200, 740, 0, 1, RunWindowRenderTest::dialog, true, 1),
         // The buttons are right-packed, each RUN_WINDOW_BUTTON_WIDTH or its label plus RUN_WINDOW_BUTTON_PADDING if wider
         // (plan 8b, FOOTER): every label the mocks show fits, so each is the mocks' 70.
-        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
-        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1, Owner.FOOTER),
+        new Feature("primary button left", 300, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
+        new Feature("cancel button left", 596, 796, 1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("browse button right", 920, 796, -1, 0, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("button top", 520, 765, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
         new Feature("window bottom", 200, 800, 0, 1, c -> derived(c, DerivedColor.SURFACE_FOOTER), true, 1),
@@ -100,24 +88,22 @@ public class RunWindowRenderTest {
         new Feature("row detail", 118, 290, 1, 0, c -> semantic(c, SemanticColor.ACCENT), false, 3));
     /** B only: the query's first glyph. */
     static final List<Feature> TYPING = List.of(
-        new Feature("query text", 125, 186, 1, 0, c -> semantic(c, SemanticColor.SURFACE_INPUT), false, 3, Owner.FONTS));
+        new Feature("query text", 125, 186, 1, 0, c -> semantic(c, SemanticColor.SURFACE_INPUT), false, 3));
 
-    record Sample(String name, int x, int y, boolean lower, Owner owner) {
-        Sample(String name, int x, int y, boolean lower) { this(name, x, y, lower, Owner.RUN_WINDOW); }
-    }
+    record Sample(String name, int x, int y, boolean lower) { }
     static final List<Sample> SAMPLES = List.of(new Sample("frame", 200, 0, false), new Sample("title band", 200, 20, false),
         new Sample("body", 20, 400, false), new Sample("help tile", 35, 90, false), new Sample("field", 500, 186, false),
         new Sample("list edge", 26, 300, false), new Sample("heading band", 300, 250, false), new Sample("selected row", 600, 290, false),
         new Sample("row", 860, 330, false), new Sample("hue square", 47, 290, false),
         new Sample("footer rule", 200, 758, true), new Sample("footer", 200, 820, true),
         // Inside the primary button's left end, above its label.
-        new Sample("primary", 462, 782, true, Owner.FACES));
+        new Sample("primary", 462, 782, true));
     /**
      * A only: the checkbox's inside. B selects a snippet, whose scope has no SPLIT verb, so spec 11.2 disables the box the B
      * mock draws enabled (plan 8a R12): there the render's {@code surface.tableHeader} against the mock's white is a
      * measured residual, printed.
      */
-    static final List<Sample> OPENED_SAMPLES = List.of(new Sample("checkbox inside", 38, 721, true, Owner.FACES));
+    static final List<Sample> OPENED_SAMPLES = List.of(new Sample("checkbox inside", 38, 721, true));
 
     /** What runs with a render on the EDT, while the context that drew it is still open. */
     @FunctionalInterface interface Drawn { void accept(BufferedImage render, KitContext context) throws Exception; }
@@ -186,14 +172,12 @@ public class RunWindowRenderTest {
         var features = new ArrayList<>(FEATURES);
         features.addAll(state.equals("typing-auth") ? TYPING : OPENED);
         var misses = new ArrayList<String>();
-        var pending = new ArrayList<String>();
         for (var feature : features) {
             int expected = probe(mock, MOCK_X, MOCK_Y, feature, 0, c);
             int actual = probe(render, 0, 0, feature, feature.lower() ? SHIFT : 0, c);
             assertThat(expected).as(state + ": the mock shows " + feature.name()).isNotNegative();
             String line = feature.name() + ": mock " + expected + ", render " + actual;
-            if (!CHECKED.contains(feature.owner())) pending.add(feature.owner() + " " + line);
-            else if (Math.abs(actual - expected) > feature.tolerance()) misses.add(line);
+            if (Math.abs(actual - expected) > feature.tolerance()) misses.add(line);
         }
         var colours = new ArrayList<String>();
         boolean typing = state.equals("typing-auth");
@@ -202,10 +186,8 @@ public class RunWindowRenderTest {
         for (var sample : samples) {
             double distance = distance(mock, render, sample);
             String line = sampleLine(mock, render, sample);
-            if (!CHECKED.contains(sample.owner())) pending.add(sample.owner() + " " + line);
-            else if (distance > 3) colours.add(line);
+            if (distance > 3) colours.add(line);
         }
-        pending.forEach(line -> System.out.println("run-window " + state + " (not yet checked) " + line));
         if (typing) OPENED_SAMPLES.forEach(sample -> System.out.println("run-window " + state + " (residual, plan 8a R12) " + sampleLine(mock, render, sample)));
         assertThat(misses).as(state + ": geometry within tolerance").isEmpty();
         assertThat(colours).as(state + ": fills within 3 dE76").isEmpty();
@@ -234,8 +216,8 @@ public class RunWindowRenderTest {
 
     @Test void typingAuthMatchesItsMock() throws Exception { compare("typing-auth"); }
 
-    /** The horizontal one-pixel probes of checked parts: the structure Dark keeps. */
-    static List<Feature> structure() { return FEATURES.stream().filter(f -> f.dy() == 0 && f.tolerance() <= 1 && CHECKED.contains(f.owner())).toList(); }
+    /** The horizontal one-pixel probes: the structure Dark keeps. */
+    static List<Feature> structure() { return FEATURES.stream().filter(f -> f.dy() == 0 && f.tolerance() <= 1).toList(); }
 
     /** No Dark mock shows the window: Dark keeps the Light geometry and its declared pairs readable. */
     @Test void enterpriseDarkKeepsTheGeometryAndTheTextReadable() throws Exception {

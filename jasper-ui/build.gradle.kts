@@ -46,7 +46,6 @@ tasks.register<JavaExec>("gallery") {
         require(scale.get() in listOf("1", "2")) { "jasper.galleryScale must be 1 or 2" }
         require(theme.get() in listOf("dark", "light")) { "Unknown jasper.galleryTheme" }
         require(kit.get() in listOf("default", "enterprise")) { "jasper.galleryKit must be default or enterprise" }
-        require(kit.get() == "default" || theme.get() == "light") { "The Enterprise gallery renders Enterprise Light only" }
     }
     systemProperty("java.awt.headless", "true")
     systemProperty("flatlaf.uiScale", scale.get())

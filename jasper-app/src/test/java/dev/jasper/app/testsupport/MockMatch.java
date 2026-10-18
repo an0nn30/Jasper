@@ -17,8 +17,6 @@ import javax.imageio.ImageIO;
  * Images are compared at their own (device) pixels; bands report logical pixels (device pixels halved).
  */
 public final class MockMatch {
-    /** The preserved mocks. */
-    public static final Path REFERENCE = EnterpriseResources.ROOT.resolve("docs/design/enterprise/reference");
     /** Where renders and side-by-side images go, for inspection and for {@code tools/visual/pairs.json}. */
     public static final Path OUT = EnterpriseResources.ROOT.resolve("jasper-app/build/enterprise-compositions");
     private static final int SEARCH = 12;
@@ -26,7 +24,7 @@ public final class MockMatch {
     /**
      * A crop of one mock, in its 2x pixels.
      *
-     * @param mock the mock's path under {@link #REFERENCE}
+     * @param mock the mock's path under {@link EnterpriseResources#REFERENCE}
      * @param x left edge
      * @param y top edge
      * @param width width in device pixels
@@ -36,7 +34,7 @@ public final class MockMatch {
         /** The crop as an opaque RGB image. */
         public BufferedImage read() {
             try {
-                BufferedImage whole = ImageIO.read(REFERENCE.resolve(mock).toFile());
+                BufferedImage whole = ImageIO.read(EnterpriseResources.REFERENCE.resolve(mock).toFile());
                 var copy = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
                 var graphics = copy.createGraphics();
                 try { graphics.drawImage(whole.getSubimage(x, y, width, height), 0, 0, null); } finally { graphics.dispose(); }
@@ -138,23 +136,8 @@ public final class MockMatch {
         return same ? "" : "expected " + expected + "\n  actual " + actual;
     }
 
-    /** CIE76 colour difference under D65. */
-    public static double deltaE(Color a, Color b) {
-        double[] p = lab(a), q = lab(b);
-        return Math.sqrt((p[0] - q[0]) * (p[0] - q[0]) + (p[1] - q[1]) * (p[1] - q[1]) + (p[2] - q[2]) * (p[2] - q[2]));
-    }
-
-    private static double[] lab(Color colour) {
-        double[] rgb = {colour.getRed() / 255.0, colour.getGreen() / 255.0, colour.getBlue() / 255.0};
-        for (int i = 0; i < 3; i++) rgb[i] = rgb[i] <= 0.04045 ? rgb[i] / 12.92 : Math.pow((rgb[i] + 0.055) / 1.055, 2.4);
-        double x = (0.4124 * rgb[0] + 0.3576 * rgb[1] + 0.1805 * rgb[2]) / 0.95047;
-        double y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-        double z = (0.0193 * rgb[0] + 0.1192 * rgb[1] + 0.9505 * rgb[2]) / 1.08883;
-        double fx = f(x), fy = f(y), fz = f(z);
-        return new double[] {116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)};
-    }
-
-    private static double f(double t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16.0 / 116; }
+    /** CIE76 colour difference under D65 ({@link MockComparison#deltaE}). */
+    public static double deltaE(Color a, Color b) { return MockComparison.deltaE(a, b); }
 
     /**
      * Whether a 2x2 block of {@code image} lies within ΔE76 6 of {@code colour}: {@code check_pairs.py}'s mock tolerance,

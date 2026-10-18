@@ -124,7 +124,7 @@ kept by theme identity (header chrome passes `TitleBarTheme.of(theme)`). `PaintP
 naming either kind of `ColorRole`, with its `SurfaceContrast.Guard` (text 4.5:1, indicator 3:1, structural boundary
 1.3:1, control boundary 1.5:1, or a CIE L* distance); `SurfaceContrast.painted` applies the guard where the pair is
 painted and never changes a role.
-`ColourLiteralScanTest` fails on any colour literal in production code or resources outside `slate-cobalt.json`. Shadows are black at the kit's shadow
+`ColourLiteralScanTest` fails on any colour literal in production code or resources outside the built-in theme files, the theme files in-repo plugins declare (`enterprise.json`) and the splash's `SplashColors.java`. Shadows are black at the kit's shadow
 metrics: `ThemePainting.softShadow` blurs one mask per treatment and nine-slices it across face sizes (a face too
 small to slice gets its own cached mask), and a hollow mask has the face cut out so nothing of the shadow lies under a
 translucent face. It serves the modal overlay's card (hollow, so a fading card does not darken) and the command

@@ -129,10 +129,12 @@ public final class KitGallery {
         });
         return new Fixture(name, "", state, name.contains("short") ? 240 : 264, name.contains("short") ? 180 : 424, spec[0]);
     }
-    /** The Enterprise gallery's theme: Enterprise Light (plan 4c Rulings 21; Enterprise Dark is plan 5's). */
+    /** The Enterprise gallery's theme: the shipped Enterprise theme's Light or Dark variant. */
     static GeneratedTheme enterpriseTheme(String name) {
-        if (!name.equals("light")) throw new IllegalArgumentException("The Enterprise gallery renders Enterprise Light only");
-        return KitFixtures.enterpriseLight();
+        return switch (name) {
+            case "dark" -> KitFixtures.enterpriseDark(); case "light" -> KitFixtures.enterpriseLight();
+            default -> throw new IllegalArgumentException("Unknown gallery theme: " + name);
+        };
     }
     public static GeneratedTheme theme(String name) {
         return switch (name) {

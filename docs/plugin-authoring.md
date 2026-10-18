@@ -154,10 +154,12 @@ private static void installUi(PluginContext context, long stepMillis) {
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
 - **The Tools menu** (SDK 0.16.1) is the home for utility commands: `context.menus().standard(StandardMenu.TOOLS).add(id)`.
-  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it, after Tab, Session and Transfer and before
-  plugins' own top-level menus.
+  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it; in the default look's menu
+  bar it comes after Tab, Session and Transfer and before plugins' own top-level menus. The Enterprise look's classic
+  menu bar is File, Edit, View, Session, Transfer, plugins' menus, Tools, Window, Help.
 - **The Session and Transfer menus** (SDK 0.18) hold commands for hosts and sessions and for moving files:
-  `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab.
+  `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab in
+  the default look.
 - **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group
   of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your
   registration. The factory also runs inside `toolbar().add(...)` for every window already open, so finish
@@ -1052,7 +1054,8 @@ bounded integer's Settings stepper); the `border.identity` semantic color; and t
 the rest of the window dims under a scrim, and the dialog, centred above it, fades from transparent while rising
 16 logical pixels into place (about 220 ms, easing out); closing is its opposite (about 200 ms): the dialog lifts
 off at once and rises another 16 while it fades out. Both follow the motion setting and are instant with animations
-off. The owner may be a terminal window, one of
+off. Under the Enterprise look an OVERLAY or ATTACHED_SHEET dialog is drawn in its window as a classic dialog: a
+still scrim, and a header strip with its swatch and title. The owner may be a terminal window, one of
 your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
 returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
 meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:

@@ -10,7 +10,6 @@ import dev.jasper.app.config.TerminalSchemeChoice;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.ChromeSpec;
 import dev.jasper.app.presentation.DesktopFlags;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -22,11 +21,9 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Supplier;
 import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
@@ -40,7 +37,6 @@ import org.junit.jupiter.api.Test;
  */
 class ChromeRenderTest {
     static final Projections.Host HOST = new Projections.Host(SystemInfo.isMacOS, MacTitleBar.isSupported());
-    static final Set<Presentation.Landed> ALL = EnumSet.allOf(Presentation.Landed.class);
     static final String[] KEYS = {"title_bar", "menu_bar", "window_title", "tool_windows", "editor_tabs", "status_bar", "palette", "dialogs", "motion"};
 
     /**
@@ -78,14 +74,14 @@ class ChromeRenderTest {
     /** Every case of spec 16.1.4 this plan renders. */
     static List<Case> cases() {
         var cases = new ArrayList<Case>();
-        cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST, ALL)));
+        cases.add(new Case("default", () -> slateCobalt(Kit.DEFAULT), Projections.of(ChromeSpec.DEFAULT, false, false, "", HOST)));
         cases.add(new Case("enterprise", () -> EnterpriseLook.controller(false),
-            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", HOST, ALL)));
-        cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST, ALL)));
+            Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", HOST)));
+        cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST)));
         cases.add(new Case("fallback", () -> slateCobalt(Kit.DEFAULT), Projections.fallback(new DesktopFlags(false, true), HOST)));
         var rows = covering();
         for (int i = 0; i < rows.size(); i++)
-            cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(rows.get(i), true, true, "dev.jasper.enterprise", HOST, ALL)));
+            cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(rows.get(i), true, true, "dev.jasper.enterprise", HOST)));
         return cases;
     }
 

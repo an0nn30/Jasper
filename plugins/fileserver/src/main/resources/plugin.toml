@@ -1,6 +1,6 @@
 id = "dev.jasper.fileserver"
 name = "File Server"
-version = "0.4.0"
+version = "0.5.0"
 entry = "dev.jasper.fileserver.FileServerPlugin"
 sdk = ">=0.18.0, <0.19"
 description = "Share a local folder with other computers over HTTP, HTTPS, FTP, FTPS, SFTP or TFTP: named servers in a File Servers panel, read-only and local-only by default, with an activity log, Vault logins and Serve Current Folder."

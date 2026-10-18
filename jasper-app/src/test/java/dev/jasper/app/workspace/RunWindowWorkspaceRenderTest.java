@@ -11,7 +11,6 @@ import dev.jasper.app.palette.RunWindowRenderTest;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.presentation.PaletteLook;
-import dev.jasper.app.presentation.Presentation;
 import dev.jasper.app.presentation.Projections;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.EnterpriseResources;
@@ -39,8 +38,7 @@ class RunWindowWorkspaceRenderTest {
             MacTitleBar bar = null;
             try {
                 // The Enterprise workspace as the application builds it: the shipped kit's chrome, every landed group.
-                var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.HOST,
-                    Presentation.LANDED);
+                var projections = Projections.of(EnterpriseLook.chrome(), true, true, "dev.jasper.enterprise", ChromeRenderTest.HOST);
                 var look = WindowLook.of(projections);
                 assertThat(look.chrome().palette()).as("the classic chrome's palette is the Run window").isEqualTo(PaletteLook.RUN_WINDOW);
                 var owner = DesktopTestSupport.track(new WindowContent(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), DesktopTestSupport.HOME,
