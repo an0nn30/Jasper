@@ -66,3 +66,108 @@ def testPortal = tasks.register('testDesktopPortal', Exec) {
     commandLine('dbus-run-session', '--', portalTests.get().asFile.absolutePath)
 }
 if (linux) tasks.named('check') { dependsOn(testPortal) }
+
+// GTK executables link GLib/GIO and dl only; toolkit libraries are optional dlopen capabilities.
+def gtkOutputs = [:]
+[3, 4].each { major ->
+    def helper = layout.buildDirectory.file("desktop-colors/jasper-desktop-gtk${major}")
+    def tests = layout.buildDirectory.file("desktop-colors/gtk${major}-tests")
+    def compile = tasks.register("compileDesktopGtk${major}", Exec) {
+        onlyIf { linux }
+        inputs.files(new File(source, 'gtk_api.c'), new File(source, 'gtk_api.h'), new File(source, "gtk${major}.c"),
+            new File(source, 'protocol.c'), new File(source, 'protocol.h'))
+        outputs.file(helper)
+        doFirst {
+            helper.get().asFile.parentFile.mkdirs()
+            commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+                new File(source, 'protocol.c').absolutePath, new File(source, 'gtk_api.c').absolutePath,
+                new File(source, "gtk${major}.c").absolutePath, '-o', helper.get().asFile.absolutePath,
+                '-ldl', '-lm'] + gioFlags())
+        }
+    }
+    def compileTests = tasks.register("compileDesktopGtk${major}Tests", Exec) {
+        onlyIf { linux }
+        inputs.files(new File(source, 'gtk_api.c'), new File(source, 'gtk_api.h'), new File(source, "gtk${major}.c"),
+            new File(source, 'protocol.c'), new File(source, 'protocol.h'),
+            new File(fixtures, "gtk${major}_test.c"), new File(fixtures, 'probe_test_support.c'))
+        outputs.file(tests)
+        doFirst {
+            tests.get().asFile.parentFile.mkdirs()
+            commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-DDC_GTK_NO_MAIN',
+                '-I' + source.absolutePath, new File(source, 'protocol.c').absolutePath,
+                new File(source, "gtk${major}.c").absolutePath,
+                new File(fixtures, "gtk${major}_test.c").absolutePath, new File(fixtures, 'probe_test_support.c').absolutePath,
+                '-o', tests.get().asFile.absolutePath, '-ldl', '-lm'] + gioFlags())
+        }
+    }
+    gtkOutputs[major] = [helper: helper, tests: tests, compile: compile, compileTests: compileTests]
+}
+def gtkShim = layout.buildDirectory.file('desktop-colors/gtk-runtime-shim.so')
+def compileGtkShim = tasks.register('compileDesktopGtkTestShim', Exec) {
+    onlyIf { linux }
+    inputs.file(new File(fixtures, 'probe_test_support.c'))
+    outputs.file(gtkShim)
+    doFirst {
+        gtkShim.get().asFile.parentFile.mkdirs()
+        commandLine('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', '-DDC_TEST_SHIM',
+            new File(fixtures, 'probe_test_support.c').absolutePath, '-ldl', '-o', gtkShim.get().asFile.absolutePath)
+    }
+}
+def verifyGtkAbi = tasks.register('verifyDesktopGtkAbi') {
+    group = 'verification'
+    description = 'Verifies opaque GTK ABI layouts/signatures against development headers and absence of GTK linkage.'
+    onlyIf { linux }
+    dependsOn(gtkOutputs.values().collect { it.compile })
+    doLast {
+        [3, 4].each { major ->
+            def flags = providers.exec {
+                commandLine(major == 3 ? ['pkg-config', '--cflags', 'gtk+-3.0'] : ['pkg-config', '--cflags', 'gtk4', 'libadwaita-1'])
+            }.standardOutput.asText.get().trim().split('\\s+') as List
+            providers.exec {
+                ignoreExitValue = true
+                commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations',
+                    '-DDC_GTK_ABI=' + major, '-fsyntax-only', '-I' + source.absolutePath,
+                    new File(fixtures, 'probe_test_support.c').absolutePath] + flags)
+            }.with { execution ->
+                def errors = execution.standardError.asText.get()
+                if (!errors.isBlank()) logger.lifecycle(errors)
+                execution.result.get().assertNormalExitValue()
+            }
+            def linkage = providers.exec {
+                commandLine('readelf', '-d', gtkOutputs[major].helper.get().asFile.absolutePath)
+            }.standardOutput.asText.get()
+            if (linkage =~ /NEEDED.*(gtk|adwaita)/) throw new GradleException('GTK helper links a toolkit library')
+            println("GTK ${major} public ABI and optional linkage verified")
+        }
+    }
+}
+def testGtk = tasks.register('testDesktopGtk') {
+    group = 'verification'
+    description = 'Runs GTK extraction assertions on a private Xvfb display and private D-Bus session.'
+    onlyIf { linux }
+    dependsOn(compileGtkShim, verifyGtkAbi, gtkOutputs.values().collect { it.compileTests })
+    doLast {
+        [3, 4].each { major ->
+            providers.exec {
+                ignoreExitValue = true
+                environment('DC_GTK_FIXTURES', new File(fixtures, 'themes').absolutePath)
+                environment('DC_GTK3_HELPER', gtkOutputs[3].helper.get().asFile.absolutePath)
+                environment('DC_GTK4_HELPER', gtkOutputs[4].helper.get().asFile.absolutePath)
+                environment('DC_GTK_SHIM', gtkShim.get().asFile.absolutePath)
+                environment('GTK_USE_PORTAL', '0')
+                environment('GTK_A11Y', 'none')
+                environment('NO_AT_BRIDGE', '1')
+                environment('GSETTINGS_BACKEND', 'memory')
+                environment('GIO_USE_VFS', 'local')
+                commandLine('xvfb-run', '-a', '-s', '-screen 0 1024x768x24 -nolisten tcp',
+                    'dbus-run-session', '--config-file=' + new File(fixtures, 'themes/private-bus.conf').absolutePath, '--', gtkOutputs[major].tests.get().asFile.absolutePath)
+            }.with { execution ->
+                println(execution.standardOutput.asText.get())
+                def errors = execution.standardError.asText.get()
+                if (!errors.isBlank()) logger.lifecycle(errors)
+                execution.result.get().assertNormalExitValue()
+            }
+        }
+    }
+}
+if (linux) tasks.named('check') { dependsOn(testGtk) }

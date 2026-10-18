@@ -40,3 +40,46 @@ includes the fake-portal suite under `dbus-run-session`, with a private test bus
 The native targets require GIO development headers, `pkg-config` and `dbus-run-session`. Tests cover signal/read
 ordering, owner replacement, partial and malformed preferences, late registration, the response timeout,
 pending-read shutdown, and helper ping/EOF behavior.
+
+`src/gtk3.c` and `src/gtk4.c` build separate `jasper-desktop-gtk3 --protocol=1` and
+`jasper-desktop-gtk4 --protocol=1` processes. `gtk_api.c` opens GTK with `RTLD_LOCAL`, checks GTK 3.24 or
+GTK 4.10 at runtime, and resolves optional libadwaita. Only GLib/GIO, dl and the C runtime are linked.
+`dc_sample_gtk3` / `dc_sample_gtk4` return complete paired observations, with the request generation and
+observed polarity. Process-local forced appearances are checked against the opaque WINDOW pair and its
+4.5:1 contrast. Missing display/library and unsupported variants produce palette capability envelopes with a
+reason and absent WINDOW, and the process continues answering pings. A failed display initialization remains
+unavailable until process restart. The parent owns recovery. Roots are replaced and destroyed without mapping.
+
+GTK 3 uses paired theme background/foreground, base/text and selected background/foreground names; secondary
+surfaces use Window. GTK 4 before 4.16 uses paired underscore names, followed by GTK 3-style base-pair names.
+GTK 4.16+ creates dedicated labels beneath an unmapped root, assigning each documented variable to `color`
+with magenta and cyan fallbacks. An idle follows invalidation before foreground lookup. Matching results identify
+resolved variables, preserving real magenta/cyan. The instrumentation provider outranks user label colors while
+variables inherit the theme/user cascade. Missing modern variables remain absent. Theme/dark-preference and
+optional StyleManager notifications coalesce into an idle resample of the last requested appearance/generation;
+a 30-second refresh catches CSS changes without notifications. EOF destroys roots and ends the helper.
+
+Runtime symbols (all are public; GTK-major alternatives are resolved only in that process):
+
+| Library | Resolved symbols | Minimum symbol version |
+|---|---|---|
+| GTK 3 / 4 | `gtk_get_major_version`, `gtk_get_minor_version`, `gtk_get_micro_version`, `gtk_init_check`, `gtk_settings_get_default`, `gtk_window_new`, `gtk_label_new`, `gtk_box_new`, `gtk_widget_get_mapped`, `gtk_widget_get_style_context`, `gtk_style_context_lookup_color`, `gtk_css_provider_new`, `gtk_css_provider_load_from_data`, `gdk_display_get_default` | GTK 3.0 / 4.0 |
+| GTK 3 | `gtk_container_add`, `gtk_widget_destroy`, `gtk_style_context_add_provider_for_screen`, `gtk_style_context_remove_provider_for_screen` | GTK 3.0 |
+| GTK 4 | `gtk_window_set_child`, `gtk_box_append`, `gtk_window_destroy`, `gtk_widget_add_css_class`, `gtk_style_context_add_provider_for_display`, `gtk_style_context_remove_provider_for_display` | GTK 4.0 |
+| GTK 4 | `gtk_widget_get_color` | GTK 4.10 |
+| libadwaita (optional) | `adw_init`, `adw_style_manager_get_default`, `adw_style_manager_set_color_scheme`, `adw_get_major_version`, `adw_get_minor_version`, `adw_get_micro_version` | libadwaita 1.0 |
+
+CSS-variable capability requires GTK 4.16. Library versions identify libadwaita plus GTK when present, and GTK
+otherwise. GTK 3 RGBA uses doubles; GTK 4 uses floats. `verifyDesktopGtkAbi` checks layouts and public function
+signatures against installed GTK/libadwaita headers and verifies that toolkit libraries are absent from ELF
+`DT_NEEDED`. Test-only root enumeration additionally resolves `gtk_window_list_toplevels` and
+`gdk_screen_get_default` on GTK 3.0, or `gtk_window_get_toplevels` on GTK 4.0.
+
+Run `./gradlew :jasper-app:test --tests '*DesktopGtkProtocolTest'` on any host and
+`./gradlew :jasper-app:testDesktopGtk` on Linux. The latter prints toolkit versions and TAP test counts,
+compiles ABI checks, and uses `xvfb-run -a` and a private D-Bus configuration without service activation.
+It requires GTK 3/4 and libadwaita development headers, GIO development headers, `pkg-config`, Xvfb, xauth and
+D-Bus. Production compilation needs only GIO headers. Fixture CSS is loaded into the real toolkit in-process;
+subprocess fault injection covers absent libraries and unsupported runtimes. Ubuntu 24.04 CI covers named colors;
+a digest-pinned Ubuntu 26.04 container requires GTK 4.16+ and covers overridden variables. Linux `check` includes
+this gate; other hosts skip it without discovering native dependencies.
