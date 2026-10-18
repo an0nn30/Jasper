@@ -13,6 +13,7 @@ Amended on 2026-10-17 with plan 6b's rulings 10 and R44, made under the same aut
 Amended on 2026-10-17 with plan 5b's accent ruling, made under the same authority: 7.6 (Enterprise Dark's accent is #3C74D6).
 Amended on 2026-10-17 with plan 5b's status-text ruling, made under the same authority: 5.6 (classic status text is 11 px).
 Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same authority: 10.7 (the bottom strip is 24 px plus its rule).
+Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -1190,8 +1191,8 @@ string. The graph stays acyclic; `dev.jasper.app.dock` stays JDK-only.
   bar.
 - On Windows and Linux, plan 6 sets the dark-caption hint where JBR exposes it; otherwise the documentation records
   that the system title bar follows the operating system's light or dark setting.
-- Under `menu_bar = "window"` the auxiliary frames keep their minimal File menu (`NativeShells.java:494-514`), now a row
-  in the window as it already is on Windows and Linux, so Close Window keeps ⌘W.
+- Under `menu_bar = "window"` the auxiliary frames show no menu row, as the 07 Credential Vault mocks draw them; their
+  actions stay on their own controls, and each frame binds Close Window's ⌘W itself.
 - The native title, menu bar and toolbar rows meet flush, separated by 1 px rules.
 
 ### 10.2 Menu composition

@@ -220,8 +220,8 @@ that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
 the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
 Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
-macOS's screen menu bar off, so each window's menus are a row in the window (an auxiliary frame's File row takes the
-classic row's look, `ClassicMenuRow`). A native-titled macOS frame's appearance follows the theme; Jasper gives the
+macOS's screen menu bar off, so each terminal window's menus are a row in the window (an auxiliary frame shows none
+and binds Close Window's shortcut itself). A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).

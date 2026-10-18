@@ -23,30 +23,30 @@ class ShellChromeTest {
         });
     }
 
-    /** Spec 10.1: under in-window classic menus an auxiliary frame's File row is the terminal windows' row; the default look's stays FlatLaf's. */
-    @Test void aClassicLookGivesAFramesMenuRowTheTerminalWindowsRow() throws Exception {
+    /** Plan 10b Rulings 14 (spec 10.1 as amended): a classic look's auxiliary frames show no menu row and close with their key. */
+    @Test void aClassicLooksFramesHaveNoMenuRowAndCloseWithTheirKey() throws Exception {
+        assertThat(ShellChrome.of(new ShellLook(false, true, true), true).frameMenuRow()).as("a classic look on macOS").isFalse();
+        assertThat(ShellChrome.of(new ShellLook(false, true, true), false).frameMenuRow()).as("a classic look elsewhere").isFalse();
+        assertThat(ShellChrome.of(new ShellLook(false, false, false), true).frameMenuRow()).as("the default look").isTrue();
+        assertThat(ShellChrome.standard().frameMenuRow()).isTrue();
         edt(() -> {
-            var themes = dev.jasper.app.appearance.ThemeTestSupport.controller(true);
-            try {
-                var classic = new javax.swing.JMenuBar();
-                ShellChrome.of(new ShellLook(false, true, true), true).styleMenus(classic);
-                var reference = new javax.swing.JMenuBar();
-                dev.jasper.app.platform.ClassicMenuRow.style(reference);
-                assertThat(classic.getClientProperty("FlatLaf.style")).isEqualTo(reference.getClientProperty("FlatLaf.style")).isNotNull();
-                assertThat(classic.getBackground()).isEqualTo(reference.getBackground());
-                assertThat(classic.getInsets()).isEqualTo(reference.getInsets());
-                assertThat(dev.jasper.app.platform.ClassicMenuRow.styled(classic)).isTrue();
-                assertThat(classic.getLayout()).as("a plain bar takes the row's layout in place of the look-and-feel's")
-                    .isNotInstanceOf(javax.swing.plaf.UIResource.class).hasSameClassAs(reference.getLayout());
-                var standard = new javax.swing.JMenuBar();
-                var border = standard.getBorder();
-                ShellChrome.of(new ShellLook(false, false, false), true).styleMenus(standard);
-                ShellChrome.standard().styleMenus(standard);
-                assertThat(standard.getClientProperty("FlatLaf.style")).isNull();
-                assertThat(standard.getBorder()).isSameAs(border);
-                assertThat(dev.jasper.app.platform.ClassicMenuRow.styled(standard)).isFalse();
-                assertThat(standard.getLayout()).isInstanceOf(javax.swing.plaf.UIResource.class);
-            } finally { themes.close(); }
+            var surface = new AuxiliarySurface("dev.jasper.vault.manager", "Credential Vault", AuxiliarySurface.Kind.WINDOW, false,
+                new java.awt.Dimension(820, 571), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });
+            var commands = new java.util.concurrent.atomic.AtomicInteger();
+            surface.onCloseCommand(() -> { commands.incrementAndGet(); return true; });
+            var root = new JRootPane();
+            NativeShells.bindCloseWindow(root, surface);
+            int menu = com.formdev.flatlaf.util.SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK;
+            var key = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_W, menu);
+            var action = root.getActionMap().get(root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(key));
+            assertThat(action).as("Close Window's key is bound on the frame").isNotNull();
+            action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));
+            assertThat(commands).as("it runs the window's Close Window command").hasValue(1);
+            root.putClientProperty(dev.jasper.app.platform.WindowInput.SHORTCUT_RECORDER,
+                new dev.jasper.app.platform.WindowInput.ShortcutRecorder(stroke -> stroke.equals(key)));
+            action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));
+            assertThat(commands).as("a window recording shortcuts keeps the key").hasValue(1);
+            surface.close();
         });
     }
 

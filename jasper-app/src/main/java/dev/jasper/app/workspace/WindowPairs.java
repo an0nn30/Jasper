@@ -20,7 +20,7 @@ final class WindowPairs {
 
     private static PaintPair pair(ColorRole slot, ColorRole against, Guard guard) { return new PaintPair(slot, against, guard); }
 
-    /** An open classic menu's title on the accent ({@code ClassicMenuRow} paints it; the row is shared with auxiliary frames). */
+    /** An open classic menu's title on the accent ({@code ClassicMenuRow} paints it). */
     static final PaintPair OPEN_MENU = dev.jasper.app.platform.ClassicMenuRow.OPEN_TITLE;
     /** The toolbar row's and the status bar's rule, and the toolbar's separators. */
     static final PaintPair RULE = pair(SemanticColor.BORDER_WINDOW, SemanticColor.SURFACE_APP, Guard.STRUCTURAL);

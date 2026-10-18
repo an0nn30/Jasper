@@ -26,8 +26,8 @@ import javax.swing.plaf.UIResource;
  * The classic menu row (Enterprise presentation spec 10.1 and 10.2), the mocks' row: 24 px of titles on
  * {@code surface.app} over a 1 px {@code border.divider} rule; a hovered closed title on {@code surface.control.hover},
  * an open one in the accent, square. The titles stand side by side at their {@link #titleWidth}, as the mocks set them,
- * so whole-pixel text widths do not add up along the row. Terminal windows and the auxiliary frames of a classic look
- * share it. EDT only.
+ * so whole-pixel text widths do not add up along the row. A classic look's terminal
+ * windows show it. EDT only.
  */
 public final class ClassicMenuRow {
     /** An open title on the accent (spec 16.1.1), declared for the window chrome's pairs ({@code WindowPairs}). */

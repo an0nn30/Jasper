@@ -302,10 +302,12 @@ public final class NativeShells {
             frame.setIconImages(ApplicationIcon.images());
             resources.layout = installChrome(frame.getRootPane(), surface, shell.unifiedTitle());
             MacTitleBar bar = resources.layout.bar();
-            // Under in-window menus (spec 10.1) the minimal File menu is a row of this frame, so Close Window keeps its key;
-            // a classic look gives it its terminal windows' row.
-            JMenuBar menus = menuBar(surface);
-            if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }
+            // The minimal File menu is a row of this frame (spec 10.1); a classic look's frames show no menu row, as the 07
+            // Credential Vault mocks draw them, and bind Close Window's key themselves (plan 10b Rulings 14).
+            JMenuBar menus = bar != null || shell.frameMenuRow() ? menuBar(surface) : null;
+            if (bar != null) bar.setMenuBar(menus);
+            else if (menus != null) frame.setJMenuBar(menus);
+            else bindCloseWindow(frame.getRootPane(), surface);
             shell.followTheme(frame.getRootPane(), bar, themes.current().chrome().dark());
             // Spec 10.8: under the classic mapping a window form's footer is the band too; content set later takes it.
             var marks = nativeMarks(surface, false);
@@ -325,7 +327,7 @@ public final class NativeShells {
             else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
-                if (bar != null) bar.setLight(!resolved.chrome().dark()); else shell.styleMenus(menus);
+                if (bar != null) bar.setLight(!resolved.chrome().dark());
                 shell.followTheme(frame.getRootPane(), bar, resolved.chrome().dark());
                 resources.layout.body().changed();
             });
@@ -714,6 +716,20 @@ public final class NativeShells {
         var bar = new JMenuBar();
         bar.add(file);
         return bar;
+    }
+
+    /**
+     * Close Window's shortcut on {@code root}, for a frame without a menu row (a classic look's auxiliary frames, plan 10b
+     * Rulings 14): it runs the window's Close Window command unless the window is recording shortcuts, as the item does.
+     */
+    static void bindCloseWindow(JRootPane root, AuxiliarySurface surface) {
+        var key = KeyStroke.getKeyStroke(KeyEvent.VK_W, SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK);
+        root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(key, "jasper.closeWindow");
+        root.getActionMap().put("jasper.closeWindow", new javax.swing.AbstractAction("Close Window") {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, key)) surface.closeCommand();
+            }
+        });
     }
 
     /** Remembered bounds are ignored when no current display shows them, for example after unplugging a monitor. */

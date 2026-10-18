@@ -377,8 +377,9 @@ ends probing and takes precedence. The fake host models the same fallback and li
 ### Close command, quit guards and the save chooser (SDK 0.8.4)
 
 `PluginWindow.onCloseCommand` lets a plugin window's content handle File → Close Window and
-Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item calls
-`AuxiliarySurface.closeCommand()`, which asks the handlers newest first and otherwise closes like
+Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item (or, in a classic look's
+frame, which has no menu row, its shortcut) calls `AuxiliarySurface.closeCommand()`, which asks the
+handlers newest first and otherwise closes like
 the close button, through the guards. The close button itself (`windowClosing`) still calls
 `requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
 key bindings see Cmd+W, so a key binding could not do this.
