@@ -11,6 +11,7 @@ import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.List;
@@ -184,6 +185,28 @@ class ClassicVaultRenderTest {
                 bands("the Add SSH Key group", keyRender, GROUPS_X, 0, ADD_SSH_KEY.height(), "0+" + top + " #ECEDEF, " + top + "+1 #C4C7CC, "
                     + (top + 1) + "+144 #ECEDEF, " + (top + 145) + "+1 #C4C7CC, " + (top + 146) + "+" + (174 - top - 146) + " #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA");
                 onEdt(key::requestClose);
+                assertThat(vault.problems).isEmpty();
+            }
+        });
+    }
+
+    static final MockMatch.Crop UNLOCK = new MockMatch.Crop(V + "1 - Unlock Vault (over Workstation).png", 1106, 838, 800, 310);
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theUnlockOverlayMatchesItsMock() throws Exception {
+        ClassicCompositionRenderTest.under(false, () -> {
+            try (var vault = vault(root.resolve("unlock"))) {
+                vault.invoke("dev.jasper.vault.lock");
+                var manager = vault.surface("Credential Vault");
+                onEdt(manager::requestClose);
+                vault.invoke("dev.jasper.vault.open");
+                var unlock = vault.awaitSurface("Unlock Vault");
+                ClassicCompositionRenderTest.check("light/vault-unlock", UNLOCK, render(unlock, UNLOCK.logicalWidth(), UNLOCK.logicalHeight()),
+                    14, "0+114 #ECEDEF, 114+1 #C4C7CC, 115+40 #E6E7EA", 1, 0.55, "#2F65CA", "#E6E7EA", "#FFFFFF");
+                // The overlay asks for the mock's size, not only fills it: 400 wide, the 114 px body over the 41 px band.
+                assertThat(onEdtValue(() -> StagedVaultHost.kitView(unlock.holder()).getPreferredSize()))
+                    .as("the Unlock Vault form's own size").isEqualTo(new Dimension(UNLOCK.logicalWidth(), UNLOCK.logicalHeight()));
+                onEdt(unlock::requestClose);
                 assertThat(vault.problems).isEmpty();
             }
         });

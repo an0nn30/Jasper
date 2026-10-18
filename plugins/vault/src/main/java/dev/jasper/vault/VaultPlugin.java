@@ -291,7 +291,9 @@ public class VaultPlugin implements Plugin {
         var presentation=prompt.presentationOwner();
         PluginDialog dialog = context.windows().dialog(new DialogSpec("Unlock Vault", prompt.anchored()?presentation:owner(prompt.owner()), true,
             DialogSpec.Presentation.OVERLAY));
-        PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt);
+        // The footnote is the auto-lock (plan 10b Rulings 11); the rows layout ignores it.
+        PasswordPanel panel = PasswordPanel.unlock(context.kit(), prompt, layout,
+            settings.autoLock().isZero() ? "" : "Auto-locks after " + settings.autoLock().toMinutes() + " min idle");
         dialog.setContent(panel.view());
         boolean[] active={true};
         prompt.onPresentationRetired(()->{active[0]=false;panel.close();dialog.close();});

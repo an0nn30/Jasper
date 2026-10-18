@@ -250,6 +250,13 @@ public final class DesignMetrics {
         values.put(Role.TITLE_SEARCH_ARC, 0);
         values.put(Role.PROMPT_TILE_RADIUS, 0);
         values.put(Role.PROMPT_TILE, 30);
+        // Plan 10b: a prompt is the Unlock Vault mock's: 400 wide (PROMPT_COMPACT), its content 14 inside the dialog's
+        // card, the tile's row 14 under the header strip and 12 above the 22 px field.
+        values.put(Role.PROMPT_COMPACT_WIDTH, 400);
+        values.put(Role.PROMPT_SIDES, 14);
+        values.put(Role.PROMPT_TOP, 14);
+        values.put(Role.PROMPT_COMPACT_INTRO_GAP, 12);
+        values.put(Role.PROMPT_FIELD_HEIGHT, 22);
         values.put(Role.ICON_PROMPT, 16);
         values.put(Role.FORM_LABEL_WIDTH, 100);
         values.put(Role.COLUMN_GAP, 12);
