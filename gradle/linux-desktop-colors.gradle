@@ -1,0 +1,26 @@
+// Protocol-only targets need a C11 compiler. Toolkit discovery belongs to later Linux helper tasks.
+def linux = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('linux')
+def source = rootProject.file('packaging/desktop-colors/src')
+def fixtures = rootProject.file('packaging/desktop-colors/test')
+def executable = layout.buildDirectory.file('desktop-colors/protocol-tests')
+def compileProtocol = tasks.register('compileDesktopProtocolTests', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(fixtures, 'protocol_test.c'))
+    outputs.file(executable)
+    doFirst {
+        executable.get().asFile.parentFile.mkdirs()
+        commandLine('cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+            new File(source, 'protocol.c').absolutePath, new File(fixtures, 'protocol_test.c').absolutePath,
+            '-o', executable.get().asFile.absolutePath)
+    }
+}
+def testProtocol = tasks.register('testDesktopProtocol', Exec) {
+    group = 'verification'
+    description = 'Tests Linux desktop helper commands, palette serialization and shared protocol vectors.'
+    onlyIf { linux }
+    dependsOn(compileProtocol)
+    inputs.files(new File(fixtures, 'vectors.jsonl'), new File(fixtures, 'vectors.tsv'))
+    commandLine(executable.get().asFile.absolutePath, new File(fixtures, 'vectors.jsonl').absolutePath,
+        new File(fixtures, 'vectors.tsv').absolutePath)
+}
+if (linux) tasks.named('check') { dependsOn(testProtocol) }

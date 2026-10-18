@@ -85,6 +85,8 @@ tasks.test {
     // Explicit opt-in scaled geometry tests; use the same property as headless previews.
     providers.gradleProperty("jasper.uiScale").orNull?.let { systemProperty("flatlaf.uiScale", it) }
     systemProperty("jasper.repoRoot", rootProject.projectDir.absolutePath)
+    inputs.files(rootProject.fileTree("packaging/desktop-colors/test") { include("vectors.*") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // Tests start the staged plugins and install the zips, so their contents are inputs (which also brings
     // the task dependency); a path property alone left this task UP-TO-DATE after a plugin's code changed.
     inputs.files(stagePlugins).withPropertyName("stagedPlugins").withPathSensitivity(PathSensitivity.RELATIVE)
@@ -181,6 +183,7 @@ for ((taskName, entryPoint) in listOf(
 // The commit this jar is built from (dev/jasper/app/build-info.properties); packaging.gradle reads its version from it.
 apply(from = rootProject.file("gradle/build-info.gradle"))
 apply(from = rootProject.file("gradle/packaging.gradle"))
+apply(from = rootProject.file("gradle/linux-desktop-colors.gradle"))
 
 // Keep API/package contracts in the ordinary headless verification path.
 tasks.withType<Javadoc>().configureEach {
