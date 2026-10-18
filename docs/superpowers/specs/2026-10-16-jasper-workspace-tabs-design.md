@@ -2,7 +2,8 @@
 
 Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans once Enterprise 6-11 has merged.").
 Amended 2026-10-17: section 5.4 no longer adds `LSMultipleInstancesProhibited`, which limits an app to one user
-session rather than one instance (plan 1's spec issue). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+session rather than one instance (plan 1's spec issue). Amended 2026-10-18: closing a tab keeps its group maximized, as
+VS Code does (sections 7.3 and 15, plan 2 Ruling 5). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -330,7 +331,7 @@ Each returns a new `Layout` and rejects arguments that break the invariants.
 | `moveToNewGroup(tab, group, side)` | As `split` with an existing tab |
 | `remove(tab)` | Removes the tab (closing or moving out); an emptied group is removed, a split left with one child collapses into it and nesting is re-flattened; the active group becomes the most recently used remaining group |
 | `resize(split path, weights)` | From divider drags |
-| `toggleMaximize(group)` | The group fills the workspace; any structural change clears it |
+| `toggleMaximize(group)` | The group fills the workspace; a move between groups, a new group, the maximized group's removal or a single remaining group clears it; closing one of its tabs keeps it (VS Code) |
 | `neighbour(group, direction)` | The group in that direction by geometry over the unit square (today's `SplitTree.navigate` rule: nearest in the direction, then nearest centre across it) |
 
 The model keeps a most-recently-used order of groups for focus after removal; it is not persisted.
@@ -525,7 +526,7 @@ this repository, gets a hand-off note in `docs/STATUS.md`.
 | The last tab in the main window closes | The empty workspace stays (section 10) |
 | The main window closes with child windows open | Section 6.4 |
 | A shell exits | `terminal.on_exit` applies to its tab |
-| A maximized group loses a tab or gains one by a move | Maximize clears |
+| A maximized group loses a tab or gains one by a move | Maximize clears; closing one of its tabs keeps it |
 | A plugin is disabled with tabs open | Its tabs close; at the next start they restore as placeholders |
 | A tab moves while its old window shows an overlay (Remote's "Connecting…") | The overlay belongs to the window and stays |
 | A tab moves while its find bar is open | The find bar is inside the terminal tab and moves with it |
