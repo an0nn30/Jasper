@@ -59,8 +59,10 @@ variables inherit the theme/user cascade. Missing modern libadwaita variables re
 supply complete named pairs when its variables are absent. Theme/dark-preference and
 optional StyleManager notifications coalesce into an idle resample of the last requested appearance/generation;
 a 30-second refresh catches CSS changes without notifications. Requests arriving during a notification/timer
-sample are queued until its extraction and publication finish, preserving widget lifetimes and generations.
-EOF destroys roots and ends the helper.
+sample remain in the bounded OS pipe until publication finishes, preserving widget lifetimes and generations.
+Input dispatch reads at most 4096 bytes and one command. During extraction only a one-shot EOF/error watch
+remains active. Closing the input cancels outstanding samples, suppresses an active publication, and destroys
+roots after extraction unwinds. Clients await requested responses before closing the input.
 
 Runtime symbols (all are public; GTK-major alternatives are resolved only in that process):
 

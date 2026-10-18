@@ -66,6 +66,7 @@ unsigned gtk_get_micro_version(void) {return 0;}
 #else
 #include "../src/gtk_api.c"
 #include <gio/gio.h>
+#include <gio/gunixinputstream.h>
 #include <dlfcn.h>
 #include <math.h>
 #include <stdlib.h>
@@ -110,7 +111,23 @@ void helper_contract(const char *helper,const char *mode) {
     const char *commands="{\"v\":1,\"kind\":\"sample\",\"generation\":17,\"appearance\":\"dark\"}\n"
         "{\"v\":1,\"kind\":\"sample\",\"generation\":18,\"appearance\":\"light\"}\n"
         "{\"v\":1,\"kind\":\"ping\",\"generation\":19}\n";
-    char *out=NULL,*err=NULL;g_assert_true(g_subprocess_communicate_utf8(process,commands,NULL,&out,&err,&error));g_assert_no_error(error);
+    GOutputStream *writer=g_subprocess_get_stdin_pipe(process);
+    g_assert_true(g_output_stream_write_all(writer,commands,strlen(commands),NULL,NULL,&error));g_assert_no_error(error);
+    GDataInputStream *reader=g_data_input_stream_new(g_subprocess_get_stdout_pipe(process));
+    GString *responses=g_string_new(NULL);bool pong=false;
+    for(int i=0;i<16 && !pong;i++) {
+        if(g_buffered_input_stream_get_available(G_BUFFERED_INPUT_STREAM(reader))==0) {
+            GPollFD wait={.fd=g_unix_input_stream_get_fd(G_UNIX_INPUT_STREAM(g_subprocess_get_stdout_pipe(process))),.events=G_IO_IN|G_IO_HUP};
+            g_assert_cmpint(g_poll(&wait,1,2000),>,0);
+        }
+        gsize length=0;char *line=g_data_input_stream_read_line(reader,&length,NULL,&error);g_assert_no_error(error);g_assert_nonnull(line);
+        pong=strstr(line,"\"kind\":\"pong\",\"generation\":19")!=NULL;
+        g_string_append_len(responses,line,length);g_string_append_c(responses,'\n');g_free(line);
+    }
+    g_assert_true(pong);
+    /* EOF is cancellation. Keep the request pipe live until all requested responses arrive. */
+    char *tail=NULL,*err=NULL;g_assert_true(g_subprocess_communicate_utf8(process,NULL,NULL,&tail,&err,&error));g_assert_no_error(error);
+    g_string_append(responses,tail);g_free(tail);char *out=g_string_free(responses,FALSE);g_object_unref(reader);
     if(err && *err) g_printerr("%s",err);
     if(!g_subprocess_get_successful(process)) g_test_message("helper output: %s",out);
     g_assert_true(g_subprocess_get_successful(process));
@@ -170,7 +187,7 @@ void assert_nested_requests(struct dc_gtk_api *api,GtkCssProvider *provider,bool
         .last={DC_SAMPLE,40,1},.have_last=true};
     int descriptors[2];g_assert_cmpint(pipe(descriptors),==,0);
     g_assert_cmpint(fcntl(descriptors[0],F_SETFL,O_NONBLOCK),==,0);
-    guint source=g_unix_fd_add(descriptors[0],G_IO_IN,input,&worker);
+    worker.input_fd=descriptors[0];watch_input(&worker,false);
     struct injected_commands injected={.fd=descriptors[1]};
     g_idle_add_full(G_PRIORITY_DEFAULT_IDLE+50,inject_samples,&injected,NULL);
     if(notification) {
@@ -180,6 +197,7 @@ void assert_nested_requests(struct dc_gtk_api *api,GtkCssProvider *provider,bool
         g_signal_handler_disconnect(api->settings(),signal);
     } else g_assert_true(periodic(&worker));
     g_assert_true(injected.delivered);
+    while(worker.last.generation!=42) g_main_context_iteration(NULL,TRUE);
     rewind(output);char line[8192];
     for(int generation=40;generation<=42;generation++) {
         char token[64];snprintf(token,sizeof token,"\"generation\":%d",generation);
@@ -187,7 +205,8 @@ void assert_nested_requests(struct dc_gtk_api *api,GtkCssProvider *provider,bool
         g_assert_nonnull(strstr(line,"window.bg"));
     }
     g_assert_null(fgets(line,sizeof line,output));assert_unmapped(api);
-    g_source_remove(source);close(descriptors[0]);close(descriptors[1]);fclose(output);g_main_loop_unref(worker.loop);
+    if(worker.input_source) g_source_remove(worker.input_source);
+    close(descriptors[0]);close(descriptors[1]);fclose(output);g_main_loop_unref(worker.loop);
 }
 void assert_plain_native(const char *program) {
     GError *error=NULL;
@@ -199,5 +218,81 @@ void assert_plain_native(const char *program) {
     g_print("%s",out);if(err && *err) g_printerr("%s",err);
     g_assert_true(g_subprocess_get_successful(process));g_assert_nonnull(strstr(out,"ok 1 /gtk4/plain-named-native"));
     g_free(out);g_free(err);g_object_unref(process);g_object_unref(launcher);
+}
+#endif
+
+#if !defined(DC_GTK_ABI) && !defined(DC_TEST_SHIM)
+#include <sys/ioctl.h>
+struct burst_writer { int fd, read_fd; unsigned written, callbacks; bool observed; };
+static gboolean write_burst(gint fd,GIOCondition condition,gpointer data) {
+    (void)condition;struct burst_writer *writer=data;writer->callbacks++;
+    g_assert_true(sampling);
+    for(int i=0;i<16 && writer->written<1024;i++) {
+        char command[128];int length=snprintf(command,sizeof command,"{\"v\":1,\"kind\":\"sample\",\"generation\":%u,\"appearance\":\"dark\"}\n",100+writer->written);
+        ssize_t n=write(fd,command,(size_t)length);
+        if(n<0) {g_assert_cmpint(errno,==,EAGAIN);break;}
+        g_assert_cmpint(n,==,length);writer->written++;
+    }
+    return writer->written<1024?G_SOURCE_CONTINUE:G_SOURCE_REMOVE;
+}
+static gboolean observe_burst(gpointer data) {
+    struct burst_writer *writer=data;int pending=0;
+    g_assert_true(sampling);g_assert_cmpuint(writer->callbacks,<=,8);
+    g_assert_cmpint(ioctl(writer->read_fd,FIONREAD,&pending),==,0);g_assert_cmpint(pending,>,0);
+    writer->observed=true;return G_SOURCE_REMOVE;
+}
+static gboolean inject_eof(gpointer data) {
+    int fd=*(int *)data;g_assert_true(sampling);
+    const char *commands="{\"v\":1,\"kind\":\"sample\",\"generation\":71,\"appearance\":\"dark\"}\n"
+        "{\"v\":1,\"kind\":\"sample\",\"generation\":72,\"appearance\":\"dark\"}\n";
+    g_assert_cmpint(write(fd,commands,strlen(commands)),==,(ssize_t)strlen(commands));close(fd);return G_SOURCE_REMOVE;
+}
+void assert_bounded_dispatch(void) {
+    struct worker worker={.loop=g_main_loop_new(NULL,FALSE),.output=tmpfile()};
+    int descriptors[2];g_assert_cmpint(pipe(descriptors),==,0);
+    g_assert_cmpint(fcntl(descriptors[0],F_SETPIPE_SZ,8192),>=,8192);
+    g_assert_cmpint(fcntl(descriptors[0],F_SETFL,O_NONBLOCK),==,0);
+    char bytes[8192];memset(bytes,'x',sizeof bytes);g_assert_cmpint(write(descriptors[1],bytes,sizeof bytes),==,sizeof bytes);
+    g_assert_true(input(descriptors[0],G_IO_IN,&worker));
+    int pending=0;g_assert_cmpint(ioctl(descriptors[0],FIONREAD,&pending),==,0);g_assert_cmpint(pending,>=,4096);
+    g_assert_cmpuint(worker.used,<=,4096);
+    close(descriptors[0]);close(descriptors[1]);fclose(worker.output);g_main_loop_unref(worker.loop);
+}
+void assert_burst_or_eof(struct dc_gtk_api *api,GtkCssProvider *provider,bool eof) {
+    if(api->variables) fixture_load(api,provider,"window { --window-bg-color: rgb(10%,20%,30%); --window-fg-color: white; }");
+    else {char *css=fixture_read("named.css");fixture_load(api,provider,css);g_free(css);}
+    FILE *output=tmpfile();g_assert_nonnull(output);
+    struct worker worker={.loop=g_main_loop_new(NULL,FALSE),.output=output,.api=api->major==3?&api3:&api4,
+        .last={DC_SAMPLE,70,1},.have_last=true};
+    int descriptors[2];g_assert_cmpint(pipe(descriptors),==,0);
+    g_assert_cmpint(fcntl(descriptors[0],F_SETPIPE_SZ,4096),>=,4096);
+    g_assert_cmpint(fcntl(descriptors[0],F_SETFL,O_NONBLOCK),==,0);
+    g_assert_cmpint(fcntl(descriptors[1],F_SETFL,O_NONBLOCK),==,0);
+    worker.input_fd=descriptors[0];watch_input(&worker,false);guint writer_source=0;
+    struct burst_writer writer={.fd=descriptors[1],.read_fd=descriptors[0]};
+    if(eof) g_idle_add_full(G_PRIORITY_DEFAULT_IDLE+50,inject_eof,&descriptors[1],NULL);
+    else {
+        writer_source=g_unix_fd_add_full(G_PRIORITY_DEFAULT_IDLE+50,descriptors[1],G_IO_OUT,write_burst,&writer,NULL);
+        g_idle_add_full(G_PRIORITY_DEFAULT_IDLE+60,observe_burst,&writer,NULL);
+    }
+    g_assert_true(periodic(&worker));
+    if(!eof) {
+        g_assert_true(writer.observed);g_assert_cmpuint(writer.written,>,0);
+        GSource *writer_remaining=g_main_context_find_source_by_id(NULL,writer_source);if(writer_remaining) g_source_destroy(writer_remaining);
+        close(descriptors[1]);
+        for(int i=0;i<128 && !worker.stopping;i++) g_main_context_iteration(NULL,TRUE);
+    }
+    rewind(output);char line[8192];
+    if(!eof) {g_assert_nonnull(fgets(line,sizeof line,output));g_assert_nonnull(strstr(line,"\"generation\":70"));}
+    g_assert_null(fgets(line,sizeof line,output));
+    g_assert_true(worker.stopping);g_assert_cmpuint(worker.input_source,==,0);
+    if(api->major==4) {
+        GListModel *(*windows)(void);*(void **)(&windows)=dlsym(api->gtk,"gtk_window_get_toplevels");
+        g_assert_cmpuint(g_list_model_get_n_items(windows()),==,0);
+    } else {
+        GList *(*windows)(void);*(void **)(&windows)=dlsym(api->gtk,"gtk_window_list_toplevels");
+        GList *list=windows();g_assert_null(list);
+    }
+    close(descriptors[0]);fclose(output);g_main_loop_unref(worker.loop);
 }
 #endif

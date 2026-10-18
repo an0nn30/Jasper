@@ -145,45 +145,79 @@ void dc_gtk_shutdown(void) {
     /* GTK registers process-global GTypes: keep its library loaded until process exit. */
 }
 
-struct worker { GMainLoop *loop; FILE *output; struct dc_gtk_api *api; struct dc_command last; bool have_last, publishing; GQueue deferred; guint idle; char line[DC_MAX_MESSAGE+1]; size_t used; bool overflow; };
+struct worker {
+    GMainLoop *loop; FILE *output; struct dc_gtk_api *api; struct dc_command last;
+    bool have_last, publishing, stopping; guint idle, input_source; int input_fd;
+    char line[DC_MAX_MESSAGE+1]; size_t used; bool overflow;
+};
+static gboolean input(gint fd,GIOCondition condition,gpointer data);
+static void stop_worker(struct worker *w) {
+    if(w->stopping) return;
+    w->stopping=true;w->have_last=false;w->used=0;w->overflow=false;
+    if(w->input_source) {g_source_remove(w->input_source);w->input_source=0;}
+    if(w->idle) {g_source_remove(w->idle);w->idle=0;}
+    g_main_loop_quit(w->loop);
+    if(!w->publishing && !sampling) dc_gtk_shutdown();
+}
+static gboolean input_closed(gint fd,GIOCondition condition,gpointer data) {
+    (void)fd;(void)condition;stop_worker(data);return G_SOURCE_REMOVE;
+}
+static void watch_input(struct worker *w,bool paused) {
+    if(w->input_source) {g_source_remove(w->input_source);w->input_source=0;}
+    if(w->stopping) return;
+    /* Leave commands in the bounded OS pipe while GTK pumps the settle context.
+     * Only a one-shot HUP/error watch remains active to cancel shutdown promptly. */
+    w->input_source=g_unix_fd_add_full(paused?G_PRIORITY_DEFAULT:G_PRIORITY_DEFAULT_IDLE,w->input_fd,
+        G_IO_HUP|G_IO_ERR|G_IO_NVAL|(paused?0:G_IO_IN),paused?input_closed:input,w,NULL);
+}
 static void publish(struct worker *w) {
-    if(w->publishing || sampling) return;
+    if(w->stopping || w->publishing || sampling) return;
     w->publishing=true;
-    for(;;) {
-        struct dc_palette p; dc_gtk_sample(w->api,w->last.dark,w->last.generation,&p);
-        if(dc_write_palette(w->output,&p)!=0) {g_main_loop_quit(w->loop);break;}
-        struct dc_command *next=g_queue_pop_head(&w->deferred);
-        if(!next) break;
-        w->last=*next;g_free(next);
-    }
+    bool watched=w->input_source!=0;
+    if(watched) watch_input(w,true);
+    struct dc_palette p;dc_gtk_sample(w->api,w->last.dark,w->last.generation,&p);
+    if(!w->stopping && dc_write_palette(w->output,&p)!=0) stop_worker(w);
     w->publishing=false;
+    if(w->stopping) dc_gtk_shutdown();
+    else if(watched) watch_input(w,false);
 }
-static gboolean refresh(gpointer data) { struct worker *w=data; w->idle=0; if(w->have_last && !sampling) publish(w); return G_SOURCE_REMOVE; }
+static gboolean refresh(gpointer data) {
+    struct worker *w=data;w->idle=0;
+    if(w->have_last && !sampling) publish(w);
+    return G_SOURCE_REMOVE;
+}
 static void changed(GObject *object,GParamSpec *property,gpointer data) {
-    (void)object;(void)property; struct worker *w=data;
-    if(!sampling && w->have_last && !w->idle) w->idle=g_idle_add(refresh,w);
+    (void)object;(void)property;struct worker *w=data;
+    if(!w->stopping && !sampling && w->have_last && !w->idle) w->idle=g_idle_add(refresh,w);
 }
-static gboolean periodic(gpointer data) { struct worker *w=data; if(w->have_last && !sampling) publish(w); return G_SOURCE_CONTINUE; }
+static gboolean periodic(gpointer data) {
+    struct worker *w=data;if(w->have_last && !sampling) publish(w);return G_SOURCE_CONTINUE;
+}
 static gboolean input(gint fd,GIOCondition condition,gpointer data) {
-    struct worker *w=data; char bytes[4096]; ssize_t n;
-    (void)condition;
-    while((n=read(fd,bytes,sizeof bytes))>0) for(ssize_t i=0;i<n;i++) {
-        if(bytes[i]=='\n') {
-            struct dc_command c;
-            if(!w->overflow && dc_read_command(w->line,w->used,&c)==0) {
-                if(c.kind==DC_PING) {if(dc_write_pong(stdout,c.generation)!=0) g_main_loop_quit(w->loop);}
-                else if(w->publishing || sampling) {
-                    /* The GTK settle idle pumps this context. Preserve the active root and
-                     * request metadata until extraction and its publication have finished. */
-                    struct dc_command *pending=g_new(struct dc_command,1);*pending=c;
-                    g_queue_push_tail(&w->deferred,pending);
-                } else {w->last=c;w->have_last=true;publish(w);}
-            }
+    struct worker *w=data;
+    if(w->stopping) return G_SOURCE_REMOVE;
+    if(condition&(G_IO_HUP|G_IO_ERR|G_IO_NVAL)) {stop_worker(w);return G_SOURCE_REMOVE;}
+    /* At most 4096 bytes and one command per dispatch; no user-space request queue. */
+    for(size_t budget=0;budget<4096;budget++) {
+        char byte;ssize_t n=read(fd,&byte,1);
+        if(n<0 && errno==EINTR) continue;
+        if(n<0 && (errno==EAGAIN || errno==EWOULDBLOCK)) return G_SOURCE_CONTINUE;
+        if(n<=0) {stop_worker(w);return G_SOURCE_REMOVE;}
+        if(byte=='\n') {
+            struct dc_command c;bool valid=!w->overflow && dc_read_command(w->line,w->used,&c)==0;
             w->used=0;w->overflow=false;
-        } else if(w->used<DC_MAX_MESSAGE) w->line[w->used++]=bytes[i];
+            if(valid && c.kind==DC_PING) {
+                if(dc_write_pong(w->output,c.generation)!=0) {stop_worker(w);return G_SOURCE_REMOVE;}
+            } else if(valid) {
+                w->last=c;w->have_last=true;publish(w);
+                /* publish replaced this source with a fresh readability watch. */
+                return G_SOURCE_REMOVE;
+            }
+            return G_SOURCE_CONTINUE;
+        }
+        if(w->used<DC_MAX_MESSAGE) w->line[w->used++]=byte;
         else w->overflow=true;
     }
-    if(n==0 || (n<0 && errno!=EAGAIN && errno!=EWOULDBLOCK)) {g_main_loop_quit(w->loop);return G_SOURCE_REMOVE;}
     return G_SOURCE_CONTINUE;
 }
 int dc_gtk_main(int major,int argc,char **argv) {
@@ -199,16 +233,15 @@ int dc_gtk_main(int major,int argc,char **argv) {
     }
     int flags=fcntl(STDIN_FILENO,F_GETFL);
     if(flags<0 || fcntl(STDIN_FILENO,F_SETFL,flags|O_NONBLOCK)<0) return 1;
-    guint source=g_unix_fd_add(STDIN_FILENO,G_IO_IN|G_IO_HUP|G_IO_ERR,input,&w);
+    w.input_fd=STDIN_FILENO;watch_input(&w,false);
     guint timer=g_timeout_add_seconds(30,periodic,&w);
     g_main_loop_run(w.loop);
-    GSource *remaining=g_main_context_find_source_by_id(NULL,source); if(remaining) g_source_destroy(remaining);
+    if(w.input_source) g_source_remove(w.input_source);
     if(w.idle) g_source_remove(w.idle);
     g_source_remove(timer);
     if(w.api->gtk && (major==3?initialized3:initialized4)) {
         g_signal_handlers_disconnect_by_data(w.api->settings(),&w);
         if(w.api->adw) g_signal_handlers_disconnect_by_data(w.api->style_manager(),&w);
     }
-    g_queue_clear_full(&w.deferred,g_free);
     dc_gtk_shutdown();g_main_loop_unref(w.loop);fcntl(STDIN_FILENO,F_SETFL,flags);return 0;
 }

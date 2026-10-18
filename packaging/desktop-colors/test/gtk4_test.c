@@ -12,6 +12,8 @@ void assert_notifications(struct dc_gtk_api *,GtkCssProvider *,bool);
 void assert_nested_requests(struct dc_gtk_api *,GtkCssProvider *,bool);
 void assert_plain_native(const char *);
 static const char *program;
+void assert_bounded_dispatch(void);
+void assert_burst_or_eof(struct dc_gtk_api *,GtkCssProvider *,bool);
 static struct dc_gtk_api api;
 static GtkCssProvider *provider;
 static struct dc_palette modern_palette(void) {
@@ -75,6 +77,8 @@ static void gtk3_only(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"gtk3-on
 static void ping_and_preview(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),NULL);}
 static void close_idempotent(void) {struct dc_gtk_api absent={0};dc_gtk_api_close(&absent);dc_gtk_api_close(&absent);g_assert_false(dc_gtk_api_open(2,&absent));}
 static void notification(void) {assert_notifications(&api,provider,api.variables);}
+static void burst(void) {assert_burst_or_eof(&api,provider,false);}
+static void eof_during_sample(void) {assert_burst_or_eof(&api,provider,true);}
 int main(int argc,char **argv) {
     program=argv[0];g_test_init(&argc,&argv,NULL);g_assert_true(dc_gtk_api_open(4,&api));g_assert_true(api.init4());
     if(api.adw) api.adw_init();
@@ -97,5 +101,7 @@ int main(int argc,char **argv) {
     g_test_add_func("/gtk4/request-during-notification-sample",during_notification);
     g_test_add_func("/gtk4/request-during-timer-sample",during_timer);
     if(!api.adw) g_test_add_func("/gtk4/plain-named-native",plain_named_native);
+    g_test_add_func("/gtk4/bounded-input-dispatch",assert_bounded_dispatch);
+    g_test_add_func("/gtk4/burst-backpressure",burst);g_test_add_func("/gtk4/eof-during-sample",eof_during_sample);
     int status=g_test_run();api.remove_provider(fixture_target(&api),provider);g_object_unref(provider);dc_gtk_shutdown();return status;
 }
