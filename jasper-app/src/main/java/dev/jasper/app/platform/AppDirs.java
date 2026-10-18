@@ -72,6 +72,11 @@ public record AppDirs(Path root, Path configFile, Path logs, boolean overridden)
         return daemonDir().resolve("token");
     }
 
+    /** The instance lock: the process that holds it owns this home (workspace-tabs spec 5.1); its id is in {@code instance.pid} beside it. */
+    public Path instanceLock() {
+        return daemonDir().resolve("instance.lock");
+    }
+
     public Path daemonLock() {
         return daemonDir().resolve("lock");
     }

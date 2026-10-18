@@ -68,6 +68,7 @@ class AppDirsTest {
         assertThat(dirs.daemonDir()).isEqualTo(daemon);
         assertThat(dirs.daemonSocket()).isEqualTo(daemon.resolve("socket"));
         assertThat(dirs.daemonToken()).isEqualTo(daemon.resolve("token"));
+        assertThat(dirs.instanceLock()).isEqualTo(daemon.resolve("instance.lock"));
         assertThat(dirs.daemonLock()).isEqualTo(daemon.resolve("lock"));
         assertThat(daemon).doesNotExist();
     }
