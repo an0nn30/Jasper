@@ -63,6 +63,10 @@ final class ClassicTableFace implements TableFace {
     @Override public Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) {
         return settings && role == dev.jasper.ui.model.Nodes.TextRole.DESCRIPTION ? Typography.Role.BODY : null;
     }
+    /** Plan 10b: the Credential Vault mock's Items rows start right under the header band's rule. */
+    @Override public int columnTop(KitContext context) { return 0; }
+    /** Plan 10b: the Credential Vault mock's "2 of 2 items" stands in a 20 px {@code surface.zebra} band under a {@code border.row} rule. */
+    @Override public boolean columnFooterBand() { return true; }
     /** Plan 9b Rulings 12: a list heading is a {@code surface.tableHeader} band between faint {@code border.row} rules, its own first and last lines. */
     @Override public void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width) {
         var context = rows.context();

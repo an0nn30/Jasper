@@ -389,8 +389,9 @@ final class Tables {
             if (focusControl != null && !nodeRows.containsKey(focusControl)) focusControl = null;
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
-            // A manager list column's rows start at the rail's top inset below the header, level with a rail beside it.
-            scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(ThemePainting.metric(context(), DesignMetrics.Role.COLUMN_RAIL_TOP), 0, 0, 0) : null);
+            // A manager list column's rows start at the face's column top below the header (today's: the rail's top inset,
+            // level with a rail beside it).
+            scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(context().faces().table.columnTop(context()), 0, 0, 0) : null);
             header.removeAll();
             header.setLayout(weights());
             var titles = value().columns();

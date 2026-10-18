@@ -1,7 +1,9 @@
 package dev.jasper.ui.swing;
 
 import dev.jasper.ui.metrics.DesignMetrics;
+import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
+import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
 
 import java.awt.*;
@@ -36,6 +38,11 @@ final class PanelFooters {
          * right below the rows, and it stands on {@code surface.card} under that rule down to the panel's bottom.
          */
         boolean inline;
+        /**
+         * The footer is a manager list column's text under a table whose face bands it ({@link TableFace#columnFooterBand}):
+         * a {@code TABLE_HEADER_HEIGHT} band on {@code surface.zebra} under a {@code border.row} rule.
+         */
+        boolean band;
 
         Footer(KitContext context, String id) {
             this.context = context;
@@ -50,6 +57,15 @@ final class PanelFooters {
             int side = ThemePainting.metric(context, arranged ? DesignMetrics.Role.PANEL_FOOTER_SIDE : DesignMetrics.Role.FIELD_HORIZONTAL_PADDING),
                     vertical = arranged ? 0 : ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP);
             int rule = inline ? ThemePainting.metric(context, DesignMetrics.Role.PANEL_STATUS_RULE) : 0;
+            if (band) {
+                int hairline = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), height = ThemePainting.metric(context, DesignMetrics.Role.TABLE_HEADER_HEIGHT);
+                int line = (int) Math.ceil(ThemePainting.font(context, Typography.Role.CAPTION)
+                    .getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+                int top = Math.max(0, (height - line) / 2);
+                setBorder(new EmptyBorder(hairline + top, side, Math.max(0, height - line - top), side));
+                setLayout(new Composition.Vertical(0));
+                return;
+            }
             setBorder(detail || flush ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(vertical + rule, side, vertical, side));
             setLayout(new Composition.Vertical(0));
         }
@@ -70,6 +86,7 @@ final class PanelFooters {
         }
 
         int height(int width) {
+            if (band) return ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE) + ThemePainting.metric(context, DesignMetrics.Role.TABLE_HEADER_HEIGHT);
             return Math.max(
                     arranged ? 0 : ThemePainting.metric(context, DesignMetrics.Role.PANEL_FOOTER),
                     Composition.height(this, width));
@@ -92,6 +109,13 @@ final class PanelFooters {
                 ThemePainting.antialias(g);
                 // A separator is one physical pixel at every device/user scale.
                 double stroke = 1.0 / Math.abs(g.getTransform().getScaleY());
+                if (band) {
+                    g.setColor(ThemePainting.role(context, DerivedColor.SURFACE_ZEBRA));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                    g.setColor(ThemePainting.role(context, DerivedColor.BORDER_ROW));
+                    g.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
+                    return;
+                }
                 if (inline) {
                     g.setColor(ThemePainting.color(context, SemanticColor.SURFACE_CARD));
                     g.fillRect(0, 0, getWidth(), getHeight());

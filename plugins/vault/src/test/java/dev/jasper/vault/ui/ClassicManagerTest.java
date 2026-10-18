@@ -9,7 +9,10 @@ import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.testing.FakeKit;
 import dev.jasper.sdk.testing.FakeNotifications;
 import dev.jasper.sdk.testing.FakePluginHost;
+import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.Nodes;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.TreeItem;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.vault.model.Account;
@@ -18,9 +21,12 @@ import dev.jasper.vault.service.VaultService;
 import dev.jasper.vault.workstation.Layout;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -134,6 +140,88 @@ class ClassicManagerTest {
                     .containsExactly(ManagerPanel.UNLOCK);
                 window.close();
             }
+        });
+    }
+
+    static String date(Instant timestamp) {
+        return DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(timestamp);
+    }
+
+    @Test void theCategoriesAreATreeWithCountsAndTheItemsATable() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            panel.refresh(rows(), List.of(), STATUS, true);
+            var tree = node(view, ManagerPanel.KIND, Nodes.Tree.class);
+            var all = tree.roots().getFirst();
+            assertThat(all.title()).isEqualTo("All Items");
+            assertThat(all.count()).hasValue(2);
+            assertThat(all.children()).extracting(TreeItem::title).containsExactly("Logins", "SSH Keys", "Secure Notes");
+            assertThat(all.children()).extracting(item -> item.count().getAsInt()).containsExactly(2, 0, 0);
+            assertThat(tree.expandedIds()).containsExactly(ManagerPanel.ALL_TYPES);
+            assertThat(tree.selectedIds()).containsExactly(ManagerPanel.ALL_TYPES);
+            assertThat(node(view, "categories.header", Nodes.Header.class).state().visible()).isTrue();
+            var table = node(view, ManagerPanel.ROWS, Nodes.Table.class);
+            assertThat(table.columns()).extracting(Column::title).containsExactly("Name", "Username", "Type", "Modified");
+            assertThat(table.columns().getFirst().sorted()).hasValue(true);
+            assertThat(table.activateAction()).as("Enter and double-click edit").isEqualTo(ManagerPanel.EDIT);
+            assertThat(table.rows()).extracting(TableRow::id).containsExactly(amp.toString(), proxmox.toString());
+            var first = table.rows().getFirst();
+            assertThat(first.cells()).containsEntry(ManagerPanel.COLUMN_USERNAME, "ubuntu").containsEntry(ManagerPanel.COLUMN_TYPE, "Login")
+                .containsEntry(ManagerPanel.COLUMN_MODIFIED, date(MODIFIED));
+            var name = (Nodes.Stack) first.cellNodes().get(ManagerPanel.COLUMN_NAME);
+            var swatch = (Nodes.Icon) name.children().getFirst();
+            assertThat(swatch.size()).isEqualTo(Nodes.IconSize.SWATCH);
+            assertThat(swatch.hue()).isEqualTo(Nodes.Hue.BLUE);
+            assertThat(((Nodes.Text) name.children().get(1)).text()).isEqualTo("amp");
+            assertThat(node(view, ManagerPanel.ITEMS_FOOTER, Nodes.Text.class).text()).isEqualTo("2 of 2 items");
+            emit(view, new UiEvent.Expanded(ManagerPanel.KIND, ManagerPanel.ALL_TYPES, false));
+            assertThat(node(view, ManagerPanel.KIND, Nodes.Tree.class).expandedIds()).as("the user collapsed All Items").isEmpty();
+            emit(view, new UiEvent.Selected(ManagerPanel.KIND, Set.of(VaultManager.Type.SSH_KEY.name())));
+            assertThat(node(view, ManagerPanel.ITEMS_FOOTER, Nodes.Text.class).text()).isEqualTo("0 of 0 items");
+            panel.close();
+        });
+    }
+
+    @Test void aSearchThatMatchesNothingKeepsTheHeadersAndCountsZero() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            panel.refresh(rows(), List.of(), STATUS, true);
+            emit(view, new UiEvent.Selected(ManagerPanel.ROWS, Set.of(amp.toString())));
+            emit(view, new UiEvent.Selected(ManagerPanel.KIND, Set.of(VaultManager.Type.LOGIN.name())));
+            emit(view, new UiEvent.Edited(ManagerPanel.SEARCH, "no such entry"));
+            var table = node(view, ManagerPanel.ROWS, Nodes.Table.class);
+            assertThat(table.rows()).isEmpty();
+            assertThat(table.columns()).hasSize(4);
+            assertThat(table.empty()).as("no empty state replaces the headers").isEmpty();
+            assertThat(table.emptyText()).isEqualTo("No matching entries");
+            assertThat(node(view, ManagerPanel.ITEMS_FOOTER, Nodes.Text.class).text()).isEqualTo("0 of 2 items");
+            for (String verb : VERBS) assertThat(enabled(view, verb)).as(verb + " without a shown selection").isFalse();
+            emit(view, new UiEvent.Selected(ManagerPanel.KIND, Set.of(ManagerPanel.ALL_TYPES)));
+            assertThat(node(view, ManagerPanel.ITEMS_FOOTER, Nodes.Text.class).text()).isEqualTo("0 of 2 items");
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).emptyText()).isEqualTo("No matching entries");
+            panel.close();
+        });
+    }
+
+    @Test void theSortSurvivesARefreshAndTheSelectionStays() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            var rows = rows();
+            panel.refresh(rows, List.of(), STATUS, true);
+            emit(view, new UiEvent.Selected(ManagerPanel.ROWS, Set.of(proxmox.toString())));
+            emit(view, new UiEvent.Sorted(ManagerPanel.ROWS, ManagerPanel.COLUMN_MODIFIED));
+            assertThat(node(view, ManagerPanel.ROWS, Nodes.Table.class).rows()).extracting(TableRow::id).as("oldest first")
+                .containsExactly(proxmox.toString(), amp.toString());
+            emit(view, new UiEvent.Sorted(ManagerPanel.ROWS, ManagerPanel.COLUMN_MODIFIED));
+            panel.refresh(rows, List.of(), STATUS, true);
+            var table = node(view, ManagerPanel.ROWS, Nodes.Table.class);
+            assertThat(table.rows()).extracting(TableRow::id).as("newest first, after the refresh").containsExactly(amp.toString(), proxmox.toString());
+            assertThat(table.selectedIds()).containsExactly(proxmox.toString());
+            assertThat(table.columns()).filteredOn(column -> column.sorted().isPresent()).singleElement().satisfies(column -> {
+                assertThat(column.id()).isEqualTo(ManagerPanel.COLUMN_MODIFIED);
+                assertThat(column.sorted()).hasValue(false);
+            });
+            panel.close();
         });
     }
 }

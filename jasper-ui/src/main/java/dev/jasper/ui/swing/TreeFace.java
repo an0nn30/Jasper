@@ -18,4 +18,9 @@ interface TreeFace extends HeaderFace {
     boolean fillsDetailRow();
     /** Whether a selected row's keycaps are opaque light caps (the classic Keymap's), not today's passive translucent ones. */
     boolean boxesSelectedKeycaps();
+    /**
+     * Whether a manager rail's tree (column 0) shows its branches as flat section headings over rail rows (today's), not
+     * as tree rows with the face's disclosure and indent (the classic Credential Vault's Categories).
+     */
+    boolean flatRail();
 }

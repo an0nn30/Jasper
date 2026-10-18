@@ -1,10 +1,13 @@
 package dev.jasper.vault.ui;
 
+import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.ListItem;
 import dev.jasper.sdk.ui.MenuItem;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.Option;
+import dev.jasper.sdk.ui.TableRow;
+import dev.jasper.sdk.ui.TreeItem;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiKit;
 import dev.jasper.sdk.ui.UiView;
@@ -19,8 +22,10 @@ import dev.jasper.vault.service.UnlockPrompt;
 import dev.jasper.vault.workstation.Layout;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -40,6 +45,9 @@ final class ManagerPanel implements AutoCloseable {
     /** The Lock Vault action's default binding as the platform writes it (plan 10b Rulings 8). */
     static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "\u21E7\u2318L" : "Ctrl+Shift+L";
     static final String ALL_TYPES = "all";
+    /** The classic table's columns and footer (spec 14.8). */
+    static final String COLUMN_NAME = "name", COLUMN_USERNAME = "username", COLUMN_TYPE = "type", COLUMN_MODIFIED = "modified",
+        ITEMS_FOOTER = "items.footer";
     /** Full rows the former list showed in the 800×600 window (11.1 of its 42-pixel rows), measured at baseline f16ae32f. */
     static final int VISIBLE_ROWS = 11;
     private enum Card { ENTRIES, GRANTS }
@@ -56,6 +64,10 @@ final class ManagerPanel implements AutoCloseable {
     private boolean unlocked, closed;
     private Card card = Card.ENTRIES;
     private String query = "", kind = ALL_TYPES;
+    /** The classic table's sort (a header click) and the tree items the user collapsed; both survive refreshes. */
+    private String sortColumn = COLUMN_NAME;
+    private boolean ascending = true;
+    private final Set<String> collapsed = new HashSet<>();
     private VaultManagerWindow.Status status = new VaultManagerWindow.Status("", "", "");
     private UUID selection, shownSecret;
     private java.time.Instant shownSecretVersion;
@@ -154,6 +166,14 @@ final class ManagerPanel implements AutoCloseable {
                 grantSelection = chosen.ids().stream().findFirst().map(id -> Integer.parseInt(id.substring("grant-".length()))).orElse(-1);
                 render();
             }
+            case UiEvent.Sorted sorted when sorted.id().equals(ROWS) -> {
+                if (sortColumn.equals(sorted.columnId())) ascending = !ascending; else { sortColumn = sorted.columnId(); ascending = true; }
+                filter(); render();
+            }
+            case UiEvent.Expanded expanded when expanded.id().equals(KIND) -> {
+                if (expanded.expanded()) collapsed.remove(expanded.itemId()); else collapsed.add(expanded.itemId());
+                render();
+            }
             case UiEvent.Action action -> act(action.id());
             default -> { }
         }
@@ -202,7 +222,8 @@ final class ManagerPanel implements AutoCloseable {
         String needle = query.strip().toLowerCase(Locale.ROOT);
         visible = allRows.stream().filter(row -> kind.equals(ALL_TYPES) || row.type().name().equals(kind))
             .filter(row -> (row.name() + " " + row.subtitle()).toLowerCase(Locale.ROOT).contains(needle))
-            .sorted(Comparator.comparing(VaultManager.Row::type).thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER)).toList();
+            .sorted(layout == Layout.CLASSIC ? classicOrder()
+                : Comparator.comparing(VaultManager.Row::type).thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER)).toList();
         if (selection != null && visible.stream().noneMatch(row -> row.id().equals(selection))) selection = null;
     }
 
@@ -392,13 +413,80 @@ final class ManagerPanel implements AutoCloseable {
             text("status."+id,value,role)));
     }
 
-    /** The classic columns: today's rail, list and detail with the search moved into the toolbar row (Tasks 4 and 5 recompose them). */
+    /** The classic columns (spec 14.8): the Categories tree with counts, the item table over its footer, and the details. */
     private Nodes.Node classicEntries() {
-        var split = (Nodes.Split) entries();
-        var browser = (Nodes.Panel) split.children().get(1);
-        return new Nodes.Split(split.id(), split.state(), split.kind(), List.of(split.children().get(0),
-            new Nodes.Panel(browser.id(), browser.state(), browser.header(), Optional.empty(), browser.body(), browser.footer()),
-            split.children().get(2)));
+        var kinds = new ArrayList<TreeItem>();
+        for (var type : VaultManager.Type.values())
+            kinds.add(new TreeItem(type.name(), plural(type), Optional.of(icon(type)), true, List.of(), OptionalInt.of(count(type)), false));
+        var all = new TreeItem(ALL_TYPES, "All Items", Optional.of("menu"), false, kinds, OptionalInt.of(allRows.size()), false);
+        var tree = new Nodes.Tree(KIND, ControlState.READY, List.of(all), collapsed.contains(ALL_TYPES) ? Set.of() : Set.of(ALL_TYPES), Set.of(kind), "");
+        var rail = new Nodes.Panel("categories", ControlState.READY, header("categories.header", "Categories"), Optional.empty(), tree, Optional.empty());
+        int scoped = kind.equals(ALL_TYPES) ? allRows.size() : count(VaultManager.Type.valueOf(kind));
+        var browser = new Nodes.Panel("browser", ControlState.READY, hiddenHeader("browser.header", "Items"), Optional.empty(), classicTable(),
+            Optional.of(text(ITEMS_FOOTER, visible.size() + " of " + scoped + (scoped == 1 ? " item" : " items"), Nodes.TextRole.CAPTION)));
+        return new Nodes.Split("columns", ControlState.READY, Nodes.SplitKind.THREE_COLUMN, List.of(rail, browser, detail()));
+    }
+
+    /** The item table: the kind's swatch and the name, then the username, the kind and the date; a header click sorts it. */
+    private Nodes.Table classicTable() {
+        var columns = List.of(column(COLUMN_NAME, "Name", Nodes.TextRole.BODY, 111), column(COLUMN_USERNAME, "Username", Nodes.TextRole.MONO, 80),
+            column(COLUMN_TYPE, "Type", Nodes.TextRole.DESCRIPTION, 72), column(COLUMN_MODIFIED, "Modified", Nodes.TextRole.DESCRIPTION, 85));
+        Optional<Nodes.Empty> none = allRows.isEmpty() ? Optional.of(new Nodes.Empty(EMPTY, ControlState.READY,
+            new Nodes.Icon(EMPTY + ".icon", ControlState.READY, "search", Nodes.Hue.NEUTRAL, Nodes.IconSize.EMPTY, "Nothing to show"),
+            "Nothing to show", "", List.of())) : Optional.empty();
+        return new Nodes.Table(ROWS, ControlState.READY, columns, visible.stream().map(this::tableRow).toList(),
+            selected().map(id -> Set.of(id.toString())).orElse(Set.of()), EDIT, List.of(), Nodes.SelectionMode.SINGLE,
+            Nodes.ScrollPolicy.STANDARD, none, allRows.isEmpty() ? "" : "No matching entries");
+    }
+
+    private Column column(String id, String title, Nodes.TextRole role, double weight) {
+        return new Column(id, title, role, false, weight, sortColumn.equals(id) ? Optional.of(ascending) : Optional.empty());
+    }
+
+    private TableRow tableRow(VaultManager.Row row) {
+        String id = row.id().toString();
+        var name = new Nodes.Stack("row." + id + ".name", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Icon("row." + id + ".icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.SWATCH, row.type().toString()),
+            text("row." + id + ".title", row.name(), Nodes.TextRole.BODY)));
+        return new TableRow(id, Map.of(COLUMN_USERNAME, username(row), COLUMN_TYPE, row.type().toString(),
+                COLUMN_MODIFIED, modified(row).map(ManagerPanel::date).orElse("")),
+            Optional.empty(), false, Optional.empty(), row.name() + ", " + row.type(), Map.of(COLUMN_NAME, name), Optional.empty());
+    }
+
+    /** The classic order: the sorted column, then the name and the id, so equal keys keep a stable order. */
+    private Comparator<VaultManager.Row> classicOrder() {
+        Comparator<VaultManager.Row> order = switch (sortColumn) {
+            case COLUMN_USERNAME -> Comparator.comparing(this::username, String.CASE_INSENSITIVE_ORDER);
+            case COLUMN_TYPE -> Comparator.comparing(VaultManager.Row::type);
+            case COLUMN_MODIFIED -> Comparator.comparing(row -> modified(row).orElse(java.time.Instant.EPOCH));
+            default -> Comparator.comparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER);
+        };
+        order = order.thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER).thenComparing(row -> row.id().toString());
+        return ascending ? order : order.reversed();
+    }
+
+    private String username(VaultManager.Row row) {
+        return entry.apply(row.id()).map(value -> value instanceof Account account ? account.username() : "—").orElse("—");
+    }
+
+    private Optional<java.time.Instant> modified(VaultManager.Row row) {
+        return entry.apply(row.id()).map(value -> switch (value) {
+            case Account account -> account.updated();
+            case SshKey key -> key.created();
+            case ManagedSshKey key -> key.created();
+            case Note note -> note.updated();
+            default -> null;
+        });
+    }
+
+    private int count(VaultManager.Type type) { return (int) allRows.stream().filter(row -> row.type() == type).count(); }
+
+    private static String plural(VaultManager.Type type) {
+        return switch (type) { case LOGIN -> "Logins"; case SSH_KEY -> "SSH Keys"; case NOTE -> "Secure Notes"; };
+    }
+
+    private static Nodes.Header header(String id, String title) {
+        return new Nodes.Header(id, ControlState.READY, title, OptionalInt.empty(), Optional.empty(), Optional.empty(), List.of());
     }
 
     /**

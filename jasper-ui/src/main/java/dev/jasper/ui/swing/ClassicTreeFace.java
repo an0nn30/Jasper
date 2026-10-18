@@ -75,4 +75,6 @@ final class ClassicTreeFace implements TreeFace {
     @Override public boolean fillsDetailRow() { return true; }
     /** Mock 07b: the edited row keeps its accent fill, and its keycaps stand in light boxes on it. */
     @Override public boolean boxesSelectedKeycaps() { return true; }
+    /** Plan 10b: the Credential Vault mock's Categories are a tree, All Items with its ▼ over the indented kinds. */
+    @Override public boolean flatRail() { return false; }
 }

@@ -6,10 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockMatch;
 import dev.jasper.app.windows.AuxiliarySurface;
+import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -86,6 +88,26 @@ class ClassicVaultRenderTest {
                 bands("the toolbar row", render, 1600, 0, 70, TOOLBAR);
                 bands("the status row and Done", render, 1600, 1068, 1142, STATUS);
                 assertThat(MockMatch.present(render, Color.decode("#C4C7CC"))).as("the classic rules").isTrue();
+                assertThat(vault.problems).isEmpty();
+            }
+        });
+    }
+
+    static final String CATEGORIES = "0+34 #ECEDEF, 34+1 #C4C7CC, 35+24 #E1E3E6, 59+1 #C4C7CC, 60+4 #F7F7F8, 64+22 #2F65CA, 86+448 #F7F7F8, 534+1 #C4C7CC";
+    static final String ITEMS = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+22 #2F65CA, 43+22 #F7F8FA, 65+413 #FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC";
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theCategoriesAndItemsMatchTheItemSelectedMock() throws Exception {
+        ClassicCompositionRenderTest.under(false, () -> {
+            try (var vault = vault(root.resolve("columns"))) {
+                var ids = vault.seedLogins(LOGINS);
+                vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
+                var render = render(vault.surface("Credential Vault"), SELECTED.logicalWidth(), SELECTED.logicalHeight());
+                MockMatch.save("light/vault-columns", SELECTED.read(), render);
+                bands("the Categories column", render, 6, 0, 1070, CATEGORIES);
+                bands("the Items column", render, 854, 70, 1070, ITEMS);
+                assertThat(MockMatch.present(render, Color.decode("#F0F1F3"))).as("the table's header band").isTrue();
+                assertThat(MockMatch.present(render, Color.decode("#E1E3E6"))).as("the pane header strip").isTrue();
                 assertThat(vault.problems).isEmpty();
             }
         });

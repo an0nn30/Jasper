@@ -28,4 +28,11 @@ interface TableFace extends HeaderFace {
     Typography.Role cellType(Nodes.TextRole role, boolean settings);
     /** Paints behind an item list's heading rows across {@code width}: nothing, or the classic heading bands (plan 9b Rulings 12). */
     void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width);
+    /** How far a manager column's table rows start below its header: the rail's top inset, or flush under the classic band. */
+    int columnTop(KitContext context);
+    /**
+     * Whether a manager list column's text footer under a table is a band ({@code surface.zebra} under a {@code border.row}
+     * rule, the header band's height); otherwise today's raised footer.
+     */
+    boolean columnFooterBand();
 }

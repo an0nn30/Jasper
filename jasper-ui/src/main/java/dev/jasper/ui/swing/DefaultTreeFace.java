@@ -31,4 +31,5 @@ final class DefaultTreeFace implements TreeFace {
     @Override public void paintDetail(Trees.TreeControl tree, java.awt.Graphics2D g, int index, int width) { tree.paintDetailCard(g, index, width); }
     @Override public boolean fillsDetailRow() { return false; }
     @Override public boolean boxesSelectedKeycaps() { return false; }
+    @Override public boolean flatRail() { return true; }
 }

@@ -32,4 +32,6 @@ final class DefaultTableFace implements TableFace {
     @Override public boolean everyRowOnPage() { return false; }
     @Override public dev.jasper.ui.metrics.Typography.Role cellType(dev.jasper.ui.model.Nodes.TextRole role, boolean settings) { return null; }
     @Override public void paintListHeadings(InteractiveRows.RowsControl rows, java.awt.Graphics2D g, int width) { }
+    @Override public int columnTop(KitContext context) { return ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_TOP); }
+    @Override public boolean columnFooterBand() { return false; }
 }

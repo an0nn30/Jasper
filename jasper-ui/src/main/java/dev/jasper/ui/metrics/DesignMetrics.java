@@ -220,6 +220,8 @@ public final class DesignMetrics {
         values.put(Role.FOCUS_RING, 2);
         values.put(Role.NATIVE_TOOL_HEADER_HEIGHT, 24);
         values.put(Role.PANEL_HEADER, 24);
+        // Plan 10b: a manager rail's rows start 4 under its header strip (the Credential Vault mock's Categories).
+        values.put(Role.COLUMN_RAIL_TOP, 4);
         values.put(Role.CARD_PADDING, 12);
         values.put(Role.FULL_SETTING_SIDE_PADDING, 12);
         values.put(Role.SETTINGS_ROW_SIDE, 12);
