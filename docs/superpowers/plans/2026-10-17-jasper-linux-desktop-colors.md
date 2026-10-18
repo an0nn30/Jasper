@@ -10,7 +10,7 @@
 
 **Spec:** [Approved Linux Desktop colors design](../specs/2026-10-17-jasper-linux-desktop-colors-design.md).
 
-**Status:** Approved for execution, 2026-10-18. Implementation started in `codex/linux-desktop-colors`. This is one runnable deliverable; intermediate commits are not a claim that Desktop colors ships. Execution clarifications: modern libadwaita missing variables remain missing (spec precedence over Task 3 fallback wording); Task 8 preview acquisition will carry explicit source/appearance demand. Linux native evidence remains required; macOS protocol tests are supplemental. Record further deviations here and in `docs/STATUS.md`.
+**Status:** Approved for execution, 2026-10-18. Implementation started in `codex/linux-desktop-colors`. This is one runnable deliverable; intermediate commits are not a claim that Desktop colors ships. Execution clarifications: modern libadwaita missing variables remain missing (spec precedence over Task 3 fallback wording); Task 8 preview acquisition will carry explicit source/appearance demand. Linux native evidence remains required; macOS protocol tests are supplemental. Ubuntu 26.04 VM native protocol/portal tests pass. Task 2 Java regression already passed against Task 1; native missing APIs supplied RED evidence. Record further deviations here and in `docs/STATUS.md`.
 
 ## Global Constraints
 

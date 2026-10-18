@@ -1,6 +1,6 @@
 # Jasper — Status and Handoff
 
-**Linux Desktop colors — 2026-10-18.** Approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) execution started on `codex/linux-desktop-colors` in the attached worktree. Native-first gate awaits Linux access. Clarifications: missing modern libadwaita variables remain missing, and preview acquisition carries explicit source/appearance demand. No feature completion claimed.
+**Linux Desktop colors — 2026-10-18.** Approved [plan](superpowers/plans/2026-10-17-jasper-linux-desktop-colors.md) execution started on `codex/linux-desktop-colors` in the attached worktree. Protocol and portal helpers pass focused Java and native tests on the authorized Ubuntu 26.04 VM; GTK extraction is next. Clarifications: missing modern libadwaita variables remain missing, and preview acquisition carries explicit source/appearance demand. The Task 2 Java regression was already covered by Task 1; native missing APIs supplied RED evidence. No feature completion claimed.
 
 **Ubuntu Yaru theme — 2026-10-17** (`codex/ubuntu-yaru-theme`). Built-in `ubuntu-yaru` Light and Dark, adapted
 from Yaru `26.04.5.1ubuntu`: neutral GTK surfaces, orange actions and focus, matching terminal and editor palettes.
