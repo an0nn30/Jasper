@@ -1,5 +1,93 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation: the series — 2026-10-18** (`claude/enterprise-final`, worktree
+`.claude/worktrees/enterprise-final`, from `main` at `5d5e5fcf3`, where plans 1 to 11 are merged;
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md), plans `2026-10-1*-enterprise-*.md` in
+`superpowers/plans/`). The series is complete; each plan's entry below keeps its rulings and measurements. What it
+delivered: (1) the kit seam, a `Kit` naming metrics, type scale, faces and FlatLaf keys, with `Kit.DEFAULT` today's look;
+(2) the theme engine's 23 derived roles, overridable ones and paint-time guards; (3) SDK 0.18 in five plans: 3a the
+renames, 3b the controls (Notice, Properties, Separator, TABS, read-only fields, swatches, footnotes), 3c the table
+vocabulary, 3d the chrome (Session and Transfer menus, toolbar views, scope hues and nouns, dialog swatches) and 3e
+spec 13's default-look changes; (4) the classic look in three: 4a the frozen classic catalog, 4b the form faces and 4c the
+data faces with the full kit matrix and the first mock comparison; (5) presentation providers in two: 5a the declarative
+kit file, the election and the start-up fallback, 5b the bundled Enterprise plugin with IBM Plex and the Enterprise
+theme in Light and Dark; (6) the window in two: 6a the shell (in-window classic menu row, native title, still motion),
+6b the content (toolbar row, classic tabs, ruled status cells, "▶ Run…" and in-window classic dialogs); (7) dock chrome:
+labelled stripes, the bottom strip, flush frames and header strips, and a dock layout per look; (8) the Run window in
+two: 8a its view and 8b its modeless place at the dock's bottom-left corner; (9) Settings in two: 9a the classic dialog
+chrome and row menus, 9b the classic page compositions; (10) plugin compositions in two: 10a Remote's Workstation,
+Tunnels, SFTP and Transfers and File Server's panel, 10b the Credential Vault manager, sheets and Unlock Vault; (11)
+branding: the look's icons and the Boot Splash with its start-up steps. This branch adds the open Run item's header tint
+(`500adedfd`) and aligns the spec with the rulings made during execution (`19678cd50`). To turn Enterprise on: Settings ›
+Plugins, enable Enterprise (bundled, off by default), restart; turning it off and restarting brings Slate Cobalt back,
+and safe mode starts without it. `./gradlew check --continue`: **<counts>**.
+Residuals against the mocks (logical px unless stated; plan that recorded each): the secondary ink `#3A3D42` that no SDK
+text role paints, so the box titles (4b), SFTP breadcrumbs (10a), Vault status cells (`text.tertiary` `#5C6370`) and
+Unlock's intro (`#1E1F22` at (59, 24) for (55, 18)) paint other inks (10b); `DESCRIPTION` and `SUPPORTING` at 11 px
+where the New File Server and New Tunnel mocks draw 12, New Tunnel's floor 0.53 at 0.535 (4a, 10a); the classic label
+column, Add Login's 94 under the 100 px floor (4b) and the sheets' fields at 142 for 121 (10b); unfocused native table
+and tree selections keep the terminal-selection wildcard (4a, 4c); Add Host's side column shows four buttons for the
+mock's two (4c); classic tabs 1 px and the status bar 2 px taller than the mocks (6b Rulings 7 and 8); Add SSH Key's
+swatch `#2C8B48` for `#2E9E4F`, ΔE 9.7 (6b R39); the header action glyphs in one 10 px box, at 2x "+" 14 for 12, the
+import arrow 12 to 13 for 14, the ellipsis 16 for 19, the minus 14 to 16 for 12 (7); the Light open stripe tile
+`#D7D9DC` for `#CFD4DC`, 8 apart (7); the side stripes 28 thick for the mocks' 23 (7, measured in 8b); Transfer's menu
+title ink 3 px wider in Light and 2 in Dark, the Run window's help text top 84 for 85 (5b); the Run window's muted inks
+TEXT-guarded (`#717680`, `#686D75`, `#E3EAF9` for `#7A808A`, `#7A808A`, `#DCE5F7`), its disabled checkbox on
+`surface.tableHeader` for white, its empty line guarded against the dialog surface (8a); Settings' history buttons draw
+chevrons for the mocks' arrows and the crumb's page title stands at 226 for 225 (9a); `SETTINGS_DESCRIPTION_HEIGHT` 47
+for 47.5, the checkbox label gap and description offset, Keymap recording's Cancel and Set 3 and 1 px narrower, the
+Plugins folder tabs' baseline rule, Shell's "Empty" placement, File Server's port description wrapping one word later,
+and the fixture differences (Keymap counts, the Enterprise plugin in Plugins, Shell's Custom profile, Shell History's
+list, Project Index's empty state at 0.930 over its 0.92 floor) (9b); the Disconnected mock's striped second host
+(`#F7F8FA`) renders `#FFFFFF`, the Tunnels row 22 for 24, the Session combo about 212 wide at 2x for 219, Transfers' place
+after Event Log unchecked (10a Rulings 14); the Sessions tree's separators at 148 and 248 for 166 and 293 with
+right-aligned Host and Port, the Tunnels cell positions, the SFTP row, table and chooser details, Add Host's 106 px keys
+box, "No keys" line, placeholders and disabled buttons, the HTTP tag's ink `#2F65CA` for `#2655AE`, the File Servers
+status dot, ink and Address alignment, the keys table's 22 px empty body and 7 px title inset, and inks no check sees
+(New File Server's "Authorized keys" label and empty key lines `#5C6370`, the combo's address unmuted, SFTP's Modified
+values `#1E1F22`, the selected tree row's idle dot) (10a D3 to D22); the Vault status row's one 18 px `#C4C7CC` cell rule
+for the mock's two full-height `#D3D6DA` (SDK 0.19), its round 7 px dot, the Details' Show and Copy 24 tall for 20, the
+Details column `#F7F7F8` for `#ECEDEF` (ΔE76 3.6), the sheets' first group rule 18 below the strip for 16, plain kind
+glyphs in the tree and hued ones in + New where the mocks draw swatches (SDK 0.19), the toolbar's 14 px "+" setting New
+and its ▼ 1.5 right and the shortcut 2.5 right, the Fields values at 619 for 614.5, a selected row's Name swatch lost in
+the selection where the mock outlines it, the tree's texts at 50 and 58 for 39 and 53, Unlock's field at 126 for 117,
+and Cancel and Save 58 and 54 wide for 69 (10b). Face residuals with no mock behind them: a disabled classic dropdown
+faded twice, a disabled button on a selected row faded as one layer, a classic checkbox row 1 px left of the labels in
+SETTINGS and MIXED cards (4b), and the classic radio's focus halo clipped by 2 px (4b, 4c).
+GUI checks for the user (spec 16.2), Enterprise on unless stated. Window chrome: Light and Dark against the
+Workstation and Dark Mode mocks; the macOS in-window menu bar, native title and About in Help; menus folding into "…",
+then ☰; the toolbar row giving way as the window narrows; many tabs; a configuration warning cell; Compact keeping the
+menu row; nothing moving with animations on; turning Enterprise off brings Slate Cobalt back without a warning; with IBM
+Plex installed, the look's Warning names the hidden files; in the default look, the menu bar's Session and Transfer menus
+(no SSH menu; Transfer reads Share Folder…, New File Server…, —, Open SFTP here, Transfers), the Vault status item
+locking and unlocking, the palette's three recent rows. Dock: stripe drag and drop including the bottom strip; the
+stripes' numbers after a Keymap change; the focused header strip (Catppuccin included); the header action glyphs;
+Enterprise Dark's dock against the Dark Mode mock; the default slots on a fresh Enterprise start; Transfers and ⌘⌥3. Run
+window: open it with ⇧⌘P, "▶ Run…" (shown active while open) and Search everywhere; drag it, drop it near its home and
+below it (it re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; a clicked
+pane takes the keys while it stays; its title row or help text gives the keys back; tab switches and other applications
+leave it open; Escape, ×, Cancel and running a row close it; Browse… opens a file and it stays. Settings: the native
+"Settings" title, the strip, the triangles; a right-click on a modified row, a Notifications row and a plugin page's
+setting row; the Keymap's recording band and Find by Shortcut; the Plugins page's checkboxes and ⋯; Add Variable… and
+its sheet with variables in the table; in the default look, Command Palette, Terminal and System Settings' first
+headings and Project Index's ordered lists. Plugin compositions: the Workstation window (the toolbar view's combo and
+Connect, the Sessions tree's star and Properties, the Tunnels and File Servers tables' activation and context menus, the
+SFTP row); Add Host; New File Server (in the default look too: TFTP's read-only login, FTP's Warning notice, Choose…
+setting the folder); the Vault manager against the Item selected and New menu mocks (sorting, the tree's collapse, Show
+and Copy, the toolbar's verbs while locked), Add Login, Add SSH Key and Unlock Vault; the Licenses and Errors windows'
+list width; a plugin window without a menu row closing with ⌘W, and the default look's File row unchanged. Dialogs:
+Unlock Vault over a terminal window and Add Login over the Vault window (Escape, a second dialog over the first, the
+window closing under them, full screen, either requested over a minimised window opening natively; an in-window classic
+dialog blocks only its window, a known residual); the file chooser (Browse…, File › Open File…, which opens the file in
+the default editor and nothing on Cancel), Create Vault, About Jasper and Remote's "Items already exist". Splash and
+icon: on a cold start the splash appears centred, unfocused and crisp, with no light flash, the art, icon, version line,
+steps and bar, and closes as the first window shows; a start failing after it opened leaves none; none with
+`--background`, `--no-window` or `--safe-mode`, nor in the default look; the Dock icon is Enterprise's in packaged and
+development builds, also when a `--background` resident opens its first window and after Quit then reopen. Windows and
+Linux: the NATIVE title and what the caption shows under Enterprise Dark (6a Rulings 32: `DWMWA_USE_IMMERSIVE_DARK_MODE`
+or not); Settings without the title-bar and animations rows; the window icons are Enterprise's; Ctrl+W closes a plugin
+window without a menu row. Not merged, not pushed.
+
 **Enterprise presentation, plan 10b: the Credential Vault composition — 2026-10-18**
 (`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `6cd4d80cf..5c6808c56`, then this
 documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10b-vault-compositions.md),
