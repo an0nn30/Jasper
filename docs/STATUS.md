@@ -327,8 +327,8 @@ palette scopes specifications carry spec 19.2's banners. Deviations: (a) Task 2:
 before, and the headless gallery's files for Slate Cobalt Dark and Light (322) are byte-identical to the base. `./gradlew check --continue` after the final review fixes: **11,265 tests, 0 failures, 0 errors, 25 skipped**
 (the base's 11,240, this plan's 20 and the final review's 5). A
 selected result's title and tag take the text-aware face (Plex has no ⌘): the Enterprise print's selected row reads ⌘T.
-Open for the orchestrator: the 06 mocks paint the active "▶ Run…" status cell #D9DFEA, the code spec 10.6's
-`surface.control.selected` (#D7D9DC in Enterprise Light). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
+Under ruled cells the open Run window's "▶ Run…" paints `surface.header.active` (the 06 mocks' #D9DFEA; Dark #3D4658), not
+spec 10.6's `surface.control.selected`, which slash segments keep (orchestrator ruling, mock wins; `WindowPairs.ACTIVE_RUN`). GUI checks for the user (spec 16.2): with Enterprise on, open the Run
 window with ⇧⌘P, "▶ Run…" and Search everywhere; drag it by its title, drop it near its home and below it (it
 re-attaches) and elsewhere (it stays, and a new window opens it there); double-click its title; click a terminal pane
 and type (the pane takes the keys, the window stays); click the Run window's title row or help text and type (the keys go to

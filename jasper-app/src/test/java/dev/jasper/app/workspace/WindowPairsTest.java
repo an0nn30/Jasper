@@ -91,7 +91,7 @@ class WindowPairsTest {
             @Override public void actionPerformed(ActionEvent event) { } }, "Go", ClassicToolbarButton.Glyph.PLUS, true, null);
         final ClassicHeader header = new ClassicHeader();
         final TitleSearchField field;
-        final RunItem run, activeRun, slashRun;
+        final RunItem run, activeRun, slashRun, slashActiveRun;
         final WindowStatusBar warning, danger, idle;
 
         Fixture(ThemeController themes) {
@@ -108,6 +108,7 @@ class WindowPairsTest {
             run = new RunItem(open, () -> false);
             activeRun = new RunItem(open, () -> true);
             slashRun = new WindowStatusBar(new SlashSegments(), new RunItem(open, () -> false)).runItem();
+            slashActiveRun = new WindowStatusBar(new SlashSegments(), new RunItem(open, () -> true)).runItem();
             warning = bar(ConfigDiagnostic.Severity.WARNING, true);
             danger = bar(ConfigDiagnostic.Severity.ERROR, true);
             idle = bar(null, false);
@@ -126,7 +127,7 @@ class WindowPairsTest {
             new ClassicMenuBar().style(menus);
             tabs.refresh(); LayoutTestSupport.layoutTree(tabs);
             for (var bar : List.of(warning, danger, idle)) { bar.refreshTheme(); bar.setSize(600, 24); LayoutTestSupport.layoutTree(bar); }
-            for (JComponent each : List.of(button, run, activeRun, slashRun)) { Dimension size = each.getPreferredSize(); each.setSize(size); }
+            for (JComponent each : List.of(button, run, activeRun, slashRun, slashActiveRun)) { Dimension size = each.getPreferredSize(); each.setSize(size); }
         }
 
         BufferedImage search(boolean hover) {
@@ -190,7 +191,8 @@ class WindowPairsTest {
                 && paints(f.danger, expected)),
             new Declared("run item", WindowPairs.RUN, (theme, expected) -> paints(f.run, expected)),
             new Declared("run item on slash segments", WindowPairs.SLASH_RUN, (theme, expected) -> paints(f.slashRun, expected)),
-            new Declared("active run item", WindowPairs.ACTIVE_RUN, (theme, expected) -> paints(f.activeRun, expected)));
+            new Declared("active run item", WindowPairs.ACTIVE_RUN, (theme, expected) -> paints(f.activeRun, expected)),
+            new Declared("active run item on slash segments", WindowPairs.SLASH_ACTIVE_RUN, (theme, expected) -> paints(f.slashActiveRun, expected)));
     }
 
     /** A classic dialog over a 400 x 300 layer, at 4x, in {@code theme} under {@code kit}. */

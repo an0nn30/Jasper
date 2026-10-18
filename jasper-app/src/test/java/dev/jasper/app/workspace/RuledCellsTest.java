@@ -180,6 +180,34 @@ class RuledCellsTest {
         });
     }
 
+    /**
+     * The 06 Run Dialog mock: under ruled cells the open Run window's item lies on {@code surface.header.active} (#D9DFEA
+     * in Enterprise Light, #3D4658 in Dark), its accent ink held readable on it by its pair's guard.
+     */
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void theOpenRunWindowsItemTakesTheMocksHeaderTintUnderRuledCells(boolean dark) throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(dark);
+            try {
+                var run = new RunItem(new AbstractAction("Command Palette") { @Override public void actionPerformed(ActionEvent event) { } }, () -> true);
+                var bar = new WindowStatusBar(new RuledCells(), run);
+                bar.setMetadata(local("Mac"), "130 × 69", true);
+                var image = MockProfile.print(bar, 800, 24);
+                var theme = themes.current().chrome();
+                var tint = DerivedColor.SURFACE_HEADER_ACTIVE.color(theme);
+                assertThat(dev.jasper.ui.theme.ColorMath.hex(tint)).as("the theme's surface.header.active").isEqualToIgnoringCase(dark ? "#3D4658" : "#D9DFEA");
+                assertThat(MockProfile.at(image, 4, 24)).as("the open Run window's item").isEqualTo(tint);
+                if (!dark) assertThat(MockProfile.deltaE(MockProfile.at(image, 4, 22), MockProfile.at(MockProfile.mock(EnterpriseWorkstationMockTest.RUN),
+                    EnterpriseWorkstationMockTest.X + 4, 1795))).as("the Run Dialog mock's item").isLessThanOrEqualTo(2.5);
+                var pair = WindowPairs.run(true, true);
+                assertThat(pair.against()).as("its ink's pair lies on the tint").isEqualTo(DerivedColor.SURFACE_HEADER_ACTIVE);
+                var ink = dev.jasper.ui.theme.SurfaceContrast.painted(theme, pair);
+                assertThat(pair.guard().holds(ink, tint)).as("the accent ink meets its guard").isTrue();
+                assertThat(WindowPairsTest.has(image, ink)).as("the accent ink is painted").isTrue();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void aContentTabsItemsAreCellsRuledBetweenTheirLabels() throws Exception {
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
