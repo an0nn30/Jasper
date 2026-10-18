@@ -841,6 +841,7 @@ final class Stacks {
         }
         int verticalGap(Component previous, Component child) {
             if (role == Nodes.LayoutRole.DETAIL && previous instanceof Cards.CardSurface && captions.contains(child)) return ThemePainting.metric(context, DesignMetrics.Role.DETAIL_METADATA_GAP);
+            if (role == Nodes.LayoutRole.DETAIL && child instanceof Cards.SectionSurface section) return context.faces().group.sectionGap(section, gap());
             return titlePair ? ThemePainting.metric(context, DesignMetrics.Role.TITLE_PAIR_GAP) : child instanceof Indicators.StrengthMeter
                 ? ThemePainting.metric(context, DesignMetrics.Role.STRENGTH_TOP_GAP) : gap();
         }

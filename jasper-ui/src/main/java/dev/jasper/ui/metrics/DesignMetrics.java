@@ -46,6 +46,9 @@ public final class DesignMetrics {
         // A port field's resting width: New File Server and New Tunnel agree on 83; Add Host's older 71 is a recorded residual.
         PORT_FIELD_WIDTH(83),
         FOOTER_STATUS_GAP(11), WINDOW_ACTION_MIN_WIDTH(72), MENU_ICON_ARROW_WIDTH(21), TITLE_PAIR_GAP(3), DETAIL_MASK_PITCH(7), DETAIL_MASK_COUNT(12), DETAIL_ROW_SIDE(12),
+        // A manager detail's grid of label and value rows (a group face's, spec 14.8's Fields): its box inside the card's
+        // sides and bottom and its rows inside the box, and the box's top line under the card's top.
+        DETAIL_GRID_INSET(9), DETAIL_GRID_TOP(11),
         CONTROL_RADIUS(4), CARD_RADIUS(6), WINDOW_RADIUS(8), SEGMENT_TRACK_RADIUS(4), SEGMENT_ITEM_RADIUS(3),
         // Title rows measured on the 2026-10-10 Desktop references: a window's row above its rule (Credential Vault, and
         // the Settings header that stands in for it), a dialog's band before its content (Add Host, New File Server, New
@@ -65,7 +68,7 @@ public final class DesignMetrics {
         FOCUS_HALO_PERCENT_DARK(32), FOCUS_HALO_PERCENT_LIGHT(25), ERROR_HALO_PERCENT(22), TILE_PERCENT_DARK(17), TILE_PERCENT_LIGHT(13),
         FOCUS_RING(3), PANEL_HEADER(35), PANEL_HEADER_BOTTOM_GAP(5), PANEL_HEADER_ACTION(24), PANEL_HEADER_ACTION_GAP(2), PANEL_HEADER_TRAILING_PADDING(6), PANEL_HEADER_CONTRIBUTED_GLYPH(18), PANEL_SEARCH_SIDE(7), PANEL_SEARCH_BOTTOM(6), PANEL_SEARCH_HEIGHT(24), PANEL_SEARCH_VERTICAL_PADDING(8), PANEL_HEADER_ACTION_VERTICAL(7), PANEL_SEARCH_PADDING(5), PANEL_SEARCH_GAP(3), PANEL_SEARCH_TEXT_BASELINE(1), PANEL_SEARCH_TOP(0), PANEL_SEARCH_RULE(0), PANEL_STATUS_RULE(0), PANEL_FOOTER(30), SWITCH_WIDTH(32), SWITCH_HEIGHT(18), SWITCH_KNOB(14),
         COMPACT_SWITCH_WIDTH(28), COMPACT_SWITCH_HEIGHT(16), COMPACT_SWITCH_KNOB(12),
-        ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_PROMPT(24),
+        ICON_CAPTION(12), ICON_CONTROL(14), ICON_RAIL(16), ICON_EMPTY(20), ICON_PROMPT(24), ICON_SWATCH(12),
         FIELD_VERTICAL_PADDING(8), BUTTON_VERTICAL_PADDING(8), BUTTON_GAP(6), ICON_GAP(6),
         TRANSPARENT_FIELD_PADDING(5), TRANSPARENT_FIELD_RADIUS(3), TRANSPARENT_FIELD_FOCUS_RADIUS(4), FIELD_HORIZONTAL_PADDING(8), BUTTON_HORIZONTAL_PADDING(14), PRIMARY_BUTTON_HORIZONTAL_PADDING(14),
         TEXTAREA_PADDING(7), PORT_PREFIX_GAP(2), SEGMENT_PADDING(2), SEGMENT_HORIZONTAL_PADDING(10), CHIP_HEIGHT(16), CHIP_PADDING(4),
@@ -222,6 +225,12 @@ public final class DesignMetrics {
         values.put(Role.PANEL_HEADER, 24);
         // Plan 10b: a manager rail's rows start 4 under its header strip (the Credential Vault mock's Categories).
         values.put(Role.COLUMN_RAIL_TOP, 4);
+        // Plan 10b: a manager detail's content stands 12 inside its column, its parts 12 apart (the Credential Vault
+        // mock's Details pane).
+        values.put(Role.DETAIL_PADDING, 12);
+        values.put(Role.DETAIL_SECTION_GAP, 12);
+        // Plan 10b: a swatch is a 10 px square (the Credential Vault mocks' Name cells and Details heading).
+        values.put(Role.ICON_SWATCH, 10);
         values.put(Role.CARD_PADDING, 12);
         values.put(Role.FULL_SETTING_SIDE_PADDING, 12);
         values.put(Role.SETTINGS_ROW_SIDE, 12);

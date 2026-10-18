@@ -17,6 +17,7 @@ import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.UiView;
 import dev.jasper.vault.model.Account;
 import dev.jasper.vault.model.Auth;
+import dev.jasper.vault.model.Grant;
 import dev.jasper.vault.service.VaultService;
 import dev.jasper.vault.workstation.Layout;
 import java.nio.file.Path;
@@ -221,6 +222,61 @@ class ClassicManagerTest {
                 assertThat(column.id()).isEqualTo(ManagerPanel.COLUMN_MODIFIED);
                 assertThat(column.sorted()).hasValue(false);
             });
+            panel.close();
+        });
+    }
+
+    @Test void theDetailsPaneFollowsTheSelection() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            panel.refresh(rows(), List.of(new Grant("dev.jasper.remote", amp)), STATUS, true);
+            assertThat(node(view, "detail.header", Nodes.Header.class).title()).isEqualTo("Details");
+            assertThat(node(view, "detail.none", Nodes.Text.class).text()).isEqualTo("Select an item to view its details.");
+            emit(view, new UiEvent.Selected(ManagerPanel.ROWS, Set.of(amp.toString())));
+            assertThat(find(view, "detail.none")).isEmpty();
+            assertThat(node(view, "detail.icon", Nodes.Icon.class).size()).isEqualTo(Nodes.IconSize.SWATCH);
+            assertThat(node(view, "detail.name", Nodes.Text.class).text()).isEqualTo("amp");
+            assertThat(node(view, "detail.type", Nodes.Text.class).text()).isEqualTo("Login \u00B7 Password");
+            assertThat(node(view, "detail.fields.section", Nodes.Section.class).title()).isEqualTo("Fields");
+            assertThat(node(view, "detail.username.row", Nodes.FormRow.class).label()).isEqualTo("Username");
+            assertThat(node(view, "detail.username", Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.MONO);
+            assertThat(button(view, "detail.username.copy").label()).isEqualTo("Copy");
+            assertThat(button(view, "detail.username.copy").action()).isEqualTo("detail.username.copy");
+            String first = "detail.secret." + amp;
+            assertThat(node(view, first, Nodes.Secret.class).kind()).isEqualTo(Nodes.SecretKind.DETAIL);
+            assertThat(node(view, first, Nodes.Secret.class).copyAction()).isEqualTo("detail.password.copy");
+            assertThat(secret(view, first)).isEqualTo("synthetic-amp");
+            var properties = node(view, "detail.properties", Nodes.Properties.class);
+            assertThat(properties.title()).as("untitled: label-colon lines (10a Rulings 4)").isEmpty();
+            assertThat(properties.rows()).extracting(row -> row.label() + "=" + row.value()).containsExactly("Modified=" + date(MODIFIED), "Used by=Remote");
+            assertThat(button(view, ManagerPanel.EDIT).label()).isEqualTo("Edit\u2026");
+            assertThat(button(view, ManagerPanel.DELETE).label()).isEqualTo("Delete\u2026");
+            assertThat(view.spec().toString()).as("no secret in the descriptor").doesNotContain("synthetic-amp");
+            emit(view, new UiEvent.Selected(ManagerPanel.ROWS, Set.of(proxmox.toString())));
+            assertThat(find(view, first)).as("the first entry's value is gone with its control").isEmpty();
+            assertThat(secret(view, "detail.secret." + proxmox)).as("the selected entry's own value").isEqualTo("synthetic-Proxmox");
+            assertThat(node(view, "detail.properties", Nodes.Properties.class).rows().get(1).value()).isEqualTo("Not used");
+            press(view, ManagerPanel.DELETE);
+            assertThat(asked).containsExactly("delete " + proxmox);
+            panel.close();
+        });
+    }
+
+    @Test void anSshKeysDetailsListItsFilesAndCopyThePublicKey() throws Exception {
+        edt(() -> {
+            var panel = panel(); var view = panel.view();
+            UUID laptop = UUID.randomUUID();
+            entries.put(laptop, new dev.jasper.vault.model.SshKey(laptop, "laptop", "ssh-ed25519", "SHA256:fixture", "",
+                directory.resolve("laptop"), directory.resolve("laptop.pub"), MODIFIED));
+            panel.refresh(List.of(new VaultManager.Row(laptop, "laptop", "SHA256:fixture", VaultManager.Type.SSH_KEY)), List.of(), STATUS, true);
+            emit(view, new UiEvent.Selected(ManagerPanel.ROWS, Set.of(laptop.toString())));
+            assertThat(node(view, "detail.type", Nodes.Text.class).text()).isEqualTo("SSH Key \u00B7 ssh-ed25519");
+            assertThat(node(view, "detail.private.row", Nodes.FormRow.class).label()).isEqualTo("Private key");
+            assertThat(node(view, "detail.public.row", Nodes.FormRow.class).label()).isEqualTo("Public key");
+            assertThat(node(view, "detail.fingerprint", Nodes.Text.class).text()).isEqualTo("SHA256:fixture");
+            press(view, ManagerPanel.COPY_PUBLIC);
+            assertThat(button(view, ManagerPanel.COPY_PUBLIC).label()).isEqualTo("Copy Public Key");
+            assertThat(asked).containsExactly("copy-public " + laptop);
             panel.close();
         });
     }

@@ -20,6 +20,8 @@ final class Cards {
         boolean fullForm, detail;
         /** On a Settings page: rows share the card's top stroke, and the bottom stroke has its own line below the last row. */
         boolean settings;
+        /** A manager detail's FORM card of label and value rows under a group face that draws it as a grid ({@link GridRows}). */
+        boolean grid;
         /** The children of the last update, which {@link #relabel} measures again. */
         private List<ControlRegistry.Control> members = List.of();
         CardControl(KitView view, Nodes.Card node) {
@@ -39,6 +41,7 @@ final class Cards {
             component.setBorder(context().faces().group.cardBorder(context(), ((Nodes.Card) node).kind(), settings, new EmptyBorder(pad, pad, bottom, pad)));
             ((CardSurface) component).kind = ((Nodes.Card) node).kind();
             ((CardSurface) component).page = settings;
+            ((CardSurface) component).grid = grid;
             component.setLayout(
                     ((Nodes.Card) node).kind() == Nodes.CardKind.MIXED
                             ? new MixedLayout(this)
@@ -47,12 +50,16 @@ final class Cards {
                                             ? 0
                                             : context().faces().group.cardGap(context(), ((Nodes.Card) node).kind(), settings,
                                                     ThemePainting.metric(context(), DesignMetrics.Role.ROW_GAP))));
+            if (grid) { component.setBorder(GridRows.border(context())); component.setLayout(new GridRows(context())); }
         }
 
         @Override
         void children(List<ControlRegistry.Control> controls) {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
             members = List.copyOf(controls);
+            boolean rows = detail && ((Nodes.Card) node).kind() == Nodes.CardKind.FORM && !controls.isEmpty()
+                && controls.stream().allMatch(c -> c instanceof FormRows.RowControl) && context().faces().group.detailGrid();
+            if (rows != grid) { grid = rows; refresh(); }
             labelColumnFor(this, controls);
             ((CardSurface) component).settings =
                     controls.stream()
@@ -103,6 +110,66 @@ final class Cards {
             if (c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE) {
                 var inset = labels.choiceInset(card.context(), column);
                 if (inset != null || c.component.getBorder() != null) c.component.setBorder(inset);
+            }
+        }
+    }
+
+    /**
+     * A grid card's rows (spec 14.8's Fields): inside a box {@code DETAIL_GRID_INSET} from the card's sides and bottom and
+     * {@code DETAIL_GRID_TOP} below its top, each row centred in a slot at least {@code SETTING_HEIGHT} tall, the slots a
+     * hairline apart for the rules the group face paints, and the rows {@code DETAIL_GRID_INSET} inside the box's sides.
+     */
+    static final class GridRows implements Composition.WidthLayout {
+        private final KitContext context;
+        GridRows(KitContext context) { this.context = context; }
+
+        static EmptyBorder border(KitContext context) {
+            int inset = ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_INSET), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
+            return new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_TOP) + line, 2 * inset + line, inset + line, 2 * inset + line);
+        }
+
+        private static int slot(KitContext context, int height) { return Math.max(ThemePainting.metric(context, DesignMetrics.Role.SETTING_HEIGHT), height); }
+
+        /** The y of the rule between each two visible rows of {@code card}, laid out by this layout. */
+        static List<Integer> rules(CardSurface card) {
+            var rules = new java.util.ArrayList<Integer>();
+            int line = ThemePainting.metric(card.context, DesignMetrics.Role.HAIRLINE), y = card.getInsets().top;
+            boolean first = true;
+            for (Component c : card.getComponents()) if (c.isVisible()) {
+                if (!first) { rules.add(y); y += line; }
+                y += slot(card.context, c.getHeight());
+                first = false;
+            }
+            return rules;
+        }
+
+        @Override public int height(Container p, int width) {
+            Insets insets = p.getInsets();
+            int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), h = insets.top + insets.bottom, count = 0;
+            for (Component c : p.getComponents()) if (c.isVisible()) {
+                h += slot(context, Composition.height(c, Math.max(0, width - insets.left - insets.right))) + (count++ > 0 ? line : 0);
+            }
+            return h;
+        }
+
+        @Override public Dimension preferredLayoutSize(Container p) {
+            int w = 0;
+            for (Component c : p.getComponents()) if (c.isVisible()) w = Math.max(w, c.getPreferredSize().width);
+            Insets insets = p.getInsets();
+            w += insets.left + insets.right;
+            return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+        }
+
+        @Override public void layoutContainer(Container p) {
+            Insets insets = p.getInsets();
+            int line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE), y = insets.top, w = Math.max(0, p.getWidth() - insets.left - insets.right);
+            boolean first = true;
+            for (Component c : p.getComponents()) if (c.isVisible()) {
+                if (!first) y += line;
+                int h = Composition.height(c, w), s = slot(context, h);
+                c.setBounds(insets.left, y + (s - h) / 2, w, h);
+                y += s;
+                first = false;
             }
         }
     }
@@ -170,7 +237,7 @@ final class Cards {
         List<JComponent> settings = List.of();
         /** The card's kind and whether it is on a Settings page, which the group face reads to place its dividers. */
         Nodes.CardKind kind = Nodes.CardKind.FORM;
-        boolean page;
+        boolean page, grid;
         final KitContext context;
 
         CardSurface(KitContext context) {

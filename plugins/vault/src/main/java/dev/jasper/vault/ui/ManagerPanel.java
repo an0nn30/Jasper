@@ -424,7 +424,87 @@ final class ManagerPanel implements AutoCloseable {
         int scoped = kind.equals(ALL_TYPES) ? allRows.size() : count(VaultManager.Type.valueOf(kind));
         var browser = new Nodes.Panel("browser", ControlState.READY, hiddenHeader("browser.header", "Items"), Optional.empty(), classicTable(),
             Optional.of(text(ITEMS_FOOTER, visible.size() + " of " + scoped + (scoped == 1 ? " item" : " items"), Nodes.TextRole.CAPTION)));
-        return new Nodes.Split("columns", ControlState.READY, Nodes.SplitKind.THREE_COLUMN, List.of(rail, browser, detail()));
+        return new Nodes.Split("columns", ControlState.READY, Nodes.SplitKind.THREE_COLUMN, List.of(rail, browser, classicDetail()));
+    }
+
+    /**
+     * The classic Details pane (spec 14.8): the swatch and name, the kind and method, the Fields group, the untitled
+     * Properties and the entry's buttons; one line without a selection. Stored secrets stay in DETAIL Secret nodes.
+     */
+    private Nodes.Node classicDetail() {
+        var row = visible.stream().filter(item -> item.id().equals(selection)).findFirst().orElse(null);
+        var content = new ArrayList<Nodes.Node>();
+        if (row == null) content.add(text("detail.none", "Select an item to view its details.", Nodes.TextRole.DESCRIPTION));
+        else entry.apply(row.id()).ifPresent(value -> {
+            // The swatch beside the name over the kind and method, as one block (the Item selected mock).
+            content.add(new Nodes.Stack("detail.heading", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Icon("detail.icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.SWATCH, row.type().toString()),
+                new Nodes.Stack("detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
+                    text("detail.name", row.name(), Nodes.TextRole.DETAIL_TITLE),
+                    text("detail.type", row.type() + method(value), Nodes.TextRole.DESCRIPTION))))));
+            var fields = new ArrayList<Nodes.Node>();
+            switch (value) {
+                case Account account -> {
+                    fields.add(field("username", "Username", new Nodes.Stack("detail.username.value", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                        text("detail.username", account.username(), Nodes.TextRole.MONO),
+                        new Nodes.Button("detail.username.copy", ControlState.READY, "Copy", "", Nodes.ButtonKind.SECONDARY, "detail.username.copy", "Copy username")))));
+                    if (password(account.auth()) != null) fields.add(field("password", "Password",
+                        new Nodes.Secret(secretId(), ControlState.READY, "", "Password", "", Nodes.SecretKind.DETAIL, "detail.password.copy")));
+                    if (account.auth() instanceof Auth.Key key) fields.add(fieldText("private", "Private key", key.keyPath().toString()));
+                    if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(fieldText("private", "Private key", key.keyPath().toString()));
+                }
+                case SshKey key -> {
+                    fields.add(fieldText("algorithm", "Algorithm", key.algorithm())); fields.add(fieldText("fingerprint", "Fingerprint", key.fingerprint()));
+                    fields.add(fieldText("private", "Private key", key.privatePath().toString())); fields.add(fieldText("public", "Public key", key.publicPath().toString()));
+                    if (!key.comment().isBlank()) fields.add(fieldText("comment", "Comment", key.comment()));
+                }
+                case ManagedSshKey key -> {
+                    fields.add(fieldText("storage", "Storage", "Stored in Vault")); fields.add(fieldText("fingerprint", "Fingerprint", key.fingerprint()));
+                }
+                case Note note -> fields.add(field("note", "Note",
+                    new Nodes.Secret(secretId(), ControlState.READY, "", "Secure note", "", Nodes.SecretKind.DETAIL, "detail.note.copy")));
+                default -> { }
+            }
+            content.add(new Nodes.Section("detail.fields.section", ControlState.READY, "Fields",
+                new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.FORM, fields)));
+            content.add(new Nodes.Properties("detail.properties", ControlState.READY, "", List.of(
+                new Nodes.PropertyRow("Modified", modified(row).map(ManagerPanel::date).orElse(""), false),
+                new Nodes.PropertyRow("Used by", usedBy(row.id()), false))));
+            var actions = new ArrayList<Nodes.Node>(List.of(
+                new Nodes.Button(EDIT, ControlState.READY, "Edit…", "", Nodes.ButtonKind.SECONDARY, EDIT, "Edit entry"),
+                new Nodes.Button(DELETE, ControlState.READY, "Delete…", "", Nodes.ButtonKind.SECONDARY, DELETE, "Delete entry")));
+            if (row.type() == VaultManager.Type.SSH_KEY) actions.add(new Nodes.Button(COPY_PUBLIC, ControlState.READY, "Copy Public Key", "",
+                Nodes.ButtonKind.SECONDARY, COPY_PUBLIC, "Copy public key"));
+            content.add(new Nodes.Stack("detail.actions", ControlState.READY, Nodes.LayoutRole.INLINE, actions));
+        });
+        return new Nodes.Panel("detail", ControlState.READY, header("detail.header", "Details"), Optional.empty(),
+            new Nodes.Stack("detail.content", ControlState.READY, Nodes.LayoutRole.DETAIL, content), Optional.empty());
+    }
+
+    /** " · Password", " · Private key", " · ssh-ed25519": what the kind's heading line adds. */
+    private static String method(Object value) {
+        return switch (value) {
+            case Account account -> " · " + (account.auth() instanceof Auth.Password ? "Password" : account.auth() instanceof Auth.Key ? "Private key" : "Private key and password");
+            case SshKey key -> " · " + key.algorithm();
+            case ManagedSshKey _ -> " · Stored in Vault";
+            default -> "";
+        };
+    }
+
+    private static Nodes.Node field(String id, String label, Nodes.Node control) {
+        return new Nodes.FormRow("detail." + id + ".row", ControlState.READY, label, "", control, Optional.empty(), false);
+    }
+
+    /** A Fields row whose value is data text. */
+    private static Nodes.Node fieldText(String id, String label, String data) { return field(id, label, text("detail." + id, data, Nodes.TextRole.MONO)); }
+
+    /** The plugins granted this entry, by their id's last segment capitalised ("Remote"); "Not used" without one (Rulings 6). */
+    private String usedBy(UUID id) {
+        var users = grants.stream().filter(grant -> grant.credentialId().equals(id)).map(grant -> {
+            String plugin = grant.pluginId().substring(grant.pluginId().lastIndexOf('.') + 1);
+            return plugin.isEmpty() ? grant.pluginId() : plugin.substring(0, 1).toUpperCase(Locale.ROOT) + plugin.substring(1);
+        }).distinct().toList();
+        return users.isEmpty() ? "Not used" : String.join(", ", users);
     }
 
     /** The item table: the kind's swatch and the name, then the username, the kind and the date; a header click sorts it. */

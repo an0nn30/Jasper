@@ -4,6 +4,7 @@ import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.testsupport.EnterpriseLook;
+import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockMatch;
 import dev.jasper.app.windows.AuxiliarySurface;
 import dev.jasper.sdk.ui.UiEvent;
@@ -11,6 +12,7 @@ import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
@@ -108,6 +110,37 @@ class ClassicVaultRenderTest {
                 bands("the Items column", render, 854, 70, 1070, ITEMS);
                 assertThat(MockMatch.present(render, Color.decode("#F0F1F3"))).as("the table's header band").isTrue();
                 assertThat(MockMatch.present(render, Color.decode("#E1E3E6"))).as("the pane header strip").isTrue();
+                assertThat(vault.problems).isEmpty();
+            }
+        });
+    }
+
+    static final String DETAILS = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E6E8EB, 130+26 #FFFFFF, "
+        + "156+1 #D3D6DA, 157+8 #ECEDEF, 165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22 #FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, "
+        + "499+1 #C4C7CC";
+    static final String DETAILS_NONE = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+474 #ECEDEF, 499+1 #C4C7CC";
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theManagerMatchesItsMocksWithAndWithoutASelection() throws Exception {
+        ClassicCompositionRenderTest.under(false, () -> {
+            try (var vault = vault(root.resolve("details"))) {
+                var ids = vault.seedLogins(LOGINS);
+                var manager = vault.surface("Credential Vault");
+                var none = render(manager, NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
+                MockMatch.save("light/vault-manager", NO_SELECTION.read(), none);
+                bands("the Details pane without a selection", none, 1600, 70, 1070, DETAILS_NONE);
+                MockCrops.fontsFloor("light/vault-manager edge agreement", MockMatch.agreement(NO_SELECTION.read(), none), 0.55);
+                vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
+                var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
+                MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
+                bands("the Details pane of amp", selected, 1085, 70, 1070, DETAILS);
+                bands("the Categories column", selected, 6, 0, 1070, CATEGORIES);
+                bands("the Items column", selected, 854, 70, 1070, ITEMS);
+                bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);
+                bands("the status row and Done", selected, 1600, 1068, 1142, STATUS);
+                for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
+                    assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();
+                MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
                 assertThat(vault.problems).isEmpty();
             }
         });
