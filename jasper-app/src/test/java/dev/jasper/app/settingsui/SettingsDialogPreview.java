@@ -12,7 +12,6 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.shortcuthelp.ShortcutTestSupport;
@@ -82,10 +81,9 @@ public final class SettingsDialogPreview {
                 home.resolve("plugins.toml"), home.resolve("plugins.lock")), new ActivityNotifier(new BuddyTestSupport().companion(), () -> { }),
                 PluginRuntime.SettingsReports.IGNORED, contributions, windows, new TerminalRegistry());
             runtime[0].start(Map.of(), true);
-            var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run,
-                Duration.ofMillis(20), Duration.ofMillis(1));
+            var flow = new RestartFlow(mode -> true);
             manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
-                ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                Runnable::run, path -> { }, path -> { }, uri -> { }));
             previewPlugins[0] = new dev.jasper.app.plugins.PluginPreviewSupport(home.resolve("preview-plugins"));
         });
         var keymapHooks = new KeymapPage.Hooks(new Contributions(), Map::of, Map::of, true, edits -> CompletableFuture.completedFuture(null));

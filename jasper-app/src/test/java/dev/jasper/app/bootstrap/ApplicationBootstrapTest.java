@@ -208,19 +208,6 @@ class ApplicationBootstrapTest {
         } finally { if (received.get() != null) received.get().close(); }
     }
 
-    @Test void onlyAPlainReplacementCanHandOffAndOnlyAPureStandaloneLaunchExplainsItself() {
-        Path file = Path.of("/tmp/other.toml"), plugin = Path.of("/tmp/plugin");
-        var safe = new AppArguments(null, false, false, true, null, false);
-        assertThat(ApplicationBootstrap.replacementHandsOff(safe)).as("--safe-mode restarts into a plain launch").isTrue();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(file, false, false, true, null, false))).isFalse();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(null, false, false, true, plugin, false))).isFalse();
-        assertThat(ApplicationBootstrap.replacementHandsOff(new AppArguments(null, false, false, true, null, true))).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, null, true))).isTrue();
-        assertThat(ApplicationBootstrap.standaloneNotice(safe)).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(file, false, false, false, null, true))).isFalse();
-        assertThat(ApplicationBootstrap.standaloneNotice(new AppArguments(null, false, false, false, plugin, true))).isFalse();
-    }
-
     @Test void onlyAPackagedMacLoginLaunchStartsHiddenFromTheDock() throws Exception {
         // A real bundle layout, because a packaged image only counts when it carries the bridge beside the launcher.
         Path bundle = directory.resolve("Jasper.app");

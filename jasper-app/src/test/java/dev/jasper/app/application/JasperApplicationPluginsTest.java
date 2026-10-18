@@ -226,10 +226,11 @@ class JasperApplicationPluginsTest {
             assertThat(application.restart(RestartMode.NORMAL)).as("already on its way out").isTrue();
         });
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
-        assertThat(order).containsExactly("endpoint released", "spawn [jasper, SAME]", "terminate");
+        assertThat(order).containsExactly("endpoint released", "spawn [jasper, SAME, --replacing, " + ProcessHandle.current().pid() + "]",
+            "terminate");
     }
 
-    @Test void aReplacementForAnEndpointOwnerWhoseCleanupHangsCanNeverHandOff() throws Exception {
+    @Test void aReplacementStartsEvenWhenCleanupHangsAndWaitsForTheLock() throws Exception {
         List<String> spawned = new CopyOnWriteArrayList<>();
         var terminated = new CountDownLatch(1);
         var release = new CountDownLatch(1);
@@ -243,7 +244,7 @@ class JasperApplicationPluginsTest {
                 application.restart(RestartMode.SAME);
             });
             assertThat(terminated.await(10, TimeUnit.SECONDS)).as("the shutdown grace bounds the wait").isTrue();
-            assertThat(spawned).containsExactly("jasper --standalone");
+            assertThat(spawned).containsExactly("jasper --replacing " + ProcessHandle.current().pid());
         } finally { release.countDown(); }
     }
 

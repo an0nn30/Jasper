@@ -10,7 +10,6 @@ import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
 import dev.jasper.app.presentation.Projections;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -179,9 +178,9 @@ final class EnterpriseSettings implements AutoCloseable {
                         {"notifications.errors", "Notifications: Show Errors"}, {"notifications.history", "Notifications: Show History"},
                         {"notifications.dismiss", "Notifications: Dismiss Cards"}})
                     contributions.addAction(action[0], action[1], null, List.of(), Optional.empty(), invocation -> { });
-                var flow = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
+                var flow = new RestartFlow(mode -> true);
                 var manager = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), flow, () -> { },
-                    ResidentControl.NONE, false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                    Runnable::run, path -> { }, path -> { }, uri -> { }));
                 var installed = new InstalledThemes(
                     List.of(new InstalledThemes.ThemeOption("slate-cobalt", "Slate Cobalt", preview(enterprise, true)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, true))),
                     List.of(new InstalledThemes.ThemeOption("slate-daylight", "Slate Daylight", preview(enterprise, false)), new InstalledThemes.ThemeOption("enterprise", "Enterprise", preview(enterprise, false))),

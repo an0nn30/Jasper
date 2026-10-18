@@ -1,7 +1,6 @@
 package dev.jasper.app.pluginmanager;
 
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.settingsui.PageContext;
 import dev.jasper.app.settingsui.SettingsPage;
@@ -26,21 +25,20 @@ public final class PluginManager {
      * What the manager needs from the application.
      *
      * @param chooseZip asks the user for a plugin zip over the Settings dialog; empty when cancelled
-     * @param restarts the restart conversation
+     * @param restarts the restart banner's state
      * @param quit quits Jasper, for when it cannot restart itself
-     * @param resident the resident process, probed for the standalone notice
-     * @param standaloneNotice whether this process is a {@code --standalone} replacement that should say when a resident still runs
-     * @param worker runs the blocking resident probe
+     * @param worker runs blocking file work: preparing a settings file, creating a folder to reveal
+     * @param openInEditor opens a file for editing
+     * @param reveal shows a folder in the file manager
      * @param browse opens a plugin's homepage in the browser
      */
-    public record Hooks(Function<AuxiliarySurface, Optional<Path>> chooseZip, RestartFlow restarts, Runnable quit,
-                        ResidentControl resident, boolean standaloneNotice, Executor worker,
+    public record Hooks(Function<AuxiliarySurface, Optional<Path>> chooseZip, RestartFlow restarts, Runnable quit, Executor worker,
                         java.util.function.Consumer<Path> openInEditor, java.util.function.Consumer<Path> reveal,
                         java.util.function.Consumer<java.net.URI> browse) {
         /** Rejects nulls. */
         public Hooks {
             Objects.requireNonNull(chooseZip); Objects.requireNonNull(restarts); Objects.requireNonNull(quit);
-            Objects.requireNonNull(resident); Objects.requireNonNull(worker);
+            Objects.requireNonNull(worker);
             Objects.requireNonNull(openInEditor); Objects.requireNonNull(reveal); Objects.requireNonNull(browse);
         }
     }
@@ -108,18 +106,8 @@ public final class PluginManager {
     /** The plugins as last listed. */
     List<PluginRuntime.Row> rows() { return snapshot.rows(); }
 
-    /** Lists the plugins again: another process may have changed plugins.toml since the page was last shown. */
-    void refresh() {
-        runtime.snapshot(this::accept);
-        if (panel == null || !hooks.standaloneNotice()) return;
-        hooks.worker().execute(() -> {
-            boolean live = hooks.resident().live().getAsBoolean();
-            SwingUtilities.invokeLater(() -> {
-                if (panel != null) panel.notice(live
-                    ? "Another Jasper process is still running with the plugin set it started with. Quit it for your changes to apply there." : "");
-            });
-        });
-    }
+    /** Lists the plugins again: plugins.toml may have changed since the page was last shown. */
+    void refresh() { runtime.snapshot(this::accept); }
 
     private void accept(PluginRuntime.Outcome outcome) { accept(outcome, ""); }
 
@@ -136,17 +124,9 @@ public final class PluginManager {
     private void renderBanner() {
         if (panel == null) return;
         RestartFlow flow = hooks.restarts();
-        var launchAnyway = new PluginManagerPanel.BannerAction("Launch Anyway", flow::launchAnyway);
-        var cancel = new PluginManagerPanel.BannerAction("Cancel", flow::cancel);
         switch (flow.state()) {
             case UNAVAILABLE -> panel.banner("Jasper could not work out how it was started. Quit and reopen it to apply your changes.",
                 List.of(new PluginManagerPanel.BannerAction("Quit Jasper", hooks.quit())));
-            case PROBING -> panel.banner("Looking for another Jasper process…", List.of());
-            case RESIDENT_FOUND -> panel.banner("Another Jasper process is running with the previous plugin set. It has to quit before a normal restart can apply your changes.",
-                List.of(new PluginManagerPanel.BannerAction("Quit It and Restart", flow::askResidentToQuit), launchAnyway, cancel));
-            case WAITING -> panel.banner("Waiting for the other Jasper process to quit…", List.of(launchAnyway, cancel));
-            case RESIDENT_STUCK -> panel.banner("The other Jasper process did not quit. Launch Anyway starts a separate Jasper with your changes; the other one keeps the previous plugin set until you quit it.",
-                List.of(new PluginManagerPanel.BannerAction("Try Again", flow::askResidentToQuit), launchAnyway, cancel));
             case IDLE -> {
                 if (snapshot.safeMode()) panel.banner("Safe mode: installed plugins are not loaded.",
                     List.of(new PluginManagerPanel.BannerAction("Restart Normally", flow::restartNormally)));

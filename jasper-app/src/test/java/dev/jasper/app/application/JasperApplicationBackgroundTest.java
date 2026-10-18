@@ -641,7 +641,8 @@ class JasperApplicationBackgroundTest {
         edt(application::reopened);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("the old build exits").isTrue();
         assertThat(modes).containsExactly(RestartMode.SAME);
-        assertThat(spawned).as("and starts the new one").containsExactly(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+        assertThat(spawned).as("and starts the new one, waiting for this process's lock")
+            .containsExactly(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper", "--replacing", Long.toString(ProcessHandle.current().pid())));
         assertThat(dock).as("no window of the old build was shown").isEmpty();
     }
 

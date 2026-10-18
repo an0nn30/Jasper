@@ -11,7 +11,6 @@ import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.pluginmanager.PluginManager;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.shortcuthelp.KeymapPage;
 import dev.jasper.app.terminals.TerminalRegistry;
@@ -70,9 +69,9 @@ class PluginSettingsPagesEvidenceTest {
                 // As JasperApplication wires it: plugin kit views follow the application's theme.
                 runtime[0].appearance(themes[0]::current, handler -> themes[0].subscribe((value, changed) -> handler.accept(value)));
                 runtime[0].start(Map.of(), true);
-                var restarts = new RestartFlow(ResidentControl.NONE, mode -> true, Runnable::run, Runnable::run, Duration.ofMillis(20), Duration.ofMillis(1));
-                manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), restarts, () -> { }, ResidentControl.NONE,
-                    false, Runnable::run, path -> { }, path -> { }, uri -> { }));
+                var restarts = new RestartFlow(mode -> true);
+                manager[0] = new PluginManager(runtime[0], windows, new PluginManager.Hooks(surface -> Optional.empty(), restarts, () -> { },
+                    Runnable::run, path -> { }, path -> { }, uri -> { }));
             });
             var lines = new ArrayList<String>();
             for (String family : List.of("dark", "light", "dark-font20")) {

@@ -1,8 +1,7 @@
 /**
- * Restarting Jasper to apply a plugin change: planning the replacement's command line from this process's own,
- * a seam over the resident process, and the "Restart normally" conversation that never starts a
- * handoff-capable replacement while a resident still holds the endpoint. No owner: values and one
- * state machine whose worker threads are daemons.
+ * Restarting Jasper: planning the replacement's command line from this process's own (the replacement waits for this
+ * process's instance lock with {@code --replacing}) and the Plugins page's restart banner state. No owner: values and
+ * one state machine on the UI thread.
  * <p>Allowed outgoing Jasper dependencies: no other Jasper package.
  * The module architecture check forbids package cycles; app types are not an external plugin API.
  */

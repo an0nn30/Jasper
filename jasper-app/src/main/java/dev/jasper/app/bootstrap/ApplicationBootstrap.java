@@ -38,7 +38,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
-import dev.jasper.app.restart.ResidentControl;
 
 /** Resolves desktop-free launch roles, then assembles the application's resource owners. */
 public final class ApplicationBootstrap {
@@ -332,9 +331,8 @@ public final class ApplicationBootstrap {
             ApplicationIcon.installTaskbarIcon();
             application.startupSteps(steps);
             Path source = HandoffSocket.codeLocation();
-            application.residentControl(new ResidentControl(() -> HandoffSocket.live(dirs.daemonSocket()),
-                () -> HandoffSocket.retire(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source))),
-                replacementHandsOff(options), standaloneNotice(options));
+            // A restart replays this launch's own arguments, without its paths (workspace-tabs spec 5.3).
+            application.launchArguments(options.given());
             application.staleBuild(replacedOnDisk(source, HandoffSocket.lastModified(source)));
             // The macOS menu bar item and the Windows notification-area icon, once start-up has settled. On Windows the
             // same icon carries the system notifications' balloons, and one is added for them when Jasper is not resident.
@@ -608,20 +606,6 @@ public final class ApplicationBootstrap {
         grace.start();
     }
 
-    /**
-     * Whether leaving safe mode yields a plain launch. A replacement that keeps {@code --config},
-     * {@code --plugin-dir} or {@code --standalone} is standalone anyway: it never hands off, so there is no
-     * resident to ask, and a resident with another configuration must not be retired on its account.
-     */
-    static boolean replacementHandsOff(AppArguments options) {
-        return options.configOverride() == null && options.pluginDir() == null && !options.standalone() && !options.homeOverride();
-    }
-
-    /** A launch that is standalone only because of {@code --standalone} is a "Launch anyway" replacement. */
-    static boolean standaloneNotice(AppArguments options) {
-        return options.standalone() && options.configOverride() == null && options.pluginDir() == null && !options.safeMode();
-    }
-
     /** True when a request comes from a different build than this one. A resident process must not
      *  serve windows built from code it is not running. */
     static boolean stale(LaunchRequest request, Path source, long modified) {
@@ -640,17 +624,11 @@ public final class ApplicationBootstrap {
     /**
      * The resident process's side of a handoff. A stale request also ends residency: the endpoint
      * goes away with the reply, so the last window closing must run the normal bounded shutdown
-     * rather than leaving a process with nothing to reach it and no cleanup on the way out. A retire
-     * request runs the normal quit path; the endpoint is released by the application's shutdown, not here.
+     * rather than leaving a process with nothing to reach it and no cleanup on the way out.
      */
     static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(
             JasperApplication application, Path source, long modified) {
         return request -> {
-            // Before the staleness check: a recovery launch may well come from another build.
-            if (request.kind() == LaunchRequest.Kind.RETIRE) {
-                SwingUtilities.invokeLater(application::quit);
-                return LaunchRequest.Response.OK;
-            }
             if (stale(request, source, modified)) {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;

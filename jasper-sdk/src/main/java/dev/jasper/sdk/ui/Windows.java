@@ -38,7 +38,7 @@ public interface Windows {
      * <p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
      * Quit and a terminal window's File &rsaquo; Quit by closing its windows through the content tabs' and plugin windows'
      * closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
-     * really quits (Quit Jasper Completely, a log-out or restart, or a request from another launch to retire).
+     * really quits (Quit Jasper Completely, a log-out or a restart).
      *
      * @param guard returns the decision, possibly after asking the user
      * @return the registration; closing it removes the guard

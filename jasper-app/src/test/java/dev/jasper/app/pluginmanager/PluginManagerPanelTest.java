@@ -310,7 +310,7 @@ class PluginManagerPanelTest {
         assertThat(panel.details()).contains("<html><b>Bold", "<html><i>Acme");
     }
 
-    @Test void theBannerTheNoticeAndTheMessageAreIndependent() {
+    @Test void theBannerAndTheMessageAreIndependentAndTheHeaderHasNoNoticeLine() {
         List<String> clicks = new ArrayList<>();
         assertThat(panel.bannerText()).isEmpty();
         assertThat(KitTestSupport.require(PluginKit.laidOut(panel.headerView()), "banner", javax.swing.JComponent.class).isVisible()).isFalse();
@@ -321,9 +321,7 @@ class PluginManagerPanelTest {
         assertThat(PluginKit.button(panel.headerView(), PluginManagerPanel.BANNER + 0).getText()).isEqualTo("Restart Now");
         PluginKit.press(panel.headerView(), PluginManagerPanel.BANNER + 0);
         assertThat(clicks).containsExactly("restart");
-        panel.notice("Another Jasper process is still running.");
         panel.message("The zip holds no jar files", true);
-        assertThat(panel.noticeText()).isEqualTo("Another Jasper process is still running.");
         assertThat(panel.messageText()).isEqualTo("The zip holds no jar files");
         assertThat(panel.messageIsError()).isTrue();
         assertThat(KitTestSupport.require(PluginKit.laidOut(panel.messageView()), "message-dot", javax.swing.JComponent.class).isVisible()).isTrue();
@@ -333,7 +331,7 @@ class PluginManagerPanelTest {
         assertThat(panel.bannerText()).isEmpty();
         assertThat(panel.bannerLabels()).isEmpty();
         assertThat(KitTestSupport.require(PluginKit.laidOut(panel.headerView()), "banner", javax.swing.JComponent.class).isVisible()).isFalse();
-        assertThat(panel.noticeText()).isNotEmpty();
+        assertThat(KitTestSupport.find(PluginKit.laidOut(panel.headerView()), "notice", java.awt.Component.class)).isNull();
     }
 
     @Test void theConsentViewSaysWhatIsAskedAndThatItIsNoSandbox() {

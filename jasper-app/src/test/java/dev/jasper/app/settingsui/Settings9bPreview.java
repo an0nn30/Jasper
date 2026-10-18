@@ -44,8 +44,8 @@ public final class Settings9bPreview {
                 // The application's own contributed entries, registered as JasperApplication registers them.
                 contributions.addAction("plugins.manage","Manage Plugins…",null,List.of("plugins","extensions","install","safe mode"),Optional.empty(),invocation->{});
                 contributions.addAction("app.shortcuts","Keyboard Shortcuts…",null,List.of("help","keys","bindings","keymap","edit shortcuts","keyboard settings"),Optional.empty(),invocation->{});
-                var restarts=new RestartFlow(ResidentControl.NONE,mode->true,Runnable::run,Runnable::run,Duration.ofMillis(20),Duration.ofMillis(1));
-                manager[0]=new PluginManager(runtime[0],windows,new PluginManager.Hooks(surface->Optional.empty(),restarts,()->{},ResidentControl.NONE,false,Runnable::run,path->{},path->{},uri->{}));
+                var restarts=new RestartFlow(mode->true);
+                manager[0]=new PluginManager(runtime[0],windows,new PluginManager.Hooks(surface->Optional.empty(),restarts,()->{},Runnable::run,path->{},path->{},uri->{}));
             });
             for(String family:List.of("dark","light"))for(int font:List.of(0,20)) {
                 var dialog=new SettingsDialog[1];

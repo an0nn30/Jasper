@@ -4,7 +4,6 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.notifications.ActivityNotifier;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.plugins.PluginRuntime;
-import dev.jasper.app.restart.ResidentControl;
 import dev.jasper.app.restart.RestartFlow;
 import dev.jasper.app.restart.RestartMode;
 import dev.jasper.app.settingsui.PageContext;
@@ -47,11 +46,10 @@ class PluginManagerTest {
     private Path chosenZip;
     private SettingsPage page;
     private AuxiliarySurface host;
-    private boolean residentLive;
 
     private Path user() { return root.resolve("plugins"); }
 
-    private void start(boolean safeMode, boolean standaloneNotice) throws Exception {
+    private void start(boolean safeMode) throws Exception {
         edt(() -> {
             windows = new AuxiliaryWindows(UiState.inMemory(), surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { },
                 title -> { }, () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
@@ -59,11 +57,9 @@ class PluginManagerTest {
                 root.resolve("plugins.lock")), new ActivityNotifier(deck.companion(), () -> { }),
                 dev.jasper.app.plugins.PluginRuntime.SettingsReports.IGNORED, new Contributions(), windows, new dev.jasper.app.terminals.TerminalRegistry());
             runtime.start(Map.of(), true);
-            var control = new ResidentControl(() -> residentLive, () -> false);
-            var flow = new RestartFlow(control, mode -> { restarts.add(mode); return true; }, Runnable::run, Runnable::run,
-                Duration.ofMillis(20), Duration.ofMillis(1));
+            var flow = new RestartFlow(mode -> { restarts.add(mode); return true; });
             manager = new PluginManager(runtime, windows, new PluginManager.Hooks(surface -> Optional.ofNullable(chosenZip), flow,
-                () -> quits.add("quit"), control, standaloneNotice, Runnable::run, edited::add, revealed::add, uri -> { }));
+                () -> quits.add("quit"), Runnable::run, edited::add, revealed::add, uri -> { }));
         });
     }
 
@@ -108,7 +104,7 @@ class PluginManagerTest {
     private void pressBanner(int index) { PluginKit.press(manager.panel().headerView(), PluginManagerPanel.BANNER + index); }
 
     @Test void installsAZipAfterConsentAndOffersTheRestart() throws Exception {
-        start(false, false);
+        start(false);
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "capabilities = [\"terminal.inject\"]\n");
         open();
         until(() -> manager.panel().details().contains("No plugins"));
@@ -141,7 +137,7 @@ class PluginManagerTest {
 
     /** Allowing after the Plugins page went away cannot install: it is a refusal, so the staged plugin is discarded. */
     @Test void allowingAfterThePageWentAwayDiscardsTheStagedPlugin() throws Exception {
-        start(false, false);
+        start(false);
         chosenZip = zipOf("dev.example.orphan", "1.0.0", "");
         open();
         until(() -> manager.panel().details().contains("No plugins"));
@@ -161,7 +157,7 @@ class PluginManagerTest {
     }
 
     @Test void decliningConsentDiscardsTheStagedPluginAndABadZipIsExplained() throws Exception {
-        start(false, false);
+        start(false);
         chosenZip = zipOf("dev.example.zipped", "1.0.0", "");
         open();
         until(() -> manager.panel().details().contains("No plugins"));
@@ -188,7 +184,7 @@ class PluginManagerTest {
     @Test void reviewingAFoundPluginConsentsToExactlyWhatWasShownAndRefreshesOnActivation() throws Exception {
         PluginJars.build(user().resolve("dev.example.found"), "main.jar", PluginJars.descriptor("dev.example.found", "1.0.0", "fix.Main")
             + "capabilities = [\"terminal.observe\"]\n", Map.of(), List.of());
-        start(false, false);
+        start(false);
         open();
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
@@ -206,40 +202,21 @@ class PluginManagerTest {
         until(() -> manager.panel().bannerText().isEmpty());
     }
 
-    @Test void safeModeOffersRestartNormallyAndWalksTheResidentConversation() throws Exception {
-        residentLive = true;
-        start(true, false);
+    @Test void safeModeOffersRestartNormallyWhichRestartsWithoutSafeMode() throws Exception {
+        start(true);
         open();
         until(() -> manager.panel().bannerText().startsWith("Safe mode"));
         edt(() -> {
             assertThat(bannerButtons()).containsExactly("Restart Normally");
             pressBanner(0);
-            assertThat(manager.panel().bannerText()).contains("Another Jasper process is running with the previous plugin set");
-            assertThat(bannerButtons()).containsExactly("Quit It and Restart", "Launch Anyway", "Cancel");
-            pressBanner(0);
-            assertThat(manager.panel().bannerText()).as("the fake resident refuses").contains("did not quit");
-            assertThat(bannerButtons()).containsExactly("Try Again", "Launch Anyway", "Cancel");
-            assertThat(restarts).isEmpty();
-            pressBanner(1);
         });
-        assertThat(restarts).containsExactly(RestartMode.STANDALONE);
-    }
-
-    @Test void aStandaloneReplacementSaysThatTheOtherProcessStillRunsThePreviousSet() throws Exception {
-        residentLive = true;
-        start(false, true);
-        open();
-        until(() -> !manager.panel().noticeText().isEmpty());
-        edt(() -> assertThat(manager.panel().noticeText()).contains("still running with the plugin set it started with"));
-        residentLive = false;
-        edt(() -> page.selected());
-        until(() -> manager.panel().noticeText().isEmpty());
+        assertThat(restarts).containsExactly(RestartMode.NORMAL);
     }
 
         @Test void removingAsksFirstAndTheOpenersGoThroughTheHooks() throws Exception {
             PluginJars.build(user().resolve("dev.example.gone/jars"), "main.jar", PluginJars.descriptor("dev.example.gone", "1.0.0", "fix.Main"), Map.of(), List.of());
             Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.gone\"]\nenabled = true\nconsented = []\n");
-            start(false, false);
+            start(false);
             // Built before start so the launch discovers it; consented so Remove is offered.
             open();
             until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.gone")));
@@ -274,7 +251,7 @@ class PluginManagerTest {
         PluginJars.build(user().resolve("dev.example.declares/jars"), "main.jar",
             PluginJars.descriptor("dev.example.declares", "1.0.0", "fix.declared.Main"), Map.of("fix.declared.Main", source), List.of());
         Files.writeString(root.resolve("plugins.toml"), "version = 1\n[plugins.\"dev.example.declares\"]\nenabled = true\nconsented = []\n");
-        start(false, false);
+        start(false);
         open();
         until(() -> manager.panel().listed().stream().anyMatch(line -> line.contains("dev.example.declares")));
         edt(() -> {
@@ -289,7 +266,7 @@ class PluginManagerTest {
     @Test void thePageSearchesPluginNamesSelectsAMatchAndLetsGoWhenDisposed() throws Exception {
         PluginJars.build(user().resolve("dev.example.found/jars"), "main.jar",
             PluginJars.descriptor("dev.example.found", "1.0.0", "fix.Main"), Map.of(), List.of());
-        start(false, false);
+        start(false);
         open();
         until(() -> manager.panel().listed().size() == 1);
         edt(() -> {
@@ -303,7 +280,7 @@ class PluginManagerTest {
     }
 
     @org.junit.jupiter.api.Test void theRestartBannerNamesTheLooksTurnedOff() throws Exception {
-        start(false, false); // the class's @AfterEach stops the runtime and closes the windows that start makes
+        start(false); // the class's @AfterEach stops the runtime and closes the windows that start makes
         var plain = new dev.jasper.app.plugins.PluginRuntime.Snapshot(java.util.List.of(), true, false);
         org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain)).isEqualTo("Restart Jasper to apply your changes.");
         org.assertj.core.api.Assertions.assertThat(PluginManager.restartText(plain.withTurnedOff(java.util.List.of("Alpha", "Beta"))))

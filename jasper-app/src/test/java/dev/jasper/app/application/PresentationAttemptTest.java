@@ -181,7 +181,7 @@ class PresentationAttemptTest {
                 .actions().getFirst());
             edt(() -> tryAgain[0].run().run());
             assertThat(terminated.await(10, TimeUnit.SECONDS)).as("Try Again restarts Jasper").isTrue();
-            assertThat(spawned).containsExactly("jasper SAME");
+            assertThat(spawned).containsExactly("jasper SAME --replacing " + ProcessHandle.current().pid());
             assertThat(state()).as("the record is forgotten").isEmpty();
             assertThat(PluginSelection.of(dirs(), null, "B", dev, false).skipped()).as("so the next start tries the look").isEmpty();
         } finally {

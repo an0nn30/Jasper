@@ -116,26 +116,17 @@ public final class HandoffSocket implements AutoCloseable {
      * normally.
      */
     public static boolean handOff(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
-        return exchange(socketPath, tokenPath, codeLocation, modified, LaunchRequest.Kind.OPEN) == LaunchRequest.Response.OK;
-    }
-
-    /**
-     * Asks a resident process to quit through its normal quit path. True only when it accepted; it then
-     * releases the endpoint as part of its shutdown, which {@link #live} observes. Blocks, bounded.
-     */
-    public static boolean retire(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
-        return exchange(socketPath, tokenPath, codeLocation, modified, LaunchRequest.Kind.RETIRE) == LaunchRequest.Response.OK;
+        return exchange(socketPath, tokenPath, codeLocation, modified) == LaunchRequest.Response.OK;
     }
 
     /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
     public static boolean live(Path socketPath) { return owned(socketPath); }
 
-    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeLocation, long modified,
-                                                   LaunchRequest.Kind kind) {
+    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
         String token = readToken(tokenPath);
         if (token == null) return LaunchRequest.Response.PROTOCOL;
         // codeLocation() is nullable; an unknown location compares equal to itself and to nothing else.
-        var request = new LaunchRequest(token, codeLocation == null ? Path.of("") : codeLocation, modified, kind);
+        var request = new LaunchRequest(token, codeLocation == null ? Path.of("") : codeLocation, modified);
         var answer = new CompletableFuture<LaunchRequest.Response>();
         // A wedged owner must not hang the caller, so the exchange is bounded from outside it.
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
