@@ -94,7 +94,8 @@ class PackagedResourcesTest {
                     .filter(name -> name.startsWith("dev/jasper/ui/theme/") && !name.endsWith("/") && !name.endsWith(".class")).toList())
                 .containsExactlyInAnyOrder("dev/jasper/ui/theme/slate-cobalt.json", "dev/jasper/ui/theme/catppuccin-latte.json",
                     "dev/jasper/ui/theme/catppuccin-frappe.json", "dev/jasper/ui/theme/catppuccin-macchiato.json",
-                    "dev/jasper/ui/theme/catppuccin-mocha.json", "dev/jasper/ui/theme/catppuccin.LICENSE.txt");
+                    "dev/jasper/ui/theme/catppuccin-mocha.json", "dev/jasper/ui/theme/ubuntu-yaru.json",
+                    "dev/jasper/ui/theme/catppuccin.LICENSE.txt");
             assertThat(jar.stream().map(java.util.jar.JarEntry::getName).toList())
                 .noneMatch(name -> name.startsWith("dev/jasper/ui/themeimport/") || name.endsWith("THIRD-PARTY-THEMES.md"));
         }

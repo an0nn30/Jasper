@@ -1,5 +1,16 @@
 # Jasper — Status and Handoff
 
+**Ubuntu Yaru theme — 2026-10-17** (`codex/ubuntu-yaru-theme`). Built-in `ubuntu-yaru` Light and Dark, adapted
+from Yaru `26.04.5.1ubuntu`: neutral GTK surfaces, orange actions and focus, matching terminal and editor palettes.
+[Colour reference](design/theme-engine/ubuntu-yaru.md). Existing presentation geometry and typography are retained.
+Contrast checks cover UI text, action/selection labels, syntax and ANSI foregrounds (except Dark ANSI black);
+75 control-gallery fixtures render per appearance. Independent review's invisible Light ANSI bright-white finding
+fixed and covered. `./gradlew check --continue`: Java XML **11,385 tests, 0 failures, 0 errors, 25 skipped**;
+all checks pass except `checkThemeTool` (68/69): `test_deeply_nested_input_is_a_message` expects "nested too deeply"
+but Python 3.14.7 returns "expected a JSON object" for the nested-array fixture, reproduced with the unchanged HEAD
+converter. The converter reserves `ubuntu-yaru`. Native Ubuntu appearance/window checks remain user-run.
+Not merged or pushed.
+
 **Enterprise presentation, plan 10a: Workstation, Remote and File Server compositions — 2026-10-17**
 (`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `4a266828f..490e4dca9`, then this
 documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-16-enterprise-10a-plugin-compositions.md),

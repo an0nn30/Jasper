@@ -13,9 +13,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** spec 3.2: the built-in themes plus every valid {@code <home>/themes/*.json}; bad files are skipped and reported. */
 class ThemeLibraryTest {
-    static final List<String> BUILT_IN = List.of("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
+    static final List<String> BUILT_IN = List.of("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru");
     static final List<String> BUILT_IN_SCHEMES = List.of("slate-cobalt/dark", "slate-cobalt/light", "slate-cobalt/high-contrast",
-        "catppuccin-latte/light", "catppuccin-frappe/dark", "catppuccin-macchiato/dark", "catppuccin-mocha/dark");
+        "catppuccin-latte/light", "catppuccin-frappe/dark", "catppuccin-macchiato/dark", "catppuccin-mocha/dark", "ubuntu-yaru/dark", "ubuntu-yaru/light");
     @TempDir Path home;
 
     static List<String> builtInAnd(String... more) {
@@ -35,8 +35,8 @@ class ThemeLibraryTest {
         assertThat(library.themes()).containsExactlyElementsOf(JasperTheme.builtIns());
         assertThat(library.themes().getFirst()).isSameAs(JasperTheme.bundled());
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
-        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru");
+        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "ubuntu-yaru");
         assertThat(library.imported()).isEmpty();
         assertThat(library.problems()).isEmpty();
         assertThat(library.schemes()).extracting(scheme -> scheme.id().toString()).containsExactlyElementsOf(BUILT_IN_SCHEMES);
@@ -53,8 +53,8 @@ class ThemeLibraryTest {
         assertThat(library.problems()).isEmpty();
         assertThat(library.themes()).extracting(JasperTheme::id).containsExactlyElementsOf(builtInAnd("abyss", "ocean", "zenburn"));
         assertThat(library.themes(true)).extracting(JasperTheme::id)
-            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "abyss", "ocean");
-        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "abyss", "ocean");
+            .containsExactly("slate-cobalt", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru", "abyss", "ocean");
+        assertThat(library.themes(false)).extracting(JasperTheme::id).containsExactly("slate-cobalt", "catppuccin-latte", "ubuntu-yaru", "abyss", "ocean");
         assertThat(library.theme("zenburn")).get().extracting(JasperTheme::name).isEqualTo("Zenburn");
         assertThat(library.theme("nord")).isEmpty();
         var schemes = new java.util.ArrayList<>(BUILT_IN_SCHEMES);

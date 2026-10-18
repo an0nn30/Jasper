@@ -52,12 +52,12 @@ class ThemeSelectionTest {
         assertThat(selection.scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
         assertThat(problems).containsExactly(
             Map.entry("ui.theme.dark", "\"zenburn\" has no Dark variant. Use one of \"slate-cobalt\", \"catppuccin-frappe\", "
-                + "\"catppuccin-macchiato\", \"catppuccin-mocha\", \"ocean\"; using the default."),
-            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-cobalt\", \"catppuccin-latte\", \"ocean\"; "
+                + "\"catppuccin-macchiato\", \"catppuccin-mocha\", \"ubuntu-yaru\", \"ocean\"; using the default."),
+            Map.entry("ui.theme.light", "\"nord\" is not an installed theme. Use one of \"slate-cobalt\", \"catppuccin-latte\", \"ubuntu-yaru\", \"ocean\"; "
                 + "using the default."),
             Map.entry("terminal.scheme", "\"nord/dark\" is not an installed scheme. Use \"match\" or one of \"slate-cobalt/dark\", "
                 + "\"slate-cobalt/light\", \"slate-cobalt/high-contrast\", \"catppuccin-latte/light\", \"catppuccin-frappe/dark\", "
-                + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
+                + "\"catppuccin-macchiato/dark\", \"catppuccin-mocha/dark\", \"ubuntu-yaru/dark\", \"ubuntu-yaru/light\", \"ocean/dark\", \"ocean/light\", \"ocean/high-contrast\", "
                 + "\"zenburn/dark\"; using the default."));
         assertThat(selection.withScheme(TerminalSchemeChoice.parse("nord/dark").orElseThrow()).scheme()).isEqualTo(TerminalSchemeChoice.MATCH);
     }

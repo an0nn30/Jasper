@@ -8,9 +8,9 @@ import org.junit.jupiter.api.Test;
 class BuiltInThemesTest {
     @Test void slateCobaltComesFirstThenCatppuccinsFlavours() {
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::id)
-            .containsExactly("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha");
+            .containsExactly("slate-cobalt", "catppuccin-latte", "catppuccin-frappe", "catppuccin-macchiato", "catppuccin-mocha", "ubuntu-yaru");
         assertThat(JasperTheme.builtIns()).extracting(JasperTheme::name)
-            .containsExactly("Slate Cobalt", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha");
+            .containsExactly("Slate Cobalt", "Catppuccin Latte", "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha", "Ubuntu Yaru");
         assertThat(JasperTheme.builtIns().getFirst()).isSameAs(JasperTheme.bundled());
     }
 

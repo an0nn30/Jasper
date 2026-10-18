@@ -5,7 +5,9 @@ Dark**, **Slate Cobalt Light** and **High Contrast**. Its colours are defined on
 [the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md), and bundled as `slate-cobalt.json`. Catppuccin's
 four flavours are built in too, converted from [its IntelliJ plugin](https://github.com/catppuccin/jetbrains) 3.6.1:
 **Catppuccin Latte** (Light), **Catppuccin Frappé**, **Catppuccin Macchiato** and **Catppuccin Mocha** (Dark), each with
-its own terminal scheme. Plugins can ship themes: the bundled Enterprise plugin brings **Enterprise** (Light and Dark)
+its own terminal scheme. **Ubuntu Yaru** (`ubuntu-yaru`) provides Light and Dark variants adapted from Ubuntu 26.04,
+with matching terminal and editor palettes; [its colour reference](design/theme-engine/ubuntu-yaru.md) records the source
+and mapping. Plugins can ship themes: the bundled Enterprise plugin brings **Enterprise** (Light and Dark)
 while it is turned on. Other themes are Jasper theme files in the themes folder: a UI theme recolours the whole application and brings its own terminal and
 editor schemes; a terminal-only theme adds terminal schemes.
 
@@ -27,7 +29,7 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 setting live; with `system`, Jasper uses Dark when it cannot read the operating system's setting, and an
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name, by id, the theme each
 appearance shows: `slate-cobalt`, another built-in theme's id (`catppuccin-latte`, `catppuccin-frappe`,
-`catppuccin-macchiato`, `catppuccin-mocha`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
+`catppuccin-macchiato`, `catppuccin-mocha`, `ubuntu-yaru`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
 `system`, Jasper switches between the two picks as the operating system does.
 
 `terminal.scheme` colours the terminal panes: `match` uses the shown theme's own scheme, and a scheme id,
@@ -48,7 +50,7 @@ be copied in by hand. It holds one Jasper theme file per theme, named after the 
 when `config.toml` changes; a theme changed on disk is shown again then. A file named after a built-in theme's id,
 such as `slate-cobalt.json` or `catppuccin-mocha.json`, is ignored, and so is one named after a theme an installed
 plugin ships, such as `enterprise.json`, even while that plugin is off. Dropdowns list the built-in themes first, Slate
-Cobalt then the Catppuccin flavours, then the plugins' themes by name, captioned with their plugin, then the installed
+Cobalt then the Catppuccin flavours and Ubuntu Yaru, then the plugins' themes by name, captioned with their plugin, then the installed
 themes by name; two themes with the same name show their ids. A setting that names the theme of a plugin that is off
 uses Slate Cobalt without a warning and keeps the name, so turning the plugin on again restores it.
 

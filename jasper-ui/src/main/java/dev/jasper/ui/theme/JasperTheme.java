@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 /**
  * A Jasper theme file ({@code docs/themes.md}): a name, an optional author, a Dark and/or Light UI variant, terminal
  * schemes and an editor scheme for each UI variant. The built-in themes are {@code <id>.json} beside this class: Slate
- * Cobalt, the default, and Catppuccin's flavours, converted from its IntelliJ plugin ({@code tools/themes/catppuccin}). A UI
+ * Cobalt, the default, Catppuccin's flavours ({@code tools/themes/catppuccin}), and Ubuntu Yaru. A UI
  * variant lists every role except those that follow fixed rules, never colour values: {@code border.focus} is
  * {@code accent}, {@code surface.status} is {@code surface.app}, {@code border.identity} is {@code border.control} and
  * each {@code hue.<name>.surface} is its hue (the kit applies the tile alpha). A variant may leave out the title bar's
@@ -120,6 +120,7 @@ public final class JasperTheme {
         private static List<JasperTheme> read() {
             var themes = new ArrayList<JasperTheme>(List.of(bundled()));
             for (String id : CONVERTED) themes.add(load("/dev/jasper/ui/theme/" + id + ".json", id));
+            themes.add(load("/dev/jasper/ui/theme/ubuntu-yaru.json", "ubuntu-yaru"));
             return List.copyOf(themes);
         }
     }

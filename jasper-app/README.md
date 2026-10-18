@@ -86,7 +86,7 @@ updating reflective class names in `.properties` files.
 
 ## Native theme engine
 
-The built-in themes are Slate Cobalt and Catppuccin's four flavours; installed themes are theme files in `<home>/themes/`, read by
+The built-in themes are Slate Cobalt, Catppuccin's four flavours and Ubuntu Yaru; installed themes are theme files in `<home>/themes/`, read by
 `appearance.ThemeLibrary`. `ui.appearance` (system, dark, light) picks the appearance, `ui.theme.dark` and
 `ui.theme.light` the theme each shows, and `terminal.scheme` the terminal panes' colours;
 `application.ConfigurationController` applies them through `appearance.ThemeController`, with
