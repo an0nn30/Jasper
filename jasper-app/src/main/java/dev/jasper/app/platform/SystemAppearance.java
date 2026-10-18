@@ -45,6 +45,24 @@ public final class SystemAppearance implements AutoCloseable {
         }
         return monitor;
     }
+    /** Uses the application-owned Linux portal service for the same appearance policy input. */
+    public static SystemAppearance open(DesktopColors desktop) {
+        return open(desktop, System.getProperty("os.name", ""), java.awt.GraphicsEnvironment.isHeadless(), SwingUtilities::invokeLater);
+    }
+    static SystemAppearance open(DesktopColors desktop, String os, boolean headless, Consumer<Runnable> dispatch) {
+        if (!os.startsWith("Linux") || headless) return open();
+        Objects.requireNonNull(desktop);
+        var monitor = new SystemAppearance(Observation.unavailable("Desktop preferences pending"), dispatch);
+        monitor.nativeClose = desktop.subscribe(value -> monitor.portalObservation(value.portal()));
+        monitor.portalObservation(desktop.current().portal());
+        return monitor;
+    }
+    private void portalObservation(DesktopObservation.Portal portal) {
+        observed(switch (portal.appearance()) {
+            case DARK -> Observation.dark(); case LIGHT -> Observation.light();
+            case UNKNOWN -> Observation.unavailable(portal.reason());
+        });
+    }
     private void nativeObservation(int preference) {
         observed(switch (preference) { case 1 -> Observation.dark(); case 0 -> Observation.light(); default -> Observation.unavailable("macOS did not report an application appearance."); });
     }

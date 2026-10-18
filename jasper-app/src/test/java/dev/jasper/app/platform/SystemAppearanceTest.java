@@ -33,6 +33,31 @@ class SystemAppearanceTest {
         assertThat(monitor.current().preference()).isEqualTo(SystemAppearance.Preference.DARK);
         monitor.close();
     }
+    @Test void headlessDefaultStartupDoesNotCreateNativeDesktopChildren() {
+        assertThat(java.awt.GraphicsEnvironment.isHeadless()).isTrue();
+        var before = ProcessHandle.current().descendants().map(ProcessHandle::pid).toList();
+        try (var monitor = SystemAppearance.open()) {
+            assertThat(ProcessHandle.current().descendants().map(ProcessHandle::pid).toList()).containsExactlyInAnyOrderElementsOf(before);
+            assertThat(monitor.current().preference()).isEqualTo(SystemAppearance.Preference.UNAVAILABLE);
+            assertThat(monitor.current().reason()).contains("headless");
+        }
+    }
+    @Test void injectedLinuxOpenFeedsPortalIntoThePolicyMonitorAndRemovesSubscription() {
+        try (var f = new DesktopProcessTest.Fixture()) {
+            var desktop = DesktopColorsTest.service(f, new ArrayList<>(), "echo");
+            var queue = new ArrayDeque<Runnable>();
+            var monitor = SystemAppearance.open(desktop, "Linux", false, queue::add);
+            f.await(() -> desktop.current().portal().appearance() == DesktopObservation.Polarity.DARK);
+            f.time.advance(100, java.util.concurrent.TimeUnit.MILLISECONDS); f.pump();
+            while (!queue.isEmpty()) queue.remove().run();
+            assertThat(monitor.current()).isEqualTo(SystemAppearance.Observation.dark());
+            monitor.close(); f.children.getFirst().destroyForcibly();
+            f.await(() -> desktop.current().portal().appearance() == DesktopObservation.Polarity.UNKNOWN);
+            f.time.advance(100, java.util.concurrent.TimeUnit.MILLISECONDS); f.pump();
+            assertThat(queue).isEmpty(); assertThat(monitor.current()).isEqualTo(SystemAppearance.Observation.dark());
+            desktop.close(); f.pump();
+        }
+    }
     @Test void developmentLibraryDoesNotBroadenThePackagedNotificationLoader() {
         assertThat(MacNative.libraryPath("/tmp/jasper/bin/jasper-app")).isNull();
         assertThat(MacAppearance.library("/tmp/dev/libappearance.dylib", null, null)).isEqualTo(java.nio.file.Path.of("/tmp/dev/libappearance.dylib"));
