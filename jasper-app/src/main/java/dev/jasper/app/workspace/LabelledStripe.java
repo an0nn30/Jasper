@@ -28,7 +28,9 @@ import javax.swing.Action;
  * One of the classic look's labelled tool window stripes (spec 10.7): each window as a label, "N: " first when its
  * toggle ends in a digit, read bottom to top on the left stripe and top to bottom on the right, on {@code surface.stripe},
  * an open window's label on {@code surface.control.selected}; the top group's labels from {@code RAIL_GAP} below the top,
- * then the second group's, then on the left the plugins' rail actions; a 1 px rule along the edge toward the workspace.
+ * then on the left the plugins' rail actions, and the second group's at the stripe's bottom end, in order, its last label
+ * {@code RAIL_GAP} above it, as IntelliJ's bottom group (the user's direction of 2026-10-18); a 1 px rule along the edge
+ * toward the workspace.
  * The stripe is as thick as a label's line and its two rail edges, the line centred across it; {@code window.rail_width}
  * does not apply (the user's direction of 2026-10-18). A badge ends its label with a count pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
  * During a dock drag both groups show (an empty group as the dragged label's drop space), the dragged label is lifted
@@ -196,16 +198,17 @@ final class LabelledStripe extends DockStripe {
         gap = placement.gap;
     }
 
-    /** The two groups down from {@code RAIL_GAP}, then the actions; the drop groups meet after the top group. */
+    /**
+     * The top group down from {@code RAIL_GAP}, then the actions; the second group ends {@code RAIL_GAP} above the bottom,
+     * or follows them on a stripe too short for both; the drop groups meet midway between.
+     */
     private Placement place(boolean withGap) {
         var placement = new Placement();
         var styles = labels.styles();
-        int rule = styles.metric(DesignMetrics.Role.DOCK_RULE);
+        int rule = styles.metric(DesignMetrics.Role.DOCK_RULE), edge = styles.metric(DesignMetrics.Role.RAIL_GAP);
         int across = Math.max(0, getWidth() - rule), x = side == Side.LEFT ? 0 : rule;
         int between = styles.metric(DesignMetrics.Role.STRIPE_LABEL_GAP);
-        int y = column(Slot.Group.TOP, styles.metric(DesignMetrics.Role.RAIL_GAP), x, across, between, withGap, placement);
-        int split = y;
-        y = column(Slot.Group.SECOND, y, x, across, between, withGap, placement);
+        int y = column(Slot.Group.TOP, edge, x, across, between, withGap, placement);
         if (!actions.isEmpty()) {
             y += styles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
             for (StripeLabels.Label action : actions) {
@@ -214,8 +217,13 @@ final class LabelledStripe extends DockStripe {
                 y += length + between;
             }
         }
-        placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), split));
-        placement.groups.put(Slot.Group.SECOND, new Rectangle(0, split, getWidth(), Math.max(0, getHeight() - split)));
+        // The second group's extent, its gap or drop space included, from a dry run of its column.
+        int extent = column(Slot.Group.SECOND, 0, x, across, between, withGap, new Placement());
+        int start = Math.max(y, getHeight() - edge - Math.max(0, extent - between));
+        column(Slot.Group.SECOND, start, x, across, between, withGap, placement);
+        int boundary = Math.clamp((y + start) / 2, 0, Math.max(0, getHeight()));
+        placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), boundary));
+        placement.groups.put(Slot.Group.SECOND, new Rectangle(0, boundary, getWidth(), Math.max(0, getHeight() - boundary)));
         return placement;
     }
 

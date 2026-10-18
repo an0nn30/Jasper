@@ -59,7 +59,7 @@ class LabelledStripeTest {
             assertThat(stripe.buttons()).extracting(AbstractButton::getToolTipText).containsExactly("1: SFTP", "2: File Servers");
             Rectangle first = stripe.buttons().get(0).getBounds(), second = stripe.buttons().get(1).getBounds();
             assertThat(first.y).as("RAIL_GAP below the top").isEqualTo(metric(DesignMetrics.Role.RAIL_GAP));
-            assertThat(second.y).as("edge to edge").isEqualTo(first.y + first.height);
+            assertThat(second.y + second.height).as("the second group RAIL_GAP above the bottom").isEqualTo(300 - metric(DesignMetrics.Role.RAIL_GAP));
             assertThat(first.width).as("the fill, without the rule").isEqualTo(stripe.getWidth() - metric(DesignMetrics.Role.DOCK_RULE));
             assertThat(stripe.buttons().get(0).isSelected()).isTrue();
             assertThat(stripe.getPreferredSize().width).as("the label's line, its edges and the rule").isEqualTo(fitted(EnterpriseLook.kit()));
@@ -202,6 +202,109 @@ class LabelledStripeTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
+    /** The user's direction of 2026-10-18: the second group stands at the stripe's bottom end, in order, edge to edge. */
+    @Test void theSecondGroupStandsAtTheBottomEndInOrder() throws Exception {
+        try {
+            for (Side side : List.of(Side.LEFT, Side.RIGHT)) {
+                var stripe = stripe(side);
+                Slot top = Slot.on(side, Slot.Group.TOP), second = Slot.on(side, Slot.Group.SECOND);
+                stripe.render(List.of(window("a", "Alpha", second, 0), window("t", "Top", top, 0), window("b", "Beta", second, 0)), List.of());
+                MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
+                assertThat(stripe.buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Top", "Alpha", "Beta");
+                Rectangle t = stripe.buttons().get(0).getBounds(), a = stripe.buttons().get(1).getBounds(), b = stripe.buttons().get(2).getBounds();
+                assertThat(t.y).as(side + ": the top group from RAIL_GAP").isEqualTo(metric(DesignMetrics.Role.RAIL_GAP));
+                assertThat(b.y + b.height).as(side + ": the second group's last label RAIL_GAP above the bottom")
+                    .isEqualTo(400 - metric(DesignMetrics.Role.RAIL_GAP));
+                assertThat(a.y + a.height).as(side + ": edge to edge, in order").isEqualTo(b.y);
+                assertThat(a.y).as(side + ": below the top group").isGreaterThan(t.y + t.height);
+            }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** A stripe too short for both groups keeps the second group after the top group; labels past its end are cut off. */
+    @Test void aShortStripeNeverOverlapsItsGroups() throws Exception {
+        try {
+            var stripe = stripe(Side.LEFT);
+            stripe.render(List.of(window("t", "A long top group title", Slot.LEFT_TOP, 0), window("s", "A long second title", Slot.LEFT_BOTTOM, 0)),
+                List.of());
+            MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 1);
+            Rectangle t = stripe.buttons().get(0).getBounds(), s = stripe.buttons().get(1).getBounds();
+            assertThat(s.y).isEqualTo(t.y + t.height);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /**
+     * A drag over the bottom-anchored second group: its drop bounds start midway between the top group's end and its
+     * start, a drop above or below a label's middle opens the gap before or after it, the lifted label's length stays at
+     * the group's end (the stripe's bottom), and an empty second group's drop space lies at the bottom end. Both sides.
+     */
+    @Test void aDragOverTheSecondGroupDropsWhereTheGapOpens() throws Exception {
+        try {
+            for (Side side : List.of(Side.LEFT, Side.RIGHT)) {
+                Slot top = Slot.on(side, Slot.Group.TOP), second = Slot.on(side, Slot.Group.SECOND);
+                int gapEdge = metric(DesignMetrics.Role.RAIL_GAP), height = 400;
+                var stripe = stripe(side);
+                stripe.render(List.of(window("t", "Top", top, 0), window("u", "Under", top, 0), window("f", "File Servers", second, 2)), List.of());
+                MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
+                Rectangle under = stripe.buttons().get(1).getBounds(), servers = stripe.buttons().get(2).getBounds();
+                // A drag of a top window: the second group keeps its label at the bottom end.
+                stripe.beginDrag("u", "Under");
+                var groups = stripe.dropGroups();
+                assertThat(groups).extracting(DockDropResolver.Group::slot).containsExactly(top, second);
+                Rectangle topBounds = groups.get(0).bounds(), secondBounds = groups.get(1).bounds();
+                assertThat(topBounds.y + topBounds.height).as(side + ": the groups meet").isEqualTo(secondBounds.y);
+                assertThat(secondBounds.y + secondBounds.height).as(side + ": to the stripe's end").isEqualTo(height);
+                assertThat(secondBounds.y).as(side + ": after the top group's end (its lifted label's length kept)")
+                    .isGreaterThan(under.y + under.height).isLessThan(servers.y);
+                assertThat(groups.get(1).buttons()).as(side + ": the second group's label stays").containsExactly(servers);
+                var workspace = new Rectangle(500, 0, 500, height);
+                int x = servers.x + servers.width / 2;
+                assertThat(DockDropResolver.resolve(new java.awt.Point(x, servers.y + 2), groups, workspace))
+                    .contains(DockDropResolver.Target.stripe(second, 0));
+                assertThat(DockDropResolver.resolve(new java.awt.Point(x, servers.y + servers.height - 2), groups, workspace))
+                    .contains(DockDropResolver.Target.stripe(second, 1));
+                // Before the label: the gap opens above it and the label stays at the bottom end.
+                stripe.showGap(second, 0);
+                Rectangle gap = stripe.gapBounds().orElseThrow();
+                assertThat(gap.y + gap.height).as(side + ": the gap ends where the label starts").isEqualTo(servers.y);
+                assertThat(stripe.buttons().get(2).getBounds()).isEqualTo(servers);
+                // After it: the gap takes the bottom end and the label moves up by the gap.
+                stripe.showGap(second, 1);
+                gap = stripe.gapBounds().orElseThrow();
+                assertThat(gap.y + gap.height).as(side + ": the gap at the bottom end").isEqualTo(height - gapEdge);
+                assertThat(stripe.buttons().get(2).getY() + stripe.buttons().get(2).getHeight()).isEqualTo(gap.y);
+                // Back over the top group: the gap opens there and the second group is where it was.
+                stripe.showGap(top, 1);
+                assertThat(stripe.gapBounds().orElseThrow().y).isEqualTo(stripe.buttons().get(0).getY() + stripe.buttons().get(0).getHeight());
+                assertThat(stripe.buttons().get(2).getBounds()).isEqualTo(servers);
+                stripe.endDrag();
+
+                // Dragging the second group's only label: its length stays at the bottom end as the group's drop space.
+                stripe.beginDrag("f", "2: File Servers");
+                groups = stripe.dropGroups();
+                assertThat(groups.get(1).buttons()).as(side + ": lifted out").isEmpty();
+                assertThat(groups.get(1).bounds().contains(x, servers.y + servers.height / 2)).as(side + ": its place drops back").isTrue();
+                assertThat(DockDropResolver.resolve(new java.awt.Point(x, servers.y + servers.height / 2), groups, workspace))
+                    .contains(DockDropResolver.Target.stripe(second, 0));
+                stripe.showGap(second, 0);
+                assertThat(stripe.gapBounds().orElseThrow()).as(side + ": the gap takes its place").isEqualTo(servers);
+                stripe.endDrag();
+
+                // An empty second group shows one label's drop space at the bottom end.
+                stripe.render(List.of(window("t", "Top", top, 0), window("u", "Under", top, 0)), List.of());
+                MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
+                stripe.beginDrag("u", "Under");
+                groups = stripe.dropGroups();
+                assertThat(groups.get(1).buttons()).isEmpty();
+                stripe.showGap(second, 0);
+                gap = stripe.gapBounds().orElseThrow();
+                assertThat(gap.y + gap.height).as(side + ": an empty group's drop space at the bottom end").isEqualTo(height - gapEdge);
+                assertThat(groups.get(1).bounds().contains(x, gap.y + gap.height / 2)).as(side + ": and it drops there").isTrue();
+                stripe.endDrag();
+            }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
     @Test void aDragShowsBothGroupsLiftsTheLabelAndOpensAGap() throws Exception {
         try {
             var stripe = stripe(Side.LEFT);
@@ -222,17 +325,20 @@ class LabelledStripeTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
-    @Test void railActionsFollowTheSecondGroupAndNeverStaySelected() throws Exception {
+    @Test void railActionsFollowTheTopGroupAndNeverStaySelected() throws Exception {
         try {
             var stripe = stripe(Side.LEFT);
             var ran = new ArrayList<String>();
             var action = new AbstractAction("About Sample") { @Override public void actionPerformed(ActionEvent event) { ran.add("about"); } };
-            stripe.render(List.of(window("sftp", "SFTP", Slot.LEFT_TOP, 1)), List.of(action));
+            stripe.render(List.of(window("sftp", "SFTP", Slot.LEFT_TOP, 1), window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of(action));
             MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
             var buttons = stripe.buttons();
-            assertThat(buttons).extracting(AbstractButton::getToolTipText).containsExactly("1: SFTP", "About Sample");
-            assertThat(buttons.get(1).getY()).isGreaterThanOrEqualTo(buttons.get(0).getY() + buttons.get(0).getHeight()
+            assertThat(buttons).extracting(AbstractButton::getToolTipText).containsExactly("1: SFTP", "2: File Servers", "About Sample");
+            var about = buttons.get(2);
+            assertThat(about.getY()).as("RAIL_SECTION_GAP after the top group").isEqualTo(buttons.get(0).getY() + buttons.get(0).getHeight()
                 + metric(DesignMetrics.Role.RAIL_SECTION_GAP));
+            assertThat(about.getY() + about.getHeight()).as("above the second group").isLessThan(buttons.get(1).getY());
+            buttons = List.of(buttons.get(0), about);
             buttons.get(1).doClick(0);
             assertThat(ran).containsExactly("about");
             assertThat(buttons.get(1).isSelected()).isFalse();

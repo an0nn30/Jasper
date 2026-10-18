@@ -85,8 +85,10 @@ class DockMockTest {
                     LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of());
                 int thickness = stripe.getPreferredSize().width;
                 assertThat(thickness).as("the stripe fits its labels: the mocks' 22 and the rule").isEqualTo(23);
-                compareStripe(variant, "left-stripe", variant.seen(MockCrops.render(stripe, thickness, 165, 2)),
-                    variant.crop(2, 180, 44, 330), thickness, Side.LEFT, List.of(29, 109, 151, 301));
+                int height = fitted("1: SFTP", "2: File Servers");
+                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
+                assertSecondAtTheEnd(variant.name() + " left stripe", stripe, height);
+                compareStripe(variant, "left-stripe", render, variant.crop(2, 180, 44, 2 * height), thickness, Side.LEFT, List.of(29, 109, 151, 301));
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -99,10 +101,33 @@ class DockMockTest {
                 stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0),
                     LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0)), List.of());
                 int thickness = stripe.getPreferredSize().width;
-                compareStripe(variant, "right-stripe", variant.seen(MockCrops.render(stripe, thickness, 135, 2)),
-                    variant.crop(2838, 180, 44, 270), thickness, Side.RIGHT, List.of(29, 121, 164, 247));
+                int height = fitted("Sessions", "Tunnels");
+                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
+                assertSecondAtTheEnd(variant.name() + " right stripe", stripe, height);
+                compareStripe(variant, "right-stripe", render, variant.crop(2838, 180, 44, 2 * height), thickness, Side.RIGHT, List.of(29, 121, 164, 247));
             } finally { EnterpriseLook.restoreDefault(); }
         }
+    }
+
+    /**
+     * How tall a side stripe holding one label in each group is when its second group, which stands at the stripe's
+     * bottom end (the user's direction of 2026-10-18), meets its top group: {@code RAIL_GAP} at both ends and the two
+     * labels. The mocks draw the second group straight under the top group, so the stripe comparisons render the stripe
+     * this tall (166 and 138, the mocks' crops 332 and 276 tall at 2x) and the mocks' labels compare in place.
+     */
+    static int fitted(String top, String second) {
+        var labels = new StripeLabels(EnterpriseLook.kit());
+        return 2 * rail() + labels.length(top, java.util.Optional.empty()) + labels.length(second, java.util.Optional.empty());
+    }
+
+    private static int rail() {
+        return com.formdev.flatlaf.util.UIScale.scale(EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.RAIL_GAP));
+    }
+
+    /** The stripe's second label ends {@code RAIL_GAP} above its bottom end. */
+    static void assertSecondAtTheEnd(String where, LabelledStripe stripe, int height) {
+        Rectangle second = stripe.buttons().get(1).getBounds();
+        assertThat(second.y + second.height).as(where + ": the second group at the bottom end").isEqualTo(height - rail());
     }
 
     /**
@@ -362,6 +387,10 @@ class DockMockTest {
                     var strip = fixture.stripes.bottomStrip();
                     assertThat(2 * strip.getY()).as(where + ": the bottom strip's rule").isEqualTo(1706 - 180);
                     assertThat(strip.getWidth()).as(where + ": the bottom strip spans the window").isEqualTo(DockFixture.WIDTH);
+                    // File Servers and Tunnels, the second groups, stand at their stripes' bottom ends (the user's direction of
+                    // 2026-10-18), where the mocks draw them under the top groups.
+                    for (DockStripe side : List.of(fixture.stripes.left(), fixture.stripes.right()))
+                        assertSecondAtTheEnd(where + " " + side.side(), (LabelledStripe) side, side.getHeight());
                     var rule = MockCrops.at(variant.crop(648, 1000, 1, 1), 0, 0);
                     assertThat(MockCrops.near(MockCrops.at(render, 648 - 2 + left, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the left rule").isTrue();
                     assertThat(MockCrops.near(MockCrops.at(render, 2134 - 2 + right, 1000 - 180), rule, variant.fillTolerance())).as(where + ": the right rule").isTrue();

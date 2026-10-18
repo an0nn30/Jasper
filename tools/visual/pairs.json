@@ -1598,7 +1598,7 @@
       2,
       180,
       44,
-      330
+      332
     ],
     "render": "jasper-app/build/dock-renders/light-left-stripe-render.png",
     "min_agreement": 0.85,
@@ -1606,7 +1606,8 @@
       "#D7D9DC",
       "#1E1F22",
       "#E4E6E9"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-light-right-stripe",
@@ -1615,7 +1616,7 @@
       2838,
       180,
       44,
-      270
+      276
     ],
     "render": "jasper-app/build/dock-renders/light-right-stripe-render.png",
     "min_agreement": 0.9,
@@ -1623,7 +1624,8 @@
       "#D7D9DC",
       "#1E1F22",
       "#E4E6E9"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-light-bottom-strip",
@@ -1785,7 +1787,7 @@
       2,
       180,
       44,
-      330
+      332
     ],
     "render": "jasper-app/build/dock-renders/dark-left-stripe-render.png",
     "min_agreement": 0.85,
@@ -1793,7 +1795,8 @@
       "#50545B",
       "#DFE1E5",
       "#383B40"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-dark-right-stripe",
@@ -1802,7 +1805,7 @@
       2838,
       180,
       44,
-      270
+      276
     ],
     "render": "jasper-app/build/dock-renders/dark-right-stripe-render.png",
     "min_agreement": 0.9,
@@ -1810,7 +1813,8 @@
       "#50545B",
       "#DFE1E5",
       "#383B40"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-dark-bottom-strip",
@@ -1904,7 +1908,7 @@
       66,
       244,
       44,
-      330
+      332
     ],
     "render": "jasper-app/build/dock-renders/vault-left-stripe-render.png",
     "min_agreement": 0.85,
@@ -1912,7 +1916,8 @@
       "#AAABAE",
       "#18181B",
       "#B4B6B8"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-vault-right-stripe",
@@ -1921,14 +1926,15 @@
       2902,
       244,
       44,
-      270
+      276
     ],
     "render": "jasper-app/build/dock-renders/vault-right-stripe-render.png",
     "min_agreement": 0.9,
     "colours": [
       "#AAABAE",
       "#B4B6B8"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: the stripe fits its labels (the mocks' 22 and the rule), the label line is centred across it where the mock sets it along the outer edge, and the second group stands at the stripe's bottom end; the render is as tall as its two labels and RAIL_GAP at both ends, so the mock's labels compare in place (crop height measured: 332 left, 276 right)."
   },
   {
     "name": "dock-vault-bottom-strip",
