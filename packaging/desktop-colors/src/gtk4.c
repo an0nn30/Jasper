@@ -32,9 +32,14 @@ void dc_gtk_extract(struct dc_gtk_api *api, GtkWidget *root, struct dc_palette *
             out->colors[p]=(struct dc_colors){available,halves[0],halves[1]};
         }
         api->remove_provider(api->display(),provider); g_object_unref(provider);
-    } else {
-        dc_gtk_settle(); GtkStyleContext *context=api->context(root);
+    }
+    if(!api->variables || !api->adw) {
+        if(!api->variables) dc_gtk_settle();
+        GtkStyleContext *context=api->context(root);
         for(int p=0;p<DC_PAIR_COUNT;p++) {
+            /* Modern variables win. Plain GTK can supply paired names when absent;
+             * modern libadwaita deliberately retains missing-variable observations. */
+            if(out->colors[p].present) continue;
             bool found=false;
             if(api->major==4) {
                 char bg[64],fg[64]; snprintf(bg,sizeof bg,"%s",variables[p][0]); snprintf(fg,sizeof fg,"%s",variables[p][1]);

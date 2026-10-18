@@ -151,3 +151,53 @@ void assert_notifications(struct dc_gtk_api *api,GtkCssProvider *provider,bool m
     g_main_loop_unref(worker.loop);fclose(output);
 }
 #endif
+
+#if !defined(DC_GTK_ABI) && !defined(DC_TEST_SHIM)
+struct injected_commands { int fd; bool delivered; };
+static gboolean inject_samples(gpointer data) {
+    struct injected_commands *injected=data;
+    g_assert_true(sampling);
+    const char *commands="{\"v\":1,\"kind\":\"sample\",\"generation\":41,\"appearance\":\"dark\"}\n"
+        "{\"v\":1,\"kind\":\"sample\",\"generation\":42,\"appearance\":\"dark\"}\n";
+    g_assert_cmpint(write(injected->fd,commands,strlen(commands)),==,(ssize_t)strlen(commands));
+    injected->delivered=true;return G_SOURCE_REMOVE;
+}
+void assert_nested_requests(struct dc_gtk_api *api,GtkCssProvider *provider,bool notification) {
+    if(api->variables) fixture_load(api,provider,"window { --window-bg-color: rgb(10%,20%,30%); --window-fg-color: white; }");
+    else {char *css=fixture_read("named.css");fixture_load(api,provider,css);g_free(css);}
+    FILE *output=tmpfile();g_assert_nonnull(output);
+    struct worker worker={.loop=g_main_loop_new(NULL,FALSE),.output=output,.api=api->major==3?&api3:&api4,
+        .last={DC_SAMPLE,40,1},.have_last=true};
+    int descriptors[2];g_assert_cmpint(pipe(descriptors),==,0);
+    g_assert_cmpint(fcntl(descriptors[0],F_SETFL,O_NONBLOCK),==,0);
+    guint source=g_unix_fd_add(descriptors[0],G_IO_IN,input,&worker);
+    struct injected_commands injected={.fd=descriptors[1]};
+    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE+50,inject_samples,&injected,NULL);
+    if(notification) {
+        gulong signal=g_signal_connect(api->settings(),"notify::gtk-theme-name",G_CALLBACK(changed),&worker);
+        g_object_notify(G_OBJECT(api->settings()),"gtk-theme-name");
+        while(worker.idle) g_main_context_iteration(NULL,TRUE);
+        g_signal_handler_disconnect(api->settings(),signal);
+    } else g_assert_true(periodic(&worker));
+    g_assert_true(injected.delivered);
+    rewind(output);char line[8192];
+    for(int generation=40;generation<=42;generation++) {
+        char token[64];snprintf(token,sizeof token,"\"generation\":%d",generation);
+        g_assert_nonnull(fgets(line,sizeof line,output));g_assert_nonnull(strstr(line,token));
+        g_assert_nonnull(strstr(line,"window.bg"));
+    }
+    g_assert_null(fgets(line,sizeof line,output));assert_unmapped(api);
+    g_source_remove(source);close(descriptors[0]);close(descriptors[1]);fclose(output);g_main_loop_unref(worker.loop);
+}
+void assert_plain_native(const char *program) {
+    GError *error=NULL;
+    GSubprocessLauncher *launcher=g_subprocess_launcher_new(G_SUBPROCESS_FLAGS_STDOUT_PIPE|G_SUBPROCESS_FLAGS_STDERR_PIPE);
+    g_subprocess_launcher_setenv(launcher,"LD_PRELOAD",g_getenv("DC_GTK_SHIM"),TRUE);
+    g_subprocess_launcher_setenv(launcher,"DC_TEST_RUNTIME","plain",TRUE);
+    GSubprocess *process=g_subprocess_launcher_spawn(launcher,&error,program,"-p","/gtk4/plain-named-native",NULL);g_assert_no_error(error);
+    char *out=NULL,*err=NULL;g_assert_true(g_subprocess_communicate_utf8(process,NULL,NULL,&out,&err,&error));g_assert_no_error(error);
+    g_print("%s",out);if(err && *err) g_printerr("%s",err);
+    g_assert_true(g_subprocess_get_successful(process));g_assert_nonnull(strstr(out,"ok 1 /gtk4/plain-named-native"));
+    g_free(out);g_free(err);g_object_unref(process);g_object_unref(launcher);
+}
+#endif

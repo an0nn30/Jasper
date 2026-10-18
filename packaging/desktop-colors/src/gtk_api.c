@@ -111,6 +111,7 @@ bool dc_gtk_sample(struct dc_gtk_api *requested, bool dark, uint64_t generation,
     *out=(struct dc_palette){.generation=(int64_t)generation,.source=api==&api3?DC_GTK3:DC_GTK4,
         .appearance=DC_UNKNOWN,.implementation=api==&api3?"gtk3":"gtk4",.version="",.reason="toolkit unavailable or unsupported"};
     if (generation>INT64_MAX) return false;
+    if (sampling) {out->reason="sample already active";return false;}
     if (!*tried) { *tried=true; if (!dc_gtk_api_open(api==&api3?3:4,api)) return false; }
     if (!api->gtk) return false;
     out->version=api->version;
@@ -144,10 +145,18 @@ void dc_gtk_shutdown(void) {
     /* GTK registers process-global GTypes: keep its library loaded until process exit. */
 }
 
-struct worker { GMainLoop *loop; FILE *output; struct dc_gtk_api *api; struct dc_command last; bool have_last; guint idle; char line[DC_MAX_MESSAGE+1]; size_t used; bool overflow; };
+struct worker { GMainLoop *loop; FILE *output; struct dc_gtk_api *api; struct dc_command last; bool have_last, publishing; GQueue deferred; guint idle; char line[DC_MAX_MESSAGE+1]; size_t used; bool overflow; };
 static void publish(struct worker *w) {
-    struct dc_palette p; dc_gtk_sample(w->api,w->last.dark,w->last.generation,&p);
-    if(dc_write_palette(w->output,&p)!=0) g_main_loop_quit(w->loop);
+    if(w->publishing || sampling) return;
+    w->publishing=true;
+    for(;;) {
+        struct dc_palette p; dc_gtk_sample(w->api,w->last.dark,w->last.generation,&p);
+        if(dc_write_palette(w->output,&p)!=0) {g_main_loop_quit(w->loop);break;}
+        struct dc_command *next=g_queue_pop_head(&w->deferred);
+        if(!next) break;
+        w->last=*next;g_free(next);
+    }
+    w->publishing=false;
 }
 static gboolean refresh(gpointer data) { struct worker *w=data; w->idle=0; if(w->have_last && !sampling) publish(w); return G_SOURCE_REMOVE; }
 static void changed(GObject *object,GParamSpec *property,gpointer data) {
@@ -163,7 +172,12 @@ static gboolean input(gint fd,GIOCondition condition,gpointer data) {
             struct dc_command c;
             if(!w->overflow && dc_read_command(w->line,w->used,&c)==0) {
                 if(c.kind==DC_PING) {if(dc_write_pong(stdout,c.generation)!=0) g_main_loop_quit(w->loop);}
-                else {w->last=c;w->have_last=true;publish(w);}
+                else if(w->publishing || sampling) {
+                    /* The GTK settle idle pumps this context. Preserve the active root and
+                     * request metadata until extraction and its publication have finished. */
+                    struct dc_command *pending=g_new(struct dc_command,1);*pending=c;
+                    g_queue_push_tail(&w->deferred,pending);
+                } else {w->last=c;w->have_last=true;publish(w);}
             }
             w->used=0;w->overflow=false;
         } else if(w->used<DC_MAX_MESSAGE) w->line[w->used++]=bytes[i];
@@ -195,5 +209,6 @@ int dc_gtk_main(int major,int argc,char **argv) {
         g_signal_handlers_disconnect_by_data(w.api->settings(),&w);
         if(w.api->adw) g_signal_handlers_disconnect_by_data(w.api->style_manager(),&w);
     }
+    g_queue_clear_full(&w.deferred,g_free);
     dc_gtk_shutdown();g_main_loop_unref(w.loop);fcntl(STDIN_FILENO,F_SETFL,flags);return 0;
 }

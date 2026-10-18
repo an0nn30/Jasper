@@ -9,6 +9,9 @@ void fixture_load(struct dc_gtk_api *,GtkCssProvider *,const char *);
 char *fixture_read(const char *);
 void helper_contract(const char *,const char *);
 void assert_notifications(struct dc_gtk_api *,GtkCssProvider *,bool);
+void assert_nested_requests(struct dc_gtk_api *,GtkCssProvider *,bool);
+void assert_plain_native(const char *);
+static const char *program;
 static struct dc_gtk_api api;
 static GtkCssProvider *provider;
 static struct dc_palette modern_palette(void) {
@@ -49,13 +52,31 @@ static void old_named(void) {
 static void runtime_limits(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"old-gtk4");}
 static void neither(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"neither");helper_contract(g_getenv("DC_GTK3_HELPER"),"neither");}
 static void no_display(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"no-display");}
-static void plain(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"plain");}
+static void plain_named_native(void) {
+    g_assert_null(api.adw);
+    char *css=fixture_read("named.css");
+    char *combined=g_strconcat(css,api.variables?"window { --window-bg-color: initial; --window-fg-color: initial; }":"",NULL);
+    fixture_load(&api,provider,combined);g_free(css);g_free(combined);
+    struct dc_palette p;g_assert_true(dc_sample_gtk4(true,51,&p));
+    assert_rgba(p.colors[DC_WINDOW].background,.1,.2,.3,1);assert_rgba(p.colors[DC_WINDOW].foreground,1,1,1,1);
+    g_assert_cmpstr(p.implementation,==,"gtk4");assert_unmapped(&api);
+    if(api.variables) {
+        fixture_load(&api,provider,"@define-color window_bg_color red; @define-color window_fg_color white; window { --window-bg-color: rgb(10%,20%,30%); --window-fg-color: white; }");
+        g_assert_true(dc_sample_gtk4(true,52,&p));assert_rgba(p.colors[DC_WINDOW].background,.1,.2,.3,1);
+        fixture_load(&api,provider,"@define-color window_bg_color rgb(10%,20%,30%); @define-color window_fg_color white; window { --window-bg-color: red; --window-fg-color: initial; }");
+        g_assert_true(dc_sample_gtk4(true,53,&p));assert_rgba(p.colors[DC_WINDOW].background,.1,.2,.3,1);
+        assert_rgba(p.colors[DC_WINDOW].foreground,1,1,1,1);
+    }
+}
+static void plain(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"plain");assert_plain_native(program);}
+static void during_notification(void) {assert_nested_requests(&api,provider,true);}
+static void during_timer(void) {assert_nested_requests(&api,provider,false);}
 static void gtk3_only(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),"gtk3-only");helper_contract(g_getenv("DC_GTK3_HELPER"),"gtk3-only");}
 static void ping_and_preview(void) {helper_contract(g_getenv("DC_GTK4_HELPER"),NULL);}
 static void close_idempotent(void) {struct dc_gtk_api absent={0};dc_gtk_api_close(&absent);dc_gtk_api_close(&absent);g_assert_false(dc_gtk_api_open(2,&absent));}
 static void notification(void) {assert_notifications(&api,provider,api.variables);}
 int main(int argc,char **argv) {
-    g_test_init(&argc,&argv,NULL);g_assert_true(dc_gtk_api_open(4,&api));g_assert_true(api.init4());
+    program=argv[0];g_test_init(&argc,&argv,NULL);g_assert_true(dc_gtk_api_open(4,&api));g_assert_true(api.init4());
     if(api.adw) api.adw_init();
     unsigned (*adw_major)(void)=NULL,(*adw_minor)(void)=NULL,(*adw_micro)(void)=NULL;
     if(api.adw) {*(void **)(&adw_major)=dlsym(api.adw,"adw_get_major_version");*(void **)(&adw_minor)=dlsym(api.adw,"adw_get_minor_version");*(void **)(&adw_micro)=dlsym(api.adw,"adw_get_micro_version");}
@@ -73,5 +94,8 @@ int main(int argc,char **argv) {
     g_test_add_func("/gtk4/plain-without-adwaita",plain);g_test_add_func("/gtk4/gtk3-only",gtk3_only);
     g_test_add_func("/gtk4/helper-ping-preview-eof",ping_and_preview);g_test_add_func("/gtk4/loader-close-idempotent",close_idempotent);
     g_test_add_func("/gtk4/stylesheet-setting-notification",notification);g_test_add_func("/gtk4/no-display-ping",no_display);
+    g_test_add_func("/gtk4/request-during-notification-sample",during_notification);
+    g_test_add_func("/gtk4/request-during-timer-sample",during_timer);
+    if(!api.adw) g_test_add_func("/gtk4/plain-named-native",plain_named_native);
     int status=g_test_run();api.remove_provider(fixture_target(&api),provider);g_object_unref(provider);dc_gtk_shutdown();return status;
 }

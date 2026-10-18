@@ -55,9 +55,12 @@ surfaces use Window. GTK 4 before 4.16 uses paired underscore names, followed by
 GTK 4.16+ creates dedicated labels beneath an unmapped root, assigning each documented variable to `color`
 with magenta and cyan fallbacks. An idle follows invalidation before foreground lookup. Matching results identify
 resolved variables, preserving real magenta/cyan. The instrumentation provider outranks user label colors while
-variables inherit the theme/user cascade. Missing modern variables remain absent. Theme/dark-preference and
+variables inherit the theme/user cascade. Missing modern libadwaita variables remain absent; plain GTK 4 can
+supply complete named pairs when its variables are absent. Theme/dark-preference and
 optional StyleManager notifications coalesce into an idle resample of the last requested appearance/generation;
-a 30-second refresh catches CSS changes without notifications. EOF destroys roots and ends the helper.
+a 30-second refresh catches CSS changes without notifications. Requests arriving during a notification/timer
+sample are queued until its extraction and publication finish, preserving widget lifetimes and generations.
+EOF destroys roots and ends the helper.
 
 Runtime symbols (all are public; GTK-major alternatives are resolved only in that process):
 
