@@ -1701,9 +1701,10 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    classic button states, the Run window's title row, the active "▶ Run…" item and the count pills.
 2. **Painted contrast.** `ShippedControlReadabilityTest` generalises into `PaintedContrastTest`: it renders every face
    and chrome painter under both shipped kits and samples the declared pairs as painted, over Slate Cobalt Dark and
-   Light, the four Catppuccin flavours, the converter fixtures (ocean, ocean-dawn, stray), Enterprise Light and
-   Dark, and eight seeded degenerate palettes (all roles one grey, all black, all white, accent equal to the surfaces,
-   maximum chroma, each text equal to its surface, each border equal to its surface, light colours under the dark flag).
+   Light, the four Catppuccin flavours, Ubuntu Yaru Dark and Light, the converter fixtures (ocean, ocean-dawn, stray),
+   Enterprise Light and Dark, and eight seeded degenerate palettes (all roles one grey, all black, all white, accent
+   equal to the surfaces, maximum chroma, each text equal to its surface, each border equal to its surface, light
+   colours under the dark flag).
 3. **Kit matrix, as JUnit.** jasper-ui gains a `testFixtures` source set (`KitFixtures.context(theme, kit)`, the
    classic fixture, the gallery builders). `KitMatrixTest` renders the gallery for: the default and the Enterprise
    fixture kits over the full theme set; the complement kit (every point at the value Enterprise does not use, with

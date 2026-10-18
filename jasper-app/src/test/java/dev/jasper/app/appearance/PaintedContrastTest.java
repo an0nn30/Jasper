@@ -458,9 +458,7 @@ class PaintedContrastTest {
 
     /** Spec 16.1.2 for plan 9a's classic Settings frame: each window rule it declares is painted as its guard makes it, everywhere. */
     @Test void theClassicSettingsFramePaintsEachRuleAsItsGuardMakesItOverEveryPalette() {
-        var palettes = palettes();
-        palettes.add(KitFixtures.enterpriseLight());
-        for (var theme : palettes) {
+        for (var theme : palettes()) {
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
             var parts = new JComponent[6];
             for (int i = 0; i < parts.length; i++) { parts[i] = new JPanel(); parts[i].setOpaque(false); }
@@ -619,7 +617,6 @@ class PaintedContrastTest {
     /** Spec 16.1.2 for the classic faces (plan 4c Rulings 17): every pair they declare meets its guard as painted, everywhere. */
     @Test void everyClassicPairMeetsItsGuardOverEveryPaletteAndEnterpriseLight() {
         var palettes = palettes();
-        palettes.add(KitFixtures.enterpriseLight());
         for (var kit : List.of(Kit.CLASSIC, KitFixtures.enterprise()))
             for (var pair : KitFaces.declared(kit).stream().distinct().toList())
                 for (var theme : palettes) {

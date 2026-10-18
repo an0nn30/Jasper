@@ -17,13 +17,13 @@ contact sheets of eight and a manifest under `jasper-ui/build/gallery/<theme>-<s
 state, typed descriptor busy/error/visibility state, route, central font and scale. It excludes values
 and secrets. Coverage tests require every node, enum variants, nine originals and real panel
 transitions. Test and gallery classes stay out of the production jar. At scale 2 the form font is scaled too.
-`-Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=light` renders the gallery and the Enterprise fixtures under the
-Enterprise fixture kit into `build/gallery/enterprise-light-<scale>x/`; `tools/visual/check_pairs.py` compares the 2×
-renders with the Enterprise mocks (opt-in).
+`-Pjasper.galleryKit=enterprise` renders the gallery and the Enterprise fixtures under the Enterprise fixture kit over
+the Enterprise theme's `galleryTheme` variant into `build/gallery/enterprise-<theme>-<scale>x/`;
+`tools/visual/check_pairs.py` compares the Light 2× renders with the Enterprise mocks (opt-in).
 The gallery and the kit fixtures (`KitFixtures`, `Edt` and the `dev.jasper.ui.gallery` builders) are jasper-ui's
 `testFixtures` source set, which jasper-app's tests use through `testFixtures(project(":jasper-ui"))`. Inside
 `check`, `KitMatrixTest` renders every fixture under `Kit.DEFAULT` over `KitFixtures.themes()`, and the gallery with the
-Enterprise fixtures under the Enterprise fixture kit over the theme set and Enterprise Light and under the complement
+Enterprise fixtures under the Enterprise fixture kit over the theme set and under the complement
 kit and the seven covering-array kits (`control-covering-array.tsv`) over five palettes; jasper-app's
 `PaintedContrastTest` samples every declared pair over the theme set and `KitFixtures.degenerate()`.
 

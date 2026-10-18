@@ -133,10 +133,10 @@ class ClassicIndicatorsTest {
     /**
      * Review Focus 3, as painted: each chip drawn on {@code surface.card}, the ground a tag stands on in a table or list.
      * Its most contrasting label pixel stands 3:1 from the tint, and its 1 px box stands the structural 1.3:1 apart from
-     * the card outside and the tint inside, over the theme set and Enterprise Light.
+     * the card outside and the tint inside, over the theme set.
      */
     @Test void aClassicTagsLabelAndBoxStandOutAsPainted() {
-        var themes = new ArrayList<>(KitFixtures.themes()); themes.add(KitFixtures.enterpriseLight());
+        var themes = KitFixtures.themes();
         var failures = new ArrayList<String>();
         for (var theme : themes) Edt.run(() -> {
             var context = KitFixtures.context(theme, KitFixtures.enterprise());
