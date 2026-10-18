@@ -201,3 +201,35 @@ int dc_write_palette(FILE *stream, const struct dc_palette *palette) {
     if (fwrite(writer.text, 1, writer.length, stream) != writer.length || fflush(stream) != 0) return -1;
     return 0;
 }
+
+int dc_write_portal(FILE *stream, const struct dc_portal *portal) {
+    static const char *const appearances[] = {"dark", "light", "unknown"};
+    if (!stream || !portal || portal->owner < 0
+        || portal->appearance < DC_DARK || portal->appearance > DC_UNKNOWN
+        || !valid_text(portal->reason, DC_MAX_REASON)) return -1;
+    locale_t decimal = newlocale(LC_NUMERIC_MASK, "C", (locale_t) 0);
+    if (!decimal) return -1;
+    locale_t previous = uselocale(decimal);
+    if (!previous) { freelocale(decimal); return -1; }
+    struct writer writer = { .length = 0, .failed = 0 };
+    append(&writer, "{\"v\":1,\"kind\":\"portal\",\"owner\":%" PRId64 ",\"appearance\":\"%s\",\"reason\":",
+        portal->owner, appearances[portal->appearance]);
+    quoted(&writer, portal->reason);
+    if (portal->accent_present && valid_color(portal->accent)) {
+        struct dc_rgba a = portal->accent;
+        append(&writer, ",\"accent\":\"%.17g,%.17g,%.17g,%.17g\"", a.red, a.green, a.blue, a.alpha);
+    }
+    if (portal->contrast_present) append(&writer, ",\"highContrast\":%s", portal->high_contrast ? "true" : "false");
+    append(&writer, "}\n");
+    uselocale(previous);
+    freelocale(decimal);
+    if (writer.failed) return -1;
+    return fwrite(writer.text, 1, writer.length, stream) == writer.length && fflush(stream) == 0 ? 0 : -1;
+}
+int dc_write_pong(FILE *stream, int64_t generation) {
+    if (!stream || generation < 0) return -1;
+    struct writer writer = { .length = 0, .failed = 0 };
+    append(&writer, "{\"v\":1,\"kind\":\"pong\",\"generation\":%" PRId64 "}\n", generation);
+    if (writer.failed) return -1;
+    return fwrite(writer.text, 1, writer.length, stream) == writer.length && fflush(stream) == 0 ? 0 : -1;
+}

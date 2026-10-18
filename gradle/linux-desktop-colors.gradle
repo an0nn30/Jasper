@@ -1,4 +1,4 @@
-// Protocol-only targets need a C11 compiler. Toolkit discovery belongs to later Linux helper tasks.
+// Linux helper targets need a C11 compiler; the portal additionally uses GIO.
 def linux = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('linux')
 def source = rootProject.file('packaging/desktop-colors/src')
 def fixtures = rootProject.file('packaging/desktop-colors/test')
@@ -24,3 +24,45 @@ def testProtocol = tasks.register('testDesktopProtocol', Exec) {
         new File(fixtures, 'vectors.tsv').absolutePath)
 }
 if (linux) tasks.named('check') { dependsOn(testProtocol) }
+
+// Resolve GIO only inside Linux task actions, so other platforms never need pkg-config.
+def gioFlags = {
+    providers.exec {
+        commandLine('pkg-config', '--cflags', '--libs', 'gio-2.0', 'gio-unix-2.0')
+    }.standardOutput.asText.get().trim().split('\\s+') as List
+}
+def portalExecutable = layout.buildDirectory.file('desktop-colors/jasper-desktop-portal')
+def compilePortal = tasks.register('compileDesktopPortal', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(source, 'portal.c'))
+    outputs.file(portalExecutable)
+    doFirst {
+        portalExecutable.get().asFile.parentFile.mkdirs()
+        commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-I' + source.absolutePath,
+            new File(source, 'protocol.c').absolutePath, new File(source, 'portal.c').absolutePath,
+            '-o', portalExecutable.get().asFile.absolutePath] + gioFlags())
+    }
+}
+def portalTests = layout.buildDirectory.file('desktop-colors/portal-tests')
+def compilePortalTests = tasks.register('compileDesktopPortalTests', Exec) {
+    onlyIf { linux }
+    inputs.files(new File(source, 'protocol.c'), new File(source, 'protocol.h'), new File(source, 'portal.c'),
+        new File(fixtures, 'portal_test.c'), new File(fixtures, 'fake_portal.c'))
+    outputs.file(portalTests)
+    doFirst {
+        portalTests.get().asFile.parentFile.mkdirs()
+        commandLine(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-DDC_PORTAL_NO_MAIN',
+            '-I' + source.absolutePath, new File(source, 'protocol.c').absolutePath,
+            new File(source, 'portal.c').absolutePath, new File(fixtures, 'portal_test.c').absolutePath,
+            '-o', portalTests.get().asFile.absolutePath] + gioFlags())
+    }
+}
+def testPortal = tasks.register('testDesktopPortal', Exec) {
+    group = 'verification'
+    description = 'Tests owner-safe Linux portal observation against a fake service on a private D-Bus session.'
+    onlyIf { linux }
+    dependsOn(compilePortal, compilePortalTests)
+    environment('DC_PORTAL_TEST_HELPER', portalExecutable.get().asFile.absolutePath)
+    commandLine('dbus-run-session', '--', portalTests.get().asFile.absolutePath)
+}
+if (linux) tasks.named('check') { dependsOn(testPortal) }

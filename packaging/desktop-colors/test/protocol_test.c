@@ -93,6 +93,41 @@ static void output(void) {
     fclose(stream);
 }
 
+static void portal_output(void) {
+    struct dc_portal portal = { .owner = INT64_MAX, .appearance = DC_LIGHT,
+        .accent_present = 1, .accent = {.25, .5, .75, 1}, .contrast_present = 1,
+        .high_contrast = 0, .reason = "quote \" and newline\n" };
+    FILE *stream = tmpfile();
+    check(dc_write_portal(stream, &portal) == 0, "portal snapshot writes");
+    check(dc_write_pong(stream, INT64_MAX) == 0, "pong writes");
+    rewind(stream);
+    char text[2048] = {0};
+    fread(text, 1, sizeof text - 1, stream);
+    check(strstr(text, "\"owner\":9223372036854775807") != NULL, "portal owner is exact integer");
+    check(strstr(text, "\"appearance\":\"light\"") != NULL, "portal appearance");
+    check(strstr(text, "\"accent\":\"0.25,0.5,0.75,1\"") != NULL, "portal accent");
+    check(strstr(text, "\"highContrast\":false") != NULL, "explicit false contrast");
+    check(strstr(text, "quote \\\" and newline\\u000a") != NULL, "portal reason escaping");
+    check(strstr(text, "{\"v\":1,\"kind\":\"pong\",\"generation\":9223372036854775807}\n") != NULL, "pong envelope");
+    fclose(stream);
+    stream = tmpfile();
+    portal.accent.red = 2;
+    portal.contrast_present = 0;
+    check(dc_write_portal(stream, &portal) == 0, "invalid optional preference omitted");
+    rewind(stream); memset(text, 0, sizeof text); fread(text, 1, sizeof text - 1, stream);
+    check(strstr(text, "\"accent\"") == NULL && strstr(text, "\"highContrast\"") == NULL,
+        "optional preferences remain independent");
+    check(strstr(text, "\"appearance\":\"light\"") != NULL, "invalid accent retains appearance");
+    fclose(stream);
+    stream = tmpfile();
+    portal.owner = -1;
+    check(dc_write_portal(stream, &portal) == -1 && ftell(stream) == 0, "negative owner rejected without partial output");
+    check(dc_write_pong(stream, -1) == -1 && ftell(stream) == 0, "negative pong rejected");
+    portal.owner = 1; portal.reason = "bad\xff";
+    check(dc_write_portal(stream, &portal) == -1 && ftell(stream) == 0, "invalid portal UTF-8 rejected");
+    fclose(stream);
+}
+
 static void vectors(const char *json_path, const char *manifest_path) {
     FILE *json = fopen(json_path, "r"), *manifest = fopen(manifest_path, "r");
     check(json && manifest, "shared vector files open");
@@ -120,7 +155,7 @@ static void vectors(const char *json_path, const char *manifest_path) {
 
 int main(int argc, char **argv) {
     if (argc != 3) { fprintf(stderr, "usage: protocol-test vectors.jsonl vectors.tsv\n"); return 2; }
-    commands(); output(); vectors(argv[1], argv[2]);
+    commands(); output(); portal_output(); vectors(argv[1], argv[2]);
     printf("desktop protocol: %d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }

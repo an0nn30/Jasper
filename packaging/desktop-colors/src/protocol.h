@@ -25,11 +25,23 @@ struct dc_palette {
     const char *reason;
 };
 
+struct dc_portal {
+    int64_t owner;
+    enum dc_polarity appearance;
+    int accent_present;
+    struct dc_rgba accent;
+    int contrast_present;
+    int high_contrast;
+    const char *reason;
+};
+
 /* Return 0 on success, -1 on invalid input or I/O failure. No partial parse is published.
  * Commands accept only the fixed v1 schema; length excludes the framing newline.
- * A palette is buffered and validated before writing one newline-terminated envelope.
- * Invalid optional color pairs are omitted. Strings are borrowed for the duration of the call. */
+ * Messages are buffered and validated before writing one newline-terminated envelope.
+ * Invalid optional colors are omitted. Strings are borrowed for the duration of the call. */
 int dc_read_command(const char *line, size_t length, struct dc_command *out);
 int dc_write_palette(FILE *stream, const struct dc_palette *palette);
+int dc_write_portal(FILE *stream, const struct dc_portal *portal);
+int dc_write_pong(FILE *stream, int64_t generation);
 
 #endif
