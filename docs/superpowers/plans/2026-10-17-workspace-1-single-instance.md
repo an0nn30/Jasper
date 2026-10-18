@@ -27,7 +27,7 @@ standard library for the edit scripts (always `python3 -I`).
 sections 1, 2.5, 4, 5 (all of it), 15, 16, 17 and 18; plan 1 of the six in section 18.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`
-(on `main` at `11e40192c`). Run every command from the worktree root. Line numbers are from `e2890657c` ("Spec:
+(on `main` at `4ed94fb78`). Run every command from the worktree root. Line numbers are from `c92cd3afb` ("Spec:
 workspace tabs approved"); the commits after it on this branch change only the spec and the plans. Every edit quotes the
 text it replaces, and the edit scripts stop with a message when that text
 is not found the stated number of times: re-find the quoted text, adjust the anchor and re-run; never edit around a
@@ -35,9 +35,9 @@ missing anchor. Later tasks anchor on text earlier tasks wrote; the plan quotes 
 
 ## Spec issues
 
-None open. The spec was amended while this plan was written, and the plan follows the amended text: `36fc3dd6b` dropped
+None open. The spec was amended while this plan was written, and the plan follows the amended text: `c6d11f711` dropped
 `LSMultipleInstancesProhibited` from 5.4 (Apple's key decides whether more than one *user* may run the app at once and
-does not guard `open -n`), so Task 10 adds only `CFBundleDocumentTypes`; `38ec03740` made 5.3 say that a ready owner
+does not guard `open -n`), so Task 10 adds only `CFBundleDocumentTypes`; `a92166bb2` made 5.3 say that a ready owner
 answers a handoff OK only after its EDT has taken it, within one second, and PROTOCOL otherwise, and that a quitting
 owner answers PROTOCOL so the launch's retry takes the lock once it has exited (Task 6, Rulings 22 and 23).
 
@@ -213,7 +213,7 @@ Decisions the spec leaves open; record them in `docs/STATUS.md` (Task 11). "What
 
 ## Verified facts
 
-At `e2890657c` unless a task is named.
+At `c92cd3afb` unless a task is named.
 
 1. `HandoffSocket.bind(socketPath, tokenPath, lockPath, handler)` (`residency/HandoffSocket.java:74-111`) takes
    `daemon/lock` while binding (`:85-87`), declines when something answers on the path (`:88-91`, `owned` `:270-276`),
@@ -239,21 +239,21 @@ At `e2890657c` unless a task is named.
    `commandSocket(long)` (`platform/AppDirs.java:75-90`) name `daemon/lock` and `commands-<pid>`.
 6. `RestartFlow` (`restart/RestartFlow.java`) probes `ResidentControl.live`, retires, waits 30 s and offers
    `RestartMode.STANDALONE`; `RestartCommand.plan` filters flags by spelling and `standalone()` appends `--standalone`
-   (`restart/RestartCommand.java:20-56`). `JasperApplication.restart` (`application/JasperApplication.java:1672-1682`)
-   asks the guards, records the relaunch and quits; `relaunchIfRequested` (`:1685-1696`) spawns it from the exit thread,
-   `--standalone` when cleanup did not finish. Callers: Restart Now/Normally (`pluginManager()` `:1746-1758`), VM
-   options (`:1056`), Try Again for a skipped look (`:1028`), `reopened()` (`:723-732`).
+   (`restart/RestartCommand.java:20-56`). `JasperApplication.restart` (`application/JasperApplication.java:1671-1681`)
+   asks the guards, records the relaunch and quits; `relaunchIfRequested` (`:1684-1695`) spawns it from the exit thread,
+   `--standalone` when cleanup did not finish. Callers: Restart Now/Normally (`pluginManager()` `:1745-1757`), VM
+   options (`:1055`), Try Again for a skipped look (`:1027`), `reopened()` (`:722-731`).
 7. `PluginManager.Hooks` carries `ResidentControl resident` and `boolean standaloneNotice` (`pluginmanager/PluginManager.java:36-46`);
    `refresh` probes for the standalone notice (`:112-122`); `renderBanner` has six states (`:136-158`). Test callers of
    `RestartFlow`/`Hooks`: `PluginManagerTest`, `PluginManagerStatesPreview`, `EnterpriseSettings`,
    `PluginSettingsPagesEvidenceTest`, `Settings9bPreview`, `SettingsDialogPreview`.
-8. `JasperApplication.openOrRaise(String)` and `openOrRaise(Path, String)` (`:820-835`) raise the last active window or
-   open one; callers are `commands()` (`:661`), `reopened()` (`:731`), the resident indicator (`:737`) and the handoff
-   handler. `openFileAt(file, line, window)` (`:623-639`) is the Cmd-click path. `endpointReleased` (`:804-807`) exists
+8. `JasperApplication.openOrRaise(String)` and `openOrRaise(Path, String)` (`:819-834`) raise the last active window or
+   open one; callers are `commands()` (`:660`), `reopened()` (`:730`), the resident indicator (`:736`) and the handoff
+   handler. `openFileAt(file, line, window)` (`:622-638`) is the Cmd-click path. `endpointReleased` (`:803-806`) exists
    for the STALE path only. The quit, reopen, preferences and about handlers are installed in the constructor
-   (`:393-412`) and removed in `shutdown` (`:1937-1940`); no open-file handler exists.
+   (`:392-411`) and removed in `shutdown` (`:1936-1939`); no open-file handler exists.
 9. `PluginCommands.dispatch` answers "jasper: unknown command NAME; run jasper --help for the list" with exit 2
-   (`plugins/PluginCommands.java:88-93`); `Subcommands.owner(name)` (`plugins/Subcommands.java:60`) also knows names of
+   (`plugins/PluginCommands.java:88-93`); `Subcommands.owner(name)` (`plugins/Subcommands.java:74`) also knows names of
    plugins that do not run; `PluginRuntime.commands()` (`plugins/PluginRuntime.java:568-575`).
 10. The `jasper` client sends every call, arguments as given plus its working directory, to the command socket, and
     runs the launcher for a first argument starting with `--` (`packaging/cli/src/jasper_cli.c:766-776`); its usage
@@ -264,7 +264,7 @@ At `e2890657c` unless a task is named.
     Child-JVM helpers use `java.home/bin/java` and code-source class paths
     (`jasper-app/src/test/java/dev/jasper/app/testsupport/EndpointLockChild.java:11-14`).
 13. `JasperApplication.notificationCenter()`, `restartPlanner` and `spawner` are package-private test seams
-    (`:169-173`, `:1713`); `NotificationCenter.history()` records a notice posted with no window open
+    (`:169-173`, `:1712`); `NotificationCenter.history()` records a notice posted with no window open
     (`PresentationAttemptTest:179-181` reads one).
 
 ## File structure
@@ -295,7 +295,7 @@ At `e2890657c` unless a task is named.
 ## Before you start
 
 ```bash
-git diff --stat e2890657c HEAD -- jasper-app jasper-sdk gradle packaging config.example.toml docs/*.md   # nothing: only the spec and plans moved
+git diff --stat c92cd3afb HEAD -- jasper-app jasper-sdk gradle packaging config.example.toml docs/*.md   # nothing: only the spec and plans moved
 git status --short            # nothing
 grep -c 'public void openOrRaise(String trigger)' jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java   # 1
 grep -c 'boolean standaloneLaunch()' jasper-app/src/main/java/dev/jasper/app/bootstrap/AppArguments.java                      # 1
@@ -1186,7 +1186,7 @@ Spec 5.3 "Restart" and 16: the replacement gets `--replacing <pid>`; nothing pro
 - Modify: `jasper-app/src/main/java/dev/jasper/app/residency/LaunchRequest.java` (whole file), `HandoffSocket.java:113-161`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/pluginmanager/PluginManager.java:4,25-46,111-122,136-158`,
   `PluginManagerPanel.java:23,50,142-143,203-204,233,288`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:67-70,159-176,1664-1709,1746-1758,1948`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:67-70,159-176,1663-1708,1745-1757,1947`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java:41,334-338,611-623,640-661`
 - Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Windows.java:41` (the `onQuitting` Javadoc: what really quits)
 - Modify (test): `restart/RestartCommandTest.java`, `restart/RestartFlowTest.java` (whole files);
@@ -2138,7 +2138,7 @@ directory (Ruling 13); a file from outside opens in a plugin's editor or is reve
 
 **Files:**
 - Create: `jasper-app/src/main/java/dev/jasper/app/application/OpenPlan.java`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:449-453,626-638,661,731,737,820-835`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:448-452,625-637,660,730,736,819-834`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/platform/ConfigEditor.java:90-91`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java` (the handoff handler's raise)
 - Create (test): `jasper-app/src/test/java/dev/jasper/app/application/OpenPlanTest.java`
@@ -6177,7 +6177,7 @@ command"). The running Jasper decides, so the C client only documents it. Ruling
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java` (`commands()`, Task 4's text)
-- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginCommands.java:52-53`, `PluginRuntime.java:567`
+- Modify: `jasper-app/src/main/java/dev/jasper/app/plugins/PluginCommands.java:53-54`, `PluginRuntime.java:567`
 - Modify: `packaging/cli/src/jasper_cli.c:63-69`
 - Modify (test): `application/ApplicationCommandsTest.java`, `plugins/PluginRuntimeTest.java:300-307`,
   `commandline/CommandClientTest.java:121-127,298-306`
@@ -6473,7 +6473,7 @@ Spec 5.4: `Desktop.setOpenFileHandler` at start-up, files and folders through `o
 is revealed, Ruling 26); the plist gains `CFBundleDocumentTypes` at `Alternate`, and `verifyPackage` checks it. Ruling 18.
 
 **Files:**
-- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:90,155,400-403,1939` and after
+- Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:90,155,399-402,1938` and after
   `restartForUpdate` (Task 5)
 - Modify: `gradle/packaging.gradle:34,267,307,558`
 - Modify (test): `application/JasperApplicationResidencyTest.java`
@@ -6635,8 +6635,8 @@ standing inaccuracy that a `./gradlew run` session "stays resident" (a dev run h
 
 **Files:**
 - Modify: `docs/configuration.md:15,17,24,37-45,279-280,294-316`, `config.example.toml:59`, `docs/app-architecture.md:51,69-73,86-88,102-103,108,159,178-179,186`,
-  `docs/app-maintenance.md:220`, `docs/packaging.md:296,341,362,366`, `docs/sdk-architecture.md:18,71,267-274,391-393,398`,
-  `docs/plugin-authoring.md:772-773`, `packaging/cli/README.md:4,39`, `docs/STATUS.md:2`
+  `docs/app-maintenance.md:220`, `docs/packaging.md:305,341,362,366`, `docs/sdk-architecture.md:18,71,267-274,391-393,398`,
+  `docs/plugin-authoring.md:774-775`, `packaging/cli/README.md:4,39`, `docs/STATUS.md:2`
 
 **Interfaces:**
 - Consumes: everything above. Produces: nothing new.
@@ -6831,9 +6831,9 @@ PY
 - [ ] **Step 2: The STATUS entry**
 
 Insert this entry in `docs/STATUS.md` directly under the `# Jasper — Status and Handoff` heading and its blank line,
-above the Enterprise plan 10a entry. Fill in the date, the commit range (`git log --oneline` from Task 1's commit to this
-task's), any deviation from this plan, the counts from Step 3, and for FIGURES the `settings-plugins:` line Task 3
-recorded before and after:
+above the Enterprise presentation series entry. Fill in the date, the commit range (`git log --oneline` from Task 1's
+commit to this task's), any deviation from this plan, the counts from Step 3, and for FIGURES the `settings-plugins:`
+line Task 3 recorded before and after:
 
 ```markdown
 **Workspace tabs, plan 1: the single instance — 2026-10-DD** (`claude/workspace-tabs`, worktree
@@ -6878,7 +6878,7 @@ which it then carries out as an ordinary start; (21) raise and path calls answer
 answers a handoff once its EDT took it, within 1 s; (23) a quitting owner takes no handoff; (24) a failed start keeps
 the lock until its process exits; (25) the lock is never opened twice in one process; (26) a file from outside is
 revealed, never desktop-edited, without a plugin's editor; (27) a replacement whose predecessor has gone hands off. The
-spec was amended while the plan was written (`36fc3dd6b`: no `LSMultipleInstancesProhibited`; `38ec03740`: the EDT
+spec was amended while the plan was written (`c6d11f711`: no `LSMultipleInstancesProhibited`; `a92166bb2`: the EDT
 take and the quitting owner); the plan follows the amended text. `./gradlew check --continue`: **N tests, 0 failures,
 0 errors, M skipped**. Before the first launch of this build, quit any older resident Jasper completely (its menu bar
 item's Quit Jasper Completely): it holds no instance lock and is unreachable from the new build, so it would keep
@@ -6959,12 +6959,12 @@ EOF
   List<String>, boolean)`, `restart(RestartMode, List<Path>)`, `commandPaths` and `missingPaths(Path, List<String>,
   Predicate<String>)`, `ConfigEditor.revealOnly(Path)` and `RestartCommand.replacing(List<String>, long, List<Path>)` are
   spelled the same in every task that names them.
-- **Spec amendments.** 5.3's EDT take and quitting owner (`38ec03740`): Task 6's `Instance` (Rulings 22, 23) and Task 7's
-  `serve` call; 5.4 without `LSMultipleInstancesProhibited` (`36fc3dd6b`): Task 10 and the docs in Task 11.
+- **Spec amendments.** 5.3's EDT take and quitting owner (`a92166bb2`): Task 6's `Instance` (Rulings 22, 23) and Task 7's
+  `serve` call; 5.4 without `LSMultipleInstancesProhibited` (`c6d11f711`): Task 10 and the docs in Task 11.
 - **No retire left.** RETIRE goes in Task 3 (with the SDK's `Windows.onQuitting` Javadoc) and Task 5; the documents
   that describe it (`sdk-architecture.md`'s restart paragraph, quit-guard sentence and background-work list,
   `app-architecture.md`'s quit list and reopen paragraph, `configuration.md`'s Updates paragraph) change in Task 11.
-- **Anchors.** Every edit script was replayed in order against a copy of the branch on `main` `11e40192c` with
+- **Anchors.** Every edit script was replayed in order against a copy of the branch on `main` `4ed94fb78` with
   the whole-file writes of the tasks before it; each anchor matched its stated count.
 - **Proportion.** Most of the plan's length is complete test and source code, as AGENTS.md asks; whole files are given
   where a file changes throughout (`LaunchRequest`, `HandoffSocket`, `AppArguments`, the restart package) and anchored
