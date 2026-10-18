@@ -232,12 +232,13 @@ final class Forms {
             footer.setBorder(new EmptyBorder(footerTop, side,
                     window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_VERTICAL) : prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTER_BOTTOM) : pad, side));
             // A classic dialog's band (spec 10.8): 8 above and below the buttons' faces (10 in a native dialog, whose card
-            // the dialog does not draw), the form's sides, under its rule.
+            // the dialog does not draw), the form's sides, under its rule; a window form's band keeps the window footer's
+            // padding and sides below its rule.
             footer.band = view.dialogBand();
             if (footer.band) {
-                int vertical = ThemePainting.metric(context(), view.dialogCard()
+                int vertical = ThemePainting.metric(context(), window ? DesignMetrics.Role.WINDOW_FOOTER_VERTICAL : view.dialogCard()
                         ? DesignMetrics.Role.DIALOG_FOOTER_VERTICAL : DesignMetrics.Role.NATIVE_DIALOG_FOOTER_VERTICAL);
-                int sides = ThemePainting.metric(context(), DesignMetrics.Role.FORM_SIDES);
+                int sides = window ? side : ThemePainting.metric(context(), DesignMetrics.Role.FORM_SIDES);
                 footer.setBorder(new EmptyBorder(vertical + stroke, sides, vertical, sides));
             }
             footer.setLayout(new FooterLayout(this));
@@ -338,19 +339,18 @@ final class Forms {
     /** Stable footer ancestry; only its viewport overflows on screens shorter than the fixed actions. */
     static final class Footer extends JPanel implements Scrollable {
         boolean window;
-        /** A classic dialog's band: {@code surface.footer} under a {@code border.window} rule. */
+        /** A classic dialog's or window's band: {@code surface.footer} under a {@code border.window} rule. */
         boolean band;
         KitContext context;
         @Override protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
-            if (band && !window) {
+            if (band) {
                 var theme = context.theme();
                 graphics.setColor(dev.jasper.ui.theme.DerivedColor.SURFACE_FOOTER.color(theme));
                 graphics.fillRect(0, 0, getWidth(), getHeight());
                 graphics.setColor(dev.jasper.ui.theme.SurfaceContrast.painted(theme, ClassicDialog.BAND_RULE));
                 graphics.fillRect(0, 0, getWidth(), ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE));
-            }
-            if (window) {
+            } else if (window) {
                 // The window footer band shares the sidebar surface below one full-width hairline.
                 graphics.setColor(ThemePainting.color(context, SemanticColor.SURFACE_SIDEBAR));
                 graphics.fillRect(0, 0, getWidth(), getHeight());

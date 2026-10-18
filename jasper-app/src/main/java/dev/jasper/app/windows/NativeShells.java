@@ -149,7 +149,7 @@ public final class NativeShells {
     }
 
     /**
-     * The host flags of a native dialog's kit content (spec 10.8): under the classic mapping its form footer is the band,
+     * The host flags of a native dialog's or a window's kit content (spec 10.8): under the classic mapping its form footer is the band,
      * and when a title bar the system draws ({@code systemTitle}) already shows the dialog's title, a FULL form does not
      * repeat it.
      */
@@ -307,6 +307,11 @@ public final class NativeShells {
             JMenuBar menus = menuBar(surface);
             if (bar != null) bar.setMenuBar(menus); else { frame.setJMenuBar(menus); shell.styleMenus(menus); }
             shell.followTheme(frame.getRootPane(), bar, themes.current().chrome().dark());
+            // Spec 10.8: under the classic mapping a window form's footer is the band too; content set later takes it.
+            var marks = nativeMarks(surface, false);
+            for (var child : surface.holder().getComponents())
+                if (child instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) marks.accept(view);
+            surface.laterContent(marks);
             frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
             frame.addWindowListener(new WindowAdapter() {
                 @Override public void windowClosing(WindowEvent event) { surface.requestClose(); }

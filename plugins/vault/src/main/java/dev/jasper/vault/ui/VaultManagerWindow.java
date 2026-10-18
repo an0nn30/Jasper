@@ -15,6 +15,7 @@ import dev.jasper.vault.model.ManagedSshKey;
 import dev.jasper.vault.model.SshKey;
 import dev.jasper.vault.service.UnlockPrompt;
 import dev.jasper.vault.service.VaultService;
+import dev.jasper.vault.workstation.Layout;
 import java.awt.Dimension;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -37,6 +38,7 @@ public final class VaultManagerWindow implements AutoCloseable {
     private final Supplier<Status> status;
     private final Runnable generate;
     private final EntryPresenter editors;
+    private final Layout layout;
     private final CopyCards copies;
     private PluginWindow window;
     private WindowHandle owner;
@@ -46,6 +48,13 @@ public final class VaultManagerWindow implements AutoCloseable {
 
     public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
                               VaultService service, Supplier<Status> status, Runnable generate) {
+        this(context, lock, manager, service, status, generate, Layout.ROWS);
+    }
+
+    /** The manager window in {@code layout}'s composition (Enterprise presentation spec 14.8). */
+    public VaultManagerWindow(PluginContext context, LockManager lock, VaultManager manager,
+                              VaultService service, Supplier<Status> status, Runnable generate, Layout layout) {
+        this.layout = layout;
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
         this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
         this.copies = CopyCards.declare(context);
@@ -56,14 +65,15 @@ public final class VaultManagerWindow implements AutoCloseable {
     public void show(WindowHandle owner, Optional<UUID> selection) {
         this.owner = owner;
         if (window == null) {
-            window = context.windows().create(new WindowSpec(ID, "Credential Vault", new Dimension(900, 555), true, WindowSpec.SizeBasis.CONTENT));
-            var shown = new ManagerPanel(context.kit(), manager::entry, this::add, this::edit, this::delete, this::copyPublic,
+            window = context.windows().create(new WindowSpec(ID, "Credential Vault", layout == Layout.CLASSIC ? new Dimension(820, 571) : new Dimension(900, 555), true, WindowSpec.SizeBasis.CONTENT));
+            var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
                 () -> service.requestUnlock(this.owner), this::close);
             shown.copies(copies);
             panel = shown;
             window.setContent(shown.view());
-            window.setTitleActions(Optional.of(shown.titleActions()));
+            // The classic toolbar row carries the title actions (plan 10b Rulings 3).
+            window.setTitleActions(layout == Layout.CLASSIC ? Optional.empty() : Optional.of(shown.titleActions()));
             window.onClosed(() -> {
                 // The surface has already disposed the view and erased its storage; nothing touches it from here.
                 window = null; shown.close(); closeDialogs();

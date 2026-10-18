@@ -16,6 +16,7 @@ import dev.jasper.vault.model.SshKey;
 import dev.jasper.vault.model.Note;
 import dev.jasper.vault.model.ManagedSshKey;
 import dev.jasper.vault.service.UnlockPrompt;
+import dev.jasper.vault.workstation.Layout;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,7 +36,9 @@ final class ManagerPanel implements AutoCloseable {
     static final String ROOT = "manager", SEARCH = "search", KIND = "kind", ADD = "add", EDIT = "edit", DELETE = "delete",
         COPY_PUBLIC = "copy-public", LOCK = "lock", ROWS = "rows", EMPTY = "empty", LOCKED = "locked", UNLOCK = "unlock",
         GRANTS = "grants", BACK = "back", REVOKE = "revoke", STATUS = "status", CANCEL = "cancel", OKAY = "okay", CLOSE = "close",
-        ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.";
+        ADD_GENERATE = "add.generate", UNLOCK_PREFIX = "unlock.", TOOLBAR = "toolbar";
+    /** The Lock Vault action's default binding as the platform writes it (plan 10b Rulings 8). */
+    static final String LOCK_SHORTCUT = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("mac") ? "\u21E7\u2318L" : "Ctrl+Shift+L";
     static final String ALL_TYPES = "all";
     /** Full rows the former list showed in the 800×600 window (11.1 of its 42-pixel rows), measured at baseline f16ae32f. */
     static final int VISIBLE_ROWS = 11;
@@ -47,6 +50,7 @@ final class ManagerPanel implements AutoCloseable {
     private final Consumer<Grant> onRevoke;
     private final Runnable onGenerate, onLock, onUnlock, onClose;
     private final UiView view, titleActions;
+    private final Layout layout;
     private List<VaultManager.Row> allRows = List.of(), visible = List.of();
     private List<Grant> grants = List.of();
     private boolean unlocked, closed;
@@ -65,6 +69,15 @@ final class ManagerPanel implements AutoCloseable {
                  Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
                  Consumer<Grant> onRevoke, Runnable onGenerate,
                  Runnable onLock, Runnable onUnlock, Runnable onClose) {
+        this(kit, Layout.ROWS, entry, onAdd, onEdit, onDelete, onCopy, onRevoke, onGenerate, onLock, onUnlock, onClose);
+    }
+
+    /** The manager in {@code layout}'s composition (Enterprise presentation spec 14.8), kept for its life. */
+    ManagerPanel(UiKit kit, Layout layout, Function<UUID, Optional<Object>> entry, Consumer<VaultManager.Type> onAdd,
+                 Consumer<UUID> onEdit, Consumer<UUID> onDelete, Consumer<UUID> onCopy,
+                 Consumer<Grant> onRevoke, Runnable onGenerate,
+                 Runnable onLock, Runnable onUnlock, Runnable onClose) {
+        this.layout = layout;
         this.entry = entry; this.onAdd = onAdd; this.onEdit = onEdit; this.onDelete = onDelete; this.onCopy = onCopy;
         this.onRevoke = onRevoke; this.onGenerate = onGenerate;
         this.onLock = onLock; this.onUnlock = onUnlock; this.onClose = onClose;
@@ -73,6 +86,7 @@ final class ManagerPanel implements AutoCloseable {
     }
 
     UiView view() { return view; }
+    Layout layout() { return layout; }
     UiView titleActions() { return titleActions; }
     Optional<UUID> selected() { return Optional.ofNullable(selection); }
     List<VaultManager.Row> visibleRows() { return visible; }
@@ -347,12 +361,18 @@ final class ManagerPanel implements AutoCloseable {
 
     private Nodes.Form node() {
         Nodes.Node body = !unlocked ? new Nodes.Stack("locked.body", ControlState.READY, Nodes.LayoutRole.DETAIL, lockedCard())
-            : card == Card.GRANTS ? new Nodes.Stack("grants.body", ControlState.READY, Nodes.LayoutRole.DETAIL, grantsCard()) : entries();
+            : card == Card.GRANTS ? new Nodes.Stack("grants.body", ControlState.READY, Nodes.LayoutRole.DETAIL, grantsCard())
+            : layout == Layout.CLASSIC ? classicEntries() : entries();
+        if (layout == Layout.CLASSIC) {
+            // One section: the toolbar row over the body, which fills (plan 10b Rulings 3); the passive locked state centres.
+            if (!unlocked && unlock == null) body = lockedCard().getFirst();
+            body = new Nodes.Split("classic", ControlState.READY, Nodes.SplitKind.DOCUMENT, List.of(toolbar(), body));
+        }
         boolean prompting = unlock != null && !unlocked;
         var actions = new ArrayList<Nodes.Button>(List.of(new Nodes.Button(OKAY, ControlState.READY, "Done", "", prompting ? Nodes.ButtonKind.SECONDARY : Nodes.ButtonKind.PRIMARY, CLOSE, "")));
         if (prompting) actions.add(unlock.submitButton());
         return new Nodes.Form(ROOT, ControlState.READY, Nodes.FormKind.WINDOW, "Credential Vault", Optional.empty(), List.of(body),
-            Optional.of(status()), actions, prompting ? unlock.cancel : CLOSE);
+            Optional.of(layout == Layout.CLASSIC ? classicStatus() : status()), actions, prompting ? unlock.cancel : CLOSE);
     }
 
     private static String date(java.time.Instant timestamp) {
@@ -370,6 +390,63 @@ final class ManagerPanel implements AutoCloseable {
         return new Nodes.Stack("status."+id+".group",ControlState.READY,Nodes.LayoutRole.NAVIGATION,List.of(
             new Nodes.Icon("status."+id+".icon",ControlState.READY,icon,Nodes.Hue.NEUTRAL,Nodes.IconSize.CAPTION,id),
             text("status."+id,value,role)));
+    }
+
+    /** The classic columns: today's rail, list and detail with the search moved into the toolbar row (Tasks 4 and 5 recompose them). */
+    private Nodes.Node classicEntries() {
+        var split = (Nodes.Split) entries();
+        var browser = (Nodes.Panel) split.children().get(1);
+        return new Nodes.Split(split.id(), split.state(), split.kind(), List.of(split.children().get(0),
+            new Nodes.Panel(browser.id(), browser.state(), browser.header(), Optional.empty(), browser.body(), browser.footer()),
+            split.children().get(2)));
+    }
+
+    /**
+     * The classic toolbar row (spec 14.8, plan 10b Rulings 3): + New, the selection's verbs, Lock Vault and its shortcut,
+     * then the search, which the bar puts at its trailing edge. The verbs run the same actions as the rows composition's.
+     */
+    private Nodes.Stack toolbar() {
+        var row = visible.stream().filter(item -> item.id().equals(selection)).findFirst().orElse(null);
+        Object value = row == null ? null : entry.apply(row.id()).orElse(null);
+        boolean chosen = unlocked && card == Card.ENTRIES && row != null;
+        boolean account = chosen && value instanceof Account;
+        boolean secret = account && password(((Account) value).auth()) != null;
+        var adds = new ArrayList<MenuItem>();
+        for (var type : VaultManager.Type.values()) adds.add(new MenuItem("add." + type.name(), type.toString(), icon(type), "add." + type.name(), true, false, hue(type)));
+        adds.add(new MenuItem("add.separator", "", "", "", true, true));
+        adds.add(new MenuItem(ADD_GENERATE, "Generate SSH Key...", "sparkle", ADD_GENERATE, true, false, Nodes.Hue.PURPLE));
+        return new Nodes.Stack(TOOLBAR, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.MenuButton(TOOLBAR + ".new", new ControlState(true, unlocked, false, ""), "New", "add", Nodes.ButtonKind.GHOST, "", adds, "Add entry"),
+            new Nodes.Separator(TOOLBAR + ".rule.1", ControlState.READY),
+            verb("edit", "Edit…", EDIT, chosen), verb("delete", "Delete", DELETE, chosen),
+            verb("copy-username", "Copy Username", "detail.username.copy", account),
+            verb("copy-password", "Copy Password", "detail.password.copy", secret),
+            new Nodes.Separator(TOOLBAR + ".rule.2", ControlState.READY),
+            verb("lock", "Lock Vault", LOCK, unlocked),
+            text(TOOLBAR + ".shortcut", LOCK_SHORTCUT, Nodes.TextRole.CAPTION),
+            new Nodes.Field(SEARCH, new ControlState(true, unlocked && card == Card.ENTRIES, false, ""), Nodes.FieldKind.SEARCH, query,
+                "Search vault", "Search vault", "")));
+    }
+
+    private static Nodes.Button verb(String id, String label, String action, boolean enabled) {
+        return new Nodes.Button(TOOLBAR + "." + id, new ControlState(true, enabled, false, ""), label, "", Nodes.ButtonKind.GHOST, action, "");
+    }
+
+    /**
+     * The classic status row (spec 14.8): the lock state with its dot and store, a rule, the auto-lock and the vault file.
+     * As a FOOTER stack the leading cells stay whole and a long path elides; a Separator stands only between two items of
+     * an INLINE stack, so the cells before the path are one and no rule precedes the path.
+     */
+    private Nodes.Node classicStatus() {
+        String state = !unlocked ? "Locked" : status.deviceSecret().isEmpty() ? "Unlocked" : "Unlocked · " + sentence(status.deviceSecret());
+        return new Nodes.Stack(STATUS, ControlState.READY, Nodes.LayoutRole.FOOTER, List.of(
+            new Nodes.Stack("status.cells", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+                new Nodes.Stack("status.state.group", ControlState.READY, Nodes.LayoutRole.NAVIGATION, List.of(
+                    new Nodes.StatusDot("status.state", ControlState.READY, unlocked ? Nodes.StatusKind.SUCCESS : Nodes.StatusKind.IDLE),
+                    text("status.provider", state, Nodes.TextRole.CAPTION))),
+                new Nodes.Separator("status.rule.1", ControlState.READY),
+                text("status.autolock", "Auto-lock: " + status.autoLock(), Nodes.TextRole.CAPTION))),
+            text("status.path", status.path(), Nodes.TextRole.MONO_CAPTION)));
     }
 
     /** The window closed (its surface already disposed the view and erased its storage) or is closing. */

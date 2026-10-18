@@ -244,7 +244,7 @@ final class ViewReconciler implements AutoCloseable {
     /**
      * A DOCUMENT split's bars: each INLINE stack among its children, directly or as a row of a VERTICAL group child, is a
      * compact document bar row ({@link Stacks.DocumentBarLayout}); a group stacks its rows without gaps and shows a passive list's rows as text lines. The row's own single-line fields take the panel
-     * search field's compact presentation and its buttons the panel action size, as a tool window's search and icon
+     * search field's compact presentation and its buttons and menu buttons the panel action size, as a tool window's search and icon
      * actions do; nested content keeps its ordinary presentation.
      */
     private void applyDocumentBars(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
@@ -268,6 +268,8 @@ final class ViewReconciler implements AutoCloseable {
             var control = next.get(child.id());
             if (control instanceof TextFields.FieldControl field && child instanceof Nodes.Field value && value.kind() != Nodes.FieldKind.TEXTAREA) field.panelSearch = true;
             if (control instanceof Buttons.ButtonControl button) button.button.panel = true;
+            // A bar's menu button stands as its buttons do, as a panel header's menus do (plan 10b, the Vault's + New).
+            if (control instanceof Menus.MenuControl menu) { menu.main.panel = true; menu.arrow.panel = true; }
         }
     }
     /**

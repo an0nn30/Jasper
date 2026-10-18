@@ -851,7 +851,8 @@ final class Stacks {
      * the first visible field or text fills the width the controls after it leave, other text keeps a stable status
      * width so its neighbours do not move as it changes, and buttons keep their natural widths, closer together when
      * adjacent. Rows of one vertical group align their fills' trailing edges, so a replace field lines up under its find
-     * field. A row too narrow for its fill's minimum keeps the fill and clips what follows at the trailing edge.
+     * field. A row too narrow for its fill's minimum keeps the fill and clips what follows at the trailing edge; under a
+     * catalog search width a text fill first gives way down to its own width.
      */
     static final class DocumentBarLayout implements Composition.WidthLayout {
         final StackControl owner;
@@ -861,6 +862,12 @@ final class Stacks {
         Component fill(List<Component> children) {
             for (Component child : children) if (owner.barFields.contains(child)) return child;
             return null;
+        }
+        /** A child's height in the row: under a catalog search width a search that does not fill stands a field tall (plan 10b). */
+        int tall(Component child, Component fill) {
+            int height = child.getPreferredSize().height;
+            boolean search = metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH) > 0 && child != fill && owner.barFields.contains(child) && !owner.barTexts.contains(child);
+            return search ? Math.min(height, metric(DesignMetrics.Role.FIELD_HEIGHT)) : height;
         }
         int natural(Component child, Component fill) {
             int width = child.getPreferredSize().width;
@@ -892,7 +899,8 @@ final class Stacks {
         }
         @Override public int height(Container parent, int width) {
             int height = 0;
-            for (Component child : visible(parent)) height = Math.max(height, child.getPreferredSize().height);
+            var children = visible(parent); Component fill = fill(children);
+            for (Component child : children) height = Math.max(height, tall(child, fill));
             Insets insets = parent.getInsets();
             return insets.top + insets.bottom + height + 2 * metric(DesignMetrics.Role.DOCUMENT_BAR_VERTICAL_PADDING);
         }
@@ -913,11 +921,14 @@ final class Stacks {
                 if (i > 0) x += gap(children.get(i - 1), child);
                 int width = natural(child, fill);
                 if (child == fill) {
-                    int minimum = Math.min(metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH), Math.max(0, right - x));
+                    // Under a catalog search width (plan 10b) a text fill gives way down to its own width before the search clips.
+                    int least = metric(DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH);
+                    if (metric(DesignMetrics.Role.DOCUMENT_BAR_SEARCH_WIDTH) > 0 && owner.barTexts.contains(child)) least = Math.min(least, child.getPreferredSize().width);
+                    int minimum = Math.min(least, Math.max(0, right - x));
                     width = Math.max(minimum, right - aligned(parent) - x);
                 }
                 width = Math.max(0, Math.min(width, right - x));
-                int height = Math.min(inner, child.getPreferredSize().height);
+                int height = Math.min(inner, tall(child, fill));
                 child.setBounds(x, top + (inner - height) / 2, width, height);
                 x += width;
             }

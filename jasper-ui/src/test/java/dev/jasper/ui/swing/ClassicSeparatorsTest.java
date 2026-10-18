@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.model.ControlState;
+import dev.jasper.ui.model.MenuItem;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.model.ViewSpec;
 import dev.jasper.ui.testsupport.Edt;
@@ -33,7 +34,7 @@ class ClassicSeparatorsTest {
     static ViewSpec manager() {
         return new ViewSpec(new Nodes.Split("document", READY, Nodes.SplitKind.DOCUMENT, List.of(
             new Nodes.Stack("bar", READY, Nodes.LayoutRole.INLINE, List.of(
-                new Nodes.Button("new", READY, "New", "", Nodes.ButtonKind.GHOST, "new", ""),
+                new Nodes.MenuButton("new", READY, "New", "add", Nodes.ButtonKind.GHOST, "", List.of(new MenuItem("add", "Login", "", "add", true, false)), ""),
                 new Nodes.Separator("rule", READY),
                 new Nodes.Button("lock", READY, "Lock Vault", "", Nodes.ButtonKind.GHOST, "lock", ""),
                 new Nodes.Text("shortcut", READY, "Ctrl+Shift+L", Nodes.TextRole.CAPTION),
@@ -52,10 +53,14 @@ class ClassicSeparatorsTest {
                 var bar = KitViewTest.find(view, "bar", JComponent.class);
                 var columns = KitViewTest.find(view, "columns", JComponent.class);
                 var search = KitViewTest.find(view, "search", JComponent.class);
-                assertThat(columns.getY()).as("the columns start under the bar").isEqualTo(bar.getHeight());
-                assertThat(columns.getHeight()).as("a Split child fills a document split").isEqualTo(400 - bar.getHeight());
+                int gap = ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_RULE_GAP);
+                assertThat(gap).as("the rule stands between the bar and the columns").isEqualTo(1);
+                assertThat(columns.getY()).as("the columns start under the bar's rule").isEqualTo(bar.getHeight() + gap);
+                assertThat(columns.getHeight()).as("a Split child fills a document split").isEqualTo(400 - bar.getHeight() - gap);
                 assertThat(search.getWidth()).as("the bar's search width").isEqualTo(200);
-                assertThat(bar.getHeight()).as("the bar pads its tallest child by 6 on each side").isGreaterThanOrEqualTo(search.getHeight() + 12);
+                assertThat(search.getHeight()).as("the toolbar's 22 px field").isEqualTo(22);
+                assertThat(bar.getHeight()).as("the bar pads its field by 6 on each side; its buttons and menu button are no taller")
+                    .isEqualTo(search.getHeight() + 12);
                 assertThat(SwingUtilities.convertPoint(search.getParent(), search.getLocation(), view).x + 200)
                     .as("the search ends at the bar's side padding").isEqualTo(820 - ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_SIDE_PADDING));
                 assertThat(KitViewTest.find(view, "categories", JComponent.class).getWidth()).isEqualTo(171);
@@ -67,12 +72,32 @@ class ClassicSeparatorsTest {
                 int window = rgb(ThemePainting.role(context, SemanticColor.BORDER_WINDOW));
                 var at = SwingUtilities.convertPoint(rule.getParent(), rule.getLocation(), view);
                 assertThat(image.getRGB(at.x + rule.getWidth() / 2, at.y + rule.getHeight() / 2) & 0xFFFFFF).as("the separator").isEqualTo(window);
-                assertThat(image.getRGB(400, bar.getHeight() - 1) & 0xFFFFFF).as("the bar's hairline").isEqualTo(window);
+                assertThat(image.getRGB(400, bar.getHeight()) & 0xFFFFFF).as("the bar's hairline").isEqualTo(window);
+                assertThat(image.getRGB(400, bar.getHeight() - 1) & 0xFFFFFF).as("below the bar's own 34 px").isNotEqualTo(window);
                 assertThat(image.getRGB(170, 300) & 0xFFFFFF).as("the rail's edge").isEqualTo(window);
                 var header = (PanelHeaders.HeaderControl) view.control("categories.header");
                 assertThat(header.pane).as("the header heads a manager column").isTrue();
                 assertThat(header.flush()).as("a manager column's header is a strip").isTrue();
                 KitFixtures.capture(context, view.spec(), 820, 400, "classic-manager-rules");
+            } finally { KitViewTest.release(context); }
+        });
+    }
+
+    /** A narrow bar keeps the catalog's search width: the shortcut caption that fills gives way to its own width first. */
+    @Test void aNarrowBarKeepsItsSearchWidth() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            try (var view = new KitView(context, manager(), event -> { })) {
+                KitFixtures.render(view, 820, 400, 1);
+                var shortcut = KitViewTest.find(view, "shortcut", JComponent.class);
+                var search = KitViewTest.find(view, "search", JComponent.class);
+                int side = ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_SIDE_PADDING), gap = ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_GAP);
+                int width = SwingUtilities.convertPoint(shortcut.getParent(), shortcut.getLocation(), view).x + shortcut.getPreferredSize().width + gap + 200 + side;
+                assertThat(shortcut.getPreferredSize().width).as("the fixture's caption is narrower than a fill's minimum")
+                    .isLessThan(ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_FILL_MIN_WIDTH));
+                KitFixtures.render(view, width, 400, 1);
+                assertThat(search.getWidth()).as("the search keeps its width").isEqualTo(200);
+                assertThat(shortcut.getWidth()).as("the caption gives way to its own width").isEqualTo(shortcut.getPreferredSize().width);
             } finally { KitViewTest.release(context); }
         });
     }

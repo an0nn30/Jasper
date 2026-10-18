@@ -40,8 +40,9 @@ final class SplitViews {
     }
 
     /**
-     * DOCUMENT: a hairline in the subtle border colour at every boundary between visible children, drawn inside the bar
-     * side of the boundary (the document's own pixels and every child's bounds stay as laid out).
+     * DOCUMENT: a hairline in the separator face's colour at every boundary between visible children, drawn inside the bar
+     * side of the boundary (the document's own pixels and every child's bounds stay as laid out), or in the
+     * {@code DOCUMENT_RULE_GAP} rows the layout leaves between them where the catalog has that gap.
      */
     static final class SplitSurface extends JPanel {
         SplitControl owner;
@@ -54,10 +55,11 @@ final class SplitViews {
             try {
                 g.setColor(owner.context().faces().separators.rule(owner.context()));
                 int stroke = ThemePainting.metric(owner.context(), DesignMetrics.Role.HAIRLINE);
+                int gap = ThemePainting.metric(owner.context(), DesignMetrics.Role.DOCUMENT_RULE_GAP);
                 for (int i = 1; i < children.size(); i++) {
                     Component above = children.get(i - 1), below = children.get(i);
-                    int y = owner.fills.contains(above) ? below.getY() : above.getY() + above.getHeight() - stroke;
-                    g.fillRect(0, y, getWidth(), stroke);
+                    int y = gap > 0 ? above.getY() + above.getHeight() : owner.fills.contains(above) ? below.getY() : above.getY() + above.getHeight() - stroke;
+                    g.fillRect(0, y, getWidth(), gap > 0 ? gap : stroke);
                 }
             } finally { g.dispose(); }
         }
@@ -79,6 +81,9 @@ final class SplitViews {
         List<Component> visible(Container p) {
             return java.util.Arrays.stream(p.getComponents()).filter(Component::isVisible).toList();
         }
+
+        /** DOCUMENT: the rows left for the rules between {@code count} visible children ({@code DOCUMENT_RULE_GAP} each). */
+        int rules(int count) { return Math.max(0, count - 1) * ThemePainting.metric(owner.context(), DesignMetrics.Role.DOCUMENT_RULE_GAP); }
 
         int[] widths(int width, int n) {
             int[] result = new int[n];
@@ -107,8 +112,8 @@ final class SplitViews {
         @Override
         public int height(Container p, int width) {
             if (owner.document()) {
-                int h = 0;
-                for (Component c : visible(p)) h += Composition.height(c, width);
+                var children = visible(p); int h = rules(children.size());
+                for (Component c : children) h += Composition.height(c, width);
                 return h;
             }
             var children = visible(p); var widths = widths(width, children.size());
@@ -122,7 +127,7 @@ final class SplitViews {
         public Dimension minimumLayoutSize(Container p) {
             if (!owner.document()) return Composition.WidthLayout.super.minimumLayoutSize(p);
             var children = visible(p); Component fill = fill(children);
-            int width = Math.max(1, p.getWidth()), h = 0;
+            int width = Math.max(1, p.getWidth()), h = rules(children.size());
             for (Component c : children) h += c == fill ? c.getMinimumSize().height : Composition.height(c, width);
             return new Dimension(0, h);
         }
@@ -145,13 +150,13 @@ final class SplitViews {
         public void layoutContainer(Container p) {
             if (owner.document()) {
                 var children = visible(p); Component fill = fill(children);
-                int width = p.getWidth(), others = 0;
+                int width = p.getWidth(), gap = rules(2), others = rules(children.size());
                 for (Component c : children) if (c != fill) others += Composition.height(c, width);
                 int y = 0;
                 for (Component c : children) {
                     int h = c == fill ? Math.max(0, p.getHeight() - others) : Composition.height(c, width);
                     c.setBounds(0, y, width, h);
-                    y += h;
+                    y += h + gap;
                 }
                 return;
             }

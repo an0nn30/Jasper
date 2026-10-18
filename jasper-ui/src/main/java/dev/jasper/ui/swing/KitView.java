@@ -348,9 +348,9 @@ public final class KitView extends JPanel implements AutoCloseable {
     public boolean hostTitled() { return hostTitled; }
     private boolean hostTitled;
     /**
-     * App-only: this view's form is a dialog's content under the classic mapping, so its footer is the dialog's band on
-     * {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog or a native one. EDT
-     * confined.
+     * App-only: this view's form is a dialog's or a window's content under the classic mapping, so its footer is the
+     * band on {@code surface.footer} under a {@code border.window} rule (spec 10.8), in a classic dialog, a native one or
+     * a window. EDT confined.
      */
     public void dialogBand(boolean value) {
         requireOpen();

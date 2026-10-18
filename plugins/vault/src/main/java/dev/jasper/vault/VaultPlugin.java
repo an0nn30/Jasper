@@ -137,7 +137,7 @@ public class VaultPlugin implements Plugin {
         scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
         manager = new VaultManager(lock, context.background(), ui, this::vaultChanged);
-        managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator);
+        managerWindow = new VaultManagerWindow(context, lock, manager, service, this::managerStatus, this::showGenerator, layout);
         context.actions().register(ActionSpec.of(GENERATE, "Generate SSH Key...")
             .withKeywords(List.of("vault", "ssh", "key", "generate")),
             invoked -> openThen(invoked.window(), Optional.empty(), this::showGenerator));

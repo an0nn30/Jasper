@@ -233,6 +233,13 @@ class ClassicPlacementTest {
                 assertThat(later.dialogBand() && later.hostTitled()).as(surface.title() + ": content set later is marked too").isTrue();
             }
         }
+        // A window's form (NativeShells.frame marks it with no system title): the band, never the title (plan 10b).
+        var vault = windows.window("dev.jasper.vault.manager", "Credential Vault", new Dimension(820, 571), true);
+        try (var view = new KitView(context, spec, event -> { })) {
+            NativeShells.nativeMarks(vault, false).accept(view);
+            assertThat(view.dialogBand()).as("a classic window's footer is the band").isTrue();
+            assertThat(view.hostTitled() || view.dialogCard()).as("its form keeps its title and its own fill").isFalse();
+        }
         var plain = windows(DialogMapping.Kind.AS_REQUESTED, false).dialog("Add Host", true, UUID.randomUUID());
         try (var view = new KitView(context, spec, event -> { })) {
             NativeShells.nativeMarks(plain, true).accept(view);
