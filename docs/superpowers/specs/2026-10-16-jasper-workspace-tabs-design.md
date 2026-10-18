@@ -3,7 +3,8 @@
 Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans once Enterprise 6-11 has merged.").
 Amended 2026-10-17: section 5.4 no longer adds `LSMultipleInstancesProhibited`, which limits an app to one user
 session rather than one instance (plan 1's spec issue). Amended 2026-10-18: closing a tab keeps its group maximized, as
-VS Code does (sections 7.3 and 15, plan 2 Ruling 5). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+VS Code does (sections 7.3 and 15, plan 2 Ruling 5); a ready owner answers a handoff only once its EDT has taken it,
+and a quitting owner refuses handoffs (section 5.3, plan 1 review). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -211,8 +212,12 @@ window as today.
 - The owner binds the handoff endpoint (`daemon/socket`) and the command socket (`daemon/commands`) right after taking
   the lock, before AWT. Neither depends on residency any more. The bind-time locks (`daemon/lock`,
   `daemon/commands.lock`) go: the instance lock already excludes every other binder.
-- Requests that arrive before the application is ready are queued and run in order once the main window can take them.
-  A handoff is answered OK on receipt; a CLI call is answered when it has run.
+- Requests that arrive before the application is ready are queued and run in order once the main window can take them,
+  and answered OK on receipt. Once the application is ready, a handoff is answered OK only after the EDT has taken it
+  (within one second), and PROTOCOL otherwise, so a launch meeting a hung owner ends in the not-responding error
+  instead of exiting silently (IntelliJ waits for the running instance the same way). An owner that is quitting stops
+  accepting first: it answers PROTOCOL, and the launch's retry takes the lock once the owner has exited. A CLI call is
+  answered when it has run.
 - **Handoff protocol v2** (`LaunchRequest`): the magic line and token as today, protocol `2`, the code location and
   modification time, then the intent: `RAISE` or `OPEN_PATHS`, the launch's working directory, its paths (resolved
   against that directory) and the start-up flags it ignored. RETIRE is removed: there is never another instance to
