@@ -5,7 +5,8 @@ Amended 2026-10-17: section 5.4 no longer adds `LSMultipleInstancesProhibited`, 
 session rather than one instance (plan 1's spec issue). Amended 2026-10-18: closing a tab keeps its group maximized, as
 VS Code does (sections 7.3 and 15, plan 2 Ruling 5); a ready owner answers a handoff only once its EDT has taken it,
 and a quitting owner refuses handoffs (section 5.3, plan 1 review). Amended 2026-10-18: under a look with in-window
-menus a child window has no menu bar (section 6.3, plan 4a review). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+menus a child window has no menu bar (section 6.3, plan 4a review); sessions carry restore state too (section 14, plan
+6b). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -510,7 +511,7 @@ repository's SDK rules require.
 | `Terminals.split(pane, direction, request)` | A terminal tab in a new group beside the pane's group |
 | `Terminals.openTab(window, request)` | A terminal tab in the window's active group |
 | `Windows.openTab(spec, owner, view)` | Gains a `TabPlacement`: ACTIVE_GROUP (default), SPLIT_RIGHT, SPLIT_DOWN, NEW_WINDOW |
-| `ContentSpec` | Gains restore state: a restorer kind and a small string map |
+| `ContentSpec`, `SessionSpec` | Gain restore state: a restorer kind and a small string map (a session's tab, such as Remote's SSH tab, is restored by its plugin like a content tab) |
 | `Windows.restorer(kind, restorer)` | New: rebuilds a plugin's tabs at start from their restore state |
 | `ContentTab` | `move(boolean)` and `isSeparate()` are replaced by `moveToNewWindow()`, `moveToMainWindow()` and `window()` |
 | `Windows.create`, `PluginWindow`, `WindowSpec`, `ShortcutContext.Kind.WINDOW` | Removed |
