@@ -20,7 +20,7 @@ class ProjectionsTest {
         assertThat(classic.shell()).isEqualTo(new ShellLook(false, true, true));
         assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
         assertThat(classic.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(classic.composition()).isEqualTo(Composition.CLASSIC);
         assertThat(classic.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
         assertThat(classic.motion()).isEqualTo(Motion.NONE);
@@ -113,11 +113,23 @@ class ProjectionsTest {
         assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
     }
 
+    /** The user's direction of 2026-10-18: labelled stripes fit their labels, so Settings hides the Panel rail width. */
+    @Test void labelledStripesHideThePanelRailWidth() {
+        var d = ChromeSpec.DEFAULT;
+        var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
+            d.statusBar(), d.palette(), d.dialogs(), d.motion());
+        for (var host : new Projections.Host[] {MAC, LINUX}) {
+            assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
+            assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+            assertThat(Projections.fallback(DesktopFlags.STANDARD, host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+        }
+    }
+
     /** Plan 9a: the kit file's Settings chrome and composition reach the projection. */
     @Test void theClassicSettingsChromeAndComposition() {
         var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(shipped.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(shipped.composition()).isEqualTo(Composition.CLASSIC);
     }
 

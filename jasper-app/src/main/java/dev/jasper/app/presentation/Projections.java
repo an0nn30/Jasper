@@ -66,6 +66,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         var hidden = new LinkedHashSet<String>();
         if (chrome.titleBar() == ChromeSpec.TitleBar.NATIVE || host.mac()) hidden.add("window.native_decorations");
         if (chrome.motion() == ChromeSpec.MotionKind.NONE) hidden.add("ui.animations.enabled");
+        if (stripes) hidden.add("window.rail_width");
         var settings = new SettingsChrome(chrome.titleBar() != ChromeSpec.TitleBar.NATIVE, classicBase, !classicBase, hidden, namesUiFace);
         return new Projections(desktop, workspace, shell, palette, settings, classicBase ? Composition.CLASSIC : Composition.ROWS,
             new DialogMapping(chrome.dialogs() == ChromeSpec.DialogKind.CLASSIC ? DialogMapping.Kind.CLASSIC : DialogMapping.Kind.AS_REQUESTED, nativeTitle),

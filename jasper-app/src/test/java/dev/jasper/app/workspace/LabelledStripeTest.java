@@ -41,6 +41,15 @@ class LabelledStripeTest {
 
     private static int metric(DesignMetrics.Role role) { return com.formdev.flatlaf.util.UIScale.scale(EnterpriseLook.kit().metrics().value(role)); }
 
+    /**
+     * A labelled side stripe's whole thickness: the label's line across it (the face's fractional ascent and descent,
+     * rounded), its two rail edges and its rule.
+     */
+    private static int fitted(Kit kit) {
+        var line = new StripeLabels(kit).font().getLineMetrics("Mg", new java.awt.font.FontRenderContext(null, true, true));
+        return Math.round(line.getAscent() + line.getDescent()) + 2 * metric(DesignMetrics.Role.RAIL_EDGE) + metric(DesignMetrics.Role.DOCK_RULE);
+    }
+
     @Test void itShowsItsSidesWindowsByGroupWithTheirNumbersEdgeToEdge() throws Exception {
         try {
             var stripe = stripe(Side.LEFT);
@@ -53,9 +62,24 @@ class LabelledStripeTest {
             assertThat(second.y).as("edge to edge").isEqualTo(first.y + first.height);
             assertThat(first.width).as("the fill, without the rule").isEqualTo(stripe.getWidth() - metric(DesignMetrics.Role.DOCK_RULE));
             assertThat(stripe.buttons().get(0).isSelected()).isTrue();
-            assertThat(stripe.getPreferredSize().width).as("the 28 px floor").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(28));
+            assertThat(stripe.getPreferredSize().width).as("the label's line, its edges and the rule").isEqualTo(fitted(EnterpriseLook.kit()));
             assertThat(stripe.empty()).isFalse();
             assertThat(stripe.emptyWithout("sftp")).isFalse();
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The user's direction of 2026-10-18: a labelled stripe fits its labels, and window.rail_width does not resize it. */
+    @Test void theStripeFitsItsLabelsWhateverThePanelRailWidth() throws Exception {
+        try {
+            var stripe = stripe(Side.RIGHT);
+            stripe.render(List.of(window("sessions", "Sessions", Slot.RIGHT_TOP, 0)), List.of());
+            int fitted = stripe.getPreferredSize().width;
+            assertThat(fitted).as("narrower than the 28 px rail").isLessThan(com.formdev.flatlaf.util.UIScale.scale(28));
+            for (int width : new int[] {28, 40, 64}) {
+                stripe.setRailWidth(width);
+                assertThat(stripe.getPreferredSize().width).as("window.rail_width " + width).isEqualTo(fitted);
+                assertThat(stripe.getMinimumSize().width).isEqualTo(fitted);
+            }
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
@@ -121,12 +145,35 @@ class LabelledStripeTest {
                     for (int x = label.x; x < label.x + label.width; x++)
                         if (image.getRGB(x, y) == ground.getRGB()) { rows++; sum += y; across += x; }
                 assertThat(rows).as(side + ": the pill is painted").isPositive();
-                int middle = label.y + label.height / 2, centre = label.x + label.width / 2;
+                int middle = label.y + label.height / 2;
                 if (side == Side.LEFT) assertThat(sum / rows).as("the pill ends the label, read bottom to top").isLessThan(middle);
                 else assertThat(sum / rows).as("the pill ends the label, read top to bottom").isGreaterThan(middle);
-                // The label's line, and its pill with it, lies along the stripe's outer edge, as the mocks set it.
-                if (side == Side.LEFT) assertThat(across / rows).as("on the left stripe's outer half").isLessThan(centre);
-                else assertThat(across / rows).as("on the right stripe's outer half").isGreaterThan(centre);
+                // The label's line, and its pill with it, is centred across the stripe's fill (the user's direction).
+                assertThat(across / (double) rows).as(side + ": the pill is centred across").isCloseTo(label.x + (label.width - 1) / 2.0,
+                    org.assertj.core.data.Offset.offset(1.0));
+            }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The user's direction of 2026-10-18: a label's text is centred across the stripe's fill, on both sides. */
+    @Test void theLabelsTextIsCentredAcrossTheStripe() throws Exception {
+        try {
+            var theme = EnterpriseLook.theme(false);
+            var painter = new ChromePainter(EnterpriseLook.kit());
+            for (Side side : List.of(Side.LEFT, Side.RIGHT)) {
+                var stripe = stripe(side);
+                stripe.render(List.of(new ToolStripe.Button("sftp", "SFTP", null, side == Side.LEFT ? Slot.LEFT_TOP : Slot.RIGHT_TOP,
+                    false, Optional.empty(), OptionalInt.empty())), List.of());
+                var image = MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 4);
+                Rectangle label = stripe.buttons().getFirst().getBounds();
+                int surface = painter.stripeSurface(theme).getRGB(), first = Integer.MAX_VALUE, last = -1;
+                for (int y = label.y * 4; y < (label.y + label.height) * 4; y++)
+                    for (int x = label.x * 4; x < (label.x + label.width) * 4; x++)
+                        if (image.getRGB(x, y) != surface) { first = Math.min(first, x); last = Math.max(last, x); }
+                assertThat(last).as(side + ": the text is painted").isNotNegative();
+                // "SFTP" is capitals: their ink's middle stands within 1 px of the fill's middle.
+                assertThat((first + last) / 2.0 / 4).as(side + ": the capitals are centred across")
+                    .isCloseTo(label.x + label.width / 2.0, org.assertj.core.data.Offset.offset(1.0));
             }
         } finally { EnterpriseLook.restoreDefault(); }
     }
@@ -142,7 +189,8 @@ class LabelledStripeTest {
             stripe.render(List.of(new ToolStripe.Button("a", "A rather long tool window title", null, Slot.LEFT_TOP, true, badge, OptionalInt.of(1)),
                 window("b", "Second", Slot.LEFT_TOP, 0), window("c", "Third", Slot.LEFT_BOTTOM, 0)), List.of());
             int thickness = stripe.getPreferredSize().width;
-            assertThat(thickness).as("thicker than the 28 px floor").isGreaterThan(com.formdev.flatlaf.util.UIScale.scale(28));
+            assertThat(thickness).as("thicker than at the kit's own size").isGreaterThan(new LabelledStripe(Side.LEFT, kit).getPreferredSize().width)
+                .isEqualTo(fitted(big));
             MockCrops.render(stripe, thickness, 1200, 1);
             var bounds = stripe.buttons().stream().map(AbstractButton::getBounds).toList();
             for (int i = 1; i < bounds.size(); i++) assertThat(bounds.get(i).y).isGreaterThanOrEqualTo(bounds.get(i - 1).y + bounds.get(i - 1).height);

@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
@@ -30,8 +29,8 @@ import javax.swing.Action;
  * toggle ends in a digit, read bottom to top on the left stripe and top to bottom on the right, on {@code surface.stripe},
  * an open window's label on {@code surface.control.selected}; the top group's labels from {@code RAIL_GAP} below the top,
  * then the second group's, then on the left the plugins' rail actions; a 1 px rule along the edge toward the workspace.
- * A label's line lies along the stripe's outer edge, as the mocks set it, so a stripe thicker than its line widens on its
- * inner side. A badge ends its label with a count pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
+ * The stripe is as thick as a label's line and its two rail edges, the line centred across it; {@code window.rail_width}
+ * does not apply (the user's direction of 2026-10-18). A badge ends its label with a count pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
  * During a dock drag both groups show (an empty group as the dragged label's drop space), the dragged label is lifted
  * out and its length stays at the end of its group, and a gap as long as it opens where it would drop. Labels past the
  * stripe's end are cut off by it. EDT only.
@@ -53,7 +52,6 @@ final class LabelledStripe extends DockStripe {
     private final EnumMap<Slot.Group, List<StripeLabels.Label>> groups = new EnumMap<>(Slot.Group.class);
     private final Map<String, StripeLabels.Label> byId = new LinkedHashMap<>();
     private final List<StripeLabels.Label> actions = new ArrayList<>();
-    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     private boolean dragging;
     private String lifted;
     private int liftedLength;
@@ -141,12 +139,8 @@ final class LabelledStripe extends DockStripe {
         return List.copyOf(all);
     }
 
-    @Override void setRailWidth(int width) {
-        if (railWidth == width) return;
-        railWidth = width;
-        revalidate();
-        repaint();
-    }
+    /** A labelled stripe fits its labels: {@code window.rail_width} does not apply. */
+    @Override void setRailWidth(int width) { }
 
     @Override void beginDrag(String id, String label) {
         dragging = true;
@@ -191,7 +185,7 @@ final class LabelledStripe extends DockStripe {
     @Override void refreshTheme() { repaint(); }
 
     @Override public Dimension getMinimumSize() {
-        return new Dimension(labels.thickness(railWidth, this), labels.styles().metric(DesignMetrics.Role.RAIL_MIN_HEIGHT));
+        return new Dimension(labels.thickness(), labels.styles().metric(DesignMetrics.Role.RAIL_MIN_HEIGHT));
     }
 
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
