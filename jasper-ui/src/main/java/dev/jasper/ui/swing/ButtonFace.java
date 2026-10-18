@@ -50,4 +50,15 @@ interface ButtonFace extends Face {
      * top, on the title's line; otherwise they are centred on the title block.
      */
     boolean titleLine();
+    /** A DOCUMENT bar's text button's side padding, scaled, or -1 to keep the standard padding. */
+    int barPadding(KitContext context);
+    /**
+     * The lane, scaled, a DOCUMENT bar's menu button that only opens its menu keeps after its label for its arrow, or -1
+     * for the standard chevron in {@code MENU_ARROW_WIDTH}.
+     */
+    int barMenuLane(KitContext context);
+    /** Paints that arrow in {@code main}'s trailing lane, where {@link #barMenuLane} gives one. */
+    void paintBarMenuArrow(Buttons.KitButton main, Graphics2D g);
+    /** The colour of a DOCUMENT bar's caption standing after a button (that action's shortcut), or null to keep the caption's. */
+    SemanticColor barShortcut();
 }

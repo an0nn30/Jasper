@@ -40,4 +40,8 @@ final class DefaultButtonFace implements ButtonFace {
             + ThemePainting.metric(context, DesignMetrics.Role.CHOICE_CHEVRON_INSET);
     }
     @Override public boolean titleLine() { return false; }
+    @Override public int barPadding(KitContext context) { return -1; }
+    @Override public int barMenuLane(KitContext context) { return -1; }
+    @Override public void paintBarMenuArrow(Buttons.KitButton main, Graphics2D g) { }
+    @Override public SemanticColor barShortcut() { return null; }
 }

@@ -49,6 +49,9 @@ public final class DesignMetrics {
         // A manager detail's grid of label and value rows (a group face's, spec 14.8's Fields): its box inside the card's
         // sides and bottom and its rows inside the box, and the box's top line under the card's top.
         DETAIL_GRID_INSET(9), DETAIL_GRID_TOP(11),
+        // A grid's rows end this far inside its box's trailing edge; its rows' Show and Copy (and a value's Copy) stand this
+        // far inside their faces; a manager detail's row of text buttons keeps this minimum width (0: none).
+        DETAIL_GRID_TRAILING(9), DETAIL_ACTION_PADDING(8), DETAIL_ACTION_MIN_WIDTH(0),
         CONTROL_RADIUS(4), CARD_RADIUS(6), WINDOW_RADIUS(8), SEGMENT_TRACK_RADIUS(4), SEGMENT_ITEM_RADIUS(3),
         // Title rows measured on the 2026-10-10 Desktop references: a window's row above its rule (Credential Vault, and
         // the Settings header that stands in for it), a dialog's band before its content (Add Host, New File Server, New
@@ -98,6 +101,10 @@ public final class DesignMetrics {
         FIND_GAP(6), FIND_SIDE_PADDING(6), FIND_CONTROL_GAP(4), FIND_CLOSE_SPACER(16),
         // Compact document bars (an editor's find/replace rows, notice and command strip) inside a DOCUMENT split.
         DOCUMENT_BAR_VERTICAL_PADDING(4), DOCUMENT_BAR_SIDE_PADDING(6), DOCUMENT_BAR_GAP(8), DOCUMENT_BAR_ACTION_GAP(3), DOCUMENT_BAR_STATUS_WIDTH(84), DOCUMENT_BAR_FILL_MIN_WIDTH(120), DOCUMENT_BAR_LINE_GAP(4), DOCUMENT_BAR_SEARCH_WIDTH(0), SEPARATOR_HEIGHT(18), DOCUMENT_RULE_GAP(0),
+        // A document bar's text button's side padding under a face that pads them so (the 07 Credential Vault toolbar's verbs).
+        DOCUMENT_BAR_BUTTON_PADDING(7),
+        // The gap on each side of a document bar's separator, which the 07 Credential Vault toolbar draws a little tighter.
+        DOCUMENT_BAR_RULE_GAP(8),
         TITLE_SEARCH_PADDING(8), TITLE_SEARCH_GAP(6), NATIVE_MENU_ARROW_GAP(3),
         NOTICE_VERTICAL_PADDING(8), NOTICE_HORIZONTAL_PADDING(12), NOTICE_BUTTON_GAP(8), BREADCRUMB_COLLAPSED_HEIGHT(16),
         // Kit breadcrumbs and the opt-in overlay scroll policy (Plan 2 Task 6b), keeping the chooser's former geometry.
@@ -229,6 +236,12 @@ public final class DesignMetrics {
         // mock's Details pane).
         values.put(Role.DETAIL_PADDING, 12);
         values.put(Role.DETAIL_SECTION_GAP, 12);
+        // Plan 10b final review: the Item selected mock's Fields: its Show and Copy 4 apart and 6 inside their faces, the
+        // lane ending 4 inside the grid's box, and Edit… and Delete… 86 wide.
+        values.put(Role.DETAIL_GRID_TRAILING, 4);
+        values.put(Role.DETAIL_ACTION_PADDING, 6);
+        values.put(Role.DETAIL_ACTION_GAP, 4);
+        values.put(Role.DETAIL_ACTION_MIN_WIDTH, 86);
         // Plan 10b: a swatch is a 10 px square (the Credential Vault mocks' Name cells and Details heading).
         values.put(Role.ICON_SWATCH, 10);
         values.put(Role.CARD_PADDING, 12);
@@ -381,6 +394,8 @@ public final class DesignMetrics {
         values.put(Role.DOCUMENT_BAR_SEARCH_WIDTH, 200);
         // A document split's rule stands between its bar and its body, not inside the bar (the 34 px toolbar row over its rule).
         values.put(Role.DOCUMENT_RULE_GAP, 1);
+        // The 07 toolbar's rules: 7 either side, so its verbs meet the mock's positions (plan 10b final review).
+        values.put(Role.DOCUMENT_BAR_RULE_GAP, 7);
         int[] table = declared();
         values.forEach((role, value) -> table[role.ordinal()] = value);
         return new DesignMetrics(table);

@@ -60,6 +60,25 @@ class VaultPluginTest {
         }
     }); }
 
+    /** Plan 10b Rulings 11: under Enterprise, Unlock Vault's footnote is the auto-lock, and none while auto-lock is off. */
+    @Test void unlockVaultUnderEnterpriseFootsItsFormWithTheAutoLock() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
+        for (long minutes : new long[] {0, 15}) try (var host = new FakePluginHost()) {
+            dev.jasper.vault.workstation.FakeEnterprise.start(host);
+            host.setSetting("dev.jasper.vault", "auto_lock_minutes", minutes);
+            var plugin = plugin();
+            host.start(INFO, Set.of(), Set.of("dev.jasper.enterprise"), plugin);
+            UUID window = host.addTerminalWindow();
+            plugin.lockManager().create("test-password".toCharArray(), false);
+            host.runBackground();
+            plugin.lockManager().lock();
+            host.flush();
+            assertThat(host.invoke(VaultPlugin.OPEN, window, null)).isTrue();
+            var form = (dev.jasper.sdk.ui.Nodes.Form) host.windowView(INFO.id(), "Unlock Vault").orElseThrow().spec().root();
+            assertThat(form.footnote()).as(minutes + " min").isEqualTo(minutes == 0 ? "" : "Auto-locks after 15 min idle");
+            assertThat(host.failures()).isEmpty();
+        }
+    }); }
+
     @Test void cancellingOneImportDoesNotCancelSharedVaultSetup() throws Exception { dev.jasper.vault.testsupport.KitViews.edt(() -> {
         var plugin = plugin();
         try (var host = new FakePluginHost()) {

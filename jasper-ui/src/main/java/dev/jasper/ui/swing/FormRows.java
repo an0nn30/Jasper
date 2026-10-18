@@ -19,6 +19,11 @@ final class FormRows {
         java.util.List<ControlRegistry.Control> controls = java.util.List.of();
         /** The card's shared label column (the label policy's), or -1 for the fixed FORM_LABEL_WIDTH column. */
         int column = -1;
+        /**
+         * A row of a manager detail's grid card (set by the reconciler, cleared before each update): its label reads as the
+         * grid's, without the label policy's colon, in {@code text.secondary} (the Credential Vault mock's Fields).
+         */
+        boolean grid;
         /** A trailing PORT field's own label, mounted only when the label policy gives one. */
         final JLabel port = Labels.literal();
 
@@ -37,7 +42,7 @@ final class FormRows {
         void refresh() {
             state();
             var row = (Nodes.FormRow) node;
-            label.setText(context().faces().labels.label(row.label()));
+            label.setText(grid ? row.label() : context().faces().labels.label(row.label()));
             ((Labels.LiteralLabel)label).wrap = true;
             caption.text(row.caption());
             caption.setVisible(!row.caption().isEmpty());
@@ -46,7 +51,7 @@ final class FormRows {
             caption.setToolTipText(row.caption().isEmpty() ? null : row.caption());
             Composition.style(
                     label, context(), row.control() instanceof Nodes.Choice choice && choice.face().filter(face -> face.density()==Nodes.PickerDensity.COMPACT).isPresent()?Typography.Role.PICKER_COMPACT:Typography.Role.LABEL, SemanticColor.TEXT_SECONDARY);
-            label.setForeground(context().faces().labels.labelInk(context(), label.getForeground()));
+            label.setForeground(grid ? ThemePainting.color(context(), SemanticColor.TEXT_SECONDARY) : context().faces().labels.labelInk(context(), label.getForeground()));
             context().faces().labels.styleCaption(caption, context());
             port.setText(context().faces().labels.label("Port")); port.setFont(label.getFont()); port.setForeground(label.getForeground());
             followPort();

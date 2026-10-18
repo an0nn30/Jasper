@@ -125,7 +125,7 @@ final class ClassicRevealFace implements RevealFace {
         button.setDisabledIcon(null);
         button.setText(text);
         button.setFont(ThemePainting.font(context, Typography.Role.LABEL));
-        int side = ThemePainting.metric(context, DesignMetrics.Role.FIELD_HORIZONTAL_PADDING);
+        int side = ThemePainting.metric(context, DesignMetrics.Role.DETAIL_ACTION_PADDING);
         button.setBorder(new EmptyBorder(0, side, 0, side));
         button.repaint();
     }

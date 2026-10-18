@@ -167,7 +167,7 @@ class ClassicManagerTest {
             assertThat(table.activateAction()).as("Enter and double-click edit").isEqualTo(ManagerPanel.EDIT);
             assertThat(table.rows()).extracting(TableRow::id).containsExactly(amp.toString(), proxmox.toString());
             var first = table.rows().getFirst();
-            assertThat(first.cells()).containsEntry(ManagerPanel.COLUMN_USERNAME, "ubuntu").containsEntry(ManagerPanel.COLUMN_TYPE, "Login")
+            assertThat(first.cells()).containsEntry(ManagerPanel.COLUMN_USERNAME, "ubuntu").containsEntry(ManagerPanel.COLUMN_TYPE, "Password")
                 .containsEntry(ManagerPanel.COLUMN_MODIFIED, date(MODIFIED));
             var name = (Nodes.Stack) first.cellNodes().get(ManagerPanel.COLUMN_NAME);
             var swatch = (Nodes.Icon) name.children().getFirst();
@@ -286,7 +286,10 @@ class ClassicManagerTest {
             press(view, "detail.public.copy");
             assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.vault|SHA256:fixture",
                 "copy|dev.jasper.vault|" + directory.resolve("laptop.pub"));
-            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the fingerprint for laptop|");
+            // A key row copies the file's path and says so; "the public key" is Copy Public Key's, which copies the key itself.
+            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the fingerprint for laptop|",
+                "dev.jasper.vault.copies|INFO|Copied the public key path for laptop|");
+            assertThat(host.notifications().lines()).noneMatch(line -> line.contains("Copied the public key for laptop"));
             press(view, ManagerPanel.COPY_PUBLIC);
             assertThat(button(view, ManagerPanel.COPY_PUBLIC).label()).isEqualTo("Copy Public Key");
             assertThat(asked).containsExactly("copy-public " + laptop);

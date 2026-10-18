@@ -73,8 +73,11 @@ final class ClassicHeaders {
         /** Whether {@code c} is a panel's body, whose rows stand on {@code surface.card} without the box. */
         boolean panelBody(Component c) { return !unboxed() && SwingUtilities.getAncestorOfClass(Panels.Body.class, c) != null; }
 
-        /** Whether the owner is a table in a manager's list column, whose rows stand on {@code surface.card} without the box (plan 10b). */
-        boolean listColumn() { return owner instanceof Tables.TableControl && owner.column == 1; }
+        /**
+         * Whether the owner is a table in a manager's list column, whose rows stand on {@code surface.card} without the box
+         * (plan 10b); a host's own list column (the file chooser's listing) stands on its pane as before.
+         */
+        boolean listColumn() { return owner instanceof Tables.TableControl && owner.column == 1 && owner.view.hostColumn() < 0; }
 
         /** The Settings navigation tree, a manager's rail and a rail or list column's table stand without the box. */
         private boolean unboxed() { return owner instanceof Trees.TreeControl tree ? tree.settingsNavigation || tree.column == 0 : owner.column == 0 || owner.column == 1; }

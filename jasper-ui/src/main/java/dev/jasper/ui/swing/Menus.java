@@ -199,6 +199,9 @@ final class Menus {
             }
             ((MenuSurface) component).background.embedded = embedded;
             main.setText(menu.label());
+            // A document bar's menu takes the face's compact arrow lane where it has one (plan 10b, the Vault's + New).
+            int barLane = main.documentBar ? context().faces().buttons.barMenuLane(context()) : -1;
+            ((Main) main).barArrow = barLane >= 0;
             if (menu.action().isBlank() && !embedded && !menu.label().isBlank()) {
                 Insets insets = main.getInsets();
                 main.setBorder(
@@ -207,8 +210,8 @@ final class Menus {
                                 insets.left,
                                 insets.bottom,
                                 insets.right
-                                        + ThemePainting.metric(
-                                                context(), DesignMetrics.Role.MENU_ARROW_WIDTH)));
+                                        + (barLane >= 0 ? barLane : ThemePainting.metric(
+                                                context(), DesignMetrics.Role.MENU_ARROW_WIDTH))));
             }
             main.setIcon(
                     menu.icon().isEmpty()
@@ -218,7 +221,7 @@ final class Menus {
                                     .icon(
                                             menu.icon(),
                                             context().theme().semantic(),
-                                            main.textRole(false),
+                                            main.documentBar ? context().faces().buttons.iconRole(main, false) : main.textRole(false),
                                             com.formdev.flatlaf.util.UIScale.scale(
                                                     context()
                                                             .icons()
@@ -323,6 +326,8 @@ final class Menus {
     static final class Main extends Part {
         final KitContext context;
         boolean menuOnly, iconMenu;
+        /** A document bar's menu under a face with a bar arrow ({@link ButtonFace#barMenuLane}), set on every refresh. */
+        boolean barArrow;
 
         @Override
         public Dimension getPreferredSize() {
@@ -340,7 +345,8 @@ final class Menus {
         @Override
         protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
-            if (menuOnly)
+            if (menuOnly && barArrow) context.faces().buttons.paintBarMenuArrow(this, (Graphics2D) graphics);
+            else if (menuOnly)
                 chevron(
                         graphics,
                         this,

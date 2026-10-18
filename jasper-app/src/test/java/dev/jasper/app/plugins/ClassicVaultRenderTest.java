@@ -82,6 +82,49 @@ class ClassicVaultRenderTest {
             .as(name + " at x " + x + ", rows " + top + ".." + bottom).isEmpty();
     }
 
+    /**
+     * The runs of columns, in logical pixels {@code [start, end)}, between device columns {@code from} and {@code to} where a
+     * pixel of device rows {@code top..bottom} is darker than {@code threshold} (its channels' mean); runs closer than
+     * {@code join} blank device columns apart are one.
+     */
+    static List<int[]> inkRuns(BufferedImage render, int top, int bottom, int from, int to, int threshold, int join) {
+        var runs = new java.util.ArrayList<int[]>();
+        int start = -1, last = -1;
+        for (int x = from; x < to; x++) {
+            boolean ink = false;
+            for (int y = top; y < bottom && !ink; y++) {
+                int rgb = render.getRGB(x, y);
+                ink = (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3 < threshold;
+            }
+            if (!ink) continue;
+            if (start >= 0 && x - last > join + 1) { runs.add(new int[] {start / 2, (last + 1) / 2}); start = -1; }
+            if (start < 0) start = x;
+            last = x;
+        }
+        if (start >= 0) runs.add(new int[] {start / 2, (last + 1) / 2});
+        return runs;
+    }
+
+    /**
+     * The toolbar's verbs in the mock's ink and places (plan 10b final review): text.primary labels, Edit… starting at the
+     * mock's x 99 after the first rule and Lock Vault at its x 415 after the second (±2 logical px).
+     */
+    static void toolbarVerbs(BufferedImage render) {
+        assertThat(MockMatch.present(render.getSubimage(0, 0, render.getWidth(), 68), Color.decode("#1E1F22"))).as("the verbs' text.primary ink").isTrue();
+        // The rules are the device columns #C4C7CC from row 24 to 44; the labels are the dark ink after each.
+        var rules = new java.util.ArrayList<Integer>();
+        for (int x = 0; x < 1100; x++) {
+            boolean rule = true;
+            for (int y = 24; y < 44 && rule; y++) rule = MockMatch.deltaE(new Color(render.getRGB(x, y)), Color.decode("#C4C7CC")) < 3;
+            if (rule && (rules.isEmpty() || x - rules.getLast() > 2)) rules.add(x);
+        }
+        assertThat(rules).as("the toolbar's two rules").hasSize(2);
+        int edit = inkRuns(render, 20, 50, rules.get(0) + 4, 1100, 128, 8).getFirst()[0];
+        int lock = inkRuns(render, 20, 50, rules.get(1) + 4, 1100, 128, 8).getFirst()[0];
+        assertThat(edit).as("Edit…'s ink").isBetween(97, 101);
+        assertThat(lock).as("Lock Vault's ink").isBetween(413, 417);
+    }
+
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theManagerHasTheMocksToolbarAndStatusRows() throws Exception {
         ClassicCompositionRenderTest.under(false, () -> {
@@ -139,6 +182,15 @@ class ClassicVaultRenderTest {
                 bands("the Categories column", selected, 6, 0, 1070, CATEGORIES);
                 bands("the Items column", selected, 854, 70, 1070, ITEMS);
                 bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);
+                toolbarVerbs(selected);
+                // The Fields grid (plan 10b final review): the mask row's 12 dots from the value column, and the username's Copy
+                // in the column of the password's Show.
+                var dots = inkRuns(selected, 345, 372, 1212, 1410, 128, 0);
+                assertThat(dots).as("the password mask's dots").hasSize(12);
+                assertThat(dots.getFirst()[0]).as("the value column").isBetween(614, 620);
+                int copy = inkRuns(selected, 290, 315, 1400, 1580, 200, 0).getFirst()[0], show = inkRuns(selected, 345, 372, 1400, 1580, 200, 0).getFirst()[0];
+                assertThat(copy).as("the username's Copy shares the password's Show column").isEqualTo(show);
+                assertThat(show).as("the action lane, the mock's x 711").isBetween(707, 713);
                 bands("the status row and Done", selected, 1600, 1068, 1142, STATUS);
                 for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
                     assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();

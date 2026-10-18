@@ -55,12 +55,19 @@ final class Stacks {
     static final class StackControl extends ControlRegistry.Control {
         final Tile tile;
         boolean detail, sheetHeading, panelDetail, embedded, settings, identityHeader, identityGroup, hint, settingsHeader, keycapDetail;
+        /** The grid card whose row's value this INLINE stack is (set by the reconciler, cleared on every update); see {@link Cards.GridValueLayout}. */
+        Cards.CardControl gridCard;
         /** An INLINE row among a DOCUMENT split's bars, assigned by the reconciler; see {@link DocumentBarLayout}. */
         boolean documentBar;
         /** The Run window's help row inked this PROMPT_HEADER's glyph (plan 8a); turning the flag off returns it. */
         boolean helpInked;
         /** A VERTICAL group of a DOCUMENT split's bars: its rows carry their own padding, so they stack without gaps. */
         boolean documentBarGroup;
+        /**
+         * A document bar's captions that stand right after a button as its shortcut under a face that colours them
+         * ({@link ButtonFace#barShortcut}): each follows its button without a gap (set by the reconciler, cleared on every update).
+         */
+        java.util.Set<Component> barShortcuts = java.util.Set.of();
         /** Components of Field and Text children, in order: the bar's fill candidates; Text ones also hold status. */
         java.util.Set<Component> barFields = java.util.Set.of(), barTexts = java.util.Set.of();
         /** The panel footer this vertical stack is (set by its panel, cleared on every update); null otherwise. */
@@ -148,6 +155,7 @@ final class Stacks {
             if (component.getLayout() instanceof Navigation.InlineLayout inline) inline.titleLine = titleLine(stack);
             if (documentBar && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new DocumentBarLayout(this));
             if (panelRow && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new PanelRowLayout(context()));
+            if (gridCard != null && stack.role() == Nodes.LayoutRole.INLINE) component.setLayout(new Cards.GridValueLayout(gridCard));
             if (documentBarGroup && stack.role() == Nodes.LayoutRole.VERTICAL) component.setLayout(new Composition.Vertical(0));
             // An entry row a classic ordered list holds keeps the face's layout across refreshes (plan 9b Task 6).
             if (entryOf != null && entryOf.entry == component) component.setLayout(new ClassicOrderedFace.EntryLayout(entryOf));
@@ -216,6 +224,17 @@ final class Stacks {
 
         /** Whether this ROUTE strip's steps lead with hue tiles (the default) rather than the classic hue edges. */
         boolean routeTiles() { return context().faces().route.tiles(); }
+    }
+
+    /**
+     * Styles {@code text}, a document bar's caption right after a button, as that action's shortcut where the buttons face
+     * colours one ({@link ButtonFace#barShortcut}), and says whether it did.
+     */
+    static boolean barShortcut(Labels.TextControl text) {
+        var role = text.context().faces().buttons.barShortcut();
+        if (role == null) return false;
+        text.styled = label -> label.setForeground(ThemePainting.color(text.context(), role));
+        return true;
     }
 
     static void mount(Container component, List<JComponent> wanted) {
@@ -878,6 +897,8 @@ final class Stacks {
             return owner.barTexts.contains(child) && child != fill ? Math.max(width, metric(DesignMetrics.Role.DOCUMENT_BAR_STATUS_WIDTH)) : width;
         }
         int gap(Component before, Component after) {
+            if (owner.barShortcuts.contains(after)) return 0;
+            if (before instanceof Separators.Rule || after instanceof Separators.Rule) return metric(DesignMetrics.Role.DOCUMENT_BAR_RULE_GAP);
             return metric(before instanceof AbstractButton && after instanceof AbstractButton ? DesignMetrics.Role.DOCUMENT_BAR_ACTION_GAP : DesignMetrics.Role.DOCUMENT_BAR_GAP);
         }
         /** The width the children after the fill take, with their gaps; -1 without a fill. */

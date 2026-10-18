@@ -14,8 +14,8 @@ public key and lock the vault; each has a tooltip and accessible name.
 Under the Enterprise look the manager is a toolbar row (**New** with the add menu, **Edit...**, **Delete**, **Copy
 Username**, **Copy Password**, **Lock Vault** and the search) over a Categories tree with counts, a
 Name/Username/Type/Modified table that sorts by its headers and counts what shows, and a Details pane whose stored values
-have **Show** and **Copy**, with the lock state, auto-lock and vault file in the status row beside **Done**. The add
-sheets carry their kind's colour, and Unlock Vault shows the auto-lock under its field.
+have **Show** and **Copy**, with the lock state, auto-lock and vault file in the status row beside **Done**. The add and
+edit sheets carry their kind's colour, and Unlock Vault shows the auto-lock in its footer.
 
 The **+** menu adds a login, imports an SSH key, adds a secure note, or generates a new SSH key. The palette's
 **Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, creating or unlocking the vault first.

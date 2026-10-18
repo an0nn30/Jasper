@@ -60,7 +60,7 @@ final class Cards {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
             members = List.copyOf(controls);
             boolean rows = detail && titled && ((Nodes.Card) node).kind() == Nodes.CardKind.FORM && !controls.isEmpty()
-                && controls.stream().allMatch(c -> c instanceof FormRows.RowControl) && context().faces().group.detailGrid();
+                && controls.stream().allMatch(c -> c instanceof FormRows.RowControl) && gridFace();
             if (rows != grid) { grid = rows; refresh(); }
             labelColumnFor(this, controls);
             ((CardSurface) component).settings =
@@ -73,6 +73,9 @@ final class Cards {
             controls.forEach(c -> { if (c instanceof SettingRows.RowControl row && row.grouped != grouped) { row.grouped = grouped; row.refresh(); } });
             Stacks.mount(component, controls.stream().map(c -> c.component).toList());
         }
+
+        /** Whether the kit's group face draws a manager detail's titled card of label and value rows as a grid. */
+        boolean gridFace() { return context().faces().group.detailGrid(); }
 
         /** Measures the label column again after every control has refreshed (a theme or interface font change). */
         void relabel() { labelColumnFor(this, members); }
@@ -97,7 +100,8 @@ final class Cards {
                 widths.add(ThemePainting.measureText(row.title.getFont(),
                     labels.label(setting.title()) + (setting.titleNote().isEmpty() ? "" : " · " + setting.titleNote())));
         }
-        int column = form ? labels.column(card.context(), widths) : -1;
+        // A grid's labels take a column as wide as its widest label (the Credential Vault mock's Fields).
+        int column = card.grid ? widths.stream().mapToInt(Integer::intValue).max().orElse(0) : form ? labels.column(card.context(), widths) : -1;
         int rowInset = ((Nodes.Card) card.node).kind() == Nodes.CardKind.FORM ? 0
             : ThemePainting.metric(card.context(), DesignMetrics.Role.CARD_PADDING) + ThemePainting.metric(card.context(), DesignMetrics.Role.HAIRLINE);
         for (var c : controls) {
@@ -127,7 +131,8 @@ final class Cards {
 
         static EmptyBorder border(KitContext context) {
             int inset = ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_INSET), line = ThemePainting.metric(context, DesignMetrics.Role.HAIRLINE);
-            return new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_TOP) + line, 2 * inset + line, inset + line, 2 * inset + line);
+            return new EmptyBorder(ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_TOP) + line, 2 * inset + line, inset + line,
+                inset + line + ThemePainting.metric(context, DesignMetrics.Role.DETAIL_GRID_TRAILING));
         }
 
         private static int slot(KitContext context, int height) { return Math.max(ThemePainting.metric(context, DesignMetrics.Role.SETTING_HEIGHT), height); }
@@ -172,6 +177,67 @@ final class Cards {
                 c.setBounds(insets.left, y + (s - h) / 2, w, h);
                 y += s;
                 first = false;
+            }
+        }
+    }
+
+    /**
+     * A grid row's value beside its actions (an INLINE stack the reconciler marks): the value fills up to the grid's action
+     * lane, as wide as its widest row's actions, and the actions stand from the lane's start, {@code DETAIL_ACTION_GAP}
+     * apart, so each row's first action shares one column with a secret's Show (the Credential Vault mock's Fields).
+     */
+    static final class GridValueLayout implements Composition.WidthLayout {
+        private final CardControl card;
+        GridValueLayout(CardControl card) { this.card = card; }
+
+        private int gap() { return ThemePainting.metric(card.context(), DesignMetrics.Role.DETAIL_ACTION_GAP); }
+
+        private static List<Component> visible(Container p) { return java.util.Arrays.stream(p.getComponents()).filter(Component::isVisible).toList(); }
+
+        /** The widest actions among the grid's rows: a value's actions after it, or a secret's Show and Copy. */
+        private int lane() {
+            int lane = 0;
+            for (var member : card.members) {
+                if (!(member instanceof FormRows.RowControl row) || row.controls.isEmpty() || !row.component.isVisible()) continue;
+                int width = 0;
+                if (row.controls.getFirst() instanceof Stacks.StackControl stack && stack.gridCard == card) {
+                    var children = visible(stack.component);
+                    for (int i = 1; i < children.size(); i++) width += (i > 1 ? gap() : 0) + children.get(i).getPreferredSize().width;
+                } else if (row.controls.getFirst() instanceof SecretFields.SecretControl secret && secret.detail) {
+                    width = secret.reveal.isVisible() ? secret.reveal.getPreferredSize().width : 0;
+                    if (secret.copy.isVisible()) width += (width > 0 ? gap() : 0) + secret.copy.getPreferredSize().width;
+                }
+                lane = Math.max(lane, width);
+            }
+            return lane;
+        }
+
+        @Override public int height(Container p, int width) {
+            Insets insets = p.getInsets();
+            int h = 0;
+            for (Component c : visible(p)) h = Math.max(h, c.getPreferredSize().height);
+            return insets.top + insets.bottom + h;
+        }
+
+        @Override public Dimension preferredLayoutSize(Container p) {
+            var children = visible(p); Insets insets = p.getInsets();
+            int w = insets.left + insets.right + (children.isEmpty() ? 0 : children.getFirst().getPreferredSize().width) + (children.size() > 1 ? gap() + lane() : 0);
+            return new Dimension(w, height(p, p.getWidth() > 0 ? p.getWidth() : w));
+        }
+
+        @Override public void layoutContainer(Container p) {
+            var children = visible(p); if (children.isEmpty()) return;
+            Insets insets = p.getInsets();
+            int h = Math.max(0, p.getHeight() - insets.top - insets.bottom), right = p.getWidth() - insets.right;
+            int start = children.size() > 1 ? Math.max(insets.left, right - lane()) : right;
+            var value = children.getFirst();
+            int vh = Math.min(h, value.getPreferredSize().height);
+            value.setBounds(insets.left, insets.top + (h - vh) / 2, Math.max(0, (children.size() > 1 ? start - gap() : right) - insets.left), vh);
+            int x = start;
+            for (int i = 1; i < children.size(); i++) {
+                var size = children.get(i).getPreferredSize();
+                children.get(i).setBounds(x, insets.top + (h - size.height) / 2, size.width, Math.min(h, size.height));
+                x += size.width + gap();
             }
         }
     }

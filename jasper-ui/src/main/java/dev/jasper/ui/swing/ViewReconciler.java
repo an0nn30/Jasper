@@ -34,6 +34,7 @@ final class ViewReconciler implements AutoCloseable {
         applyFlow(spec.root(), next);
         applyColumns(spec.root(), next, view.hostColumn(), false);
         applyPanelDetail(spec.root(), next, false);
+        applyGrids(spec.root(), next);
         applyHint(spec.root(), next, false);
         applyPanelBody(spec.root(), next, false);
         applyRoute(spec.root(), next, false);
@@ -92,7 +93,7 @@ final class ViewReconciler implements AutoCloseable {
             secret.detailActionsBelow = false;
         }
         if (control instanceof SettingRows.RowControl row) { row.panelFooter = false; row.formLabel = false; row.column = -1; row.formInset = 0; }
-        if (control instanceof FormRows.RowControl row) row.column = -1;
+        if (control instanceof FormRows.RowControl row) { row.column = -1; row.grid = false; }
         // A form card's label column insets a bare EXCLUSIVE choice (Cards.labelColumnFor); the default look sets no border there.
         if (control instanceof Choices.ChoiceControl choice && choice.node instanceof Nodes.Choice node && node.kind() == Nodes.ChoiceKind.EXCLUSIVE)
             choice.component.setBorder(null);
@@ -108,10 +109,15 @@ final class ViewReconciler implements AutoCloseable {
             button.button.sideColumn = false;
             button.button.panelEmpty = false;
             button.button.noticeGround = null;
+            button.button.documentBar = false;
+            button.button.gridAction = false;
+            button.button.detailAction = false;
         }
         if (control instanceof Menus.MenuControl menu) {
             menu.main.panel = false;
             menu.arrow.panel = false;
+            menu.main.documentBar = false;
+            menu.arrow.documentBar = false;
         }
         if (control instanceof Labels.IconControl icon) { icon.glyphOverride = 0; icon.facePair = null; icon.tile(0, false); }
         if (control instanceof EmptyStates.EmptyControl empty) empty.panel = false;
@@ -121,7 +127,7 @@ final class ViewReconciler implements AutoCloseable {
             text.flow = false;
         }
         if (control instanceof Labels.TextControl label) { label.override = null; label.styled = null; }
-        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.panelRow = false; stack.documentBar = false; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
+        if (control instanceof Stacks.StackControl stack) { stack.sheetHeading = false; stack.panelFooter = null; stack.routeStep = false; stack.panelRow = false; stack.documentBar = false; stack.barShortcuts = java.util.Set.of(); stack.gridCard = null; stack.documentBarGroup = false; stack.settingsHeader = false; stack.keycapDetail = false; }
         if (control instanceof InteractiveRows.RowsControl rows) rows.documentLines = false;
         control.embeddedLabel(false);
         control.prompt(false);
@@ -202,6 +208,11 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof SettingRows.RowControl row) row.detail = detail;
         if (control instanceof Stacks.StackControl stack) stack.detail = detail;
         if (control instanceof Cards.CardControl card) { card.detail = detail; card.titled = false; }
+        // A manager detail's row of actions: its text buttons keep the catalog's detail action width (the Vault's Edit… and Delete…).
+        if (column == 2 && node instanceof Nodes.Stack content && content.role() == Nodes.LayoutRole.DETAIL)
+            for (var child : content.children())
+                if (child instanceof Nodes.Stack row && row.role() == Nodes.LayoutRole.INLINE)
+                    for (var item : row.children()) if (next.get(item.id()) instanceof Buttons.ButtonControl button) button.button.detailAction = true;
         var children = ControlRegistry.children(node);
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
             node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i
@@ -209,6 +220,25 @@ final class ViewReconciler implements AutoCloseable {
                 : column, detail);
         // A Section's card is a titled group's body, which a group face may draw as a grid (GroupFace.detailGrid).
         if (node instanceof Nodes.Section section && next.get(section.body().id()) instanceof Cards.CardControl card) card.titled = true;
+    }
+    /**
+     * A manager detail's titled FORM card of label and value rows under a group face that draws it as a grid
+     * ({@link Cards.GridRows}, the condition {@code Cards.CardControl.children} checks): its rows' labels read as the grid's,
+     * and a value beside its actions ({@link Cards.GridValueLayout}) puts them in the grid's shared action lane.
+     */
+    private void applyGrids(Nodes.Node node, Map<String, ControlRegistry.Control> next) {
+        if (node instanceof Nodes.Section section && section.body() instanceof Nodes.Card card && card.kind() == Nodes.CardKind.FORM
+            && next.get(card.id()) instanceof Cards.CardControl owner && owner.detail && owner.titled && !card.children().isEmpty()
+            && card.children().stream().allMatch(Nodes.FormRow.class::isInstance) && owner.gridFace())
+            for (var child : card.children()) {
+                var row = (Nodes.FormRow) child;
+                if (next.get(row.id()) instanceof FormRows.RowControl control) control.grid = true;
+                if (row.control() instanceof Nodes.Stack value && value.role() == Nodes.LayoutRole.INLINE && next.get(value.id()) instanceof Stacks.StackControl stack) {
+                    stack.gridCard = owner;
+                    for (var item : value.children()) if (next.get(item.id()) instanceof Buttons.ButtonControl button) button.button.gridAction = true;
+                }
+            }
+        ControlRegistry.children(node).forEach(child -> applyGrids(child, next));
     }
     /** The app-only hint face (KitView.setHintPresentation) covers its stack and everything inside it. */
     private void applyHint(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {
@@ -265,14 +295,22 @@ final class ViewReconciler implements AutoCloseable {
         ControlRegistry.children(node).forEach(child -> applyDocumentBars(child, next));
     }
     private static void documentBar(Nodes.Stack row, Map<String, ControlRegistry.Control> next) {
-        if (next.get(row.id()) instanceof Stacks.StackControl stack) stack.documentBar = true;
+        var bar = next.get(row.id()) instanceof Stacks.StackControl stack ? stack : null;
+        if (bar != null) bar.documentBar = true;
+        var shortcuts = new java.util.HashSet<java.awt.Component>();
+        Nodes.Node previous = null;
         for (var child : row.children()) {
             var control = next.get(child.id());
             if (control instanceof TextFields.FieldControl field && child instanceof Nodes.Field value && value.kind() != Nodes.FieldKind.TEXTAREA) field.panelSearch = true;
-            if (control instanceof Buttons.ButtonControl button) button.button.panel = true;
+            if (control instanceof Buttons.ButtonControl button) { button.button.panel = true; button.button.documentBar = true; }
             // A bar's menu button stands as its buttons do, as a panel header's menus do (plan 10b, the Vault's + New).
-            if (control instanceof Menus.MenuControl menu) { menu.main.panel = true; menu.arrow.panel = true; }
+            if (control instanceof Menus.MenuControl menu) { menu.main.panel = true; menu.arrow.panel = true; menu.main.documentBar = true; menu.arrow.documentBar = true; }
+            // A caption right after a button is that action's shortcut, in the face's shortcut colour where it has one.
+            if (control instanceof Labels.TextControl text && child instanceof Nodes.Text caption && caption.role() == Nodes.TextRole.CAPTION
+                && previous instanceof Nodes.Button && Stacks.barShortcut(text)) shortcuts.add(text.component);
+            previous = child;
         }
+        if (bar != null) bar.barShortcuts = java.util.Set.copyOf(shortcuts);
     }
     /**
      * A panel body's empty states take the panel empty geometry, and its two-line item lists (the body itself or the

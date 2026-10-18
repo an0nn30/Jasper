@@ -214,9 +214,10 @@ final class Forms {
             int focusClearance = prompt ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
             // A sheet in a classic dialog's card starts at the form top, as a native dialog's form does (plan 10b Task 6).
             boolean formTop = form.kind() == Nodes.FormKind.FULL || form.kind() == Nodes.FormKind.SHEET && hosted;
-            // Over a classic dialog's band, which carries the footnote, a prompt keeps the footnote's gap above it (the Unlock
-            // Vault mock: 13 under the "Show password" row, plan 10b Task 7).
-            int bottom = prompt && view.dialogBand() ? focusClearance + ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTNOTE_GAP) : focusClearance;
+            // Over a classic dialog's band, which carries the footnote, a prompt with a footnote keeps the footnote's gap above
+            // it (the Unlock Vault mock: 13 under the "Show password" row, plan 10b Task 7).
+            int bottom = prompt && view.dialogBand() && !form.footnote().isBlank()
+                ? focusClearance + ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_FOOTNOTE_GAP) : focusClearance;
             body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : formTop ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, bottom, side));
             body.setLayout(window ? new Composition.Vertical(0) {

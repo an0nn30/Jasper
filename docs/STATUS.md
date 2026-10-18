@@ -16,7 +16,7 @@ jasper-ui gains two face pairs: `SeparatorFace` (buttons point: 18 px `border.wi
 hairlines and manager column edges, pane header strips) and `RevealFace` (toggle point: Show, Show password, Show and
 Copy); a document split fills with a Split child; the bar's search width and the classic manager's widths and bar
 padding are catalog roles. `ClassicVaultRenderTest` renders the staged Vault under the shipped kit, Plex and theme
-against the five mock crops (bands, colours, edge agreement: the manager 0.687 with nothing selected, 0.790 with a login
+against the five mock crops (bands, colours, edge agreement: the manager 0.732 with nothing selected, 0.849 with a login
 selected; Add Login 0.787; Add SSH Key 0.734; Unlock Vault 0.633; every floor 0.55); `tools/visual/pairs.json` gains the
 five `composition-light-vault-*` pairs, which `check_pairs.py` passes; `CompositionParityTest` checks every rows
 gesture's classic path. Rulings (plan, "Rulings"): (1) the reveal follows the `toggle` point (a "Show" checkbox after an
@@ -24,7 +24,8 @@ input, "Show password" under a prompt's field, a discreet input's always, "Show"
 (2) the rules follow the `buttons` point (18 px `border.window` separators, hairlines and column edges); (3) the classic
 manager is one WINDOW section, a document split of the toolbar row over the three columns, which a document split now
 fills with its first Split child, and the window has no title actions; (4) the classic manager catalog: sidebar 171,
-list 348, a 34 px bar with a 200 px search (History, Snippets and the Editor's bars take the same values); (5) swatches
+list 348, a 34 px bar with a 200 px search (the Editor's document bars and the File Servers' and Tunnels' broken-file
+notes take the same values); (5) swatches
 where SDK 0.18 carries them (the Name cells, the Details heading, the editors), plain kind glyphs in the tree and hued
 glyphs in the + New menu (a residual for SDK 0.19); (6) "Used by" lists the plugins granted the entry by their ids' last
 segment, else "Not used"; (7) "Private key" and "Public key" in sentence case under CLASSIC only; (8) the Lock Vault
@@ -38,26 +39,53 @@ R20. Execution deviations (plan banner): to meet the mocks the host also gives a
 action size and its search a field's height, puts a classic document split's rule between bar and body
 (`DOCUMENT_RULE_GAP`) and a classic window form's footer band on `surface.footer`; starts a classic manager rail 4 under
 its strip (`COLUMN_RAIL_TOP`, R11) and a list column's table at its header band on `surface.card`, with a 20 px
-`surface.zebra` text footer; draws a manager detail's untitled FORM card of label and value rows as a grid
+`surface.zebra` text footer; draws a manager detail's titled group (its FORM card of label and value rows) as a grid
 (`DETAIL_GRID_INSET`, `DETAIL_GRID_TOP`, `ClassicGroupFace.GRID_EDGE`), with classic `DETAIL_PADDING` and
 `DETAIL_SECTION_GAP` 12 and `ICON_SWATCH` 10 (12 in the default catalog); starts a sheet in a classic dialog's card at
 `FORM_TOP` with classic `SHEET_SECTION_GAP` 10; and takes the mock's compact prompt (`PROMPT_COMPACT_WIDTH` 400,
 `PROMPT_SIDES` and `PROMPT_TOP` 14, `PROMPT_COMPACT_INTRO_GAP` 12, `PROMPT_FIELD_HEIGHT` 22); every Fields row has its
-Copy (`CopyCards.plain` for the non-secret ones). Residuals: Rulings 13's (the Fields labels' colon; the status row's
-cell rules 18 px `#C4C7CC` where the mock draws full-height `#D3D6DA`; the round 7 px status dot; the Details' Show and
+Copy (`CopyCards.plain` for the non-secret ones, announcing a key row's copy as the key's path); the Unlock hero is a
+`PROMPT_HEADER` stack and the status row a FOOTER stack (the plan says INLINE for both). Final review fixes: a document
+bar's flat verbs take `text.primary` (disabled `text.secondary` at half), `DOCUMENT_BAR_BUTTON_PADDING` 7 and
+`DOCUMENT_BAR_RULE_GAP` 7 beside its rules, its menu a drawn ▼ one icon gap after the label, and a caption right after a
+button (Lock Vault's shortcut) follows it without a gap in `text.placeholder`; the Fields grid's labels drop the colon in
+`text.secondary`, its label column is the widest label, its rows' actions share one lane (`DETAIL_GRID_TRAILING` 4,
+`DETAIL_ACTION_PADDING` 6, classic `DETAIL_ACTION_GAP` 4) so the mask keeps 12 dots, and a manager detail's row of text
+buttons is at least `DETAIL_ACTION_MIN_WIDTH` 86 wide; the Type column shows a login's method ("Password"), as the Item
+selected mock's cells do, and the kind for keys and notes; a prompt over a classic band keeps the footnote gap only with
+a footnote; the file chooser's Places and listing, host columns (`KitView.managerColumn`), keep their flat rail and pane.
+Residuals: Rulings 13's (the status row draws one cell rule, 18 px `#C4C7CC` where the mock draws full-height
+`#D3D6DA`, and not the mock's second before the path: SDK 0.18 lets a Separator stand only in an INLINE or ACTIONS stack,
+and an INLINE row would squeeze its cells rather than elide the path, a residual for SDK 0.19; its cells paint
+`text.tertiary` `#5C6370` where the mock has `#3A3D42`, which no SDK text role paints; the round 7 px status dot; the Details' Show and
 Copy at `BUTTON_HEIGHT` 24 where the mock draws 20; the Details column `#F7F7F8` where the mock has `#ECEDEF`, ΔE76 3.6;
 the dialog header strips and frames are plan 6's); the sheets' first group rule stands 18 below the header strip where
 the 07 sheets draw 16 (10a's `FORM_TOP` 10 stays, R13); the Unlock tile is 30 × 30 at (14, 14), as the mock's crop
-measures. No floor was lowered. The classic `MANAGER_LIST_WIDTH` 348 also sizes the Licenses and Errors windows' list
-column under Enterprise (R12). For the user: decision 17's sentence case for "Private Key" and "Public Key" in the
-default look is not applied (Rulings 7). The default look is byte-identical (gallery PNG digests unchanged; only three
+measures. Final review residuals (logical px, render vs mock): the toolbar's + glyph is the 14 px control icon where the
+mock's is smaller, so New and its ▼ stand 1.5 right, and the shortcut 2.5 right in a heavier ⇧ (owner 4b's button face);
+the Fields values start at 619 vs 614.5 (`COLUMN_GAP` 12); a selected row's Name swatch vanishes into the selection
+where the mock outlines it in white (owner 4c's table face); in the tree All Items' text stands at 50 vs 39 and the
+kinds' at 58 vs 53 (owner 4c's tree face); Unlock's intro paints `#1E1F22` at (59, 24) where the mock has `#3A3D42` at
+(55, 18), which no SDK text role paints, and its field starts at 126 vs 117 (owner 6b's prompt face); the sheets' fields
+start at 142 vs 121 (classic `FORM_LABEL_WIDTH`, R13's precedent keeps 10a's value); the dialogs' Cancel and Save are 58
+and 54 wide where the mock draws both 69 (owners 4b and 6b). No floor was lowered. The classic `MANAGER_LIST_WIDTH` 348 also sizes the Licenses and Errors windows' list
+column under Enterprise (R12); the classic `COLUMN_RAIL_TOP` 4 also starts the Enterprise file chooser's Places and
+listing 4 under their headers (8 before); the classic `PROMPT_SIDES`, `PROMPT_TOP` 14 and `PROMPT_FIELD_HEIGHT` 22 reach
+every Enterprise prompt (Create Vault, About Jasper, Remote's "Items already exist" and any in-window prompt), and
+`PROMPT_COMPACT_WIDTH` 400 every compact one; a DOCUMENT bar's menu buttons take the panel action size, as its buttons
+already do, under every kit (no bundled default-look bar has one). For the user: decision 17's sentence case for
+"Private Key" and "Public Key" in the default look is not applied (Rulings 7); the classic Type column shows a login's
+method where no ruling covers it (the final review's reading of the Item selected mock). The default look is byte-identical (gallery PNG digests unchanged; only three
 component-tree dumps per theme name the anonymous `SecretFields$SecretControl$2` where they named `$3`, since one
-anonymous class moved into `DefaultRevealFace`; no default render changed). `./gradlew check --continue`: **11,421
-tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the Enterprise Vault manager against the Item
+anonymous class moved into `DefaultRevealFace`; no default render changed; the final review fixes' roles and face methods
+are unused by the default faces, and the gallery was not re-run for them). `./gradlew check --continue` before the final
+review fixes: **11,421 tests, 0 failures, 0 errors, 25 skipped**; the fixes add one test and ran with the targeted
+suites (jasper-ui, jasper-app, the Vault plugin). GUI checks for the user: the Enterprise Vault manager against the Item
 selected and New menu mocks (sorting, the tree's collapse, Show and Copy, the toolbar's verbs while locked), Add Login,
 Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with ⌘W (and Ctrl+W on
 Windows and Linux), and the default look's File row unchanged; the Licenses and Errors windows' list width under
-Enterprise. Not merged, not pushed.
+Enterprise; under Enterprise, the file chooser (Browse…, File › Open File…), Create Vault, About Jasper and Remote's
+"Items already exist". Not merged, not pushed.
 
 **Ubuntu Yaru theme — 2026-10-17** (`codex/ubuntu-yaru-theme`). Built-in `ubuntu-yaru` Light and Dark, adapted
 from Yaru `26.04.5.1ubuntu`: neutral GTK surfaces, orange actions and focus, matching terminal and editor palettes.

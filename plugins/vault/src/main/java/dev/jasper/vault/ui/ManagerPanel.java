@@ -214,7 +214,7 @@ final class ManagerPanel implements AutoCloseable {
             String name = value instanceof SshKey key ? key.name() : value instanceof ManagedSshKey key ? key.name()
                 : value instanceof Account account ? account.name() : "";
             dataFields(value).stream().filter(data -> action.equals("detail." + data.id() + ".copy")).findFirst()
-                .ifPresent(data -> copies.plain(data.label().toLowerCase(Locale.ROOT), name, data.text()));
+                .ifPresent(data -> copies.plain(data.noun(), name, data.text()));
         });
     }
 
@@ -494,25 +494,30 @@ final class ManagerPanel implements AutoCloseable {
                 "Copy " + label.toLowerCase(Locale.ROOT)))));
     }
 
-    /** A classic Fields row that is no secret and no username: its id, its label and its value, copied as ordinary text. */
-    private record DataField(String id, String label, String text) { }
+    /**
+     * A classic Fields row that is no secret and no username: its id, its label, its value, copied as ordinary text, and
+     * what its copy announces ("Copied the private key path for laptop": a key row copies the file's path, not the key).
+     */
+    private record DataField(String id, String label, String text, String noun) { }
 
     /** {@code value}'s DataFields in their order: a login's key file, an SSH key's algorithm, fingerprint, files and comment. */
     private static List<DataField> dataFields(Object value) {
         var fields = new ArrayList<DataField>();
         switch (value) {
             case Account account -> {
-                if (account.auth() instanceof Auth.Key key) fields.add(new DataField("private", "Private key", key.keyPath().toString()));
-                if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(new DataField("private", "Private key", key.keyPath().toString()));
+                if (account.auth() instanceof Auth.Key key) fields.add(new DataField("private", "Private key", key.keyPath().toString(), "private key path"));
+                if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(new DataField("private", "Private key", key.keyPath().toString(), "private key path"));
             }
             case SshKey key -> {
-                fields.add(new DataField("algorithm", "Algorithm", key.algorithm())); fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint()));
-                fields.add(new DataField("private", "Private key", key.privatePath().toString()));
-                fields.add(new DataField("public", "Public key", key.publicPath().toString()));
-                if (!key.comment().isBlank()) fields.add(new DataField("comment", "Comment", key.comment()));
+                fields.add(new DataField("algorithm", "Algorithm", key.algorithm(), "algorithm"));
+                fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint(), "fingerprint"));
+                fields.add(new DataField("private", "Private key", key.privatePath().toString(), "private key path"));
+                fields.add(new DataField("public", "Public key", key.publicPath().toString(), "public key path"));
+                if (!key.comment().isBlank()) fields.add(new DataField("comment", "Comment", key.comment(), "comment"));
             }
             case ManagedSshKey key -> {
-                fields.add(new DataField("storage", "Storage", "Stored in Vault")); fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint()));
+                fields.add(new DataField("storage", "Storage", "Stored in Vault", "storage"));
+                fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint(), "fingerprint"));
             }
             default -> { }
         }
@@ -528,7 +533,7 @@ final class ManagerPanel implements AutoCloseable {
         return users.isEmpty() ? "Not used" : String.join(", ", users);
     }
 
-    /** The item table: the kind's swatch and the name, then the username, the kind and the date; a header click sorts it. */
+    /** The item table: the kind's swatch and the name, then the username, the type and the date; a header click sorts it. */
     private Nodes.Table classicTable() {
         var columns = List.of(column(COLUMN_NAME, "Name", Nodes.TextRole.BODY, 111), column(COLUMN_USERNAME, "Username", Nodes.TextRole.MONO, 80),
             column(COLUMN_TYPE, "Type", Nodes.TextRole.DESCRIPTION, 72), column(COLUMN_MODIFIED, "Modified", Nodes.TextRole.DESCRIPTION, 85));
@@ -549,7 +554,7 @@ final class ManagerPanel implements AutoCloseable {
         var name = new Nodes.Stack("row." + id + ".name", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
             new Nodes.Icon("row." + id + ".icon", ControlState.READY, icon(row.type()), hue(row.type()), Nodes.IconSize.SWATCH, row.type().toString()),
             text("row." + id + ".title", row.name(), Nodes.TextRole.BODY)));
-        return new TableRow(id, Map.of(COLUMN_USERNAME, username(row), COLUMN_TYPE, row.type().toString(),
+        return new TableRow(id, Map.of(COLUMN_USERNAME, username(row), COLUMN_TYPE, typeText(row),
                 COLUMN_MODIFIED, modified(row).map(ManagerPanel::date).orElse("")),
             Optional.empty(), false, Optional.empty(), row.name() + ", " + row.type(), Map.of(COLUMN_NAME, name), Optional.empty());
     }
@@ -558,12 +563,17 @@ final class ManagerPanel implements AutoCloseable {
     private Comparator<VaultManager.Row> classicOrder() {
         Comparator<VaultManager.Row> order = switch (sortColumn) {
             case COLUMN_USERNAME -> Comparator.comparing(this::username, String.CASE_INSENSITIVE_ORDER);
-            case COLUMN_TYPE -> Comparator.comparing(VaultManager.Row::type);
+            case COLUMN_TYPE -> Comparator.comparing(this::typeText, String.CASE_INSENSITIVE_ORDER);
             case COLUMN_MODIFIED -> Comparator.comparing(row -> modified(row).orElse(java.time.Instant.EPOCH));
             default -> Comparator.comparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER);
         };
         order = order.thenComparing(VaultManager.Row::name, String.CASE_INSENSITIVE_ORDER).thenComparing(row -> row.id().toString());
         return ascending ? order : order.reversed();
+    }
+
+    /** The Type cell: a login's method ("Password", as the Item selected mock's cells read), else the entry's kind. */
+    private String typeText(VaultManager.Row row) {
+        return entry.apply(row.id()).filter(Account.class::isInstance).map(value -> method(value).substring(" \u00B7 ".length())).orElse(row.type().toString());
     }
 
     private String username(VaultManager.Row row) {

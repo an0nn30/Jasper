@@ -21,6 +21,8 @@ import javax.swing.SwingUtilities;
  */
 final class ClassicButtonFace implements ButtonFace {
     private static final float DISABLED = .42f;
+    /** A document bar's disabled verb: {@code text.secondary} at half (the 07 toolbar mock's #A2A7AF on its bar). */
+    private static final float BAR_DISABLED = .5f;
     private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel;
 
     /** A face whose buttons stand on {@code surface}, the kit's dialog surface. */
@@ -116,6 +118,9 @@ final class ClassicButtonFace implements ButtonFace {
         var c = b.context();
         if (b.embedded || b.recorder() || b.onSelection || b.kind == Nodes.ButtonKind.LINK && !b.sideColumn) return ThemePainting.color(c, b.textRole(hover));
         if (b.sideColumn && b.isEnabled() && b.kind != Nodes.ButtonKind.PRIMARY) return ThemePainting.painted(c, label);
+        // A document bar's flat verbs read as the 07 toolbar mock's: text.primary, disabled text.secondary at half (plan 10b).
+        if (b.documentBar && ghost(b) && flat(b))
+            return b.isEnabled() ? ThemePainting.painted(c, label) : ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_SECONDARY), BAR_DISABLED);
         if (!b.isEnabled()) return ColorMath.opacity(ThemePainting.color(c, SemanticColor.TEXT_PRIMARY), DISABLED);
         if (ghost(b) && flat(b)) return ThemePainting.color(c, b.textRole(hover));
         // A hovered or pressed primary fills accent.hover (paintFace), so its label is guarded there.
@@ -138,10 +143,12 @@ final class ClassicButtonFace implements ButtonFace {
     /**
      * The mocks' glyph inks on a standard face: a joined pair's halves in {@code text.primary}, the disabled half's at the
      * disabled alpha in {@code text.strong.secondary} (the mocks' #A3A8B0 over its flat fill), and the circular ? in
-     * {@code text.strong.secondary}; every other glyph takes its text role, as by default.
+     * {@code text.strong.secondary}, an enabled document bar verb's in {@code text.primary} as its label; every other glyph
+     * takes its text role, as by default.
      */
     @Override public SemanticColor iconRole(Buttons.KitButton b, boolean hover) {
         if (joinedHalf(b)) return b.isEnabled() ? SemanticColor.TEXT_PRIMARY : SemanticColor.TEXT_STRONG_SECONDARY;
+        if (b.documentBar && ghost(b) && b.isEnabled() && !b.onSelection) return SemanticColor.TEXT_PRIMARY;
         if (b.circular) return SemanticColor.TEXT_STRONG_SECONDARY;
         return b.textRole(hover);
     }
@@ -235,4 +242,24 @@ final class ClassicButtonFace implements ButtonFace {
     }
     /** Plan 9b Task 5: the Plugins mock's Disable stands on the plugin name's line, above its metadata. */
     @Override public boolean titleLine() { return true; }
+    /** Plan 10b: the 07 toolbar mock's verbs stand {@code DOCUMENT_BAR_BUTTON_PADDING} inside their faces. */
+    @Override public int barPadding(KitContext context) { return ThemePainting.metric(context, DesignMetrics.Role.DOCUMENT_BAR_BUTTON_PADDING); }
+    /** Plan 10b: the 07 toolbar mock's "New ▼": the drawn ▼ one icon gap after the label. */
+    @Override public int barMenuLane(KitContext context) {
+        return ThemePainting.metric(context, DesignMetrics.Role.ICON_GAP) + ThemePainting.metric(context, DesignMetrics.Role.DROPDOWN_GLYPH);
+    }
+    /** The guarded ▼ in {@code text.secondary}, ending the menu item padding inside the button, faded while disabled. */
+    @Override public void paintBarMenuArrow(Buttons.KitButton main, Graphics2D graphics) {
+        var c = main.context();
+        var g = (Graphics2D) graphics.create();
+        try {
+            ThemePainting.antialias(g);
+            int glyph = ThemePainting.metric(c, DesignMetrics.Role.DROPDOWN_GLYPH);
+            double right = main.getWidth() - ThemePainting.metric(c, DesignMetrics.Role.MENU_ITEM_PADDING);
+            Color ink = ThemePainting.painted(c, arrow);
+            ClassicGlyphs.down(g, right - glyph / 2.0, (main.getHeight() - glyph * .8) / 2, glyph, main.isEnabled() ? ink : ColorMath.opacity(ink, DISABLED));
+        } finally { g.dispose(); }
+    }
+    /** Plan 10b: the 07 toolbar mock's "⇧⌘L" after Lock Vault, in the placeholder grey. */
+    @Override public SemanticColor barShortcut() { return SemanticColor.TEXT_PLACEHOLDER; }
 }

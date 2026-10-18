@@ -390,8 +390,9 @@ final class Tables {
             measureColumns();
             scroll.setMinimumSize(new Dimension(usableWidth(),0));
             // A manager list column's rows start at the face's column top below the header (today's: the rail's top inset,
-            // level with a rail beside it).
-            scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(context().faces().table.columnTop(context()), 0, 0, 0) : null);
+            // level with a rail beside it); a host's own column (the file chooser's listing) keeps the rail's top inset.
+            scroll.setViewportBorder(column >= 0 ? BorderFactory.createEmptyBorder(view.hostColumn() >= 0
+                ? ThemePainting.metric(context(), dev.jasper.ui.metrics.DesignMetrics.Role.COLUMN_RAIL_TOP) : context().faces().table.columnTop(context()), 0, 0, 0) : null);
             header.removeAll();
             header.setLayout(weights());
             var titles = value().columns();

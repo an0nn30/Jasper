@@ -294,8 +294,11 @@ final class Trees {
         private int keycapGroupHeight() {
             return ThemePainting.height(context(), dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_TREE_GROUP_HEIGHT, dev.jasper.ui.metrics.Typography.Role.PANEL_TITLE);
         }
-        /** A manager rail's tree (column 0) under a face with flat rails: its branches are flat section headings, its leaves rail rows. */
-        boolean rail(){return column==0 && !settingsNavigation && presentation.isEmpty() && context().faces().tree.flatRail();}
+        /**
+         * A manager rail's tree (column 0) under a face with flat rails, or a host's own rail (the file chooser's places)
+         * under any face: its branches are flat section headings, its leaves rail rows.
+         */
+        boolean rail(){return column==0 && !settingsNavigation && presentation.isEmpty() && (context().faces().tree.flatRail() || view.hostColumn() >= 0);}
         @Override int rowShellHeight(int index){
             if((settingsNavigation || rail()) && !visible.get(index).item().leaf())return ThemePainting.height(context(),dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_NAV_HEADING,dev.jasper.ui.metrics.Typography.Role.SECTION_LABEL);
             if(!presentation.isEmpty() && !visible.get(index).item().leaf())return keycapGroupHeight();

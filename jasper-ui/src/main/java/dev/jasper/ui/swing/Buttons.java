@@ -97,7 +97,8 @@ final class Buttons {
             button.getAccessibleContext().setAccessibleName(keycaps!=null?keycaps.accessibleName():value.label().isEmpty() ? value.tooltip() : value.label());
             button.getAccessibleContext().setAccessibleDescription(value.state().error());
             int ring = ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING);
-            int horizontal = ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
+            int bar = button.documentBar && !value.label().isEmpty() ? context().faces().buttons.barPadding(context()) : -1;
+            int horizontal = bar >= 0 ? bar : button.gridAction ? ThemePainting.metric(context(), DesignMetrics.Role.DETAIL_ACTION_PADDING) : ThemePainting.metric(context(), button.armed() ? DesignMetrics.Role.KEYCAP_RECORDER_PADDING : button.orderedAction ? DesignMetrics.Role.ORDERED_ROW_SIDE : button.recorder() ? DesignMetrics.Role.FIELD_HORIZONTAL_PADDING : button.panelDetail ? DesignMetrics.Role.PANEL_DETAIL_ACTION_PADDING : view.runWindow() ? DesignMetrics.Role.RUN_WINDOW_BUTTON_PADDING : value.kind() == Nodes.ButtonKind.PRIMARY ? DesignMetrics.Role.PRIMARY_BUTTON_HORIZONTAL_PADDING : DesignMetrics.Role.BUTTON_HORIZONTAL_PADDING);
             button.setBorder(embedded ? new EmptyBorder(0, 0, 0, 0)
                 : new EmptyBorder(ring, value.label().isEmpty() ? ring : horizontal, ring, value.label().isEmpty() ? ring : horizontal));
             button.setIconTextGap(ThemePainting.metric(context(), DesignMetrics.Role.ICON_GAP));
@@ -142,6 +143,15 @@ final class Buttons {
         int disclosureWidth;
         /** A WINDOW form footer action keeps the window footer's measured minimum width. */
         boolean windowFooter;
+        /**
+         * In a DOCUMENT split's bar row (set by the reconciler, cleared before each update): a text button takes the face's
+         * bar padding ({@link ButtonFace#barPadding}) and a menu part the face's bar arrow, where the face has them.
+         */
+        boolean documentBar;
+        /** A value's action in a manager detail's grid row (set by the reconciler, cleared before each update): {@code DETAIL_ACTION_PADDING} inside its face. */
+        boolean gridAction;
+        /** A text button in a row of a manager detail's actions (set by the reconciler, cleared before each update): at least {@code DETAIL_ACTION_MIN_WIDTH} wide. */
+        boolean detailAction;
         /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
         boolean borderless;
         /**
@@ -268,6 +278,7 @@ final class Buttons {
             height += reservation;
             size.width += reservation;
             if (windowFooter) size.width = Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.WINDOW_ACTION_MIN_WIDTH));
+            if (detailAction) size.width = Math.max(size.width, ThemePainting.metric(context, DesignMetrics.Role.DETAIL_ACTION_MIN_WIDTH));
             return new Dimension(getText() == null || getText().isEmpty() ? height : size.width, Math.max(height, size.height));
         }
         /** Shared painter permits a real specialized owner to select its semantic surface. */
