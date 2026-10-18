@@ -78,9 +78,8 @@ already do, under every kit (no bundled default-look bar has one). For the user:
 method where no ruling covers it (the final review's reading of the Item selected mock). The default look is byte-identical (gallery PNG digests unchanged; only three
 component-tree dumps per theme name the anonymous `SecretFields$SecretControl$2` where they named `$3`, since one
 anonymous class moved into `DefaultRevealFace`; no default render changed; the final review fixes' roles and face methods
-are unused by the default faces, and the gallery was not re-run for them). `./gradlew check --continue` before the final
-review fixes: **11,421 tests, 0 failures, 0 errors, 25 skipped**; the fixes add one test and ran with the targeted
-suites (jasper-ui, jasper-app, the Vault plugin). GUI checks for the user: the Enterprise Vault manager against the Item
+are unused by the default faces, and the gallery was not re-run for them). `./gradlew check --continue` after the final
+review fixes: **11,422 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the Enterprise Vault manager against the Item
 selected and New menu mocks (sorting, the tree's collapse, Show and Copy, the toolbar's verbs while locked), Add Login,
 Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with ⌘W (and Ctrl+W on
 Windows and Linux), and the default look's File row unchanged; the Licenses and Errors windows' list width under
