@@ -16,6 +16,7 @@ Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same aut
 Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).
 Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
+Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 12.1 and 12.2 (Settings hides the Panel rail width).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -1277,9 +1278,11 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
 - **Stripes.** `StripeSet` has `IconRails` (today's `ToolStripe`) and `LabelledStripes`: rotated text labels on
   `surface.stripe`, an open panel's label on `surface.control.selected`. A label starts with "N: " when the panel's
   toggle action is bound to a single digit with modifiers (⌘⌥1 on macOS, Alt+1 elsewhere), read from the live keymap,
-  so today's bindings give "1: Sessions", "2: SFTP" and "3: Transfers". The stripe is as thick as its label needs and
-  at least `window.rail_width`. Left-stripe labels read bottom to top, right-stripe labels top to bottom. The mocks'
-  22 px stripes are superseded by the 28 px floor of `window.rail_width` (the Panel rail width row).
+  so today's bindings give "1: Sessions", "2: SFTP" and "3: Transfers". The stripe is as thick as its label's line and
+  the rail's two edges, with its 1 px rule (the mocks' 22 + 1 under IBM Plex), the label centred across it;
+  `window.rail_width` does not apply to it. Left-stripe labels read bottom to top, right-stripe labels top to bottom.
+  The top group stands at the stripe's top and the second group (LEFT_BOTTOM, RIGHT_BOTTOM) at its bottom end, as
+  IntelliJ's.
 - **Bottom strip.** `LabelledStripes` adds a horizontal strip for the BOTTOM_LEFT and BOTTOM_RIGHT slots, with count
   pills for badges that carry a number. It is 24 px plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop
   resolution gain horizontal group rectangles, as `Rectangle` math; the six slots are unchanged.
@@ -1467,7 +1470,7 @@ Browse… runs the new File › Open File… action (section 13): Jasper's file 
 | `integratedTitle` | true (`SettingsDialog.java:174-177`) | false: a native title bar with "Settings" |
 | `collapsibleNav` | false: fixed headings | true: ▼ section nodes; a click selects the page, the triangle toggles; the state is not saved |
 | `inlineReset` | true: the row's Reset button | false: "Reset to Default" in the row's context menu |
-| `hiddenKeys` | `window.native_decorations` on macOS (as today) | `window.native_decorations` (implied by the look) and `ui.animations.enabled` (no motion) |
+| `hiddenKeys` | `window.native_decorations` on macOS (as today) | `window.native_decorations` (implied by the look), `ui.animations.enabled` (no motion) and `window.rail_width` (the stripes fit their labels) |
 | `fontRowCopy` | "Use platform font size" | "Use the default font size"; the default is `[type].base` (12) |
 
 The navigation surface comes from the `navigation_surface` slot, metrics from the catalog, and the footer sits on
@@ -1479,8 +1482,7 @@ Pages branch once at their composition root on `Composition`:
 
 - **Appearance:** View mode stays; theme import and remove move from the gear to a ⋯ menu beside the theme dropdowns
   (CLASSIC).
-- **Window:** the Toolbar choice renders as radios through EXCLUSIVE; Panel rail width stays and sets the stripes'
-  minimum thickness.
+- **Window:** the Toolbar choice renders as radios through EXCLUSIVE; Panel rail width is hidden (12.1).
 - **Notifications** (CLASSIC): one grouped table with Group, Display and Source columns; a heading row per owner with
   "N groups"; the Display cell is a DROPDOWN ("Card ▼"); Source reads "Default" or "Custom".
 - **Keymap** (CLASSIC): the tree gets Action, Scope and Shortcut columns; the buttons read "Find by Shortcut" (the

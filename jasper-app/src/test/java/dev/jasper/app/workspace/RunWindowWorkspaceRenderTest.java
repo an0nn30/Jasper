@@ -83,7 +83,7 @@ class RunWindowWorkspaceRenderTest {
                 assertThat(stripAt.y - (placed.y + placed.height)).as("the mocks' 5 above the bottom strip")
                     .isEqualTo(context.metrics().value(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM));
                 // Against the mock's frame at 2x (Verified facts 8: frame x 60-61, frame bottom y 1694-1695, strip rule y 1706-1707): the
-                // mock's 2 px window border is not drawn here, and plan 7's left stripe is 28 thick against the mock's 23 (DockMockTest).
+                // mock's 2 px window border is not drawn here, and the left stripe is the mock's 23 thick (DockMockTest).
                 assertThat(2 * placed.x).as("the frame's left edge, the mock's x 60 less its border plus the stripe's extra thickness")
                     .isEqualTo(60 - 2 + 2 * (stripeAt.width - 23));
                 assertThat(2 * stripAt.y).as("the bottom strip's rule, the mock's y 1706").isEqualTo(1706);

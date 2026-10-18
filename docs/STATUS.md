@@ -1,5 +1,29 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
+`.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
+commit; spec 10.7, 12.1 and 12.2 amended). After trying Enterprise the user asked for side stripes that fit their labels,
+centred and not resizable, and for the second group at the stripe's bottom, as IntelliJ. A labelled side stripe is its
+label's line (the face's fractional ascent and descent), the rail's two edges and its rule thick: 23 under IBM Plex, the
+mocks' 22 + 1; a larger interface font still thickens it; `window.rail_width` no longer applies to the labelled stripes
+or the bottom strip's lead, and Settings hides the Panel rail width under a look with `tool_windows = "stripes"`
+(`SettingsChrome.hiddenKeys`). Side labels and their pills are centred across the stripe (plan 7's Rulings 21 reverted;
+the line stands 4 px further in than the mocks'). The second group (Left Bottom, Right Bottom) is laid out in order
+ending `RAIL_GAP` above the stripe's bottom end, or straight after the top group on a stripe too short for both, as
+IntelliJ's `Stripe` places its split group, so its first label stands at the group's top; the left stripe's rail
+actions follow the top group; during a drag the groups' drop bounds meet midway between them, the gap opens before or
+after a label where the drop lands, and the lifted label's length and an empty group's drop space stay at the group's
+end, the stripe's bottom. `DockMockTest` renders each side stripe as tall as its two labels and `RAIL_GAP` at both ends
+(166 and 138; the six side-stripe pairs' crops 332 and 276 tall at 2x, with a note), where the mocks' labels compare in
+place, compares the glyphs against the mock moved across to the centred line (agreement 0.933 to 0.947 for 0.92), and
+asserts File Servers and Tunnels at their stripes' bottom ends in the whole dock, a user-directed deviation from the 01
+and 08 mocks; the whole dock and the bottom strip now meet the mocks' places with no extra stripe thickness. All 25 dock
+pairs pass `check_pairs.py`; the default look is byte-identical (`DefaultDockPixelsTest`, the headless gallery's 322
+files). `:jasper-app:test`: **3,495 tests, 0 failures, 0 errors, 19 skipped**; `verifyApplicationArchitecture` and
+`:jasper-app:javadoc` pass; the whole `check` was not run. GUI checks for the user: the stripes' width and centred
+labels, drag and drop onto both groups of both stripes, and the Window page without Panel rail width under Enterprise.
+Not merged, not pushed.
+
 **CI and prerelease workflows — 2026-10-18** (`codex/release-workflows-main`): Tests run on PRs and
 pushes to `main`, retaining documentation/path filters and cancelling superseded PR runs.
 The manual [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z`
@@ -547,6 +571,9 @@ derived role moved); `EnterpriseFirstWindowTest` asserts Event Log at Bottom Lef
 stripe pairs' tile colours are the shipped theme's; all 75 `check_pairs.py` pairs pass (the 25 dock pairs 0.982 to
 1.000) and the default look is byte-identical (gallery, 322 files, and `DefaultDockPixelsTest`); merged counts, with
 the side labels at the outer edge (`97abf5932`), **11,240 tests, 0 failures, 0 errors, 25 skipped**.
+Changed on 2026-10-18 at the user's direction (the side-stripes entry at the top): the side stripes fit their labels,
+centred, whatever `window.rail_width`, and the second group stands at the stripe's bottom end, so Rulings 4's side
+thickness and Rulings 21 no longer hold.
 
 **Enterprise presentation, plan 9a: the Settings chrome — 2026-10-17** (`claude/enterprise-settings`, worktree
 `.claude/worktrees/enterprise-9`, `87e894a99..82633dd6c`, then this documentation commit;
