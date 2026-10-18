@@ -22,6 +22,7 @@ classic	ClassicFolderTabsFace	text.primary	surface.stripe	CONTRAST:4.5
 classic	ClassicFolderTabsFace	border.control	surface.app	CONTRAST:1.5
 classic	ClassicGroupFace	border.window	surface.app	CONTRAST:1.3
 classic	ClassicGroupFace	text.primary	surface.app	CONTRAST:4.5
+classic	ClassicGroupFace	border.divider	surface.card	CONTRAST:1.3
 classic	ClassicLabelPolicy	text.strong.secondary	surface.app	CONTRAST:4.5
 classic	ClassicLabelPolicy	text.primary	surface.app	CONTRAST:4.5
 classic	ClassicLabelPolicy	text.secondary	surface.app	CONTRAST:4.5

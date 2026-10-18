@@ -201,12 +201,14 @@ final class ViewReconciler implements AutoCloseable {
         if (control instanceof InteractiveRows.RowsControl rows) rows.column = column;
         if (control instanceof SettingRows.RowControl row) row.detail = detail;
         if (control instanceof Stacks.StackControl stack) stack.detail = detail;
-        if (control instanceof Cards.CardControl card) card.detail = detail;
+        if (control instanceof Cards.CardControl card) { card.detail = detail; card.titled = false; }
         var children = ControlRegistry.children(node);
         for (int i = 0; i < children.size(); i++) applyColumns(children.get(i), next,
             node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.THREE_COLUMN ? i
                 : node instanceof Nodes.Split split && split.kind() == Nodes.SplitKind.SIDEBAR_DETAIL ? (i == children.size() - 1 ? 2 : 1)
                 : column, detail);
+        // A Section's card is a titled group's body, which a group face may draw as a grid (GroupFace.detailGrid).
+        if (node instanceof Nodes.Section section && next.get(section.body().id()) instanceof Cards.CardControl card) card.titled = true;
     }
     /** The app-only hint face (KitView.setHintPresentation) covers its stack and everything inside it. */
     private void applyHint(Nodes.Node node, Map<String, ControlRegistry.Control> next, boolean inherited) {

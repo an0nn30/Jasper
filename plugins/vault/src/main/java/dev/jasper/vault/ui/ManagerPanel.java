@@ -192,6 +192,7 @@ final class ManagerPanel implements AutoCloseable {
             case REVOKE -> { if (grantSelection >= 0 && grantSelection < grants.size()) onRevoke.accept(grants.get(grantSelection)); }
             case CLOSE -> onClose.run();
             default -> {
+                if (id.startsWith("detail.") && id.endsWith(".copy")) copyDetail(id);
                 for (var type : VaultManager.Type.values()) if (id.equals("add." + type.name())) onAdd.accept(type);
             }
         }
@@ -210,6 +211,10 @@ final class ManagerPanel implements AutoCloseable {
                     if (secret != null) copies.secret("password", account.name(), new String(secret));
                 }
             } else if (value instanceof Note note && action.equals("detail.note.copy")) copies.secret("note", note.name(), new String(note.text()));
+            String name = value instanceof SshKey key ? key.name() : value instanceof ManagedSshKey key ? key.name()
+                : value instanceof Account account ? account.name() : "";
+            dataFields(value).stream().filter(data -> action.equals("detail." + data.id() + ".copy")).findFirst()
+                .ifPresent(data -> copies.plain(data.label().toLowerCase(Locale.ROOT), name, data.text()));
         });
     }
 
@@ -442,29 +447,15 @@ final class ManagerPanel implements AutoCloseable {
                 new Nodes.Stack("detail.identity", ControlState.READY, Nodes.LayoutRole.VERTICAL, List.of(
                     text("detail.name", row.name(), Nodes.TextRole.DETAIL_TITLE),
                     text("detail.type", row.type() + method(value), Nodes.TextRole.DESCRIPTION))))));
+            // Every field has its Copy (spec 14.8): a secret's through its DETAIL Secret, the others beside their value.
             var fields = new ArrayList<Nodes.Node>();
-            switch (value) {
-                case Account account -> {
-                    fields.add(field("username", "Username", new Nodes.Stack("detail.username.value", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-                        text("detail.username", account.username(), Nodes.TextRole.MONO),
-                        new Nodes.Button("detail.username.copy", ControlState.READY, "Copy", "", Nodes.ButtonKind.SECONDARY, "detail.username.copy", "Copy username")))));
-                    if (password(account.auth()) != null) fields.add(field("password", "Password",
-                        new Nodes.Secret(secretId(), ControlState.READY, "", "Password", "", Nodes.SecretKind.DETAIL, "detail.password.copy")));
-                    if (account.auth() instanceof Auth.Key key) fields.add(fieldText("private", "Private key", key.keyPath().toString()));
-                    if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(fieldText("private", "Private key", key.keyPath().toString()));
-                }
-                case SshKey key -> {
-                    fields.add(fieldText("algorithm", "Algorithm", key.algorithm())); fields.add(fieldText("fingerprint", "Fingerprint", key.fingerprint()));
-                    fields.add(fieldText("private", "Private key", key.privatePath().toString())); fields.add(fieldText("public", "Public key", key.publicPath().toString()));
-                    if (!key.comment().isBlank()) fields.add(fieldText("comment", "Comment", key.comment()));
-                }
-                case ManagedSshKey key -> {
-                    fields.add(fieldText("storage", "Storage", "Stored in Vault")); fields.add(fieldText("fingerprint", "Fingerprint", key.fingerprint()));
-                }
-                case Note note -> fields.add(field("note", "Note",
-                    new Nodes.Secret(secretId(), ControlState.READY, "", "Secure note", "", Nodes.SecretKind.DETAIL, "detail.note.copy")));
-                default -> { }
-            }
+            if (value instanceof Account account) {
+                fields.add(fieldText("username", "Username", account.username()));
+                if (password(account.auth()) != null) fields.add(field("password", "Password",
+                    new Nodes.Secret(secretId(), ControlState.READY, "", "Password", "", Nodes.SecretKind.DETAIL, "detail.password.copy")));
+            } else if (value instanceof Note) fields.add(field("note", "Note",
+                new Nodes.Secret(secretId(), ControlState.READY, "", "Secure note", "", Nodes.SecretKind.DETAIL, "detail.note.copy")));
+            dataFields(value).forEach(data -> fields.add(fieldText(data.id(), data.label(), data.text())));
             content.add(new Nodes.Section("detail.fields.section", ControlState.READY, "Fields",
                 new Nodes.Card("detail.fields", ControlState.READY, Nodes.CardKind.FORM, fields)));
             content.add(new Nodes.Properties("detail.properties", ControlState.READY, "", List.of(
@@ -495,8 +486,38 @@ final class ManagerPanel implements AutoCloseable {
         return new Nodes.FormRow("detail." + id + ".row", ControlState.READY, label, "", control, Optional.empty(), false);
     }
 
-    /** A Fields row whose value is data text. */
-    private static Nodes.Node fieldText(String id, String label, String data) { return field(id, label, text("detail." + id, data, Nodes.TextRole.MONO)); }
+    /** A Fields row whose value is data text beside its Copy ({@code detail.<id>.copy}). */
+    private static Nodes.Node fieldText(String id, String label, String data) {
+        return field(id, label, new Nodes.Stack("detail." + id + ".value", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            text("detail." + id, data, Nodes.TextRole.MONO),
+            new Nodes.Button("detail." + id + ".copy", ControlState.READY, "Copy", "", Nodes.ButtonKind.SECONDARY, "detail." + id + ".copy",
+                "Copy " + label.toLowerCase(Locale.ROOT)))));
+    }
+
+    /** A classic Fields row that is no secret and no username: its id, its label and its value, copied as ordinary text. */
+    private record DataField(String id, String label, String text) { }
+
+    /** {@code value}'s DataFields in their order: a login's key file, an SSH key's algorithm, fingerprint, files and comment. */
+    private static List<DataField> dataFields(Object value) {
+        var fields = new ArrayList<DataField>();
+        switch (value) {
+            case Account account -> {
+                if (account.auth() instanceof Auth.Key key) fields.add(new DataField("private", "Private key", key.keyPath().toString()));
+                if (account.auth() instanceof Auth.KeyAndPassword key) fields.add(new DataField("private", "Private key", key.keyPath().toString()));
+            }
+            case SshKey key -> {
+                fields.add(new DataField("algorithm", "Algorithm", key.algorithm())); fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint()));
+                fields.add(new DataField("private", "Private key", key.privatePath().toString()));
+                fields.add(new DataField("public", "Public key", key.publicPath().toString()));
+                if (!key.comment().isBlank()) fields.add(new DataField("comment", "Comment", key.comment()));
+            }
+            case ManagedSshKey key -> {
+                fields.add(new DataField("storage", "Storage", "Stored in Vault")); fields.add(new DataField("fingerprint", "Fingerprint", key.fingerprint()));
+            }
+            default -> { }
+        }
+        return fields;
+    }
 
     /** The plugins granted this entry, by their id's last segment capitalised ("Remote"); "Not used" without one (Rulings 6). */
     private String usedBy(UUID id) {

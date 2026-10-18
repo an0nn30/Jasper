@@ -20,7 +20,9 @@ final class Cards {
         boolean fullForm, detail;
         /** On a Settings page: rows share the card's top stroke, and the bottom stroke has its own line below the last row. */
         boolean settings;
-        /** A manager detail's FORM card of label and value rows under a group face that draws it as a grid ({@link GridRows}). */
+        /** The body of a Section (a titled group), which the reconciler marks. */
+        boolean titled;
+        /** A manager detail's titled FORM card of label and value rows under a group face that draws it as a grid ({@link GridRows}). */
         boolean grid;
         /** The children of the last update, which {@link #relabel} measures again. */
         private List<ControlRegistry.Control> members = List.of();
@@ -57,7 +59,7 @@ final class Cards {
         void children(List<ControlRegistry.Control> controls) {
             controls.stream().filter(c -> c.node instanceof Nodes.Choice choice && choice.kind() == Nodes.ChoiceKind.EXCLUSIVE).forEach(c -> Composition.label(c, true));
             members = List.copyOf(controls);
-            boolean rows = detail && ((Nodes.Card) node).kind() == Nodes.CardKind.FORM && !controls.isEmpty()
+            boolean rows = detail && titled && ((Nodes.Card) node).kind() == Nodes.CardKind.FORM && !controls.isEmpty()
                 && controls.stream().allMatch(c -> c instanceof FormRows.RowControl) && context().faces().group.detailGrid();
             if (rows != grid) { grid = rows; refresh(); }
             labelColumnFor(this, controls);

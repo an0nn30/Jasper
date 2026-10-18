@@ -227,8 +227,9 @@ class ClassicManagerTest {
     }
 
     @Test void theDetailsPaneFollowsTheSelection() throws Exception {
-        edt(() -> {
+        edt(() -> { try (var host = new FakePluginHost()) {
             var panel = panel(); var view = panel.view();
+            panel.copies(CopyCards.declare(host.start(INFO, Set.of(), Set.of(), c -> { })));
             panel.refresh(rows(), List.of(new Grant("dev.jasper.remote", amp)), STATUS, true);
             assertThat(node(view, "detail.header", Nodes.Header.class).title()).isEqualTo("Details");
             assertThat(node(view, "detail.none", Nodes.Text.class).text()).isEqualTo("Select an item to view its details.");
@@ -256,15 +257,19 @@ class ClassicManagerTest {
             assertThat(find(view, first)).as("the first entry's value is gone with its control").isEmpty();
             assertThat(secret(view, "detail.secret." + proxmox)).as("the selected entry's own value").isEqualTo("synthetic-Proxmox");
             assertThat(node(view, "detail.properties", Nodes.Properties.class).rows().get(1).value()).isEqualTo("Not used");
+            press(view, "detail.password.copy");
+            assertThat(host.clipboard().copies()).as("Copy copies the selected entry's own password")
+                .containsExactly("secret|dev.jasper.vault|synthetic-Proxmox");
             press(view, ManagerPanel.DELETE);
             assertThat(asked).containsExactly("delete " + proxmox);
             panel.close();
-        });
+        } });
     }
 
     @Test void anSshKeysDetailsListItsFilesAndCopyThePublicKey() throws Exception {
-        edt(() -> {
+        edt(() -> { try (var host = new FakePluginHost()) {
             var panel = panel(); var view = panel.view();
+            panel.copies(CopyCards.declare(host.start(INFO, Set.of(), Set.of(), c -> { })));
             UUID laptop = UUID.randomUUID();
             entries.put(laptop, new dev.jasper.vault.model.SshKey(laptop, "laptop", "ssh-ed25519", "SHA256:fixture", "",
                 directory.resolve("laptop"), directory.resolve("laptop.pub"), MODIFIED));
@@ -274,10 +279,18 @@ class ClassicManagerTest {
             assertThat(node(view, "detail.private.row", Nodes.FormRow.class).label()).isEqualTo("Private key");
             assertThat(node(view, "detail.public.row", Nodes.FormRow.class).label()).isEqualTo("Public key");
             assertThat(node(view, "detail.fingerprint", Nodes.Text.class).text()).isEqualTo("SHA256:fixture");
+            // Every row has its Copy (spec 14.8); a key's fields are ordinary copies.
+            for (String field : List.of("algorithm", "fingerprint", "private", "public"))
+                assertThat(button(view, "detail." + field + ".copy").label()).as(field).isEqualTo("Copy");
+            press(view, "detail.fingerprint.copy");
+            press(view, "detail.public.copy");
+            assertThat(host.clipboard().copies()).containsExactly("copy|dev.jasper.vault|SHA256:fixture",
+                "copy|dev.jasper.vault|" + directory.resolve("laptop.pub"));
+            assertThat(host.notifications().lines()).contains("dev.jasper.vault.copies|INFO|Copied the fingerprint for laptop|");
             press(view, ManagerPanel.COPY_PUBLIC);
             assertThat(button(view, ManagerPanel.COPY_PUBLIC).label()).isEqualTo("Copy Public Key");
             assertThat(asked).containsExactly("copy-public " + laptop);
             panel.close();
-        });
+        } });
     }
 }

@@ -63,7 +63,7 @@ class ClassicDetailGridTest {
                 var surface = card.component;
                 var origin = SwingUtilities.convertPoint(surface.getParent(), surface.getLocation(), view);
                 assertThat(image.getRGB(origin.x + inset, origin.y + top + slot) & 0xFFFFFF).as("the box's edge")
-                    .isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_DIVIDER).getRGB() & 0xFFFFFF);
+                    .isEqualTo(ThemePainting.painted(context, ClassicGroupFace.GRID_EDGE).getRGB() & 0xFFFFFF);
                 assertThat(image.getRGB(origin.x + 2 * inset, origin.y + top + line + slot) & 0xFFFFFF).as("the rule between the rows")
                     .isEqualTo(ThemePainting.role(context, DerivedColor.BORDER_ROW).getRGB() & 0xFFFFFF);
                 assertThat(image.getRGB(origin.x + inset + 2, origin.y + top + 2) & 0xFFFFFF).as("the box's ground")
@@ -76,6 +76,23 @@ class ClassicDetailGridTest {
                 assertThat(y(section.component, view) - (y(heading, view) + heading.getHeight()))
                     .as("the box's top line, not its title, stands the section gap below the heading")
                     .isEqualTo(gap - section.title.getPreferredSize().height / 2);
+            }
+        });
+    }
+
+    /** The Vault's in-window unlock: a DETAIL stack around an untitled FORM card whose one row holds an INPUT Secret. */
+    @Test void anUntitledCardInADetailKeepsItsCard() {
+        Edt.run(() -> {
+            var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+            var unlock = new Nodes.Stack("locked", READY, Nodes.LayoutRole.DETAIL, List.of(new Nodes.Stack("form", READY, Nodes.LayoutRole.VERTICAL, List.of(
+                new Nodes.Text("intro", READY, "Enter the master password.", Nodes.TextRole.BODY),
+                new Nodes.Card("form.card", READY, Nodes.CardKind.FORM, List.of(new Nodes.FormRow("form.row", READY, "Password", "",
+                    new Nodes.Secret("password", READY, "Master password", "Master password", "", Nodes.SecretKind.INPUT, "", "submit"), Optional.empty())))))));
+            try (var view = new KitView(context, new ViewSpec(unlock), event -> { })) {
+                KitFixtures.render(view, 520, 300, 1);
+                var card = (Cards.CardControl) view.control("form.card");
+                assertThat(card.detail).as("under a DETAIL stack").isTrue();
+                assertThat(card.grid).as("not a titled group's body: no grid box around the password field").isFalse();
             }
         });
     }
