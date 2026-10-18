@@ -28,7 +28,8 @@ class DesktopColorsTest {
         }
     }
     @Test void snapshotsAreImmutableAndCoalescedAndListenerCannotPreventClose() {
-        try (var f = new DesktopProcessTest.Fixture()) {
+        try (var diagnostics = new CapturedWarnings(DesktopColors.class);
+             var f = new DesktopProcessTest.Fixture()) {
             var desktop = service(f, new ArrayList<>(), "echo");
             var seen = new ArrayList<DesktopObservation>(); desktop.subscribe(seen::add);
             desktop.subscribe(value -> { desktop.close(); throw new IllegalStateException("listener"); });
@@ -41,6 +42,7 @@ class DesktopColorsTest {
             f.time.advance(100, TimeUnit.MILLISECONDS); f.pump();
             assertThat(seen).hasSize(1); desktop.close(); f.pump();
             f.await(() -> f.children.stream().noneMatch(Process::isAlive));
+            diagnostics.assertListenerFailure("Desktop colors listener failed");
         }
     }
     @Test void retriesAreCancelledByCloseAndRepeatedCloseIsSafe() {
@@ -187,6 +189,32 @@ class DesktopColorsTest {
                 && !desktop.current().portal().reason().equals("Desktop preferences pending"));
             desktop.close(); desktop.close(); f.pump();
             f.time.advance(1, TimeUnit.DAYS); f.pump(); assertThat(commands).hasSize(2);
+        }
+    }
+    static final class CapturedWarnings implements AutoCloseable {
+        private final java.util.logging.Logger logger;
+        private final java.util.logging.Level previousLevel;
+        private final boolean previousParents;
+        private final List<java.util.logging.LogRecord> records = new ArrayList<>();
+        private final java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        CapturedWarnings(Class<?> owner) {
+            logger = java.util.logging.Logger.getLogger(owner.getName());
+            previousLevel = logger.getLevel(); previousParents = logger.getUseParentHandlers();
+            logger.setLevel(java.util.logging.Level.ALL); logger.setUseParentHandlers(false); logger.addHandler(handler);
+        }
+        void assertListenerFailure(String message) {
+            assertThat(records).singleElement().satisfies(record -> {
+                assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+                assertThat(record.getMessage()).isEqualTo(message);
+                assertThat(record.getThrown()).isInstanceOf(IllegalStateException.class).hasMessage("listener");
+            });
+        }
+        @Override public void close() {
+            logger.removeHandler(handler); logger.setLevel(previousLevel); logger.setUseParentHandlers(previousParents);
         }
     }
     static DesktopColors service(DesktopProcessTest.Fixture f, List<List<String>> commands, String mode) {

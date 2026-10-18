@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import javax.swing.SwingUtilities;
 
 /** Application-owned operating-system appearance input. Native callbacks are coalesced onto EDT. */
@@ -51,10 +52,15 @@ public final class SystemAppearance implements AutoCloseable {
     }
     static SystemAppearance open(DesktopColors desktop, String os, boolean headless, Consumer<Runnable> dispatch) {
         if (!os.startsWith("Linux") || headless) return open();
+        return open(desktop, dispatch, desktop::current);
+    }
+    static SystemAppearance open(DesktopColors desktop, Consumer<Runnable> dispatch, Supplier<DesktopObservation> initial) {
         Objects.requireNonNull(desktop);
         var monitor = new SystemAppearance(Observation.unavailable("Desktop preferences pending"), dispatch);
-        monitor.nativeClose = desktop.subscribe(value -> monitor.portalObservation(value.portal()));
-        monitor.portalObservation(desktop.current().portal());
+        synchronized (monitor) {
+            monitor.nativeClose = desktop.subscribe(value -> monitor.portalObservation(value.portal()));
+            monitor.portalObservation(initial.get().portal());
+        }
         return monitor;
     }
     private void portalObservation(DesktopObservation.Portal portal) {
