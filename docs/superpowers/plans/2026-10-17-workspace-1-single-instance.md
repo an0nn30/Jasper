@@ -27,7 +27,7 @@ standard library for the edit scripts (always `python3 -I`).
 sections 1, 2.5, 4, 5 (all of it), 15, 16, 17 and 18; plan 1 of the six in section 18.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`
-(from `main` at `f866788de`). Run every command from the worktree root. Line numbers are from `941599fc2` ("Spec:
+(on `main` at `11e40192c`). Run every command from the worktree root. Line numbers are from `e2890657c` ("Spec:
 workspace tabs approved"); the commits after it on this branch change only the spec and the plans. Every edit quotes the
 text it replaces, and the edit scripts stop with a message when that text
 is not found the stated number of times: re-find the quoted text, adjust the anchor and re-run; never edit around a
@@ -35,9 +35,9 @@ missing anchor. Later tasks anchor on text earlier tasks wrote; the plan quotes 
 
 ## Spec issues
 
-None open. The spec was amended while this plan was written, and the plan follows the amended text: `7b4138588` dropped
+None open. The spec was amended while this plan was written, and the plan follows the amended text: `36fc3dd6b` dropped
 `LSMultipleInstancesProhibited` from 5.4 (Apple's key decides whether more than one *user* may run the app at once and
-does not guard `open -n`), so Task 10 adds only `CFBundleDocumentTypes`; `ac2f7cf34` made 5.3 say that a ready owner
+does not guard `open -n`), so Task 10 adds only `CFBundleDocumentTypes`; `38ec03740` made 5.3 say that a ready owner
 answers a handoff OK only after its EDT has taken it, within one second, and PROTOCOL otherwise, and that a quitting
 owner answers PROTOCOL so the launch's retry takes the lock once it has exited (Task 6, Rulings 22 and 23).
 
@@ -213,7 +213,7 @@ Decisions the spec leaves open; record them in `docs/STATUS.md` (Task 11). "What
 
 ## Verified facts
 
-At `941599fc2` unless a task is named.
+At `e2890657c` unless a task is named.
 
 1. `HandoffSocket.bind(socketPath, tokenPath, lockPath, handler)` (`residency/HandoffSocket.java:74-111`) takes
    `daemon/lock` while binding (`:85-87`), declines when something answers on the path (`:88-91`, `owned` `:270-276`),
@@ -295,7 +295,7 @@ At `941599fc2` unless a task is named.
 ## Before you start
 
 ```bash
-git diff --stat 941599fc2 HEAD -- jasper-app gradle packaging config.example.toml docs/*.md   # nothing: only the spec and plans moved
+git diff --stat e2890657c HEAD -- jasper-app jasper-sdk gradle packaging config.example.toml docs/*.md   # nothing: only the spec and plans moved
 git status --short            # nothing
 grep -c 'public void openOrRaise(String trigger)' jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java   # 1
 grep -c 'boolean standaloneLaunch()' jasper-app/src/main/java/dev/jasper/app/bootstrap/AppArguments.java                      # 1
@@ -1188,6 +1188,7 @@ Spec 5.3 "Restart" and 16: the replacement gets `--replacing <pid>`; nothing pro
   `PluginManagerPanel.java:23,50,142-143,203-204,233,288`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java:67-70,159-176,1664-1709,1746-1758,1948`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/bootstrap/ApplicationBootstrap.java:41,334-338,611-623,640-661`
+- Modify: `jasper-sdk/src/main/java/dev/jasper/sdk/ui/Windows.java:41` (the `onQuitting` Javadoc: what really quits)
 - Modify (test): `restart/RestartCommandTest.java`, `restart/RestartFlowTest.java` (whole files);
   `residency/LaunchRequestTest.java:53-64`, `residency/HandoffSocketTest.java:244-256`;
   `pluginmanager/PluginManagerTest.java`, `pluginmanager/PluginManagerPanelTest.java:313-337`,
@@ -2077,17 +2078,22 @@ edit(M + "bootstrap/ApplicationBootstrap.java", [
             JasperApplication application, Path source, long modified) {
         return request -> {
             if (stale(request, source, modified)) {''', 1)])
+edit("jasper-sdk/src/main/java/dev/jasper/sdk/ui/Windows.java", [
+    ('''     * really quits (Quit Jasper Completely, a log-out or restart, or a request from another launch to retire).''',
+     '''     * really quits (Quit Jasper Completely, a log-out or a restart).''', 1)])
 PY
 ```
 
 `JasperApplication`'s `Duration` import stays in use elsewhere in the file; `PluginManager` keeps its `SwingUtilities`
 import (it still posts a failure message, `PluginManager.java:212`). `PluginManagerPanel`'s notice line goes with its only
-caller (Ruling 9): its field, `notice(String)`, `noticeText()` and the header's hidden `notice` node.
+caller (Ruling 9): its field, `notice(String)`, `noticeText()` and the header's hidden `notice` node. The SDK's
+`Windows.onQuitting` Javadoc names what really quits: Quit Jasper Completely, a log-out or a restart.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.restart.*' --tests 'dev.jasper.app.residency.*' --tests 'dev.jasper.app.pluginmanager.*' --tests 'dev.jasper.app.settingsui.PluginSettingsPagesEvidenceTest' --tests 'dev.jasper.app.settingsui.SettingsPagesMockTest' --tests 'dev.jasper.app.application.JasperApplicationPluginsTest' --tests 'dev.jasper.app.application.JasperApplicationBackgroundTest' --tests 'dev.jasper.app.application.JasperApplicationResidencyTest' --tests 'dev.jasper.app.application.PresentationAttemptTest' --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
-Expected: PASS. Then `./gradlew :jasper-app:check` (architecture, doclint, every app test): PASS.
+Expected: PASS. Then `./gradlew :jasper-app:check :jasper-sdk:javadoc` (architecture, doclint, every app test, the SDK's
+Javadoc): PASS.
 
 The notice node was hidden in every state the 8b and 9b comparisons render, and the kit's stacks lay out only visible
 children (`jasper-ui/src/main/java/dev/jasper/ui/swing/Stacks.java`), so the Plugins page's geometry does not move and
@@ -2105,7 +2111,7 @@ and report both lines; do not change a mock or `pairs.json`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A jasper-app/src
+git add -A jasper-app/src jasper-sdk/src/main/java/dev/jasper/sdk/ui/Windows.java
 git commit -F - <<'EOF'
 Single instance: restart's replacement waits for the lock
 
@@ -6629,7 +6635,7 @@ standing inaccuracy that a `./gradlew run` session "stays resident" (a dev run h
 
 **Files:**
 - Modify: `docs/configuration.md:15,17,24,37-45,279-280,294-316`, `config.example.toml:59`, `docs/app-architecture.md:51,69-73,86-88,102-103,108,159,178-179,186`,
-  `docs/app-maintenance.md:220`, `docs/packaging.md:296,341,362,366`, `docs/sdk-architecture.md:18,71,267-274,390-392,397`,
+  `docs/app-maintenance.md:220`, `docs/packaging.md:296,341,362,366`, `docs/sdk-architecture.md:18,71,267-274,391-393,398`,
   `docs/plugin-authoring.md:772-773`, `packaging/cli/README.md:4,39`, `docs/STATUS.md:2`
 
 **Interfaces:**
@@ -6872,7 +6878,7 @@ which it then carries out as an ordinary start; (21) raise and path calls answer
 answers a handoff once its EDT took it, within 1 s; (23) a quitting owner takes no handoff; (24) a failed start keeps
 the lock until its process exits; (25) the lock is never opened twice in one process; (26) a file from outside is
 revealed, never desktop-edited, without a plugin's editor; (27) a replacement whose predecessor has gone hands off. The
-spec was amended while the plan was written (`7b4138588`: no `LSMultipleInstancesProhibited`; `ac2f7cf34`: the EDT
+spec was amended while the plan was written (`36fc3dd6b`: no `LSMultipleInstancesProhibited`; `38ec03740`: the EDT
 take and the quitting owner); the plan follows the amended text. `./gradlew check --continue`: **N tests, 0 failures,
 0 errors, M skipped**. Before the first launch of this build, quit any older resident Jasper completely (its menu bar
 item's Quit Jasper Completely): it holds no instance lock and is unreachable from the new build, so it would keep
@@ -6899,7 +6905,7 @@ for root in ("jasper-app/src", "packaging/cli/src"):
         bad = sum(1 for c in text if 0xD800 <= ord(c) <= 0xDFFF or 0xE000 <= ord(c) <= 0xF8FF or (ord(c) < 0x20 and c not in "\n\t\r") or ord(c) == 0x7f)
         if bad: print(p, "bad chars:", bad)
 PY
-git grep -n -e '--standalone' -e 'ResidentControl' -e 'commands-<pid>' -e 'daemonLock' -e 'openOrRaise' -e 'endpointReleased' -e 'retire request' \
+git grep -n -e '--standalone' -e 'ResidentControl' -e 'commands-<pid>' -e 'daemonLock' -e 'openOrRaise' -e 'endpointReleased' -e 'retire request' -e 'to retire' \
   -- ':!docs/superpowers' ':!docs/STATUS.md' ':!docs/design' ':!docs/benchmarks'
 ./gradlew check --continue
 ```
@@ -6953,9 +6959,12 @@ EOF
   List<String>, boolean)`, `restart(RestartMode, List<Path>)`, `commandPaths` and `missingPaths(Path, List<String>,
   Predicate<String>)`, `ConfigEditor.revealOnly(Path)` and `RestartCommand.replacing(List<String>, long, List<Path>)` are
   spelled the same in every task that names them.
-- **Spec amendments.** 5.3's EDT take and quitting owner (`ac2f7cf34`): Task 6's `Instance` (Rulings 22, 23) and Task 7's
-  `serve` call; 5.4 without `LSMultipleInstancesProhibited` (`7b4138588`): Task 10 and the docs in Task 11.
-- **Anchors.** Every edit script was replayed in order against a copy of `ac2f7cf34` (its code is `941599fc2`'s) with
+- **Spec amendments.** 5.3's EDT take and quitting owner (`38ec03740`): Task 6's `Instance` (Rulings 22, 23) and Task 7's
+  `serve` call; 5.4 without `LSMultipleInstancesProhibited` (`36fc3dd6b`): Task 10 and the docs in Task 11.
+- **No retire left.** RETIRE goes in Task 3 (with the SDK's `Windows.onQuitting` Javadoc) and Task 5; the documents
+  that describe it (`sdk-architecture.md`'s restart paragraph, quit-guard sentence and background-work list,
+  `app-architecture.md`'s quit list and reopen paragraph, `configuration.md`'s Updates paragraph) change in Task 11.
+- **Anchors.** Every edit script was replayed in order against a copy of the branch on `main` `11e40192c` with
   the whole-file writes of the tasks before it; each anchor matched its stated count.
 - **Proportion.** Most of the plan's length is complete test and source code, as AGENTS.md asks; whole files are given
   where a file changes throughout (`LaunchRequest`, `HandoffSocket`, `AppArguments`, the restart package) and anchored
