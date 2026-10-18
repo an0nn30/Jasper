@@ -1,5 +1,6 @@
 package dev.jasper.app.plugins;
 
+import static dev.jasper.app.plugins.AppContractTest.onEdt;
 import static dev.jasper.app.plugins.AppContractTest.onEdtValue;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -141,6 +142,48 @@ class ClassicVaultRenderTest {
                 for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
                     assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();
                 MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
+                assertThat(vault.problems).isEmpty();
+            }
+        });
+    }
+
+    static final MockMatch.Crop ADD_LOGIN = new MockMatch.Crop(V + "4 - Add Login.png", 382, 112, 880, 494),
+        ADD_SSH_KEY = new MockMatch.Crop(V + "5 - Add SSH Key.png", 382, 112, 880, 430);
+    /**
+     * The group rules' device column: mock x 44, inside the boxes and clear of their titles. The plan's x 34 is 3 px inside
+     * the mock's boxes (left edge 14) but crosses the render's rounded corners, whose boxes start at the classic
+     * {@code FORM_SIDES} 16 that 10a's Add Host matched.
+     */
+    static final int GROUPS_X = 44;
+    /**
+     * The first group's rule: 18 below the header strip where the 07 sheets draw 16. A sheet in a classic dialog's card
+     * starts at {@code FORM_TOP}, 10 since 10a matched Add Host's rule at 19 (plan 10b Execution notes R13: 10a's value
+     * stays, a recorded residual).
+     */
+    static final int FIRST_RULE = 18;
+
+    @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
+    void theAddLoginAndAddSshKeySheetsMatchTheirMocks() throws Exception {
+        ClassicCompositionRenderTest.under(false, () -> {
+            try (var vault = vault(root.resolve("sheets"))) {
+                vault.dispatchToManager(new UiEvent.Action("add.LOGIN"));
+                var login = vault.awaitSurface("Add Login");
+                var loginRender = render(login, ADD_LOGIN.logicalWidth(), ADD_LOGIN.logicalHeight());
+                ClassicCompositionRenderTest.check("light/vault-add-login", ADD_LOGIN, loginRender,
+                    18, "0+206 #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
+                int top = FIRST_RULE;
+                bands("the Add Login groups", loginRender, GROUPS_X, 0, ADD_LOGIN.height(), "0+" + top + " #ECEDEF, " + top + "+1 #C4C7CC, "
+                    + (top + 1) + "+80 #ECEDEF, " + (top + 81) + "+1 #C4C7CC, " + (top + 82) + "+18 #ECEDEF, " + (top + 100) + "+1 #C4C7CC, "
+                    + (top + 101) + "+76 #ECEDEF, " + (top + 177) + "+1 #C4C7CC, " + (top + 178) + "+" + (206 - top - 178) + " #ECEDEF, 206+1 #C4C7CC, 207+40 #E6E7EA");
+                onEdt(login::requestClose);
+                vault.dispatchToManager(new UiEvent.Action("add.SSH_KEY"));
+                var key = vault.awaitSurface("Add SSH Key");
+                var keyRender = render(key, ADD_SSH_KEY.logicalWidth(), ADD_SSH_KEY.logicalHeight());
+                ClassicCompositionRenderTest.check("light/vault-add-ssh-key", ADD_SSH_KEY, keyRender,
+                    18, "0+174 #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA", 1, 0.55, "#C4C7CC", "#E6E7EA", "#FFFFFF");
+                bands("the Add SSH Key group", keyRender, GROUPS_X, 0, ADD_SSH_KEY.height(), "0+" + top + " #ECEDEF, " + top + "+1 #C4C7CC, "
+                    + (top + 1) + "+144 #ECEDEF, " + (top + 145) + "+1 #C4C7CC, " + (top + 146) + "+" + (174 - top - 146) + " #ECEDEF, 174+1 #C4C7CC, 175+40 #E6E7EA");
+                onEdt(key::requestClose);
                 assertThat(vault.problems).isEmpty();
             }
         });

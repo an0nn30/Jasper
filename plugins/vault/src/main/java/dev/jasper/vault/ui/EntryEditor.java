@@ -52,6 +52,7 @@ public final class EntryEditor extends EditorForm {
         form.visibleWhen(PASSWORD, () -> form.selected(AUTH).equals(AUTH_PASSWORD) || form.checked(ALSO_PASSWORD));
         form.group("identity-fields", "", NAME, USERNAME);
         form.group("authentication", "Authentication", AUTH, PRIVATE_PATH, PASSPHRASE, ALSO_PASSWORD, PASSWORD);
+        form.classicGroup("Login"); form.classicLabel(AUTH, "Method"); form.classicLabel(PRIVATE_PATH, "Private key");
         form.readyWhen(() -> !form.value(NAME).isBlank() && (form.selected(AUTH).equals(AUTH_PASSWORD) || validPath(form.value(PRIVATE_PATH))));
         form.secret(PASSWORD, "Password", "");
         form.path(PRIVATE_PATH, "Private Key", keyPath);
@@ -81,6 +82,7 @@ public final class EntryEditor extends EditorForm {
         var form = new EntryEditor(kit, close, initial == null ? "" : initial.name());
         UUID id = initial == null ? UUID.randomUUID() : initial.id();
         form.identity("note", Nodes.Hue.AMBER);
+        form.classicGroup("Secure Note");
         form.readyWhen(() -> !form.value(NAME).isBlank());
         form.note(NOTE, "Secure note");
         if (initial != null) form.replaceSecret(NOTE, initial.text());
@@ -102,6 +104,7 @@ public final class EntryEditor extends EditorForm {
         form.hint(PRIVATE_PATH, "~/.ssh/id_ed25519");
         form.hint(PUBLIC_PATH, "~/.ssh/id_ed25519.pub");
         form.hint(COMMENT, "Optional");
+        form.classicGroup("SSH Key"); form.classicLabel(PRIVATE_PATH, "Private key"); form.classicLabel(PUBLIC_PATH, "Public key");
         form.readyWhen(() -> !form.value(NAME).isBlank() && validPath(form.value(PRIVATE_PATH)) && validPath(form.value(PUBLIC_PATH)));
         form.path(PRIVATE_PATH, "Private Key", initial == null ? "" : initial.privatePath().toString());
         form.path(PUBLIC_PATH, "Public Key", initial == null ? "" : initial.publicPath().toString());

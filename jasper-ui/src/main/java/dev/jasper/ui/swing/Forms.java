@@ -212,7 +212,9 @@ final class Forms {
             int side = window ? ThemePainting.metric(context(), DesignMetrics.Role.WINDOW_FOOTER_SIDE) : ThemePainting.metric(context(), prompt ? DesignMetrics.Role.PROMPT_SIDES : DesignMetrics.Role.FORM_SIDES);
             int pad = ThemePainting.metric(context(), DesignMetrics.Role.FOOTER_PADDING);
             int focusClearance = prompt ? ThemePainting.metric(context(), DesignMetrics.Role.FOCUS_RING) : 0;
-            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : form.kind() == Nodes.FormKind.FULL ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
+            // A sheet in a classic dialog's card starts at the form top, as a native dialog's form does (plan 10b Task 6).
+            boolean formTop = form.kind() == Nodes.FormKind.FULL || form.kind() == Nodes.FormKind.SHEET && hosted;
+            body.setBorder(window ? new EmptyBorder(0, 0, 0, 0) : new EmptyBorder(prompt ? ThemePainting.metric(context(), DesignMetrics.Role.PROMPT_TOP) : formTop ? ThemePainting.metric(context(), DesignMetrics.Role.FORM_TOP) : pad,
                     side, focusClearance, side));
             body.setLayout(window ? new Composition.Vertical(0) {
                 @Override public void layoutContainer(Container parent) {

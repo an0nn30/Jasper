@@ -3,6 +3,7 @@ package dev.jasper.vault.ui;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.DialogSpec;
+import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.UiKit;
@@ -56,7 +57,7 @@ public final class VaultManagerWindow implements AutoCloseable {
                               VaultService service, Supplier<Status> status, Runnable generate, Layout layout) {
         this.layout = layout;
         this.context = context; this.lock = lock; this.manager = manager; this.service = service;
-        this.status = status; this.generate = generate;this.editors=new EntryPresenter(context);
+        this.status = status; this.generate = generate;this.editors=new EntryPresenter(context, layout);
         this.copies = CopyCards.declare(context);
     }
     public boolean isOpen() { return window != null; }
@@ -112,33 +113,35 @@ public final class VaultManagerWindow implements AutoCloseable {
         window.toFront(); return true;
     }
     /** Every form, including the generator, gets the same modal ownership and close-time wipe. */
-    public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) {
+    public void dialog(String title, Function<Runnable, ? extends EditorForm> factory) { dialog(title, Nodes.Hue.NONE, factory); }
+    /** As {@link #dialog(String, Function)}, the sheet's swatch in {@code hue} under the classic layout (plan 10b Rulings 5). */
+    public void dialog(String title, Nodes.Hue hue, Function<Runnable, ? extends EditorForm> factory) {
         if (window == null || lock.state() != LockState.UNLOCKED) return;
-        editors.show(window,title,factory,()->{});
+        editors.show(window,title,hue,factory,()->{});
     }
     /** Opens the sheet for a new entry of the type over the open window; does nothing when it is closed or locked. */
     public void add(VaultManager.Type type) {
         UiKit kit = context.kit();
         switch (type) {
-            case LOGIN -> dialog("Add Login", close -> EntryEditor.login(kit, null, manager::saveAccount, close));
-            case SSH_KEY -> dialog("Add SSH Key", close -> EntryEditor.key(kit, null, manager::importKey, close));
-            case NOTE -> dialog("Add Secure Note", close -> EntryEditor.note(kit, null, manager::saveNote, close));
+            case LOGIN -> dialog("Add Login", Nodes.Hue.BLUE, close -> EntryEditor.login(kit, null, manager::saveAccount, close));
+            case SSH_KEY -> dialog("Add SSH Key", Nodes.Hue.GREEN, close -> EntryEditor.key(kit, null, manager::importKey, close));
+            case NOTE -> dialog("Add Secure Note", Nodes.Hue.AMBER, close -> EntryEditor.note(kit, null, manager::saveNote, close));
         }
     }
     private void edit(UUID id) {
         UiKit kit = context.kit();
         manager.entry(id).ifPresent(value -> {
             switch (value) {
-                case Account a -> dialog("Edit Login", close -> EntryEditor.login(kit, a, manager::saveAccount, close));
-                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", close -> {
+                case Account a -> dialog("Edit Login", Nodes.Hue.BLUE, close -> EntryEditor.login(kit, a, manager::saveAccount, close));
+                case dev.jasper.vault.model.ManagedSshKey k -> dialog("Edit stored SSH key", Nodes.Hue.GREEN, close -> {
                     var form = new EditorForm(kit, close);
                     form.text(EntryEditor.NAME, "Name", k.name());
                     form.display("storage", "Storage", "Stored in Vault");
                     form.display("fingerprint", "Fingerprint", k.fingerprint());
                     UUID keyId = k.id(); form.submit(() -> manager.renameManaged(keyId, form.value(EntryEditor.NAME).strip())); return form;
                 });
-                case SshKey k -> dialog("Edit SSH Key", close -> EntryEditor.key(kit, k, manager::importKey, close));
-                case Note n -> dialog("Edit Secure Note", close -> EntryEditor.note(kit, n, manager::saveNote, close));
+                case SshKey k -> dialog("Edit SSH Key", Nodes.Hue.GREEN, close -> EntryEditor.key(kit, k, manager::importKey, close));
+                case Note n -> dialog("Edit Secure Note", Nodes.Hue.AMBER, close -> EntryEditor.note(kit, n, manager::saveNote, close));
                 default -> throw new IllegalArgumentException("Unknown vault entry");
             }
         });

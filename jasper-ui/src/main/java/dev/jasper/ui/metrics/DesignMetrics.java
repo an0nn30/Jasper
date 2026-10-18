@@ -254,7 +254,8 @@ public final class DesignMetrics {
         values.put(Role.FORM_LABEL_WIDTH, 100);
         values.put(Role.COLUMN_GAP, 12);
         values.put(Role.SECTION_GAP, 12);
-        values.put(Role.SHEET_SECTION_GAP, 12);
+        // Plan 10b: a sheet's groups stand 18 apart, rule to rule (the 07 Add Login mock).
+        values.put(Role.SHEET_SECTION_GAP, 10);
         values.put(Role.FORM_SIDES, 16);
         // Plan 10a: a FULL form's first group stands 10 under the dialog's top and a mixed card's rows 8 apart (the Add
         // Host and New Tunnel mocks: the first group's rule 18 below the title bar, Authentication's rows 8 apart).
