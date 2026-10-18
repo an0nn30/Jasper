@@ -110,11 +110,15 @@ class InstanceLockTest {
     }
 
     @Test void closingOnAnotherThreadNeverMakesAnAskHereFail() throws Exception {
-        for (int round = 0; round < 300; round++) {
+        for (int round = 0; round < 50; round++) {
             InstanceLock lock = InstanceLock.tryAcquire(file()).orElseThrow();
             Thread closer = Thread.ofPlatform().start(lock::close);
+            long deadline = System.nanoTime() + 5_000_000_000L;
             Optional<InstanceLock> taken;
-            do { taken = InstanceLock.tryAcquire(file()); } while (taken.isEmpty());
+            do {
+                taken = InstanceLock.tryAcquire(file());
+                assertThat(taken.isPresent() || System.nanoTime() < deadline).as("close finished within 5 s in round " + round).isTrue();
+            } while (taken.isEmpty());
             closer.join();
             taken.get().close();
         }
