@@ -1,5 +1,64 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 10b: the Credential Vault composition — 2026-10-18**
+(`claude/enterprise-plugin-compositions`, worktree `.claude/worktrees/enterprise-10`, `6cd4d80cf..5c6808c56`, then this
+documentation commit; [plan](superpowers/plans/2026-10-16-enterprise-10b-vault-compositions.md),
+[spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Under the Enterprise look the Vault
+manager is the 07 mocks' classic window (820 × 571, no title actions): a toolbar row (New with the add menu, Edit…,
+Delete, Copy Username, Copy Password, Lock Vault and its shortcut, the search) over a Categories tree with counts, a
+sortable Name/Username/Type/Modified table with swatches and an "N of M items" footer, and a Details pane (swatch, name
+and method, a Fields group, the untitled Properties Modified and Used by, Edit… and Delete…), with the status row (lock
+state, auto-lock, vault file) beside Done; the add and edit sheets carry their kind's swatch, drop the prompt hero, title
+their groups and label the method; Unlock Vault puts the tile beside the intro and the auto-lock in its footnote. Under
+the classic look every auxiliary frame shows no menu row and binds Close Window's key on its root pane
+(`ShellChrome.frameMenuRow`, `NativeShells.bindCloseWindow`; the orchestrator's ruling, spec 10.1 amended).
+jasper-ui gains two face pairs: `SeparatorFace` (buttons point: 18 px `border.window` separators, document-split
+hairlines and manager column edges, pane header strips) and `RevealFace` (toggle point: Show, Show password, Show and
+Copy); a document split fills with a Split child; the bar's search width and the classic manager's widths and bar
+padding are catalog roles. `ClassicVaultRenderTest` renders the staged Vault under the shipped kit, Plex and theme
+against the five mock crops (bands, colours, edge agreement: the manager 0.687 with nothing selected, 0.790 with a login
+selected; Add Login 0.787; Add SSH Key 0.734; Unlock Vault 0.633; every floor 0.55); `tools/visual/pairs.json` gains the
+five `composition-light-vault-*` pairs, which `check_pairs.py` passes; `CompositionParityTest` checks every rows
+gesture's classic path. Rulings (plan, "Rulings"): (1) the reveal follows the `toggle` point (a "Show" checkbox after an
+input, "Show password" under a prompt's field, a discreet input's always, "Show" and "Copy" buttons on a stored value);
+(2) the rules follow the `buttons` point (18 px `border.window` separators, hairlines and column edges); (3) the classic
+manager is one WINDOW section, a document split of the toolbar row over the three columns, which a document split now
+fills with its first Split child, and the window has no title actions; (4) the classic manager catalog: sidebar 171,
+list 348, a 34 px bar with a 200 px search (History, Snippets and the Editor's bars take the same values); (5) swatches
+where SDK 0.18 carries them (the Name cells, the Details heading, the editors), plain kind glyphs in the tree and hued
+glyphs in the + New menu (a residual for SDK 0.19); (6) "Used by" lists the plugins granted the entry by their ids' last
+segment, else "Not used"; (7) "Private key" and "Public key" in sentence case under CLASSIC only; (8) the Lock Vault
+caption is the action's default binding as the platform writes it; (9) the tree shows counts and All Items stays
+expanded unless collapsed; (10) the classic editors drop the prompt hero, title their groups "Login", "Authentication",
+"SSH Key" and "Secure Note" and label the choice "Method"; (11) Unlock Vault: the tile beside the intro, "Master
+password" in the label column, "Show password", the footnote "Auto-locks after <n> min idle", none when auto-lock is
+off; (12) the manager window is 820 × 571 (content); (13) the residuals below; (14) under a classic look an auxiliary
+frame shows no menu row and Close Window's key stays bound (supersedes 6a ruling 31). Execution notes (2026-10-17) R1 to
+R20. Execution deviations (plan banner): to meet the mocks the host also gives a document bar's menu button the panel
+action size and its search a field's height, puts a classic document split's rule between bar and body
+(`DOCUMENT_RULE_GAP`) and a classic window form's footer band on `surface.footer`; starts a classic manager rail 4 under
+its strip (`COLUMN_RAIL_TOP`, R11) and a list column's table at its header band on `surface.card`, with a 20 px
+`surface.zebra` text footer; draws a manager detail's untitled FORM card of label and value rows as a grid
+(`DETAIL_GRID_INSET`, `DETAIL_GRID_TOP`, `ClassicGroupFace.GRID_EDGE`), with classic `DETAIL_PADDING` and
+`DETAIL_SECTION_GAP` 12 and `ICON_SWATCH` 10 (12 in the default catalog); starts a sheet in a classic dialog's card at
+`FORM_TOP` with classic `SHEET_SECTION_GAP` 10; and takes the mock's compact prompt (`PROMPT_COMPACT_WIDTH` 400,
+`PROMPT_SIDES` and `PROMPT_TOP` 14, `PROMPT_COMPACT_INTRO_GAP` 12, `PROMPT_FIELD_HEIGHT` 22); every Fields row has its
+Copy (`CopyCards.plain` for the non-secret ones). Residuals: Rulings 13's (the Fields labels' colon; the status row's
+cell rules 18 px `#C4C7CC` where the mock draws full-height `#D3D6DA`; the round 7 px status dot; the Details' Show and
+Copy at `BUTTON_HEIGHT` 24 where the mock draws 20; the Details column `#F7F7F8` where the mock has `#ECEDEF`, ΔE76 3.6;
+the dialog header strips and frames are plan 6's); the sheets' first group rule stands 18 below the header strip where
+the 07 sheets draw 16 (10a's `FORM_TOP` 10 stays, R13); the Unlock tile is 30 × 30 at (14, 14), as the mock's crop
+measures. No floor was lowered. The classic `MANAGER_LIST_WIDTH` 348 also sizes the Licenses and Errors windows' list
+column under Enterprise (R12). For the user: decision 17's sentence case for "Private Key" and "Public Key" in the
+default look is not applied (Rulings 7). The default look is byte-identical (gallery PNG digests unchanged; only three
+component-tree dumps per theme name the anonymous `SecretFields$SecretControl$2` where they named `$3`, since one
+anonymous class moved into `DefaultRevealFace`; no default render changed). `./gradlew check --continue`: **11,421
+tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the Enterprise Vault manager against the Item
+selected and New menu mocks (sorting, the tree's collapse, Show and Copy, the toolbar's verbs while locked), Add Login,
+Add SSH Key and Unlock Vault; under Enterprise, a plugin window without a menu row closing with ⌘W (and Ctrl+W on
+Windows and Linux), and the default look's File row unchanged; the Licenses and Errors windows' list width under
+Enterprise. Not merged, not pushed.
+
 **Ubuntu Yaru theme — 2026-10-17** (`codex/ubuntu-yaru-theme`). Built-in `ubuntu-yaru` Light and Dark, adapted
 from Yaru `26.04.5.1ubuntu`: neutral GTK surfaces, orange actions and focus, matching terminal and editor palettes.
 [Colour reference](design/theme-engine/ubuntu-yaru.md). Existing presentation geometry and typography are retained.

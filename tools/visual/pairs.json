@@ -2252,5 +2252,90 @@
       "#ECEDEF",
       "#E6E7EA"
     ]
+  },
+  {
+    "name": "composition-light-vault-manager",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 2 - New menu.png",
+    "crop": [
+      2,
+      60,
+      1640,
+      1142
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-manager@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "composition-light-vault-manager-selected",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 3 - Item selected.png",
+    "crop": [
+      2,
+      60,
+      1640,
+      1142
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-manager-selected@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "composition-light-vault-add-login",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 4 - Add Login.png",
+    "crop": [
+      382,
+      112,
+      880,
+      494
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-add-login@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "composition-light-vault-add-ssh-key",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 5 - Add SSH Key.png",
+    "crop": [
+      382,
+      112,
+      880,
+      430
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-add-ssh-key@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
+  },
+  {
+    "name": "composition-light-vault-unlock",
+    "mock": "docs/design/enterprise/reference/07 Credential Vault/Credential Vault 1 - Unlock Vault (over Workstation).png",
+    "crop": [
+      1106,
+      838,
+      800,
+      310
+    ],
+    "render": "jasper-app/build/enterprise-compositions/light/vault-unlock@2x.png",
+    "min_agreement": 0.55,
+    "colours": [
+      "#ECEDEF",
+      "#E6E7EA",
+      "#C4C7CC"
+    ]
   }
 ]

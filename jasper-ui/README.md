@@ -39,7 +39,7 @@ publication and restores the old LAF, LAF defaults and developer overrides on fa
 `KitContext.of(kit, …)` carries a kit, selects each view's theme route and supplies host-owned values.
 `KitFaces` holds one face per control point, chosen from the kit's `ControlVariants`: the toggle, buttons (with the
 field policy built with them), exclusive choice, tabs, group, form label, stepper, prompt, empty state, table, tree
-(the two share a header face), ordered list, tag and route faces.
+(the two share a header face), separator, reveal, ordered list, tag and route faces.
 Every node renderer and four working panel controllers are implemented. The headless gallery
 now exercises the eight initial mock compositions, panel transitions and state variants; final
 whole-branch review remains Plan 1 Task 14. Existing consumers migrate in Plans 2/3.
