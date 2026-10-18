@@ -4,7 +4,8 @@ Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans on
 Amended 2026-10-17: section 5.4 no longer adds `LSMultipleInstancesProhibited`, which limits an app to one user
 session rather than one instance (plan 1's spec issue). Amended 2026-10-18: closing a tab keeps its group maximized, as
 VS Code does (sections 7.3 and 15, plan 2 Ruling 5); a ready owner answers a handoff only once its EDT has taken it,
-and a quitting owner refuses handoffs (section 5.3, plan 1 review). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+and a quitting owner refuses handoffs (section 5.3, plan 1 review). Amended 2026-10-18: under a look with in-window
+menus a child window has no menu bar (section 6.3, plan 4a review). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -269,7 +270,9 @@ A child window has a title bar and a workspace, nothing else: no toolbar, header
 layer or Buddy. Its title is the active tab's title.
 
 - **macOS:** a focused child window shows the same menus as the main window in the screen menu bar, built from the same
-  menu model (IntelliJ's floating editor windows do the same; macOS expects menus there).
+  menu model (IntelliJ's floating editor windows do the same; macOS expects menus there). Under a look that puts the
+  menus inside the window instead of the screen menu bar (Enterprise), a child window follows the Windows and Linux
+  rule below.
 - **Windows and Linux:** no menu bar; the title pane shows the title only.
 - In both, the Keymap applies (root bindings per frame, with the same contexts), the command palette opens over the
   focused window, and the workspace has the same translucency as the main window's.
