@@ -27,7 +27,8 @@ behaviour the series changed (Remote 0.13.0, File Server 0.5.0, Vault 0.6.0, Edi
 and Sample 0.3.0), and correct the guides. To turn Enterprise on: Settings ›
 Plugins, enable Enterprise (bundled, off by default), restart; turning it off and restarting brings Slate Cobalt back,
 and safe mode starts without it. `./gradlew check --continue` (this branch, before the rebase): **11,424 tests, 0 failures, 0
-errors, 25 skipped**.
+errors, 25 skipped**; `check_pairs.py`: 101 of 101 gated pairs pass; the default gallery (Dark and Light, 322 files) is
+byte-identical to `5d5e5fcf3`'s.
 Residuals against the mocks (logical px unless stated; plan that recorded each): the secondary ink `#3A3D42` that no SDK
 text role paints, so the box titles (4b), SFTP breadcrumbs (10a), Vault status cells (`text.tertiary` `#5C6370`) and
 Unlock's intro (`#1E1F22` at (59, 24) for (55, 18)) paint other inks (10b); `DESCRIPTION` and `SUPPORTING` at 11 px
