@@ -13,6 +13,7 @@ import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -152,16 +153,38 @@ class JasperApplicationResidencyTest {
         }
     }
 
-    @Test void openOrRaiseDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
+    @Test void anOpenDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));
         edt(application::quit);
-        // Only that a late request is harmless: with no windows open this reaches openWindow, which
-        // has its own quitting guard. The branch that openOrRaise's own guard protects -- raising an
-        // existing window during shutdown -- needs a live window and cannot be covered headlessly.
-        // It is on the manual checklist instead.
-        edt(() -> application.openOrRaise(DesktopTestSupport.HOME, "handoff"));
+        // Only that a late request is harmless. The branch open's own guard protects -- raising an existing window
+        // during shutdown -- needs a live window and cannot be covered headlessly; it is on the manual checklist.
+        edt(() -> application.open(List.of(DesktopTestSupport.HOME), "handoff"));
         edt(() -> { });
+    }
+
+    @Test void anOpenWithNoWindowGoesForOne() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.open(List.of(DesktopTestSupport.HOME), "handoff")))
+                .as("composing the window is where a headless JVM fails").hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aLaunchsFirstWindowWithPathsIsStillAColdStart() throws Exception {
+        var trace = StartupTrace.detached();
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> application.trace(trace));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of(DesktopTestSupport.HOME))))
+                .hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+            assertThat(trace.windows()).as("timed as the cold start it is (plan Ruling 13)")
+                .extracting(dev.jasper.app.startup.WindowTrace::trigger).containsExactly("cold");
+        } finally {
+            edt(application::quitNow);
+        }
     }
 
     @Test void aStaleRequestEndsResidencyAndShutsDownWhenNoWindowsRemain() throws Exception {

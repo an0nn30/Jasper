@@ -633,7 +633,7 @@ public final class ApplicationBootstrap {
                 SwingUtilities.invokeLater(() -> application.endpointReleased());
                 return LaunchRequest.Response.STALE;
             }
-            SwingUtilities.invokeLater(() -> application.openOrRaise(JasperApplication.HANDOFF));
+            SwingUtilities.invokeLater(() -> application.open(java.util.List.of(), JasperApplication.HANDOFF));
             return LaunchRequest.Response.OK;
         };
     }

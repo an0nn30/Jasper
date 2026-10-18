@@ -135,7 +135,7 @@ class JasperApplicationBackgroundTest {
             // Headless, composing the window fails at its JFrame. By then Jasper must already be back in the Dock (macOS
             // gives a window of a hidden application neither the menu bar nor focus), and it hides again because
             // nothing opened.
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(true, false);
         } finally {
             edt(application::quitNow);
@@ -154,7 +154,7 @@ class JasperApplicationBackgroundTest {
             assertThat(presence(application)).as("resident, nothing open, nothing opening: it may stay so for hours")
                 .isEqualTo(Delivery.Presence.IDLE);
             // Headless, composing fails at the JFrame; the Dock switch inside the opening sees the open in progress.
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "reopen"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presenceAtSwitch).as("a failure raised while the window opens still waits for it")
                 .startsWith(Delivery.Presence.NO_WINDOW);
             assertThat(presence(application)).as("the failed open is over: idle again").isEqualTo(Delivery.Presence.IDLE);
@@ -220,7 +220,7 @@ class JasperApplicationBackgroundTest {
         // A plain launch is in the Dock already: the failed window must not leave it there with nothing open.
         JasperApplication application = settled(() -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(() -> application.openOrRaise("menu"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "menu"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(false);
             assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).as("the second attempt shows Jasper, then hides it again").containsExactly(false, true, false);
@@ -705,7 +705,7 @@ class JasperApplicationBackgroundTest {
                 application.staleBuild(() -> true);
             });
             // Composing the window is where a headless JVM fails. Reaching it proves the process was neither quitting nor
-            // stopped, because openOrRaise returns first thing in either state.
+            // stopped, because open returns first thing in either state.
             assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(planned).as("a relaunch was planned").hasValue(1);
             assertThat(asked).as("and the plugin refused it").hasValue(1);

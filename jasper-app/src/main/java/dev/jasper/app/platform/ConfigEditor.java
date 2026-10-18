@@ -88,4 +88,22 @@ public final class ConfigEditor {
         }
         throw failure;
     }
+
+    /**
+     * Reveals a file in the file manager and does nothing else: for a file another program asked Jasper to open, which
+     * the desktop's edit action could hand straight back to Jasper and its open action could run. Never on the EDT.
+     *
+     * @param path the file
+     * @throws IllegalStateException on the EDT, or when revealing did not work (its failure is suppressed in it)
+     */
+    public void revealOnly(Path path) {
+        if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor operations require a worker thread");
+        try {
+            attempts.get(2).accept(path);
+        } catch (RuntimeException exception) {
+            var failure = new IllegalStateException("Could not reveal: " + path);
+            failure.addSuppressed(exception);
+            throw failure;
+        }
+    }
 }

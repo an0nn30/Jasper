@@ -440,9 +440,10 @@ public final class JasperApplication {
     private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
 
     /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
-    public TerminalWindow newWindow() {
-        return openWindow(null, false,
-            windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()));
+    public TerminalWindow newWindow() { return openWindow(null, false, newWindowTrigger()); }
+
+    private String newWindowTrigger() {
+        return windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent());
     }
 
     /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
@@ -619,14 +620,33 @@ public final class JasperApplication {
 
     /** As {@link #openFileAt(Path, int, UUID)}, falling back to {@code desktop}; tests inject its actions. */
     void openFileAt(Path file, int line, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        openFile(file, line, window, desktop::editOrReveal, "Could not open a clicked file");
+    }
+
+    /**
+     * Opens a file another program asked Jasper to open (a second launch, the {@code jasper} command, the macOS open-file
+     * event) in window {@code window}, when it is an existing regular file: on a virtual thread, through the editor a
+     * plugin provides, else by revealing it in the file manager. Never the desktop's edit or open action: the edit action
+     * could hand the file straight back to Jasper, and the open action runs programs and scripts.
+     */
+    void openRequestedFile(Path file, UUID window) {
+        openRequestedFile(file, window, new dev.jasper.app.platform.ConfigEditor());
+    }
+
+    /** As {@link #openRequestedFile(Path, UUID)}, falling back to {@code desktop}; tests inject its actions. */
+    void openRequestedFile(Path file, UUID window, dev.jasper.app.platform.ConfigEditor desktop) {
+        openFile(file, 0, window, desktop::revealOnly, "Could not open a requested file");
+    }
+
+    private void openFile(Path file, int line, UUID window, Consumer<Path> fallback, String failed) {
         Thread.ofVirtual().name("jasper-open-file").start(() -> {
             try {
                 if (!java.nio.file.Files.isRegularFile(file)) return;
                 PluginRuntime runtime = plugins;
-                if (runtime == null) desktop.editOrReveal(file);
-                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), desktop::editOrReveal);
+                if (runtime == null) fallback.accept(file);
+                else runtime.open(file, line > 0 ? OptionalInt.of(line) : OptionalInt.empty(), Optional.of(window), fallback);
             } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "Could not open a clicked file", failure);
+                LOG.log(System.Logger.Level.WARNING, failed, failure);
             }
         });
     }
@@ -651,7 +671,7 @@ public final class JasperApplication {
     public CommandDispatcher commands() {
         return invocation -> {
             if (invocation.arguments().isEmpty()) {
-                SwingUtilities.invokeLater(() -> openOrRaise(HANDOFF));
+                SwingUtilities.invokeLater(() -> open(List.of(), HANDOFF));
                 return CompletableFuture.completedFuture(0);
             }
             PluginRuntime runtime = plugins;
@@ -721,13 +741,13 @@ public final class JasperApplication {
             LOG.log(System.Logger.Level.WARNING,
                 "Jasper was updated on disk but could not relaunch as the new build; this window comes from the running build");
         }
-        openOrRaise("reopen");
+        open(List.of(), "reopen");
     }
 
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
             removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
-                () -> openOrRaise("menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
+                () -> open(List.of(), "menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
@@ -811,20 +831,45 @@ public final class JasperApplication {
     }
 
     /**
-     * The handoff, the macOS reopen event and the resident indicator share this: raise what is open, or open the
-     * first window where a new shell starts. {@code trigger} names the caller for start-up timing.
+     * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
+     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3 and 5.4). With no paths it raises the
+     * last active window, or opens one where a new shell starts; each directory opens as a terminal tab and each file
+     * in the editor a plugin provides, else revealed ({@code openRequestedFile}), in the last active
+     * window, or in a new window (in the first directory) when none is open ({@code OpenPlan}). Plan 4 of the
+     * workspace-tabs series retargets this method to the main window. {@code trigger} names the caller for start-up
+     * timing. EDT.
+     *
+     * @param paths absolute paths to open; none raises
+     * @param trigger what asked, for the window's timing line
      */
-    public void openOrRaise(String trigger) {
+    public void open(List<Path> paths, String trigger) {
         if (quitting || stopped) return;
-        if (windows.isEmpty()) openWindow(null, false, trigger);
-        else raiseTerminal();
+        TerminalWindow target = activeWindow();
+        OpenPlan plan = OpenPlan.of(paths, target != null, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
+        if (plan.newWindow()) target = openWindow(plan.windowDirectory(), false, trigger);
+        else target.toFront();
+        openRest(target, plan);
     }
 
-    /** As {@link #openOrRaise(String)}, opening the first window in {@code directory}. */
-    public void openOrRaise(Path directory, String trigger) {
-        if (quitting || stopped) return;
-        if (windows.isEmpty()) openWindow(directory, directory == null, trigger);
-        else raiseTerminal();
+    /**
+     * A launch's first window, timed as {@link #newWindow()} times it (a cold start unless a {@code --background} launch
+     * warmed up): its tab starts in the first directory {@code paths} names, else where a new shell starts, and the rest
+     * of the paths open in it as {@link #open} opens them (plan Ruling 13). EDT.
+     *
+     * @param paths the launch's absolute paths
+     * @return the window; null while the application is quitting
+     */
+    public TerminalWindow openFirstWindow(List<Path> paths) {
+        OpenPlan plan = OpenPlan.of(paths, false, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
+        TerminalWindow window = openWindow(plan.windowDirectory(), false, newWindowTrigger());
+        openRest(window, plan);
+        return window;
+    }
+
+    private void openRest(TerminalWindow target, OpenPlan plan) {
+        if (target == null) return;
+        for (Path directory : plan.tabs()) target.content().newTab(directory);
+        for (Path file : plan.files()) openRequestedFile(file, target.content().id());
     }
 
     /**
@@ -1597,9 +1642,13 @@ public final class JasperApplication {
 
     boolean buddyEnabled() { return buddy.enabled(); }
 
+    /** The terminal window used last, else the first open one; null with none open. EDT. */
+    private TerminalWindow activeWindow() {
+        return lastActive != null && windows.contains(lastActive) ? lastActive : windows.isEmpty() ? null : windows.iterator().next();
+    }
+
     private void raiseTerminal() {
-        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive
-            : windows.isEmpty() ? null : windows.iterator().next();
+        TerminalWindow target = activeWindow();
         if (target != null) target.toFront();
     }
     /**

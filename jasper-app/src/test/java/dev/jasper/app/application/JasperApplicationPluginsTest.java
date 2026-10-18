@@ -558,6 +558,37 @@ class JasperApplicationPluginsTest {
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
+    @Test void aRequestedFilesDesktopFallbackOnlyReveals() throws Exception {
+        Path notes = java.nio.file.Files.writeString(home.resolve("notes.txt"), "notes\n");
+        var calls = new CopyOnWriteArrayList<String>();
+        var desktop = new dev.jasper.app.platform.ConfigEditor(path -> calls.add("edit:" + path.getFileName()),
+            path -> calls.add("open:" + path.getFileName()), path -> calls.add("reveal:" + path.getFileName()));
+        java.util.UUID window = java.util.UUID.randomUUID();
+        var terminated = new CountDownLatch(1);
+        JasperApplication[] application = new JasperApplication[1];
+        edt(() -> {
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown);
+            application[0].openRequestedFile(notes, window, desktop);
+        });
+        awaitCalls(calls, 1);
+        assertThat(calls).as("plugins not started: the desktop's edit action could hand the file back to Jasper")
+            .containsExactly("reveal:notes.txt");
+
+        calls.clear();
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("life-plugin");
+        PluginJars.build(dev, "life.jar", PluginJars.descriptor("dev.example.life", "1.0.0", "fix.life.Main"),
+            Map.of("fix.life.Main", FIXTURE), List.of());
+        edt(() -> {
+            application[0].startPlugins(null, dev, false, dirs);
+            application[0].openRequestedFile(notes, window, desktop);
+        });
+        awaitCalls(calls, 1);
+        assertThat(calls).as("plugins running, none provides an editor").containsExactly("reveal:notes.txt");
+        edt(application[0]::quit);
+        assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
     private static void awaitCalls(List<String> calls, int count) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline && calls.size() < count) Thread.sleep(10);
