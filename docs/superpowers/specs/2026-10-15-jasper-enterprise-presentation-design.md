@@ -14,6 +14,8 @@ Amended on 2026-10-17 with plan 5b's accent ruling, made under the same authorit
 Amended on 2026-10-17 with plan 5b's status-text ruling, made under the same authority: 5.6 (classic status text is 11 px).
 Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same authority: 10.7 (the bottom strip is 24 px plus its rule).
 Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).
+Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
+7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -279,6 +281,9 @@ entry = "dev.jasper.enterprise.EnterprisePlugin"
 sdk = ">=0.18.0, <0.19"
 description = "The Enterprise look: native title bars, menus in the window, labelled tool window stripes, a Run window and classic controls, in the Enterprise theme or any other."
 vendor = "Jasper"
+icon_hue = "blue"
+icon_selected_ink = "foreground"
+icon = "icons/enterprise.svg"
 enabled_by_default = false
 capabilities = ["presentation.provide"]
 exports = ["dev.jasper.enterprise.api"]
@@ -819,7 +824,7 @@ control's construction. Faces never reference `Kit` or `ControlVariants`.
 | `ButtonFace` | inset line and drop | gradient, `border.hover`, `accent.edge` on the primary; combo and picker faces alike, without icon tiles (below) |
 | `TagFace` | borderless tint | uppercase, `tag.border` box on the hue tint |
 | `RouteFace` | icon tiles | edged cells with a hue left edge |
-| `PromptFace` | 54 px icon tile | small glyph, plain title |
+| `PromptFace` | 54 px icon tile | 30 px accent tile beside the message; the title in the dialog's header strip |
 
 Composition rules for classic forms: a non-Toggle `SettingRow` inside a Form renders under `LabelPolicy` like a
 `FormRow`; the classic ordered side column spans the list and any sibling entry row and is top-aligned; an unlabelled
@@ -873,8 +878,9 @@ Enterprise. `StaticDefaultTest` keeps it so and allows only that read.
 `dev.jasper.ui.theme.DerivedColor` is a separate host-private enum, so `SemanticPalette`'s completeness rule and the
 SDK mirror stay untouched. `DerivedPalette.of(GeneratedTheme)` is a pure function of the palette and the theme's
 authored overrides, computed after `TitleBarTheme`, cached by identity and frozen as `derived-roles.tsv` for the shipped
-themes. Recipes use `ColorMath` and `SurfaceContrast`. `*` marks a role with an authored override key; `′` means the
-role after its boundary guard.
+themes. Recipes use `ColorMath` and `SurfaceContrast`; a recipe that keeps its result a ΔL* from a reference (`apart`,
+"kept … from") moves it toward `text.primary`'s lightness, and the other way only when that side has no room. `*`
+marks a role with an authored override key; `′` means the role after its boundary guard.
 
 | Role | Recipe | Used for |
 |---|---|---|
@@ -972,10 +978,12 @@ Slate Cobalt Light's value.
 | `text.onAccent.secondary`, `text.onSelection.secondary` | #DCE5F7 | `status.success`, `hue.green` | #2E9E4F |
 | `status.warning` | #8A5A00 | `status.danger` | #D03A3A |
 | `hue.amber` | #B5651D | `hue.purple` | #8A4FBF |
+| `surface.tabstrip` | #E8E9EB | `tab.indicator` | #2F65CA |
+| `surface.scrim` | #00000036 | | |
 
 Overrides: `surface.header` #E1E3E6, `surface.header.active` #D9DFEA, `surface.stripe` #E4E6E9,
 `surface.tableHeader` #F0F1F3, `surface.zebra` #F7F8FA, `surface.rowHover` #EEF2FA, `warning.ground` #FBF1DA,
-`warning.border` #E6CF95.
+`warning.border` #E6CF95, `border.divider` #D3D6DA.
 The `light` scheme follows Slate Cobalt Light's; `dark-terminal` has background #1F2125 and foreground #D5D8DD, with
 the ANSI colours of Slate Cobalt Dark's scheme.
 
@@ -994,12 +1002,14 @@ keeps the ΔL* it has from `surface.card` in Light, on the lighter side; a hue o
 | `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #8E939B |
 | `button.secondary.bg` | #45484D | `status.success`, `hue.green` | #4CB86A |
 | `surface.control.selected` | #50545B | `status.warning` | #E3C27A |
-| `hue.amber` | #D08A4A | | |
+| `hue.amber` | #D08A4A | `surface.scrim` | #00000036 |
+| `surface.tabstrip` | #3A3D42 | `tab.indicator` | #3C74D6 |
 
 Overrides: `surface.header` #36393E, `surface.header.active` #3D4658, `surface.stripe` #383B40,
-`surface.tableHeader` #393C41, `surface.zebra` #313439, `warning.ground` #4A4128, `warning.border` #6B5A30;
+`surface.tableHeader` #393C41, `surface.zebra` #313439, `warning.ground` #4A4128, `warning.border` #6B5A30,
+`border.divider` #4A4D53;
 `surface.rowHover` keeps its recipe. Its `dark` scheme has background #2E3135 and foreground #DFE1E5, with the ANSI
-colours of Slate Cobalt Dark's scheme. The mock's tab strip (#3A3D42), unfocused stripe labels and HTTP chip are targets
+colours of Slate Cobalt Dark's scheme. The mock's unfocused stripe labels and HTTP chip are targets
 for the chrome renders (16.1.4), which plans 6 and 7 compare in both variants.
 
 ### 7.7 Converter
@@ -1170,7 +1180,7 @@ The `package-info` files gain these allowed dependencies:
 - `workspace`, `windows`, `palette`, `settingsui`, `pluginmanager`, `shortcuthelp`, `plugins`, `application` →
   `presentation`;
 - `presentation` → `config`, `settings`, `persistence`, `dock`, `dev.jasper.ui.kit`, `dev.jasper.ui.metrics`,
-  `dev.jasper.ui.theme`, tomlj;
+  `dev.jasper.ui.theme`, `dev.jasper.ui.icons` (the splash art's check), tomlj;
 - `appearance` → `dev.jasper.ui.kit` (it receives the `Kit` and a `centerTitle` flag, not the presentation);
 - `plugins`' public-type sentence names `PluginRuntime`, `GlassSource` and `PluginSelection`.
 
@@ -1254,8 +1264,9 @@ dividers, no motion. Both drive the same `TerminalDeck` callbacks mounted at `Wi
 the session cell ("● Mac", the dot and the session name) and the folder; on the right, plugin items as cells ("Vault:
 Locked", "1 SSH session"), the grid size, "UTF-8" (the encoding Jasper's sessions write, `TerminalSession.java:80`),
 and the configuration warning as a `warning.ground` cell with "▲". When `palette = "run_window"` either layout adds a
-leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window is open it shows as an active toggle on
-`surface.control.selected`. The status bar keeps `window.status_bar_height` (24 by default) against DESIGN_LANGUAGE
+leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window is open it shows as an active toggle, on
+`surface.header.active` under `RuledCells`, as the Run Dialog mocks draw it, and on `surface.control.selected` under
+`SlashSegments`. The status bar keeps `window.status_bar_height` (24 by default) against DESIGN_LANGUAGE
 §4's 22 px, and the Run Dialog mocks, which show "▶ Run…", supersede the Workstation mocks, which leave it out.
 
 ### 10.7 Dock
@@ -1335,7 +1346,8 @@ the taskbar and Dock icon as the splash opens, in packaged macOS launches too (t
 packaged icons (`packaging/icons`) are unchanged.
 
 **Splash.** A start that will open a window (not a launch handed to a running instance, not `--background`, not safe
-mode) shows `Splash` as soon as `PluginSelection` (4.8) has chosen a branded presentation, until the first window is
+mode) shows `Splash` once `PluginSelection` (4.8) has chosen a branded presentation and the desktop properties are
+committed, until the first window is
 shown or start-up fails. It is an undecorated, unfocusable window centred on the main screen, drawn as the 10 Boot
 Splash frames and the animated mock's markup give it, the same in Light and Dark:
 
@@ -1362,14 +1374,14 @@ closes at once and the fill moves without easing; the animated mock's fades and 
 The same `PaletteController`, scopes, verbs, history, steps and `PaletteKeyRouter` drive both views. `PaletteView` is
 extracted from `CommandPalette`'s controller-facing API with two implementations, `CardView` (today's card) and
 `RunWindowView`, built by `PaletteViews.of`. The Run window is assembled from kit nodes only: hue squares are
-`IconSize.SWATCH` icons, the help tile is `Icon("play", BLUE)`, and the shortcut is the existing `Keycaps`. No app code
-paints it.
+`IconSize.SWATCH` icons, the help tile is `Icon("play.filled", BLUE)`, and the shortcut is the live binding as caption
+text. No app code paints it.
 
 ### 11.2 Layout
 
 From top to bottom, as in the two `06 Run Dialog` mocks:
 
-- **Title row:** a header strip on `surface.header.active` with "Run", the live COMMAND_PALETTE keycap (⇧⌘P), and × to
+- **Title row:** a header strip on `surface.header.active` with "Run", the live COMMAND_PALETTE shortcut (⇧⌘P), and × to
   close. The title row and empty areas drag the window.
 - **Help row:** the ▶ tile and the fixed host string "Type the name of a session, command, file or snippet, and Jasper
   will open it for you." With a scope chosen, the row shows that scope's description.
@@ -1412,7 +1424,8 @@ picks them from `PaletteLook.home`; `PaletteViews.of` picks only the view (`pale
 
 - `TitleFieldHome` is today's: dropped from the title field, centred in Compact.
 - `CornerHome` is the bottom-left of the dock work area: to the right of the left stripe, above the bottom strip and the
-  status bar, inset by `PALETTE_WINDOW_MARGIN`, `RUN_WINDOW_WIDTH` wide. It attaches at or below its home:
+  status bar, inset by the mocks' 6 px across and 5 px up (`RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM`),
+  `RUN_WINDOW_WIDTH` wide. It attaches at or below its home:
   `|left − home.left| ≤ reach && bottom ≥ home.bottom − reach`. It has no centre or top-fifth guides; home is its only
   snap target. Double-clicking the title row forgets the saved place and returns home.
 
@@ -1627,14 +1640,14 @@ Under CLASSIC the Credential Vault window takes the 07 Credential Vault mocks:
   Key…, each with its hue swatch (BLUE, GREEN, AMBER and PURPLE); a Separator; Edit…, Delete, Copy
   Username and Copy Password; a Separator; Lock Vault followed by its shortcut as a muted caption; and the SEARCH field
   "Search vault" at the trailing edge. An entry the selection does not allow is disabled.
-- **Categories.** A Tree with a count column: All Items, expanded, over Logins, SSH Keys and Secure Notes, each with
+- **Categories.** A Tree with counts: All Items, expanded, over Logins, SSH Keys and Secure Notes, each with
   its swatch and its count.
 - **Items.** A sortable Table: Name (the entry's swatch and name), Username (data face), Type and Modified ("Sep 24,
   2026"), with the footer "<shown> of <total> items".
 - **Details.** The selected entry's swatch and name, its kind and method muted below ("Login · Password"); a titled
   group "Fields" with one row per field: its label, its value in the data face (a secret masked) and Copy, with Show
-  before Copy for a secret; Properties for Modified and Used by (the sessions granted the entry); Edit… and Delete….
-  With nothing selected the pane reads "Select an item to view its details."
+  before Copy for a secret; Properties for Modified and Used by (the plugins granted the entry, else "Not used"); Edit…
+  and Delete…. With nothing selected the pane reads "Select an item to view its details."
 - **Status row.** Cells for the store ("● Unlocked · Keychain"), the auto-lock setting ("Auto-lock: 15 min") and the
   vault file's path in the data face, and the PRIMARY Done at the trailing edge.
 - **Editors.** ATTACHED_SHEET forms titled "Add Login", "Add SSH Key" and "Add Secure Note" ("Edit …" when editing),
