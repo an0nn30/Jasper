@@ -1,6 +1,8 @@
 # Jasper single instance, windows and workspace tabs
 
-Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans once Enterprise 6-11 has merged."). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+Status: **Approved on 2026-10-16** (the user: "Spec approved. Write the plans once Enterprise 6-11 has merged.").
+Amended 2026-10-17: section 5.4 no longer adds `LSMultipleInstancesProhibited`, which limits an app to one user
+session rather than one instance (plan 1's spec issue). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -229,10 +231,10 @@ window as today.
 
 - **macOS:** `Desktop.setOpenFileHandler` is installed at start-up; each file opens as an editor tab in the main
   window's active group (through the default editor, as Cmd-click does), each directory as a terminal tab there. The
-  plist gains `LSMultipleInstancesProhibited` (a second guard against `open -n`) and `CFBundleDocumentTypes` for
-  `public.text`, `public.source-code` and `public.folder` at `LSHandlerRank` `Alternate`, so Jasper appears in Open With
-  and accepts drops on its Dock icon without claiming any type as default. The reopen event restores or raises the main
-  window.
+  plist gains `CFBundleDocumentTypes` for `public.text`, `public.source-code` and `public.folder` at `LSHandlerRank`
+  `Alternate`, so Jasper appears in Open With and accepts drops on its Dock icon without claiming any type as default.
+  `open -n` starts a process that meets the instance lock and hands off like any other launch. The reopen event restores
+  or raises the main window.
 - **Windows and Linux:** paths on the command line are positional arguments (`AppArguments` gains them); a second
   `Jasper.exe file.txt` hands off OPEN_PATHS. On Windows the launch still passes its foreground right
   (`WindowsForeground.allow`) before handing off.
