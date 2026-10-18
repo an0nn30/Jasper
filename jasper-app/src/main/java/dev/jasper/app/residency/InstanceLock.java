@@ -101,12 +101,15 @@ public final class InstanceLock implements AutoCloseable {
 
     /**
      * Releases the lock and removes the process id beside it: tests and {@code start}'s own rollback; an owner keeps it
-     * until its process ends. Idempotent.
+     * until its process ends. Idempotent. It runs under the monitor {@link #tryAcquire} holds, so an ask never sees the
+     * lock gone from this process's held set while the file is still locked.
      */
     @Override public void close() {
-        if (!HELD.remove(this)) return;
-        try { Files.deleteIfExists(pidFile(file)); } catch (IOException ignored) { }
-        try { lock.release(); } catch (IOException ignored) { }
-        try { channel.close(); } catch (IOException ignored) { }
+        synchronized (InstanceLock.class) {
+            if (!HELD.remove(this)) return;
+            try { Files.deleteIfExists(pidFile(file)); } catch (IOException ignored) { }
+            try { lock.release(); } catch (IOException ignored) { }
+            try { channel.close(); } catch (IOException ignored) { }
+        }
     }
 }
