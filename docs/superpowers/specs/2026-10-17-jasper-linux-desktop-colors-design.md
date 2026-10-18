@@ -1,7 +1,7 @@
 # Linux Desktop colors
 
-Status: **Draft for written-spec review, 2026-10-17.** The user approved the behavior described below;
-implementation planning follows approval of this written specification.
+Status: **Approved for implementation planning, 2026-10-17.** The user approved this written specification.
+[Implementation plan](../plans/2026-10-17-jasper-linux-desktop-colors.md) is drafted for review; implementation has not started.
 
 This extends the current [theme import design](2026-10-13-jasper-theme-import-design.md) and
 [theme engine](2026-10-04-jasper-theme-engine-design.md). It uses the current `ui.appearance`,
