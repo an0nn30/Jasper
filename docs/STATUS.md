@@ -55,7 +55,10 @@ Tunnels' chain link, File Servers' server rack, Event Log's bell, Transfers' arr
 "About Sample" in the label's colour; closed, hovered and open labels; switching Light and Dark with the stripes
 showing; dragging a label within a stripe, to the other stripe and between a side stripe and the bottom strip (the
 label keeps its icon, the gap fits it, the ghost is the icon); Event Log's count pill after its bell; a short window
-cutting off labels; the About page's IntelliJ icons entry; the default look's rails unchanged. Not merged, not pushed.
+cutting off labels; the About page's IntelliJ icons entry; the default look's rails unchanged. Merged with local `main`'s
+splash fix (`64ead2e34`) and then to local `main`, not pushed: `./gradlew check --continue` on the merged tree gives
+**11,514 tests, 0 failures, 0 errors, 25 skipped**. Its first run timed out once in `StagedTransferLifecycleTest` and
+failed a `@TempDir` clean-up in `StartupStepsApplicationTest`; both passed three runs alone and the second full run.
 
 **The boot splash no longer flashes on Windows and Linux — 2026-10-19** (`claude/splash-no-flash`, worktree
 `.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; merged to local `main`, not pushed). Each start-up step repainted the
