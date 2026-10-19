@@ -345,7 +345,7 @@ produces no notifications and no cards at all — Jasper cannot know how long an
 no fallback guess.
 
 When a command that ran at least `long_command_seconds` finishes anywhere except the pane you were
-typing in (a visible but unfocused split pane included), Jasper posts a notification in **Long-running
+typing in (a visible tab in another group included), Jasper posts a notification in **Long-running
 commands**: the command as its title, and "Finished in 2m 03s" or "Exited 1 · 2m 03s" below it. While
 Jasper is focused it shows as a card in the pane's window; otherwise it waits, unread, in the
 Notifications panel. Clicking the card focuses the pane (a row in the panel has no click of its own),
@@ -503,7 +503,7 @@ The bundled Editor reads `plugins/dev.jasper.editor/dev.jasper.editor.toml` (see
 
 ### Live settings and temporary choices
 
-Live changes reach existing windows and terminals, including hidden tabs, zoomed-out sibling panes and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
+Live changes reach existing windows and terminals, including hidden tabs, groups hidden behind a maximized group and pending shell launches when their views become ready. Shells continue running, with their terminal content and find controls retained. Normal terminal resize/reflow behavior still applies when layout or font metrics change.
 
 View menu choices save: Toolbar and Status Bar write `window.toolbar` and `window.status_bar` to `config.toml`, and every window follows. Choose themes in Settings › Appearance and tab, rail, toolbar and status bar sizes in Settings › Window. The command palette’s Window Settings… command opens the Window page. If `config.toml` has errors, a View choice is refused with a message and nothing changes. Per-pane font sizes (Cmd+= and Cmd+-) and the command palette’s Show/Hide Jasper stay temporary. Changing font family, fallback, ligatures, line height or terminal behavior preserves each pane's manually adjusted size when the saved `terminal.font.size` is unchanged. Changing saved `terminal.font.size` applies it to all retained panes. New panes and Font reset use the saved size.
 
@@ -531,8 +531,8 @@ configured arguments, with no implicit login flag. When `profile` is empty, a no
 platform default and shows a warning with the configuration problems in the status bar. Until the startup detection
 finishes, a WSL or PowerShell 7 profile cannot be checked yet: a pane that starts one then waits for detection (at
 most 12 seconds, showing "Starting terminal…") and starts the platform default with that warning if the profile is
-missing; the warning also appears as soon as detection finds the configured profile missing. A split starts the profile of
-the pane it splits; New Tab starts the configured one. Jasper does not split strings, expand shell expressions or
+missing; the warning also appears as soon as detection finds the configured profile missing. A split beside a running terminal starts
+that terminal's profile; any other split, and New Tab, start the configured one. Jasper does not split strings, expand shell expressions or
 parse a shell command line.
 
 A WSL tab runs `wsl.exe -d <name> --cd <directory>` and is named after the distribution. The terminal process starts
@@ -577,7 +577,7 @@ Environment entries overlay the inherited child environment and the variables pl
 - `"close_on_success"` closes the pane only after a normal exit with code 0. Nonzero or abnormal exits retain the output.
 - `"close"` closes the pane after any process exit, including nonzero or abnormal exits.
 
-Only the exited pane closes. Its tab closes when its final pane closes, and its window closes when its final tab closes. Sibling panes and tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and remove the failed pane. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
+Only the exited pane's tab closes, and its window closes when its final tab closes. Other tabs keep running. Reloading this setting applies to future exit deliveries in existing, new and pending panes; it never closes output already retained after an earlier exit. It does not change fonts, palettes or sessions. Launch failures continue to show an error and close the failed tab. A tab that runs a program, such as the [default editor](editor.md#default-editor) or one a plugin opens with `LocalSpec.command`, closes after a code 0 exit and keeps its output otherwise, whatever this setting says.
 
 To opt into closing successful exits, add or edit this setting in the existing `[terminal]` table:
 
@@ -678,7 +678,7 @@ View › View Modes › Zen toggles a workspace-focused view in the current wind
 tool windows and their rails. The command palette field, toolbar icons, workspace tabs and native window/menu
 controls remain available; the toolbar keeps its selected style. A tool window opened in Zen (by its shortcut,
 View › Tool Windows, the palette or a plugin command) shows in its usual place, without the rails. Toggle Zen again
-to restore your layout: the tool windows opened in Zen close and the ones that showed before return; pane zoom
+to restore your layout: the tool windows opened in Zen close and the ones that showed before return; Maximize Group
 works independently.
 Zen is independent of Appearance's Normal/Compact setting: Compact keeps its native title bar, hidden header
 and floating command palette when Zen is toggled.

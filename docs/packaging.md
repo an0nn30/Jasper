@@ -329,7 +329,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm vim and htop behavior.
 - [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
 - [ ] Confirm Option-as-Meta and terminal resizing during streaming output.
-- [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
+- [ ] Confirm split into groups, close, maximize, group navigation, search, and prompt navigation.
 - [ ] Confirm links, working-directory status, config live reload, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Connect a Remote SSH host by Vault key, by agent and on a LAN address; the first LAN connection shows the Local Network prompt, and after allowing it the host connects.
@@ -367,7 +367,7 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm tmux mouse input including right-click and pane drag resizing.
 - [ ] Confirm vim and htop behavior.
 - [ ] Confirm ligatures, Nerd Font icons, emoji, CJK, and truecolor rendering.
-- [ ] Confirm split, close, zoom, pane navigation, search, and prompt navigation.
+- [ ] Confirm split into groups, close, maximize, group navigation, search, and prompt navigation.
 - [ ] Confirm links, working-directory status, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.

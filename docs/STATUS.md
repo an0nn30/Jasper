@@ -1,5 +1,108 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 3a: the tab registry and the workspace view — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `f623a24bc..ea571cec8` (Tasks 1 to 6 and their fix rounds), then this documentation
+commit; [plan](superpowers/plans/2026-10-17-workspace-3a-tab-registry.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Every tab of every window is a
+`contributions.Tab` in the application's `TabRegistry`, which absorbs `ContentRegistry`, `ContentEntry` and
+`ContentHost` and keeps the per-plugin close guards and batched approval; a tab holds a `TabContent`, either
+`workspace.TerminalContent` (one terminal pane and its `TabState`) or a plugin's `HostedContent`. Each window renders
+plan 2's `Layout` in a `WorkspaceView`: `SplitContainer`s with draggable dividers (a tenth of the split on each side,
+weights written to the layout on release) over `GroupView`s, each an always-visible `TabStrip` (the equal or the classic
+tabs, shown active for the active group of the active window) over its selected tab, reporting its strip and card
+rectangles for plan 5. Focus going into a tab (a pane, or a plugin's view through a window-level focus listener) makes
+it the active tab without moving focus again. `TabHost` wires a terminal tab to its window and again after
+`TabRegistry.move(Tab, UUID)`, which keeps its session and ends a maximize on both sides (`Tab.moving()`); a tab that
+moves or is reordered takes its place in a strip without motion. Cmd+D and Cmd+Shift+D open a terminal tab in a new
+group to the right or below, in a running active terminal's directory with its profile, otherwise (beside a plugin's
+view or an ended shell) where a new tab starts with the default profile; `close_tab` (⌘W / Ctrl+Shift+W) absorbs
+`close_pane`; `close_group` (⌥⌘W / Ctrl+Alt+Shift+W) is new; `maximize_group` and `focus_group_*` replace `zoom_pane`
+and `focus_pane_*`; Next, Previous and Select Tab act in the active group; `terminal.dim_inactive_panes` dims terminal
+tabs outside the active group. The tab menu reads Rename Tab, Open in Separate Window or Move to Main Window, Close Tab,
+Close Others, Close Group, then the content's commands. `TerminalTab`, `SplitTree`, `TerminalDeck`,
+`terminals.SplitAxis` and jasper-ui's `DesignMetrics.Role.TAB_REVEAL_INSET` are gone; the terminal registry splits into
+new groups (`PaneEntry.split` takes `layout.Side`). Rulings (plan, "Rulings"): (1) the registry lives in `contributions`
+(`TabRegistry`, `Tab`, `TabContent`, `HostedContent`, `WorkspaceHost`) with an edge to `layout`, and
+`workspace.TerminalContent` is the second `TabContent`; (2) placeholder content is plan 6's, `Tab.Kind` is `TERMINAL`
+and `HOSTED`; (3) a window starts on a registry of its own and joins the application's, with its tabs, when
+`connectContributions` hosts content (`TabRegistry.adopt`), and the warm-up rehearsal never joins; (4) terminal tabs
+have no close guard and close at once, hosted tabs keep per-plugin approval, `inWindow` lists every tab for the
+window-close approval and `hosted()` the plugin tabs Quit asks; (5) `TabRegistry.add(TabId, Kind, TabContent, UUID)`
+registers a tab its window places itself, and `open` and `move` attach through `WorkspaceHost.attach` to the active
+group; (6) a strip drives one group (`WorkspaceChrome.tabs(GroupView)`) and shows active while its window and group are;
+(7) strips always show: the equal tabs lose their one-tab hiding and reveal, and `TAB_REVEAL_INSET` goes with its two
+frozen catalog rows; (8) a terminal tab is active while it is its window's active tab and the window is, so dimming
+covers every terminal tab outside the active group; (9) a divider drag moves the boundary between its neighbours, each
+keeping a tenth of the split, writes the weights on release and cannot be moved by a theme change; (10) the view
+rebuilds its splits only when the shape changes, otherwise it pushes weights and moves tab components, and the active
+tab takes focus when it or the shape changed; (11) Split Right and Down are enabled whenever the window can open a tab,
+beside a running terminal the new tab starts in its directory with its profile, otherwise with the default profile; (12)
+New Tab, Next, Previous and Select Tab act in the active group and reordering keeps the selection; (13) the tab menu
+reads Rename Tab, Open in Separate Window or Move to Main Window, Close Tab, Close Others, Close Group, then the
+content's commands; (14) Close Others and Close Group ask the hosted tabs' guards as one batch and a refusal closes
+nothing; (15) the Pane menu keeps its slot until plan 3b; (16) Maximize Group needs two or more groups and its palette
+titles read Maximize Group and Restore Group; (17) a moved tab keeps its content and session, announced as `TabClosed`
+then `TabOpened`, and each window ends its maximize; (18) the activity's "go to" selects through the registry
+(`Tab.select()`) and follows a moved tab; (19) the terminal registry keeps `TabEntry`'s pane list for terminal tabs, and
+`PaneEntry.split` takes `Side`; (20) `TabState` stays the terminal tab's naming state, owned by `TerminalContent` with
+`renamed()`; (21) the move test runs `IdleTerminalSession`; (22) the benchmark alternates Split Right and Down on the
+active group; (23) a group view reports its strip's and card area's rectangles; (24) new files take ledger rows
+`nonvisual-helper,none,none`; (25) the keymap page's Panes category becomes Groups, the toolbar button reads "Maximize
+group" and the old names stay as palette keywords; (26) focus going into a tab makes it the active tab without moving
+focus again; (27) the equal tabs move only for a tab that opens or closes, never for one that moves or reorders; (28) a
+terminal tab whose attach fails is closed again; (29) `WorkspaceView.model()`, `moveTab`, `resizeSplit` and
+`GroupView.display` avoid AWT's method names; (30) what the rewrite leaves without a caller goes. Deviations from the
+plan text made while executing it, each ruled by the controller: (a) Task 2:
+`SplitContainerTest.aDividerDragMovesItsBoundaryAndReportsTheWeightsOnRelease` releases at the divider-relative `2, 50`,
+and Task 3's `WorkspaceViewTest.aDividerDragWritesTheLayoutsWeights` at `2`, because AWT delivers a release relative to
+the divider where it now is (the verbatim release was a second move); (b) Task 2's review round changed
+`SplitContainer`: a press and release, or a drag back to its start, reports no weights (the plan's exact comparison
+reported about 60% of non-dyadic weights), and a boundary clamps to `[min(least, start[i]), pair - min(least,
+start[i+1])]` instead of a plain tenth, so a press never snaps one and a divider whose pair is under a fifth stays
+draggable (it can grow a narrow side, never shrink one further; Rulings 9's `narrow` case changed with it, and two
+adjacent columns both under a tenth cannot trade space directly, they widen through their other dividers);
+`SplitContainerTest` has 10 tests, not 7; (c) Task 3 Step 6 also ports `TerminalTabTest`'s `reorderTab(0, 1)` to
+`workspace().activeGroupView().reorder(...)`, since Task 3 deletes `reorderTab` and Task 5 replaces the file; (d) Task
+3's `WindowPanelsTest.theStripesAndSidePanelsReachTheToolbarAndTheBottomSpansStripeToStripe` takes `deck` as the
+selected tab's component after the `tabStrip()` to `workspace()` port, because the workspace now holds the strip
+(assertions unchanged), and `WindowTabs.capped` and `WindowContent.tabTitle` keep the Java escapes of the ellipsis and
+the bullet where the plan text carries the characters; (e) Task 3's fix round: `Tab.dispose` isolates its listeners (the
+first failure is rethrown, later ones suppressed) and always disposes its content, `TabRegistry.remove` always detaches,
+the `addHost` unregister removes every tab before it forgets the host, and `WindowContent.close` guards its registry
+leave, so a throwing listener never leaks a session or a window; five tests (`WorkspaceViewTest` has 10, not 8); (f)
+Task 4's `TabRegistryTest` insertion anchor was re-found, since the fix round had changed the end of the class; (g) Task
+5, D1: `workspaceChanged` tells the palette only when the selected tab changed, as the old deck did, because the plan's
+Task 3 code and Task 5 test contradicted each other (the palette stays open across a maximize); (h) Task 5, D2: a closed
+`TerminalContent` reports no pane to the terminal registry, so `ActivePaneChanged(empty)` precedes `WindowClosed` as
+before; (i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
+registry hears `PaneOpened` before the activity's OPENED, and a failure ends in `PaneClosed`, `TabClosed` and a CLOSED
+for every OPENED, with `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` (11 tests, not 10); (j) Task 5's
+mechanical test ports beyond the brief: `WorkspaceViewTest.shellOf` reads `.pane().session()`, `WindowCommandsTest`
+expects the split commands while a pane is pending (Rulings 11), `ConfigurationControllerTest` counts four tabs, not
+three (a split is a tab); (k) `ContentRegistryTest` has 10 cases, not 11, so `TabRegistryTest` has 13 after Task 1, 15
+after Task 3 and 16 after Task 4 as planned, and 19 as built (the fix round's three tests), and Task 1 touched 22 test
+files, not 21; `LayoutGeometryTest`'s class Javadoc loses only "today's" and keeps its citations of the deleted
+`SplitTreeTest`; `Layout.unmaximize`'s Javadoc keeps "plans 4 and 5 call it"; (l) Task 7 also rewords
+`docs/app-architecture.md` and `docs/app-maintenance.md`, which named the removed `WindowContent.configurePane`, to
+`TabHost.configure`, and leaves `TAB_REVEAL_INSET` in the dated history of `docs/STATUS.md`,
+`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`. Every other anchor and all
+other code and test text were applied as written. Left for plan 3b (the SDK break): `TabEntry` gains a kind and loses
+its pane list, `WindowEntry` lists every tab, `TabHandle.kind()`/`terminal()` replace `panes()`/`activePane()`,
+`WindowHandle.tabs()` lists every tab, TAB events cover every content and gain `TAB_MOVED`, `StandardMenu.PANE` and
+`MenuTarget.Slot.PANE` fold into Tab; the test-side fake still splits within a tab: `TerminalFixture` adds a split's
+pane to the same tab and `PluginContractTest.openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane` asserts
+`split.tab().id()` is the old tab, so `AppContractTest` never exercises the new split behaviour. Left for plan 4: an
+operating-system notification's click raises the window its command finished in, captured when `JasperApplication`
+composed that window, before the activity's "go to" follows a moved tab; resolve that window at click time once tabs
+move between windows. `./gradlew check --continue`: BUILD SUCCESSFUL, **11,599 tests, 0 failures, 0 errors, 25 skipped**
+(from the XML in `*/build/test-results/test/`; `jasper-app` 3,662, `SplitContainerTest` 10, `WorkspaceViewTest` 10,
+`TabRegistryTest` 19, `TabMoveTest` 6, `WorkspaceTabsTest` 11, `TabMenuTest` 5, `KeymapDefaultsTest` 4). GUI checks for
+the user: each group's strip in the equal and the classic tabs and its active state across windows; clicking into
+another group's terminal or plugin view (it becomes active, Cmd+W closes it); Cmd+D, Cmd+Shift+D (also beside a plugin
+view), dragging a divider and a theme change with splits; Maximize Group and Focus Group; dimming; the tab menu, and
+Close Group over a modified Editor tab (one prompt); a translucent workspace with groups; Open in Separate Window. Not
+merged, not pushed.
+
 **Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), the documentation commit
 `5d2cd4ed1` and the final-review fixes; [plan](superpowers/plans/2026-10-17-workspace-2-layout-model.md),

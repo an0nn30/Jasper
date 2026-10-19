@@ -415,8 +415,8 @@ batch flag for window close, quit and restart. Repeated tab-close requests share
 result; final `close` is reserved for shutdown and disposes exactly once without prompting.
 Closed handles cannot reattach or take focus.
 
-The application translates SDK values to `contributions.ContentRegistry`/`ContentEntry`.
-`WindowContent` hosts both terminal and plugin components; `WindowTabs` and
+The application translates SDK values to `contributions.TabRegistry`/`Tab`.
+`WindowContent` hosts both terminal and plugin components; its `WorkspaceView` and
 `ToolWindowArea` remain the single renderer. Separate document windows reuse those same
 owners without starting a shell. Terminal enumeration and active-pane APIs continue to
 report terminal content only. Plugins must tolerate an empty active pane while editing.

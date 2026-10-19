@@ -68,7 +68,7 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 
 ## Saved, live and session-only settings
 
-Start with [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java) and [WorkspaceConfiguration](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceConfiguration.java). Every new field starts in [CoreSettings](../jasper-app/src/main/java/dev/jasper/app/config/CoreSettings.java): declare a `Setting` (key, kind, default, label, description, keywords, when it applies) and add it to `SCHEMA` in template order. Place it on a page in `settingsui.CorePages` (a test checks every setting appears on exactly one page). Then add the `ConfigSnapshot` component, its builder/toBuilder copying and its line in `ConfigSnapshot.from`; a row in the key table of `docs/configuration.md` and a line in the root `config.example.toml` (both are checked against the schema); comparison against the previous saved value in the responsible live owner (WorkspaceConfiguration for view/workspace fields, ThemeController for appearance, JasperApplication for app policy); and, for new-session-only values, LaunchSettings capture and SessionLaunchOptions construction. The loader, the generated template and saving need no per-field code. To rename a key, give the setting an `alias` for the old one: old files keep working with a warning, and Migrate Config moves it. Update reload tests and docs. A View menu choice for a saved field saves it (WindowContent.choose); only per-pane font sizes and Show/Hide Jasper stay session-only, and an unchanged saved font size must preserve a pane's size. Check WindowContent.configurePane for pending-session attachment as well as existing views. Shell, environment, integration and scrollback are captured per launch; columns/lines are captured once per window in JasperApplication.windowLauncher. See the architecture guide for this distinction.
+Start with [ConfigSnapshot](../jasper-app/src/main/java/dev/jasper/app/config/ConfigSnapshot.java) and [WorkspaceConfiguration](../jasper-app/src/main/java/dev/jasper/app/workspace/WorkspaceConfiguration.java). Every new field starts in [CoreSettings](../jasper-app/src/main/java/dev/jasper/app/config/CoreSettings.java): declare a `Setting` (key, kind, default, label, description, keywords, when it applies) and add it to `SCHEMA` in template order. Place it on a page in `settingsui.CorePages` (a test checks every setting appears on exactly one page). Then add the `ConfigSnapshot` component, its builder/toBuilder copying and its line in `ConfigSnapshot.from`; a row in the key table of `docs/configuration.md` and a line in the root `config.example.toml` (both are checked against the schema); comparison against the previous saved value in the responsible live owner (WorkspaceConfiguration for view/workspace fields, ThemeController for appearance, JasperApplication for app policy); and, for new-session-only values, LaunchSettings capture and SessionLaunchOptions construction. The loader, the generated template and saving need no per-field code. To rename a key, give the setting an `alias` for the old one: old files keep working with a warning, and Migrate Config moves it. Update reload tests and docs. A View menu choice for a saved field saves it (WindowContent.choose); only per-pane font sizes and Show/Hide Jasper stay session-only, and an unchanged saved font size must preserve a pane's size. Check TabHost.configure for pending-session attachment as well as existing views. Shell, environment, integration and scrollback are captured per launch; columns/lines are captured once per window in JasperApplication.windowLauncher. See the architecture guide for this distinction.
 
 <!-- example:settings -->
 ```java
@@ -267,7 +267,7 @@ failure leaves an opaque window.
   `-Djasper.glassLibrary`; a packaged app loads it from `Contents/app/`.
 - **Painting**: the window peer is the only non-opaque ancestor. `ToolWindowArea`'s center host fills its rounded
   surface with the terminal background at the opacity in effect (`Src`), so a strip no pane covers is glass too;
-  `TerminalDeck`, `TerminalTab` and its `PaneSplit`s paint nothing except solid dividers; `TerminalPane` and
+  `WorkspaceView`, its `SplitContainer`s and the groups' card areas paint nothing except solid dividers; `TerminalPane` and
   `TerminalView` fill the default background with alpha using the `Src` composite, replacing the host's fill. Anything
   new inside the terminal surface must either be opaque on purpose or follow `applyBackgroundOpacity`.
 - **Plugins** learn the opacity through `Appearance.workspaceOpacity(Component)` (SDK 0.14.1). The answer comes from
@@ -641,7 +641,7 @@ coverage, while kit control tests cover their owned rounded selections.
 Workspace boundaries use continuous chrome instead of painted rules: rail, toolbar,
 workspace title bar and status bar have no edge strokes. The equal-width tab strip uses
 vertical separators and a subtle bottom rule. Dock dividers paint nothing, so no UI
-update can give them a border or grip; terminal-internal splits keep their existing visible indicators. Auxiliary title rows follow the
+update can give them a border or grip; the workspace's group splits keep their visible dividers. Auxiliary title rows follow the
 2026-10-10 references through `MacTitleBar.Style` and the kit's title metrics: a window (`WINDOW`, the Vault
 manager, the file chooser) has a 45-logical row above a hairline with the title and controls on its middle; a dialog
 (`DIALOG`) has a 30-logical band in the dialog surface with no rule, its title and controls centred 21 down (the
@@ -679,8 +679,8 @@ dedicated connections, OS support and failure limits still apply. `PathBreadcrum
 saves light/dark local/remote/narrow previews under `build/render-preview`.
 
 
-Workspace tabs use centered text and equal-width cells, hiding the rail when only one tab
-remains. `WindowTabs` derives selected/inactive surfaces from the workspace palette while
+Workspace tabs use centered text and equal-width cells; each group's strip shows even with
+one tab. `WindowTabs` derives selected/inactive surfaces from the workspace palette while
 preserving glass alpha. Child repaints start at the strip to reconstruct translucent pixels
 once. Width animations interpolate the sampled Alacritty reference; resize/reorder/animation
 disable settle, and closed content is released before its empty gap contracts. See the

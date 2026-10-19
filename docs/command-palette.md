@@ -72,7 +72,7 @@ and Linux, `cmd` continues to mean Ctrl+Shift; use literal `ctrl+k` to bind the
 palette to Ctrl+K.
 
 Settings opens the existing configuration file in the [default editor](editor.md#default-editor). Split Right
-creates side-by-side panes; Split Down creates vertically stacked panes.
+opens a terminal tab in a new group to the right; Split Down opens one in a new group below.
 
 To keep Cmd+K for Clear Scrollback on macOS and open the palette with Cmd+P:
 

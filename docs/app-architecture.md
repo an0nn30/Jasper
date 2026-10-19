@@ -150,7 +150,7 @@ environment and integration mode are captured by `LaunchSettings` for each launc
 The initial grid is captured once per window by `JasperApplication.windowLauncher`; a later
 saved grid change applies to new windows. Scrollback capacity belongs to the session and
 is not resized by applying view options. A pending pane receives the latest live view
-configuration in `WindowContent.configurePane` when its session arrives.
+configuration in `TabHost.configure` when its session arrives.
 
 ThemeController publishes resolved values; platform title bars receive components and
 callbacks. Application-level Buddy enablement, snippet reload and login-item reconciliation
@@ -163,7 +163,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows, their workspaces of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `layout` | Pure workspace layout model: tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes it as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
@@ -171,7 +171,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `config` | Immutable values and pure parsing through CoreSettings.SCHEMA; ConfigService owns background watch/reload, the save transaction (settings, shortcuts) and Migrate Config, and marshals delivery to EDT. Application closes the service. |
 | `settingsui` | EDT Settings dialog: the shell, the draft of pending core-setting edits, schema-generated and group pages, editors and the core page tree; the application supplies the Keymap, Plugins and plugin tool pages (`CorePages.Pages`). SettingsDialog owns each opening's pages and disposes them on close. The look's `presentation.SettingsChrome` sets the frame (a native title, the collapsible navigation), Reset inline or in the row's menu, the rows the look implies and the font row's copy; every page's `PageContext` carries it with the `Composition` only the composition roots read. |
 | `settings` | Pure declarative settings machinery: setting kinds, descriptors, the schema, loaded values and the comment-preserving TomlDocument editor. No Jasper dependencies; caller chooses thread. SchemaReader reads any settings file against its schema. |
-| `contributions` | EDT model of what extensions contribute to the chrome, in app-native types. Application owns the single instance; the plugin runtime writes it and every window renders it. |
+| `contributions` | EDT model of what extensions contribute to the chrome, in app-native types, and the `TabRegistry` of every window's tabs, terminal and plugin. Application owns the single instance; the plugin runtime writes it, every window renders it and registers its tabs in it. |
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture, shell profiles (WSL distributions, PowerShell 7, Command Prompt, the login shell, Custom) and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT; the EDT-confined ShellProfileCatalog detects off EDT and is closed by the application. Receiving pane owns the session. |
 | `terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane, and the app-native session request and attempt state machine. Application owns the TerminalRegistry; each window closes its own registration. |
@@ -215,7 +215,7 @@ Javadoc and copied guide examples are normal check dependencies. See the
 
 ## Window chrome
 
-Every window has a header row and `WindowTabs` below it. `WindowHeader` (workspace) centres
+Every window has a header row above its workspace of tab groups, each with its own tab strip. `WindowHeader` (workspace) centres
 `TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
 pane, plugin, then Find/Settings groups; tooltips carry live shortcuts) against the trailing edge.
 The field is always centred on the window; the sides give way first (toolbar labels, then controls into
@@ -233,7 +233,7 @@ Windows and Linux system title bar no appearance hint (JBR has none). `Workspace
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).
 `WindowTitle` fills the look's title template. `WorkspaceChrome.of` also picks the window content: `HeaderComposition`
 (`UnifiedHeader`, or `ClassicHeader`, a toolbar row of left-packed buttons with the search field and Settings…
-trailing), `TabStrip` (`WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
+trailing), `TabStrip` (one per tab group: `WindowTabs`, or the content-sized `ClassicTabs`), `StatusCells` (`SlashSegments`, or
 `RuledCells`) and the leading "▶ Run…" item. `AuxiliaryWindows` reads the look's dialog mapping and marks the surfaces
 it makes; `NativeShells` draws a marked modal overlay or attached sheet whose window is showing in that window as a
 `ClassicDialog`. The title search field shows `WindowHeaderContext` and opens the palette, which `WindowCommandPalette`
