@@ -89,12 +89,12 @@ files = ["dev.jasper.enterprise/presentation/fonts/ibm-plex-mono-medium.ttf", "d
   "dev.jasper.enterprise/presentation/fonts/ibm-plex-sans-semibold.ttf"]
 
 [[component]]
-name = "IntelliJ Platform icons"
+name = "IntelliJ Platform icons (New UI and Classic)"
 version = ""
 license = "Apache-2.0"
 homepage = "https://github.com/JetBrains/intellij-community"
 text = "/dev/jasper/ui/icons/LICENSE.txt"
-notice = "/dev/jasper/ui/icons/NOTICE.txt"
+notice = "/dev/jasper/ui/icons/ATTRIBUTION.txt"
 
 [[component]]
 name = "JCL over SLF4J"

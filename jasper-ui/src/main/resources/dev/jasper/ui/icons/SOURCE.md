@@ -31,3 +31,14 @@ assets.tsv records source paths and SHA-256. catalog.txt and SDK BundledIcon are
 generated together. Refresh with `python3 tools/icons/fetch-intellij-icons.py`.
 The script pins tree IDs, verifies Git blob hashes, stages downloads, and only
 then replaces managed SVGs. Builds and runtime do not access the network.
+
+# IntelliJ classic artwork
+
+Fourteen SVGs under `classic/`, listed in assets-classic.tsv with their upstream paths under `platform/icons/src/`
+and SHA-256 values: `general/add`, `actions/splitVertically`, `general/settings`, `actions/moveToWindow`,
+`actions/find` and `actions/execute`, each with its dark sibling, plus `general/expandComponent` and
+`runConfigurations/application`. They come from JetBrains/intellij-community at tag `idea/2026.2.3`
+(commit `8062c061ff33e22041d9f1844db5b8b8a6b5e4d7`) and are byte-identical, each keeping its copyright comment.
+`python3 -I tools/icons/fetch-classic-icons.py` reproduces them. A file without `_dark` serves both variants.
+Chrome receivers marked `ChromeArtwork.CLASSIC` get six of them (add, split, zoom, settings, window.add and search);
+the catalog's `run` and `application` get the rest.

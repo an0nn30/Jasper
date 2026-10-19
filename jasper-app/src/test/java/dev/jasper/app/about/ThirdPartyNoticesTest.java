@@ -37,6 +37,20 @@ class ThirdPartyNoticesTest {
         assertThat(ThirdPartyNotices.read(catppuccin.text())).startsWith("MIT License\n\nCopyright (c) 2022 Catppuccin\n");
     }
 
+    /** Plan 12 Rulings 5: one component names both IntelliJ icon sets, ships the Apache text and keeps upstream's NOTICE. */
+    @Test void theIntelliJIconsComponentNamesBothSetsAndKeepsTheUpstreamNotice() {
+        var icons = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().startsWith("IntelliJ Platform icons")).toList();
+        assertThat(icons).singleElement().satisfies(c -> {
+            assertThat(c.name()).isEqualTo("IntelliJ Platform icons (New UI and Classic)");
+            assertThat(c.license()).isEqualTo("Apache-2.0");
+            assertThat(ThirdPartyNotices.read(c.text())).contains("Apache License").contains("Version 2.0, January 2004")
+                .doesNotContain("OPEN-SOURCE BUILD TERMS");
+            assertThat(ThirdPartyNotices.read(c.notice().orElseThrow()))
+                .contains("8062c061ff33e22041d9f1844db5b8b8a6b5e4d7", "60b8fbadc2f08ef18a6ecab0c138a849e14f13fb")
+                .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
+        });
+    }
+
     @Test void jaspersTextIsTheRootLicense() throws Exception {
         String root = Files.readString(ROOT.resolve("LICENSE.md"));
         assertThat(ThirdPartyNotices.read(ThirdPartyNotices.jasper("").text())).isEqualTo(root);

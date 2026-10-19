@@ -1,0 +1,13 @@
+IntelliJ Platform icons, New UI and Classic
+Copyright 2000-2026 JetBrains s.r.o. and contributors.
+Licensed under the Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+New UI icons: https://github.com/JetBrains/intellij-community at commit 60b8fbadc2f08ef18a6ecab0c138a849e14f13fb,
+files from platform/icons/src/expui/ and plugins/terminal/resources/icons/expui/.
+Classic icons: https://github.com/JetBrains/intellij-community at tag idea/2026.2.3 (commit
+8062c061ff33e22041d9f1844db5b8b8a6b5e4d7), files from platform/icons/src/.
+The files are unmodified; each keeps its JetBrains copyright notice.
+
+NOTICE (from the upstream NOTICE.txt):
+This software includes code from IntelliJ IDEA
+Copyright (C) JetBrains s.r.o.
+https://www.jetbrains.com/idea/
