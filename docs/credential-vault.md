@@ -21,7 +21,7 @@ The **+** menu adds a login, imports an SSH key, adds a secure note, or generate
 **Add Login...**, **Add SSH Key...** and **Add Secure Note...** open the manager on the same sheets, creating or unlocking the vault first.
 **File → Vault Plugin Grants...** (or the palette) opens the manager on the saved plugin grants, and **File → Change
 Vault Master Password...** asks for a new master password over it; both unlock first. Grant revocation has a **Back to
-entries** button. **Cancel** and **Okay** both close the manager; changes made in
+entries** button. The tab's close button closes the manager; changes made in
 individual editors are saved immediately and are not rolled back by closing the manager.
 The footer retains device-secret source, auto-lock setting and vault path, with full text in its
 tooltip when the window is narrow.

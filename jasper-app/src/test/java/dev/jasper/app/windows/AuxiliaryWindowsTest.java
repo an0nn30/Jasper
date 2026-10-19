@@ -155,6 +155,19 @@ class AuxiliaryWindowsTest {
         assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog("Late", true, manager));
     }
 
+    /** Headless nothing shows, so an anchor in a content tab's view owns a dialog and a modal overlay alike (plan 4b, option A). */
+    @Test void headlessAnAnchorThatDoesNotShowOwnsADialogAndAModalOverlay() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(java.awt.GraphicsEnvironment.isHeadless(), "only meaningful headless");
+        var anchor = new JLabel("in a content tab");
+        AuxiliarySurface dialog = windows.dialog("Details", true, anchor);
+        AuxiliarySurface overlay = windows.modalOverlay("Unlock", anchor);
+        assertThat(dialog.kind()).isEqualTo(AuxiliarySurface.Kind.DIALOG);
+        assertThat(dialog.anchorOwner()).containsSame(anchor);
+        assertThat(overlay.kind()).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
+        assertThat(overlay.modal()).isTrue();
+        assertThat(overlay.anchorOwner()).containsSame(anchor);
+    }
+
     @Test void reportsWhenTheLastSurfaceCloses() {
         List<String> events = new ArrayList<>();
         windows.onAllClosed = () -> events.add("empty");

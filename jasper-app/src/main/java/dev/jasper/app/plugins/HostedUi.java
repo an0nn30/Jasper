@@ -464,7 +464,7 @@ final class HostedUi {
         };
     }
 
-    /** One SDK view of an application surface: a plugin's dialog. */
+    /** One SDK view of an application surface: a plugin's dialog or overlay. */
     private class Surface implements WindowSurface {
         final AuxiliarySurface surface;
         HostedKitView mounted;

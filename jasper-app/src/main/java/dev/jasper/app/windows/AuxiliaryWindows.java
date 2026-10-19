@@ -82,8 +82,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
     public AuxiliarySurface dialog(String title, boolean modal, javax.swing.JComponent anchor) {
         for(var surface:open) if(surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor,surface.holder()))
             return dialog(title,modal,surface);
-        // Headless, nothing shows, so a content tab's anchor would always be refused; HostedAnchor.isOpen skips the same check.
-        if(!java.awt.GraphicsEnvironment.isHeadless() && !anchor.isShowing())throw new IllegalArgumentException("Anchor has no shown owner");
+        requireShown(anchor);
         var result=new AuxiliarySurface("",title,AuxiliarySurface.Kind.DIALOG,modal,new Dimension(1,1),null,null,shells);
         result.anchorOwner(anchor);return track(result);
     }
@@ -126,9 +125,14 @@ public final class AuxiliaryWindows implements AutoCloseable {
     public AuxiliarySurface modalOverlay(String title, javax.swing.JComponent anchor) {
         for (var surface : open) if (surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor, surface.holder()))
             return modalOverlay(title, surface);
-        if (!anchor.isShowing()) throw new IllegalArgumentException("Anchor has no shown owner");
+        requireShown(anchor);
         var result = new AuxiliarySurface("", title, AuxiliarySurface.Kind.OVERLAY, true, new Dimension(1, 1), null, null, shells);
         result.anchorOwner(anchor); return track(result);
+    }
+
+    /** Refuses an anchor that does not show. Headless nothing shows, so a content tab's anchor would always be refused; HostedAnchor.isOpen skips the same check. */
+    private static void requireShown(javax.swing.JComponent anchor) {
+        if (!java.awt.GraphicsEnvironment.isHeadless() && !anchor.isShowing()) throw new IllegalArgumentException("Anchor has no shown owner");
     }
 
     /** Removes terminal-owned surfaces even if they have never been shown. */

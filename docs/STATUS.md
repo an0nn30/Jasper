@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 4b: plugin windows become tabs — 2026-10-19** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `da79cae7c..4576cbecf` (Tasks 1 to 7, after the plan refresh), then this
-documentation commit; [plan](superpowers/plans/2026-10-18-workspace-4b-plugin-windows.md),
+`.claude/worktrees/workspace-tabs`, `da79cae7c..4576cbecf` (Tasks 1 to 7, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-4b-plugin-windows.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.20.0, a breaking boundary: every
 bundled manifest, the external example and every guide range declare `sdk = ">=0.20.0, <0.21"`; the Vault is 0.7.0, the
 sample 0.4.0, the Editor 0.11.0, Remote 0.14.0 and File Server 0.6.0, and every cross-plugin range still holds.
@@ -99,7 +99,20 @@ patterns miss is fixed, so `ShortcutCatalog`'s `auxiliary.close` context reads "
 `TransfersPanel`, `TransferUi` and `RemotePlugin` no longer call their panel one per window, `Panels.toggle`'s Javadoc
 and the guide say a child window's request shows the panel and brings the main window to the front, `ErrorsView`'s two
 comments name the tab, `DesignMetrics`' comment names the Errors tab, and this plan's banner replaces Task 3's
-"executing" line; the banner's "nothing else moved" was wrong, and (c) corrects it. THD Sourcing Crypto
+"executing" line; the banner's "nothing else moved" was wrong, and (c) corrects it; (i) final review: a child window's
+panel request goes through `Panels.toggle` every time, which raises the main window, where `SftpUi`, `TunnelsUi`,
+`TransfersPanels` and `FileServerPlugin` had called a built panel's `show()`, which changed it behind the child window,
+and the fake's toggle from a child window records `front|<main window>` in `openRequests()`; SFTP's host chooser and a
+Browse's follow-up belong to the explorer's window, the main one, so a requester that closes mid-connect no longer
+leaves the explorer on "Connecting…"; the Vault manager's passive Unlock asks over `tab.window()`;
+`AuxiliaryWindows.modalOverlay(String, JComponent)` shares `dialog`'s headless guard; `Tab.inMainWindow()` is gone, its
+tests reading `isMain`; `WorkspaceContentRouteTest` proves its two dropped window cases on a dialog; the SDK Javadoc
+names `ContentTab.window()`'s window that is not open, the four-argument `openTab`'s `IllegalStateException` while the
+main window closes or Jasper quits, and `WindowSurface`'s dialogs without a menu bar or saved bounds, and `HostedUi`'s
+surface comment names overlays; the sample's and the guide's sheet comment says a modal sheet keeps its tab where it is;
+`EditorWindowTest`'s close test is renamed; and Task 8's six stale phrases follow the main window
+(`PanelHost.setHeader`, the Toolbar and Status Bar choices, the badge's `ToolStripe` and toolbar views, the Vault
+manager's close button, the Editor's Cmd+W, the guide's panel heading and header callbacks). THD Sourcing Crypto
 (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18)
 stays skipped: plan 6 bumps the SDK again (restorers), so rebuild it once, after the series' last SDK bump, against the
 jars `sdkRelease` then publishes. That rebuild carries every change since 0.17.1: its `plugin.toml` (`sdk = ">=0.16.1,
@@ -115,8 +128,8 @@ selects its tab); 0.20 needs nothing more (its dialog is owned by the action's w
 closing and nulling the panel instance as `WindowContributions` does, with `AppContractTest` clearing its panel caches
 (unobservable today). Left for plan 6: `ContentSpec` restore state, `Windows.restorer` and the Editor's restorer, the
 next SDK bump, and restoring the Vault manager's tab; Jasper's own tabs (`TabRegistry.APP_OWNER`, the Errors tab) are
-never saved, so plan 6 can skip them by owner. `./gradlew check --continue`: **11,694 tests, 0 failures, 0 errors, 25
-skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,744, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+never saved, so plan 6 can skip them by owner. `./gradlew check --continue`: **11,700 tests, 0 failures, 0 errors, 25
+skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,745, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
 `jasper-plugin-editor` 4,912, `PluginContractTest` 108 on each runtime, `AnchorContractTest` 8 on each,
 `WindowManagerTest` 33, `TabRegistryTest` 33, `KitCompatibilityTest` 15, `JasperApplicationWindowsTest` 7,
 `ErrorsTabTest` 5, `ErrorsViewTest` 16, `ClassicVaultRenderTest` 5, `EditorPluginTest` 20; the build passed on its first
@@ -129,9 +142,10 @@ ground (`#F7F7F8`, the workspace's) against the mock's; Move Tab to New Window o
 sample's About tab (with the sample enabled) and its Details sheet; Show more… on an error notification opens the Errors
 tab in the main window, from a child window too, with no Done; New Editor Window from the File menu and the palette
 opens an untitled document in a child window and leaves the window it came from as it was; a tool window shortcut,
-SFTP's Open SFTP here and a tunnel's panel from a child window show the panel in the main window, and Open SFTP here
-from a child window with no SSH pane shows its host chooser (owned by the child window) in front of the raised main
-window, not behind it; Settings, About and Licenses close with Close Window and Cmd/Ctrl+W; Cmd+Q with an unsaved editor
+SFTP's Open SFTP here and a tunnel's panel from a child window show the panel in the main window; Open SFTP here twice
+from a child window: the main window comes to the front each time; Open SFTP here from a child window with no SSH pane
+shows its host chooser (owned by the main window) in front of the raised main window, not behind it; Settings, About and
+Licenses close with Close Window and Cmd/Ctrl+W; Cmd+Q with an unsaved editor
 tab in a child window asks once. Not merged, not pushed.
 
 **Workspace tabs, plan 4a: the main window and child windows — 2026-10-19** (`claude/workspace-tabs`, worktree

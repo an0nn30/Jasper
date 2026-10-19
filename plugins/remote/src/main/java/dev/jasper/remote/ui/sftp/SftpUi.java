@@ -108,15 +108,18 @@ public final class SftpUi implements AutoCloseable {
         host.onVisibility(visible->{controller.visible(visible);if(visible) activePane.apply(window).ifPresent(pane->controller.open(pane.pane(),pane.identity(),pane.directory(),false));});
         host.onClosed(()-> { if(layout==dev.jasper.remote.workstation.Layout.ROWS) releaseStrip.accept(window);cancelBrowse();if(explorer==view) explorer=null;controller.close();operations.close();panel.close(); });return panel.view();
     }
-    /** The explorer, shown; asked from any window, the panel opens in the main window. */
+    /**
+     * The explorer, shown in the main window. A child window's request always goes through the toggle, which raises the
+     * main window; the panel's own show would change it behind the child window.
+     */
     private View showView(WindowHandle window) {
-        if(explorer==null) context.panels().toggle(PANEL,window);else explorer.host().show();return explorer;
+        if(explorer==null || !window.isMain()) context.panels().toggle(PANEL,window);else explorer.host().show();return explorer;
     }
     public void show(WindowHandle window) {
         if(closed) return;var view=showView(window);if(view==null) return;
         var pane=activePane.apply(window);
         if(pane.isPresent()) { var target=pane.orElseThrow();view.controller().open(target.pane(),target.identity(),target.directory(),true); }
-        else if(view.controller().capture().isEmpty()) chooseHost(window);
+        else if(view.controller().capture().isEmpty()) chooseHost(view.host().window());
     }
     public void show(WindowHandle window,PaneTarget pane) {
         if(closed)return;var view=showView(window);if(view!=null)view.controller().open(pane.pane(),pane.identity(),pane.directory(),true);
@@ -127,9 +130,11 @@ public final class SftpUi implements AutoCloseable {
     /** Shows the SFTP sidebar without choosing a host. */
     public void reveal(WindowHandle window) { if(!closed) showView(window); }
     public void browse(WindowHandle window,RemoteHost host) {
-        if(closed) return;var view=showView(window);if(view==null) return;view.panel().busy(true,"Connecting…");
+        if(closed) return;var view=showView(window);if(view==null) return;var owner=view.host().window();view.panel().busy(true,"Connecting…");
         cancelBrowse();var request=connections.resolveIdentity(host.id(),window);browsing=request;
-        request.whenComplete((identity,error)->ui.execute(()-> { if(closed || !window.isOpen() || browsing!=request) return;browsing=null;if(error!=null) view.panel().error(message(error));else view.controller().open(host.id(),identity,"",true); }));
+        // The follow-up is the explorer's, in the main window: a requester that closed meanwhile ended the attempt.
+        request.whenComplete((identity,error)->ui.execute(()-> { if(closed || !owner.isOpen() || browsing!=request) return;browsing=null;
+            if(error!=null) view.panel().error(window.isOpen()?message(error):"");else view.controller().open(host.id(),identity,"",true); }));
     }
     private void cancelBrowse() { var request=browsing;browsing=null;if(request!=null) request.cancel(true); }
     public void pane(WindowHandle window,PaneTarget pane) { cancelBrowse();if(explorer!=null) explorer.controller().open(pane.pane(),pane.identity(),pane.directory(),false); }

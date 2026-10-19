@@ -131,11 +131,11 @@ class TabRegistryTest {
         registry.addHost(new WorkspaceHost(other, mounted::add, mounted::remove, tab -> {}, () -> {}));
         var tab = registry.open("plugin.file", "one", "One", null, new JPanel());
         assertThat(tab.window()).as("a view without a window goes to the main window").isEqualTo(main);
-        assertThat(tab.inMainWindow()).isTrue();
+        assertThat(registry.isMain(tab.window())).isTrue();
         tab.moveToNewWindow();
         assertThat(tab.window()).isEqualTo(main);
         registry.move(tab, other);
-        assertThat(tab.inMainWindow()).isFalse();
+        assertThat(registry.isMain(tab.window())).isFalse();
         tab.moveToMainWindow();
         assertThat(tab.window()).isEqualTo(main);
     }

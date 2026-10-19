@@ -40,7 +40,6 @@ public final class VaultManagerTab implements AutoCloseable {
     private final Layout layout;
     private final CopyCards copies;
     private ContentTab tab;
-    private WindowHandle owner;
     private UnlockPrompt unlockPrompt;
     ManagerPanel panel;
     PasswordPanel passwordPanel;
@@ -63,11 +62,11 @@ public final class VaultManagerTab implements AutoCloseable {
     public UiKit kit() { return context.kit(); }
     /** Opens the manager as a tab in {@code owner}'s window, or selects the open one, with {@code selection} selected. */
     public void show(WindowHandle owner, Optional<UUID> selection) {
-        this.owner = owner;
         if (tab == null) {
+            // The passive Unlock asks over the window that holds the tab, wherever it has moved.
             var shown = new ManagerPanel(context.kit(), layout, manager::entry, this::add, this::edit, this::delete, this::copyPublic,
                 grant -> report("Could not revoke the grant", manager.revoke(grant)), generate, lock::lock,
-                () -> service.requestUnlock(this.owner));
+                () -> { if (tab != null) service.requestUnlock(tab.window()); });
             shown.copies(copies);
             panel = shown;
             tab = context.windows().openTab(new ContentSpec(KEY, "Credential Vault"), owner, shown.view());

@@ -434,8 +434,10 @@ final class FakeUi {
             Panel panel = panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
             if (!window.isOpen()) return;
-            // Panels live in the main window (workspace tabs spec 14): a child window's toggle shows the panel there, as
-            // the application's does (workspace plan 4a's final review); the main window's toggles it.
+            // Panels live in the main window (workspace tabs spec 14): a child window's toggle raises the main window and
+            // shows the panel there, as the application's does (workspace plan 4a's final review); the main window's
+            // toggles it.
+            if (!window.isMain()) host.workspace.main().ifPresent(main -> host.workspace.openRequests.add("front|" + main.id));
             if (panel.instance == null) openPanel(panelId);
             else if (!window.isMain()) panel.instance.show();
             else panel.instance.setVisible(!panel.instance.visible());

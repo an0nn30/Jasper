@@ -188,7 +188,7 @@ lifetime on its owned view. Ordinary controls must remain descriptors.
 [Building plugin UI](plugin-ui.md) walks through the compositions (grouped dialogs, docked panels, empty
 states, settings pages), icons, colors for specialized content and testing, with compiled examples.
 
-## Panels, the rail and windows
+## Panels, the rail and plugin dialogs
 
 A panel is an owned `UiView` docked as a tool window in the main window, as in IntelliJ:
 stripes of icons on the window's left and right edges, and six slots. The left and right sides each
@@ -212,7 +212,7 @@ tells it nothing.
 Since SDK 0.14.2, call `host.setHeader(new PanelHeader(detail, active, actions))` inside the panel
 factory or when its model changes. `detail` is a count or connection name; `active` adds a status dot.
 Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
-and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
+and tooltip. Keep callbacks scoped to that panel instance. Header state survives hiding and moving
 the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
 registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
 do not add a duplicate action row inside the panel. Declare `sdk = ">=0.20.0, <0.21"` when using it.
@@ -248,7 +248,7 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
             "This tab's strip and window belong to Jasper; its content to the plugin.",
             List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
             if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
-            // The tab owns the sheet, which follows it to whichever window holds it.
+            // The tab owns the modal sheet, which opens over the tab's window; the tab cannot move until the sheet closes.
             PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", about[0], true));
             // A sheet's canonical body: a form card of label/value rows, then the one primary action.
             var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,

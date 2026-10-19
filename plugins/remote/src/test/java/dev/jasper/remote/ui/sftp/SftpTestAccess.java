@@ -68,6 +68,9 @@ public final class SftpTestAccess {
         });
     }
 
+    /** The host chooser's Browse button, which browses the host it has selected (the first saved host at first). */
+    public static void browse(UiView chooser) throws Exception { Kits.edt(() -> Kits.click(chooser, HostChooser.BROWSE)); }
+
     /** The Upload button's menu item with this label, which acts on the selection. */
     public static void menu(SftpPanel panel, String label) throws Exception {
         Kits.edt(() -> {

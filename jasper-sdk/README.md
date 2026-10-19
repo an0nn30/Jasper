@@ -221,7 +221,7 @@ outside a translucent window. Plugins that use it declare `sdk = ">=0.20.0, <0.2
 
 ## Panel headers (SDK 0.14.2)
 
-`PanelHost.setHeader(new PanelHeader(detail, active, actions))` publishes per-window metadata beside
+`PanelHost.setHeader(new PanelHeader(detail, active, actions))` publishes metadata beside
 its title and icon-only actions before the host's options/hide controls. Use a count or connection
 name for `detail`; `active` adds a connected status dot. Each `PanelHeader.Action` carries an
 accessible label, icon and UI-thread callback. Header updates work while the panel is hidden;

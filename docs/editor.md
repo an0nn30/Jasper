@@ -50,7 +50,7 @@ indentation and Wrap (click to toggle soft wrap for the tab).
 | ⌥⌘S / Ctrl+Alt+S | Save All |
 | ⌘O / Ctrl+O | Open… |
 | ⌘N / Ctrl+N | New File |
-| ⌘W / Ctrl+W | Close Tab; with no tabs, close the window |
+| ⌘W / Ctrl+W | Close Tab; a child window closes with its last tab |
 | ⌘F / Ctrl+F, ⌥⌘F / Ctrl+Alt+F | Find, Replace |
 | ⌘G / Ctrl+G, ⇧⌘G / Ctrl+Shift+G | Next, previous match |
 | ⌘L / Ctrl+L | Go to Line |

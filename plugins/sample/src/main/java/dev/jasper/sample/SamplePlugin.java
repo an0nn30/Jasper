@@ -130,7 +130,7 @@ public final class SamplePlugin implements Plugin {
                 "This tab's strip and window belong to Jasper; its content to the plugin.",
                 List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
                 if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
-                // The tab owns the sheet, which follows it to whichever window holds it.
+                // The tab owns the modal sheet, which opens over the tab's window; the tab cannot move until the sheet closes.
                 PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", about[0], true));
                 // A sheet's canonical body: a form card of label/value rows, then the one primary action.
                 var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,

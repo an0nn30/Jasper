@@ -203,7 +203,7 @@ class EditorWindowTest {
         assertThat(window.headerTitle(0)).isEqualTo("config.toml");
     }
 
-    @Test void theCloseCommandClosesTabsFirstAskingAboutUnsavedOnesThenTheWindow() throws Exception {
+    @Test void closingEachTabAsksAboutUnsavedChangesAndTheLastLeavesTheEditorEmpty() throws Exception {
         opened(file("a.toml", "a = 1\n"));
         EditorTab second = opened(file("b.toml", "b = 1\n"));
         second.area().setText("b = 2\n");

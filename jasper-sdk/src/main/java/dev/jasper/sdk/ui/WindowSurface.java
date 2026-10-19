@@ -6,8 +6,8 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * A plugin's dialog. The application owns the frame, title bar, icon, menu bar,
- * theme tracking and saved bounds (overlays use their owner’s chrome); the plugin fills the content. UI thread only. {@link #close()}
+ * A plugin's dialog or overlay. The application owns the frame, title bar, icon and
+ * theme tracking (overlays use their owner’s chrome); the plugin fills the content. UI thread only. {@link #close()}
  * closes at once, without consulting {@link #onClosing} guards, and is idempotent.
  */
 public interface WindowSurface extends Subscription {
@@ -29,7 +29,7 @@ public interface WindowSurface extends Subscription {
     void setTitle(String title);
 
     /**
-     * Opens a native chooser for one existing file, owned by this window or dialog.
+     * Opens a native chooser for one existing file, owned by this dialog.
      * Blocks on the UI thread while the platform pumps events. If the owner closes during
      * selection, the result is discarded. This does not read the selected file.
      *
@@ -42,10 +42,10 @@ public interface WindowSurface extends Subscription {
     Optional<Path> chooseFile(String title, Optional<Path> initialPath);
 
     /**
-     * Adds a guard consulted when the user tries to close the window. Overlays have no implicit user-close action. Any guard returning false keeps
+     * Adds a guard consulted when the user tries to close the dialog. Overlays have no implicit user-close action. Any guard returning false keeps
      * it open; a guard that throws is treated as allowing the close.
      *
-     * @param guard returns whether the window may close
+     * @param guard returns whether the dialog may close
      * @return the registration
      */
     Subscription onClosing(BooleanSupplier guard);

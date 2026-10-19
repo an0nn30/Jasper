@@ -39,7 +39,8 @@ public interface Windows {
      * @param placement where a new tab goes; the open tab with the same key is selected where it is
      * @return the new tab, or the open tab with the same key, selected
      * @throws IllegalArgumentException for a foreign owner or a closed content tab
-     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread, or while the
+     *                               main window closes or Jasper quits
      * @since 0.20.0
      */
     ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);

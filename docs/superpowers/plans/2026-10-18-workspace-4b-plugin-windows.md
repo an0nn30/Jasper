@@ -1,6 +1,7 @@
 # Workspace tabs 4b: plugin windows become tabs Implementation Plan
 
-**Status: executed on 2026-10-19** (`da79cae7c..4576cbecf`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-19** (`da79cae7c..4576cbecf`, then the documentation commit and the final review's
+fixes); see `docs/STATUS.md`.
 Deviations from the plan's text: (a) before Task 1 the plan was replayed on `499d47901` and refreshed in `da79cae7c`,
 with the pre-flight's rulings F1 to F21 (STATUS lists them); (b) Task 3 Step 3 (controller ruling Q1): the ROWS split's
 id is `rows.layout`, since `rows` is `ManagerPanel.ROWS`, the entry list's id, and `ViewSpec` refuses a duplicate; (c)
@@ -28,7 +29,20 @@ window case is ported to the Licenses window, and twelve unused imports go; (e) 
 unused imports go; (f) Task 6: the `errorsTab` field's comment in `JasperApplication` says its tab opens in the main
 window; (g) Task 8 (controller ruling): wording the brief's patterns miss is fixed (`ShortcutCatalog`, `MacTitleBar`,
 the panel classes' "one per window", `TransferUi`, `RemotePlugin`, `Panels.toggle`, `ErrorsView`, `DesignMetrics`), and
-this banner replaces Task 3's "executing" line.
+this banner replaces Task 3's "executing" line; (h) final review: a child window's panel request goes through
+`Panels.toggle` every time, which raises the main window, where `SftpUi`, `TunnelsUi`, `TransfersPanels` and
+`FileServerPlugin` had called a built panel's `show()`, which changed it behind the child window, and the fake's toggle
+from a child window records `front|<main window>` in `openRequests()`; SFTP's host chooser and a Browse's follow-up
+belong to the explorer's window, the main one, so a requester that closes mid-connect no longer leaves the explorer on
+"Connecting…"; the Vault manager's passive Unlock asks over `tab.window()`;
+`AuxiliaryWindows.modalOverlay(String, JComponent)` shares `dialog`'s headless guard; `Tab.inMainWindow()` is gone, its
+tests reading `isMain`; `WorkspaceContentRouteTest` proves its two dropped window cases on a dialog; the SDK Javadoc
+names `ContentTab.window()`'s window that is not open, the four-argument `openTab`'s `IllegalStateException` while the
+main window closes or Jasper quits, and `WindowSurface`'s dialogs without a menu bar or saved bounds, and `HostedUi`'s
+surface comment names overlays; the sample's and the guide's sheet comment says a modal sheet keeps its tab where it is;
+`EditorWindowTest`'s close test is renamed; and Task 8's six stale phrases follow the main window
+(`PanelHost.setHeader`, the Toolbar and Status Bar choices, the badge's `ToolStripe` and toolbar views, the Vault
+manager's close button, the Editor's Cmd+W, the guide's panel heading and header callbacks).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

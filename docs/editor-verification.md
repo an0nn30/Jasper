@@ -10,7 +10,7 @@ unverified.
 - [ ] 2. Dropping a file from Finder onto an editor tab opens it; dropping a folder does nothing.
 - [ ] 3. TOML, JSON, Python, Bash and YAML samples are highlighted; `Cargo.lock` and a `#!/usr/bin/env python3` script without an extension are detected.
 - [ ] 4. Editing shows ●; Cmd/Ctrl+S saves and clears it; `ls -l` shows the same permissions, and a symbolic link to the file is still a link.
-- [ ] 5. Cmd/Ctrl+W closes the current tab, asking about unsaved changes; with no tabs it closes the window.
+- [ ] 5. Cmd/Ctrl+W closes the current tab, asking about unsaved changes; a child window closes with its last tab, and the main window stays open.
 - [ ] 6. Cmd+Q with an unsaved tab asks Save All / Discard / Cancel; Cancel keeps Jasper running, Save All saves then quits.
 - [ ] 7. Changing an open file from the terminal (`echo x >> file`) reloads a clean tab within a few seconds and shows the banner on an edited one.
 - [ ] 8. Switching the theme between light and dark recolours the editor; the tab row, status line and find bar follow the theme.

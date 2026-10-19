@@ -479,6 +479,33 @@ class FileServerPluginTest {
         }
     }
 
+    /**
+     * Plan 4b's final review: each serve from a child window shows the File Servers panel through {@code Panels.toggle},
+     * which raises the main window, the second time as the first.
+     */
+    @Test void eachServeFromAChildWindowRaisesTheMainWindow() throws Exception {
+        Path project = Files.createDirectories(home.resolve("project"));
+        try (var host = new FakePluginHost(root)) {
+            var plugin = plugin(FileServerPlugin::portFree);
+            host.start(INFO, Set.of(), Set.of(), plugin);
+            settle(host);
+            UUID main = host.addTerminalWindow(), child = host.addTerminalWindow(), tab = host.addTerminalTab(child, "zsh");
+            UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
+            for (int serve = 1; serve <= 2; serve++) {
+                UiTestAccess.edt(() -> assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, child, local)).isTrue());
+                int served = serve;
+                await(host, () -> plugin.registry().servers().size() == served
+                    && plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "start " + serve + " settles");
+                assertThat(host.openRequests()).as("serve " + serve).containsOnly("front|" + main).hasSize(serve);
+            }
+            assertThat(plugin.panel().selected()).as("the panel selects the newest server")
+                .contains(plugin.registry().servers().get(1).definition().id());
+            plugin.registry().stopAll();
+            await(host, () -> plugin.registry().active() == 0, "everything stops");
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
     @Test void aBurstOfActivityIsOneRefreshOnTheUiThread() {
         try (var host = new FakePluginHost(root)) {
             var plugin = plugin();

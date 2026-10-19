@@ -32,8 +32,11 @@ public final class TransfersPanels {
         return panel.view();
     }
 
-    /** Shows the Transfers panel, opening it in the main window when it is not open; {@code window} asked for it. */
+    /**
+     * Shows the Transfers panel, opening it in the main window when it is not open; {@code window} asked for it. A child
+     * window's request goes through the toggle, which raises the main window.
+     */
     public void show(WindowHandle window) {
-        if (host == null) context.panels().toggle(TransfersPanel.PANEL, window); else host.show();
+        if (host == null || !window.isMain()) context.panels().toggle(TransfersPanel.PANEL, window); else host.show();
     }
 }

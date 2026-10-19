@@ -40,7 +40,8 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
      * The window that holds the tab; {@link dev.jasper.sdk.terminal.WindowHandle#isMain()} tells the main window from a
      * child window.
      *
-     * @return the window, or the last window that held the tab once it is closed
+     * @return the window, or the last window that held the tab once it is closed; a window that is not open, with the id
+     *         {@code new UUID(0, 0)}, for a tab waiting for the main window to open or one no window could take back
      * @since 0.20.0
      */
     dev.jasper.sdk.terminal.WindowHandle window();

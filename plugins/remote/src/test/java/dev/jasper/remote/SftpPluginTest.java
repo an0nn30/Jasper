@@ -30,7 +30,7 @@ class SftpPluginTest {
             host.setSetting("dev.jasper.remote","sftp.max_parallel_files",8L);host.setSetting("dev.jasper.remote","sftp.request_timeout_seconds",1L);
             assertThat(plugin.sftpSettings().maxParallelFiles()).isEqualTo(8);assertThat(plugin.sftpSettings().requestTimeout().toSeconds()).isEqualTo(1);
             UUID window=host.addTerminalWindow(),second=host.addTerminalWindow();dev.jasper.remote.testsupport.Kits.edt(()-> { host.invoke("dev.jasper.remote.transfers",window,null);host.invoke("dev.jasper.remote.transfers",second,null); });
-            assertThat(host.openRequests()).isEmpty();assertThat(host.failures()).isEmpty();
+            assertThat(host.openRequests()).as("the child window's request raises the main window").containsExactly("front|"+window);assertThat(host.failures()).isEmpty();
             assertThat(host.windows()).as("showing transfers never opens the host chooser").isEmpty();
             dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL));
             var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
@@ -86,4 +86,52 @@ class SftpPluginTest {
         assertThat(source.isCancelled()).isTrue();
     }
 
+    /**
+     * Plan 4b's final review: the explorer's window, the main one, guards a Browse's follow-up, so a requesting child window
+     * that closes while the host's credential is pending ends the attempt and leaves the explorer idle, not "Connecting…".
+     */
+    @Test void aBrowseWhoseChildWindowClosesMidConnectLeavesTheExplorerIdle() throws Exception {
+        try(var host=new FakePluginHost(root.resolve("home"))) {
+            var vault=new FakeVault();host.start(FakeVault.INFO,Set.of(),Set.of(),vault);
+            var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
+            var context=host.start(RemotePluginTest.INFO,Set.of(),Set.of("dev.jasper.vault"),plugin);
+            UUID credential=vault.password("deploy login","deploy","s3cret");
+            var prod=dev.jasper.remote.hosts.RemoteHost.create("prod","prod.invalid",22,"",new dev.jasper.remote.hosts.Auth.Vault(credential),"",Optional.empty());
+            plugin.store().put(prod);RemotePluginTest.settle(host);
+            host.addTerminalWindow();UUID child=host.addTerminalWindow(),tab=host.addTerminalTab(child,"zsh");
+            var pending=new CompletableFuture<Optional<dev.jasper.vault.api.Credential>>();vault.pendingCredential=pending;
+            dev.jasper.remote.testsupport.Kits.edt(()->plugin.sftp().browse(context.terminals().window(child).orElseThrow(),prod));
+            var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
+            assertThat(dev.jasper.remote.ui.sftp.SftpTestAccess.texts(sidebar)).contains("Connecting…");
+            dev.jasper.remote.testsupport.Kits.edt(()-> { host.closeTab(tab);pending.complete(Optional.of(vault.secrets.get(credential).get())); });
+            RemotePluginTest.settle(host);
+            assertThat(dev.jasper.remote.ui.sftp.SftpTestAccess.texts(sidebar)).as("the main window's explorer is idle again").doesNotContain("Connecting…");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
+
+    /**
+     * Plan 4b's final review: Open SFTP here from a child window with no SSH pane raises the main window and opens the host
+     * chooser over it, so the host chosen there browses in the main window's explorer after the child window closed.
+     */
+    @Test void theHostChooserAskedForFromAChildWindowBrowsesInTheMainWindow() throws Exception {
+        try(var host=new FakePluginHost(root.resolve("home"))) {
+            var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
+            host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
+            plugin.store().put(dev.jasper.remote.hosts.RemoteHost.create("second","second.invalid",22,"user",dev.jasper.remote.hosts.Auth.AGENT,"",Optional.empty()));
+            RemotePluginTest.settle(host);
+            UUID main=host.addTerminalWindow(),child=host.addTerminalWindow(),tab=host.addTerminalTab(child,"zsh");
+            dev.jasper.remote.testsupport.Kits.edt(()->assertThat(host.invoke(RemotePlugin.SFTP,child,null)).isTrue());
+            assertThat(host.openRequests()).containsExactly("front|"+main);
+            var chooser=dev.jasper.remote.testsupport.Kits.value(()->host.windowView("dev.jasper.remote","Browse files on SSH host").orElseThrow());
+            dev.jasper.remote.testsupport.Kits.edt(()->host.closeTab(tab));
+            dev.jasper.remote.ui.sftp.SftpTestAccess.browse(chooser);
+            var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
+            dev.jasper.remote.testsupport.Kits.await(host,()->dev.jasper.remote.testsupport.Kits.texts(sidebar.view()).contains("SSH agent not available"),
+                "the chosen host's connection attempt in the main window's explorer");
+            host.stopAll();
+            assertThat(host.failures()).isEmpty();
+        }
+    }
 }

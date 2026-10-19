@@ -104,8 +104,6 @@ public final class Tab implements AutoCloseable {
     /** A modal owner keeps the tab where it is and open until the returned subscription closes. */
     public Subscription pin() { pins++; return new Subscription(() -> pins--); }
     public boolean pinned() { return pins > 0; }
-    /** @return whether the main window holds the tab (workspace tabs spec 6) */
-    public boolean inMainWindow() { return registry.isMain(window); }
 
     /** Sets the presentation and tells the listeners; ignored once closed. */
     public void presentation(String title, String detail, Icon icon, boolean dirty, String location, String host) {

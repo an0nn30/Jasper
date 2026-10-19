@@ -152,7 +152,7 @@ Application code never opens a message dialog to tell the user something; it pos
 - Contextual feedback (a Settings field error, a palette error row, a plugin's inline row) stays where it is, and
   confirmation or input prompts stay dialogs: notifications are for things that happen elsewhere or later.
 - Cards, the panel and the badge read `Jasper.notification.*` and `Jasper.railBadge*` colours derived in `ChromeKeys`;
-  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: each window's
+  a theme's own `Notification.*` keys win. The badge is a `PanelEntry.setBadge` on the panel: the main window's
   `ToolStripe` shows it as a `BadgedIcon` on that panel's stripe button, with the count in the tooltip and
   accessible description. Cards stack in the layer `WindowContent.mountCornerLayer` keeps in the bottom-right corner
   of the `ToolWindowArea`, on `PALETTE_LAYER`, below a dock drag's `DRAG_LAYER` guides.
@@ -537,8 +537,8 @@ toolbar is hidden. `MacTitleBar` updates the JBR custom-title height with the sa
 geometry; standalone dialog titles remain 28px tall.
 
 `WindowToolbar` allocates whole buttons by stable priority and constructs overflow menus
-from the same Actions as their original placements. A contributed toolbar view (`ToolbarEntry.View`) is built once per
-window, when `WindowContent.connectTerminals` reports the window open (never for the warm-up rehearsal), and closed
+from the same Actions as their original placements. A contributed toolbar view (`ToolbarEntry.View`) is built once, for
+the main window, when `WindowContent.connectTerminals` reports the window open (never for the warm-up rehearsal), and closed
 with its window or its entry; it lays out at its preferred size and hides, never overflows, when the row is too
 narrow. Do not retain a second plugin registry
 for overflow. Theme changes must retain selected-tab contrast when terminal colors differ

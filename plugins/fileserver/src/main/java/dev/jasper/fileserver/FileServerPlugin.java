@@ -388,8 +388,8 @@ public final class FileServerPlugin implements Plugin {
     }
 
     private void showPanel(WindowHandle window, UUID id) {
-        // Asked from any window, the panel shows in the main window.
-        if (panelHost == null) context.panels().toggle(PANEL, window);
+        // The panel shows in the main window; a child window's request goes through the toggle, which raises the main window.
+        if (panelHost == null || !window.isMain()) context.panels().toggle(PANEL, window);
         else if (!panelHost.visible()) panelHost.show();
         if (panel != null) panel.select(id);
     }

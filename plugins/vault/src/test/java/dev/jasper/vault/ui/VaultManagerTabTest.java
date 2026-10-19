@@ -261,6 +261,33 @@ class VaultManagerTabTest {
         });
     }
 
+    /** Plan 4b's final review: the passive Unlock asks over the window that holds the manager's tab, not the last window that asked for it. */
+    @Test void thePassiveUnlockAsksOverTheWindowThatHoldsTheTab() throws Exception {
+        edt(() -> {
+            try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
+                PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
+                UUID main = host.addTerminalWindow(), child = host.addTerminalWindow();
+                var owners = new java.util.ArrayList<UUID>();
+                var controller = new AtomicReference<VaultManagerTab>();
+                var service = new VaultService(f.lock, () -> context.terminals().window(main),
+                    prompt -> { owners.add(prompt.owner().id()); controller.get().showUnlock(prompt); },
+                    p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                controller.set(window);
+                window.show(context.terminals().window(main).orElseThrow(), Optional.empty());
+                window.show(context.terminals().window(child).orElseThrow(), Optional.empty());
+                assertThat(host.contentTabs()).as("one manager tab, selected where it is").singleElement()
+                    .satisfies(tab -> assertThat(tab.window().id()).isEqualTo(main));
+                f.manager.invalidate(); f.lock.lock(); window.changed();
+                press(window.panel.view(), ManagerPanel.UNLOCK);
+                assertThat(owners).as("the prompt's owner").containsExactly(main);
+                window.close();
+                assertThat(host.failures()).isEmpty();
+            }
+        });
+    }
+
     @Test void grantsShowCredentialNamesAndRevokeUpdatesTheList() throws Exception {
         edt(() -> {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {

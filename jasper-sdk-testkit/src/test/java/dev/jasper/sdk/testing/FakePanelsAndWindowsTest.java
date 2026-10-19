@@ -137,6 +137,8 @@ class FakePanelsAndWindowsTest {
             context.panels().toggle("dev.x.tool.hosts", context.terminals().window(main).orElseThrow());
             assertThat(instances).as("one instance, hidden by the main window's toggle").singleElement()
                 .satisfies(panel -> assertThat(panel.visible()).isFalse());
+            assertThat(host.openRequests()).as("each child window's toggle raises the main window; the main window's raises nothing")
+                .containsExactly("front|" + main, "front|" + main);
         }
     }); }
 

@@ -265,11 +265,11 @@ class WindowManagerTest {
         edt(() -> {
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
             MainWindow main = manager.main().orElseThrow();
-            assertThat(notes.inMainWindow()).isTrue();
+            assertThat(manager.isMain(notes.window())).isTrue();
             notes.moveToNewWindow();
             ChildWindow child = manager.children().getFirst();
             assertThat(notes.window()).isEqualTo(child.id());
-            assertThat(notes.inMainWindow()).isFalse();
+            assertThat(manager.isMain(notes.window())).isFalse();
             notes.moveToNewWindow();
             assertThat(manager.children()).as("a child window's only tab stays").containsExactly(child);
             notes.moveToMainWindow();
