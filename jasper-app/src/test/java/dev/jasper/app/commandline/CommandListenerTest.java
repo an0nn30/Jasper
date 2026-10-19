@@ -59,8 +59,23 @@ class CommandListenerTest {
     /** Everything Jasper wrote until it closed the connection. */
     private static String readAll(SocketChannel client) throws IOException {
         var bytes = new ByteArrayOutputStream();
-        ByteBuffer buffer = ByteBuffer.allocate(4096);
-        while (client.read(buffer.clear()) >= 0) bytes.write(buffer.array(), 0, buffer.position());
+        // Windows' blocking AF_UNIX read can remain asleep after a fast peer has replied and closed.
+        // Readiness-driven reads still require EOF; a large buffer drains flood replies within the shutdown grace.
+        ByteBuffer buffer = ByteBuffer.allocate(64 * 1024);
+        client.configureBlocking(false);
+        try (var selector = java.nio.channels.Selector.open()) {
+            client.register(selector, java.nio.channels.SelectionKey.OP_READ);
+            while (true) {
+                int count = client.read(buffer.clear());
+                if (count < 0) break;
+                if (count > 0) bytes.write(buffer.array(), 0, count);
+                else {
+                    selector.select(1_000);
+                    selector.selectedKeys().clear();
+                    if (Thread.currentThread().isInterrupted()) throw new IOException("Interrupted waiting for peer EOF");
+                }
+            }
+        }
         return bytes.toString(StandardCharsets.UTF_8);
     }
 
