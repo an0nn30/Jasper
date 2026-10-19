@@ -30,13 +30,12 @@ move API, `Windows.create`/`PluginWindow`/`WindowSpec`/`ShortcutContext.Kind.WIN
 `WindowHandle.isMain()` are plan 4's; `ContentSpec` restore state and `Windows.restorer` are plan 6's.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`,
-after plan 3a's last commit. Run every command from the worktree root. Line numbers are from `22b702456` ("Plan 3a: the
-tab registry and the workspace view", on `main` `11e40192c`); plans 1 to 3a move some of them. Edits into files that
-plan 3a creates or rewrites (`Tab`, `TabRegistry`, `WindowContent`, `WindowTerminals`, `TabMoveTest`, `TabRegistryTest`,
-`TabMenuTest`, `WindowTerminalsTest`, the renamed `AppContractTest` and `WindowChrome` lines) quote 3a's text exactly as
-its committed plan writes it; that code is not on disk while this plan is written. Every edit of this plan was replayed
-on a scratch copy of `22b702456` after replaying plan 3a's scripts and files there, and every anchor matched; plans 1
-and 2 change none of the files this plan edits (a replay of plans 1, 2 and 3a leaves them byte for byte the same). Every edit
+after plan 3a's last commit. Run every command from the worktree root. Line numbers are from `9a60e08d0` ("Workspace
+tabs: Focus Group takes focus from anywhere; a throwing guard never wedges closes", plan 3a's last commit, on `main`
+`4ed94fb78`). Edits into files that plan 3a created or rewrote (`Tab`, `TabRegistry`, `WindowContent`,
+`WindowTerminals`, `TabMoveTest`, `TabRegistryTest`, `TabMenuTest`, `WindowTerminalsTest`, the renamed `AppContractTest`
+and `WindowChrome` lines) quote 3a's executed code at `9a60e08d0`. Every edit of this plan was replayed in task order on
+a scratch copy of `9a60e08d0`, and every anchor matched. Every edit
 script stops with a message when its quoted text is not found the stated number of times: re-find the text, adjust the
 anchor, re-run, and record the change in this plan's banner; never edit around a missing anchor. Later tasks anchor on text
 earlier tasks of this plan wrote, and quote it as those tasks leave it.
@@ -64,8 +63,9 @@ contradicts the spec.
   `TerminalRegistry`'s EDT check (`SwingUtilities`); it already depends on `layout` and `lifecycle` after 3a. SDK types
   appear in the app only inside `dev.jasper.app.plugins`; `jasper-sdk` stays JDK-only.
   `verifyApplicationArchitecture`, `verifySdkArchitecture` and `verifyPluginArchitecture` are part of `check`.
-- The theme-migration ledger: this plan creates and deletes no file, so `docs/design/theme-engine/migration.csv` gains no
-  row. `ThemeMigrationCoverageTest` scans `jasper-app/src`, `jasper-sdk/src`, `jasper-sdk-testkit/src` and every
+- The theme-migration ledger: this plan creates and deletes no file and renames one test (`TerminalTabTest` to
+  `TerminalContentTest`, Task 4 Step 4b), whose ledger row and evidence paths move with it, so
+  `docs/design/theme-engine/migration.csv` gains no row. `ThemeMigrationCoverageTest` scans `jasper-app/src`, `jasper-sdk/src`, `jasper-sdk-testkit/src` and every
   `plugins/*/src`; files without a row (`FakeTerminals`, `FakeTerminalsTest`, `FakeContractTest`, `ContractHarness`,
   `TabHandle`, `TerminalEvents`, `TabEntry`, `WindowEntry`, `TerminalEvent`, `TerminalBridge`, `MenuTarget`,
   `WindowTerminals`, `LookFixtures`) must not start matching its `CANDIDATE` pattern: no `new ArrayList` (or any
@@ -162,7 +162,7 @@ text inside a script is a raw string (`r"""…"""`), so `\n` in Java source stay
 
 ## Verified facts
 
-At `22b702456` unless a plan is named (every file cited here is as it was at `ac2f7cf34`).
+At `9a60e08d0`, plan 3a's last commit.
 
 1. SDK terminal model: `TabHandle.panes()` and `activePane()` (`TabHandle.java:23-35`); `WindowHandle.tabs()` and
    `activeTab()` (`WindowHandle.java:17-29`), the class comment "One terminal window" (`:8`); `Terminals.activePane()`,
@@ -181,11 +181,11 @@ At `22b702456` unless a plan is named (every file cited here is as it was at `ac
    EDT with `SwingUtilities` (`TerminalRegistry.java:12`), the package's only Swing use.
 4. After plan 3a (its Task 5): `WindowTerminals` lists `owner.terminalTabs()` only, its `selectedTab` is the current
    terminal (empty while a plugin's tab is active), its `TabEntry entry(TerminalContent terminal)` builds
-   `() -> List.of(entry(terminal, terminal.pane()))` and `() -> Optional.of(entry(terminal, terminal.pane()))`, and it
-   publishes `TabOpened`/`TabClosed` through `tabOpened(TerminalContent)`/`tabClosed(TerminalContent)`;
-   `WindowContent.attach(Tab, boolean, GroupId, Side)` calls
-   `if (tab.content() instanceof TerminalContent terminal && terminals != null) terminals.tabOpened(terminal);` and
-   `detach(Tab)` the matching `tabClosed`, so a moved terminal tab reports `TabClosed` then `TabOpened` (3a Rulings 17)
+   `() -> terminal.closed() ? List.of() : List.of(entry(terminal, terminal.pane()))` and the matching `Optional` (a
+   closed terminal reports no pane, 3a Task 5 D2), and it publishes `TabOpened`/`TabClosed` through
+   `tabOpened(TerminalContent)`/`tabClosed(TerminalContent)`; `WindowContent.attach(Tab, boolean, GroupId, Side)`
+   announces a terminal tab with `terminals.tabOpened(terminal)`, keeping it in `published`, and `detach(Tab)` the
+   matching `tabClosed`, so a moved terminal tab reports `TabClosed` then `TabOpened` (3a Rulings 17)
    and a plugin's tab reports nothing. `TabRegistry.transfer(Tab, WorkspaceHost, WorkspaceHost)` sets the tab's window,
    then, with `tab.moving = true`, detaches it from the old host and attaches it to the new, recovering on failure, sets
    `tab.moving = false` in a `finally`, and selects (3a Tasks 1, 4); `Tab.moving()` (`boolean moving`, package-private
@@ -195,7 +195,8 @@ At `22b702456` unless a plan is named (every file cited here is as it was at `ac
    (`openBeside`, 3a Rulings 11, 19); the app's Split Right and Split Down are enabled whenever New Tab is.
    `WindowContent.attach` announces the tab before `TabHost.attach` and `workspace.open`, and both can run `update()`
    (`TabHost.present` fires the tab's change listeners; every layout change runs `workspaceChanged`), which calls the
-   package-private `onTitle`; its failure path removes the listener, unmounts the tab and rethrows, and
+   package-private `onTitle`; its failure path removes the listener, closes a new terminal tab's pane, unwires the tab,
+   publishes `tabClosed(published)`, unmounts the tab and rethrows (3a Task 4 Minor 1, in Task 5), and
    `TabRegistry.transfer` then attaches the tab to the window it left, else another, else none, and rethrows. A window
    whose last tab leaves closes at once (`onEmpty`), so its `WindowClosed` comes before the arrival in the new window;
    `TabRegistry.move(Tab, true)` creates the new window, `WindowOpened`, before the transfer.
@@ -213,7 +214,7 @@ At `22b702456` unless a plan is named (every file cited here is as it was at `ac
    and `terminalEventsNameIdsAndFollowTheActivePane` (`:1313-1420`) and asserts `split.tab().id() == tab`
    (`:1432`). `AppContractTest` runs it over `TerminalFixture` (`plugins/TerminalFixture.java:27-234`), whose split adds a
    pane to the same tab (`:49-64`); its content factory registers a `WorkspaceHost` whose attach and detach do nothing
-   (`AppContractTest.java:139-147`, renamed by 3a Task 1), and `addTerminalWindow` registers no host (`:379`).
+   (`AppContractTest.java:140-147`, renamed by 3a Task 1), and `addTerminalWindow` registers no host (`:379`).
    `FakeContractTest` runs it over `FakePluginHost` (`FakeContractTest.java:78-101`).
 8. Plugins: only Remote reads the removed API, `window.activeTab().flatMap(tab -> tab.activePane())` six times
    (`RemotePlugin.java:273`, `:304`, `:517`, `:638`, `:650`, `:727`); `FileServerPluginTest` adds a second pane to a tab
@@ -225,7 +226,7 @@ At `22b702456` unless a plan is named (every file cited here is as it was at `ac
    `ClassicMenuBar.fresh` and `window` move Pane then Tab into Window (`:20-50`); `WindowChrome` builds `paneMenu()` and
    `tabMenu()` (`:96-103`, `:401-402`, `:437-443`; 3a renames `FOCUS_PANE_*` there to `FOCUS_GROUP_*`); `HostedUi` maps
    `StandardMenu` by name (`plugins/HostedUi.java:289`). Tests name the Pane menu in `WindowChromeMenusTest.java:75`,
-   `:78`, `:95-108`, `ChromeRenderTest.java:111-112`, `WindowChromeContributionsTest.java:270` and 3a's
+   `:78`, `:95-108`, `ChromeRenderTest.java:107-108`, `WindowChromeContributionsTest.java:270` and 3a's
    `TabMenuTest.theFileViewAndPaneMenusNameTabsAndGroups`.
 10. `HostedSessions` maps `ExitPolicy.CLOSE_PANE` to `SessionRequest.closeOnExit` (`plugins/HostedSessions.java:41`);
     `terminal.on_exit` takes `keep_open`, `close_on_success` and `close` (`config/CoreSettings.java:146-148`): no value
@@ -243,7 +244,7 @@ At `22b702456` unless a plan is named (every file cited here is as it was at `ac
     Javadoc 9 (`FakePluginHost.java` 6, `FakeUi.java:135,137`, `ContractHarness.java:122`). The plugin-facing exception
     messages say "live terminal owner" or "terminal window" in both runtimes (`FakeUi.java:515`, `:582`, `:597`, `:615`;
     `HostedUi.java:605`, `:754`, `:786`), and no test asserts them. The guides say it once across a line break
-    (`docs/plugin-authoring.md:883-884`), and `docs/sdk-architecture.md:340` says "terminal owner". The application's
+    (`docs/plugin-authoring.md:886-887`), and `docs/sdk-architecture.md:335` says "terminal owner". The application's
     user-facing text keeps the phrase (`shortcuthelp/ShortcutCatalog.java:59`, Remote's `RemoteHosts.java:105` and
     `EditChannels.java:99`, `docs/remote.md:234`, the user guides), and plan 4 adds New Terminal Window, a child window
     with a terminal tab (spec 6.5).
@@ -337,7 +338,7 @@ Record them in `docs/STATUS.md` (Task 5).
 ```bash
 git branch --show-current                                                                    # claude/workspace-tabs
 git status --short                                                                           # nothing
-git log --oneline -1 --grep 'Workspace tabs: documentation and status for the tab registry and groups'   # 3a's last commit
+git log --oneline -1 --grep 'Workspace tabs: Focus Group takes focus from anywhere'                      # 3a's last commit, 9a60e08d0
 grep -c 'VERSION = "0.18.0";' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java                     # 1
 # Plan 3a's text this plan quotes, file by file:
 C=jasper-app/src/main/java/dev/jasper/app/contributions; W=jasper-app/src/main/java/dev/jasper/app/workspace
@@ -350,10 +351,11 @@ grep -c 'tab.moving = true;' $C/TabRegistry.java                                
 grep -c 'tab.moving = false;' $C/TabRegistry.java                                                         # 1
 grep -c 'terminals.tabOpened(terminal);' $W/WindowContent.java                                            # 1
 grep -c 'terminals.tabClosed(terminal);' $W/WindowContent.java                                            # 1
-grep -c 'window opened. A failure leaves nothing mounted and propagates.' $W/WindowContent.java          # 1
+grep -c 'window opened. A failure leaves nothing mounted, closes again what it announced, and propagates.' $W/WindowContent.java  # 1
 grep -c '        JComponent component = tab.component();' $W/WindowContent.java                          # 1
-grep -c '            WorkspaceTheme.clear(component);' $W/WindowContent.java                              # 1
-grep -c 'window: a terminal tab is announced closed here,' $W/WindowContent.java                         # 1
+grep -c '        TerminalContent published = null;' $W/WindowContent.java                                 # 1
+grep -c '            if (published != null) terminals.tabClosed(published);' $W/WindowContent.java      # 1
+grep -c 'a terminal tab is announced closed here, and the window closes' $W/WindowContent.java           # 1
 grep -c 'each closes, a terminal tab announced closed.' $W/WindowContent.java                             # 1
 grep -c "One window's presence in the terminal registry" $W/WindowTerminals.java                          # 1
 grep -c 'var entry = new WindowEntry(owner.id(),' $W/WindowTerminals.java                                 # 1
@@ -565,7 +567,7 @@ only; Task 3 lists the rest.
   `jasper-sdk-testkit/src/testFixtures/java/dev/jasper/sdk/testing/contract/PluginContractTest.java:61-75,1313-1435`,
   `jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeTerminalsTest.java`;
   `jasper-app/src/test/java/dev/jasper/app/plugins/HostedTerminalsTest.java:95-222`, `KitCompatibilityTest.java`,
-  `workspace/WindowTerminalsTest.java`, `workspace/ShellExitBehaviorTest.java:363`;
+  `workspace/WindowTerminalsTest.java`, `workspace/ShellExitBehaviorTest.java:361`;
   `plugins/fileserver/src/test/java/dev/jasper/fileserver/FileServerPluginTest.java:472,655`
 
 **Interfaces:**
@@ -1146,7 +1148,8 @@ edit(M + "terminals/TerminalRegistry.java", [
                 if (pane.isPresent() && pane.get().id().equals(id)) return pane;
             }''', 1)])
 span(M + "workspace/WindowTerminals.java", "    TabEntry entry(TerminalContent terminal) {\n", "    }\n", r'''    TabEntry entry(TerminalContent terminal) {
-        return new TabEntry(terminal.id().value(), owner.id(), TabEntry.Kind.TERMINAL, () -> Optional.of(entry(terminal, terminal.pane())),
+        return new TabEntry(terminal.id().value(), owner.id(), TabEntry.Kind.TERMINAL,
+            () -> terminal.closed() ? Optional.empty() : Optional.of(entry(terminal, terminal.pane())),
             terminal::title, () -> owner.selectTab(terminal));
     }
 ''')
@@ -1755,7 +1758,7 @@ the app's contract harness makes every window a workspace host.
   `ContractHarness.java` (after `closeTerminalPane`); replace `FakeContent.java`
 - Test: `TerminalValuesTest`, `PluginContractTest`, `FakeTerminalsTest`, `FakeContractTest.java:79`;
   `TabRegistryTest`, `TabMoveTest`, `WindowTerminalsTest`, `TerminalBridgeTest`, `HostedTerminalsTest`,
-  `TerminalFixture`, `AppContractTest.java:139-147,379`
+  `TerminalFixture`, `AppContractTest.java:140-147,379`
 
 **Interfaces:**
 - Consumes: Task 2's `TabEntry`, `FakeWorkspace.addTab(Window, TabHandle.Kind, String)`, `close(Tab)`, `select(Tab)`,
@@ -2254,21 +2257,23 @@ edit(C + "Tab.java", [
 edit(C + "TabRegistry.java", [("        tab.moving = true;\n", "        tab.movingFrom = old.id();\n", 1),
                               ("            tab.moving = false;\n", "            tab.movingFrom = null;\n", 1)])
 edit(M + "workspace/WindowContent.java", [
-    ("     * window opened. A failure leaves nothing mounted and propagates.\n",
+    ("     * window opened. A failure leaves nothing mounted, closes again what it announced, and propagates.\n",
      "     * window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and propagates.\n", 1),
-    ("        JComponent component = tab.component();\n", "        JComponent component = tab.component();\n        boolean announced = false;\n", 1),
-    ("            if (tab.content() instanceof TerminalContent terminal && terminals != null) terminals.tabOpened(terminal);\n",
+    ("        JComponent component = tab.component();\n        TerminalContent published = null;\n",
+     "        JComponent component = tab.component();\n        boolean announced = false;\n", 1),
+    ("            if (tab.content() instanceof TerminalContent terminal && terminals != null) {\n"
+     "                published = terminal;\n"
+     "                terminals.tabOpened(terminal);\n"
+     "            }\n",
      "            if (terminals != null) { terminals.tabArrived(tab, tab.movingFrom()); announced = true; }\n", 1),
-    ("            WorkspaceTheme.clear(component);\n            throw failure;\n",
-     "            WorkspaceTheme.clear(component);\n"
+    ("            if (published != null) terminals.tabClosed(published);\n",
      "            // Plugins must not believe the tab is here (workspace plan 3b Rulings 5).\n"
-     "            if (announced && terminals != null) terminals.tabWithdrawn(tab, tab.movingFrom());\n"
-     "            throw failure;\n", 1),
+     "            if (announced && terminals != null) terminals.tabWithdrawn(tab, tab.movingFrom());\n", 1),
     ("each closes, a terminal tab announced closed.", "each closes and is announced closed.", 1),
     ("        if (tab.content() instanceof TerminalContent terminal && terminals != null) terminals.tabClosed(terminal);\n",
      "        if (terminals != null && !tab.moving()) terminals.tabClosed(tab);\n", 1),
-    ("     * Takes a tab out of this window before it closes or moves to another window: a terminal tab is announced closed here,\n",
-     "     * Takes a tab out of this window before it closes or moves to another window: a closing tab is announced closed here,\n", 1)])
+    ("     * a terminal tab is announced closed here, and the window closes when its last tab has left.",
+     "     * a closing tab is announced closed here, and the window closes when its last tab has left.", 1)])
 W = M + "workspace/WindowTerminals.java"
 edit(W, [("package dev.jasper.app.workspace;\n\n", "package dev.jasper.app.workspace;\n\nimport dev.jasper.app.contributions.Tab;\n", 1)])
 span(W, "/**\n * One window's presence in the terminal registry", " */\nfinal class WindowTerminals implements AutoCloseable {\n", r'''/**
@@ -2294,7 +2299,8 @@ span(W, "        var entry = new WindowEntry(owner.id(),", "            tabSelec
 span(W, "    TabEntry entry(TerminalContent terminal) {\n", "    }\n", r'''    /** A tab of this window: a terminal tab, or content (a plugin's tab, and later a placeholder; Rulings 13, 14). */
     TabEntry entry(Tab tab) {
         if (tab.content() instanceof TerminalContent terminal)
-            return new TabEntry(tab.id().value(), owner.id(), TabEntry.Kind.TERMINAL, () -> Optional.of(entry(terminal, terminal.pane())),
+            return new TabEntry(tab.id().value(), owner.id(), TabEntry.Kind.TERMINAL,
+                () -> terminal.closed() ? Optional.empty() : Optional.of(entry(terminal, terminal.pane())),
                 terminal::title, () -> owner.selectTab(tab));
         return new TabEntry(tab.id().value(), owner.id(), TabEntry.Kind.CONTENT, Optional::empty, tab::title, () -> owner.selectTab(tab));
     }
@@ -2338,8 +2344,8 @@ grep -n 'TerminalContent terminal) {\|tabOpened(\|currentTerminal()' jasper-app/
 
 The last line prints nothing: `WindowTerminals` no longer lists terminal tabs alone, and 3a's `PaneEntry entry(TerminalContent,
 TerminalPane)` and `openTab(OpenSpec)` are untouched (`git diff` shows them). `WindowContent` calls only
-`tabArrived`, `tabWithdrawn`, `tabClosed`, `tabSelected`, `publish`, `atomically` and `refresh` on it (grep `terminals\.`
-there).
+`tabArrived`, `tabWithdrawn`, `tabClosed`, `tabSelected`, `publish`, `atomically`, `refresh` and `close` on it (grep
+`terminals\.` there).
 
 - [ ] **Step 5: The fixtures: content tabs, moves and windows that close**
 
@@ -2614,9 +2620,13 @@ becomes `ExitPolicy.CLOSE` (Rulings 8). `KitCompatibility` refuses both removed 
   `workspace/StandardMenuBar.java:11-15`, `workspace/ClassicMenuBar.java:12-50`, `workspace/WindowChrome.java:96-103,400-402,437-443`,
   `plugins/HostedSessions.java:41`, `plugins/KitCompatibility.java` (Task 2's "0.19" list);
   `jasper-sdk-testkit/.../FakeSessions.java:186`, `FakePluginHost.java:586`, `ContractHarness.java:61-66`
+- Rename (Step 4b): `jasper-app/src/test/java/dev/jasper/app/workspace/TerminalTabTest.java` to `TerminalContentTest.java`;
+  Step 4b also modifies `workspace/WindowChrome.java:145,200`, `workspace/TabHost.java:67`, `WindowChromeTest.java:87`,
+  `ConfigurationControllerTest.java:302`, `ShortcutContextDispatchTest.java:112`, `docs/design/theme-engine/migration.csv`
+  and `jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/StateFixtures.java:73,76`
 - Test: `jasper-sdk/src/test/java/dev/jasper/sdk/ui/UiValuesTest.java`, `terminal/SessionValuesTest.java`;
   `PluginContractTest` (one case); `jasper-app/src/test/java/dev/jasper/app/workspace/WindowChromeMenusTest.java:75,78,95-104`,
-  `ChromeRenderTest.java:111-112`, `WindowChromeContributionsTest.java:270`, 3a's `TabMenuTest`; `KitCompatibilityTest`
+  `ChromeRenderTest.java:107-108`, `WindowChromeContributionsTest.java:270`, 3a's `TabMenuTest`; `KitCompatibilityTest`
 
 **Interfaces:**
 - Consumes: Task 2's `KitCompatibility` "0.19" list; 3a's `TabMenuTest.items(WindowContent, String)` and
@@ -2854,16 +2864,49 @@ git grep -n -e 'Slot.PANE' -e 'StandardMenu.PANE' -e 'CLOSE_PANE' -e 'paneMenu' 
 
 The last line prints nothing (`KitCompatibility` and its test name the removed constants on purpose).
 
+- [ ] **Step 4b: Plan 3a's hand-offs: the split button, the gallery sample and three stale names**
+
+The toolbar's split button says "Split", as its label does; the jasper-ui gallery's palette sample closes a tab;
+`TerminalTabTest` is `TerminalContentTest` (its ledger row and evidence paths move with it), a test name no longer says
+"zoomed hidden panes", and `TabHost` no longer says a registry listener cannot fail (an `Error` propagates):
+
+```bash
+git mv jasper-app/src/test/java/dev/jasper/app/workspace/TerminalTabTest.java \
+  jasper-app/src/test/java/dev/jasper/app/workspace/TerminalContentTest.java
+python3 -I - <<'PY'
+import sys; sys.path.insert(0, "build/plan3b"); from edits import edit
+W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
+T = "jasper-app/src/test/java/dev/jasper/app/workspace/"
+edit(W + "WindowChrome.java", [(
+    'split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");',
+    'split.setToolTipText("Split right or down"); split.getAccessibleContext().setAccessibleName("Split");', 2)])
+edit(T + "WindowChromeTest.java", [('getAccessibleName()).isEqualTo("Split pane");', 'getAccessibleName()).isEqualTo("Split");', 1)])
+edit(W + "TabHost.java", [("the terminal registry, whose listeners cannot fail it, then",
+                           "the terminal registry, which logs a listener's exception (an Error still propagates), then", 1)])
+edit(T + "ConfigurationControllerTest.java", [("PreservesSelectionAndZoomedHiddenPanes()", "PreservesSelectionAndTheMaximizedGroup()", 1)])
+edit(T + "TerminalContentTest.java", [("class TerminalTabTest {", "class TerminalContentTest {", 1)])
+edit(T + "ShortcutContextDispatchTest.java", [("as in TerminalTabTest.", "as in TerminalContentTest.", 1)])
+edit("docs/design/theme-engine/migration.csv", [("workspace/TerminalTabTest.java", "workspace/TerminalContentTest.java", 23),
+                                               (",TerminalTabTest,", ",TerminalContentTest,", 1)])
+edit("jasper-ui/src/testFixtures/java/dev/jasper/ui/gallery/StateFixtures.java", [
+    ('List.of("New Tab", "Split Right", "Close Pane")', 'List.of("New Tab", "Split Right", "Close Tab")', 1),
+    ('text(id + "-detail", "Panes", TextRole.DESCRIPTION)', 'text(id + "-detail", "Tabs", TextRole.DESCRIPTION)', 1)])
+PY
+git grep -n 'TerminalTabTest\|Split pane\|ZoomedHiddenPanes\|cannot fail it\|Close Pane' -- . ':!docs/superpowers' ':!docs/STATUS.md' && exit 1 || true
+```
+
+The last line prints nothing (plan texts and `docs/STATUS.md` keep the old names as history).
+
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `./gradlew :jasper-sdk:test :jasper-sdk-testkit:test :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.plugins.*' --continue`
+Run: `./gradlew :jasper-sdk:test :jasper-sdk-testkit:test :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.plugins.*' :jasper-ui:test --continue`
 Expected: PASS (`UiValuesTest` +1, `SessionValuesTest` +1, the contract suite +1 on both runtimes,
 `KitCompatibilityTest` +1). Then `./gradlew check --continue`: BUILD SUCCESSFUL.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add jasper-sdk/src jasper-sdk-testkit/src jasper-app/src
+git add jasper-sdk/src jasper-sdk-testkit/src jasper-app/src docs/design/theme-engine/migration.csv jasper-ui/src
 git commit -F - <<'EOF'
 The Tab menu takes the Pane items; ExitPolicy.CLOSE
 
@@ -2884,9 +2927,9 @@ EOF
 ### Task 5: Documentation, STATUS and the whole build
 
 **Files:**
-- Modify: `docs/plugin-authoring.md:192,221,293,295-299,347-350,423,697-698,852,864,869,883-884,917,949,1055`,
-  `docs/plugin-ui.md:72`, `jasper-sdk/README.md:45,48,79`, `docs/sdk-architecture.md:13,147-153,340,426-427`,
-  `docs/app-architecture.md:171`,
+- Modify: `docs/plugin-authoring.md:194,223,295,299-301,352,425,699-700,855,867,872,886-887,920,952,1059`,
+  `docs/plugin-ui.md:72`, `jasper-sdk/README.md:45,48,79`, `docs/sdk-architecture.md:13,149-153,335,421-422`,
+  `docs/app-architecture.md:177`,
   `docs/STATUS.md` (top), this plan's status banner (line 3)
 
 - [ ] **Step 1: The documents**
@@ -2928,7 +2971,7 @@ equal.''', 1),
      "content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.", 1),
     ("including obsolete factory implementations, and SDK 0.18's renamed constants.",
      "including obsolete factory implementations, SDK 0.18's renamed constants and the members SDK 0.19 removed.", 1),
-    ("off. The owner may be a terminal window, one of", "off. The owner may be a Jasper window, one of", 1),
+    ("title. The owner may be a terminal window, one of", "title. The owner may be a Jasper window, one of", 1),
     ("`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,\n"
      "`focusTerminalPane` and `closeTerminalPane` script a workspace;",
      "`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`,\n"
@@ -3045,7 +3088,8 @@ between windows in place of a close and an open; a moved terminal tab reports no
 pane keeps its id, a window the move empties reports `WINDOW_CLOSED`, and one opened for it `WINDOW_OPENED`, before the
 `TAB_MOVED`, and a window that fails to show an arrival takes it back (the move back, or a close). `StandardMenu.PANE` and
 `MenuTarget.Slot.PANE` are gone: the Tab menu reads Split Right, Split Down, Focus Group, the prompts, a rule and the
-tab commands. `ExitPolicy.CLOSE_PANE` is `ExitPolicy.CLOSE`. App side: `TabEntry(id, windowId, kind, terminal, title,
+tab commands. `ExitPolicy.CLOSE_PANE` is `ExitPolicy.CLOSE`. Close Others and Close Group ask plugin guards with `batch`
+false, as `Windows.onTabsClosing` defines it (true for a window or quit). App side: `TabEntry(id, windowId, kind, terminal, title,
 select)`, `WindowEntry` and `WindowTerminals` list every tab, `TerminalEvent.TabMoved`, `Tab.movingFrom()`,
 `WindowTerminals.tabWithdrawn`; `KitCompatibility` refuses the four removed members as 0.19's. The testkit and the app's contract fixture hold one pane
 per terminal tab, split into a tab of their own, list a plugin's content as a `CONTENT` tab of its window and close a
@@ -3103,8 +3147,8 @@ EOF
   testkit fakes and the contract suites on both runtimes (Tasks 2-4), the THD hand-off (Task 5); 9.4's `TabEntry` and
   every-tab registry (Tasks 2, 3); 17's SDK contract tests on the app and the testkit (Tasks 2-4); 16's clean break
   (`KitCompatibility`, no shims). Out of scope here: plan 4's and plan 6's rows of spec 14.
-- Every text this plan quotes from a file plan 3a creates or changes has a count in "Before you start" (checked against a
-  replay of 3a's committed plan), and the plan says how to re-anchor where 3a's execution differs.
+- Every text this plan quotes from a file plan 3a creates or changes has a count in "Before you start" (checked against
+  `9a60e08d0`, 3a's executed code), and the plan says how to re-anchor where a later commit differs.
 - Type consistency: `TabHandle.Kind`, `TabEntry.Kind`, `TabMoved(tabId, fromWindowId, toWindowId)` (SDK and app),
   `Tab.movingFrom(): Optional<UUID>`, `tabArrived(Tab, Optional<UUID>)`, `tabWithdrawn(Tab, Optional<UUID>)`,
   `FakeWorkspace.Tab.pane`, `addContentTab` and `moveTab` keep one name and one signature from the task that creates
