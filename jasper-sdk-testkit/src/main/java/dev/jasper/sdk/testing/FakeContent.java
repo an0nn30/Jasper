@@ -35,7 +35,7 @@ final class FakeContent implements ContentTab {
     public void setCommands(List<ContentCommand> values){if(!closed)commands=List.copyOf(values);}
     public void setStatus(List<ContentStatus> values){if(!closed)status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
-    public void select(){if(closed)return;ui.host.workspace.select(tab);for(var value:ui.host.contentTabs()) { var other=(FakeContent)value; if(other!=this && Objects.equals(owner, other.owner))other.active(false); }active(true);focus.run();}
+    public void select(){if(closed)return;ui.host.workspace.select(tab);active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
     public void move(boolean value){if(!closed&&pins==0&&ui.pendingContent==null&&separate!=value){
         active(false); separate=value;

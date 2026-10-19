@@ -78,11 +78,26 @@ final class FakeWorkspace {
 
     /** A tab of {@code kind}, selected. */
     Tab addTab(Window window, TabHandle.Kind kind, String title) {
+        var tab = announceTab(window, kind, title);
+        select(tab);
+        return tab;
+    }
+
+    /**
+     * A terminal tab with its one pane, as the application opens one for {@code openTab} or a split: announced, given its
+     * pane, then selected, so the active pane goes straight to the new pane.
+     */
+    Pane openTerminal(Window window, String title, PaneInfo info) {
+        var pane = addPane(announceTab(window, TabHandle.Kind.TERMINAL, title), info);
+        select(pane.tab);
+        return pane;
+    }
+
+    private Tab announceTab(Window window, TabHandle.Kind kind, String title) {
         var tab = new Tab(window, kind, title);
         everyTab.add(tab);
         window.tabs.add(tab);
         host.publishApp(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window.id, tab.id));
-        select(tab);
         return tab;
     }
 
@@ -91,6 +106,9 @@ final class FakeWorkspace {
         tab.window.selected = tab;
         host.publishApp(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(tab.window.id, tab.id));
         refreshActive();
+        // As the application's window does on every selection: each content tab is active while it is its window's selected tab.
+        for (var content : host.contentTabs())
+            if (content instanceof FakeContent shown && !shown.closed && shown.tab.window == tab.window) shown.active(shown.tab == tab);
     }
 
     /** A terminal tab's one pane; a second, or one in a content tab, is refused. */
@@ -160,5 +178,6 @@ final class FakeWorkspace {
         if (lastActive == window) lastActive = null;
         host.closeToolbarViews(window.id);
         host.publishApp(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(window.id));
+        refreshActive();
     }
 }

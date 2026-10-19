@@ -60,11 +60,11 @@ final class TerminalFixture {
                         opened.add("split|" + pane.id + "|" + side + "|" + local.directory().map(Path::toString).orElse("-")
                             + local.profile().map(profile -> "|" + profile).orElse("")
                             + local.program().map(program -> "|run:" + String.join(" ", program)).orElse(""));
-                        yield addPane(addTab(window, "split"), "split", local.directory().orElse(pane.directory));
+                        yield openTerminal(window, "split", local.directory().orElse(pane.directory));
                     }
                     case OpenSpec.Session session -> {
                         opened.add("session-split|" + pane.id + "|" + side + "|" + session.request().title());
-                        yield addSessionPane(addTab(window, session.request().title()), session.request());
+                        yield openSession(window, session.request());
                     }
                 };
                 focusPane(created);
@@ -86,11 +86,11 @@ final class TerminalFixture {
                     opened.add("tab|" + window.id + "|" + local.directory().map(Path::toString).orElse("-")
                         + local.profile().map(profile -> "|" + profile).orElse("")
                         + local.program().map(program -> "|run:" + String.join(" ", program)).orElse(""));
-                    yield Optional.of(entry(panes.get(addPane(addTab(window.id, "opened"), "opened", local.directory().orElse(null)))));
+                    yield Optional.of(entry(panes.get(openTerminal(window.id, "opened", local.directory().orElse(null)))));
                 }
                 case OpenSpec.Session session -> {
                     opened.add("session-tab|" + window.id + "|" + session.request().title());
-                    yield Optional.of(entry(panes.get(addSessionPane(addTab(window.id, session.request().title()), session.request()))));
+                    yield Optional.of(entry(panes.get(openSession(window.id, session.request()))));
                 }
             }));
         return window.id;
@@ -98,12 +98,28 @@ final class TerminalFixture {
 
     /** A terminal tab, selected; {@link #addPane} gives it its one pane. */
     UUID addTab(UUID windowId, String title) {
-        Window window = windows.get(windowId);
+        Tab tab = newTab(windows.get(windowId), title);
+        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(tab.window.id, tab.id)); select(tab); });
+        return tab.id;
+    }
+
+    /**
+     * A terminal tab with its one pane, as a window opens one for {@code openTab} or a split: announced, given its pane,
+     * then selected, so the active pane goes straight to the new pane. Returns the pane's id.
+     */
+    private UUID openTerminal(UUID windowId, String title, Path directory) {
+        Tab tab = newTab(windows.get(windowId), title);
+        registry.publish(new TerminalEvent.TabOpened(tab.window.id, tab.id));
+        UUID pane = addPane(tab.id, title, directory);
+        select(tab);
+        return pane;
+    }
+
+    private Tab newTab(Window window, String title) {
         var tab = new Tab(); tab.window = window; tab.title = () -> title;
         tabs.put(tab.id, tab);
         window.tabs.add(tab);
-        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); select(tab); });
-        return tab.id;
+        return tab;
     }
 
     private void select(Tab tab) {
@@ -222,8 +238,9 @@ final class TerminalFixture {
             Optional.ofNullable(panes.get(paneId)).map(pane -> pane.remote)));
     }
 
-    private UUID addSessionPane(UUID tabId, SessionRequest request) {
-        UUID id = addPane(tabId, request.title(), null);
+    /** A provided session's terminal tab, opened as {@link #openTerminal} opens one, then connected. */
+    private UUID openSession(UUID windowId, SessionRequest request) {
+        UUID id = openTerminal(windowId, request.title(), null);
         panes.get(id).request = request;
         connect(panes.get(id));
         return id;

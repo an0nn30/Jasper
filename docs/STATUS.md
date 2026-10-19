@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 3b: the SDK's tab and pane break — 2026-10-19** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `f3cceb7b7..5c27d93d8` (Tasks 1 to 4, after the plan's refresh commit `b6687d9df`),
-then this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-3b-sdk-tabs.md),
+`.claude/worktrees/workspace-tabs`, `b6687d9df..5c27d93d8` (Tasks 1 to 4, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-3b-sdk-tabs.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.19.0, a breaking boundary: every
 in-repo manifest, the example external plugin and every guide range declare `sdk = ">=0.19.0, <0.20"`, plugin versions
 are unchanged, and the SDK's and the testkit's Javadoc, the exception messages both runtimes throw at plugins and the
@@ -61,7 +61,14 @@ and Task 3's reviewer ran `:jasper-plugin-editor:test` (it passes with no Editor
 and `e.sdk`'s too-new range to `>=0.20.0`), because they resolve plugins that `LookFixtures` writes at 0.19, so the
 brief's "keep 0.18" was wrong; `DescriptorParserTest` keeps 0.18; (j) Task 2: an unused `List` import is removed from
 `WindowTerminals`; (k) Task 3, controller ruling: `TerminalFixture.addPane` throws `IllegalArgumentException` for a
-content tab, as `FakeWorkspace` does. THD Sourcing Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch
+content tab, as `FakeWorkspace` does; (l) final review: `TabMoveTest` and `WindowTerminalsTest` pin exactly one
+`TabMoved` per move, the move there and back, and one `TabClosed` for an open its window failed to show;
+`FakeWorkspace`, `FakeTerminals` and `TerminalFixture` announce a tab that `openTab` or a split opens, add its pane,
+then select it, as the application does, which a `PluginContractTest` case pins on both runtimes; `FakeWorkspace`
+reports the active pane right after the `WINDOW_CLOSED` of a window it closes; the fake's content tabs are active while
+their tab is their window's selected tab, as `WindowContent.update` sets them; `TabHandle.title()`'s and
+`FakePluginHost.closeToolbarViews`'s Javadoc are corrected; and a reworded `TabHost` comment is rewrapped. THD Sourcing
+Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch
 `jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18) stays skipped. Plan 4 removes `Windows.create`,
 `PluginWindow` and `WindowSpec` (spec 14) and bumps the SDK again, so rebuild it once, after the series' last SDK bump,
 against the jars `sdkRelease` then publishes; that rebuild includes 0.19's changes: its `plugin.toml` (`sdk = ">=0.16.1,
@@ -81,8 +88,8 @@ whose every recovery fails (every window's attach throws, F8) leaves no `TabClos
 and its test; the take-back can name a window already reported closed; a throwing `old.detach` during a move publishes
 nothing while `tab.window()` names the next window; and owner-less content lands in the last-added host in
 `AppContractTest` but in the first open window in `FakeUi`, so plan 4's `TabPlacement` moves it to the main window and
-pins it in the contract. `./gradlew check --continue`: **11,631 tests, 0 failures, 0 errors, 25 skipped** (from the XML
-in `*/build/test-results/test/`; `jasper-app` 3,684, `jasper-sdk` 94, `jasper-sdk-testkit` 203, `PluginContractTest` 106
+pins it in the contract. `./gradlew check --continue`: **11,635 tests, 0 failures, 0 errors, 25 skipped** (from the XML
+in `*/build/test-results/test/`; `jasper-app` 3,685, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107
 on each runtime, `TabRegistryTest` 23, `TabMoveTest` 7, `WindowTerminalsTest` 3, `KitCompatibilityTest` 14,
 `TabMenuTest` 8, `TerminalContentTest` 9; Remote's `StagedTransferLifecycleTest` is load-sensitive, timing out once
 under a full run in Task 4 and passing alone and on rerun, and it passed here). GUI checks for the user: the Tab menu in

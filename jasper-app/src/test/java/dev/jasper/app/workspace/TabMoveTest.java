@@ -74,7 +74,8 @@ class TabMoveTest {
             var pane = ((TerminalContent) tab.content()).pane();
             model.tabs().move(tab, target.id());
             assertThat(after).as("a moved pane is not opened again").isEmpty();
-            assertThat(facts).as("one move, reported where it arrives").contains(new TerminalEvent.TabMoved(tab.id().value(), source.id(), target.id()));
+            assertThat(facts).as("one move, reported where it arrives").filteredOn(TerminalEvent.TabMoved.class::isInstance)
+                .containsExactly(new TerminalEvent.TabMoved(tab.id().value(), source.id(), target.id()));
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.PaneOpened || fact instanceof TerminalEvent.PaneClosed);
             assertThat(registry.tab(tab.id().value()).orElseThrow().windowId()).isEqualTo(target.id());
@@ -104,8 +105,8 @@ class TabMoveTest {
             assertThat(tab.window()).as("back where it was").isEqualTo(source.id());
             assertThat(source.tabs()).contains(tab);
             assertThat(target.tabs()).doesNotContain(tab);
-            assertThat(facts).as("the move there and back").containsSubsequence(new TerminalEvent.TabMoved(id, source.id(), target.id()),
-                new TerminalEvent.TabMoved(id, target.id(), source.id()));
+            assertThat(facts).as("the move there and back").filteredOn(TerminalEvent.TabMoved.class::isInstance)
+                .containsExactly(new TerminalEvent.TabMoved(id, source.id(), target.id()), new TerminalEvent.TabMoved(id, target.id(), source.id()));
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             assertThat(registry.tab(id).orElseThrow().windowId()).isEqualTo(source.id());
             facts.clear();
@@ -119,6 +120,8 @@ class TabMoveTest {
             assertThat(opened).singleElement().extracting(TerminalEvent.TabOpened::windowId).isEqualTo(target.id());
             assertThat(facts).as("an open the window failed to show closes").containsSubsequence(opened.getFirst(),
                 new TerminalEvent.TabClosed(target.id(), opened.getFirst().tabId()));
+            assertThat(facts).as("closed once").filteredOn(fact -> fact instanceof TerminalEvent.TabClosed closed && closed.tabId().equals(opened.getFirst().tabId()))
+                .hasSize(1);
         });
     }
 

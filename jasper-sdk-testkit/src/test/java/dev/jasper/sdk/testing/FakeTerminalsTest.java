@@ -137,6 +137,64 @@ class FakeTerminalsTest {
         }
     }
 
+    /** As in the application: a move that empties the active window reports no active pane as that window closes. */
+    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneAsItCloses() {
+        try (var host = new FakePluginHost()) {
+            UUID first = host.addTerminalWindow(), moving = host.addTerminalTab(first, "build");
+            host.addTerminalPane(moving, info("make"));
+            UUID second = host.addTerminalWindow(), other = host.addTerminalTab(second, "zsh");
+            host.addTerminalPane(other, info("zsh"));
+            host.activateTerminalWindow(first);
+            var heard = new java.util.ArrayList<Object>();
+            host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
+                for (var topic : List.of(dev.jasper.sdk.terminal.TerminalEvents.WINDOW_CLOSED, dev.jasper.sdk.terminal.TerminalEvents.TAB_MOVED,
+                        dev.jasper.sdk.terminal.TerminalEvents.TAB_SELECTED, dev.jasper.sdk.terminal.TerminalEvents.ACTIVE_PANE_CHANGED))
+                    plugin.events().subscribe(topic, heard::add);
+            });
+            host.flush();
+            heard.clear();
+            host.moveTab(moving, second);
+            host.flush();
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first),
+                new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(moving, first, second),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving));
+        }
+    }
+
+    /** As the application's window does on every selection: a content tab is active while it is its window's selected tab. */
+    @Test void aContentTabIsActiveWhileItIsItsWindowsSelectedTab() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try (var host = new FakePluginHost()) {
+                UUID window = host.addTerminalWindow(), shell = host.addTerminalTab(window, "zsh"), pane = host.addTerminalPane(shell, info("zsh"));
+                var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), plugin -> { });
+                var terminals = context.terminals();
+                var view = context.kit().create(new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Text("body", dev.jasper.sdk.ui.ControlState.READY,
+                    "Notes", dev.jasper.sdk.ui.Nodes.TextRole.BODY)), event -> { });
+                var notes = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), terminals.window(window).orElseThrow(), view);
+                var tab = terminals.window(window).orElseThrow().activeTab().orElseThrow();
+                var heard = new java.util.ArrayList<Boolean>();
+                notes.onActive(heard::add);
+                assertThat(notes.isActive()).as("it opens selected").isTrue();
+                terminals.tab(shell).orElseThrow().select();
+                assertThat(notes.isActive()).as("selecting a terminal tab deactivates it").isFalse();
+                assertThat(heard).containsExactly(false);
+                tab.select();
+                assertThat(notes.isActive()).as("selecting its tab activates it").isTrue();
+                assertThat(heard).containsExactly(false, true);
+                host.focusTerminalPane(pane);
+                assertThat(notes.isActive()).as("focusing a pane selects its tab").isFalse();
+                notes.select();
+                terminals.split(terminals.pane(pane).orElseThrow(), dev.jasper.sdk.terminal.Direction.RIGHT, OpenRequest.local());
+                assertThat(notes.isActive()).as("a split's tab opens selected").isFalse();
+                notes.select();
+                host.addTerminalTab(window, "top");
+                assertThat(notes.isActive()).as("so does a scripted tab").isFalse();
+                assertThat(heard).containsExactly(false, true, false, true, false, true, false);
+            }
+        });
+    }
+
     @Test void profilesAreScriptedAndOnlyListedOnesOpen() {
         try (var host = new FakePluginHost()) {
             var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));

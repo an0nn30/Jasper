@@ -105,7 +105,8 @@ class WindowTerminalsTest {
             assertThat(registry.activePane()).as("a plugin's tab has no terminal").isEmpty();
             events.clear();
             model.tabs().move(view, otherId);
-            assertThat(events).contains(new TerminalEvent.TabMoved(tabId, windowId, otherId), new TerminalEvent.TabSelected(otherId, tabId));
+            assertThat(events).filteredOn(TerminalEvent.TabMoved.class::isInstance).containsExactly(new TerminalEvent.TabMoved(tabId, windowId, otherId));
+            assertThat(events).contains(new TerminalEvent.TabSelected(otherId, tabId));
             assertThat(events).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             assertThat(registry.tab(tabId).orElseThrow().windowId()).isEqualTo(otherId);
             events.clear();

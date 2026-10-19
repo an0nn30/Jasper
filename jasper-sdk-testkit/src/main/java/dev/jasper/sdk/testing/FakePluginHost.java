@@ -567,7 +567,7 @@ public final class FakePluginHost implements AutoCloseable {
 
     /**
      * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
-     * pane closes.
+     * tab closes or moves to another window.
      *
      * @param windowId a Jasper window
      * @since 0.18.0

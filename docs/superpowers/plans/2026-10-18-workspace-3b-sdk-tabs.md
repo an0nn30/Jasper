@@ -1,6 +1,7 @@
 # Workspace tabs 3b: the SDK's tab and pane break Implementation Plan
 
-**Status: executed on 2026-10-19** (`f3cceb7b7..5c27d93d8`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-19** (`b6687d9df..5c27d93d8`, then the documentation commit and the final review's
+fixes); see `docs/STATUS.md`.
 Deviations from the plan's text: (a) before Task 1 the plan was replayed on 3a's final code `9a60e08d0` (39 blocks, 0
 failures) and refreshed in `b6687d9df`: six edit anchors (Task 3 Step 4's `WindowContent` edit now quotes 3a's executed
 `attach` and `detach`; Task 5's Enterprise owner sentence) and four "Before you start" lines were re-found on 3a's final
@@ -23,7 +24,13 @@ ran `:jasper-plugin-editor:test` (it passes with no Editor change); (i) Task 1: 
 `>=0.20.0`), because they resolve plugins that `LookFixtures` writes at 0.19, so the brief's "keep 0.18" was wrong;
 `DescriptorParserTest` keeps 0.18; (j) Task 2: an unused `List` import is removed from `WindowTerminals`; (k) Task 3,
 controller ruling: `TerminalFixture.addPane` throws `IllegalArgumentException` for a content tab, as `FakeWorkspace`
-does.
+does; (l) final review: `TabMoveTest` and `WindowTerminalsTest` pin exactly one `TabMoved` per move, the move there and
+back, and one `TabClosed` for an open its window failed to show; `FakeWorkspace`, `FakeTerminals` and `TerminalFixture`
+announce a tab that `openTab` or a split opens, add its pane, then select it, as the application does, which a
+`PluginContractTest` case pins on both runtimes; `FakeWorkspace` reports the active pane right after the `WINDOW_CLOSED`
+of a window it closes; the fake's content tabs are active while their tab is their window's selected tab, as
+`WindowContent.update` sets them; `TabHandle.title()`'s and `FakePluginHost.closeToolbarViews`'s Javadoc are corrected;
+and a reworded `TabHost` comment is rewrapped.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

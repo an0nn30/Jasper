@@ -52,7 +52,8 @@ public interface TabHandle {
     Optional<PaneHandle> terminal();
 
     /**
-     * The tab's title as its header shows it. Needs {@code terminal.observe}.
+     * The tab's title: a terminal tab's as its header shows it, a content tab's presentation title without the unsaved
+     * marker or the detail. Needs {@code terminal.observe}.
      *
      * @return the title; the last known one once the tab is closed
      */

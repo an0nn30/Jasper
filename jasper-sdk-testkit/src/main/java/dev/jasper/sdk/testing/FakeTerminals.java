@@ -163,16 +163,14 @@ final class FakeTerminals implements Terminals {
         return workspace.window(window.id()).map(target -> switch (request) {
             case OpenRequest.Local local -> {
                 workspace.openRequests.add("tab|" + target.id + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-") + profile(local) + program(local));
-                FakeWorkspace.Tab tab = workspace.addTab(target, "opened");
-                FakeWorkspace.Pane pane = workspace.addPane(tab, openedInfo(local));
-                yield new Pane(pane.id, tab.id);
+                FakeWorkspace.Pane pane = workspace.openTerminal(target, "opened", openedInfo(local));
+                yield new Pane(pane.id, pane.tab.id);
             }
             case OpenRequest.Session session -> {
                 workspace.openRequests.add("session-tab|" + target.id + "|" + session.spec().title());
-                FakeWorkspace.Tab tab = workspace.addTab(target, session.spec().title());
-                FakeWorkspace.Pane pane = workspace.addPane(tab, sessionInfo(session));
+                FakeWorkspace.Pane pane = workspace.openTerminal(target, session.spec().title(), sessionInfo(session));
                 workspace.sessions.connect(context, pane, session.spec());
-                yield new Pane(pane.id, tab.id);
+                yield new Pane(pane.id, pane.tab.id);
             }
         });
     }
@@ -190,11 +188,11 @@ final class FakeTerminals implements Terminals {
                 case OpenRequest.Local local -> {
                     workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
                         + profile(local) + program(local));
-                    yield workspace.addPane(workspace.addTab(window, "opened"), openedInfo(local));
+                    yield workspace.openTerminal(window, "opened", openedInfo(local));
                 }
                 case OpenRequest.Session session -> {
                     workspace.openRequests.add("session-split|" + model.id + "|" + direction + "|" + session.spec().title());
-                    FakeWorkspace.Pane created = workspace.addPane(workspace.addTab(window, session.spec().title()), sessionInfo(session));
+                    FakeWorkspace.Pane created = workspace.openTerminal(window, session.spec().title(), sessionInfo(session));
                     workspace.sessions.connect(context, created, session.spec());
                     yield created;
                 }

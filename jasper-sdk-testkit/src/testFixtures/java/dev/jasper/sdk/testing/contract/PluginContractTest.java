@@ -1562,6 +1562,48 @@ public abstract class PluginContractTest {
         assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
     }
 
+    /**
+     * As the application opens them: a new tab or split is announced, given its pane, then selected, so the active pane
+     * goes straight to it.
+     */
+    @Test void aTabOrSplitOpenedInTheActiveWindowIsAnnouncedGivenItsPaneThenSelected() {
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
+        h.activateTerminalWindow(window);
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OPEN, Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.PANE_OPENED, TerminalEvents.TAB_SELECTED,
+                    TerminalEvents.ACTIVE_PANE_CHANGED))
+                context.events().subscribe(topic, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        var opened = new AtomicReference<PaneHandle>();
+        var openedTab = new AtomicReference<UUID>();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            opened.set(terminals.openTab(terminals.window(window).orElseThrow(), OpenRequest.local()).orElseThrow());
+            openedTab.set(opened.get().tab().id());
+        });
+        h.flush();
+        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(window, openedTab.get()),
+            new TerminalEvents.PaneEvent(openedTab.get(), opened.get().id()), new TerminalEvents.TabEvent(window, openedTab.get()),
+            new TerminalEvents.ActivePaneChanged(Optional.of(opened.get().id())));
+        heard.clear();
+        var split = new AtomicReference<PaneHandle>();
+        var splitTab = new AtomicReference<UUID>();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            split.set(terminals.split(terminals.pane(only).orElseThrow(), Direction.RIGHT, OpenRequest.local()).orElseThrow());
+            splitTab.set(split.get().tab().id());
+        });
+        h.flush();
+        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(window, splitTab.get()),
+            new TerminalEvents.PaneEvent(splitTab.get(), split.get().id()), new TerminalEvents.TabEvent(window, splitTab.get()),
+            new TerminalEvents.ActivePaneChanged(Optional.of(split.get().id())));
+    }
+
     @Test void shellProfilesAreListedWatchedAndOpenedByIdOnly() {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
         var pwsh = new ShellProfileInfo("pwsh", "PowerShell 7", ShellProfileInfo.Kind.LOCAL_SHELL, Optional.empty());

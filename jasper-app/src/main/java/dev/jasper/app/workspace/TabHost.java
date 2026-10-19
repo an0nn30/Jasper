@@ -64,8 +64,8 @@ final class TabHost {
     }
 
     /**
-     * A pane that has just opened: the terminal registry, which logs a listener's exception (an Error still propagates), then this window's activity
-     * hear of it.
+     * A pane that has just opened: the terminal registry, which logs a listener's exception (an Error still propagates),
+     * then this window's activity hear of it.
      */
     private void announce(Tab tab, TerminalPane pane) {
         owner.report(new TerminalEvent.PaneOpened(tab.id().value(), pane.id()));
