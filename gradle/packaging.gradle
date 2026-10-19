@@ -32,6 +32,9 @@ def aotRequested = providers.gradleProperty('jasper.aot').map { it == 'true' }.g
 // Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
 // fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
 def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
+// Workspace-tabs spec 5.4: Jasper appears in Open With and takes drops on its Dock icon for text, source code and
+// folders, without claiming any of them as their default application.
+def macDocumentTypes = '[{"CFBundleTypeName":"Text","CFBundleTypeRole":"Editor","LSHandlerRank":"Alternate","LSItemContentTypes":["public.text","public.source-code"]},{"CFBundleTypeName":"Folder","CFBundleTypeRole":"Viewer","LSHandlerRank":"Alternate","LSItemContentTypes":["public.folder"]}]'
 // Modern macOS renders the full-canvas tab artwork from this Icon Composer catalog.
 def macIconCatalog = rootProject.file('packaging/icons/macos/Assets.car')
 def macIconName = 'Jasper'
@@ -265,6 +268,7 @@ def packageApp = tasks.register('packageApp') {
     inputs.property('bundledNatives', providers.provider { bundledNatives(normalizedHost().os, normalizedHost().architecture).collect { it.toString() } })
     inputs.property('bundledNativeOptions', providers.provider { bundledNativeJvmOptions(normalizedHost().os) })
     inputs.property('localNetworkUsage', localNetworkUsage)
+    inputs.property('documentTypes', macDocumentTypes)
     inputs.property('version', version)
     inputs.property('host', providers.provider { normalizedHost().toString() })
     inputs.property('toolchainHome', launcher.map { it.metadata.installationPath.asFile.absolutePath })
@@ -305,6 +309,8 @@ def packageApp = tasks.register('packageApp') {
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil icon catalog name')
                 executeNative(['/usr/bin/plutil', '-replace', 'NSLocalNetworkUsageDescription', '-string', localNetworkUsage,
                     new File(image, 'Contents/Info.plist').absolutePath], 'plutil local network usage')
+                executeNative(['/usr/bin/plutil', '-replace', 'CFBundleDocumentTypes', '-json', macDocumentTypes,
+                    new File(image, 'Contents/Info.plist').absolutePath], 'plutil document types')
                 File executable = new File(image, 'Contents/MacOS/Jasper')
                 Files.write(executable.toPath(), macLauncherWithIdentity(Files.readAllBytes(executable.toPath()),
                     'dev.jasper.app', macLauncherTemplate()))
@@ -556,6 +562,8 @@ def verifyPackage = tasks.register('verifyPackage') {
             if (identifier != 'dev.jasper.app' || bundleVersion != context.version) throw new GradleException("Package verification failed: plist identity/version is ${identifier}/${bundleVersion}")
             def localNetwork = executeNative(['/usr/bin/plutil', '-extract', 'NSLocalNetworkUsageDescription', 'raw', '-o', '-', plist.absolutePath], 'plutil local network').stdout.trim()
             if (localNetwork != localNetworkUsage) throw new GradleException("Package verification failed: plist local network usage description is '${localNetwork}'")
+            def documentTypes = new groovy.json.JsonSlurper().parseText(executeNative(['/usr/bin/plutil', '-extract', 'CFBundleDocumentTypes', 'json', '-o', '-', plist.absolutePath], 'plutil document types').stdout)
+            if (documentTypes != new groovy.json.JsonSlurper().parseText(macDocumentTypes)) throw new GradleException("Package verification failed: plist document types are ${documentTypes}")
             String iconName = executeNative(['/usr/bin/plutil', '-extract', 'CFBundleIconFile', 'raw', '-o', '-', plist.absolutePath], 'plutil icon').stdout.trim()
             if (!iconName.endsWith('.icns')) iconName += '.icns'
             File packagedIcon = new File(image, "Contents/Resources/${iconName}")

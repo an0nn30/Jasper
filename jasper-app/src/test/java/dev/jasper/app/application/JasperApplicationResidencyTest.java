@@ -170,6 +170,19 @@ class JasperApplicationResidencyTest {
         edt(() -> { });
     }
 
+    @Test void theOpenFileEventOpensItsFilesAsAnyOpenDoes(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        Path notes = java.nio.file.Files.writeString(dir.resolve("notes.txt"), "");
+        JasperApplication application = application(() -> { });
+        try {
+            // What the handler runs on the EDT (an OpenFilesEvent cannot be built headlessly).
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> edt(() -> application.filesOpened(List.of(notes.toFile()))))
+                .as("no window is open, so one opens first").hasRootCauseInstanceOf(java.awt.HeadlessException.class);
+        } finally {
+            edt(application::quitNow);
+        }
+        edt(() -> application.filesOpened(List.of(notes.toFile())));   // once quitting: nothing, and no failure
+    }
+
     @Test void anOpenWithNoWindowGoesForOne() throws Exception {
         JasperApplication application = application(() -> { });
         try {

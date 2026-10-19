@@ -87,6 +87,8 @@ public final class JasperApplication {
     private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
     /** The trigger of a window another launch asked for through the handoff endpoint. */
     public static final String HANDOFF = "handoff";
+    /** The trigger of a window the macOS open-file event asked for. */
+    public static final String OPEN_FILE = "open-file";
     private final List<Runnable> glassListeners = new ArrayList<>();
     /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
@@ -152,6 +154,7 @@ public final class JasperApplication {
     private volatile MemoryWarnings memoryWarnings;
     private boolean preferencesHandlerInstalled;
     private boolean aboutHandlerInstalled;
+    private boolean openFileHandlerInstalled;
     private UiState uiState = UiState.inMemory();
     private AuxiliaryWindows auxiliary;
     private NativeShells shells;
@@ -393,6 +396,15 @@ public final class JasperApplication {
         if (supports(Desktop.Action.APP_EVENT_REOPENED)) {
             reopenListener = event -> SwingUtilities.invokeLater(this::reopened);
             Desktop.getDesktop().addAppEventListener(reopenListener);
+        }
+        // Finder's Open With, a drop on the Dock icon, open -a Jasper FILE (workspace-tabs spec 5.4). Installed before the
+        // first window, so the event that starts a cold launch finds it.
+        if (supports(Desktop.Action.APP_OPEN_FILE)) {
+            Desktop.getDesktop().setOpenFileHandler(event -> {
+                List<java.io.File> files = List.copyOf(event.getFiles());
+                SwingUtilities.invokeLater(() -> filesOpened(files));
+            });
+            openFileHandlerInstalled = true;
         }
         if (supports(Desktop.Action.APP_PREFERENCES)) {
             Desktop.getDesktop().setPreferencesHandler(event -> SwingUtilities.invokeLater(() -> openSettings(null, null)));
@@ -970,6 +982,16 @@ public final class JasperApplication {
         if (!restart(RestartMode.SAME))
             notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "Jasper could not restart")
                 .withContent("Jasper could not work out how it was started. Quit and reopen it to run the new build."));
+    }
+
+    /**
+     * The macOS open-file event (spec 5.4): each file opens in the editor a plugin provides, else is revealed, and each
+     * folder as a terminal tab, as {@link #open} opens a launch's paths. EDT.
+     *
+     * @param files what Finder, the Dock or {@code open -a} handed over
+     */
+    void filesOpened(List<java.io.File> files) {
+        open(files.stream().map(file -> file.toPath().toAbsolutePath()).toList(), OPEN_FILE);
     }
 
     /**
@@ -2075,6 +2097,7 @@ public final class JasperApplication {
         if (quitHandlerInstalled) { Desktop.getDesktop().setQuitHandler(null); quitHandlerInstalled = false; }
         if (preferencesHandlerInstalled) { Desktop.getDesktop().setPreferencesHandler(null); preferencesHandlerInstalled = false; }
         if (aboutHandlerInstalled) { Desktop.getDesktop().setAboutHandler(null); aboutHandlerInstalled = false; }
+        if (openFileHandlerInstalled) { Desktop.getDesktop().setOpenFileHandler(null); openFileHandlerInstalled = false; }
         if (reopenListener != null) { Desktop.getDesktop().removeAppEventListener(reopenListener); reopenListener = null; }
         // Cross-process locks and socket probes must not hold up Swing or the exit deadline.
         List<CompletableFuture<?>> pending = new ArrayList<>(launches.pendingExits());
