@@ -9,8 +9,9 @@ import java.util.Optional;
  * @param title non-blank title shown to the user
  * @param detail initial detail line, possibly empty
  * @param state the first state: {@code UP}, {@code DEGRADED} or {@code DOWN}
- * @param activateActionId one of the plugin's own actions that brings the user to this connection, run when the
- *                         user clicks its card; absent when there is none
+ * @param activateActionId one of the plugin's own actions that brings the user to this connection, run in the window
+ *                         used last when the user clicks its card; absent when there is none, and any other id only
+ *                         raises the application
  * @since 0.10.2
  */
 public record ConnectionSpec(String title, String detail, ConnectionEvent.State state, Optional<String> activateActionId) {

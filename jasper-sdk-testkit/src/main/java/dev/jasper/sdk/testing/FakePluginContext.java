@@ -226,7 +226,7 @@ public final class FakePluginContext implements PluginContext {
     /** Status bar items. */
     @Override public StatusBar statusBar() { return ui.statusBar(); }
 
-    /** Side panels. */
+    /** Tool windows. */
     @Override public Panels panels() { return ui.panels(); }
 
     /** Rail buttons. */
@@ -235,7 +235,7 @@ public final class FakePluginContext implements PluginContext {
     /** Plugin windows and dialogs. */
     @Override public Windows windows() { return ui.windows(); }
 
-    /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */
+    /** The host's semantic colours, variants, workspace, editor and syntax palettes, opacity, and change notifications. */
     @Override public Appearance appearance() {
         return new Appearance() {
             @Override public java.awt.Color color(dev.jasper.sdk.ui.SemanticColor role) { host.requireAppearanceThread(); return host.semanticColor(role); }

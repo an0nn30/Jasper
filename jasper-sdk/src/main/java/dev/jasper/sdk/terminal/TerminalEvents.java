@@ -160,7 +160,10 @@ public final class TerminalEvents {
     public static final Topic<CommandStarted> COMMAND_STARTED = Topic.of(PREFIX + "command_started", CommandStarted.class);
     /** A command finished. */
     public static final Topic<CommandFinished> COMMAND_FINISHED = Topic.of(PREFIX + "command_finished", CommandFinished.class);
-    /** A pane's session started or ended. */
+    /**
+     * A pane's session changed state: {@code CONNECTING} when a provided session begins a connection attempt,
+     * {@code RUNNING} when a session starts, {@code EXITED} when a running session ends.
+     */
     public static final Topic<SessionStateChanged> SESSION_STATE_CHANGED = Topic.of(PREFIX + "session_state_changed", SessionStateChanged.class);
     /** A pane rang the bell. */
     public static final Topic<PaneEvent> BELL = Topic.of(PREFIX + "bell", PaneEvent.class);

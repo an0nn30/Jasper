@@ -101,7 +101,10 @@ public record SessionLaunchOptions(List<String> command, Map<String, String> env
         public Builder scrollback(int v) { scrollback = v; return this; }
         /** Names this machine is known by; a working directory reported under any other host is not local. */
         public Builder localHostNames(Set<String> v) { localHostNames = Set.copyOf(v); return this; }
-        /** How a local working-directory report's path becomes a directory; empty ignores the report. */
+        /**
+         * How the path of a local working-directory report, or of a clicked {@code file:} link, becomes a path on this
+         * machine; empty ignores the report and names no file for the link.
+         */
         public Builder localPathMapper(Function<String, Optional<Path>> v) { localPathMapper = v; return this; }
         /** Validates and creates an immutable launch description without process I/O. */
         public SessionLaunchOptions build() {

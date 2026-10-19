@@ -16,7 +16,8 @@ public interface Plugin {
     void start(PluginContext context) throws Exception;
 
     /**
-     * Called once at shutdown, before the runtime closes what the plugin left open. Must not block:
+     * Called once at shutdown, in reverse start order, for a plugin whose start returned normally, before the runtime
+     * closes what the plugin left open; never after a failed start. Must not block:
      * a blocked UI thread cannot be abandoned and ends the process at the exit deadline.
      */
     default void stop() { }

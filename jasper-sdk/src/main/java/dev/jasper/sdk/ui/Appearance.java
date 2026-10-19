@@ -9,7 +9,12 @@ import java.util.function.Consumer;
  * subscribes to refresh its domain palettes.
  */
 public interface Appearance {
-    /** Read a canonical semantic color on the UI thread. @param role canonical role @return current color */
+    /**
+     * Read a canonical semantic color on the UI thread.
+     *
+     * @param role canonical role
+     * @return current color
+     */
     java.awt.Color color(SemanticColor role);
     /**
      * The current variant; safe from any thread.

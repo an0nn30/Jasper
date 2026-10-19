@@ -9,7 +9,7 @@ public sealed interface EditorHint {
      */
     record Font(boolean monospaced) implements EditorHint { }
 
-    /** A folder chooser beside a text field. */
+    /** A folder path. Settings offers no folder chooser for it: the setting's kind decides the control. */
     record Directory() implements EditorHint { }
 
     /** A file chooser beside a text field. */
@@ -32,7 +32,7 @@ public sealed interface EditorHint {
     static EditorHint font(boolean monospaced) { return new Font(monospaced); }
 
     /**
-     * A folder chooser.
+     * A folder path; see {@link Directory}.
      *
      * @return the hint
      */

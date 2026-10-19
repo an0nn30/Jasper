@@ -7,7 +7,9 @@ import java.util.concurrent.CompletableFuture;
 /**
  * One pane. Handles keep an id and no Swing object; two handles for the same pane are equal. A pane can
  * close at any moment: commands to a closed pane are ignored, queries return the last known value, and
- * {@link #isOpen()} tells. A missing capability always throws. EDT only, except the three sending methods.
+ * {@link #isOpen()} tells. Input to a pane whose session is not running, while it connects or after it ended, is
+ * dropped. A missing capability always throws. Once the plugin's context is closed, queries and commands throw
+ * {@link IllegalStateException} and the three sending methods do nothing. EDT only, except the three sending methods.
  */
 public interface PaneHandle {
     /**

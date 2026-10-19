@@ -7,8 +7,9 @@ import java.util.regex.Pattern;
 
 /**
  * The declaration of one plugin setting: its key in the settings file, its kind and default, and how Settings shows
- * it. Start one with {@link #of}, give it at least a {@link #label}, and pass it to {@link PluginSettings#declare}, which
- * reads it once; later changes to the declaration are ignored.
+ * it. Start one with {@link #of}, give it at least a {@link #label(String) label}, and pass it to
+ * {@link PluginSettings#declare}; do not change it afterwards, since Settings reads some of it, such as its section,
+ * description, editor hint and unit, again when it shows the page.
  *
  * @param <T> the value type
  */

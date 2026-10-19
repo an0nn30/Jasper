@@ -15,6 +15,11 @@ public final class FakeKit implements UiKit, AutoCloseable {
     private final Map<String,IconAsset> icons = new java.util.concurrent.ConcurrentHashMap<>();
     private final List<String> failures = new ArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    /**
+     * A kit for one plugin. Each {@link FakePluginHost} plugin context has its own; a test of a view alone can make one.
+     *
+     * @param owner the plugin's id; icons registered through this kit must be named {@code <owner>:<name>}
+     */
     public FakeKit(String owner) { this.owner=Objects.requireNonNull(owner); }
     static void edt() { if(!EventQueue.isDispatchThread()) throw new IllegalStateException("Kit requires EDT"); }
     void guard() { edt(); if(closed.get()) throw new IllegalStateException("Kit is closed"); }
@@ -43,5 +48,10 @@ public final class FakeKit implements UiKit, AutoCloseable {
     public List<String> failures() { edt();return List.copyOf(failures); }
     /** Test mounting seam: foreign and disposed handles are rejected. */
     public FakeKitView requireOwned(UiView view) { guard();if(!(view instanceof FakeKitView fake) || fake.owner!=this)throw new IllegalArgumentException("Foreign view");fake.guard();return fake; }
+    /**
+     * Closes the kit: every live view closes and the registered icons are dropped, at once on the EDT or later from
+     * another thread. Afterwards {@code create} and {@code registerIcon} throw {@link IllegalStateException}; a second
+     * close does nothing.
+     */
     @Override public void close() { if(!closed.compareAndSet(false,true))return;Runnable cleanup=() -> {for(var view:List.copyOf(views))view.close();icons.clear();}; if(EventQueue.isDispatchThread())cleanup.run();else EventQueue.invokeLater(cleanup); }
 }

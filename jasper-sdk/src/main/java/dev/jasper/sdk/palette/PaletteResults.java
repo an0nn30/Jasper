@@ -8,7 +8,8 @@ import java.util.Optional;
  * What a scope answers a query with.
  *
  * @param rows               at most 200 rows, in display order; the palette lists them all, scrolling as needed
- * @param sectionLabel       a heading for the list, used for the empty query ("Recent", "Most recent")
+ * @param sectionLabel       a heading over the rows, such as "Recent", shown while this scope is chosen and the answer
+ *                           has rows; with no scope chosen the palette heads the rows itself
  * @param initialSelectionId the row selected first; defaults to the first row
  */
 public record PaletteResults(List<PaletteRow> rows, Optional<String> sectionLabel, Optional<String> initialSelectionId) {
@@ -25,10 +26,11 @@ public record PaletteResults(List<PaletteRow> rows, Optional<String> sectionLabe
     }
 
     /**
-     * Derives a value.
+     * Rows with no section label, the first selected.
      *
      * @param rows the rows
-     *  @return those rows with no section label */
+     * @return the results
+     */
     public static PaletteResults of(List<PaletteRow> rows) { return new PaletteResults(rows, Optional.empty(), Optional.empty()); }
 
     /**

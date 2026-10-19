@@ -23,6 +23,7 @@ public interface NotificationGroup {
      * @param spec what to show
      * @return the handle that expires it
      * @throws IllegalStateException when the plugin's context is closed
+     * @throws IllegalArgumentException when the spec's icon names no icon the host knows
      */
     NotificationHandle post(NotificationSpec spec);
 

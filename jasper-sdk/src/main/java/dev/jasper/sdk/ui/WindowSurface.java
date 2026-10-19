@@ -29,12 +29,13 @@ public interface WindowSurface extends Subscription {
     void setTitle(String title);
 
     /**
-     * Opens a native chooser for one existing file, owned by this window or dialog.
-     * Blocks on the UI thread while the platform pumps events. If the owner closes during
+     * Shows Jasper's file chooser for one existing local file, owned by this window or dialog.
+     * Blocks on the UI thread, which keeps pumping events, until the chooser closes. If the owner closes during
      * selection, the result is discarded. This does not read the selected file.
      *
      * @param title non-blank chooser title
-     * @param initialPath optional file or directory to start from; never null
+     * @param initialPath optional file or directory to start from (a file opens its folder with that file
+     *     selected); empty starts in the home folder; never null
      * @return an absolute normalized path, or empty on cancellation or owner closure
      * @throws IllegalStateException if the plugin is stopped or this surface is not shown or is closed
      * @since 0.7.1
@@ -43,7 +44,7 @@ public interface WindowSurface extends Subscription {
 
     /**
      * Adds a guard consulted when the user tries to close the window. Overlays have no implicit user-close action. Any guard returning false keeps
-     * it open; a guard that throws is treated as allowing the close. Since 0.8.4, quitting or restarting Jasper asks the guards of every open plugin window (not dialogs or
+     * it open; a guard that throws is treated as allowing the close. Quitting or restarting Jasper asks the guards of every open plugin window (not dialogs or
      * overlays) first, and a refusal cancels the quit; nothing closes while they are asked.
      *
      * @param guard returns whether the window may close

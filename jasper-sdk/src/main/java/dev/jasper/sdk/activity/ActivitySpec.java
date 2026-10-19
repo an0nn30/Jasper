@@ -8,9 +8,11 @@ import java.util.Optional;
  *
  * @param title non-blank title shown to the user
  * @param detail initial detail line, possibly empty
- * @param activateActionId one of the plugin's own actions that brings the user to this work, run when the user
- *                         clicks its card (from SDK 0.10.2); any other id only raises the application
- * @param cancel invoked when the user asks to stop the work; absent when it cannot be cancelled
+ * @param activateActionId one of the plugin's own actions that brings the user to this work, run in the window used
+ *                         last when the user clicks its card or its outcome notification; any other id only raises
+ *                         the application
+ * @param cancel stops the work when the user asks; absent when it cannot be cancelled. Jasper's activity cards offer
+ *               no way to cancel, so the host never runs it
  */
 public record ActivitySpec(String title, String detail, Optional<String> activateActionId, Optional<Runnable> cancel) {
     /** Rejects a blank title and null parts. */

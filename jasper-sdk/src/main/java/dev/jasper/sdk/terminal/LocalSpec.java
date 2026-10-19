@@ -8,9 +8,10 @@ import java.util.Optional;
 /**
  * A local terminal to open: the user's configured shell, one of the shell profiles Jasper detected, or a program.
  *
- * @param workingDirectory where it starts; empty means where Jasper's own New Tab would start
- * @param profile the id of a profile from {@link Terminals#profiles()} (since 0.9.1); empty means the shell Jasper's own
- *     New Tab or Split would start. An id the host does not list opens nothing.
+ * @param workingDirectory where it starts; empty means where Jasper's own New Tab would start, or for a split, where
+ *     Jasper's own Split would
+ * @param profile the id of a profile from {@link Terminals#profiles()} (since 0.9.1); empty starts the shell the user's
+ *     settings choose, as Jasper's own New Tab does, also in a split. An id the host does not list opens nothing.
  * @param command a program run instead of the shell, with the shell's environment: the executable, then its arguments,
  *     each passed as it is, with no shell parsing them (since 0.17.1). Its tab or pane closes when the program exits with
  *     status 0 and stays open otherwise. Empty runs the shell.
@@ -40,8 +41,8 @@ public record LocalSpec(Optional<Path> workingDirectory, Optional<String> profil
      * The user's shell, or a detected shell profile.
      *
      * @param workingDirectory where it starts; empty means where Jasper's own New Tab would start
-     * @param profile the id of a profile from {@link Terminals#profiles()}; empty means the shell Jasper's own New Tab or
-     *     Split would start
+     * @param profile the id of a profile from {@link Terminals#profiles()}; empty starts the shell the user's settings
+     *     choose
      * @since 0.9.1
      */
     public LocalSpec(Optional<Path> workingDirectory, Optional<String> profile) { this(workingDirectory, profile, Optional.empty()); }
