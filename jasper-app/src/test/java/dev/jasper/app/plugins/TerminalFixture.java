@@ -27,13 +27,14 @@ import dev.jasper.terminal.session.AttachedConnection;
 /**
  * A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. A terminal tab holds one
  * pane, a split opens a terminal tab of its own in the pane's window, focusing a pane selects its tab, a pane closes with
- * its tab and the last tab takes its window with it (workspace tabs spec 9.4). EDT only.
+ * its tab and the last tab takes its window with it (workspace tabs spec 9.4); a plugin's tab is a content tab of its
+ * window, and a tab moved to another window is reported as a move. EDT only.
  */
 final class TerminalFixture {
     private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
         SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh"; }
     private static final class Tab { UUID id = UUID.randomUUID(); Window window; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
-    private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; }
+    private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; Runnable closed = () -> { }; }
 
     final TerminalRegistry registry = new TerminalRegistry();
     private final Map<UUID, Window> windows = new LinkedHashMap<>();
@@ -114,13 +115,59 @@ final class TerminalFixture {
     /** A terminal tab's one pane; a second, or a pane in a content tab, is refused. */
     UUID addPane(UUID tabId, String title, Path directory) {
         Tab tab = tabs.get(tabId);
-        if (tab.kind != TabEntry.Kind.TERMINAL || tab.pane != null) throw new IllegalStateException("A terminal tab holds one pane");
+        if (tab.kind != TabEntry.Kind.TERMINAL) throw new IllegalArgumentException("A content tab holds no pane");
+        if (tab.pane != null) throw new IllegalStateException("A terminal tab holds one pane");
         var pane = new Pane(); pane.tab = tab; pane.title = title; pane.directory = directory;
         panes.put(pane.id, pane);
         tab.pane = pane;
         registry.publish(new TerminalEvent.PaneOpened(tab.id, pane.id));
         return pane.id;
     }
+
+    /** A content tab, such as a plugin's view, with the id and title its window gives it; it opens selected. */
+    void addContentTab(UUID windowId, UUID tabId, Supplier<String> title) {
+        Window window = windows.get(windowId);
+        var tab = new Tab(); tab.id = tabId; tab.window = window; tab.title = title; tab.kind = TabEntry.Kind.CONTENT;
+        tabs.put(tab.id, tab);
+        window.tabs.add(tab);
+        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); select(tab); });
+    }
+
+    /** Selects a tab in its window, as a click on it does. */
+    void selectTab(UUID tabId) {
+        Tab tab = tabs.get(tabId);
+        if (tab != null) select(tab);
+    }
+
+    /**
+     * Moves a tab to another window, where it is selected: the move is reported once, its pane keeps its id with no
+     * PaneOpened or PaneClosed, and a window left with no tab closes before the move is reported (workspace plan 3b
+     * Rulings 5, 6).
+     */
+    void moveTab(UUID tabId, UUID windowId) {
+        Tab tab = tabs.get(tabId);
+        Window to = windows.get(windowId);
+        if (tab == null || to == null || tab.window == to) return;
+        Window from = tab.window;
+        registry.atomically(() -> {
+            from.tabs.remove(tab);
+            if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
+            if (from.tabs.isEmpty()) closeWindow(from);
+            tab.window = to;
+            to.tabs.add(tab);
+            registry.publish(new TerminalEvent.TabMoved(tab.id, from.id, to.id));
+            select(tab);
+        });
+    }
+
+    /** Closes a tab of any kind, a terminal tab's pane with it. */
+    void closeTab(UUID tabId) {
+        Tab tab = tabs.get(tabId);
+        if (tab != null) close(tab);
+    }
+
+    /** Runs {@code closed} once the window closes, as the application drops a closed window's workspace. */
+    void onWindowClosed(UUID windowId, Runnable closed) { windows.get(windowId).closed = closed; }
 
     void activateWindow(UUID windowId) { registry.windowActivated(windowId); }
 
@@ -159,6 +206,7 @@ final class TerminalFixture {
     private void closeWindow(Window window) {
         windows.remove(window.id);
         window.registration.close();
+        window.closed.run();
     }
 
     void select(UUID paneId, String text) { panes.get(paneId).selection = text; }

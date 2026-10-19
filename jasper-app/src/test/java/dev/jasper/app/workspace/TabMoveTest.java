@@ -10,12 +10,14 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /** Workspace tabs spec 9.3 and 17: a tab moved between windows through the registry keeps its session. */
 class TabMoveTest {
@@ -72,8 +74,8 @@ class TabMoveTest {
             var pane = ((TerminalContent) tab.content()).pane();
             model.tabs().move(tab, target.id());
             assertThat(after).as("a moved pane is not opened again").isEmpty();
-            assertThat(facts).contains(new TerminalEvent.TabClosed(source.id(), tab.id().value()),
-                new TerminalEvent.TabOpened(target.id(), tab.id().value()));
+            assertThat(facts).as("one move, reported where it arrives").contains(new TerminalEvent.TabMoved(tab.id().value(), source.id(), target.id()));
+            assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
             assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.PaneOpened || fact instanceof TerminalEvent.PaneClosed);
             assertThat(registry.tab(tab.id().value()).orElseThrow().windowId()).isEqualTo(target.id());
             pane.onTitleChanged.accept("moved");
@@ -83,6 +85,40 @@ class TabMoveTest {
             assertThat(after).contains(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
             assertThat(facts).contains(new TerminalEvent.PaneClosed(tab.id().value(), pane.id()),
                 new TerminalEvent.TabClosed(target.id(), tab.id().value()));
+        });
+    }
+
+    /** Workspace plan 3b Rulings 5: a window that announced an arrival and then fails to show the tab takes it back. */
+    @Test void anArrivalItsWindowFailsToShowIsTakenBack() throws Exception {
+        edt(() -> {
+            var registry = new TerminalRegistry();
+            var facts = new ArrayList<TerminalEvent>();
+            registry.onEvent(facts::add);
+            source.connectTerminals(registry, () -> { });
+            target.connectTerminals(registry, () -> { });
+            Tab tab = source.selectedTab();
+            UUID id = tab.id().value();
+            target.onTitle = title -> { target.onTitle = ignored -> { }; throw new IllegalStateException("title failed"); };
+            facts.clear();
+            assertThatIllegalStateException().isThrownBy(() -> model.tabs().move(tab, target.id())).withMessage("title failed");
+            assertThat(tab.window()).as("back where it was").isEqualTo(source.id());
+            assertThat(source.tabs()).contains(tab);
+            assertThat(target.tabs()).doesNotContain(tab);
+            assertThat(facts).as("the move there and back").containsSubsequence(new TerminalEvent.TabMoved(id, source.id(), target.id()),
+                new TerminalEvent.TabMoved(id, target.id(), source.id()));
+            assertThat(facts).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
+            assertThat(registry.tab(id).orElseThrow().windowId()).isEqualTo(source.id());
+            facts.clear();
+            tab.close();
+            assertThat(facts).contains(new TerminalEvent.TabClosed(source.id(), id));
+            target.onTitle = title -> { target.onTitle = ignored -> { }; throw new IllegalStateException("title failed"); };
+            facts.clear();
+            assertThatIllegalStateException().isThrownBy(() -> model.tabs().open("dev.example.editor", "notes", "notes.txt",
+                target.id(), new javax.swing.JPanel())).withMessage("title failed");
+            var opened = facts.stream().filter(TerminalEvent.TabOpened.class::isInstance).map(TerminalEvent.TabOpened.class::cast).toList();
+            assertThat(opened).singleElement().extracting(TerminalEvent.TabOpened::windowId).isEqualTo(target.id());
+            assertThat(facts).as("an open the window failed to show closes").containsSubsequence(opened.getFirst(),
+                new TerminalEvent.TabClosed(target.id(), opened.getFirst().tabId()));
         });
     }
 

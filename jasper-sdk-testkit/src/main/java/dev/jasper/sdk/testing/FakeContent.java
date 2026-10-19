@@ -8,11 +8,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
 
-/** Recorded host content, retaining the actual component across moves. */
+/**
+ * Recorded host content, retaining the actual component across moves. Its tab is a content tab of the scripted
+ * workspace (workspace tabs spec 14): it opens, is selected, moves and closes on the tab topics like any tab.
+ */
 final class FakeContent implements ContentTab {
     final FakeUi ui;
     final String key;
     final JComponent component;
+    /** The workspace tab that shows this content. */
+    final FakeWorkspace.Tab tab;
     ContentPresentation presentation;
     List<ContentCommand> commands=List.of();
     List<ContentStatus> status=List.of();
@@ -22,25 +27,26 @@ final class FakeContent implements ContentTab {
     Runnable focus=()->{};
     final List<Consumer<Boolean>> activated=new ArrayList<>();
     final List<Runnable> disposed=new ArrayList<>();
-    FakeContent(FakeUi ui,ContentSpec spec,WindowOwner owner,JComponent component){
-        this.ui=ui;this.key=spec.key();this.owner=owner;this.component=component;
+    FakeContent(FakeUi ui,ContentSpec spec,WindowOwner owner,JComponent component,FakeWorkspace.Tab tab){
+        this.ui=ui;this.key=spec.key();this.owner=owner;this.component=component;this.tab=tab;
         presentation=new ContentPresentation(spec.title(),"",null,false,"","");
     }
-    public void setPresentation(ContentPresentation value){if(!closed){ui.context.kit().validateIcon(value.icon());presentation=value;}}
+    public void setPresentation(ContentPresentation value){if(!closed){ui.context.kit().validateIcon(value.icon());presentation=value;tab.title=value.title();}}
     public void setCommands(List<ContentCommand> values){if(!closed)commands=List.copyOf(values);}
     public void setStatus(List<ContentStatus> values){if(!closed)status=List.copyOf(values);}
     public void setFocusTarget(Runnable value){if(!closed)focus=value;}
-    public void select(){if(closed)return;for(var value:ui.host.contentTabs()) { var other=(FakeContent)value; if(other!=this && Objects.equals(owner, other.owner))other.active(false); }active(true);focus.run();}
+    public void select(){if(closed)return;ui.host.workspace.select(tab);for(var value:ui.host.contentTabs()) { var other=(FakeContent)value; if(other!=this && Objects.equals(owner, other.owner))other.active(false); }active(true);focus.run();}
     void active(boolean value){if(active==value)return;active=value;for(var listener:List.copyOf(activated))listener.accept(value);}
     public void move(boolean value){if(!closed&&pins==0&&ui.pendingContent==null&&separate!=value){
         active(false); separate=value;
         var window = value ? ui.host.workspace.addWindow() : ui.host.workspace.windows.stream().filter(w -> w.open && !w.detached).findFirst().orElseGet(ui.host.workspace::addWindow);
         if(value)window.detached=true;
+        ui.host.workspace.move(tab, window);
         owner=ui.context.terminals.windowHandle(window.id); select();
     }}
     public boolean isSeparate(){return separate;} public boolean isActive(){return active;} public boolean isClosed(){return closed;}
     public CompletableFuture<Boolean> requestClose(){return ui.closeContent(List.of(this),true);}
     public Subscription onActive(Consumer<Boolean> value){activated.add(value);return ()->activated.remove(value);}
     public Subscription onClosed(Runnable value){disposed.add(value);return ()->disposed.remove(value);}
-    public void close(){if(closed)return;active(false);closed=true;ui.contents.remove(this);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
+    public void close(){if(closed)return;active(false);closed=true;ui.contents.remove(this);ui.host.workspace.close(tab);for(var listener:List.copyOf(disposed))listener.run();disposed.clear();activated.clear();}
 }

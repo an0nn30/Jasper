@@ -137,6 +137,12 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: closes a pane with its tab; the last tab takes its window with it. */
     void closeTerminalPane(java.util.UUID paneId);
 
+    /** UI thread: adds and selects a content tab, as the application or another plugin shows a document; it has no pane. */
+    java.util.UUID addContentTab(java.util.UUID windowId, String title);
+
+    /** UI thread: moves a tab the test added to another open window, where it is selected; a window left with no tab closes. */
+    void moveTab(java.util.UUID tabId, java.util.UUID windowId);
+
     /** UI thread: sets the text selected in a pane. */
     void selectInPane(java.util.UUID paneId, String text);
 

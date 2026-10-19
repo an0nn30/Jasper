@@ -375,6 +375,28 @@ class TabRegistryTest {
         });
     }
 
+    @Test void aMoveTellsBothWindowsWhereTheTabComesFromUntilItEnds() {
+        var seen = new ArrayList<String>();
+        var first = UUID.randomUUID(); var second = UUID.randomUUID(); var failing = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(first, false, tab -> seen.add("attach first " + tab.movingFrom().orElse(null)),
+            tab -> seen.add("detach first " + tab.movingFrom().orElse(null)), tab -> { }, () -> { }));
+        registry.addHost(new WorkspaceHost(second, false, tab -> seen.add("attach second " + tab.movingFrom().orElse(null)),
+            tab -> seen.add("detach second " + tab.movingFrom().orElse(null)), tab -> { }, () -> { }));
+        registry.addHost(new WorkspaceHost(failing, false, tab -> { throw new IllegalStateException("attach failed"); },
+            tab -> { }, tab -> { }, () -> { }));
+        var tab = registry.open("plugin.file", "one", "One", first, new JPanel());
+        registry.move(tab, second);
+        assertThat(seen).containsExactly("attach first null", "detach first " + first, "attach second " + first);
+        assertThat(tab.movingFrom()).as("the move is over").isEmpty();
+        assertThat(tab.moving()).isFalse();
+        assertThatIllegalStateException().isThrownBy(() -> registry.move(tab, failing)).withMessage("attach failed");
+        assertThat(tab.window()).as("back where it was").isEqualTo(second);
+        assertThat(tab.movingFrom()).as("a failed move is over too").isEmpty();
+        seen.clear();
+        tab.close();
+        assertThat(seen).containsExactly("detach second null");
+    }
+
     @Test void anyTabMovesToANamedWindowAndIsSelectedThere() {
         hosts();
         var other = UUID.randomUUID();

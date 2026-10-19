@@ -218,7 +218,7 @@ public final class TabRegistry {
         // Change ownership before removal: an emptied old window may unregister itself synchronously.
         tab.active(false);
         tab.window(next.id());
-        tab.moving = true;
+        tab.movingFrom = old.id();
         try {
             old.detach().accept(tab);
             try { next.attach().accept(tab); }
@@ -243,7 +243,7 @@ public final class TabRegistry {
                 throw failure;
             }
         } finally {
-            tab.moving = false;
+            tab.movingFrom = null;
         }
         select(tab);
     }

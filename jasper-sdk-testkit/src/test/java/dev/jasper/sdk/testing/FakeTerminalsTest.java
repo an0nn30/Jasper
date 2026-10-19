@@ -111,6 +111,32 @@ class FakeTerminalsTest {
         }
     }
 
+    /** Workspace tabs spec 14: scripted content tabs and moves are tabs of their windows, announced on the tab topics. */
+    @Test void scriptedContentTabsAndMovesAreTabsOfTheirWindows() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), shell = host.addTerminalTab(window, "zsh"), pane = host.addTerminalPane(shell, info("zsh"));
+            var heard = new java.util.ArrayList<Object>();
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> {
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TAB_OPENED, heard::add);
+                plugin.events().subscribe(dev.jasper.sdk.terminal.TerminalEvents.TAB_MOVED, heard::add);
+            });
+            host.flush();
+            heard.clear();
+            UUID notes = host.addContentTab(window, "notes.txt");
+            UUID other = host.addTerminalWindow();
+            host.moveTab(shell, other);
+            host.flush();
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(window, notes),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(shell, window, other));
+            var terminals = context.terminals();
+            assertThat(terminals.window(window).orElseThrow().tabs()).extracting(dev.jasper.sdk.terminal.TabHandle::id).containsExactly(notes);
+            assertThat(terminals.tab(notes).orElseThrow().kind()).isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT);
+            assertThat(terminals.tab(notes).orElseThrow().terminal()).isEmpty();
+            assertThat(terminals.pane(pane).orElseThrow().tab().window().id()).as("the pane follows its tab").isEqualTo(other);
+            assertThatIllegalArgumentException().isThrownBy(() -> host.addTerminalPane(notes, info("pane")));
+        }
+    }
+
     @Test void profilesAreScriptedAndOnlyListedOnesOpen() {
         try (var host = new FakePluginHost()) {
             var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));

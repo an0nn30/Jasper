@@ -137,14 +137,24 @@ class AppContractTest extends PluginContractTest {
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
         TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
-        onEdt(() -> contributions.tabs().setFactory(separate -> {
+        // Every window is a workspace, as every application window is (workspace plan 3b Rulings 15): a plugin's tab is a
+        // content tab of the window that shows it, the window it moves to reports the move, and a window whose last tab
+        // left closes, taking its workspace with it.
+        java.util.function.Function<Boolean, UUID> workspace = separate -> {
             UUID id = terminalFixture.addWindow();
-            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id, separate,
-                entry -> {}, entry -> {}, entry -> {
-                    for (var other : contributions.tabs().inWindow(id)) other.active(other == entry);
+            var tabs = contributions.tabs();
+            var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id, separate,
+                tab -> tab.movingFrom().ifPresentOrElse(from -> terminalFixture.moveTab(tab.id().value(), id),
+                    () -> terminalFixture.addContentTab(id, tab.id().value(), tab::title)),
+                tab -> { if (!tab.moving()) terminalFixture.closeTab(tab.id().value()); },
+                entry -> {
+                    for (var other : tabs.inWindow(id)) other.active(other == entry);
+                    terminalFixture.selectTab(entry.id().value());
                 }, () -> {}));
+            terminalFixture.onWindowClosed(id, registration::close);
             return id;
-        }));
+        };
+        onEdt(() -> contributions.tabs().setFactory(workspace));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
@@ -376,7 +386,11 @@ class AppContractTest extends PluginContractTest {
                     .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
             }
             @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
-            @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
+            @Override public UUID addTerminalWindow() { return onEdtValue(() -> workspace.apply(false)); }
+            @Override public UUID addContentTab(UUID windowId, String title) {
+                return onEdtValue(() -> { UUID id = UUID.randomUUID(); terminalFixture.addContentTab(windowId, id, () -> title); return id; });
+            }
+            @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
                 return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));

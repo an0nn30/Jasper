@@ -14,6 +14,11 @@ public sealed interface TerminalEvent {
     record TabOpened(UUID windowId, UUID tabId) implements TerminalEvent { }
     record TabClosed(UUID windowId, UUID tabId) implements TerminalEvent { }
     record TabSelected(UUID windowId, UUID tabId) implements TerminalEvent { }
+    /**
+     * A tab moved to another window: no TabClosed or TabOpened, and its pane keeps its id with no PaneOpened or
+     * PaneClosed; a window the move empties reports WindowClosed first (workspace plan 3b Rulings 5, 6).
+     */
+    record TabMoved(UUID tabId, UUID fromWindowId, UUID toWindowId) implements TerminalEvent { }
     record PaneOpened(UUID tabId, UUID paneId) implements TerminalEvent { }
     record PaneClosed(UUID tabId, UUID paneId) implements TerminalEvent { }
     record PaneFocused(UUID tabId, UUID paneId) implements TerminalEvent { }

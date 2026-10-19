@@ -554,7 +554,10 @@ final class FakeUi {
                     var window = host.workspace.windows.stream().filter(w -> w.open && !w.detached).findFirst().orElseGet(host.workspace::addWindow);
                     owner = context.terminals.windowHandle(window.id);
                 }
-                var entry=new FakeContent(FakeUi.this,spec,owner,component);contents.add(entry);entry.select();return entry;
+                // A plugin's content is a content tab of its window (workspace tabs spec 14).
+                var shown = host.workspace.window(((WindowHandle) owner).id()).orElseThrow();
+                var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title()));
+                contents.add(entry);entry.select();return entry;
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};

@@ -1429,6 +1429,120 @@ public abstract class PluginContractTest {
             new TerminalEvents.ActivePaneChanged(Optional.of(left)));
     }
 
+    @Test void aContentTabIsATabOfItsWindowWithNoTerminal() {
+        UUID window = h.addTerminalWindow(), shell = h.addTerminalTab(window, "zsh"), pane = h.addTerminalPane(shell, "zsh", Path.of("/src"));
+        h.activateTerminalWindow(window);
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            context.events().subscribe(TerminalEvents.TAB_OPENED, heard::add);
+            context.events().subscribe(TerminalEvents.TAB_SELECTED, heard::add);
+            context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        UUID notes = h.addContentTab(window, "notes.txt");
+        h.flush();
+        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(window, notes), new TerminalEvents.TabEvent(window, notes),
+            new TerminalEvents.ActivePaneChanged(Optional.empty()));
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            var handle = terminals.window(window).orElseThrow();
+            assertThat(handle.tabs()).extracting(TabHandle::id).containsExactly(shell, notes);
+            assertThat(handle.tabs()).extracting(TabHandle::kind).containsExactly(TabHandle.Kind.TERMINAL, TabHandle.Kind.CONTENT);
+            TabHandle content = handle.activeTab().orElseThrow();
+            assertThat(content.id()).isEqualTo(notes);
+            assertThat(content.terminal()).isEmpty();
+            assertThat(content.title()).isEqualTo("notes.txt");
+            assertThat(content.window()).isEqualTo(handle);
+            assertThat(terminals.tab(notes)).contains(content);
+            assertThat(terminals.activePane()).as("a content tab has no terminal").isEmpty();
+            terminals.tab(shell).orElseThrow().select();
+            assertThat(terminals.activePane().map(PaneHandle::id)).contains(pane);
+        });
+    }
+
+    @Test void aTabMovedToAnotherWindowKeepsItsPaneAndReportsOnlyTheMove() {
+        UUID first = h.addTerminalWindow(), stays = h.addTerminalTab(first, "stays");
+        h.addTerminalPane(stays, "zsh", Path.of("/"));
+        UUID moving = h.addTerminalTab(first, "build"), pane = h.addTerminalPane(moving, "make", Path.of("/src"));
+        UUID second = h.addTerminalWindow(), other = h.addTerminalTab(second, "other");
+        h.addTerminalPane(other, "zsh", Path.of("/"));
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.TAB_CLOSED, TerminalEvents.TAB_MOVED,
+                    TerminalEvents.PANE_OPENED, TerminalEvents.PANE_CLOSED, TerminalEvents.WINDOW_CLOSED))
+                context.events().subscribe(topic, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        h.moveTab(moving, second);
+        h.flush();
+        assertThat(heard).containsExactly(new TerminalEvents.TabMoved(moving, first, second));
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            PaneHandle handle = terminals.pane(pane).orElseThrow();
+            assertThat(handle.tab().id()).isEqualTo(moving);
+            assertThat(handle.tab().window().id()).isEqualTo(second);
+            assertThat(terminals.window(second).orElseThrow().tabs()).extracting(TabHandle::id).containsExactly(other, moving);
+            assertThat(terminals.window(second).orElseThrow().activeTab().map(TabHandle::id)).as("it arrives selected").contains(moving);
+            assertThat(terminals.window(first).orElseThrow().tabs()).extracting(TabHandle::id).containsExactly(stays);
+        });
+        heard.clear();
+        h.moveTab(stays, second);
+        h.flush();
+        assertThat(heard).as("the window the move empties closes first").containsExactly(new TerminalEvents.WindowEvent(first),
+            new TerminalEvents.TabMoved(stays, first, second));
+        h.ui(() -> assertThat(alpha.get().terminals().window(first)).isEmpty());
+    }
+
+    @Test void aPluginsContentTabOpensMovesAndClosesOnTheTabTopics() {
+        UUID window = h.addTerminalWindow(), shell = h.addTerminalTab(window, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.TAB_MOVED, TerminalEvents.TAB_CLOSED,
+                    TerminalEvents.WINDOW_OPENED, TerminalEvents.WINDOW_CLOSED))
+                context.events().subscribe(topic, heard::add);
+        });
+        h.flush();
+        heard.clear();
+        var tab = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        h.ui(() -> tab.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"),
+            alpha.get().terminals().window(window).orElseThrow(), kitView(alpha.get()))));
+        h.flush();
+        assertThat(heard).singleElement().isInstanceOfSatisfying(TerminalEvents.TabEvent.class,
+            opened -> assertThat(opened.windowId()).isEqualTo(window));
+        UUID id = ((TerminalEvents.TabEvent) heard.getFirst()).tabId();
+        h.ui(() -> {
+            var opened = alpha.get().terminals().tab(id).orElseThrow();
+            assertThat(opened.kind()).isEqualTo(TabHandle.Kind.CONTENT);
+            assertThat(opened.terminal()).isEmpty();
+            assertThat(opened.title()).isEqualTo("Notes");
+            assertThat(alpha.get().terminals().window(window).orElseThrow().activeTab()).contains(opened);
+        });
+        heard.clear();
+        h.ui(() -> tab.get().move(true));
+        h.flush();
+        assertThat(heard).hasSize(2).first().isInstanceOf(TerminalEvents.WindowEvent.class);
+        UUID separate = ((TerminalEvents.WindowEvent) heard.getFirst()).windowId();
+        assertThat(heard.get(1)).as("the window opened for the move reports first").isEqualTo(new TerminalEvents.TabMoved(id, window, separate));
+        heard.clear();
+        h.ui(() -> assertThat(tab.get().requestClose().join()).isTrue());
+        h.flush();
+        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(separate, id), new TerminalEvents.WindowEvent(separate));
+        h.ui(() -> {
+            assertThat(alpha.get().terminals().tab(id)).isEmpty();
+            assertThat(alpha.get().terminals().window(separate)).as("its last tab took the window with it").isEmpty();
+            assertThat(alpha.get().terminals().window(window)).isPresent();
+        });
+    }
+
     @Test void openingTabsAndSplitsNeedsTheCapabilityAndReturnsTheNewPane() {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), only = h.addTerminalPane(tab, "make", Path.of("/src"));
         var alpha = new AtomicReference<PluginContext>();

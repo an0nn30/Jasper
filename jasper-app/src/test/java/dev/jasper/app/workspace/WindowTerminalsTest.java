@@ -80,6 +80,40 @@ class WindowTerminalsTest {
         });
     }
 
+    @Test void aPluginsTabIsListedOpenedMovedAndClosedLikeATerminalTab() throws Exception {
+        open();
+        WindowContent[] other = new WindowContent[1];
+        edt(() -> {
+            var model = new dev.jasper.app.contributions.Contributions();
+            owner.connectContributions(model);
+            other[0] = content(launcher(pending));
+            other[0].connectContributions(model);
+            other[0].connectTerminals(registry, () -> { });
+            UUID windowId = owner.id(), otherId = other[0].id();
+            registry.windowActivated(windowId);
+            events.clear();
+            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", windowId, new javax.swing.JPanel());
+            UUID tabId = view.id().value();
+            assertThat(events).containsSubsequence(new TerminalEvent.TabOpened(windowId, tabId), new TerminalEvent.TabSelected(windowId, tabId),
+                new TerminalEvent.ActivePaneChanged(Optional.empty()));
+            WindowEntry window = registry.window(windowId).orElseThrow();
+            assertThat(window.tabs().get()).extracting(TabEntry::kind).containsExactly(TabEntry.Kind.TERMINAL, TabEntry.Kind.CONTENT);
+            TabEntry entry = window.selectedTab().get().orElseThrow();
+            assertThat(entry.id()).isEqualTo(tabId);
+            assertThat(entry.terminal().get()).isEmpty();
+            assertThat(entry.title().get()).isEqualTo("notes.txt");
+            assertThat(registry.activePane()).as("a plugin's tab has no terminal").isEmpty();
+            events.clear();
+            model.tabs().move(view, otherId);
+            assertThat(events).contains(new TerminalEvent.TabMoved(tabId, windowId, otherId), new TerminalEvent.TabSelected(otherId, tabId));
+            assertThat(events).noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
+            assertThat(registry.tab(tabId).orElseThrow().windowId()).isEqualTo(otherId);
+            events.clear();
+            view.close();
+            assertThat(events).contains(new TerminalEvent.TabClosed(otherId, tabId));
+        });
+    }
+
     @Test void tabsSplitsInjectionAndExitAreReported() throws Exception {
         open();
         UUID windowId = owner.id();

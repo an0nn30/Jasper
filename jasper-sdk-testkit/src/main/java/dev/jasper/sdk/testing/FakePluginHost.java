@@ -1233,6 +1233,39 @@ public final class FakePluginHost implements AutoCloseable {
      * @param paneId the pane
      */
     public void closeTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::close); }
+
+    /**
+     * Adds and selects a content tab, as the application or another plugin shows a document or a tool view: a tab with no
+     * pane, which {@code TabHandle.kind()} reports as {@code CONTENT}.
+     *
+     * @param windowId an open window
+     * @param title the tab's title
+     * @return the new tab's id
+     * @since 0.19.0
+     */
+    public UUID addContentTab(UUID windowId, String title) {
+        return workspace.addTab(workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId)),
+            dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT, Objects.requireNonNull(title, "title")).id;
+    }
+
+    /**
+     * Moves a tab the test added to another open window, where it is selected, as dragging it there does: a terminal
+     * tab's pane keeps its id and session with no {@code PANE_OPENED} or {@code PANE_CLOSED}, the move is announced on
+     * {@code TAB_MOVED}, and a window left with no tab closes before it. A plugin moves its own content tab with
+     * {@code ContentTab.move}.
+     *
+     * @param tabId an open tab the test added
+     * @param windowId another open window
+     * @since 0.19.0
+     */
+    public void moveTab(UUID tabId, UUID windowId) {
+        var tab = workspace.tab(tabId).orElseThrow(() -> new IllegalArgumentException("No such tab: " + tabId));
+        var window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId));
+        for (FakePluginContext context : contexts.values())
+            if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
+                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.move");
+        workspace.move(tab, window);
+    }
     /**
      * Replaces what a pane reports, without an event.
      *

@@ -893,7 +893,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Shows a tab in this window, at the end of its active group and selected: one the registry placed here, or one this
-     * window opened. A failure leaves nothing mounted, closes again what it announced, and propagates.
+     * window opened. A failure leaves nothing mounted, takes back what the terminal registry heard, and propagates.
      */
     private void attach(Tab tab) { attach(tab, false, null, null); }
 
@@ -903,14 +903,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      */
     private void attach(Tab tab, boolean opened, GroupId beside, Side side) {
         JComponent component = tab.component();
-        TerminalContent published = null;
+        boolean announced = false;
         try {
             WorkspaceTheme.apply(component, themes.current());
             tabListeners.put(tab, tab.onChanged(this::update));
-            if (tab.content() instanceof TerminalContent terminal && terminals != null) {
-                published = terminal;
-                terminals.tabOpened(terminal);
-            }
+            if (terminals != null) { terminals.tabArrived(tab, tab.movingFrom()); announced = true; }
             tabHost.attach(tab, opened);
             if (beside == null) workspace.open(tab); else workspace.openBeside(tab, beside, side);
             // A tab that moves in ends this window's maximize; one that opens here does not (spec 15).
@@ -923,7 +920,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 try { terminal.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
             }
             tabHost.detach(tab);
-            if (published != null) terminals.tabClosed(published);
+            // Plugins must not believe the tab is here (workspace plan 3b Rulings 5).
+            if (announced && terminals != null) terminals.tabWithdrawn(tab, tab.movingFrom());
             workspace.remove(tab);
             WorkspaceTheme.clear(component);
             throw failure;
@@ -934,7 +932,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Takes a tab out of this window once it has closed (the registry disposes it first) or as it moves to another window:
-     * a terminal tab is announced closed here, and the window closes when its last tab has left. A tab whose attach failed
+     * a closing tab is announced closed here, and the window closes when its last tab has left. A tab whose attach failed
      * has nothing to take out.
      */
     private void detach(Tab tab) {
@@ -942,7 +940,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (listener == null) return;
         listener.close();
         tabHost.detach(tab);
-        if (tab.content() instanceof TerminalContent terminal && terminals != null) terminals.tabClosed(terminal);
+        if (terminals != null && !tab.moving()) terminals.tabClosed(tab);
         if (closed) return;
         // A tab that moves out ends the maximize; closing a tab keeps it while its group stands (spec 15).
         if (tab.moving()) workspace.unmaximize();
@@ -1659,7 +1657,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uninstallCornerLayer();
         if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
-        // Leaving the registry removes the tabs this window still holds: each closes, a terminal tab announced closed.
+        // Leaving the registry removes the tabs this window still holds: each closes and is announced closed.
         java.util.List<Tab> held = registry.inWindow(id);
         Throwable leaving = null;
         try { if (terminals != null) terminals.atomically(host::close); else host.close(); }

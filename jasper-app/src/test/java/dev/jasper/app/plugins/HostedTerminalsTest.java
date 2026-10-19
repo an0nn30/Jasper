@@ -227,6 +227,27 @@ class HostedTerminalsTest {
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
     }
 
+    @Test void aContentTabIsListedWithItsKindAndNoTerminalAndAMovedTabsHandlesFollowIt() {
+        HostedTerminals terminals = terminals(Capabilities.TERMINAL_OBSERVE);
+        UUID window = fixture.addWindow(), shell = fixture.addTab(window, "zsh"), pane = fixture.addPane(shell, "zsh", null);
+        UUID notes = UUID.randomUUID();
+        fixture.addContentTab(window, notes, () -> "notes.txt");
+        fixture.activateWindow(window);
+        WindowHandle handle = terminals.window(window).orElseThrow();
+        assertThat(handle.tabs()).extracting(TabHandle::kind).containsExactly(TabHandle.Kind.TERMINAL, TabHandle.Kind.CONTENT);
+        TabHandle content = handle.activeTab().orElseThrow();
+        assertThat(content.id()).isEqualTo(notes);
+        assertThat(content.terminal()).isEmpty();
+        assertThat(content.title()).isEqualTo("notes.txt");
+        assertThat(terminals.activePane()).isEmpty();
+        UUID other = fixture.addWindow();
+        fixture.addPane(fixture.addTab(other, "zsh"), "zsh", null);
+        PaneHandle moved = terminals.pane(pane).orElseThrow();
+        fixture.moveTab(shell, other);
+        assertThat(moved.tab().window().id()).as("the handle follows the move").isEqualTo(other);
+        assertThat(handle.tabs()).extracting(TabHandle::id).containsExactly(notes);
+    }
+
     /** Final review M3: a program tab's audit line names the program's file name, never its folder or arguments. */
     @Test void theAuditLineNamesATabOrSplitsProgramByItsFileNameOnly() {
         HostedTerminals terminals = terminals(Capabilities.TERMINAL_OPEN);

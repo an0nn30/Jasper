@@ -30,8 +30,8 @@ public final class Tab implements AutoCloseable {
 
     /** The registry this tab lives in; a window's own until the window joins the application's. */
     TabRegistry registry;
-    /** Set by the registry while it moves the tab from one window to another. */
-    boolean moving;
+    /** The window the registry is taking the tab out of while it moves it to another; null otherwise. */
+    UUID movingFrom;
     private final TabId id;
     private final Kind kind;
     private final String plugin, key;
@@ -83,7 +83,12 @@ public final class Tab implements AutoCloseable {
      * @return whether the registry is moving this tab between windows right now: a window that detaches or attaches it
      *     meanwhile sees a move, not a close or an open (workspace tabs spec 15)
      */
-    public boolean moving() { return moving; }
+    public boolean moving() { return movingFrom != null; }
+    /**
+     * @return the window the registry is taking this tab out of while it moves it to another, else empty: the window it
+     *     arrives in reports the move (workspace plan 3b Rulings 5)
+     */
+    public Optional<UUID> movingFrom() { return Optional.ofNullable(movingFrom); }
     /** @return the id of the window holding the tab, or null while no window does */
     public UUID window() { return window; }
     public List<ContentCommand> commands() { return commands; }

@@ -14,7 +14,8 @@ import java.util.UUID;
  * The windows, tabs and panes a test scripts, with the application's rules (workspace tabs spec 9.4): a terminal tab
  * holds one pane, a split opens a terminal tab of its own, the active pane is the pane of the active tab of the window
  * activated last when that tab is a terminal tab, focusing a pane selects its tab, a pane closes with its tab and the last
- * tab takes its window with it, and every change is announced on the terminal topics.
+ * tab takes its window with it, a tab moved to another window is announced once as a move, and every change is
+ * announced on the terminal topics.
  */
 final class FakeWorkspace {
     static final class Pane {
@@ -115,6 +116,20 @@ final class FakeWorkspace {
         if (!pane.open) return;
         select(pane.tab);
         host.publishApp(TerminalEvents.PANE_FOCUSED, new TerminalEvents.PaneEvent(pane.tab.id, pane.id));
+        refreshActive();
+    }
+
+    /** Moves a tab to another open window, where it is selected; a window left with no tab closes before the move is announced. */
+    void move(Tab tab, Window to) {
+        if (!tab.open || !to.open || tab.window == to) return;
+        Window from = tab.window;
+        from.tabs.remove(tab);
+        if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
+        if (from.tabs.isEmpty()) closeWindow(from);
+        tab.window = to;
+        to.tabs.add(tab);
+        host.publishApp(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(tab.id, from.id, to.id));
+        select(tab);
         refreshActive();
     }
 
