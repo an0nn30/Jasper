@@ -1,17 +1,18 @@
 # Editor
 
-The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in tabs in one Editor window,
+The bundled Editor plugin (`dev.jasper.editor`) edits local and remote text files in tabs of Jasper windows,
 with syntax highlighting from RSyntaxTextArea. The [design](superpowers/specs/2026-09-27-jasper-editor-plugin-design.md)
 is the binding reference.
 
 ## Opening files
 
 - **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in the File menu or the
-  palette, and **Open…** inside the Editor window.
+  palette, and **Open…** in an editor tab's ⋯ menu.
 - **Open File…** in the File menu or the palette (no default shortcut) opens the file you choose in
   the [default editor](#default-editor), as a Cmd-click does.
-- **New Editor File**, or **New File** (Cmd/Ctrl+N) inside the Editor window, for an untitled tab.
-- Drop files from the desktop onto the Editor window. Folders are ignored.
+- **New Editor File**, or **New File** (Cmd/Ctrl+N) inside an editor tab, for an untitled tab; **New Editor Window**
+  in the File menu or the palette (no default shortcut) opens the untitled tab in a new child window.
+- Drop files from the desktop onto an editor tab. Folders are ignored.
 - `jasper editor FILE[:LINE[:COLUMN]]...` from a terminal, once the
   [jasper command](configuration.md#the-jasper-command) is installed. The caret goes to the
   line and column. A file that does not exist yet opens as an empty tab and is created when you save it. A folder, or
@@ -67,8 +68,8 @@ symbolic link; for a hard-linked file, a folder you cannot write, or a different
 place instead. A read-only file is not replaced: the save fails with "permission denied" and the
 file is left as it was. Text the file's encoding cannot hold offers **Convert to UTF-8 and Save**.
 
-Closing a tab with unsaved changes asks **Save**, **Don't Save** or **Cancel**. Closing the Editor
-window, or quitting or restarting Jasper, asks **Save All**, **Discard** or **Cancel** and waits for
+Closing a tab with unsaved changes asks **Save**, **Don't Save** or **Cancel**. Closing a window with
+editor tabs, or quitting or restarting Jasper, asks **Save All**, **Discard** or **Cancel** and waits for
 saves already running.
 
 ## Outside changes

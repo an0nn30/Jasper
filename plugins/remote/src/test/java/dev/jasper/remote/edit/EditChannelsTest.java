@@ -122,7 +122,7 @@ class EditChannelsTest {
         assertThat(opened).hasSize(1);
     }
 
-    @Test void reconnectingWithoutATerminalWindowFailsWithTheSignInMessage() throws Exception {
+    @Test void reconnectingWithoutAJasperWindowFailsWithTheSignInMessage() throws Exception {
         connected = false;
         var failure = submit(identity("prod-web"), endpoint -> "never");
         assertThatThrownBy(() -> failure.get(10, TimeUnit.SECONDS))

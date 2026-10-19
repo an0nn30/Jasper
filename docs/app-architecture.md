@@ -114,7 +114,7 @@ plugin quit guards and then closes all owners. It is reached by Quit Jasper Comp
 the menu bar item and Quit Jasper in the Windows notification-area icon
 (`platform.ResidentTray`, whose Windows icon also carries the system notifications'
 balloons), the Plugin Manager's Quit Jasper button (shown when a restart
-cannot be planned), a plugin window's File › Quit, and macOS logging out, restarting or shutting down; a restart asks the same
+cannot be planned), an auxiliary window's File › Quit, and macOS logging out, restarting or shutting down; a restart asks the same
 guards and then quits through `quitNow()`. Any Quit before start-up has settled, and any
 Quit by a process that is not resident or has no Dock presence, quits the same way. The
 indicator and the macOS bridge arrive once start-up has settled (the
@@ -187,7 +187,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `windows` | Application-built auxiliary windows and dialogs: a headless surface core and the only other native frame boundary besides WindowFrame. Application owns AuxiliaryWindows and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. NativeShells shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
-| `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
+| `notificationui` | EDT Swing views of the center: the main window's CardLayer, the history panel, the Errors tab's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors tab closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. Application's AboutWindows owns both windows and closes each view with its window. |
 | `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
 | `residency` | The instance lock, the bounded handoff protocol and its endpoint worker. The lock lives as long as the process; bootstrap transfers endpoint close to application shutdown and process-hook backup. |

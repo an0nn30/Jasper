@@ -18,7 +18,7 @@ plugins built outside this repository; `./gradlew sdkRelease` builds them into `
 | `dev.jasper.sdk.events` | `Topic`, `Events`, `AppEvents` |
 | `dev.jasper.sdk.activity` | `Activities`, `ActivitySpec`, `ActivityHandle`, `ActivityEvent`, `ConnectionSpec`, `ConnectionHandle`, `ConnectionEvent` |
 | `dev.jasper.sdk.services` | `Services`, `ServiceUnavailableException` |
-| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `WindowSpec`, `DialogSpec`, `OverlaySpec`, `PluginWindow`, `PluginDialog`, `ContentTab`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
+| `dev.jasper.sdk.ui` | `Actions`, `ActionSpec`, `PluginAction`, `Toolbar`, `ToolbarViewFactory`, `Menus`, `PluginMenu`, `StatusBar`, `StatusItem`, `StatusProgress`, `StatusProgressState`, `Appearance`, `Panels`, `PanelSpec`, `PanelHost`, `PanelHeader`, `Rail`, `Windows`, `DialogSpec`, `OverlaySpec`, `PluginDialog`, `ContentTab`, `TabPlacement`, `ContentSpec`, `ContentPresentation`, `ContentCommand`, `ContentStatus`, `EditorPalette`, `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole`, `SyntaxStyle`, `Platform`, `FileEditor` |
 | `dev.jasper.sdk.notifications` | `Notifications`, `NotificationGroup`, `GroupSpec`, `NotificationSpec`, `NotificationAction`, `NotificationHandle`, `Severity`, `DisplayMode` |
 | `dev.jasper.sdk.terminal` | `Terminals`, `WindowHandle`, `TabHandle`, `PaneHandle`, `PaneInfo`, `OpenRequest`, `LocalSpec`, `ShellProfileInfo`, `Direction`, `TerminalEvents`, `SessionSpec`, `PendingSession`, `TerminalConnection`, `ExitPolicy` |
 | `dev.jasper.sdk.palette` | `Palette`, `PaletteScope`, `ScopeSpec`, `PaletteVerb`, `PaletteRow`, `PaletteResults`, `PaletteStep`, `PaletteQuery` |
@@ -42,10 +42,23 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.20.0, <0.21"` (0.20.0 is a breaking boundary for main and child windows; 0.19.0 is one too, described under Tabs of every kind below;
+Bundled manifests require `sdk = ">=0.20.0, <0.21"` (0.20.0 is a breaking boundary, described under Main and child windows below; 0.19.0 is one too, described under Tabs of every kind below;
 so is 0.18.0: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
+
+## Main and child windows (SDK 0.20.0)
+
+Jasper has one main window, which keeps an empty workspace when its last tab leaves, and any number of child windows,
+which close with their last tab; `WindowHandle.isMain()` tells them apart. Panels, the toolbar and the status bar are the
+main window's: a panel has one instance, there, and a toggle from a child window shows it in the main window.
+`Windows.openTab(spec, owner, view, placement)` takes a `TabPlacement`: `ACTIVE_GROUP` (the three-argument form),
+`SPLIT_RIGHT` or `SPLIT_DOWN` (a new tab group beside the active one) or `NEW_WINDOW` (a new child window).
+`ContentTab.moveToNewWindow()` moves a tab to a new child window, `moveToMainWindow()` to the main window, and `window()`
+is the window that holds it. A plugin's own view is a panel or a content tab; a dialog belongs to a Jasper window, a
+content tab or an anchor, and a shortcut context is global, a terminal, the plugin's content tabs or one of its panels.
+In the testkit the first window `FakePluginHost.addTerminalWindow` adds while no main window is open is the main window,
+a window's tabs sit in groups, and `contentTab` and `contentView` find a plugin's content tab by its title.
 
 ## Tabs of every kind (SDK 0.19.0)
 
@@ -89,7 +102,7 @@ View submenu that lists tool windows is now View › Tool Windows. The testkit m
 ## File workflows and progress (0.7.5)
 
 `Windows.chooseFiles(WindowOwner, title, initialPath)` and `chooseDirectory` attach local
-pickers to a live Jasper window or plugin surface. Owner closure or plugin stop cancels
+pickers to a live Jasper window or content tab. Owner closure or plugin stop cancels
 the picker and discards late results. They return paths only; perform file I/O off the UI thread.
 
 `StatusBar.addProgress(StatusItemSpec)` provides a stable native progress control, updated on
@@ -130,15 +143,14 @@ browser in the background; `FakePluginHost.browsed()` records the requests.
 
 SDK 0.11.0 adds the `network.listen` capability. A plugin declares it when it accepts connections from other
 programs or computers, such as a file server; the user consents to it like any other capability, and nothing gates
-it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
+it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
 `sdk = ">=0.20.0, <0.21"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
-`global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
-`window(id)` (one of the plugin's own panels or windows; window shortcuts take effect once plugin windows get the
-Keymap, plan K4). Where focus is, the most specific applicable action takes a
+`global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs) or `panel(id)`
+(one of the plugin's own panels). Where focus is, the most specific applicable action takes a
 key, and a key whose action doesn't apply reaches the focused component, such as the shell. A disabled action's key
 does too, except in a terminal pane, where it does nothing.
 `withDefaultBindings(macOs, other)` gives a separate Linux and Windows default; with `withDefaultBinding` alone, a

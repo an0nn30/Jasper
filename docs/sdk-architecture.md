@@ -85,11 +85,11 @@ user's configuration, built-in defaults, then plugin defaults in load order. The
 reports a user binding for an unknown action as a configuration warning and logs a dropped
 plugin default.
 
-## Panels, the rail and plugin windows
+## Panels, the rail and plugin dialogs
 
 Panels and rail actions are part of the `Contributions` model; each panel carries its default
 `dock.Slot`, which `HostedUi` maps from the SDK's `Anchor` plus `PanelSpec.split` (SDK 0.13.0).
-Each window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
+The main window's `WindowContributions` keeps one lazily built instance per panel and docks the panels
 in the window's `DockState` (per slot an ordered list with at most one active window; per-side
 sizes and ratios). One listener on that state builds what starts showing, lays out
 `ToolWindowArea` (the terminal column, the tab strip over the deck, and a rounded frame with a
@@ -106,13 +106,13 @@ second slot (Left Bottom, Right Bottom, Bottom Right) is always that slot's half
 side or the bottom area. A stripe drop moves the
 window and keeps its visibility, so a hidden window's stripe drop previews no frame; a workspace
 drop moves and shows it. A window with nothing contributed has no stripes and its old layout.
-Requests to show, hide or toggle a panel travel through the model tagged with a window id, so an
-action or a `PanelHost` reaches exactly one window. Every panel gets a View › Tool Windows entry for its
+Requests to show, hide or toggle a panel travel through the model tagged with a window id, and
+`Contributions.panelRoute` sends a child window's to the main window. Every panel gets a View › Tool Windows entry for its
 toggle action: the application-registered `<panel id>.toggle`, or, since SDK 0.8.1, the plugin's
 own action named by `PanelSpec.toggleActionId` (which must already be registered by that plugin),
 so a plugin action that toggles a panel appears once in the menu and the palette.
 
-Plugin windows follow the `WindowFrame`/`WindowContent` split: `AuxiliarySurface` holds the
+Plugin dialogs and the application's auxiliary windows follow the `WindowFrame`/`WindowContent` split: `AuxiliarySurface` holds the
 content, title, closing guards and lifetime and is fully tested headlessly; `NativeShells`
 is the only code that constructs a frame or dialog, and adds the icon, the macOS title bar,
 a minimal window menu bar, theme tracking and remembered window bounds. Both frames and dialogs
@@ -140,7 +140,6 @@ the dock's per-side sizes and ratios, stripe visibility, auxiliary window bounds
 command palette's place. It is
 application state, not configuration: a bad panel or window entry or dock key falls back alone,
 an unreadable file falls back to defaults, writes are atomic, and a version 1 file migrates on read.
-The process stays alive while a plugin window is open.
 
 ## Terminal API
 
@@ -212,14 +211,14 @@ focused pane, else at the pane's local folder. A stopped plugin's source disappe
 
 ## Shortcut contexts (SDK 0.11.0)
 
-`ShortcutContext` (`global`, `terminal`, `content`, `panel(id)`, `window(id)`) travels with `ActionSpec`. `HostedUi`
-rejects a panel or window id outside the plugin's namespace and maps the context onto the app's
+`ShortcutContext` (`global`, `terminal`, `content`, `panel(id)`) travels with `ActionSpec`. `HostedUi`
+rejects a panel id outside the plugin's namespace and maps the context onto the app's
 `dev.jasper.app.commands.KeyContext` (content becomes the plugin's own tabs), which `ActionEntry` and
 `KeyBindings.Extension` carry with the optional Linux/Windows default. `KeyBindings` keeps several actions on one
 stroke when their contexts don't conflict (a conflict is the same context, or Global with Terminal, which both apply in
 a terminal pane). `WindowContent.dispatchShortcut` resolves the stroke against the focus owner: an enabled action in
 the most specific containing context runs; a disabled one takes the key without running in a terminal pane (plan K1
-Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed. Window contexts apply once plugin windows get the Keymap (plan K4).
+Deviation 9: X11 would send it to the shell as a control character); otherwise the key is not consumed.
 
 ## Notifications (SDK 0.14.0)
 
@@ -329,7 +328,7 @@ The fake validates the same built-ins and owned registrations. Manifest identity
 an app-managed image path, separate from ordinary presentation. See [icons](sdk-icons.md).
 
 SDK 0.7.2 adds `Panels.toggle(panelId, window)` for a plugin's own registered panel.
-It dispatches the same per-window lazy toggle as the rail; the app and testkit both
+It dispatches the same lazy toggle as the rail, in the main window; the app and testkit both
 reuse the panel instance after hiding it. Remote requires this version so its SSH
 Hosts menu/status action opens the panel even before its rail icon has been used.
 
@@ -372,25 +371,16 @@ SSH session can display its path without opening SFTP. Focus and Enter request t
 bounded read-only probe. The saved host's follow setting remains authoritative; OSC 7
 ends probing and takes precedence. The fake host models the same fallback and lifetime.
 
-### Close command, quit guards and the save chooser (SDK 0.8.4)
+### Quit guards and the save chooser (SDK 0.8.4)
 
-`PluginWindow.onCloseCommand` lets a plugin window's content handle File → Close Window and
-Cmd/Ctrl+W, for example by closing a tab. `NativeShells`' Close Window item (or, in a classic look's
-frame, which has no menu row, its shortcut) calls `AuxiliarySurface.closeCommand()`, which asks the
-handlers newest first and otherwise closes like
-the close button, through the guards. The close button itself (`windowClosing`) still calls
-`requestClose()`. With the macOS screen menu bar, the menu accelerator fires before the content's
-key bindings see Cmd+W, so a key binding could not do this.
-
-Quit and restart ask plugin windows first: `JasperApplication.quit()` and `restart()` call
-`AuxiliaryWindows.mayQuit()`, which asks every open plugin window's guards in creation order (not
-dialogs or overlays) without closing anything, before `quitting` is set and before
+Quit and restart ask first: `JasperApplication.quit()` and `restart()` call `guardsAllowQuit()`, which asks
+every content tab's closing guard without closing anything, before `quitting` is set and before
 `ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
 records no relaunch. Start-up rollback and the
 benchmark exit through `quitNow()`, which does not ask. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
 `Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
 cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper's Cmd+Q does not go through `quit()`:
-`quitRequested()` calls `toBackground()`, which asks only `windowsMayClose()` (content tabs and plugin windows), so
+`quitRequested()` calls `toBackground()`, which asks only `windowsMayClose()` (content tabs), so
 `Windows.onQuitting` guards are not asked and plugin background work keeps running until `quit()` (Quit Jasper
 Completely or a log-out).
 
@@ -405,10 +395,11 @@ name; the platform dialog confirms replacing an existing file. The testkit answe
 in an application workspace. The application owns tabs, rounded frames, overflow, menus,
 status controls and native window lifetime. Keys are scoped to the contributing plugin;
 opening an existing key selects its live tab. Null or closed originating windows use the
-last main workspace, creating one when needed. Foreign owners are rejected.
+main window, restoring it when needed; a `TabPlacement` (SDK 0.20) opens the tab in the active group, a new group
+beside it or a new child window. Foreign owners are rejected.
 
 `ContentTab` updates literal presentation, commands and typed status items, supplies its
-focus callback, and moves its retained component between main and separate workspaces.
+focus callback, and moves its retained component to a new child window or the main window.
 It is a dynamic dialog/picker owner: future prompts follow the current host. Moves are
 ignored while a close decision or modal prompt is pending. A move never disposes content.
 `requestClose` consults the plugin's asynchronous `Windows.onTabsClosing` guard; exceptions
@@ -497,15 +488,15 @@ registration, so the plugin runtime depends only on the `launch.ShellProfile` va
 registrations close with the plugin. A `LocalSpec` names a profile or, since SDK 0.17.1, a
 command, not both. Remote uses profiles for its WSL group.
 
-### Per-window panel header metadata (SDK 0.14.2)
+### Panel header metadata (SDK 0.14.2)
 
 `PanelHeader` is an immutable title-detail/status/action description sent through `PanelHost.setHeader`.
 `HostedUi` translates it to application-owned `PanelHeaderState`; SDK types remain within app.plugins.
 `PanelSite` guards callback lifetime, and `WindowContributions` forwards changes to the owning
 `ToolWindowArea`, which retains metadata while hidden and updates live headers without rebuilding
 plugin content. Header actions use the normal plugin containment boundary. Closing a site clears
-its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id, windowId)`
-for inspecting and invoking the same per-window contract (and `closePanel(id, windowId)` to discard an instance).
+its metadata and invalidates retained callbacks. The testkit exposes `panelHeader(id)`
+for inspecting and invoking the same contract (and `closePanel(id)` to discard the panel).
 A panel whose content is a kit `Panel` view (`register`) shows the same metadata in its own header row, which the
 window borrows: `ToolWindowArea` passes it to the module's host-only `KitView.setPanelHostHeader`, so there is never
 a second header. The shared `PluginContractTest` covers the contract on the host and the fake.

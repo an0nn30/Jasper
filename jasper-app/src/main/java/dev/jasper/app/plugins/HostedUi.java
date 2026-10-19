@@ -725,10 +725,10 @@ final class HostedUi {
                         ? overlay ? windows.modalOverlay(spec.title(),anchor.ownerSurface()) : windows.dialog(spec.title(),spec.modal(),anchor.ownerSurface())
                         : overlay ? windows.modalOverlay(spec.title(),anchor.target) : windows.dialog(spec.title(),spec.modal(),anchor.target);
                     var registration=anchor.onClosed(surface::close);surface.onClosed(registration::close);
-                } else if (owner instanceof WindowHandle terminalWindow && terminals.ownsOpenWindow(terminalWindow)) {
-                    surface = overlay ? windows.modalOverlay(spec.title(), terminalWindow.id()) : windows.dialog(spec.title(), spec.modal(), terminalWindow.id());
+                } else if (owner instanceof WindowHandle jasperWindow && terminals.ownsOpenWindow(jasperWindow)) {
+                    surface = overlay ? windows.modalOverlay(spec.title(), jasperWindow.id()) : windows.dialog(spec.title(), spec.modal(), jasperWindow.id());
                     if (overlay) {
-                        var ownerClosed = terminals.onWindowClosed(terminalWindow.id(), surface::close);
+                        var ownerClosed = terminals.onWindowClosed(jasperWindow.id(), surface::close);
                         surface.onClosed(ownerClosed::close);
                     }
                 }

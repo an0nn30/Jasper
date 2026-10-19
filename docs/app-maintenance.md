@@ -159,9 +159,9 @@ Application code never opens a message dialog to tell the user something; it pos
 
 ## Recording an incident
 
-An unexpected failure is an incident: it is kept for the Errors window, and a Jasper or plugin incident is announced by
+An unexpected failure is an incident: it is kept for the Errors tab, and a Jasper or plugin incident is announced by
 one error notification
-([guide](notifications.md#the-errors-window), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
+([guide](notifications.md#the-errors-tab), [design](superpowers/specs/2026-10-02-jasper-notifications-design.md)).
 `application.IncidentNotices` is the only producer, and its entry points are safe from any thread:
 
 - `jasperFailure(operation, failure)` is for Jasper's own failures. The default uncaught-exception handler (every
@@ -423,7 +423,7 @@ See [Remote](remote.md) for settings and native acceptance.
 `application.SystemNotices` listens to the center. A `Change.SystemRequested` goes to `platform.SystemNotifier` when
 `notifications.system` is on and Jasper is neither quitting nor stopped, an incident's notification with its title
 only. A read, expired or removed entry, and Clear All, withdraw what the operating system shows. A click raises the
-notification's window, then runs its default action, opens the Errors window for an incident, or shows the
+notification's window, then runs its default action, opens the Errors tab for an incident, or shows the
 Notifications panel. `Delivery` decides when the operating system is asked: for card and sticky groups, in
 `BACKGROUND` and `IDLE` (a resident Jasper with no window open or opening, once start-up has settled), never in
 `NO_WINDOW` (before the first window of a start, while one opens, or until it is activated), since the card is about
@@ -494,8 +494,8 @@ failure, Jasper cannot tell a log-out from a user's Quit, so a quit is a real qu
 flag is set. A process that is not resident keeps the ordinary quit (cancel, then `quit()`) even with a presence
 installed, as does one with no presence (a development run, Windows, Linux). On the system branch the request is a real
 quit, and only two things cancel it: the Shortcuts recorder holding Cmd+Q (when macOS is not powering off), or a
-refusing guard, because `quit()` goes through `pluginWindowsMayClose()` (a content tab's or a plugin window's closing
-guard, or a plugin quit guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a
+refusing guard, because `quit()` goes through `guardsAllowQuit()` (a content tab's closing guard or a plugin quit
+guard). The power-off flag is sticky: macOS has no "log-out cancelled" notification, so after a
 cancelled log-out a later Cmd+Q quits for real, which is the safe direction. One behaviour is accepted: during a log-out
 with Jasper hidden, a plugin quit guard that opens a window or an ownerless dialog brings Jasper back into the Dock
 first (the dialog needs the menu bar and focus to be answered).

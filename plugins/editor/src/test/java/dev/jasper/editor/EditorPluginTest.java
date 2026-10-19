@@ -233,7 +233,7 @@ class EditorPluginTest {
         }
     }
 
-    @Test void theOpenActionUsesATerminalWindowsChooserAndClosingTheWindowLetsAFreshOneOpen() throws Exception {
+    @Test void theOpenActionUsesAJasperWindowsChooserAndClosingItsTabLetsAFreshOneOpen() throws Exception {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());
             UUID terminal = host.addTerminalWindow();

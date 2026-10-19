@@ -178,8 +178,8 @@ menus, palette and subsequent connection overlay follow the new family/size.
 
 Remote 0.4 includes SFTP in the same plugin as SSH. Choose **Transfer > Open SFTP here**, **View > SFTP**,
 **Open SFTP here** in a terminal's context menu, or **Browse files** on a saved host.
-Connecting a shell does not automatically open the browser. There is one remote browser in
-each window, with an editable path, compact file list, Up, Upload, Download, Refresh,
+Connecting a shell does not automatically open the browser. There is one remote browser, in
+the main window, with an editable path, compact file list, Up, Upload, Download, Refresh,
 New folder, Delete and Copy path controls. Select multiple rows for file operations. Hidden items (names starting with
 a dot) stay out of the list until the **Show hidden items** toggle beside Refresh is pressed; the choice is remembered.
 The context menu also offers **Upload folder** and **Copy to host**.
@@ -211,7 +211,7 @@ closing the source terminal does not cancel a copy.
 ### Editing remote files
 
 With the bundled Editor installed, double-click a file in the SFTP browser, or select it and press Enter, to open it
-in a tab of the Editor window; saving writes it back to the host. A link to a file opens the file it leads to (saving
+in an editor tab; saving writes it back to the host. A link to a file opens the file it leads to (saving
 changes that file, and the link stays a link); a link to a folder navigates as before. **Open in Editor** in the
 right-click menu opens the selected files and links to files, at most 20 at a time, and says so ("Opened 20 of 57
 files.") when there were more. Without the Editor, double-clicking a file does nothing and the menu item is hidden.
@@ -233,7 +233,7 @@ first and closed when none are left. When the connection has closed, the next op
 appear in the Jasper window the file was opened from, or else in the active one. With no Jasper window open it
 fails with "Reconnecting to prod-web needs an open Jasper window for the sign-in prompt."
 
-Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in every window: what is copying and where,
+Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in the main window: what is copying and where,
 a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one
 button — **Resume** (paused or interrupted), **Resolve…**, **Retry failed** or **Retry cleanup**.
 A finished transfer shows "Done" for a few seconds and leaves; failed or cancelled ones stay until

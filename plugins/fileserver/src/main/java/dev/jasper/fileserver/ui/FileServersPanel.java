@@ -34,7 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * The per-window File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. The row the
+ * The File Servers rail panel. Rows show confirmed state; the borrowed header owns count and New. The row the
  * details and activity follow is the user's selection, or the first server while nothing is selected; only a selection
  * the user (or {@link #select}) made is shown as selected.
  *

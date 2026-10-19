@@ -107,7 +107,7 @@ public class RemotePlugin implements Plugin {
     private StatusItem status;
     private PluginAction splitAction;
     private SessionsToolbar sessionsToolbar;
-    /** Each window's chosen session, shared by its toolbar view and its Sessions tree under CLASSIC (spec 14.4). */
+    /** Each window's chosen session, shared by its toolbar view and, in the main window, its Sessions tree under CLASSIC (spec 14.4). */
     private final SessionSelection sessionSelection = new SessionSelection();
     private Timer poll;
     private String icon;

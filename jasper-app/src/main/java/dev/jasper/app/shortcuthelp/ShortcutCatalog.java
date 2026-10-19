@@ -97,7 +97,7 @@ final class ShortcutCatalog {
 
     private static void contextual(List<ShortcutEntry> rows, List<ActionEntry> actions, Map<String, String> plugins, boolean macOs) {
         int primary = macOs ? InputEvent.META_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
-        add(rows, "auxiliary.close", "Application", "Close auxiliary window", KeyEvent.VK_W, primary, "Plugin and help windows");
+        add(rows, "auxiliary.close", "Application", "Close auxiliary window", KeyEvent.VK_W, primary, "Help windows");
         add(rows, "plugins.menu", "Application", "Open selected plugin menu", KeyEvent.VK_CONTEXT_MENU, 0, "Plugins manager list");
         add(rows, "plugins.menu.shift", "Application", "Open selected plugin menu", KeyEvent.VK_F10, InputEvent.SHIFT_DOWN_MASK, "Plugins manager list");
         add(rows, "find.next", "Search", "Next match", KeyEvent.VK_ENTER, 0, "Find field");

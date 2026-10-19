@@ -766,7 +766,7 @@ class EditorWindowTest {
         assertThat(host.contentTabs()).isEmpty();
     }
 
-    @Test void editOpensInTheTerminalWindowItWasGivenAndOtherwiseInTheLastMainWindow() throws Exception {
+    @Test void editOpensInTheJasperWindowItWasGivenAndOtherwiseInTheMainWindow() throws Exception {
         UUID terminal = host.addTerminalWindow();
         WindowHandle handle = context.terminals().window(terminal).orElseThrow();
         assertThat(window.edit(file("a.txt", "a\n"), OptionalInt.empty(), Optional.of(handle))).isTrue();

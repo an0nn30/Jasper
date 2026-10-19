@@ -10,7 +10,7 @@ import java.util.function.Predicate;
 /** Published by the Editor plugin with {@code Services.publish}. UI thread only. */
 public interface Editor {
     /**
-     * Opens a local file in a tab, or selects the tab already showing it, and brings the Editor window to the front.
+     * Opens a local file in a tab, or selects the tab already showing it, and brings its window to the front.
      *
      * @param file a local file
      */
@@ -22,9 +22,9 @@ public interface Editor {
      * @param document the document
      */
     void open(EditorDocument document);
-    /** Opens in the originating workspace, or the last main workspace when null.
+    /** Opens in the window the request came from, or the main window when null.
      * @param file local file
-     * @param owner originating workspace
+     * @param owner the Jasper window or content tab the request came from
      */
     default void open(Path file, WindowOwner owner) { open(file); }
 

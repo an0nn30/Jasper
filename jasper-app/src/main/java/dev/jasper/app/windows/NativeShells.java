@@ -58,7 +58,7 @@ public final class NativeShells {
     private static final String CHOOSER_BOUNDS = "file-chooser";
     private final ThemeController themes;
     private final UiState state;
-    private final Function<UUID, Window> terminalWindows;
+    private final Function<UUID, Window> jasperWindows;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
     /** Classic dialogs drawn inside their owner's window (spec 10.8): they have no native window of their own. */
@@ -70,11 +70,11 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a Jasper window's native window by id, or returns null
+     * @param jasperWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows, Runnable quit) {
-        this(themes, state, terminalWindows, quit, ShellChrome.standard());
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> jasperWindows, Runnable quit) {
+        this(themes, state, jasperWindows, quit, ShellChrome.standard());
     }
 
     /**
@@ -82,15 +82,15 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a Jasper window's native window by id, or returns null
+     * @param jasperWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      * @param shell the look's title bar, menu row and appearance
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows, Runnable quit,
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> jasperWindows, Runnable quit,
                         ShellChrome shell) {
         this.shell = Objects.requireNonNull(shell);
         this.themes = Objects.requireNonNull(themes); this.state = Objects.requireNonNull(state);
-        this.terminalWindows = Objects.requireNonNull(terminalWindows);
+        this.jasperWindows = Objects.requireNonNull(jasperWindows);
         this.quit = Objects.requireNonNull(quit);
     }
 
@@ -343,7 +343,7 @@ public final class NativeShells {
     private Window owner(AuxiliarySurface surface) {
         var placed = windowed(surface, drawnInWindow::contains);
         if (placed.ownerSurface().isPresent()) return natives.get(placed.ownerSurface().orElseThrow());
-        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(terminalWindows).orElse(null));
+        return placed.anchorOwner().map(SwingUtilities::getWindowAncestor).orElseGet(() -> placed.ownerWindow().map(jasperWindows).orElse(null));
     }
 
     /**
@@ -555,7 +555,7 @@ public final class NativeShells {
 
     /** Owner-based file, folder or save-target selection in Jasper's own chooser, over any modal dialog the owner shows. */
     public List<Location> choosePaths(PathChoice choice, Consumer<Runnable> cancellation) {
-        Window owner = choice.terminalOwner() != null ? terminalWindows.apply(choice.terminalOwner()) : natives.get(choice.auxiliaryOwner());
+        Window owner = choice.jasperOwner() != null ? jasperWindows.apply(choice.jasperOwner()) : natives.get(choice.auxiliaryOwner());
         if (owner == null || !owner.isShowing()) throw new IllegalArgumentException("Picker requires a shown owner");
         owner = TopModal.over(owner); // over a modal dialog showing on the owner, not blocked and covered by it
         ChooserRequest.Mode mode = switch (choice.mode()) {
@@ -565,7 +565,7 @@ public final class NativeShells {
         };
         var local = new LocalBrowser();
         return showChooser(owner, ChooserRequest.of(choice.title(), mode, choice.multiple(), choice.initial(), choice.terminalFolder(),
-            choice.suggestedName(), Optional.empty(), Optional.ofNullable(choice.terminalOwner()), local.homePath()), local, choice.sources(), cancellation);
+            choice.suggestedName(), Optional.empty(), Optional.ofNullable(choice.jasperOwner()), local.homePath()), local, choice.sources(), cancellation);
     }
 
     private Optional<Path> chooseFile(Window owner, String title, Optional<Path> initialPath, Optional<String> suffix) {

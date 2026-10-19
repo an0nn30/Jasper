@@ -1,20 +1,34 @@
 # Workspace tabs 4b: plugin windows become tabs Implementation Plan
 
-**Status: executing** (Tasks 1-3 committed). Deviations from the plan's text: (a) Task 3 Step 3 (controller ruling): the
-ROWS split's id is `rows.layout`, since `rows` is `ManagerPanel.ROWS`, the entry list's id, and `ViewSpec` refuses a
-duplicate; (b) Task 3 Step 6 (controller ruling): the manager tab's footer is the status row alone, 7 px shorter, so its
-top moved from logical 534 to 541, and its panes take the workspace ground, so `ClassicVaultRenderTest` re-pins
-`DETAILS` and `DETAILS_NONE` whole, not only their last runs. Re-pinned, old → new: the status row's rows 1068..1142 →
-1082..1142; the columns' bottom 1070 → 1084; `STATUS` `0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1
-#2655AE, 31+6 #E6E7EA` → `0+1 #E8E8E9, 1+29 #F7F7F8`; `CATEGORIES`' last runs `86+448 #F7F7F8, 534+1 #C4C7CC` →
-`86+455 #F7F7F8, 541+1 #E8E8E9`; `ITEMS`' last runs `65+413 #FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC` →
-`65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9`; `DETAILS_NONE` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+474
-#ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+481 #F7F7F8, 506+1 #E8E8E9`; `DETAILS` `0+24 #E1E3E6, 24+1
-#C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E6E8EB, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #ECEDEF,
-165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22 #FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, 499+1 #C4C7CC` →
-`0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, 156+1
-#D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8, 226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256
-#F7F7F8, 506+1 #E8E8E9`; the `fontsFloor` agreements (0.598, 0.752) stay above 0.55, and nothing else moved.
+**Status: executed on 2026-10-19** (`da79cae7c..4576cbecf`, then the documentation commit); see `docs/STATUS.md`.
+Deviations from the plan's text: (a) before Task 1 the plan was replayed on `499d47901` and refreshed in `da79cae7c`,
+with the pre-flight's rulings F1 to F21 (STATUS lists them); (b) Task 3 Step 3 (controller ruling Q1): the ROWS split's
+id is `rows.layout`, since `rows` is `ManagerPanel.ROWS`, the entry list's id, and `ViewSpec` refuses a duplicate; (c)
+Task 3 Step 6 (controller ruling Q2): the manager tab's footer is the status row alone, 7 px shorter, so its top moved
+from logical 534 to 541, and its panes take the workspace ground `#F7F7F8` instead of the window panel's `#ECEDEF`,
+which the 07 mock draws, so `ClassicVaultRenderTest` re-pins `DETAILS` and `DETAILS_NONE` whole, not only their last
+runs. Re-pinned, old → new: the status row's rows 1068..1142 → 1082..1142; the columns' bottom 1070 → 1084; `STATUS`
+`0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1 #2655AE, 31+6 #E6E7EA` → `0+1 #E8E8E9, 1+29 #F7F7F8`;
+`CATEGORIES`' last runs `86+448 #F7F7F8, 534+1 #C4C7CC` → `86+455 #F7F7F8, 541+1 #E8E8E9`; `ITEMS`' last runs `65+413
+#FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC` → `65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9`;
+`DETAILS_NONE` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+474 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+481
+#F7F7F8, 506+1 #E8E8E9`; `DETAILS` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1
+#E6E8EB, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #ECEDEF, 165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22
+#FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1
+#D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8,
+226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256 #F7F7F8, 506+1 #E8E8E9`. The `fontsFloor` agreements
+(0.598, 0.752) stay above 0.55. More than the ground moved: in `DETAILS` the field sits one device pixel higher
+(`166+61` → `166+60`, so 227, 228 and 250 → 226, 227 and 249), and the rule and gradient colours shifted (`#E6E8EB` →
+`#E4E5E8`, `ITEMS`' `#DDE0E4` → `#E4E5E8`, the gradient's end `#EEF0F2` → `#F6F6F6`); (d) Task 4 (controller ruling,
+option A): `AuxiliaryWindows.dialog(String, boolean, JComponent)` skips its showing check when
+`GraphicsEnvironment.isHeadless()`, as `HostedAnchor.isOpen` does, with `HostedAnchorContractTest`'s fixture gaining a
+`TerminalFixture` main window and `HostedTerminals`; `KitMountingTest` drops `owner.close()`, `ClassicPlacementTest`'s
+window case is ported to the Licenses window, and twelve unused imports go; (e) Task 5:
+`StagedRemoteHost.sessionsState`'s local is `sessionsField` (the brief's `sessions` shadowed the parameter), and seven
+unused imports go; (f) Task 6: the `errorsTab` field's comment in `JasperApplication` says its tab opens in the main
+window; (g) Task 8 (controller ruling): wording the brief's patterns miss is fixed (`ShortcutCatalog`, `MacTitleBar`,
+the panel classes' "one per window", `TransferUi`, `RemotePlugin`, `Panels.toggle`, `ErrorsView`, `DesignMetrics`), and
+this banner replaces Task 3's "executing" line.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

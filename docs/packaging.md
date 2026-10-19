@@ -336,7 +336,7 @@ acceptance remain unexecuted on macOS.
 - [ ] With the default configuration, confirm `~/Library/LaunchAgents/dev.jasper.background.plist` appears after the first launch; log out and back in and confirm Jasper is running with no window, no Dock icon at any moment during login, and its menu bar item present.
 - [ ] Confirm the menu bar glyph follows the menu bar in Light and Dark appearance (and with a tinted menu bar); New Terminal Window, Settings… and Quit Jasper Completely work with Jasper in the background and with windows open, and New Terminal Window and Settings… come to the front.
 - [ ] Press Cmd+Q with two windows open: both close, the Dock icon and the Cmd+Tab entry disappear, the menu bar item stays, and `pgrep -fl Jasper.app` still lists the process. Repeat with Jasper › Quit, File › Quit and the Dock icon's Quit.
-- [ ] With an editor content tab holding unsaved changes (or another plugin window that asks before closing), press Cmd+Q and refuse: nothing closes and Jasper stays in the Dock.
+- [ ] With an editor content tab holding unsaved changes (or another content tab that asks before closing), press Cmd+Q and refuse: nothing closes and Jasper stays in the Dock.
 - [ ] Click the pinned Dock icon in the background: a window opens in the running process (still one process in `pgrep`), the Dock icon, Cmd+Tab entry and Jasper's menu bar return, and typing reaches the shell without a click. Repeat from Spotlight and with `open -a Jasper`.
 - [ ] Open Settings… from the menu bar item in the background: Jasper returns to the Dock for the dialog and leaves it when the dialog closes.
 - [ ] Quit Jasper Completely exits, and the next launch is cold.

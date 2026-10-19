@@ -129,7 +129,7 @@ public final class DesignMetrics {
         PLUGIN_DETAILS_GAP(10), PLUGIN_DETAILS_EDGE_PADDING(7), PLUGIN_DETAILS_LEADING_PADDING(15), PLUGIN_DETAIL_ICON(52),
         PLUGIN_TEXT_VERTICAL_PADDING(6), PLUGIN_TEXT_SIDE_PADDING(0),
         NOTIFICATION_WIDTH(360), NOTIFICATION_ICON(16), NOTIFICATION_GAP(6), NOTIFICATION_CLOSE(16),
-        // App-unmocked surfaces (Plan 3 Task 9): the Errors window's trace card shows at most this many lines before it scrolls.
+        // App-unmocked surfaces (Plan 3 Task 9): the Errors tab's trace card shows at most this many lines before it scrolls.
         ERRORS_TRACE_ROWS(12),
         // A manager detail heading's title block keeps this width (or its own, if narrower) before its actions wrap.
         DETAIL_IDENTITY_MIN_WIDTH(160),

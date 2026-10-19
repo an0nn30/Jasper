@@ -181,7 +181,7 @@ public final class EditorWindow {
     /** @param document opened in a new tab, or its open tab selected; the window comes to the front */
     public void open(EditorDocument document) { open(document, null); }
 
-    /** Opens a file in the originating workspace; null chooses the last main workspace. */
+    /** Opens a file in the window the request came from; null chooses the main window. */
     public void open(EditorDocument document, WindowOwner owner) {
         origin = owner;
         Optional<DocumentSession> existing = model.find(document.key());

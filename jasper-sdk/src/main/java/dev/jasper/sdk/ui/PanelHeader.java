@@ -3,7 +3,7 @@ package dev.jasper.sdk.ui;
 import java.util.List;
 import java.util.Objects;
 
-/** Per-window panel header metadata. Set through {@link PanelHost#setHeader} on the UI thread.
+/** A panel's header metadata. Set through {@link PanelHost#setHeader} on the UI thread.
  * @param detail count or connection name beside the title; empty to omit. A count is passed as digits, and the
  *     presentation punctuates it
  * @param active whether to show a connected status dot beside the detail

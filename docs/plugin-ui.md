@@ -37,7 +37,7 @@ Pick the composition from what the surface is, not from how it should look:
 | --- | --- |
 | Small, focused prompt with an icon tile (unlock, create) | `Form` with `FormKind.PROMPT` or `PROMPT_COMPACT` and a hero |
 | Dialog with grouped fields (add host, new server, new tunnel) | `Form` with `FormKind.FULL`; each group is a `Section` holding a `Card` |
-| Sheet attached to one of your windows | `Form` with `FormKind.SHEET`, shown with `DialogSpec` sheet presentation |
+| Sheet attached to a Jasper window or one of your content tabs | `Form` with `FormKind.SHEET`, shown with `DialogSpec` sheet presentation |
 | Modal prompt inside a window, over its dimmed content (unlock, create) | Any `Form`, often `PROMPT`/`PROMPT_COMPACT`, shown with `DialogSpec.Presentation.OVERLAY` (SDK 0.15.4) |
 | Window body with a pinned footer | `Form` with `FormKind.WINDOW` (one section) |
 | Docked panel | `Panel` with a `Header`, optional search or navigation, a body and an optional footer |
@@ -169,7 +169,7 @@ static ViewSpec serversPanel(List<String> names, Set<String> running, String que
 ```
 
 Register the panel with `context.panels().register(new PanelSpec(...), host -> context.kit().create(...))` and keep
-your model outside the view: Jasper asks for one instance per window. Two-line rows in a panel are compact: the name
+your model outside the view: Jasper builds it once, in the main window. Two-line rows in a panel are compact: the name
 leads the title line; a `Chip` and a `MONO_SMALL` endpoint form the second line; one compact `Toggle` trails. A row
 switch is its own control: toggling it never activates the row, and its displayed state follows what your domain
 confirms (set `pending` while a start or stop is in flight).

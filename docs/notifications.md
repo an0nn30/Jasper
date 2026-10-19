@@ -78,7 +78,7 @@ going. See [configuration](configuration.md#finished-command-notifications).
 ## Plugin notifications
 
 Plugins post notifications in their own groups, so you can tell them apart from Jasper's. When an error a plugin
-reports has an exception behind it, its notification offers **Show more…**, which opens the Errors window at it. When
+reports has an exception behind it, its notification offers **Show more…**, which opens the Errors tab at it. When
 a plugin's background work finishes or fails, Jasper posts the outcome in the plugin's activities group; clicking it
 runs the plugin's action for that work, if it has one.
 
@@ -86,11 +86,11 @@ At launch, each plugin that could not be loaded, was not started (it needs anoth
 requires is missing) or could not be read is reported in Plugin problems with **Open Plugins**, which opens
 Settings › Plugins. A plugin that failed while starting is reported once, by its incident's notification.
 
-## The Errors window
+## The Errors tab
 
 When something fails unexpectedly, in Jasper or in a plugin, Jasper records it as an incident and tells you with an
 error notification: "Unexpected error in Jasper", or, for a plugin, "Remote failed in …" or "Remote failed to start".
-**Show more…** opens the Errors window at that incident, and **Notifications: Show Errors** in the command palette opens
+**Show more…** opens the Errors tab at that incident, in the main window, and **Notifications: Show Errors** in the command palette opens
 it too. A shell that could not start is recorded too: each failure is announced in the window it happened in, with its
 folder and cause, and offers **Show more…**.
 
@@ -119,7 +119,7 @@ While Jasper is in the background, or idle as a resident Jasper with every windo
 shows cards also appears as the operating system's own: a banner on macOS, a balloon from Jasper's notification-area
 icon on Windows, and a desktop notification through `notify-send` on Linux. Clicking it brings its window to the front
 (opening one when none is open) and does what clicking its card would; a notification with nothing to run opens the
-Errors window for an internal error, a plugin problem or a plugin's notification that carries a cause, or else the
+Errors tab for an internal error, a plugin problem or a plugin's notification that carries a cause, or else the
 Notifications panel. Reading a notification in Jasper, its expiry and its removal take the system notification away
 where the system allows it. While Jasper starts or a window opens nothing is sent, since the card is about to show;
 that includes a login launch until its start-up has settled.
@@ -134,7 +134,7 @@ that includes a login launch until its start-up has settled.
   notification comes back to Jasper; otherwise the notification only informs.
 
 An internal error, a plugin problem and a plugin's own notification that carries a cause (the ones that offer
-**Show more…**) send only their title and open the Errors window when clicked, since their details can name files and
+**Show more…**) send only their title and open the Errors tab when clicked, since their details can name files and
 hosts and system notifications show on a locked screen. Turn system notifications off with `notifications.system = false`, or in
 Settings › Notifications ([configuration](configuration.md#finished-command-notifications)).
 

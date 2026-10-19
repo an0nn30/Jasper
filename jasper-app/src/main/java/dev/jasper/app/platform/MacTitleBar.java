@@ -20,7 +20,7 @@ public final class MacTitleBar extends JPanel implements AutoCloseable {
      * How a title row without a workspace header looks; the kit's title metrics size each one.
      */
     public enum Style {
-        /** An auxiliary window's row: centred title, title actions at the right and a hairline below. */
+        /** An auxiliary window's row: centred title and a hairline below. */
         WINDOW,
         /** A dialog's band in the dialog surface, with no rule; its title and the controls centre lower, as a dialog's do. */
         DIALOG,

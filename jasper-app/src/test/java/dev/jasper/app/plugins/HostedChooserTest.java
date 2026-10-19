@@ -57,10 +57,10 @@ class HostedChooserTest {
         assertThat(disposed.get()).isEqualTo(1);kit.close();ui.closeAll();
     }
 
-    @Test void terminalOwnerSelectsMultipleFilesOrOneDirectory() {
+    @Test void aJasperWindowOwnerSelectsMultipleFilesOrOneDirectory() {
         var owner = terminals.windowHandle(fixture.addWindow());
         assertThat(ui.windows().chooseFiles(owner, "Upload", Optional.empty())).containsExactly(Path.of("/one").toAbsolutePath(),Path.of("/two").toAbsolutePath());
-        assertThat(requests.getFirst().terminalOwner()).isEqualTo(owner.id());
+        assertThat(requests.getFirst().jasperOwner()).isEqualTo(owner.id());
         assertThat(disposed).isTrue();
         selected = List.of(Path.of("/dest").toAbsolutePath());
         assertThat(ui.windows().chooseDirectory(owner, "Download", Optional.empty())).contains(Path.of("/dest").toAbsolutePath());
@@ -79,7 +79,7 @@ class HostedChooserTest {
         assertThat(ui.windows().chooseFiles(terminal, "Upload", Optional.empty())).isEmpty();
     }
 
-    @Test void terminalOwnerClosingWhilePickerPumpsDisposesIt() {
+    @Test void aJasperWindowOwnerClosingWhilePickerPumpsDisposesIt() {
         var id = fixture.addWindow();
         var pane = fixture.addPane(fixture.addTab(id, "Shell"), "Shell", null);
         during.set(() -> { fixture.closePane(pane); assertThat(disposed).isTrue(); });

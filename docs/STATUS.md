@@ -1,5 +1,139 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 4b: plugin windows become tabs — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `da79cae7c..4576cbecf` (Tasks 1 to 7, after the plan refresh), then this
+documentation commit; [plan](superpowers/plans/2026-10-18-workspace-4b-plugin-windows.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.20.0, a breaking boundary: every
+bundled manifest, the external example and every guide range declare `sdk = ">=0.20.0, <0.21"`; the Vault is 0.7.0, the
+sample 0.4.0, the Editor 0.11.0, Remote 0.14.0 and File Server 0.6.0, and every cross-plugin range still holds.
+`WindowHandle.isMain()` tells the main window from a child window; `Windows.openTab(spec, owner, view, placement)` takes
+a `TabPlacement` (`ACTIVE_GROUP`, the three-argument form; `SPLIT_RIGHT` and `SPLIT_DOWN`, a new group beside the active
+one; `NEW_WINDOW`, straight into a child window opened for the tab, the owner's window untouched, reported as
+`WINDOW_OPENED` then `TAB_OPENED`); `ContentTab.moveToNewWindow()`, `moveToMainWindow()` and `window()` replace
+`move(boolean)` and `isSeparate()`. `Windows.create`, `PluginWindow`, `WindowSpec`, `ShortcutContext.window` and
+`KeyContext.WINDOW` are gone, and `KitCompatibility` refuses them as 0.20's; so is the auxiliary windows' title-action,
+content-size and close-command chain that only plugin windows used (Close Window calls `requestClose()`). A content tab
+carries no window chrome: the Vault manager is a content tab (`VaultManagerTab`; the ROWS actions are its body's first
+row) without Done, the sample's About is a tab that owns its Details sheet, and the Errors window is `ErrorsTab`, an
+app-owned content tab (`TabRegistry.APP_OWNER`, `jasper`, key `errors`) in the main window whose view paints from the
+workspace route and has no Done. Panels, the toolbar and the status bar are the main window's in the SDK's words; a
+child window's panel toggle shows the one panel in the main window in the fake as in the application, the testkit's and
+the contract harness's panel methods take no window, Remote and File Servers keep one panel's state, and Remote's
+Sessions panel follows only its own window's row. The Editor has New Editor Window (`dev.jasper.editor.new_window`, no
+key). App side: `WindowEntry.main`, `WorkspaceHost.attachBeside(tab, group, side)` (any group), `TabRegistry.Placement`,
+`TabRegistry.Windows.emptyWindow`, `guardsAllowQuit`. The testkit's `FakeWorkspace` and the app's `TerminalFixture` keep
+a window's tabs in groups (most recently used first), make the first window opened while none is main the main window,
+which outlives its last tab, and close a child window with its last tab after the move reports `TAB_MOVED`;
+`FakePluginHost.contentTab` and `contentView` find a content tab by title; `PluginContractTest` checks placements, the
+moves, the main window's rule and the one panel on both runtimes. Rulings (plan, "Rulings"): (1) the SDK is 0.20.0 and
+every range follows, and the five plugins whose behaviour changed bump to the next minor; (2) `WindowHandle.isMain()` is
+abstract, since a default could only lie; (3) `TabPlacement` is `ACTIVE_GROUP`, `SPLIT_RIGHT`, `SPLIT_DOWN` and
+`NEW_WINDOW`, the four-argument `openTab` is the abstract one and the three-argument form a default; (4) a split opens a
+new group beside the owner window's active group, and `attachBeside` attaches beside any group, which plan 5's drop
+uses; (5) `NEW_WINDOW` attaches to a child window opened empty, a window that fails to show the tab closes again, and an
+open key is selected where it is; (6) `moveToNewWindow()` leaves a child window's only tab, a closed tab, one with a
+modal prompt open and one being closed where they are, and `moveToMainWindow()` leaves a tab the main window holds; (7)
+the fakes model the application's main window, groups and child windows, and `TerminalFixture` gains `addMainWindow()`;
+(8) the Vault manager is a content tab in the window that asked, key `manager`; (9) the sample's About is a tab whose
+Details sheet the tab owns, `installPanelAndAboutTab`; (10) the testkit finds a content tab by title; (11) tests whose
+subject was a plugin window go, and a test of behaviour that stays is rewritten for its new owner; (12) Quit and restart
+ask the content tabs' guards and the quit guards, and an open auxiliary window keeps a non-resident process alive
+(`auxiliaryOpen`); (13) the auxiliary windows' title-action, content-size and close-command chain goes, with
+`MacTitleBar`'s accessory, `KitView.titleStrip` and `SurfaceMount`'s `title`; (14) panels live in the main window as one
+instance, in the fake too; (15) the SDK says the toolbar and the status bar are the main window's, and the harness still
+builds a toolbar view for whichever window it names; (16) the Errors window becomes an app-owned tab opened by Show
+more…, Notifications: Show Errors and a system notification's click; (17) New Editor Window opens an untitled document
+with `NEW_WINDOW`; (18) the guides describe 0.20 in a new "Main and child windows" section of `jasper-sdk/README.md`,
+two older STATUS links follow renamed headings, and the stale-text check joins wrapped lines; (19) THD Sourcing Crypto
+stays skipped; (20) a content tab carries no window chrome, and Escape closes none of the three; (21) Jasper's own tabs
+share `TabRegistry.APP_OWNER`, which plan 6 never saves. Deviations: (a) the classic Vault manager departs from
+Enterprise's 07 Credential Vault mocks, which draw it as a window with Done over a dialog band: `ClassicVaultRenderTest`
+pins it to the render (the manager tab's footer is the status row alone, 7 px shorter, so its top moved from logical 534
+to 541; re-pinned, old → new: the status row's rows 1068..1142 → 1082..1142; the columns' bottom 1070 → 1084; `STATUS`
+`0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1 #2655AE, 31+6 #E6E7EA` → `0+1 #E8E8E9, 1+29 #F7F7F8`;
+`CATEGORIES`' last runs `86+448 #F7F7F8, 534+1 #C4C7CC` → `86+455 #F7F7F8, 541+1 #E8E8E9`; `ITEMS`' last runs `65+413
+#FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC` → `65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9`;
+`DETAILS_NONE` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+474 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+481
+#F7F7F8, 506+1 #E8E8E9`; `DETAILS` `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1
+#E6E8EB, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #ECEDEF, 165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22
+#FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, 499+1 #C4C7CC` → `0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1
+#D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, 156+1 #D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8,
+226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256 #F7F7F8, 506+1 #E8E8E9`; the `fontsFloor` agreements
+(0.598, 0.752) stay above 0.55); (b) Task 3, controller ruling Q1: the ROWS split's id is `rows.layout`, since `rows` is
+`ManagerPanel.ROWS`, the entry list's id, and `ViewSpec` refuses a duplicate; (c) Task 3, controller ruling Q2: as a
+content tab on the workspace route the Details pane takes the workspace ground `#F7F7F8` instead of the 07 mock's
+`#ECEDEF` (the window panel's), consistent with every other content tab, so `DETAILS` and `DETAILS_NONE` are re-pinned
+whole, and the shift is more than the ground: in `DETAILS` the field moved one device pixel (`166+61` → `166+60`, so
+227, 228 and 250 → 226, 227 and 249), the rule at 129 `#E6E8EB` → `#E4E5E8` and `ITEMS`' rule `#DDE0E4` → `#E4E5E8`
+follow the ground, and the field's gradient ends `#F6F6F6` where it ended `#EEF0F2`; (d) before Task 1 the plan was
+replayed on 4a's final code `499d47901` (61 blocks, 18 failing before the refresh, 0 after, with every proposed ruling;
+20 anchors refreshed) and refreshed in `da79cae7c`, with rulings F1 to F21: F1 the plugin bumps (Ruling 1), F2
+`PluginStateStoreOptInTest` and `PresentationSelectionTest` move to 0.20, F3 Task 4 drops the deleted `PluginWindow` and
+`WindowSpec` ledger rows, F4 Task 4's commit adds `jasper-ui` and `docs`, F5 `toBackground`'s "plugin windows" comment
+is reworded, F6 (blocking) Task 2 uses the rebased `FakeWorkspace`, `FakeContent` and `TerminalFixture`, keeping 3b's
+M1, M2 and M6, its `IllegalArgumentException` ruling and 4a's F3 refresh, with split calls `openTerminal(…, group)` and
+the `FakeTerminalsTest` move case ported, F7 `TabRegistry.Windows` keeps a four-argument constructor, F8 a `NEW_WINDOW`
+rollback keeps the attach failure first (`Tab.keep` around `movedOut`) and `emptyWindow` requires the child's host (one
+`TabRegistryTest` case), F9 `mainOpened` looks the main host up per waiting tab and re-queues one whose host is gone (a
+test), F10 a waiting tab loses its placement and can wait with no window, which `open`'s Javadoc says, F11 a refused
+move restores `tab.active` (a test) and `closingAll`'s Javadoc names the main window too, F12 the fake's toggle from a
+child window shows the panel (4a's TOGGLE to SHOW; test, Javadoc and guide follow), F13 `closeTab(UUID)` in
+`FakePluginHost` and `ContractHarness`, F14 `TerminalFixture.moveTab` leaves `registry.atomically` and the contract pins
+the move order with topics, F15 the placement case records topic and event (`WINDOW_OPENED` before `TAB_OPENED`) and
+3b's open and split case records topics, F16 `AnchorContractTest`'s body-replacement test stays on a dialog (7 to 8
+cases), F17 Task 8 renames the `terminalWindows`, `terminalOwner` and `terminalWindow` identifiers and eight test names,
+F18 plan 4a's entry (j) is rewrapped, F19 `README.md`'s toolbar and status clause is corrected, F20 executors used the
+pre-flight's absolute counts (`PluginContractTest` 110 after Task 2 and 108 after Task 4, `TabRegistryTest` 33,
+`AnchorContractTest` 8, `WindowManagerTest` 33), F21 the window manager, `JasperWindow` and `EmptyWorkspace` were
+checked and need no edit; (e) Task 4, controller ruling (option A): `AuxiliaryWindows.dialog(String, boolean,
+JComponent)` skips its showing check when `GraphicsEnvironment.isHeadless()`, as `HostedAnchor.isOpen` does, since a
+content tab's view never shows headless and every anchored dialog was refused (one production line, headless only), with
+a shared fixture change (`HostedAnchorContractTest` builds a `TerminalFixture` main window and passes `HostedTerminals`
+to `HostedUi`); `KitMountingTest` drops `owner.close()`, which no longer compiles, `ClassicPlacementTest`'s window case
+is ported to the Licenses window, since its fixture was the removed Vault manager window, and twelve now-unused imports
+go; (f) Task 5: `StagedRemoteHost.sessionsState`'s new local is `sessionsField`, since the brief's `sessions` shadowed
+the method's parameter and did not compile, and seven now-unused imports go; (g) Task 6: the `errorsTab` field's comment
+in `JasperApplication` says its tab opens in the main window; (h) Task 8, controller ruling: wording the brief's
+patterns miss is fixed, so `ShortcutCatalog`'s `auxiliary.close` context reads "Help windows",
+`MacTitleBar.Style.WINDOW` no longer names title actions, `FileServersPanel`, `HostsPanel`, `TunnelsPanel`,
+`TransfersPanel`, `TransferUi` and `RemotePlugin` no longer call their panel one per window, `Panels.toggle`'s Javadoc
+and the guide say a child window's request shows the panel and brings the main window to the front, `ErrorsView`'s two
+comments name the tab, `DesignMetrics`' comment names the Errors tab, and this plan's banner replaces Task 3's
+"executing" line; the banner's "nothing else moved" was wrong, and (c) corrects it. THD Sourcing Crypto
+(`~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18)
+stays skipped: plan 6 bumps the SDK again (restorers), so rebuild it once, after the series' last SDK bump, against the
+jars `sdkRelease` then publishes. That rebuild carries every change since 0.17.1: its `plugin.toml` (`sdk = ">=0.16.1,
+<0.18"`) and `PluginPackagingTest.java:49` move to the final range, and `build.gradle.kts:8` and `README.md:28` name the
+final version; 0.18's rename applies (`CryptoForm.java:112` and `CryptoFormTest.java:61` read `ChoiceKind.SEGMENTED`,
+now `EXCLUSIVE`); 0.19's one pane per terminal tab applies (`CryptoFormTest.java:39-41` adds two panes to one tab: give
+`other` its own tab, `host.addTerminalPane(host.addTerminalTab(window, "zsh"), zsh())`, after which focusing `other`
+selects its tab); 0.20 needs nothing more (its dialog is owned by the action's window, and its tests read
+`FakePluginHost.windows()` and `windowView`, which list dialogs, in one main window, and open no panel). Left for plan
+5: tear-out and drag-back (a child window opened at a screen point and sized like the source group, through 4a's
+`moveToNewWindow(Tab, Rectangle)` and `windowsByActivation`, and a drop beside any group through
+`WorkspaceHost.attachBeside(tab, group, side)`), and, once a fake main window can close, `FakeWorkspace.closeWindow`
+closing and nulling the panel instance as `WindowContributions` does, with `AppContractTest` clearing its panel caches
+(unobservable today). Left for plan 6: `ContentSpec` restore state, `Windows.restorer` and the Editor's restorer, the
+next SDK bump, and restoring the Vault manager's tab; Jasper's own tabs (`TabRegistry.APP_OWNER`, the Errors tab) are
+never saved, so plan 6 can skip them by owner. `./gradlew check --continue`: **11,694 tests, 0 failures, 0 errors, 25
+skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,744, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+`jasper-plugin-editor` 4,912, `PluginContractTest` 108 on each runtime, `AnchorContractTest` 8 on each,
+`WindowManagerTest` 33, `TabRegistryTest` 33, `KitCompatibilityTest` 15, `JasperApplicationWindowsTest` 7,
+`ErrorsTabTest` 5, `ErrorsViewTest` 16, `ClassicVaultRenderTest` 5, `EditorPluginTest` 20; the build passed on its first
+run, `StagedTransferLifecycleTest` included). GUI checks for the user: the Vault manager opens as a Credential Vault tab
+in the window that asked (Cmd+Shift+\ twice opens one tab) with no Done, Escape leaves it open and the tab's close
+button closes it, its editors attach to that window, and Lock Vault with an editor open clears it; under the ROWS layout
+the manager's first row holds Lock and Add above the columns; under the Enterprise look, the manager tab beside the 07
+Credential Vault mock (the recorded deviation: no Done, no dialog band under the status row), and its Details pane's
+ground (`#F7F7F8`, the workspace's) against the mock's; Move Tab to New Window on the manager keeps its state; the
+sample's About tab (with the sample enabled) and its Details sheet; Show more… on an error notification opens the Errors
+tab in the main window, from a child window too, with no Done; New Editor Window from the File menu and the palette
+opens an untitled document in a child window and leaves the window it came from as it was; a tool window shortcut,
+SFTP's Open SFTP here and a tunnel's panel from a child window show the panel in the main window, and Open SFTP here
+from a child window with no SSH pane shows its host chooser (owned by the child window) in front of the raised main
+window, not behind it; Settings, About and Licenses close with Close Window and Cmd/Ctrl+W; Cmd+Q with an unsaved editor
+tab in a child window asks once. Not merged, not pushed.
+
 **Workspace tabs, plan 4a: the main window and child windows — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `bd735c724..82a55495d` (Tasks 1 to 6 and their fix rounds, after the plan refresh),
 then the documentation commit and the final review's fixes;
@@ -86,8 +220,8 @@ a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), 
 `JasperApplicationBackgroundTest` and `JasperApplicationResidencyTest` their counts (41, 16) are unchanged; (i) F8: Task
 1's failed-build catch closes `themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is
 package-private in `contributions`, and, from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when
-`old.detach` throws, still attaches to
-the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move whose every attach fails stays as 3b's
+`old.detach` throws, still attaches to the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move
+whose every attach fails stays as 3b's
 F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
 `WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
 (`lastInWindow`, `onError`, `onEmpty` reach the target) and `TabRegistryTest` the pending, closed and unknown-window
@@ -4553,7 +4687,7 @@ launched, no AOT training. GUI checks for the user: move and resize a window, Cm
 
 - **Notifications plan 2: incidents and the Errors window, merged to local `main` (`c02673cd`); awaiting the user's
   GUI checks** (2026-10-02 to 2026-10-03; plan
-  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-window)):
+  `docs/superpowers/plans/2026-10-02-notifications-2-incidents.md`, [guide](notifications.md#the-errors-tab)):
   uncaught exceptions on any thread, contained plugin failures, failed shell launches and failing notification
   actions are in-memory incidents (at most 100, coalesced by source, class and root-cause frames, traces taken on the
   catching thread and capped at 256 KiB). Each is announced by one ERROR notification in `jasper.errors`,
@@ -7166,7 +7300,7 @@ visibility and window bounds remembered in `ui-state.toml`. The SDK is 0.3.0. Ne
 and types: `dev.jasper.app.windows` (`AuxiliarySurface`, `AuxiliaryWindows`, `NativeShells`),
 `workspace.WorkspaceRegions` and `workspace.WindowRail`, `persistence.UiState`, and panels and
 rail actions in the `contributions` model. See
-[SDK architecture](sdk-architecture.md#panels-the-rail-and-plugin-windows).
+[SDK architecture](sdk-architecture.md#panels-the-rail-and-plugin-dialogs).
 
 Verification: `./gradlew verifyTerminalArchitecture verifyApplicationArchitecture verifySdkArchitecture verifyPluginArchitecture check :jasper-app:installDist --rerun-tasks`
 passed with **1,277 tests: 1,275 passed, two expected environment skips, no failures or

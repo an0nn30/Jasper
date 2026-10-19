@@ -88,8 +88,8 @@ Native acceptance (user-run):
 - Hold a recorded key, switch away, release it, then return and type in a terminal.
 - Resize the reference and change the app's theme/UI font; headings and controls stay usable.
 
-## Editor window
+## Editor tabs
 
-The bundled Editor's window has its own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
+The bundled Editor's tabs have their own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
 They are its tabs' commands, not registered actions, so they are not in this catalog; the
 action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.

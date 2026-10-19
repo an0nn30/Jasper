@@ -6,8 +6,8 @@ unverified.
 
 ## Plan A: local files
 
-- [ ] 1. File → Open in Editor… (Cmd/Ctrl+O) in a Jasper window opens the chosen files in tabs in one Editor window.
-- [ ] 2. Dropping a file from Finder onto the Editor window opens it; dropping a folder does nothing.
+- [ ] 1. File → Open in Editor… (Cmd/Ctrl+O) in a Jasper window opens the chosen files in tabs in that window.
+- [ ] 2. Dropping a file from Finder onto an editor tab opens it; dropping a folder does nothing.
 - [ ] 3. TOML, JSON, Python, Bash and YAML samples are highlighted; `Cargo.lock` and a `#!/usr/bin/env python3` script without an extension are detected.
 - [ ] 4. Editing shows ●; Cmd/Ctrl+S saves and clears it; `ls -l` shows the same permissions, and a symbolic link to the file is still a link.
 - [ ] 5. Cmd/Ctrl+W closes the current tab, asking about unsaved changes; with no tabs it closes the window.

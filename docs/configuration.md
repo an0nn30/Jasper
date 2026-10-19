@@ -273,7 +273,7 @@ output painted, a finished `--background` warm-up, or 2 s after the first paint)
 | Plugins and the configuration watcher | running | running; no shells |
 
 **Quit (Cmd+Q, Jasper › Quit, File › Quit, the palette's Quit or the Dock's Quit) closes every window and keeps Jasper
-running in the background.** Content tabs and plugin windows are asked first, exactly as when you close them, and a
+running in the background.** Content tabs are asked first, exactly as when you close them, and a
 refusal leaves everything open. Plugins keep running, so a plugin's background work (a File Server share, for example)
 carries on after Cmd+Q, and a plugin's quit confirmation is not asked. Only **Quit Jasper Completely** ends the process
 and stops that work. Until start-up has settled, Quit
@@ -664,7 +664,7 @@ unusable one is renamed `.rejected`. Enabled state and consented capabilities ar
 pending installs wait in `plugins/.pending/`. Removing a plugin deletes its whole folder at the next
 launch. `ui-state.toml` beside `config.toml` remembers each panel's slot and place on its stripe, the
 dock's sizes and split ratios (each look apart: the Enterprise look keeps its own), which panels are open, stripe visibility, main-window size/position and maximized
-state, and plugin window bounds. The last main window closed supplies the layout for the next launch, including
+state, and the bounds of Settings, About and Licenses. The last main window closed supplies the layout for the next launch, including
 the terminal area left between its panels; a resident Jasper (see [Background residency](#background-residency))
 uses it for its next window too, also after Quit sent it to the background, which closes every window as a real
 Quit does. Normal bounds are retained while maximized or minimized; relaunch

@@ -34,7 +34,7 @@ class AuxiliaryWindowsTest {
     }
 
     /** Spec 13: File › Open File… asks for one existing local file over the Jasper window, from its pane's folder. */
-    @Test void openFileAsksForOneLocalFileOverTheTerminalWindow() {
+    @Test void openFileAsksForOneLocalFileOverTheJasperWindow() {
         var asked = new ArrayList<PathChoice>();
         var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();
         var folder = java.nio.file.Path.of("project").toAbsolutePath();
@@ -44,7 +44,7 @@ class AuxiliaryWindowsTest {
         UUID window = UUID.randomUUID();
         assertThat(host.openFile(window, java.util.Optional.of(folder))).contains(file);
         assertThat(asked).singleElement().satisfies(choice -> {
-            assertThat(choice.terminalOwner()).isEqualTo(window);
+            assertThat(choice.jasperOwner()).isEqualTo(window);
             assertThat(choice.auxiliaryOwner()).isNull();
             assertThat(choice.title()).isEqualTo("Open File");
             assertThat(choice.mode()).isEqualTo(PathChoice.Mode.OPEN);
@@ -57,7 +57,7 @@ class AuxiliaryWindowsTest {
         assertThat(cancelled.openFile(window, java.util.Optional.empty())).isEmpty();
     }
 
-    @Test void onlyOneOverlayCanOwnATerminalWindow() {
+    @Test void onlyOneOverlayCanOwnAJasperWindow() {
         UUID owner = UUID.randomUUID();
         var first = windows.overlay("Connecting", owner);
         assertThat(first.kind()).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
@@ -140,12 +140,12 @@ class AuxiliaryWindowsTest {
     @Test void dialogsNeedALiveOwnerAndCloseAllClosesEverything() {
         AuxiliarySurface manager = windows.window("dev.x.manager", "Manager", new Dimension(640, 480), true);
         AuxiliarySurface prompt = windows.dialog("Unlock", true, manager);
-        UUID terminalWindow = UUID.randomUUID();
-        AuxiliarySurface trust = windows.dialog("Trust host?", false, terminalWindow);
+        UUID jasperWindow = UUID.randomUUID();
+        AuxiliarySurface trust = windows.dialog("Trust host?", false, jasperWindow);
         assertThat(prompt.kind()).isEqualTo(AuxiliarySurface.Kind.DIALOG);
         assertThat(prompt.modal()).isTrue();
         assertThat(prompt.ownerSurface()).containsSame(manager);
-        assertThat(trust.ownerWindow()).contains(terminalWindow);
+        assertThat(trust.ownerWindow()).contains(jasperWindow);
         assertThat(windows.open()).containsExactly(manager, prompt, trust);
 
         manager.onClosing(() -> false);

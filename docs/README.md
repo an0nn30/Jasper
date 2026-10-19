@@ -33,7 +33,7 @@ then assembles the application distribution. It opens no native window. Native
 - [Notifications](notifications.md): cards, the Notifications panel and its badge, groups and system notifications.
 - [Themes](themes.md): the built-in and installed themes, the terminal schemes, the Jasper theme format and the token rule.
 - [Command palette](command-palette.md): commands, the bundled History and Snippets plugins, and scope registration.
-- [Editor](editor.md): editing local and remote files in tabs in the Editor window, saving safely, and outside changes; [verification](editor-verification.md). Vim mode: [supported keys](editor-vim-reference.md) and [differences from Vim](vim-divergences.md).
+- [Editor](editor.md): editing local and remote files in tabs, saving safely, and outside changes; [verification](editor-verification.md). Vim mode: [supported keys](editor-vim-reference.md) and [differences from Vim](vim-divergences.md).
 - [Plugins](../README.md#plugins): where installed plugins live, File → Manage Plugins…, safe mode and `--plugin-dir`.
 - [Diagnostics](diagnostics.md): log storage, bounds and privacy.
 - [Packaging](packaging.md): native builds and user-run acceptance checklists.

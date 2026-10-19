@@ -176,13 +176,13 @@ public final class ErrorsView extends JPanel {
         render();
     }
 
-    /** Scrolls the selected row into view again; the window calls this once it has been laid out. */
+    /** Scrolls the selected row into view again; the tab calls this once it has been laid out. */
     public void revealSelection() {
         if (closed || selectedId == null || indexOf(selectedId) < 0) return;
         view.reveal(summaryId(selectedId));
     }
 
-    /** Stops listening and closes the kit view; the window calls this when it closes. Idempotent. */
+    /** Stops listening and closes the kit view; the tab calls this when it closes. Idempotent. */
     public void close() {
         if (closed) return;
         closed = true;

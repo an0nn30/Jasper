@@ -147,7 +147,7 @@ class DefaultEditorTest {
         assertThat(opened).isEmpty();
     }
 
-    @Test void withoutATerminalWindowATerminalEditorUsesTheActiveOneOrLeavesTheFileToTheDesktop() {
+    @Test void withoutAJasperWindowATerminalEditorUsesTheActiveOneOrLeavesTheFileToTheDesktop() {
         Path emacs = install("emacs");
         choose("emacs");
         DefaultEditor defaults = detected(MAC);

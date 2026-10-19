@@ -17,8 +17,8 @@ public interface Panels {
     Subscription register(PanelSpec spec, PanelFactory factory);
 
     /**
-     * Toggles this plugin's registered panel in the main window, creating it lazily; a child window's request shows it.
-     * The main window comes to the front. Requests from a closed window have no effect.
+     * Toggles this plugin's registered panel in the main window, creating it lazily; a child window's request shows it and
+     * brings the main window to the front. Requests from a closed window have no effect.
      * @param panelId a registered panel id owned by this plugin
      * @param window the window the request comes from, the main window or a child window
      * @throws IllegalArgumentException when the panel is not registered by this plugin

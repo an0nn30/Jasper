@@ -2149,7 +2149,7 @@ public final class JasperApplication {
         List<CompletableFuture<?>> pluginWork = plugins == null ? List.of() : plugins.stop();
         // Plugins cleared their own secrets as they stopped; this clears anything still pending.
         clipboard.quit();
-        // Plugins closed their own windows while stopping; this is the safety net, and the state's last write.
+        // Plugins closed their own dialogs while stopping; this is the safety net, and the state's last write.
         if (auxiliary != null) auxiliary.close();
         uiState.save();
         if (pluginTheme != null) pluginTheme.close();

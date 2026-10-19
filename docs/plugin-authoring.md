@@ -146,10 +146,9 @@ private static void installUi(PluginContext context, long stepMillis) {
   dropped and logged. Users rebind an action under `[keybindings]` with its quoted id. Outside macOS,
   `cmd` means Ctrl+Shift and a default naming cmd and shift also gets alt; give a different Linux and
   Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
-  `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
+  `content()` or `panel(id)` limits where the key applies (SDK 0.11.0): the most specific
   context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
-  apply reaches the focused component. A `window(id)` shortcut takes effect once plugin windows get the
-  Keymap (plan K4).
+  apply reaches the focused component.
 - **Placements** may name only actions your plugin registered. Closing an action removes it from
   everywhere it was placed.
 - **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
@@ -191,12 +190,12 @@ states, settings pages), icons, colors for specialized content and testing, with
 
 ## Panels, the rail and windows
 
-A panel is an owned `UiView` docked as a tool window in every Jasper window, as in IntelliJ:
+A panel is an owned `UiView` docked as a tool window in the main window, as in IntelliJ:
 stripes of icons on the window's left and right edges, and six slots. The left and right sides each
 have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
 and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
-SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
-instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
+SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for it the
+first time the panel is shown (a toggle from a child window shows it in the main window), and gives the panel a stripe icon, a
 header (its title, an options menu and a hide button), a `<panel id>.toggle` action and a
 View › Tool Windows entry, so don't add a View menu item of your own that toggles it, and don't repeat the
 panel's title inside it. If you already have
@@ -218,9 +217,9 @@ the panel, and callbacks become inert when the instance closes. It works the sam
 registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
 do not add a duplicate action row inside the panel. Declare `sdk = ">=0.20.0, <0.21"` when using it.
 
-A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
-is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
-its job; the content is yours. Dialogs belong to a Jasper window or to one of your windows, so
+A rail button, on the left stripe after the panel icons, runs one of your actions. A view of your own
+that is not a panel is a content tab (see Documents in workspace tabs): Jasper draws its tab and its window;
+the content is yours. Dialogs belong to a Jasper window, a content tab or an anchor, so
 they are parented correctly without your plugin ever seeing a frame.
 
 <!-- example:pluginpanels -->
@@ -272,26 +271,21 @@ private static void installPanelAndAboutTab(PluginContext context, long stepMill
 - Share your own model between panel instances; never share components.
 - `PanelHost.onClosed` tells an instance its window is gone. `onVisibility` tells it when it
   is shown or hidden, which is the moment to start or stop refreshing.
-- `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
-  it open. Since SDK 0.8.4, quitting or restarting Jasper asks the guards of your open windows first, so a guard
-  can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
-- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
-  content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
+- `WindowSurface.onClosing` guards run when the user closes the dialog; returning false keeps
+  it open. `close()` closes at once.
+- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after content tabs, even
+  when your plugin has no tab: a background server can ask "stop the running servers?".
   Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit. It is not asked
   when a resident macOS Jasper only goes to the background (Cmd+Q closes the windows through their closing guards and
   keeps the process), so a background server keeps running until Jasper really quits.
-- In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
-  Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
-  window close. The close button is not affected.
 - A modal dialog's `show()` returns after the dialog has closed.
-- In SDK 0.7.1+, call `window.chooseFile("Choose file", Optional.of(currentPath))` (or
-  `dialog.chooseFile`) from a Browse button on the UI thread. Pass `Optional.empty()` when there
+- In SDK 0.7.1+, call `dialog.chooseFile("Choose file", Optional.of(currentPath))` from a
+  Browse button on the UI thread. Pass `Optional.empty()` when there
   is no initial path. The owner must already be shown. The native chooser returns an absolute
   normalized `Path`, or empty on cancellation or owner closure. It does not read the file.
   Keep the current text when the result is empty, and ignore results after your form closes.
   Set your manifest's minimum SDK to `>=0.7.1` when using this method.
-- The application closes a plugin's panels, windows and dialogs when the plugin stops.
-- Jasper stays running while any plugin window is open, even when no other window is.
+- The application closes a plugin's panels, content tabs and dialogs when the plugin stops.
 
 ## Terminals and capabilities
 
@@ -537,7 +531,7 @@ sync.error("Could not sync", "prod: connection refused", failure);
 - A title says what happened in a few words and carries no paths, host names or messages; those go in the content.
   A title is one line of at most 200 characters and content at most 4,000; the shortcuts cut longer content.
 - Pass the cause whenever you have a `Throwable`. Jasper records it as your plugin's incident and adds **Show more…**,
-  which opens the Errors window at its stack trace. `error(title, cause)` uses the cause's class and message as the
+  which opens the Errors tab at its stack trace. `error(title, cause)` uses the cause's class and message as the
   content, reading through a `CompletionException` or `ExecutionException` to the failure behind it.
 - `post(NotificationSpec)` takes the whole spec: up to 8 actions (7 with a cause), each run on the UI thread and
   expiring the notification unless made with `new NotificationAction(label, run, false)`; `withActivate` for a click
@@ -698,8 +692,8 @@ try (var host = new FakePluginHost()) {
 `host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
 `host.toolbarViews(windowId)` builds and returns a window's toolbar views, as the window does when it opens, and
 `closeToolbarViews(windowId)` closes them, as closing the window does.
-`host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
-`host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
+`host.panels()`, `host.openPanel(id)` (in the main window), `host.rail()`, `host.windows()` and
+`host.requestClose(windowId)` cover panels, the rail and dialogs. The fake does not model Jasper's own
 `<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
 `+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
 `host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`,
@@ -858,8 +852,8 @@ background executor, status and attachment return to the UI thread, and each she
 on a shared MINA session. Cancellation withdraws pending credentials and host-key prompts.
 
 In SDK 0.7.2+, `context.panels().toggle(panelId, window)` opens or hides your own
-registered panel in a Jasper window. It creates the panel lazily and reuses that
-window's instance. Require `>=0.7.2` in the manifest when calling it.
+registered panel in the main window; a child window's toggle opens it and brings the main window to the front. It
+creates the panel lazily and reuses it. Require `>=0.7.2` in the manifest when calling it.
 
 ### UI typography
 
@@ -882,7 +876,7 @@ required credential and trust prompts. Overlays accept Jasper window owners from
 Use `context.statusBar().addProgress(StatusItemSpec)` for host-rendered progress. Update the
 returned `StatusProgress` on the UI thread with one `StatusProgressState`: plain label, detail,
 spoken description, `OptionalDouble` fraction and optional primary/secondary registered action
-ids. Empty fraction means indeterminate. One handle updates every window; close removes it.
+ids. Empty fraction means indeterminate. One handle updates the main window's status bar; close removes it.
 The secondary action uses its registered title (for example Cancel); the primary action can
 open a richer management panel. Throttle worker samples before posting UI updates.
 
@@ -890,11 +884,11 @@ open a richer management panel. Throttle worker samples before posting UI update
 
 `context.windows().chooseFiles(owner, title, initial)` returns an immutable list of local paths;
 `chooseDirectory` returns one optional directory. Invoke on the UI thread with a live Jasper
-window or a shown plugin window. Both calls pump UI events, so revalidate selection-dependent
+window or one of your content tabs. Both calls pump UI events, so revalidate selection-dependent
 state afterwards; owner closure or plugin stop cancels and discards the result. The host uses a
 native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
 perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
-continues to select one file for window-owned workflows.
+continues to select one file for dialog-owned workflows.
 
 SDK 0.8.4 adds `chooseSaveFile(owner, title, initial)` for a file to save to: pass a suggested file to
 fill in its folder and name, or a folder to start in. The platform dialog asks before replacing an
@@ -922,8 +916,11 @@ Use SDK 0.8.5's `Windows.openTab` for document surfaces. Supply only specialized
 the app provides the tab strip, frame, window, status controls and menus. Update the returned
 `ContentTab` with `ContentPresentation`, `ContentCommand` and `ContentStatus` snapshots,
 and set a focus callback. Pass the handle as the owner of save pickers and dialogs so those
-follow moves to another window. `move(true)` opens a separate app-managed workspace, and
-leaves a child window's only tab where it is; `move(false)` moves the tab to the main window. Preserve the component/session during moves. The tab is a
+follow moves to another window. `moveToNewWindow()` moves the tab to a new child window, and leaves a child window's
+only tab where it is; `moveToMainWindow()` moves it to the main window, and `window()` is the window that holds it; since
+SDK 0.20 `openTab(spec, owner, view, placement)` opens
+it in the active group (`TabPlacement.ACTIVE_GROUP`), in a new group beside it (`SPLIT_RIGHT`, `SPLIT_DOWN`) or in a
+new child window (`NEW_WINDOW`). Preserve the component/session during moves. The tab is a
 content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 
 Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch
@@ -1064,7 +1061,7 @@ the rest of the window dims under a scrim, and the dialog, centred above it, fad
 off at once and rises another 16 while it fades out. Both follow the motion setting and are instant with animations
 off. Under the Enterprise look an OVERLAY or ATTACHED_SHEET dialog is drawn in its window as a classic dialog: a
 still scrim, and a header strip with its swatch and title. The owner may be a Jasper window, one of
-your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
+your content tabs or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
 returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
 meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:
 
