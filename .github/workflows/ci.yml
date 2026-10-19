@@ -1,10 +1,10 @@
 name: ci
 
-# A push or pull request that changes only documentation runs nothing: every run is billed against the account's
-# Actions minutes (macOS ten times, Windows twice), and ./gradlew check, which also checks the docs, runs before
-# every merge. The example external plugin under docs/examples is code and still runs.
+# Test PRs and main only; documentation-only changes remain excluded.
+# The example external plugin under docs/examples is code and still runs.
 on:
   push:
+    branches: [main]
     paths:
       - '**'
       - '!docs/**'
@@ -16,6 +16,13 @@ on:
       - '!docs/**'
       - 'docs/examples/**'
       - '!**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

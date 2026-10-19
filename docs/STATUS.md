@@ -1,5 +1,15 @@
 # Jasper — Status and Handoff
 
+**CI and prerelease workflows — 2026-10-18** (`codex/release-workflows-main`): Tests run on PRs and
+pushes to `main`, retaining documentation/path filters and cancelling superseded PR runs.
+The manual [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z`
+tag, builds its commit on five native runners, and publishes Windows x64/ARM64 ZIPs and EXEs,
+Linux x64/ARM64 DEB/RPM packages and a macOS ARM64 DMG, plus SDK jars and SHA-256 checksums,
+as a prerelease. Release packaging excludes the three native test suites already run by CI;
+package verification remains enabled. Actionlint, embedded-script fixture checks and the Gradle
+packaging dry run passed; independent review found no actionable issues. Hosted builds and
+publication await the first manual run. No local GUI/AOT execution.
+
 **Enterprise presentation: the series — 2026-10-18** (`claude/enterprise-final`, worktree
 `.claude/worktrees/enterprise-final`, rebased from `5d5e5fcf3`, where plans 1 to 11 are merged, onto `main`'s `11e40192c`
 (plan 10b on the Ubuntu Yaru commits);

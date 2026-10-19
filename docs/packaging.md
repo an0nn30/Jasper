@@ -6,6 +6,14 @@ Windows builds the portable Windows ZIP or setup wizard, and Linux builds the
 `.deb` and `.rpm` packages. Interactive installation and desktop acceptance remain
 user-run checks.
 
+The [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z` tag
+through **Actions → Release → Run workflow**. It builds that tag's commit and publishes
+a prerelease titled `Jasper X.Y.Z` after every build succeeds: Windows x64 and ARM64
+ZIPs and setup EXEs, Linux x64 and ARM64 DEB/RPM packages, and a macOS ARM64 DMG.
+SDK jars and `SHA256SUMS` accompany the packages. macOS AOT training runs on the hosted
+runner. A failed upload leaves a draft that a rerun can finish; published releases
+are protected from overwrite. Test suites run on PRs and pushes to `main`.
+
 Install a JBR **SDK** 25 whose architecture matches the host. Gradle normally
 finds it through Java toolchain discovery. If it does not, set `JAVA_HOME` and
 put its `bin` directory on `PATH` (especially on Windows), or set
@@ -99,8 +107,8 @@ still provide. It then installs each package into disposable Debian 12,
 Ubuntu 24.04, Fedora and openSUSE Tumbleweed containers with
 [`packaging/linux/check-install.sh`](../packaging/linux/check-install.sh). That
 script checks that every shared library resolves, runs the bundled Java, checks
-the menu entry and removes the package. It never opens a window. Run the workflow
-manually to choose a version, and download the packages from the run's artifacts.
+the menu entry and removes the package. It never opens a window. Packaging changes
+on PRs and pushes to `main` trigger these checks; packages are available in the run's artifacts.
 
 ## Windows setup wizard
 
