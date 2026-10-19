@@ -30,13 +30,13 @@ resolver and GUI checks, and 18). Section 18's plan 5; plans [1](2026-10-17-work
 [4b](2026-10-18-workspace-4b-plugin-windows.md) execute first, in that order.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`,
-after plan 4b's last commit (the branch is `main` at `11e40192c` plus this series). Run every command from the worktree
-root. Every anchor below was taken from, and every edit script of Tasks 1-5 replayed on, a copy of `22b702456` with the
-edit scripts and created files of plans 1, 2, 3a, 3b (as committed in `17830fac6`), 4a and 4b (as committed in
-`68e1bbb80` and `ef9ab4523`) applied in order; nothing was compiled or run. Every edit quotes the text it replaces, and
-the scripts stop with a message when that text is not found the stated number of times: re-find the quoted text (a plan
-before this one may have reworded it), adjust the anchor, re-run, and record it in this plan's banner; never edit around
-a missing anchor. Later tasks anchor on text earlier tasks of this plan wrote, and quote it as those tasks leave it.
+after plan 4b's last commit (the branch is `main` at `4ed94fb78` plus this series). Run every command from the worktree
+root. Every anchor below was re-found at, and every edit script of Tasks 1-5 replayed on, a copy of HEAD `094729d08`
+(plan 4b's last commit) by the pre-flight, and line numbers are from it; nothing was compiled or run. Every edit quotes
+the text it replaces, and the scripts stop with a message when that text is not found the stated number of times:
+re-find the quoted text (a plan before this one may have reworded it), adjust the anchor, re-run, and record it in this
+plan's banner; never edit around a missing anchor. Later tasks anchor on text earlier tasks of this plan wrote, and
+quote it as those tasks leave it.
 
 ## Spec issues
 
@@ -111,13 +111,14 @@ triple-quoted strings, so `\n` and `…` in Java source stay as written.
 
 ## Verified facts
 
-From a replay of plans 1, 2, 3a, 3b, 4a and 4b on `22b702456` (see Workspace).
+From the code at HEAD `094729d08` (see Workspace).
 
 1. The strips reorder on their own: `WindowTabs.Entry` (its `gestures` adapter) and `ClassicTabs.Entry` (its `mouse`
    adapter) select on a left press and, on a release more than the kit's `TAB_REORDER_THRESHOLD` (5,
    `jasper-ui/.../metrics/DesignMetrics.java:98`) from the press, call `GroupView.reorder(Tab, int)`, its only production
-   caller. Neither listens to mouse motion. `ClassicTabs`' × takes its own press (`closePressed`) and closes on a release
-   over it. `WorkspaceMetricsTest.nativeAdaptersDoNotBorrowGenericKitRoles` requires `TAB_REORDER_THRESHOLD` in
+   caller. `WindowTabs`' adapter takes no mouse motion; `ClassicTabs`' takes it only for the ×'s hover. `ClassicTabs`' ×
+   takes its own press (`closePressed`) and closes on a release over it.
+   `WorkspaceMetricsTest.nativeAdaptersDoNotBorrowGenericKitRoles` requires `TAB_REORDER_THRESHOLD` in
    `WindowTabs.java`.
 2. Plan 3a's `GroupView.stripBounds(Component)` and `contentBounds(Component)` give the strip's and the card area's
    rectangles in any component's coordinates, together the group's (`WorkspaceViewTest.groupsReportTheirStripAndCardRectangles`);
@@ -163,8 +164,10 @@ From a replay of plans 1, 2, 3a, 3b, 4a and 4b on `22b702456` (see Workspace).
     475 ms, on a Swing timer, so within one EDT task its entry has no width; `WindowContent.setAnimations(new
     AnimationSettings(false, 0, 0, 0))` makes it take its place at once (`WindowTabsTest` does the same). `ClassicTabs`
     never move.
-13. A native frame's `getInsets()` are its decorations (title bar, borders); `Window.getWindows()` lists every window of
-    the process, and a headless JVM has none.
+13. A native frame's `getInsets()` are its system decorations only: Jasper's title bars sit inside the frame
+    (`TitleBarStyle`: macOS's unified bar is `MacTitleBar` over full-window content, FlatLaf's title pane is the default
+    on Windows and Linux), so only the packed frame knows the chrome around its workspace; `Window.getWindows()` lists
+    every window of the process, and a headless JVM has none.
 
 ## Rulings
 
@@ -221,12 +224,13 @@ Record them in `docs/STATUS.md` (Task 5). "What — why".
     centre drop with `move(Tab, UUID)` to the end of the window's active group, after which the window's workspace places
     it, in the same EDT turn** — every move reports `TAB_MOVED`, ends both maximizes and closes an emptied child window
     after it (spec 15, plans 3b and 4a); nothing paints between the two steps.
-12. **A tear-out opens the child window through plan 4a's `moveToNewWindow(Tab, Rectangle)` with the new frame's bounds:
-    a workspace of the old group's size whose first tab sits where the dragged tab was under the cursor (the cursor less
-    where the press held the tab from the tab's own corner), the frame grown by the source window's frame insets (its
-    title bar and borders, which the new child frame shares), then kept on the usable part of the display under the
-    cursor (no larger, moved wholly onto it)** — spec 12's "at the cursor, sized like its old group"; IntelliJ and VS Code
-    size a torn-out window from the content dragged out of it, and IntelliJ keeps a floating window on its screen.
+12. **A tear-out opens the child window through plan 4a's `moveToNewWindow(Tab, Rectangle)` with the new window's
+    workspace bounds: the old group's size, its first tab where the dragged tab was under the cursor (the cursor less
+    where the press held the tab from the tab's own corner); the new frame, packed, grows them by the chrome it has
+    around its workspace (its title bar, the system's or Jasper's own) and keeps itself on the usable part of the
+    display there (no larger, moved wholly onto it)** — spec 12's "at the cursor, sized like its old group"; IntelliJ
+    and VS Code size a torn-out window from the content dragged out of it, and IntelliJ keeps a floating window on its
+    screen; only the new frame knows its title bar (fact 13).
 13. **A child window's only tab, and a pinned tab, have no tear-out target: a release outside every window does nothing,
     while the label still follows the cursor** — spec 12; plan 4a's `moveToNewWindow` refuses both too.
 14. **`GroupView.reorder` and the strips' release-to-reorder go; four tests reorder through `WorkspaceView.reorder`, and
@@ -249,12 +253,12 @@ Record them in `docs/STATUS.md` (Task 5). "What — why".
 - `dev.jasper.app.dock`: `WorkspaceDropResolver` (Task 1), `package-info` (Task 1).
 - `dev.jasper.app.workspace`: `TabStrip`, `WindowTabs`, `ClassicTabs`, `GroupView`, `WorkspaceView` (Tasks 2, 3);
   `TabDrag`, `TabDragLabel` (Task 3; both again in Task 4); `WindowContent`, `DockDropOverlay` (Task 3;
-  `WindowContent` again in Task 4); `WindowManager` (Task 4).
+  `WindowContent` again in Task 4); `WindowManager`, `WindowFrame`, `WindowShell` (Task 4).
 - `dev.jasper.app.contributions`: `TabRegistry` (Task 4).
 - `gradle/application-architecture.gradle.kts` (Task 1).
 - Tests: new `WorkspaceDropResolverTest` (Task 1), `WorkspaceDropTest` (Task 2), `TabDragTestSupport`, `TabDragTest`
   (Task 3), `TabDragWindowsTest` (Task 4); changed `WindowTabsTest`, `WorkspaceMetricsTest`, `WorkspaceViewTest`,
-  `HostedContentTest`, `TerminalTabTest` (Task 3), `TabRegistryTest` (Task 4).
+  `HostedContentTest`, `TerminalContentTest` (Task 3), `TabRegistryTest` (Task 4).
 - Documents (Task 5): `README.md`, `docs/app-architecture.md`, `docs/app-maintenance.md`, `docs/sdk-architecture.md`,
   `docs/STATUS.md`; the ledger in Tasks 1-4.
 
@@ -263,13 +267,13 @@ Record them in `docs/STATUS.md` (Task 5). "What — why".
 ```bash
 git branch --show-current                                                                              # claude/workspace-tabs
 git status --short                                                                                     # nothing
-git log --oneline -1 --grep "Workspace tabs: documentation and status for plugin windows as tabs"     # 4b's last commit
+git log --oneline -1 --grep "Workspace tabs: WindowSurface names a dialog or an overlay"              # 094729d08 Workspace tabs: WindowSurface names a dialog or an overlay
 grep -c 'void reorder(Tab tab, int index) { workspace.reorder(tab, id, index); }' jasper-app/src/main/java/dev/jasper/app/workspace/GroupView.java   # 1
 grep -c 'Rectangle stripBounds(Component target)' jasper-app/src/main/java/dev/jasper/app/workspace/GroupView.java                                  # 1
 grep -c 'public List<JasperWindow> windowsByActivation()' jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java                     # 1
 grep -c 'public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds)' jasper-app/src/main/java/dev/jasper/app/workspace/WindowManager.java  # 1
 grep -c 'void attach(Tab tab, GroupId group, Side side);' jasper-app/src/main/java/dev/jasper/app/contributions/WorkspaceHost.java                   # 1
-grep -c 'if (windows != null) windows.movedOut().accept(old.id());' jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java          # 1
+grep -c 'try { windows.movedOut().accept(old.id()); }' jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java                     # 1
 ```
 
 Every command prints the stated result. Plans 1 to 4b each added a `docs/STATUS.md` entry; this plan's goes above them.
@@ -1124,7 +1128,7 @@ drag of its own until Task 4 shares one across the windows (Rulings 3, 4, 6, 7, 
   `DockDropOverlay.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/TabDragTestSupport.java`, `TabDragTest.java`; modified
   `WindowTabsTest.java`, `WorkspaceMetricsTest.java`, `WorkspaceViewTest.java`, `HostedContentTest.java`,
-  `TerminalTabTest.java`
+  `TerminalContentTest.java`
 - Ledger: four rows
 
 **Interfaces:**
@@ -2173,7 +2177,7 @@ T = "jasper-app/src/test/java/dev/jasper/app/workspace/"
 for name in ("HostedContentTest.java", "WindowTabsTest.java"):
     edit(T + name, [("owner.workspace().activeGroupView().reorder(owner.tabs().get(1), 0);",
                      "owner.workspace().reorder(owner.tabs().get(1), owner.workspace().model().activeGroup(), 0);", 1)])
-edit(T + "TerminalTabTest.java", [("owners[1].workspace().activeGroupView().reorder(owners[1].tabs().get(0), 1);",
+edit(T + "TerminalContentTest.java", [("owners[1].workspace().activeGroupView().reorder(owners[1].tabs().get(0), 1);",
      "owners[1].workspace().reorder(owners[1].tabs().get(0), owners[1].workspace().model().activeGroup(), 1);", 1)])
 edit(T + "WorkspaceViewTest.java", [("owner.workspace().activeGroupView().reorder(tabs.get(2), 0);",
      "owner.workspace().reorder(tabs.get(2), owner.workspace().model().activeGroup(), 0);", 1)])
@@ -2219,7 +2223,8 @@ PY
 
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS (`TabDragTest` 13; `WindowTabsTest`, `WorkspaceMetricsTest`, `WorkspaceViewTest`, `HostedContentTest`,
-`TerminalTabTest`, `ClassicTabsTest` and `DockDragTest` unchanged in count). Then `./gradlew :jasper-app:check`: PASS.
+`TerminalContentTest`, `ClassicTabsTest` and `DockDragTest` unchanged in count). Then `./gradlew :jasper-app:check`:
+PASS.
 
 - [ ] **Step 9: Commit**
 
@@ -2252,28 +2257,31 @@ reported, a child window it empties closed after the move): an edge drop straigh
 through plan 4b's `WorkspaceHost.attachBeside`, any other to the end of that window's active group, where the drop puts
 it in place. A release over another window of Jasper's (Settings, About) drops nothing. A release outside every window
 tears the tab out through plan 4a's bounds-taking `moveToNewWindow`: the new window's workspace is the old group's size
-with the tab under the cursor, its frame grown by the source frame's decorations and kept on the display under the
-cursor; a child window's only tab and a pinned tab stay (Rulings 9-13, 17, 18).
+with the tab under the cursor, its frame grown by its own title bar and kept on the display there; a child window's
+only tab and a pinned tab stay (Rulings 9-13, 17, 18).
 
 **Files:**
 - Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/TabDrag.java`, `TabDragLabel.java`, `WindowContent.java`,
-  `WindowManager.java`; `jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java`
+  `WindowManager.java`, `WindowFrame.java`, `WindowShell.java`;
+  `jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java`
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/TabDragWindowsTest.java`; modified
   `jasper-app/src/test/java/dev/jasper/app/contributions/TabRegistryTest.java`
 - Ledger: one row
 
 **Interfaces:**
 - Consumes: Task 3's `TabDrag`, `TabDragTestSupport`; plan 4a's `WindowManager.windowsByActivation()`,
-  `moveToNewWindow(Tab, Rectangle bounds)` (the new frame's screen bounds, through `Opening.bounds` and `WindowShell.place`
-  before it shows), `TabRegistry.Windows.movedOut` (a child window a move empties closes once the move has reported
-  itself), `WindowManager.Hooks` with its eight hooks, the seven-function `WindowShell`; plan 4b's
+  `moveToNewWindow(Tab, Rectangle bounds)` (through `Opening.bounds` and `WindowShell.place` before it shows; this task
+  makes the bounds the new window's workspace, which `WindowFrame` grows by its title bar),
+  `TabRegistry.Windows.movedOut` (a child window a move empties closes once the move has reported itself),
+  `WindowManager.Hooks` with its eight hooks, the seven-function `WindowShell`; plan 4b's
   `WorkspaceHost.Beside.attach(Tab, GroupId, Side)`.
 - Produces: `TabDrag(Supplier<List<WindowContent>> windows, BiConsumer<Tab, Rectangle> tearOut)`, `record
-  Target.TearOut(Rectangle bounds)` (the new frame on screen), `static Rectangle TabDrag.fitted(Rectangle bounds, Rectangle
-  usable)`, `static Rectangle TabDrag.dropFrame(Rectangle frame, Rectangle display, boolean source, boolean macOs)`, the
-  test seam `Supplier<List<Rectangle>> TabDrag.otherWindows`; `boolean TabDragLabel.owns(Window)`;
-  `WindowContent.tabDrag(TabDrag shared)`; package `TabDrag WindowManager.tabDrag()`; `public void TabRegistry.move(Tab
-  tab, UUID window, GroupId group, Side side)`.
+  Target.TearOut(Rectangle bounds)` (the new window's workspace on screen), `static Rectangle TabDrag.fitted(Rectangle
+  bounds, Rectangle usable)` (`WindowFrame` calls it too), `static Rectangle TabDrag.dropFrame(Rectangle frame,
+  Rectangle display, boolean source, boolean macOs)`, the test seam `Supplier<List<Rectangle>> TabDrag.otherWindows`;
+  `boolean TabDragLabel.owns(Window)`; `WindowContent.tabDrag(TabDrag shared)`; package `TabDrag
+  WindowManager.tabDrag()`; `public void TabRegistry.move(Tab tab, UUID window, GroupId group, Side side)`;
+  `WindowFrame.shell()`'s `place` puts the frame where its workspace takes the bounds.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2494,9 +2502,9 @@ class TabDragWindowsTest {
             Rectangle home = onScreen(group, group.tabBounds(group).get(group.tabs().indexOf(tab)));
             Object session = session(tab);
             Point outside = new Point(2600, 900);
-            // The workspace keeps the group's size and the tab stays under the cursor; the frame adds the title bar.
-            Rectangle expected = new Rectangle(outside.x - (press.x - home.x), outside.y - (press.y - home.y) - TITLE,
-                size.width, size.height + TITLE);
+            // The workspace keeps the group's size and the tab stays under the cursor; its frame adds its title bar.
+            Rectangle expected = new Rectangle(outside.x - (press.x - home.x), outside.y - (press.y - home.y),
+                size.width, size.height);
             facts.clear();
             Component source = start(from, tab, outside);
             assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected));
@@ -2506,9 +2514,11 @@ class TabDragWindowsTest {
             assertThat(torn).isNotSameAs(child);
             assertThat(tab.window()).isEqualTo(torn.id());
             assertThat(torn.content().tabs()).containsExactly(tab);
-            assertThat(placed).as("its frame, grown by the source frame's title bar").containsExactly(expected);
+            assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
             assertThat(session(tab)).isSameAs(session);
             assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(tab.id().value(), main.id(), torn.id()));
+            assertThat(facts).as("the window opens empty, then the tab moves in")
+                .noneMatch(fact -> fact instanceof TerminalEvent.TabClosed || fact instanceof TerminalEvent.TabOpened);
         });
     }
 
@@ -2521,11 +2531,13 @@ class TabDragWindowsTest {
             ChildWindow torn = manager.children().getLast();
             assertThat(notes.window()).isEqualTo(torn.id());
             assertThat(notes.component()).as("the same view").isSameAs(view);
+            assertThat(view.isVisible()).as("shown in its new window").isTrue();
             relayout(frameOf(torn));
             drop(torn.content(), notes, inside(cards(main.content(), activeGroup(main)), 0.5, 0.5));
             assertThat(notes.window()).isEqualTo(main.id());
             assertThat(torn.closed()).isTrue();
             assertThat(SwingUtilities.isDescendingFrom(view, main.content())).isTrue();
+            assertThat(view.isVisible()).as("shown again").isTrue();
             assertThat(notes.closed()).isFalse();
         });
     }
@@ -2742,15 +2754,22 @@ edit("jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java", [
         transfer(tab, old, next, attach);
     }
 """, 1),
-    ("""     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. When {@code next} fails, the tab
-     * goes back to {@code old}, or another main window, or stays in no window, and the failure propagates.
+    ("""     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. A change listener that throws
+     * as the tab takes {@code next} leaves it in {@code old}, and its failure propagates. When {@code next} fails, the
+     * tab goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When
+     * {@code old} fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that
+     * failure propagates afterwards. The window the tab left hears of the move after it, then the tab is selected
+     * (workspace plan 4a); a failure of either is kept behind the move's own.
      */
-    private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {""", """     * Detaches the tab from {@code old} and attaches it to {@code next} as {@code attach} does, then selects it. When
-     * {@code next} fails, the tab goes back to {@code old}, or another main window, or stays in no window, and the failure
-     * propagates.
+    private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {""", """     * Detaches the tab from {@code old} and attaches it to {@code next} as {@code attach} does, then selects it. A
+     * change listener that throws as the tab takes {@code next} leaves it in {@code old}, and its failure propagates.
+     * When {@code next} fails, the tab goes back to {@code old}, or another window, or stays in no window, and the
+     * failure propagates. When {@code old} fails to let the tab go, the move still goes on, so the tab is shown in the
+     * window it names, and that failure propagates afterwards. The window the tab left hears of the move after it, then
+     * the tab is selected (workspace plan 4a); a failure of either is kept behind the move's own.
      */
     private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next, Consumer<WorkspaceHost> attach) {""", 1),
-    ("            try { next.attach().accept(tab); }\n", "            try { attach.accept(next); }\n", 1)])
+    ("            try { next.attach().accept(tab); arrived = true; }\n", "            try { attach.accept(next); arrived = true; }\n", 1)])
 PY
 ```
 
@@ -2784,9 +2803,7 @@ span(W + "TabDrag.java", "/**\n * The tab drag (workspace tabs spec 12).", " * i
 edit(W + "TabDrag.java", [
     ("import com.formdev.flatlaf.util.UIScale;\n", "import com.formdev.flatlaf.util.SystemInfo;\nimport com.formdev.flatlaf.util.UIScale;\n", 1),
     ("import java.awt.Container;\n", "import java.awt.Container;\nimport java.awt.Dimension;\n", 1),
-    ("import java.awt.Frame;\n",
-     "import java.awt.Frame;\nimport java.awt.GraphicsConfiguration;\nimport java.awt.GraphicsDevice;\nimport java.awt.GraphicsEnvironment;\n"
-     "import java.awt.Insets;\n", 1),
+    ("import java.awt.Frame;\n", "import java.awt.Frame;\nimport java.awt.GraphicsConfiguration;\n", 1),
     ("import java.util.List;\n", "import java.util.ArrayList;\nimport java.util.HashSet;\nimport java.util.List;\n", 1),
     ("import java.util.function.Supplier;\n", "import java.util.function.BiConsumer;\nimport java.util.function.Supplier;\n", 1),
     ("""        record Into(WindowContent window, Drop drop) implements Target { }
@@ -2794,9 +2811,9 @@ edit(W + "TabDrag.java", [
 """, """        record Into(WindowContent window, Drop drop) implements Target { }
 
         /**
-         * Out of every window, into a new child window at {@code bounds}.
+         * Out of every window, into a new child window whose workspace takes {@code bounds}.
          *
-         * @param bounds the new window's frame on screen
+         * @param bounds the new window's workspace on screen; its frame adds its title bar
          */
         record TearOut(Rectangle bounds) implements Target { }
     }
@@ -2908,19 +2925,18 @@ edit(W + "TabDrag.java", [
     }
 
     /**
-     * A tear-out's frame on screen: its workspace the size of the tab's old group with the tab where the cursor holds it,
-     * the frame grown by the source window's decorations (title bar, borders), as IntelliJ and VS Code size a window from
-     * the content dragged out of it, then kept on the usable part of the display under the cursor.
+     * A tear-out's workspace on screen: the size of the tab's old group, with the tab where the cursor holds it, as
+     * IntelliJ and VS Code size a window from the content dragged out of it. The new frame grows it by its own title
+     * bar and keeps itself on the display there ({@code WindowFrame}).
      */
     private Rectangle tearOutBounds(Point at) {
-        Insets frame = decorations(group.owner());
-        return fitted(new Rectangle(at.x - grab.x - frame.left, at.y - grab.y - frame.top,
-            groupSize.width + frame.left + frame.right, groupSize.height + frame.top + frame.bottom), display(at));
+        return new Rectangle(at.x - grab.x, at.y - grab.y, groupSize.width, groupSize.height);
     }
 
     /**
      * {@code bounds} kept on {@code usable}: no larger than it, then moved wholly onto it, as IntelliJ keeps a floating
-     * window on its screen; as they are when {@code usable} is empty (no display known).
+     * window on its screen; as they are when {@code usable} is empty (no display known). A torn-out window's frame
+     * keeps itself on its display through this.
      */
     static Rectangle fitted(Rectangle bounds, Rectangle usable) {
         if (usable.isEmpty()) return new Rectangle(bounds);
@@ -2928,23 +2944,6 @@ edit(W + "TabDrag.java", [
         int x = Math.max(usable.x, Math.min(bounds.x, usable.x + usable.width - width));
         int y = Math.max(usable.y, Math.min(bounds.y, usable.y + usable.height - height));
         return new Rectangle(x, y, width, height);
-    }
-
-    /**
-     * The usable part of the display under {@code at} (its bounds less the menu bar, Dock or task bar); empty in a
-     * headless JVM or off every display.
-     */
-    private static Rectangle display(Point at) {
-        if (GraphicsEnvironment.isHeadless()) return new Rectangle();
-        for (GraphicsDevice device : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
-            GraphicsConfiguration configuration = device.getDefaultConfiguration();
-            Rectangle bounds = configuration.getBounds();
-            if (!bounds.contains(at)) continue;
-            Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
-            return new Rectangle(bounds.x + insets.left, bounds.y + insets.top,
-                bounds.width - insets.left - insets.right, bounds.height - insets.top - insets.bottom);
-        }
-        return new Rectangle();
     }
 
     /** The frames on screen of Jasper's showing windows the drag does not reach, but the label's: see {@link #otherWindows}. */
@@ -2955,11 +2954,6 @@ edit(W + "TabDrag.java", [
         for (Window window : Window.getWindows())
             if (window.isShowing() && !reached.contains(window) && !label.owns(window)) frames.add(window.getBounds());
         return frames;
-    }
-
-    /** The decorations around {@code window}'s content: its native frame's insets, or its outermost component's in a headless test. */
-    private static Insets decorations(WindowContent window) {
-        return outermost(window) instanceof Container top ? top.getInsets() : new Insets(0, 0, 0, 0);
     }
 """, 1),
     ("""    /**
@@ -3056,6 +3050,48 @@ edit(W + "WindowManager.java", [
             if (content == null) return Optional.empty();
             // Every window drags tabs with the one drag, which reaches them all (workspace tabs spec 12).
             content.tabDrag(tabDrag);
+""", 1),
+    ("     * @param bounds where a child window opens on screen, a torn-out tab's (workspace tabs plan 5); empty for where the\n"
+     "     *     platform puts it\n",
+     "     * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty\n"
+     "     *     for where the platform puts it\n", 1),
+    ("     * As {@link #moveToNewWindow(Tab)}, the new child window at {@code bounds} on screen: a tab torn out of its window\n",
+     "     * As {@link #moveToNewWindow(Tab)}, the new child window's workspace at {@code bounds} on screen: a tab torn out of\n"
+     "     * its window\n", 1),
+    ("     * @param bounds where the new window goes on screen; null for where the platform puts it\n",
+     "     * @param bounds where the new window's workspace goes on screen; null for where the platform puts it\n", 1)])
+edit(W + "WindowShell.java", [(
+    " * @param place puts the frame at screen bounds before it first shows: a torn-out tab's window (workspace tabs plan 5)\n",
+    " * @param place puts the frame, before it first shows, so that its workspace takes screen bounds: a torn-out tab's\n"
+    " *     window (workspace tabs plan 5)\n", 1)])
+edit(W + "WindowFrame.java", [
+    ("import java.awt.Insets;\n", "import java.awt.Insets;\nimport java.awt.Point;\n", 1),
+    ("""        return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, frame::setBounds);
+    }
+""", """        return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, this::placeWorkspace);
+    }
+
+    /**
+     * Puts the frame, before it first shows, so that its workspace takes {@code workspace} on screen: the workspace
+     * grown by the chrome the packed frame has around it (its title bar: the system's, the unified macOS bar or
+     * FlatLaf's title pane), then kept on the usable part of the display there. A torn-out tab's window (workspace tabs
+     * plan 5).
+     */
+    private void placeWorkspace(Rectangle workspace) {
+        // Laid out at the frame's present size: the constructor may have resized it after pack().
+        frame.validate();
+        JComponent area = content.workspace();
+        Point corner = SwingUtilities.convertPoint(area, 0, 0, frame);
+        int chromeWidth = frame.getWidth() - area.getWidth(), chromeHeight = frame.getHeight() - area.getHeight();
+        Rectangle bounds = new Rectangle(workspace.x - corner.x, workspace.y - corner.y, workspace.width + chromeWidth,
+            workspace.height + chromeHeight);
+        java.awt.GraphicsConfiguration display = frame.getGraphicsConfiguration();
+        for (var device : GraphicsEnvironment.getLocalGraphicsEnvironment().getScreenDevices()) {
+            java.awt.GraphicsConfiguration candidate = device.getDefaultConfiguration();
+            if (candidate.getBounds().contains(workspace.getLocation())) display = candidate;
+        }
+        frame.setBounds(TabDrag.fitted(bounds, usableBounds(display)));
+    }
 """, 1)])
 PY
 ```
@@ -3207,20 +3243,27 @@ other than the drag's own takes no drop. Within a window `WorkspaceView.drop` re
 window the tab registry moves the tab (TAB_MOVED, both maximizes end, an emptied child window closes after it) and the
 drop places it, an edge drop beside the target group directly (`TabRegistry.move(Tab, UUID, GroupId, Side)`); outside
 every window the tab tears out into a new child window whose workspace is its old group's size with the tab under the
-cursor, the frame grown by the source frame's insets and kept on the display (none for a child window's only tab or a
-pinned tab, which moves within its window only). A release over a window's dock, chrome or title bar or over another
-window of Jasper's (Settings, About), a drop that would change nothing, Esc, a lost release, the source window losing
+cursor, its frame grown by its own title bar (`WindowFrame` measures it) and kept on the display (none for a child
+window's only tab or a pinned tab, which moves within its window only). A release over a window's dock, chrome or title
+bar or over another window of Jasper's (Settings, About), a drop that would change nothing, Esc, a lost release, the
+source window losing
 the focus (a modal dialog, another application) and the dragged tab closing or leaving its window or group do nothing.
 Sessions and content are never touched. `GroupView.reorder` is gone. Rulings (plan, "Rulings"): <one clause each, 1 to
 18>.
 Deviations: <none, or each with its reason>. Left for plan 6: saving a child window's bounds, which a tear-out now
-chooses, and the layout after every drag, through the debounced save. `./gradlew check --continue`: **<counts>**. GUI
+chooses, and the layout after every drag, through the debounced save; from plan 4b, `AppContractTest`'s `emptyWindow`
+(it makes the main window when none is open) and panel routing (it bypasses `panelRoute`) before the first contract
+case that needs either, and `FakeWorkspace.closeWindow` closing and nulling `Panel.instance`, with `AppContractTest`
+clearing its panel caches, once a fake main window can close. Deferred: plan 2's Rulings 8 limit, now reachable by a
+drag: a tab dropped on a group's left or upper edge and dragged back gives the new group's space to the sibling before
+it, so the group it came from halves on each round trip. `./gradlew check --continue`: **<counts>**. GUI
 checks for the user: a tab dragged along its strip, onto another group's tabs and middle, and onto each outer quarter of
 a group, in both tab faces (equal tabs and the Enterprise look's classic tabs), with the landing shown and no motion; a
 tab dragged into another Jasper window's strip, middle and edge, and a child window's last tab dragged into the main
 window (the child closes, the shell keeps running); a tab released on the desktop opens a child window under the cursor
-whose workspace is the size of its old group, the tab under the cursor and the title bar above it, also on a second
-display, near a display's edge (moved onto it) and across displays with different scales; a child window's only tab
+whose workspace is the size of its old group, the tab under the cursor and the title bar above it (the unified macOS
+bar, FlatLaf's title pane on Windows and Linux, and the system's), also on a second display, near a display's edge
+(moved onto it) and across displays with different scales; a child window's only tab
 released on the desktop stays; releases over the dock, the toolbar, a title bar and the Settings window change nothing;
 Esc, Cmd+Tab (Alt+Tab) to another application and a modal dialog (a plugin's) during a drag end it with no label left on
 screen; overlapping windows take the drop in the most recently active one; on macOS, a Jasper window in full screen
@@ -3269,8 +3312,8 @@ EOF
   10: the strip is the drag source (Task 3). Section 17: every drop zone and overlapping windows in the resolver's tests
   (Task 1); a moved terminal tab keeps its session (Task 4); the GUI checks go to the user (Task 5's STATUS entry).
   Section 18's docs: `docs/app-architecture.md` (Task 5); `docs/keyboard-shortcuts.md` has no tab section (Rulings 16).
-- Every quoted anchor was matched, at its stated count, in a replay of plans 1-4b and of Tasks 1-5 in order; nothing was
-  compiled.
+- Every quoted anchor was matched, at its stated count, in a replay of Tasks 1-5 in order on HEAD `094729d08`; nothing
+  was compiled.
 - Type consistency: `WorkspaceDropResolver.Area`, `Drop.Strip`/`Centre`/`Edge`, `resolve`, `landing`, `windowAt`;
   `WorkspaceView.dropAreas(Tab)`, `changes(Tab, Drop)`, `drop(Tab, Drop)`; `TabStrip.tabBounds()`,
   `GroupView.tabBounds(Component)`, `pressed`, `dragged`, `released`; `TabDrag.Target.Into`/`TearOut`, `TabDrag(Supplier,
