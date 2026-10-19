@@ -26,6 +26,7 @@ import dev.jasper.vault.store.KeychainStore;
 import dev.jasper.vault.store.VaultFile;
 import dev.jasper.vault.ui.CopyCards;
 import dev.jasper.vault.ui.GrantPanel;
+import dev.jasper.vault.ui.LockShortcut;
 import dev.jasper.vault.ui.PasswordPanel;
 import dev.jasper.vault.ui.PickerPanel;
 import dev.jasper.vault.ui.VaultScope;
@@ -132,7 +133,7 @@ public class VaultPlugin implements Plugin {
             .withDefaultBinding("cmd+\\"),
             invoked -> context.palette().open(invoked.window(), VaultScope.ID, Optional.empty(), Optional.empty()));
         lockAction = context.actions().register(ActionSpec.of(LOCK, "Lock Vault").withKeywords(List.of("vault", "lock"))
-            .withDefaultBinding("cmd+shift+l"), invoked -> lock.lock());
+            .withDefaultBinding(LockShortcut.BINDING), invoked -> lock.lock());
         lockAction.setEnabled(false);
         scope = new VaultScope(lock, service, CopyCards.declare(context), this::open, this::unlockThenSearch);
         context.palette().register(scope);
