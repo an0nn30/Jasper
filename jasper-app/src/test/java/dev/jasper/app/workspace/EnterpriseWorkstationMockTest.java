@@ -46,9 +46,10 @@ class EnterpriseWorkstationMockTest {
 
     static BufferedImage mock(boolean dark) { return MockProfile.mock(dark ? EnterpriseMenuRowMockTest.DARK : EnterpriseMenuRowMockTest.LIGHT); }
 
-    static void same(String what, MockProfile.Run actual, MockProfile.Run expected, int tolerance) {
+    /** The run is the mock's length (within {@code tolerance}) in the colour the shipped theme paints there, {@code colour}. */
+    static void same(String what, MockProfile.Run actual, MockProfile.Run expected, int tolerance, Color colour) {
         assertThat(actual.length()).as(what + " length").isCloseTo(expected.length(), within(tolerance));
-        assertThat(MockProfile.deltaE(actual.color(), expected.color())).as(what + " colour").isLessThanOrEqualTo(2.5);
+        assertThat(MockProfile.deltaE(actual.color(), colour)).as(what + " colour").isLessThanOrEqualTo(2.5);
     }
 
     /** The full-height 1 px rules of {@code divider}'s colour along row {@code y}: 2 px wide, and 12 px above and below too. */
@@ -68,7 +69,9 @@ class EnterpriseWorkstationMockTest {
         var expected = MockProfile.solid(MockProfile.column(mock(dark), 2000, Y, Y + 180), 2);
         var actual = MockProfile.solid(MockProfile.column(window(dark).image(), 2000 - X, 0, 180), 2);
         String[] names = {"menu row", "menu rule", "toolbar row", "toolbar rule", "tab strip", "tab rule"};
-        for (int i = 0; i < names.length; i++) same(what + names[i], actual.get(i), expected.get(i), 2);
+        Color[] colours = {MockProfile.role(dark, "surface.app"), MockProfile.role(dark, "border.divider"), MockProfile.role(dark, "surface.app"),
+            MockProfile.painted(dark, WindowPairs.RULE), MockProfile.role(dark, "surface.tabstrip"), MockProfile.role(dark, "border.window")};
+        for (int i = 0; i < names.length; i++) same(what + names[i], actual.get(i), expected.get(i), 2, colours[i]);
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})
@@ -114,10 +117,10 @@ class EnterpriseWorkstationMockTest {
         int underline = 2 * (25 + 35 + 29) - 3;
         var expected = MockProfile.solid(MockProfile.row(mock, 233, 650, 1100), 4);
         var actual = MockProfile.solid(MockProfile.row(render, underline, left, left + 450), 4);
-        same(what + "the first tab and its divider on the strip", actual.get(0), expected.get(0), 6);
-        same(what + "the active tab's tab.indicator underline", actual.get(1), expected.get(1), 6);
+        same(what + "the first tab and its divider on the strip", actual.get(0), expected.get(0), 6, MockProfile.role(dark, "surface.tabstrip"));
+        same(what + "the active tab's tab.indicator underline", actual.get(1), expected.get(1), 6, MockProfile.painted(dark, WindowPairs.TAB_INDICATOR));
         // The active tab on surface.card, inside its 12 px leading padding (mock x 850, mid-strip y 208).
-        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (25 + 35 + 14)), MockProfile.at(mock, 850, 208)))
+        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (25 + 35 + 14)), MockProfile.role(dark, "surface.card")))
             .as(what + "the active tab's ground").isLessThanOrEqualTo(2.5);
         MockProfile.write(render.getSubimage(left, 2 * (25 + 35), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
     }
@@ -131,18 +134,18 @@ class EnterpriseWorkstationMockTest {
         // From the bottom of column 1000: surface.app under its border.window rule (24 tall; the mock's 22 a residual).
         var expected = MockProfile.solid(MockProfile.column(mock, 1000, 1700, 1802), 2);
         var actual = MockProfile.solid(MockProfile.column(render, 1000 - X, height - 100, height), 2);
-        same(what + "status bar", actual.getLast(), expected.getLast(), 4);
-        same(what + "status rule", actual.get(actual.size() - 2), expected.get(expected.size() - 2), 1);
+        same(what + "status bar", actual.getLast(), expected.getLast(), 4, MockProfile.role(dark, "surface.app"));
+        same(what + "status rule", actual.get(actual.size() - 2), expected.get(expected.size() - 2), 1, MockProfile.painted(dark, WindowPairs.RULE));
         // The border.divider rules: the mock's last two (before UTF-8 and the warning) at 2470 and 2574, from the right edge.
         Color divider = MockProfile.at(mock, 2470, 1782);
         int row = height - 22;
         var mockRules = dividers(mock, 1782, X, 2882, divider);
-        var renderRules = dividers(render, row, 0, 2880, divider);
+        var renderRules = dividers(render, row, 0, 2880, MockProfile.role(dark, "border.divider"));
         assertThat(mockRules).as("the mock's seven rules").containsExactly(108, 164, 1966, 2140, 2322, 2470, 2574);
         assertThat(renderRules.size()).as(what + "a rule after the run item, session and folder and before each right cell").isEqualTo(3 + 5);
         MockProfile.fonts(what + "the rule before UTF-8", renderRules.get(renderRules.size() - 2) + X, 2470, 6);
         MockProfile.fonts(what + "the rule before the warning", renderRules.getLast() + X, 2574, 6);
-        assertThat(MockProfile.deltaE(MockProfile.at(render, 2860, row), MockProfile.at(mock, 2862, 1782)))
+        assertThat(MockProfile.deltaE(MockProfile.at(render, 2860, row), MockProfile.role(dark, "warning.ground")))
             .as(what + "the warning cell's ground").isLessThanOrEqualTo(2.5);
         // Rulings 15: the run item, 60 wide in the Run Dialog mock (its rule at 122).
         var runMock = MockProfile.mock(RUN);

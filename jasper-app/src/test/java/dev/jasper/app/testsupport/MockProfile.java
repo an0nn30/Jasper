@@ -116,6 +116,14 @@ public final class MockProfile {
             .isCloseTo(expected, org.assertj.core.api.Assertions.within(tolerance));
     }
 
+    /** {@code key}'s colour in the shipped Enterprise theme's Light or Dark variant ({@link dev.jasper.ui.testsupport.KitFixtures#colour}). */
+    public static Color role(boolean dark, String key) { return dev.jasper.ui.testsupport.KitFixtures.colour(EnterpriseLook.theme(dark), key); }
+
+    /** What a face paints for {@code pair} in the shipped Enterprise theme's Light or Dark variant. */
+    public static Color painted(boolean dark, dev.jasper.ui.theme.PaintPair pair) {
+        return dev.jasper.ui.testsupport.KitFixtures.painted(EnterpriseLook.theme(dark), pair);
+    }
+
     /** CIE76 ΔE between two opaque sRGB colours ({@link MockComparison#deltaE}). */
     public static double deltaE(Color a, Color b) { return MockComparison.deltaE(a, b); }
 
