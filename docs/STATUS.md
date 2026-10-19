@@ -1,5 +1,22 @@
 # Jasper — Status and Handoff
 
+**The boot splash no longer flashes on Windows and Linux — 2026-10-19** (`claude/splash-no-flash`, worktree
+`.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; not merged, not pushed). Each start-up step repainted the
+whole branded splash straight onto its window, the gradient first, and Windows and X11 show a window's pixels as they
+are drawn, so between steps the art, icon, name, version and bar vanished to the bare gradient; macOS presents a paint at
+once. Under Xvfb in the Linux container, 408 of 789 screen captures taken during 599 steps showed the area above the
+step line changed (up to 185,125 of its 247,680 pixels); after the fix, 0 of 596 (XRender) and 0 of 571 (X11). The new
+`SplashBuffer` draws the splash off screen at the window's device scale, and every paint, the system's included, is one
+copy from it; a step draws again and copies only the step's line (from a pixel below the icon to the bar's rule) and
+the bar. Each area it draws starts from the window's own first fill, so a redraw at a fractional scale matches the whole
+splash; `SplashPainter` is unchanged. `SplashBufferTest` records every pixel a paint writes: at 1, 1.07, 1.25, 1.5,
+1.75 and 2x a step writes nothing above its line, no pixel changes twice, and the result is the whole splash on the new
+step; a step that only moves the fill writes only the bar, and an expose writes only its clip.
+`./gradlew check --continue`: **11,486 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: on Windows (100 % and 150 %) and Linux (X11 and a
+Wayland session, scale 1 and 2), with Enterprise on, a cold start's splash keeps its art, icon, name, version and
+copyright steady at every step while only the step text and the bar change, with no blank or dark frame, and a window
+dragged over it and away leaves it whole; on macOS it looks as before.
+
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
