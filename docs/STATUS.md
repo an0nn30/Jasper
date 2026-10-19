@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), then this documentation
-commit; [plan](superpowers/plans/2026-10-17-workspace-2-layout-model.md),
+`.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), the documentation commit
+`5d2cd4ed1` and the final-review fixes; [plan](superpowers/plans/2026-10-17-workspace-2-layout-model.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Pure and unwired: no visible change. New
 JDK-only package `dev.jasper.app.layout` (nothing from `java.awt`, enforced by `verifyApplicationArchitecture`):
 `TabId` and `GroupId` (UUID records), and `Layout` over a tree of n-ary weighted `Split`s (same-orientation nesting
@@ -10,8 +10,9 @@ flattened, weights normalized) and tab `Group`s, with `open`, `select`, `activat
 `remove`, `resize`, `toggleMaximize`, `neighbour` (today's `SplitTree.navigate` rule) and `bounds()` over the unit
 square (for `neighbour`), `unmaximize`, and orders of use that pick the focused group and the selected tab after a
 removal. `persistence.WorkspaceFile` writes spec 8's `workspace.toml` atomically (`AppDirs.workspaceState()`) and reads
-it back without throwing: bad tab and window entries dropped alone, keys falling back alone, an unreadable file (or one
-over 256 KiB) set aside as `workspace.toml.bad` (`Loaded.Fresh`). Rulings (plan, "Rulings"): (1) `Group.selected` is an
+it back without throwing: bad tab and window entries dropped alone (the original file then copied to `workspace.toml.bad`
+and reported as `Loaded.Restore.keptAside`), keys falling back alone, an unreadable file (or one over 256 KiB) set aside
+under that name (`Loaded.Fresh`). Rulings (plan, "Rulings"): (1) `Group.selected` is an
 `Optional`, empty only for the empty workspace's group; (2) `Layout` is a final class with spec 7.1's public
 constructor and keeps the groups' order of use outside `equals` and the file; (3) `resize` addresses a split by its
 path, and a split's id in the file is the name-based UUID of `"jasper.split:"` plus that path; (4) weights within 1e-9
@@ -50,6 +51,20 @@ plan 3 and `UiState`'s `[main_window]` until plan 6. `./gradlew check --continue
 0 failures, 0 errors, 25 skipped** (from the XML in `*/build/test-results/test/`; `LayoutValuesTest` 6,
 `LayoutTest` 6, `LayoutOperationsTest` 15, `LayoutGeometryTest` 16, `WorkspaceFileTest` 4, `WorkspaceFileReadTest` 17,
 `AppDirsTest` 11). No GUI checks (nothing visible changed). Not merged, not pushed.
+
+Final-review fixes: `Loaded.Restore` gained `Optional<Path> keptAside`. When `read` dropped any window, any tab entry or a
+tab a group lists without one, it copies the original file to `workspace.toml.bad` (replacing an older copy) and reports
+the copy; a failed copy is logged and reports nothing. The reader checks the main window's entry before any child's, so a
+hand-edited child that reuses the main window's group or tab ids is the window dropped. Tests: a dropped child window and a
+dropped tab each keep the original aside, a clean file keeps nothing, a failed copy reports nothing, a child listed first
+is the one dropped, and a child sharing a group id with the main window is dropped alone (`WorkspaceFileReadTest` has 23
+tests). `./gradlew :jasper-app:check` afterwards: BUILD SUCCESSFUL, 3,617 tests, 0 failures, 0 errors, 19 skipped.
+
+**Deferred** (plan 2): (a) the writer has no depth cap while the reader drops a window nested deeper than 64, so a main
+window that deep sets the whole file aside on the next start; (b) Rulings 8's limit: a LEFT or UP split and then closing
+the new tab does not restore the sizes exactly, and under plan 5's drag (drop on a group's left edge, drag back) the group
+halves each round trip; (c) plan 6a's text builds `Loaded.Restore` with one argument and must read `keptAside` for the
+notice that a file was kept aside.
 
 **Workspace tabs, plan 1: the single instance — 2026-10-18** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, every commit after `91f3cd66a` (the anchor refresh before Task 1) up to the branch
