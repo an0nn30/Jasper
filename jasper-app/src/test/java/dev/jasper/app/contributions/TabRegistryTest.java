@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.TabId;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -222,5 +223,48 @@ class TabRegistryTest {
         assertThat(registry.groupOf(tab)).contains(group);
         tab.close();
         assertThat(tab.group()).as("a closed tab is in no group").isEmpty();
+    }
+
+    @Test void aTabItsWindowPlacesIsRegisteredWithoutCallingTheHost() {
+        hosts();
+        var panel = new JPanel();
+        int[] disposed = {0};
+        var content = new TabContent() {
+            @Override public JComponent component() { return panel; }
+            @Override public void dispose() { disposed[0]++; }
+        };
+        var id = TabId.random();
+        var tab = registry.add(id, Tab.Kind.TERMINAL, content, main);
+        assertThat(mounted).as("the window placed it itself").isEmpty();
+        assertThat(tab.id()).isEqualTo(id);
+        assertThat(tab.kind()).isEqualTo(Tab.Kind.TERMINAL);
+        assertThat(tab.plugin()).isEmpty();
+        assertThat(tab.window()).isEqualTo(main);
+        assertThat(registry.inWindow(main)).containsExactly(tab);
+        assertThat(registry.hosted()).as("not a plugin's tab").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> registry.add(id, Tab.Kind.TERMINAL, content, main));
+        assertThat(tab.requestClose().join()).as("no guard to ask").isTrue();
+        assertThat(disposed[0]).isEqualTo(1);
+        assertThat(registry.tabs()).isEmpty();
+    }
+
+    @Test void aJoiningWindowsTabsMoveIntoTheRegistryItJoins() {
+        var own = new TabRegistry();
+        var window = UUID.randomUUID();
+        var left = new ArrayList<Tab>();
+        var registration = own.addHost(new WorkspaceHost(window, false, tab -> {}, left::add, tab -> {}, () -> {}));
+        var tab = own.add(TabId.random(), Tab.Kind.TERMINAL, new HostedContent(new JPanel()), window);
+        int[] closed = {0};
+        tab.onClosed(() -> closed[0]++);
+        registry.adopt(own, window);
+        registration.close();
+        assertThat(left).as("leaving the window's own registry closes nothing").isEmpty();
+        assertThat(closed[0]).isZero();
+        assertThat(own.tabs()).isEmpty();
+        assertThat(registry.tabs()).containsExactly(tab);
+        registry.addHost(new WorkspaceHost(window, false, mounted::add, mounted::remove, t -> {}, () -> {}));
+        tab.close();
+        assertThat(closed[0]).isEqualTo(1);
+        assertThat(registry.tabs()).isEmpty();
     }
 }

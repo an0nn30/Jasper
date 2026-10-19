@@ -51,7 +51,7 @@ class TabHeightTest {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>())); var root = new JRootPane();
             WindowContent.installTitleBar(root, owner, false, title -> {}); root.setSize(958, 958);
-            assertThat(owner.windowTabs().isVisible()).isFalse();
+            assertThat(owner.windowTabs().isVisible()).as("one tab keeps its strip").isTrue();
             owner.newTab(HOME);
             for (int height : new int[]{20, 72, 30}) {
                 owner.setTabHeight(height); LayoutTestSupport.layoutTree(root);

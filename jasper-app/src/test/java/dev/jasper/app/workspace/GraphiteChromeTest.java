@@ -23,7 +23,7 @@ class GraphiteChromeTest {
                         owner.setRailVisible(visible);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                         var area = owner.area();
-                        var column = owner.windowTabs().getParent();
+                        var column = owner.workspace().getParent();
                         var bounds = javax.swing.SwingUtilities.convertRectangle(column.getParent(), column.getBounds(), area);
                         if (visible) {
                             assertThat(bounds.width).as("the stripes supply the side spacing").isEqualTo(area.getWidth());
@@ -38,7 +38,7 @@ class GraphiteChromeTest {
                         int terminal = owner.theme().palette().background().getRGB();
                         for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
                             assertThat(image.getRGB(x, y)).as("square workspace corner (%s,%s), %s", x, y, (themeDark ? "dark" : "light"))
-                                .isEqualTo(y == 0 && x > 0 ? owner.windowTabs().getBackground().getRGB() : terminal);
+                                .isEqualTo(y == 0 ? stripTop(owner, x == 0 ? 0 : owner.windowTabs().getWidth() - 1) : terminal);
                             assertThat(column.getParent().contains(x, y)).as("edge receives input").isTrue();
                         }
                         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
@@ -47,6 +47,15 @@ class GraphiteChromeTest {
                 }
             }
         }
+    }
+
+    /** The strip's top row at {@code x}: the workspace's top edge, now that a single tab keeps its strip. */
+    private static int stripTop(WindowContent owner, int x) {
+        var strip = owner.windowTabs();
+        var image = new java.awt.image.BufferedImage(strip.getWidth(), strip.getHeight(), 2);
+        var g = image.createGraphics();
+        try { strip.paint(g); } finally { g.dispose(); }
+        return image.getRGB(x, 0);
     }
 
     /** A window on each stripe, so both show: an empty stripe stays hidden. */
@@ -71,7 +80,7 @@ class GraphiteChromeTest {
                     assertThat(owner.leftStripe().isVisible()).isTrue();
                     assertThat(owner.rightStripe().isVisible()).as("nothing on the right").isFalse();
                     var area = owner.area();
-                    var host = (javax.swing.JComponent) owner.windowTabs().getParent().getParent();
+                    var host = (javax.swing.JComponent) owner.workspace().getParent().getParent();
                     var bounds = javax.swing.SwingUtilities.convertRectangle(host.getParent(), host.getBounds(), area);
                     assertThat(bounds.x).as("the left stripe supplies the left spacing").isZero();
                     assertThat(bounds.x + bounds.width - host.getInsets().right).as("flush with the window's right edge, as in Zen")
@@ -103,7 +112,7 @@ class GraphiteChromeTest {
                 try (var header = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     root.setSize(1000, 640); layoutTree(root); layoutTree(root);
                     var strip = owner.windowTabs();
-                    var host = (javax.swing.JComponent) strip.getParent().getParent();
+                    var host = (javax.swing.JComponent) owner.workspace().getParent().getParent();
                     var inset = host.getInsets();
                     int left = inset.left, top = inset.top;
                     int right = host.getWidth() - inset.right - 1, bottom = host.getHeight() - inset.bottom - 1;
@@ -151,7 +160,7 @@ class GraphiteChromeTest {
                     for (var scheme : dev.jasper.app.appearance.ThemeTestSupport.SCHEME_CHOICES) {
                         owner.selectTerminalScheme(scheme);
                         root.setSize(1000, 640); layoutTree(root); layoutTree(root);
-                        var grid = owner.tabStrip();
+                        var grid = owner.workspace();
                         var bottom = javax.swing.SwingUtilities.convertPoint(grid, 0, grid.getHeight(), root);
                         var image = new java.awt.image.BufferedImage(1000, 640, 2);
                         var g = image.createGraphics(); root.printAll(g); g.dispose();

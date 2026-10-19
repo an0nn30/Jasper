@@ -352,7 +352,7 @@ class PaletteScopesTest {
                 dev.jasper.app.palette.PaletteTestSupport.query(card).setText("new tab");
                 PaletteTestSupport.executeSelected(card, 1);
                 assertThat(palette.isOpen()).as("Commands has no second verb").isTrue();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(owner.tabCount()).isEqualTo(1);
             }
         });
     }

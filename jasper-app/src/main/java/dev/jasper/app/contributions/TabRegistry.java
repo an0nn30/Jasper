@@ -74,6 +74,44 @@ public final class TabRegistry {
         return host == null ? Optional.empty() : host.groupOf().apply(tab.id());
     }
 
+    /**
+     * Registers a tab that {@code window} has opened and places itself, such as a terminal tab; no host is called.
+     * Workspace plan 6 restores saved ids through here.
+     *
+     * @param id the tab's id, fresh or restored
+     * @param kind what the tab holds; a plugin's tab opens through {@link #open}
+     * @param content its content
+     * @param window the window that shows it
+     * @return the tab
+     */
+    public Tab add(TabId id, Tab.Kind kind, TabContent content, UUID window) {
+        requireEdt();
+        if (kind == Tab.Kind.HOSTED) throw new IllegalArgumentException("A plugin's tab opens through open()");
+        if (tab(id).isPresent()) throw new IllegalArgumentException("Tab " + id + " is already registered");
+        var tab = new Tab(this, id, kind, "", id.toString(), "", content);
+        tabs.add(tab);
+        tab.window(Objects.requireNonNull(window, "window"));
+        return tab;
+    }
+
+    /**
+     * Takes over the tabs {@code window} holds in {@code from}, its own registry, as the window joins this one. The tabs
+     * keep their identity, content and listeners; {@code from} forgets them, so the window's leaving it closes nothing.
+     *
+     * @param from the window's own registry
+     * @param window the joining window
+     */
+    public void adopt(TabRegistry from, UUID window) {
+        requireEdt();
+        if (from == this) return;
+        for (var tab : from.inWindow(window)) {
+            if (tab(tab.id()).isPresent()) throw new IllegalArgumentException("Tab " + tab.id() + " is already registered");
+            from.tabs.remove(tab);
+            tab.registry = this;
+            tabs.add(tab);
+        }
+    }
+
     /** Registers a plugin's close guard, which approves a list of its tabs; {@code true} marks a batch (a window or quit). */
     public Subscription guard(String plugin, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>> callback) {
         guards.put(plugin, callback);

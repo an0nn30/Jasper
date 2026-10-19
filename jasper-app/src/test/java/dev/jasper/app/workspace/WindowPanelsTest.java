@@ -435,7 +435,7 @@ class WindowPanelsTest {
 
     /** The frame around the terminal column: the area's child that holds the tab strip. */
     private static Component centerFrame(WindowContent owner) {
-        Component frame = owner.tabStrip();
+        Component frame = owner.workspace();
         while (frame.getParent() != owner.area()) frame = frame.getParent();
         return frame;
     }
@@ -549,7 +549,7 @@ class WindowPanelsTest {
             LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
 
             Rectangle toolbar = in(owner, owner.toolbar()), leftStripe = in(owner, owner.leftStripe()), rightStripe = in(owner, owner.rightStripe());
-            Rectangle strip = in(owner, owner.windowTabs()), deck = in(owner, owner.tabStrip());
+            Rectangle strip = in(owner, owner.windowTabs()), deck = in(owner, owner.selectedTab().component());
             Rectangle leftBounds = in(owner, left.getParent()), rightBounds = in(owner, right.getParent()), bottomBounds = in(owner, bottom.getParent());
             int underToolbar = toolbar.y + toolbar.height;
             assertThat(leftStripe.y).as("the left stripe starts under the toolbar").isEqualTo(underToolbar);
@@ -845,7 +845,7 @@ class WindowPanelsTest {
             last.dock().resize(Side.LEFT, 243); last.dock().resize(Side.RIGHT, 317); last.dock().resize(Side.BOTTOM, 211);
             last.dock().setRatio(Side.LEFT, .37); last.dock().setRatio(Side.RIGHT, .64); last.dock().setRatio(Side.BOTTOM, .43);
             LayoutTestSupport.layoutTree(last);
-            var terminal = new Rectangle(last.tabStrip().getBounds());
+            var terminal = new Rectangle(last.workspace().getBounds());
             var panels = state.panels(); var dock = state.dock();
             // The other window edits last, but closes first.
             first.dock().resize(Side.LEFT, 499);
@@ -858,7 +858,7 @@ class WindowPanelsTest {
             WindowContent restored = window(); restored.setSize(1403, 907);
             restored.connectContributions(model, loaded);
             LayoutTestSupport.layoutTree(restored);
-            assertThat(restored.tabStrip().getBounds()).isEqualTo(terminal);
+            assertThat(restored.workspace().getBounds()).isEqualTo(terminal);
             for (var entry : model.panels()) assertThat(restored.dock().visible(entry.id())).isTrue();
         });
     }

@@ -54,7 +54,7 @@ class ZenModeTest {
             owner.dock().resize(Side.LEFT, 240); owner.dock().resize(Side.RIGHT, 310);
             owner.dock().setRatio(Side.LEFT, .37); owner.dock().setRatio(Side.BOTTOM, .62);
             LayoutTestSupport.layoutTree(owner);
-            Rectangle normal = new Rectangle(owner.tabStrip().getBounds());
+            Rectangle normal = new Rectangle(owner.workspace().getBounds());
             var panels = state.panels(); var sizes = state.dock();
             List<JComponent> contents = Arrays.stream(Slot.values()).map(owner.area()::content).toList();
             var tab = owner.currentTab();
@@ -64,12 +64,12 @@ class ZenModeTest {
             assertThat(owner.leftStripe().isVisible()).isFalse(); assertThat(owner.rightStripe().isVisible()).isFalse();
             for (Slot slot : Slot.values()) assertThat(owner.area().content(slot)).isNull();
             assertThat(sites).allSatisfy(site -> assertThat(site.visible()).isFalse());
-            assertThat(owner.tabStrip().getWidth()).isGreaterThan(normal.width);
-            assertThat(owner.tabStrip().getHeight()).isGreaterThan(normal.height);
+            assertThat(owner.workspace().getWidth()).isGreaterThan(normal.width);
+            assertThat(owner.workspace().getHeight()).isGreaterThan(normal.height);
             assertThat(state.panels()).isEqualTo(panels); assertThat(state.dock()).isEqualTo(sizes);
             assertThat(owner.currentTab()).isSameAs(tab);
             toggle(owner); LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.tabStrip().getBounds()).isEqualTo(normal);
+            assertThat(owner.workspace().getBounds()).isEqualTo(normal);
             assertThat(Arrays.stream(Slot.values()).map(owner.area()::content).toList()).containsExactlyElementsOf(contents);
             assertThat(sites).hasSize(6).allSatisfy(site -> assertThat(site.visible()).isTrue());
             assertThat(notifications).allSatisfy(events -> assertThat(events).containsExactly(true, false, true));

@@ -19,7 +19,7 @@ public final class WorkspaceChrome {
     private final TitleFormat title;
     /** The header's composition, made for each window by {@link #header()}. */
     private final WorkspaceLook.Header header;
-    /** The editor tabs, made for each window by {@link #tabs(WindowContent)}. */
+    /** The editor tabs, made for each tab group by {@link #tabs(GroupView)}. */
     private final WorkspaceLook.Tabs tabs;
     /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
     private final WorkspaceLook.Status status;
@@ -91,11 +91,11 @@ public final class WorkspaceChrome {
         };
     }
 
-    /** The tab strip for {@code owner} (spec 10.5). */
-    TabStrip tabs(WindowContent owner) {
+    /** One tab group's strip (spec 10.5; workspace tabs spec 10). */
+    TabStrip tabs(GroupView group) {
         return switch (tabs) {
-            case EQUAL -> new WindowTabs(owner);
-            case CLASSIC -> new ClassicTabs(owner);
+            case EQUAL -> new WindowTabs(group);
+            case CLASSIC -> new ClassicTabs(group);
         };
     }
 

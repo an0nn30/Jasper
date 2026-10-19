@@ -20,7 +20,6 @@ import dev.jasper.app.config.FontConfig;
 import dev.jasper.app.config.TerminalConfig;
 import dev.jasper.app.launch.LaunchSettings;
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.workspace.TerminalTab;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.app.config.ToolbarMode;
 
@@ -151,7 +150,7 @@ class ConfigurationControllerTest {
             Object key = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).get(stroke);
             assertThat(key).isEqualTo("new_tab");
             root.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(root, 0, "test"));
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(((JButton) owner.toolbar().getComponent(0)).getAction().getValue(Action.ACCELERATOR_KEY)).isEqualTo(stroke);
             assertThat(owner.dispatchShortcut(old, owner)).isFalse();
             var field = new JTextField();
@@ -324,7 +323,7 @@ class ConfigurationControllerTest {
                 java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
             terminalKey(retained.view(), key);
             assertThat(key.isConsumed()).isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(3);
+            assertThat(owner.tabCount()).isEqualTo(3);
             assertThat(retained.view().selectedText()).contains("alpha");
         });
     }
@@ -385,7 +384,7 @@ class ConfigurationControllerTest {
         }); launchAll();
         edt(() -> {
             assertThat(owner.currentPane().view().fontSize()).isEqualTo(18);
-            owner.selectTab((TerminalTab) owner.tabStrip().getComponentAt(0));
+            owner.selectTab(owner.tabs().get(0));
             owner.invoke(ActionId.FONT_RESET);
             assertThat(pane.view().fontSize()).isEqualTo(18);
             pane.view().setFontSize(29);
@@ -444,7 +443,7 @@ class ConfigurationControllerTest {
                 java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
             terminalKey(view, event);
             assertThat(event.isConsumed()).isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
         });
     }
 

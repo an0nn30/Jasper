@@ -14,18 +14,17 @@ class WindowTabMotionTest {
     private final java.util.List<WindowTabs> strips = new java.util.ArrayList<>();
     @AfterEach void cleanup() throws Exception { edt(() -> strips.forEach(WindowTabs::close)); closeOwners(); }
 
-    @Test void firstRevealUsesFullHeightAndExpandsBothTitlesFromTheRecordedInset() throws Exception {
+    @Test void aSecondTabOpensAtTheRecordedSpeed() throws Exception {
         edt(() -> {
-            var f = fixture(); f.add("second");
-            assertThat(f.strip.isVisible()).isTrue();
-            assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
-            assertThat(f.entry("first").getX()).isEqualTo(100);
-            assertThat(f.entry("first").getWidth()).isZero();
+            var f = fixture();
+            assertThat(f.entry("first").getBounds()).as("one tab fills its strip").isEqualTo(new Rectangle(0, 0, 800, 30));
+            f.add("second");
+            assertThat(f.entry("first").getX()).isZero();
             f.advance(75);
-            // Reference at 1.750 s: left inset 122 px, first width 329 px, on a 1698 px strip.
-            assertThat(f.entry("first").getX()).isBetween(57, 63);
-            assertThat(f.entry("first").getWidth()).isBetween(151, 159);
-            f.advance(415);
+            // The open curve at 75 ms of 475: the first tab from 800 px towards 400, the second from 0.
+            assertThat(f.entry("first").getWidth()).isBetween(618, 626);
+            assertThat(f.entry("second").getX()).isEqualTo(f.entry("first").getWidth());
+            f.advance(400);
             assertThat(f.entry("first").getBounds()).isEqualTo(new Rectangle(0, 0, 400, 30));
             assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
             assertThat(f.strip.motionRunning()).isFalse();
@@ -65,8 +64,8 @@ class WindowTabMotionTest {
             assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
             assertThat(f.strip.motionRunning()).isFalse();
             f.owner.closeTab(f.owner.currentTab()); f.strip.refresh();
-            assertThat(f.strip.isVisible()).isFalse();
-            assertThat(f.strip.getPreferredSize().height).isZero();
+            assertThat(f.strip.isVisible()).as("one tab keeps its strip").isTrue();
+            assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
             assertThat(f.strip.motionRunning()).isFalse();
         });
     }
@@ -113,11 +112,11 @@ class WindowTabMotionTest {
         });
     }
 
-    @Test void firstRevealAnimatesAfterRealHiddenParentLayout() throws Exception {
+    @Test void aSecondTabAnimatesInTheMountedStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
-            assertThat(owner.windowTabs().isVisible()).isFalse();
+            assertThat(owner.windowTabs().isVisible()).isTrue();
             owner.newTab(HOME); WindowTabsTest.layoutTree(owner);
             assertThat(owner.windowTabs().motionRunning()).isTrue();
             owner.setAnimations(new AnimationSettings(false, 475, 425, 0));
@@ -135,7 +134,7 @@ class WindowTabMotionTest {
                 var owner = content(launcher(new ArrayDeque<>()), themes.get());
                 owner.setAnimations(AnimationSettings.defaults());
                 owner.currentTab().rename("first"); owner.update();
-                var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);
+                var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
                 strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
                 var f = new Fixture(owner, strip, clock);
                 f.add("second");
@@ -148,9 +147,30 @@ class WindowTabMotionTest {
         }
     }
 
+    /** Spec 4: a tab that joins or leaves a group by a move, or is reordered, takes its place at once (Rulings 27). */
+    @Test void movesAndReordersTakeTheirPlaceAtOnce() throws Exception {
+        edt(() -> {
+            var f = fixture(); f.add("second"); f.add("third"); f.advance(1000);
+            var workspace = f.owner.workspace();
+            var group = workspace.model().activeGroup();
+            var third = f.owner.selectedTab();
+            workspace.moveToNewGroup(third, group, dev.jasper.app.layout.Side.RIGHT); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a tab leaving by a move").isFalse();
+            assertThat(f.entry("first").getBounds()).isEqualTo(new Rectangle(0, 0, 400, 30));
+            workspace.moveTab(third, group, 1); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a tab joining by a move").isFalse();
+            assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(267, 0, 266, 30));
+            workspace.reorder(third, group, 0); f.strip.refresh();
+            assertThat(f.strip.motionRunning()).as("a reorder").isFalse();
+            assertThat(f.entry("third").getBounds()).isEqualTo(new Rectangle(0, 0, 267, 30));
+            f.add("fourth");
+            assertThat(f.strip.motionRunning()).as("an open still moves").isTrue();
+        });
+    }
+
     private Fixture fixture() {
         var owner = content(launcher(new ArrayDeque<>())); owner.currentTab().rename("first"); owner.update();
-        var clock = new AtomicLong(); var strip = new WindowTabs(owner, clock::get);
+        var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
         strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
         return new Fixture(owner, strip, clock);
     }

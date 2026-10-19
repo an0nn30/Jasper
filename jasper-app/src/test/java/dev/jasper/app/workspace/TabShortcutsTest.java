@@ -86,19 +86,19 @@ class TabShortcutsTest {
                 assertThat(manager.dispatchers).hasSize(1);
                 AWTKeyStroke ctrlTab = AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
                 assertThat(area.getFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS)).contains(ctrlTab);
-                assertThat(owner.tabStrip().getSelectedIndex()).as("the content tab").isEqualTo(1);
+                assertThat(owner.tabs().indexOf(owner.selectedTab())).as("the content tab").isEqualTo(1);
 
                 KeyEvent press = PaletteKeyRouterTest.press(area, KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);
                 assertThat(manager.send(press)).as("Ctrl+Tab press").isTrue();
                 assertThat(press.isConsumed()).isTrue();
-                assertThat(owner.tabStrip().getSelectedIndex()).as("Next Tab wraps to the terminal").isZero();
+                assertThat(owner.tabs().indexOf(owner.selectedTab())).as("Next Tab wraps to the terminal").isZero();
                 KeyEvent typed = new KeyEvent(area, KeyEvent.KEY_TYPED, 0, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_UNDEFINED, '\t');
                 assertThat(manager.send(typed)).as("its typed tail").isTrue();
                 assertThat(manager.send(PaletteKeyRouterTest.release(area, KeyEvent.VK_TAB))).as("its release").isTrue();
 
                 assertThat(manager.send(PaletteKeyRouterTest.press(area, KeyEvent.VK_TAB,
                     InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK))).as("Ctrl+Shift+Tab").isTrue();
-                assertThat(owner.tabStrip().getSelectedIndex()).as("Previous Tab").isEqualTo(1);
+                assertThat(owner.tabs().indexOf(owner.selectedTab())).as("Previous Tab").isEqualTo(1);
                 manager.send(PaletteKeyRouterTest.release(area, KeyEvent.VK_TAB));
 
                 for (var focus : java.util.List.<java.awt.Component>of(area, field)) {
@@ -108,7 +108,7 @@ class TabShortcutsTest {
                     assertThat(manager.send(PaletteKeyRouterTest.typed(focus, '\t'))).isFalse();
                     assertThat(manager.send(PaletteKeyRouterTest.release(focus, KeyEvent.VK_TAB))).isFalse();
                 }
-                assertThat(owner.tabStrip().getSelectedIndex()).isEqualTo(1);
+                assertThat(owner.tabs().indexOf(owner.selectedTab())).isEqualTo(1);
             } finally { KeyboardFocusManager.setCurrentKeyboardFocusManager(prior); }
         });
     }
@@ -125,7 +125,7 @@ class TabShortcutsTest {
             var keys = KeyBindings.defaults(true);
             var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {}, ThemeTestSupport.controller(true), keys);
             try {
-                var menu = owner.tabMenu(owner.currentTab());
+                var menu = owner.tabMenu(owner.selectedTab());
                 var close = java.util.Arrays.stream(menu.getComponents()).filter(c -> c instanceof JMenuItem item && item.getText().equals("Close Tab")).map(JMenuItem.class::cast).findFirst().orElseThrow();
                 assertThat(close.getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
             } finally { owner.close(); }

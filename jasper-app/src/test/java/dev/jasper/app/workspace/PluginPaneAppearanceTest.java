@@ -23,13 +23,13 @@ class PluginPaneAppearanceTest {
             panel.addPropertyChangeListener("Jasper.zone", event -> {
                 if (fail[0]) { fail[0] = false; throw new IllegalStateException("fixture zone failure"); }
             });
-            int tabs = owner.tabStrip().getTabCount();
+            int tabs = owner.tabCount();
             org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 contributions.tabs().open("fixture", "failed-zone", "Failed", owner.id(), panel))
                 .isInstanceOf(IllegalStateException.class).hasMessage("fixture zone failure");
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(panel.getClientProperty("Jasper.workspaceStylerRoot")).isNull();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(owner.tabCount()).isEqualTo(tabs);
             assertThat(contributions.tabs().hosted()).isEmpty();
             var retry = contributions.tabs().open("fixture", "failed-zone", "Recovered", owner.id(), panel);
             assertThat(contributions.tabs().hosted()).containsExactly(retry);

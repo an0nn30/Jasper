@@ -15,18 +15,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowTabsTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void oneTabHidesTheBarAndTwoTabsRestoreIt() throws Exception {
+    @Test void oneTabStillShowsTheStrip() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var strip = owner.windowTabs();
-            assertThat(strip.isVisible()).isFalse();
-            assertThat(strip.getPreferredSize().height).isZero();
+            assertThat(strip.isVisible()).as("workspace tabs spec 1, decision 4").isTrue();
+            assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
             owner.invoke(ActionId.NEW_TAB);
             assertThat(strip.isVisible()).isTrue();
-            assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
             owner.closeTab(owner.currentTab());
-            assertThat(strip.isVisible()).isFalse();
-            assertThat(strip.getMinimumSize().height).isZero();
+            assertThat(strip.isVisible()).isTrue();
+            assertThat(strip.getMinimumSize().height).isEqualTo(owner.tabHeight());
             assertThat(named(strip, "newTab")).isNull();
             assertThat(named(strip, "tabList")).isNull();
         });
@@ -93,7 +92,7 @@ class WindowTabsTest {
             assertThat(label.getBounds()).isEqualTo(before);
             label.doClick(); assertThat(owner.currentTab()).isSameAs(first);
             close.doClick(); assertThat(owner.terminalTabs()).doesNotContain(first);
-            assertThat(strip.isVisible()).isFalse();
+            assertThat(strip.isVisible()).as("one tab keeps its strip").isTrue();
         });
     }
 
@@ -156,7 +155,7 @@ class WindowTabsTest {
             var first = owner.currentTab(); first.rename("first"); owner.update();
             JComponent control = named(strip, "select:first");
             owner.newTab(HOME); var second = owner.currentTab();
-            owner.reorderTab(1, 0);
+            owner.workspace().activeGroupView().reorder(owner.tabs().get(1), 0);
             assertThat(owner.currentTab()).isSameAs(second);
             first.rename("<html>literal title"); owner.update();
             owner.selectVariant(false);
@@ -199,10 +198,10 @@ class WindowTabsTest {
             Point target = SwingUtilities.convertPoint(two, 10, 10, one);
             mouse(one, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
             mouse(one, MouseEvent.MOUSE_RELEASED, target.x, target.y, MouseEvent.BUTTON1);
-            assertThat(owner.tabStrip().getComponentAt(1)).isSameAs(first);
+            assertThat(owner.tabs().get(1).component()).isSameAs(first);
             assertThat(owner.currentTab()).isSameAs(first);
             mouse(two, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON2);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner.tabCount()).isEqualTo(1);
             assertThat(owner.currentTab()).isSameAs(first);
         });
     }

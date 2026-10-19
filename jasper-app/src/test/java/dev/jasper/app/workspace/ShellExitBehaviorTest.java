@@ -69,7 +69,7 @@ class ShellExitBehaviorTest {
         edt(() -> exit(pane, code));
         if (closes) until(() -> empty.get() == 1);
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(closes ? 0 : 1);
+            assertThat(owner.tabCount()).isEqualTo(closes ? 0 : 1);
             assertThat(tab.panes()).hasSize(closes ? 0 : 1);
             assertThat(empty).hasValue(closes ? 1 : 0);
             if (!closes) {
@@ -97,11 +97,11 @@ class ShellExitBehaviorTest {
             assertThat(sibling.running()).isTrue();
             assertThat(selectedPane.running()).isTrue();
             assertThat(owner.currentTab()).isSameAs(selected);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(empty).hasValue(0);
             exit(sibling, 7);
         });
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
             assertThat(owner.currentTab()).isSameAs(selected);
             assertThat(selectedPane.running()).isTrue();
@@ -120,7 +120,7 @@ class ShellExitBehaviorTest {
         var options = running.view().options(); var session = running.session();
         reload("close_on_success");
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(retained.view()).isSameAs(retainedView);
             assertThat(running.view().options()).isSameAs(options);
             assertThat(running.session()).isSameAs(session);
@@ -128,7 +128,7 @@ class ShellExitBehaviorTest {
             assertThat(running.view().palette()).isEqualTo(ThemeTestSupport.terminal(false));
             exit(running, 0);
         });
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
             assertThat(owner.currentPane()).isSameAs(retained);
             assertThat(retainedView.find(new SearchQuery("[process exited with code 0]", false, true)).count()).isEqualTo(1);
@@ -146,7 +146,7 @@ class ShellExitBehaviorTest {
             TerminalPane pane = owner.currentPane();
             var configure = pane.onReady;
             pane.onReady = view -> {
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+                assertThat(owner.tabCount()).isEqualTo(1);
                 assertThat(pane.view()).isSameAs(view);
                 assertThat(pane.findBar()).isNotNull();
                 configure.accept(view); ready.incrementAndGet();
@@ -156,7 +156,7 @@ class ShellExitBehaviorTest {
         edt(() -> {}); // The already-completed exit is queued after launch delivery.
         edt(() -> {
             assertThat(ready).hasValue(1);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(tabs);
+            assertThat(owner.tabCount()).isEqualTo(tabs);
             assertThat(empty).hasValue(tabs == 0 ? 1 : 0);
         });
     }
@@ -166,7 +166,7 @@ class ShellExitBehaviorTest {
         edt(() -> owner.newTab(directory));
         deliver(); deliver();
         until(() -> empty.get() == 1);
-        edt(() -> assertThat(owner.tabStrip().getTabCount()).isZero());
+        edt(() -> assertThat(owner.tabCount()).isZero());
     }
 
     @Test void exitDeliveryUsesPolicyReloadedWhileEdtWasHandlingExit() throws Exception {
@@ -216,7 +216,7 @@ class ShellExitBehaviorTest {
         edt(() -> {
             assertThat(failures).singleElement().asString().contains("controlled launch failure");
             assertThat(empty).hasValue(0);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner.tabCount()).isEqualTo(1);
             assertThat(owner.currentTab().panes()).hasSize(1);
             var label = (JLabel) owner.currentPane().getComponent(0);
             assertThat(label.getText()).startsWith("Could not start terminal: ").contains("controlled launch failure");
@@ -232,7 +232,7 @@ class ShellExitBehaviorTest {
         edt(() -> {
             assertThat(failures).singleElement().asString().contains("controlled launch failure");
             assertThat(empty).hasValue(0);
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner.tabCount()).isEqualTo(1);
             assertThat(owner.currentTab()).isSameAs(first);
             assertThat(first.panes()).hasSize(1);
             assertThat(first.focusedPane().running()).isTrue();
@@ -325,7 +325,7 @@ class ShellExitBehaviorTest {
         TerminalPane program = owner.currentPane();
         assertThat(started.getLast().command()).isEqualTo(PROGRAM);
         edt(() -> exit(program, 0));
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> {
             assertThat(owner.currentTab()).isSameAs(shellTab);
             assertThat(empty).hasValue(0);
@@ -341,12 +341,12 @@ class ShellExitBehaviorTest {
         edt(() -> exit(program, 1));
         edt(() -> { });
         edt(() -> {
-            assertThat(owner.tabStrip().getTabCount()).as("terminal.on_exit = close does not reach a program tab").isEqualTo(2);
+            assertThat(owner.tabCount()).as("terminal.on_exit = close does not reach a program tab").isEqualTo(2);
             assertThat(program.running()).isFalse();
             assertThat(program.view().find(new SearchQuery("[process exited with code 1]", false, true)).count()).isEqualTo(1);
         });
         edt(() -> exit(shell, 1));
-        until(() -> owner.tabStrip().getTabCount() == 1);
+        until(() -> owner.tabCount() == 1);
         edt(() -> assertThat(owner.currentPane()).as("the reload did reach the shell tab").isSameAs(program));
     }
 

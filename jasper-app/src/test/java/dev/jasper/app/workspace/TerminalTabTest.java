@@ -40,7 +40,7 @@ class TerminalTabTest {
             TerminalTab original = owners[1].currentTab();
             owners[1].newTab(HOME);
             owners[1].selectTab(original);
-            owners[1].reorderTab(0, 1);
+            owners[1].workspace().activeGroupView().reorder(owners[1].tabs().get(0), 1);
             assertThat(owners[1].currentTab()).isSameAs(original);
             owners[1].close();
         });

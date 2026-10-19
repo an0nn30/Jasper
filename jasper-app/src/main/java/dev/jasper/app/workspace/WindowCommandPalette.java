@@ -76,7 +76,7 @@ final class WindowCommandPalette implements AutoCloseable {
         uninstall(); root = replacement;
         root.getLayeredPane().add(overlay, JLayeredPane.MODAL_LAYER);
         root.addComponentListener(resize); root.getLayeredPane().addComponentListener(resize);
-        owner.addComponentListener(resize); owner.tabStrip().addComponentListener(resize);
+        owner.addComponentListener(resize); owner.workspace().addComponentListener(resize);
         // The corner home measures the dock work area, which can move without the tab strip resizing.
         owner.area().addComponentListener(resize);
         layoutOverlay();
@@ -292,7 +292,7 @@ final class WindowCommandPalette implements AutoCloseable {
     private void uninstall() {
         if (root == null) return;
         root.removeComponentListener(resize); root.getLayeredPane().removeComponentListener(resize);
-        owner.removeComponentListener(resize); owner.tabStrip().removeComponentListener(resize);
+        owner.removeComponentListener(resize); owner.workspace().removeComponentListener(resize);
         owner.area().removeComponentListener(resize);
         root.getLayeredPane().remove(overlay); root.repaint(); root = null;
     }

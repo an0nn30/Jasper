@@ -12,7 +12,7 @@ import dev.jasper.app.terminals.SessionRequest;
 import javax.swing.*;
 
 /** Split-tree renderer that reparents existing panes without replacing sessions. */
-public final class TerminalTab extends JPanel implements AutoCloseable {
+public final class TerminalTab extends JPanel implements dev.jasper.app.contributions.TabContent, AutoCloseable {
     private final ShellLauncher launcher;
     private final UUID id = UUID.randomUUID();
     private final TabState state = new TabState();
@@ -57,6 +57,9 @@ public final class TerminalTab extends JPanel implements AutoCloseable {
     }
 
     void start() { focusedPane().start(); }
+
+    @Override public JComponent component() { return this; }
+    @Override public void dispose() { close(); }
 
     /** {@code requestOrNull} makes the pane one whose session somebody else provides. */
     private TerminalPane createPane(Path directory, SessionRequest requestOrNull, Optional<String> profile,

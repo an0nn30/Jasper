@@ -28,7 +28,7 @@ public final class WindowTabMotionPreview {
                     var first = model.tabs().open("preview", "first", "tmux", owner.id(), terminalText());
                     first.select();
                     var clock = new AtomicLong();
-                    var strip = new WindowTabs(owner, clock::get);
+                    var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
                     var original = owner.windowTabs(); var column = original.getParent();
                     column.remove(original); column.add(strip, BorderLayout.NORTH);
                     var root = new JRootPane(); root.setContentPane(owner);

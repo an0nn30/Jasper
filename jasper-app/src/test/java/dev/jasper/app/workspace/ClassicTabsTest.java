@@ -132,12 +132,12 @@ class ClassicTabsTest {
                 assertThat(last.getWidth()).as("a long label is drawn shortened").isLessThan(last.chromeWidth() + last.labelWidth());
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 300, 24)).as("the long labels shorten first").isEqualTo(130);
                 assertThat(ClassicTabs.cap(new int[] {40, 200, 200}, 30, 24)).as("never below the minimum").isEqualTo(24);
-                int before = owner.tabStrip().getTabCount();
+                int before = owner.tabCount();
                 strip.entries().get(0).closeClicked();
-                assertThat(owner.tabStrip().getTabCount()).isEqualTo(before - 1);
+                assertThat(owner.tabCount()).isEqualTo(before - 1);
 
                 // Past the minimum the strip clips its last tabs, and the + stays at its trailing edge, over them.
-                for (int i = owner.tabStrip().getTabCount(); i < 15; i++) {
+                for (int i = owner.tabCount(); i < 15; i++) {
                     owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log");
                 }
                 owner.update();
@@ -154,7 +154,7 @@ class ClassicTabsTest {
                         .as("a whole tab's x takes the mouse").isSameAs(entry);
                 }
                 var under = strip.entries().stream().filter(entry -> entry.getBounds().contains(plus.getX() + 3, 4)).findFirst().orElseThrow();
-                owner.selectTab(owner.tabStrip().getComponentAt(strip.entries().indexOf(under)));
+                owner.selectTab(owner.tabs().get(strip.entries().indexOf(under)));
                 owner.update();
                 BufferedImage image = MockProfile.print(strip, 600, owner.tabHeight());
                 var palette = themes.current().chrome().semantic();
@@ -180,20 +180,20 @@ class ClassicTabsTest {
                 // A press and a release a pixel apart make no MOUSE_CLICKED; the + still acts.
                 mouse(plus, MouseEvent.MOUSE_PRESSED, 5, 5);
                 mouse(plus, MouseEvent.MOUSE_RELEASED, 6, 5);
-                assertThat(owner.tabStrip().getTabCount()).as("the + acts on its release").isEqualTo(2);
+                assertThat(owner.tabCount()).as("the + acts on its release").isEqualTo(2);
                 owner.update();
                 tabs(owner, 800);
                 var first = strip.entries().get(0);
                 var close = first.closeBounds();
                 int x = close.x + close.width / 2, y = close.y + close.height / 2;
                 mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
-                assertThat(owner.tabStrip().getTabCount()).as("a press on the x closes nothing yet").isEqualTo(2);
-                assertThat(owner.selectedComponent()).as("nor selects its tab").isSameAs(owner.tabStrip().getComponentAt(1));
+                assertThat(owner.tabCount()).as("a press on the x closes nothing yet").isEqualTo(2);
+                assertThat(owner.selectedTab()).as("nor selects its tab").isSameAs(owner.tabs().get(1));
                 mouse(first, MouseEvent.MOUSE_RELEASED, 2, y);
-                assertThat(owner.tabStrip().getTabCount()).as("dragged off the x before the release, nothing closes").isEqualTo(2);
+                assertThat(owner.tabCount()).as("dragged off the x before the release, nothing closes").isEqualTo(2);
                 mouse(first, MouseEvent.MOUSE_PRESSED, x, y);
                 mouse(first, MouseEvent.MOUSE_RELEASED, x + 1, y);
-                assertThat(owner.tabStrip().getTabCount()).as("released over the x, its tab closes").isEqualTo(1);
+                assertThat(owner.tabCount()).as("released over the x, its tab closes").isEqualTo(1);
                 // The x takes the pointer in a square larger than its 7 px glyph, inside its tab.
                 owner.newTab(DesktopTestSupport.HOME);
                 owner.update();
@@ -207,7 +207,7 @@ class ClassicTabsTest {
                 int beside = glyph.x + glyph.width + 3;
                 mouse(tab, MouseEvent.MOUSE_PRESSED, beside, glyph.y - 3);
                 mouse(tab, MouseEvent.MOUSE_RELEASED, beside, glyph.y - 3);
-                assertThat(owner.tabStrip().getTabCount()).as("a click just beside the glyph closes its tab").isEqualTo(1);
+                assertThat(owner.tabCount()).as("a click just beside the glyph closes its tab").isEqualTo(1);
 
                 owner.newTab(DesktopTestSupport.HOME);
                 owner.update();
@@ -215,9 +215,9 @@ class ClassicTabsTest {
                 assertThat(action.getAccessibleActionCount()).isEqualTo(2);
                 assertThat(action.getAccessibleActionDescription(1)).isEqualTo("Close tab");
                 assertThat(action.doAccessibleAction(0)).isTrue();
-                assertThat(owner.selectedComponent()).as("the first action selects the tab").isSameAs(owner.tabStrip().getComponentAt(0));
+                assertThat(owner.selectedTab()).as("the first action selects the tab").isSameAs(owner.tabs().get(0));
                 assertThat(action.doAccessibleAction(1)).isTrue();
-                assertThat(owner.tabStrip().getTabCount()).as("the second is the x").isEqualTo(1);
+                assertThat(owner.tabCount()).as("the second is the x").isEqualTo(1);
                 var button = plus.getAccessibleContext();
                 assertThat(button.getAccessibleRole()).isEqualTo(AccessibleRole.PUSH_BUTTON);
                 assertThat(button.getAccessibleName()).isEqualTo("New Tab");
@@ -268,7 +268,7 @@ class ClassicTabsTest {
             assertThat(owner.tabBar()).isInstanceOf(WindowTabs.class).isSameAs(owner.windowTabs());
             owner.setSize(800, 600);
             LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.tabBar().component().getHeight()).as("unlike the classic tabs, the equal tabs hide at one tab").isZero();
+            assertThat(owner.tabBar().component().getHeight()).as("like the classic tabs, the equal tabs show at one tab").isEqualTo(owner.tabHeight());
         });
     }
 

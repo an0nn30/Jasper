@@ -190,9 +190,9 @@ class WindowCommandPaletteTest {
     @Test void overlayDoesNotResizeTerminalAndTheCardDropsFromTheTitleField() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var owner = owner(new CommandHistory())) {
-                var root = install(owner); var before = owner.tabStrip().getBounds();
+                var root = install(owner); var before = owner.workspace().getBounds();
                 owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
-                assertThat(owner.tabStrip().getBounds()).isEqualTo(before);
+                assertThat(owner.workspace().getBounds()).isEqualTo(before);
                 var palette = owner.commandPalette().component();
                 var search = owner.chrome().search();
                 var field = SwingUtilities.convertRectangle(search.getParent(), search.getBounds(), palette.getParent());

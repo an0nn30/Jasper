@@ -112,7 +112,7 @@ class ChromeRenderTest {
         assertThat(owner.chrome().composition() instanceof ClassicHeader).as(look.name() + ": the header")
             .isEqualTo(workspace.header() == WorkspaceLook.Header.CLASSIC);
         assertThat(owner.tabBar() instanceof ClassicTabs).as(look.name() + ": the tabs").isEqualTo(workspace.tabs() == WorkspaceLook.Tabs.CLASSIC);
-        assertThat(owner.tabBar().component().isVisible() || workspace.tabs() == WorkspaceLook.Tabs.EQUAL).as(look.name() + ": classic tabs always show").isTrue();
+        assertThat(owner.tabBar().component().isVisible()).as(look.name() + ": the strip always shows").isTrue();
         assertThat(owner.status().cells() instanceof RuledCells).as(look.name() + ": the status cells")
             .isEqualTo(workspace.status() == WorkspaceLook.Status.RULED);
         assertThat(owner.status().runItem() != null).as(look.name() + ": the run item").isEqualTo(workspace.runItem());

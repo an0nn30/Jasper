@@ -21,7 +21,7 @@ class WorkspaceMetricsTest {
     /** Each native dimension has its own name, carrying the exact pre-migration value. */
     @Test void nativeGeometryKeepsItsExactValuesUnderItsOwnNames() {
         var expected = new java.util.LinkedHashMap<DesignMetrics.Role, Integer>();
-        expected.putAll(Map.of(DesignMetrics.Role.TAB_REVEAL_INSET, 100, DesignMetrics.Role.TAB_CLOSE_FIT_WIDTH, 80,
+        expected.putAll(Map.of(DesignMetrics.Role.TAB_CLOSE_FIT_WIDTH, 80,
             DesignMetrics.Role.TAB_CLOSE_GUTTER, 28, DesignMetrics.Role.TAB_COMPACT_GUTTER, 4, DesignMetrics.Role.TAB_CLOSE_WIDTH, 16,
             DesignMetrics.Role.TAB_CLOSE_TRAILING, 6, DesignMetrics.Role.TAB_DIVIDER, 1, DesignMetrics.Role.TAB_REORDER_THRESHOLD, 5));
         expected.putAll(Map.of(DesignMetrics.Role.STATUS_RUNNING_DOT, 5, DesignMetrics.Role.STATUS_PROGRESS_BAR_HEIGHT, 8,
@@ -63,7 +63,7 @@ class WorkspaceMetricsTest {
             "SURFACE_TABSTRIP", "SURFACE_TERMINAL", "TOOLBAR_ACTION_ICON", "NATIVE_HOVER_OVERLAY_PERCENT", "POPOVER_SHADOW_BLUR");
         var required = Map.of("SlashSegments.java", List.of("ChromePainter.installed().statusDot"),
             "StatusProgressView.java", List.of("STATUS_PROGRESS_BAR_HEIGHT", "STATUS_PROGRESS_MIN_HEIGHT"),
-            "WindowTabs.java", List.of("TAB_REVEAL_INSET", "TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
+            "WindowTabs.java", List.of("TAB_CLOSE_FIT_WIDTH", "TAB_CLOSE_GUTTER", "TAB_COMPACT_GUTTER",
                 "TAB_CLOSE_WIDTH", "TAB_CLOSE_TRAILING", "ChromePainter.installed().tabStrip", "TAB_REORDER_THRESHOLD"),
             "ToolWindowHeader.java", List.of("TOOL_HEADER_LEADING_PADDING", "TOOL_HEADER_TRAILING_PADDING",
                 "TOOL_HEADER_DETAIL_GAP", "TOOL_HEADER_ACTIVE_DOT"));

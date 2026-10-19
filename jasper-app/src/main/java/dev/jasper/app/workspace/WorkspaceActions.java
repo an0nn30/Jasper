@@ -62,13 +62,11 @@ final class WorkspaceActions {
             case FOCUS_PANE_RIGHT -> tab.navigate(SplitTree.Direction.RIGHT);
             case FOCUS_PANE_UP -> tab.navigate(SplitTree.Direction.UP);
             case FOCUS_PANE_DOWN -> tab.navigate(SplitTree.Direction.DOWN);
-            case NEXT_TAB -> selectRelative(1);
-            case PREVIOUS_TAB -> selectRelative(-1);
+            case NEXT_TAB -> owner.selectRelative(1);
+            case PREVIOUS_TAB -> owner.selectRelative(-1);
             case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
-                 SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> {
-                int index = id.ordinal() - ActionId.SELECT_TAB_1.ordinal();
-                if (index < owner.tabStrip().getTabCount()) owner.tabStrip().setSelectedIndex(index);
-            }
+                 SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
+                owner.selectInGroup(id.ordinal() - ActionId.SELECT_TAB_1.ordinal());
             case RENAME_TAB -> {
                 String name = owner.askTabName(tab.title());
                 if (name != null) tab.rename(name);
@@ -99,10 +97,6 @@ final class WorkspaceActions {
         };
     }
 
-    private void selectRelative(int delta) {
-        if (owner.tabStrip().getTabCount() > 0) owner.tabStrip().setSelectedIndex(Math.floorMod(owner.tabStrip().getSelectedIndex() + delta, owner.tabStrip().getTabCount()));
-    }
-
     void update() {
         updatingActions = true;
         try {
@@ -126,7 +120,7 @@ final class WorkspaceActions {
                          CLEAR_SCROLLBACK, FONT_BIGGER, FONT_SMALLER, FONT_RESET -> ready;
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
-                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.tabStrip().getTabCount();
+                        id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.groupTabCount();
                     default -> present;
                 });
                 action(id).setEnabled(enabled);

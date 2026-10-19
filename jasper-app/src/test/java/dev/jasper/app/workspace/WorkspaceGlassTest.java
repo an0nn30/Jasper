@@ -297,7 +297,7 @@ class WorkspaceGlassTest {
             side.add(sideChild);
             DockTestSupport.show(owner, Slot.LEFT_TOP, side, 200);
             assertThat(owner.workspaceOpacity(inside)).as("opaque window").isEqualTo(1.0);
-            var terminalTab = owner.tabStrip().getComponentAt(0);
+            var terminalTab = owner.tabs().get(0).component();
 
             owner.applyBackgroundOpacity(0.5);
             assertThat(owner.workspaceOpacity(hosted)).as("hosted centre content").isEqualTo(0.5);
@@ -331,7 +331,7 @@ class WorkspaceGlassTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(
                 () -> model.tabs().open("dev.editor", "glass", "Glass", owner.id(), component))
                 .as("errors other than contained ones propagate").isInstanceOf(AssertionError.class);
-            assertThat(owner.tabStrip().indexOfComponent(component)).as("the registry rolled the mount back").isEqualTo(-1);
+            assertThat(owner.tabs().stream().map(tab -> tab.component()).toList()).as("the registry rolled the mount back").doesNotContain(component);
             assertThat(owner.selectedContent()).isNull();
             assertThat(model.tabs().hosted()).isEmpty();
         });

@@ -58,7 +58,7 @@ class RailWidthTest {
             owner.setRailVisible(true); LayoutTestSupport.layoutTree(owner);
             assertThat(x(panel, 0, owner)).isEqualTo(owner.leftStripe().getWidth());
             DockTestSupport.hide(owner, Slot.LEFT_TOP); DockTestSupport.hide(owner, Slot.RIGHT_TOP); LayoutTestSupport.layoutTree(owner);
-            assertThat(x(owner.tabStrip(), 0, owner)).as("terminal follows the same stripe edge").isEqualTo(owner.leftStripe().getWidth());
+            assertThat(x(owner.workspace(), 0, owner)).as("terminal follows the same stripe edge").isEqualTo(owner.leftStripe().getWidth());
             var bottom = new JPanel(); DockTestSupport.show(owner, Slot.BOTTOM_LEFT, bottom, 150);
             LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
             assertThat(x(bottom, 0, owner)).as("bottom panels use the same edge").isEqualTo(owner.leftStripe().getWidth());

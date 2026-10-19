@@ -102,7 +102,7 @@ class ShortcutContextDispatchTest {
             var owner = content(launcher(new ArrayDeque<>()), true);
             var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
             assertThat(root.activate(mac("cmd+t"))).as("New Tab").isTrue();
-            assertThat(owner.tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner.tabCount()).isEqualTo(2);
             assertThat(root.activate(mac("cmd+9"))).as("no ninth tab: the key passes").isFalse();
             assertThat(root.activate(mac("cmd+k"))).as("Clear Scrollback applies only in a terminal pane").isFalse();
         });
@@ -121,9 +121,9 @@ class ShortcutContextDispatchTest {
             assertThat(tab[0].panes()).hasSize(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
             assertThat(tab[0].panes()).hasSize(1);
-            assertThat(owner[0].tabStrip().getTabCount()).isEqualTo(2);
+            assertThat(owner[0].tabCount()).isEqualTo(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
-            assertThat(owner[0].tabStrip().getTabCount()).isEqualTo(1);
+            assertThat(owner[0].tabCount()).isEqualTo(1);
         });
     }
 
@@ -174,13 +174,13 @@ class ShortcutContextDispatchTest {
                         assertThat(fired).as("Edit > Paste did not paste into the shell").isEmpty();
                         assertThat(taken).as("a text field's paste stays with the field").isFalse();
                     }
-                    int tabs = owner.tabStrip().getTabCount();
+                    int tabs = owner.tabCount();
                     assertThat(press(field, owner.bindings().strokeFor(ActionId.NEW_TAB).orElseThrow())).isTrue();
-                    assertThat(owner.tabStrip().getTabCount()).as("New Tab runs exactly once").isEqualTo(tabs + 1);
+                    assertThat(owner.tabCount()).as("New Tab runs exactly once").isEqualTo(tabs + 1);
                     assertThat(fired).as("no menu item fired from the keyboard").isEmpty();
                     assertThat(menuItem(owner, ActionId.CLEAR_SCROLLBACK).getAccelerator()).as("still shown").isEqualTo(clear);
                     menuItem(owner, ActionId.NEW_TAB).doClick(0);
-                    assertThat(owner.tabStrip().getTabCount()).as("a click still runs the item").isEqualTo(tabs + 2);
+                    assertThat(owner.tabCount()).as("a click still runs the item").isEqualTo(tabs + 2);
                 } finally {
                     frame.removeNotify();
                     KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);

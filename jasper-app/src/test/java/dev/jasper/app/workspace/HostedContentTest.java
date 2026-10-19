@@ -26,7 +26,7 @@ class HostedContentTest {
             assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).isFalse();
             int[] find={0};entry.commands(List.of(new ContentCommand("find","Find",KeyStroke.getKeyStroke("meta F"),true,()->find[0]++)));
             owner.invoke(ActionId.FIND);assertThat(find[0]).isEqualTo(1);
-            owner.reorderTab(1,0);assertThat(owner.selectedContent()).isSameAs(entry);
+            owner.workspace().activeGroupView().reorder(owner.tabs().get(1), 0);assertThat(owner.selectedContent()).isSameAs(entry);
             owner.selectTab(terminal);assertThat(owner.currentPane()).isNotNull();
             entry.select();assertThat(owner.selectedContent()).isSameAs(entry);
             entry.requestClose();assertThat(owner.currentTab()).isSameAs(terminal);

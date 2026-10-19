@@ -16,6 +16,10 @@ import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.config.GlassSettings;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
+import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
+import dev.jasper.app.contributions.WorkspaceHost;
+import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.commands.CommandHistory;
@@ -51,14 +55,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Consumer<Path> newWindow;
     private final Runnable quit;
     private final Runnable onEmpty;
-    private final java.util.Map<Component, dev.jasper.app.contributions.Tab> hosted = new IdentityHashMap<>();
-    private dev.jasper.app.contributions.TabRegistry contentRegistry;
-    private Subscription contentHost;
+    /** Each tab this window shows, with its change listener. */
+    private final Map<Tab, Subscription> tabListeners = new IdentityHashMap<>();
+    /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
+    private TabRegistry registry = new TabRegistry();
+    /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
+    private Subscription host;
     private Runnable bringToFront = () -> {};
     private final boolean detached;
-    private final JTabbedPane tabs = new TerminalDeck();
-    /** The look's editor tabs: the equal tabs, or the classic ones (spec 10.5). */
-    private final TabStrip windowTabs;
+    /** The window's tabs as groups in splits, each group under the look's strip (workspace tabs spec 10). */
+    private final WorkspaceView workspace;
+    /** The configured tab motion, which strips made later take too. */
+    private dev.jasper.app.config.AnimationSettings animations = dev.jasper.app.config.AnimationSettings.defaults();
     private final WorkspaceActions workspaceActions;
     private final CommandRegistry commands = new CommandRegistry();
     private final WindowCommands windowCommands;
@@ -113,7 +121,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     };
     private final java.beans.PropertyChangeListener cornerResized = event -> layoutCornerLayer();
     private final Map<KeyStroke, String> contentBindings = new HashMap<>();
-    private final Map<Component, dev.jasper.app.lifecycle.Subscription> contentListeners = new IdentityHashMap<>();
     Runnable onMinimumSizeChanged = () -> {};
     static final int DEFAULT_TAB_HEIGHT = 30;
     static final int MIN_TAB_HEIGHT = 20;
@@ -128,7 +135,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private double backgroundOpacity = 1;
     private Runnable glassListener = () -> {};
     private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
-    private boolean rearranging;
     private WindowTerminals terminals;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
@@ -264,12 +270,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.PARENT_CHANGED) != 0) syncPaletteDispatcher();
         });
-        windowTabs = look.tabs(this);
-        // The tabs belong to the terminal column, so the stripes and the side panels reach the toolbar.
+        workspace = new WorkspaceView(this);
+        // The workspace belongs to the terminal column, so the stripes and the side panels reach the toolbar.
         var terminalColumn = new JPanel(new BorderLayout());
         // The rounded host paints behind this layout-only container, including partial tab repaints.
         terminalColumn.setOpaque(false);
-        terminalColumn.add(windowTabs.component(), BorderLayout.NORTH); terminalColumn.add(tabs, BorderLayout.CENTER);
+        terminalColumn.add(workspace, BorderLayout.CENTER);
         stripes = look().dock().stripes(themes.kit());
         leftStripe = stripes.left();
         rightStripe = stripes.right();
@@ -288,15 +294,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
-        tabs.addChangeListener(event -> {
-            if (!rearranging) {
-                if (terminals != null) terminals.tabSelected();
-                if (commandPalette != null) commandPalette.tabChanged();
-                update();
-                focusSelected();
-            }
-        });
         themeRegistration = themes.subscribe(this::applyTheme);
+        host = registry.addHost(workspaceHost());
         if (!detached) newTab(directory);
         else setPreferredSize(new Dimension(900, 650));
     }
@@ -827,7 +826,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     java.util.List<TerminalTab> terminalTabs() {
         var result = new ArrayList<TerminalTab>();
-        for (int i = 0; i < tabs.getTabCount(); i++) if (tabs.getComponentAt(i) instanceof TerminalTab tab) result.add(tab);
+        for (Tab tab : tabs()) if (tab.content() instanceof TerminalTab terminal) result.add(terminal);
         return result;
     }
 
@@ -859,61 +858,114 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
-            contentRegistry = model.tabs();
-            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.WorkspaceHost(id, detached,
-                this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
+            // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
+            TabRegistry shared = model.tabs();
+            shared.adopt(registry, id);
+            host.close();
+            registry = shared;
+            host = registry.addHost(workspaceHost());
         }
         rebind();
     }
 
-    private void mountContent(dev.jasper.app.contributions.Tab entry) {
-        JComponent component = entry.component();
+    /** The registry-facing side of this window's workspace (workspace tabs spec 9.1). */
+    private WorkspaceHost workspaceHost() {
+        return new WorkspaceHost(id, detached, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
+            tab -> workspace.model().groupOf(tab));
+    }
+
+    /**
+     * Shows a tab in this window, at the end of its active group and selected: one the registry placed here, or one this
+     * window opened. A failure leaves nothing mounted and propagates.
+     */
+    private void attach(Tab tab) {
+        JComponent component = tab.component();
         try {
             WorkspaceTheme.apply(component, themes.current());
-            hosted.put(component, entry);
-            contentListeners.put(component, entry.onChanged(this::update));
-            tabs.addTab(entry.title(), component);
-            selectTab(component); update();
+            tabListeners.put(tab, tab.onChanged(this::update));
+            workspace.open(tab);
         } catch (RuntimeException | Error failure) {
-            var listener = contentListeners.remove(component);
+            var listener = tabListeners.remove(tab);
             if (listener != null) listener.close();
-            hosted.remove(component);
-            tabs.remove(component);
+            workspace.remove(tab);
             WorkspaceTheme.clear(component);
             throw failure;
         }
         // After the mount stands: a failing glass handler must not roll it back.
         if (backgroundOpacity < 1) glassListener.run();
     }
-    private void unmountContent(dev.jasper.app.contributions.Tab entry) {
-        if (!hosted.containsKey(entry.component())) return;
-        var listener = contentListeners.remove(entry.component());
-        if (listener != null) listener.close();
-        hosted.remove(entry.component()); tabs.remove(entry.component());
-        WorkspaceTheme.clear(entry.component()); update();
+
+    /**
+     * Takes a tab out of this window before it closes or moves to another window: a terminal tab is announced closed here,
+     * and the window closes when its last tab has left. A tab whose attach failed has nothing to take out.
+     */
+    private void detach(Tab tab) {
+        var listener = tabListeners.remove(tab);
+        if (listener == null) return;
+        listener.close();
+        if (tab.content() instanceof TerminalTab terminal && terminals != null) terminals.tabClosed(terminal);
+        if (closed) return;
+        workspace.remove(tab);
+        WorkspaceTheme.clear(tab.component());
+        update();
         if (backgroundOpacity < 1) glassListener.run();
-        if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
+        if (workspace.isEmpty()) onEmpty.run();
     }
-    public dev.jasper.app.contributions.Tab selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
-    Component selectedComponent() { return tabs.getSelectedComponent(); }
-    String tabTitle(Component component) {
-        var entry = hosted.get(component);
-        return entry == null ? ((TerminalTab) component).title() : (entry.dirty() ? "\u25cf " : "") + entry.title() + (entry.detail().isEmpty() ? "" : "  " + entry.detail());
+
+    /** The workspace's layout changed: the registry hears the selection, the palette its origin; the active tab takes focus when {@code refocus}. */
+    void workspaceChanged(boolean refocus) {
+        if (closed) return;
+        if (terminals != null) terminals.tabSelected();
+        if (commandPalette != null) commandPalette.tabChanged();
+        update();
+        if (refocus) focusSelected();
     }
-    Icon tabIcon(Component component) { var entry = hosted.get(component); return entry == null ? ((TerminalTab)component).icon() : entry.icon(); }
-    String tabTooltip(Component component) { var entry = hosted.get(component); return entry == null ? tabTitle(component) : entry.location(); }
-    JPopupMenu tabMenu(Component component) {
-        var menu = new JPopupMenu(); var entry = hosted.get(component);
-        if (entry != null) {
-            var move = new JMenuItem(entry.detached() ? "Move to Main Window" : "Open in Separate Window");
-            move.addActionListener(event -> entry.move(!entry.detached())); menu.add(move);
-            for (var command : entry.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
+
+    /** A terminal tab's presentation: its title and icon. */
+    private static void present(Tab tab, TerminalTab terminal) {
+        tab.presentation(terminal.title(), "", terminal.icon(), false, "", "");
+    }
+
+    /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
+    public Tab selectedContent() { Tab tab = selectedTab(); return tab != null && tab.kind() == Tab.Kind.HOSTED ? tab : null; }
+    /** The active group's selected tab; null in an empty workspace. */
+    Tab selectedTab() { return workspace.selected(); }
+    /** This window's tabs in workspace order. */
+    java.util.List<Tab> tabs() { return workspace.tabs(); }
+    int tabCount() { return workspace.tabCount(); }
+    /** The active group's tab count. */
+    int groupTabCount() { return workspace.activeGroupView().tabs().size(); }
+    /** The tab showing {@code component}; null when none of this window's does. */
+    Tab tab(Component component) {
+        for (Tab tab : tabs()) if (tab.component() == component) return tab;
+        return null;
+    }
+    WorkspaceView workspace() { return workspace; }
+    TabRegistry tabRegistry() { return registry; }
+    boolean windowActive() { return active; }
+    dev.jasper.app.config.AnimationSettings animations() { return animations; }
+    String tabTitle(Tab tab) {
+        return tab.kind() == Tab.Kind.TERMINAL ? tab.title()
+            : (tab.dirty() ? "\u25cf " : "") + tab.title() + (tab.detail().isEmpty() ? "" : "  " + tab.detail());
+    }
+    Icon tabIcon(Tab tab) { return tab.icon(); }
+    String tabTooltip(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL ? tabTitle(tab) : tab.location(); }
+    /** Whether a terminal tab's shell runs, which its strip entry tells assistive technology. */
+    boolean running(Tab tab) {
+        return tab.content() instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running();
+    }
+    JPopupMenu tabMenu(Tab tab) {
+        var menu = new JPopupMenu();
+        if (tab.kind() == Tab.Kind.HOSTED) {
+            var move = new JMenuItem(tab.detached() ? "Move to Main Window" : "Open in Separate Window");
+            move.addActionListener(event -> tab.move(!tab.detached())); menu.add(move);
+            for (var command : tab.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
                 item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
         }
-        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(component)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(tab)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
     }
-    public void focusSelected() { var entry = selectedContent(); if (entry != null) entry.focus(); else if (currentTab() != null) currentTab().focusTerminal(); }
-    public boolean mayClose() { return contentRegistry == null || contentRegistry.mayClose(() -> contentRegistry.inWindow(id)); }
+    public void focusSelected() { Tab tab = selectedTab(); if (tab != null) tab.focus(); }
+    public boolean mayClose() { return registry.mayClose(() -> registry.inWindow(id)); }
 
     ToolWindowArea area() { return area; }
     DockState dock() { return dock; }
@@ -963,13 +1015,13 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     JToolBar toolbar() { return chrome.toolbar(); }
     WindowStatusBar status() { return chrome.status(); }
     JMenuBar menuBar() { return chrome.menuBar(); }
-    JTabbedPane tabStrip() { return tabs; }
-    /** The equal tabs; the default look's tests read them. */
-    WindowTabs windowTabs() { return (WindowTabs) windowTabs; }
-    TabStrip tabBar() { return windowTabs; }
-    private void refreshTabs() { windowTabs.refresh(); }
+    /** The active group's equal tabs; the default look's tests read them. */
+    WindowTabs windowTabs() { return (WindowTabs) tabBar(); }
+    /** The active group's strip. */
+    TabStrip tabBar() { return workspace.activeGroupView().strip(); }
+    private void refreshTabs() { workspace.refresh(); }
 
-    public TerminalTab currentTab() { return tabs.getSelectedComponent() instanceof TerminalTab tab ? tab : null; }
+    public TerminalTab currentTab() { Tab tab = selectedTab(); return tab != null && tab.content() instanceof TerminalTab terminal ? terminal : null; }
     public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
     /**
      * Where a tab or window opened from here starts: the current pane's {@link TerminalPane#inheritableDirectory};
@@ -993,25 +1045,27 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** As above; {@code program} runs in the local first pane instead of its shell. */
     TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
         if (closed) return null;
-        TerminalTab tab = new TerminalTab(directory, launcher, requestOrNull, profile, program);
-        if (terminals != null) terminals.tabOpened(tab);
-        tab.onChanged = () -> {
-            for (TerminalPane pane : tab.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
-            update();
+        TerminalTab terminal = new TerminalTab(directory, launcher, requestOrNull, profile, program);
+        Tab tab = registry.add(new TabId(terminal.id()), Tab.Kind.TERMINAL, terminal, id);
+        tab.focusTarget(terminal::focusTerminal);
+        present(tab, terminal);
+        if (terminals != null) terminals.tabOpened(terminal);
+        terminal.onChanged = () -> {
+            for (TerminalPane pane : terminal.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
+            present(tab, terminal);
         };
-        tab.onEmpty = () -> closeTab(tab);
-        tab.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
-        tab.lastInWindow = () -> tabs.getTabCount() == 1;
-        tab.configure = pane -> configurePane(tab, pane);
-        tab.onPaneCreated = pane -> connectActivity(tab, pane);
-        for (TerminalPane pane : tab.panes()) connectActivity(tab, pane);
-        WorkspaceTheme.apply(tab, themes.current());
-        tab.setBackground(themes.current().surface());
-        tab.setBackgroundOpacity((float) backgroundOpacity);
-        for (TerminalPane pane : tab.panes()) pane.applyTheme(themes.current());
-        tabs.addTab(tab.title(), tab);
-        tabs.setSelectedComponent(tab); update(); tab.start();
-        return tab;
+        terminal.onEmpty = () -> closeTab(tab);
+        terminal.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
+        terminal.lastInWindow = () -> tabCount() == 1;
+        terminal.configure = pane -> configurePane(terminal, pane);
+        terminal.onPaneCreated = pane -> connectActivity(terminal, pane);
+        for (TerminalPane pane : terminal.panes()) connectActivity(terminal, pane);
+        terminal.setBackground(themes.current().surface());
+        terminal.setBackgroundOpacity((float) backgroundOpacity);
+        for (TerminalPane pane : terminal.panes()) pane.applyTheme(themes.current());
+        attach(tab);
+        terminal.start();
+        return terminal;
     }
 
     private void connectActivity(TerminalTab tab, TerminalPane pane) {
@@ -1094,36 +1148,41 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             .ifPresent(file -> onOpenFile.accept(file, link.line()));
     }
 
-    void selectTab(Component tab) {
-        if (tabs.indexOfComponent(tab) >= 0) { tabs.setSelectedComponent(tab); focusSelected(); }
+    /** Shows the tab holding {@code component}, as a click on its strip entry does. */
+    void selectTab(Component component) { selectTab(tab(component)); }
+
+    /** Shows {@code tab} in its group, activates the group and focuses the tab. */
+    void selectTab(Tab tab) {
+        if (closed || !workspace.contains(tab)) return;
+        workspace.select(tab);
+        focusSelected();
     }
 
-    void reorderTab(int from, int to) {
-        if (from == to || from < 0 || to < 0 || from >= tabs.getTabCount() || to >= tabs.getTabCount()) return;
-        Component selected = tabs.getSelectedComponent();
-        Component tab = tabs.getComponentAt(from);
-        String title = tabTitle(tab);
-        rearranging = true;
-        try {
-            tabs.removeTabAt(from); tabs.insertTab(title, null, tab, null, to);
-            tabs.setSelectedComponent(selected);
-        } finally { rearranging = false; }
-        update();
+    /** Selects the active group's tab at {@code index}; nothing past its last tab. */
+    void selectInGroup(int index) {
+        var group = workspace.activeGroupView().tabs();
+        if (index >= 0 && index < group.size()) selectTab(group.get(index));
     }
 
-    public void closeTab(Component tab) {
-        var entry = hosted.get(tab);
-        if (entry != null) { entry.requestClose(); return; }
-        if (!(tab instanceof TerminalTab terminal)) return;
-        int index = tabs.indexOfComponent(tab);
-        if (index < 0) return;
-        Runnable change = () -> {
-            terminal.close();
-            if (terminals != null) terminals.tabClosed(terminal);
-            tabs.removeTabAt(index); update();
-        };
-        if (terminals != null) terminals.atomically(change); else change.run();
-        if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
+    /** Selects the active group's tab {@code delta} places from the selected one, wrapping around. */
+    void selectRelative(int delta) {
+        var view = workspace.activeGroupView();
+        var group = view.tabs();
+        if (group.isEmpty()) return;
+        selectTab(group.get(Math.floorMod(Math.max(0, group.indexOf(view.selected())) + delta, group.size())));
+    }
+
+    /** Closes the tab holding {@code component}. */
+    public void closeTab(Component component) { closeTab(tab(component)); }
+
+    /**
+     * Closes {@code tab}: a plugin's tab once its guard allows it; a terminal tab at once, its registry facts published as
+     * one change (workspace plan 3a Rulings 4).
+     */
+    public void closeTab(Tab tab) {
+        if (!workspace.contains(tab)) return;
+        if (tab.kind() == Tab.Kind.HOSTED) { tab.requestClose(); return; }
+        if (terminals != null) terminals.atomically(tab::close); else tab.close();
     }
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {
@@ -1211,18 +1270,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void update() {
         if (closed) return;
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            Component tab = tabs.getComponentAt(i);
-            tabs.setTitleAt(i, tabTitle(tab));
-            if (tab instanceof TerminalTab terminal) terminal.setActive(active && tab == currentTab());
-            else { var entry = hosted.get(tab); if (entry != null) entry.active(tab == selectedComponent()); }
+        Tab selected = selectedTab();
+        for (Tab tab : tabs()) {
+            if (tab.content() instanceof TerminalTab terminal) terminal.setActive(active && tab == selected);
+            else tab.active(tab == selected);
         }
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
             pane.session().columns() + " \u00d7 " + pane.session().rows();
         chrome.status().setMetadata(pane == null ? null : pane.snapshot(), pane == null ? "" : size, pane != null && pane.running());
         chrome.status().setContent(selectedContent());
-        onTitle.accept(selectedComponent() == null ? "Jasper" : tabTitle(selectedComponent()));
+        onTitle.accept(selected == null ? "Jasper" : tabTitle(selected));
         syncContentBindings();
         updateActions(); refreshTabs(); onMinimumSizeChanged.run();
         if (terminals != null) terminals.refresh();
@@ -1334,12 +1392,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
             area.refreshTheme();
             area.setTerminalBackground(theme.surface());
-            WorkspaceTheme.apply(windowTabs.component(), theme);
-            windowTabs.refresh();
-            for (var component : new ArrayList<>(hosted.keySet())) {
-                var entry = hosted.get(component);
-                if (entry != null) WorkspaceTheme.apply(entry.component(), theme, () -> hosted.get(component) == entry);
-            }
+            workspace.applyTheme(theme, updateDelegates);
+            for (Tab tab : new ArrayList<>(tabListeners.keySet()))
+                if (tab.kind() == Tab.Kind.HOSTED) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
             if (updateDelegates && contributed != null) contributed.refreshTheme();
             for (TerminalTab tab : retained) {
                 WorkspaceTheme.apply(tab, theme);
@@ -1351,7 +1406,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 }
             }
             setBackground(theme.surface());
-            tabs.setBackground(theme.surface());
             chrome.refreshTheme();
             if (commandPalette != null) commandPalette.refreshTheme();
             onThemeChanged.accept(theme); update();
@@ -1391,9 +1445,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         float value = (float) opacity;
         boolean glass = value < 1f;
         area.setGlass(value);
-        tabs.setOpaque(!glass);
+        workspace.setGlass(glass);
         for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
-        windowTabs.refresh();
+        workspace.refresh();
         repaint();
         glassListener.run();
     }
@@ -1420,7 +1474,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * @return from 0.1 to 1
      */
     public double workspaceOpacity(Component component) {
-        return component != null && SwingUtilities.isDescendingFrom(component, tabs) ? backgroundOpacity : 1;
+        return component != null && SwingUtilities.isDescendingFrom(component, workspace) ? backgroundOpacity : 1;
     }
 
     /** Runs when this window's background opacity changes, or hosted content enters or leaves it while translucent.
@@ -1472,7 +1526,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     void setAnimations(dev.jasper.app.config.AnimationSettings settings) {
         if (closed) return;
-        if (windowTabs != null) windowTabs.setAnimations(settings);
+        animations = settings;
+        workspace.setAnimations(settings);
         commandPalette.setAnimations(settings);
     }
 
@@ -1480,7 +1535,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         requireSize("Tab height", height, MIN_TAB_HEIGHT, MAX_TAB_HEIGHT);
         if (closed || tabHeight == height) return;
         tabHeight = height;
-        if (windowTabs != null) { windowTabs.component().revalidate(); windowTabs.component().repaint(); }
+        for (GroupView group : workspace.groupViews()) { group.strip().component().revalidate(); group.strip().component().repaint(); }
         onTabHeightChanged.run();
         revalidate(); repaint();
         JRootPane root = SwingUtilities.getRootPane(this);
@@ -1492,7 +1547,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
-        active = value; if (value && contentRegistry != null) contentRegistry.activated(id); if (windowTabs != null) windowTabs.setActive(value); update();
+        active = value; if (value) registry.activated(id); update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
@@ -1519,22 +1574,17 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         commandPalette.close(); windowCommands.close(); commands.close();
         scopes.close();
         closed = true;
-        if (contentHost != null) { contentHost.close(); contentHost = null; }
-        for (var component : new ArrayList<>(hosted.keySet())) {
-            WorkspaceTheme.clear(hosted.get(component).component());
-        }
         syncPaletteDispatcher();
         unregisterConfiguration.run(); disconnectConfiguration();
         showConfigDiagnostics = control -> {};
-        if (windowTabs != null) windowTabs.close();
         uninstallCornerLayer();
         if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
-        Runnable closeTabs = () -> {
-            for (TerminalTab tab : terminalTabs()) { tab.close(); if (terminals != null) terminals.tabClosed(tab); }
-        };
-        if (terminals != null) terminals.atomically(closeTabs); else closeTabs.run();
-        tabs.removeAll(); removeRootBindings();
+        // Leaving the registry removes the tabs this window still holds: each closes, a terminal tab announced closed.
+        java.util.List<Tab> held = registry.inWindow(id);
+        if (terminals != null) terminals.atomically(host::close); else host.close();
+        for (Tab tab : held) WorkspaceTheme.clear(tab.component());
+        workspace.close(); removeRootBindings();
         if (terminals != null) { terminals.close(); terminals = null; }
         workspaceActions.disable();
         refreshTabs();
