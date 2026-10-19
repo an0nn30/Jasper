@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
@@ -13,10 +15,12 @@ import dev.jasper.ui.swing.ChromePainter;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
+import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.awt.Rectangle;
+import javax.swing.AbstractButton;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -26,7 +30,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * follow the UI face's glyphs are asserted under IBM Plex and printed only where an installed IBM Plex hides the plugin's
  * files ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). Renders, crops and their differences are written under
  * {@code jasper-app/build/dock-renders/}. Mock data (titles, numbers, counts) are fixtures. The render's colours are the shipped
- * theme's roles and painted pairs, seen through the variant's scrim; the mocks give the geometry.
+ * theme's roles and painted pairs, seen through the variant's scrim; the mocks give the geometry. Since the user's direction
+ * of 2026-10-19 the stripes' labels start with their icons, which the text-only mocks do not draw: each stripe is compared
+ * with its icon slices cut out, and the slices are asserted as the icons.
  */
 @ExtendWith(EdtTestExtension.class)
 class DockMockTest {
@@ -101,14 +107,17 @@ class DockMockTest {
             try {
                 EnterpriseLook.install(variant.dark());
                 var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
-                stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1),
-                    LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of());
+                stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1, new PresentationIcon("folder", null)),
+                    LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2, new PresentationIcon("server", null))), List.of());
                 int thickness = stripe.getPreferredSize().width;
+                int height = fitted("1: SFTP", "2: File Servers"), iconed = height + 2 * StripeIconsTest.slice();
+                var render = variant.seen(MockCrops.render(stripe, thickness, iconed, 2));
+                MockCrops.write(variant.name() + "-left-stripe", MockCrops.crop(render, 0, 0, 44, 2 * iconed), variant.crop(2, 180, 44, 2 * iconed));
                 MockProfile.fonts(variant.name() + " left stripe: the stripe fits its labels, the mocks' 22 and the rule", thickness, 23, 0);
-                int height = fitted("1: SFTP", "2: File Servers");
-                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
-                assertSecondAtTheEnd(variant.name() + " left stripe", stripe, height);
-                compareStripe(variant, "left-stripe", render, variant.crop(2, 180, 44, 2 * height), thickness, Side.LEFT, List.of(29, 109, 151, 301));
+                assertSecondAtTheEnd(variant.name() + " left stripe", stripe, iconed);
+                assertIcons(variant, "left-stripe", render, stripe);
+                compareStripe(variant, "left-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2, 180, 44, 2 * height),
+                    thickness, Side.LEFT, List.of(29, 109, 151, 301));
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -118,13 +127,17 @@ class DockMockTest {
             try {
                 EnterpriseLook.install(variant.dark());
                 var stripe = new LabelledStripe(Side.RIGHT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
-                stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0),
-                    LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0)), List.of());
+                stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0, new PresentationIcon("network", null)),
+                    LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0, new PresentationIcon("tunnel", null))), List.of());
                 int thickness = stripe.getPreferredSize().width;
-                int height = fitted("Sessions", "Tunnels");
-                var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
-                assertSecondAtTheEnd(variant.name() + " right stripe", stripe, height);
-                compareStripe(variant, "right-stripe", render, variant.crop(2838, 180, 44, 2 * height), thickness, Side.RIGHT, List.of(29, 121, 164, 247));
+                int height = fitted("Sessions", "Tunnels"), iconed = height + 2 * StripeIconsTest.slice();
+                var render = variant.seen(MockCrops.render(stripe, thickness, iconed, 2));
+                MockCrops.write(variant.name() + "-right-stripe", MockCrops.crop(render, 2 * thickness - 44, 0, 44, 2 * iconed),
+                    variant.crop(2838, 180, 44, 2 * iconed));
+                assertSecondAtTheEnd(variant.name() + " right stripe", stripe, iconed);
+                assertIcons(variant, "right-stripe", render, stripe);
+                compareStripe(variant, "right-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2838, 180, 44, 2 * height),
+                    thickness, Side.RIGHT, List.of(29, 121, 164, 247));
             } finally { EnterpriseLook.restoreDefault(); }
         }
     }
@@ -142,6 +155,30 @@ class DockMockTest {
 
     private static int rail() {
         return com.formdev.flatlaf.util.UIScale.scale(EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.RAIL_GAP));
+    }
+
+    /**
+     * Every iconed label of {@code stripe} in {@code render} (2x, under the variant's scrim): its icon box holds its icon,
+     * upright, painted alone over its tile (the open tile, or the closed stripe's surface), as the variant's mock shows it.
+     * Each fixture here gives two of its labels an icon.
+     */
+    static void assertIcons(Variant variant, String name, BufferedImage render, DockStripe stripe) {
+        var theme = EnterpriseLook.theme(variant.dark());
+        var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+        int size = StripeIconsTest.metric(dev.jasper.ui.metrics.DesignMetrics.Role.STRIPE_ICON), iconed = 0;
+        for (AbstractButton button : stripe.buttons()) {
+            var label = (StripeLabels.Label) button;
+            if (label.icon == null) continue;
+            iconed++;
+            Rectangle bounds = label.getBounds();
+            Point at = labels.iconAt(stripe.side(), bounds.width, bounds.height);
+            Color tile = labels.painter().stripeTile(theme, label.isSelected(), false);
+            var reference = variant.seen(StripeIconsTest.referenceImage(label.icon, label, tile != null ? tile : labels.painter().stripeSurface(theme), 2));
+            assertThat(StripeIconsTest.box(render, 2 * (bounds.x + at.x), 2 * (bounds.y + at.y), 2 * size))
+                .as(variant.name() + " " + name + ": " + label.text() + "'s icon")
+                .isEqualTo(StripeIconsTest.box(reference, 0, 0, 2 * size));
+        }
+        assertThat(iconed).as(variant.name() + " " + name + ": its iconed labels").isEqualTo(2);
     }
 
     /** The stripe's second label ends {@code RAIL_GAP} above its bottom end. */
@@ -218,7 +255,8 @@ class DockMockTest {
      * fill, the mock's 22 now that the stripes fit their labels (any extra thickness of theirs would shift the render's
      * ink right of the mock's, and the comparison with it). Asserted: the surface, three dividers in the mock's colour and place, the
      * labels' edges, the pill's start and width, and the share of agreeing pixels under IBM Plex
-     * ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}). The render is 330 wide, past the mock's 270.
+     * ({@link MockProfile#fonts}, {@link MockCrops#fontsFloor}), on the render with its two icon slices cut out (Event Log's
+     * and Transfers' icons, asserted as the icons). The cut render is 330 wide, past the mock's 270.
      */
     @Test void theBottomStripMatchesTheMocks() throws Exception {
         for (Variant variant : VARIANTS) {
@@ -228,14 +266,20 @@ class DockMockTest {
                 var problems = new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
                     java.util.Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ERROR, "1 problem")),
                     java.util.OptionalInt.empty());
-                strip.render(List.of(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false),
-                    new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
+                strip.render(List.of(new ToolStripe.Button("log", "Event Log", AppIcons.semantic("bell"), Slot.BOTTOM_LEFT, false),
+                    new ToolStripe.Button("transfers", "Transfers", new PresentationIcon("download", null), Slot.BOTTOM_LEFT, false), problems), List.of());
                 int thickness = strip.getPreferredSize().height;
-                assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
                 int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC).getPreferredSize().width - 23);
-                var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
-                // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708).
-                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
+                int slices = 2 * StripeIconsTest.slice();
+                var iconed = variant.seen(MockCrops.render(strip, 330 + slices, thickness, 2));
+                // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708): as it
+                // ships, beside the mock widened by the two slices, and with the slices cut out.
+                MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(iconed, shift, 0, 520 + 2 * slices, 50),
+                    variant.crop(2, 1706, 520 + 2 * slices, 50));
+                var render = StripeIconsTest.withoutIcons(iconed, strip, 2);
+                MockCrops.write(variant.name() + "-bottom-strip-text", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
+                assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
+                assertIcons(variant, "bottom strip", iconed, strip);
                 var mock = variant.crop(2, 1708, 520, 48);
                 // The render's fill (below its 2 px rule at 2x), 48 rows as the mock crop is the mock's fill.
                 var rows = MockCrops.crop(render, shift, 2, 600, 48);

@@ -6,6 +6,7 @@ import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.AppIcons;
+import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.icons.IconRegistry;
@@ -115,13 +116,24 @@ final class DockFixture implements AutoCloseable {
         area.sync();
         var buttons = new ArrayList<ToolStripe.Button>();
         for (Panel panel : panels)
-            buttons.add(new ToolStripe.Button(panel.id(), panel.title(), null, panel.slot(), true, Optional.empty(),
-                panel.number() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.number())));
-        buttons.add(new ToolStripe.Button("log", "Event Log", null, Slot.BOTTOM_LEFT, false));
-        buttons.add(new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false));
+            buttons.add(new ToolStripe.Button(panel.id(), panel.title(), new PresentationIcon(icon(panel.id()), null), panel.slot(), true,
+                Optional.empty(), panel.number() == 0 ? OptionalInt.empty() : OptionalInt.of(panel.number())));
+        buttons.add(new ToolStripe.Button("log", "Event Log", AppIcons.semantic("bell"), Slot.BOTTOM_LEFT, false));
+        buttons.add(new ToolStripe.Button("transfers", "Transfers", new PresentationIcon("download", null), Slot.BOTTOM_LEFT, false));
         buttons.add(new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
             Optional.of(new PanelBadge(1, PanelBadge.Tone.ERROR, "1 problem")), OptionalInt.empty()));
         for (DockStripe stripe : stripes.all()) stripe.render(buttons, List.of());
+    }
+
+    /** The icon name the shipped plugin declares for the panel {@code id} (the stripes lead each label with it). */
+    private static String icon(String id) {
+        return switch (id) {
+            case "sftp" -> "folder";
+            case "servers" -> "server";
+            case "sessions" -> "network";
+            case "tunnels" -> "tunnel";
+            default -> throw new IllegalArgumentException(id);
+        };
     }
 
     /**
