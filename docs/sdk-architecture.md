@@ -260,8 +260,8 @@ the settings file in the default editor, with `ConfigEditor` as the fallback, th
 
 `PluginCatalog` is pure: it resolves the disk as it would be after maintenance and compares the
 result with what this process selected at launch. The difference is the "Restart to apply"
-banner, and because the comparison starts from the files it also notices changes made by another
-Jasper process. `PluginRuntime` exposes the result as `Row` and `Snapshot` records; the manager
+banner, and because the comparison starts from the files it also notices changes made outside this
+process. `PluginRuntime` exposes the result as `Row` and `Snapshot` records; the manager
 package never sees a runtime type.
 
 Restart now replays the process's own command line (`ProcessHandle.info()`) without `--background`,

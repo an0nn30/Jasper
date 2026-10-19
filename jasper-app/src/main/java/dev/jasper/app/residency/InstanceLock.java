@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * One process per Jasper home (workspace-tabs spec 5.1): an exclusive lock on {@code <home>/daemon/instance.lock},
  * taken before AWT starts and held for the life of the process. The operating system releases it however the process
  * ends, so it is never stale. The process that holds it is the home's owner, and records its process id beside it in
- * {@code instance.pid}.
+ * {@code instance.pid}. On POSIX systems closing any descriptor of a file drops the process's locks on it, so once
+ * this process holds the lock nothing in it may open {@code instance.lock} again, even to close it at once.
  */
 public final class InstanceLock implements AutoCloseable {
     /** Every lock this process holds, strongly reachable: a collected channel would release its lock. */

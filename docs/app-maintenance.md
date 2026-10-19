@@ -224,9 +224,11 @@ One Jasper process owns each home (workspace-tabs spec section 5). `bootstrap.Si
 `residency.InstanceLock` before AWT and decides with `LaunchAction`; the owner's `bootstrap.Instance` binds both sockets
 at once and holds requests in `EarlyRequests` until `compose` hands it the application. Change the handoff's wire format
 in `residency.LaunchRequest` (with its protocol number), the owner's answer in `HandoffSocket.answering`, when the owner
-takes a request in `bootstrap.Instance`, and what a request opens in `JasperApplication.open`. The process-level tests
-start child JVMs through `testsupport.ChildJvm` with only the test classes and jasper-app's classes, so those classes
-must not reach the toolkit or the other modules.
+takes a request in `bootstrap.Instance`, and what a request opens in `JasperApplication.open`. On POSIX systems closing
+any descriptor of a file drops the process's locks on it, so once the owner holds `daemon/instance.lock` nothing in its
+process may open that file, even to close it at once. The process-level tests start child JVMs through
+`testsupport.ChildJvm` with only the test classes and jasper-app's classes, so those classes must not reach the toolkit
+or the other modules.
 
 ```sh
 ./gradlew :jasper-app:test --tests "*InstanceLockTest" --tests "*SingleInstance*" --tests "*EarlyRequestsTest" --tests "*LaunchRequestTest" --tests "*HandoffSocketTest"

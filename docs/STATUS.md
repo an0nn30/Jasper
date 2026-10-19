@@ -1,7 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 1: the single instance — 2026-10-18** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `88ae278c8..9530494e9` and the documentation commit after it;
+`.claude/worktrees/workspace-tabs`, every commit after `91f3cd66a` (the anchor refresh before Task 1) up to the branch
+tip: Tasks 1 to 11, the documentation commit, the spec amendment `4f9f8d629` and the final-review fixes;
 [plan](superpowers/plans/2026-10-17-workspace-1-single-instance.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One Jasper process per home: a launch takes
 `<home>/daemon/instance.lock` (`residency.InstanceLock`, `FileChannel.tryLock`, held for the life of the process; the
@@ -45,10 +46,13 @@ answers a handoff once its EDT took it, within 1 s; (23) a quitting owner takes 
 the lock until its process exits; (25) the lock is never opened twice in one process; (26) a file from outside is
 revealed, never desktop-edited, without a plugin's editor; (27) a replacement whose predecessor has gone hands off. The
 spec was amended while the plan was written (`c6d11f711`: no `LSMultipleInstancesProhibited`; `a92166bb2`: the EDT
-take and the quitting owner); the plan follows the amended text; three rulings refine it for safety: 26 reveals where
-spec 5.4 says "as Cmd-click does" (edit-or-reveal), 6 restarts on UPDATED only when the owner's own jar changed where
-spec 5.3 restarts for any differing build, and 27 lets a replacement whose predecessor has gone hand off where spec
-5.2's row only waits and then errors. Deviations from the plan text made while executing it: `InstanceLock.close()`
+take and the quitting owner) and again after its execution (`4f9f8d629`, sections 5.2 to 5.4): Rulings 26 (a file from
+outside is revealed where the spec said "as Cmd-click does", edit-or-reveal), 6 (UPDATED restarts only when the owner's
+own jar changed, where the spec restarted for any differing build) and 27 (a replacement whose predecessor has gone
+hands off, where the spec's row only waited and then errored) are now spec text, with one limitation: a second process
+that receives files by Apple event (`open -n -a Jasper FILE`, or another copy of Jasper.app chosen in Open With) claims
+the home before AWT and never sees the event, so it hands off a RAISE and its files are not opened. Deviations from the
+plan text made while executing it: `InstanceLock.close()`
 is synchronized on the class like `tryAcquire` (Task 1; its 300-round close/ask stress test is bounded, `InstanceLockTest`
 has 8 tests, not 6); `JasperApplication` gained the private helpers `activeWindow()` (shared by `open` and
 `raiseTerminal`) and `newWindowTrigger()` (shared by `newWindow` and `openFirstWindow`) (Task 4); three imports
@@ -66,15 +70,23 @@ test pins that an owner leaves only its socket and token in the folder (`anOwner
 `HandoffSocketTest` 19 tests, not 18) (Task 8); `verifyPackage` runs against `jasper-app/build/packaging/image`, not the
 plan's `build/jpackage/image` (Task 10). The stale "private launch" Javadoc (`JasperApplication`, `PluginRuntime`) and the
 `updateDock` and `DockPresence` Javadoc that still said only a resident process follows its windows were corrected in the
-documentation commit. `./gradlew check --continue`: **11475 tests, 0 failures,
+documentation commit. The whole-branch review's fixes: `EarlyRequests` logs an `Error` from a request and carries on (a
+held request that threw one used to end the drain and strand every later handoff and `jasper` call, which hung);
+`Instance.dispatch` fails a call whose dispatcher threw one; a raise or path call fails with "Jasper is quitting; run the
+command again" on a quitting owner (it exited 0 having done nothing) and fails instead of waiting when `open` throws an
+`Error`, which still reaches the event thread's handler (`JasperApplication.onEventThread`); the README and
+`docs/sdk-architecture.md` no longer say the plugin catalog notices another Jasper process's changes; and `InstanceLock`'s
+Javadoc and `docs/app-maintenance.md` say that on POSIX nothing in the owner's process may open `daemon/instance.lock`,
+because any open and close of it drops the owner's lock (eight tests added: `:jasper-app:check` ran 3546 tests, 0
+failures, 19 skipped). `./gradlew check --continue`, before these fixes: **11475 tests, 0 failures,
 0 errors, 25 skipped** (jasper-app 3538 (19 skipped), jasper-ui 920, jasper-terminal 459 (5 skipped), jasper-buddy 151, jasper-sdk 90, jasper-sdk-testkit 197, plugins 6120 (1 skipped)). Before the first launch of this build, quit any older resident Jasper
 completely (its menu bar item's Quit Jasper Completely): it holds no instance lock and is unreachable from the new
 build, so it would keep running beside it (a one-time transition, Ruling 14). A home on a filesystem without working
 file locks (some NFS or SMB mounts) cannot start: the launch reports that it could not lock its home folder (Ruling 2).
 GUI checks for the user: a second launch from Finder, Spotlight, `open -n -a Jasper` and `Jasper.exe notes.txt` (one
-process, the window comes forward); `open -n -a Jasper FILE` while Jasper runs (macOS delivers the open-file event to
-the second process, which hands off: the file may be dropped and only the raise arrive); `jasper --safe-mode` while
-Jasper runs (the notice); Open With and Dock drops of a text file and a folder, with Jasper running and quit;
+process, the window comes forward); `open -n -a Jasper FILE` while Jasper runs (macOS delivers the Apple event to the
+second process, which claims the home before AWT and never sees it, so it hands off a RAISE and the file is not opened);
+`jasper --safe-mode` while Jasper runs (the notice); Open With and Dock drops of a text file and a folder, with Jasper running and quit;
 `jasper notes.txt src` from a shell; a stopped owner (`kill -STOP`) gives the not-responding dialog after 10 s; Quit and
 an immediate relaunch end with one process; Restart Now and the VM options restart; a packaged `--background` launch
 that holds a request (a second launch handed it one while it started hidden, with residency off) shows its Dock icon
