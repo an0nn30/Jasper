@@ -26,13 +26,16 @@ import javax.swing.SwingUtilities;
 /**
  * One split of a workspace layout (workspace tabs spec 10): its children side by side (HORIZONTAL) or stacked
  * (VERTICAL), sized by weight, with a draggable divider between each two. A drag moves the boundary between the
- * divider's two neighbours, each keeping at least {@link #MINIMUM_SHARE} of the split, lays them out as the pointer moves
- * and, on release, reports the split's path and its new weights. Positions follow the weights alone, so laying the window
- * out again (a theme change) never moves a divider. Below opacity 1 the split paints nothing behind its children; its
- * dividers stay solid. EDT only.
+ * divider's two neighbours, each keeping at least the smaller of {@link #MINIMUM_SHARE} of the split and the share it began
+ * the drag with, lays them out as the pointer moves and, on release, reports the split's path and its new weights, unless
+ * the drag left them as they were. Positions follow the weights alone, so laying the window out again (a theme change)
+ * never moves a divider. Below opacity 1 the split paints nothing behind its children; its dividers stay solid. EDT only.
  */
 final class SplitContainer extends JPanel {
-    /** The least share of the split a drag leaves either neighbour of a divider: two children get 0.1 to 0.9. */
+    /**
+     * The least share of the split a drag leaves either neighbour of a divider, unless it began narrower: two children
+     * get 0.1 to 0.9.
+     */
     static final double MINIMUM_SHARE = 0.1;
     private final Orientation orientation;
     private final List<Integer> path;
@@ -170,13 +173,16 @@ final class SplitContainer extends JPanel {
         private void follow(MouseEvent event) {
             Point at = SwingUtilities.convertPoint(this, event.getPoint(), SplitContainer.this);
             int available = available();
+            if (available <= 0) return;
             double total = Arrays.stream(start).sum(), pair = start[index] + start[index + 1], least = MINIMUM_SHARE * total;
-            if (available <= 0 || pair < 2 * least) return;
+            double lowest = Math.min(least, start[index]), highest = Math.max(start[index], pair - Math.min(least, start[index + 1]));
             double moved = (horizontal() ? at.x - origin.x : at.y - origin.y) * total / available;
-            double first = Math.clamp(start[index] + moved, least, pair - least);
+            double first = Math.clamp(start[index] + moved, lowest, highest);
             double[] next = start.clone();
-            next[index] = first;
-            next[index + 1] = pair - first;
+            if (first != start[index]) {
+                next[index] = first;
+                next[index + 1] = pair - first;
+            }
             weights = next;
             SplitContainer.this.doLayout();
             SplitContainer.this.revalidate();

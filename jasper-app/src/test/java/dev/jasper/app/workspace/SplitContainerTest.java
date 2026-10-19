@@ -51,6 +51,29 @@ class SplitContainerTest {
         component.dispatchEvent(new MouseEvent(component, id, 0, 0, x, y, 1, false, MouseEvent.BUTTON1));
     }
 
+    /** An event as AWT delivers it: the pointer's place in the split, seen from the divider where it is when this arrives. */
+    private static void mouseAt(SplitContainer split, JComponent rule, int id, int x, int y) {
+        var at = SwingUtilities.convertPoint(split, x, y, rule);
+        mouse(rule, id, at.x, at.y);
+    }
+
+    /** A press and release on a divider, the pointer not moving. */
+    private static void click(SplitContainer split, int index) {
+        var rule = split.divider(index);
+        int x = rule.getX() + 2;
+        mouseAt(split, rule, MouseEvent.MOUSE_PRESSED, x, 50);
+        mouseAt(split, rule, MouseEvent.MOUSE_RELEASED, x, 50);
+    }
+
+    /** A press on a divider, a move of {@code by} pixels along the split and a release there. */
+    private static void drag(SplitContainer split, int index, int by) {
+        var rule = split.divider(index);
+        int x = rule.getX() + 2;
+        mouseAt(split, rule, MouseEvent.MOUSE_PRESSED, x, 50);
+        mouseAt(split, rule, MouseEvent.MOUSE_DRAGGED, x + by, 50);
+        mouseAt(split, rule, MouseEvent.MOUSE_RELEASED, x + by, 50);
+    }
+
     @Test void childrenShareTheLengthByWeightWithADividerBetweenEachTwo() throws Exception {
         edt(() -> {
             var a = child(10); var b = child(10); var c = child(10);
@@ -124,9 +147,76 @@ class SplitContainerTest {
             mouse(narrow.divider(0), MouseEvent.MOUSE_PRESSED, 5, 2);
             mouse(narrow.divider(0), MouseEvent.MOUSE_DRAGGED, 5, 300);
             mouse(narrow.divider(0), MouseEvent.MOUSE_RELEASED, 5, 300);
-            assertThat(narrow.weights()).as("two neighbours under two tenths together cannot trade")
+            assertThat(narrow.weights()).as("neither of two neighbours under a tenth may shrink, so they cannot trade")
                 .containsExactly(0.05, 0.05, 0.9);
             assertThat(reported).hasSize(1);
+        });
+    }
+
+    @Test void aClickThatMovesNothingWritesNothingWhateverTheWeights() throws Exception {
+        edt(() -> {
+            var split = split(Orientation.HORIZONTAL, List.of(0.1, 0.2, 0.7), child(1), child(1), child(1));
+            split.setSize(1000 + 2 * SplitContainer.dividerSize(), 300); split.doLayout();
+            click(split, 0); click(split, 1);
+            assertThat(split.weights()).as("0.3 - 0.1 is not 0.2 to the bit, but nothing moved").containsExactly(0.1, 0.2, 0.7);
+            assertThat(reported).isEmpty();
+            var rule = split.divider(0);
+            int x = rule.getX() + 2;
+            mouseAt(split, rule, MouseEvent.MOUSE_PRESSED, x, 50);
+            mouseAt(split, rule, MouseEvent.MOUSE_DRAGGED, x + 30, 50);
+            assertThat(split.weights().get(0)).as("it moved while the pointer was away").isGreaterThan(0.1);
+            mouseAt(split, rule, MouseEvent.MOUSE_DRAGGED, x, 50);
+            mouseAt(split, rule, MouseEvent.MOUSE_RELEASED, x, 50);
+            assertThat(split.weights()).as("a drag that comes back is a click").containsExactly(0.1, 0.2, 0.7);
+            assertThat(reported).isEmpty();
+        });
+    }
+
+    @Test void aClickNeverSnapsABoundaryAndANarrowSideCanBeWidened() throws Exception {
+        edt(() -> {
+            var split = split(Orientation.HORIZONTAL, List.of(0.5, 0.375, 0.0625, 0.0625), child(1), child(1), child(1), child(1));
+            split.setSize(1600 + 3 * SplitContainer.dividerSize(), 300); split.doLayout();
+            click(split, 0); click(split, 1); click(split, 2);
+            assertThat(split.weights()).as("no neighbour under a tenth is pushed to one").containsExactly(0.5, 0.375, 0.0625, 0.0625);
+            assertThat(reported).isEmpty();
+            drag(split, 1, -5000);
+            assertThat(reported).singleElement().satisfies(values -> {
+                assertThat(values.get(0)).isEqualTo(0.5);
+                assertThat(values.get(1)).as("the wide side shrinks to a tenth").isCloseTo(0.1, within(1e-9));
+                assertThat(values.get(2)).as("the narrow side takes it").isCloseTo(0.3375, within(1e-9));
+                assertThat(values.get(3)).isEqualTo(0.0625);
+            });
+        });
+    }
+
+    @Test void dividersBetweenSeveralNarrowColumnsStayUsableOneAtATime() throws Exception {
+        edt(() -> {
+            var split = split(Orientation.HORIZONTAL, List.of(0.5, 0.25, 0.125, 0.0625, 0.0625),
+                child(1), child(1), child(1), child(1), child(1));
+            split.setSize(1600 + 4 * SplitContainer.dividerSize(), 300); split.doLayout();
+            for (int index = 0; index < 4; index++) click(split, index);
+            assertThat(split.weights()).containsExactly(0.5, 0.25, 0.125, 0.0625, 0.0625);
+            assertThat(reported).isEmpty();
+            drag(split, 3, -5000);
+            assertThat(split.weights()).as("two columns under a tenth cannot trade")
+                .containsExactly(0.5, 0.25, 0.125, 0.0625, 0.0625);
+            assertThat(reported).isEmpty();
+            drag(split, 2, -5000);
+            assertThat(split.weights().get(2)).isCloseTo(0.1, within(1e-9));
+            assertThat(split.weights().get(3)).as("the column behind it gains what it gave up").isCloseTo(0.0875, within(1e-9));
+            drag(split, 1, -5000);
+            drag(split, 2, -5000);
+            drag(split, 3, -5000);
+            var values = split.weights();
+            assertThat(values.get(0)).isEqualTo(0.5);
+            assertThat(values.subList(1, 5)).as("room made one divider at a time reaches the last column")
+                .satisfies(rest -> {
+                    assertThat(rest.get(0)).isCloseTo(0.1, within(1e-9));
+                    assertThat(rest.get(1)).isCloseTo(0.1, within(1e-9));
+                    assertThat(rest.get(2)).isCloseTo(0.1, within(1e-9));
+                    assertThat(rest.get(3)).isCloseTo(0.2, within(1e-9));
+                });
+            assertThat(reported).hasSize(4);
         });
     }
 
