@@ -62,6 +62,7 @@ public final class Contributions {
     /** Single-element holders: the same action may be placed twice, and removal is by identity. */
     private final List<String[]> railActions = new ArrayList<>();
     private final List<Consumer<PanelRequest>> panelListeners = new ArrayList<>();
+    private java.util.function.UnaryOperator<PanelRequest> panelRoute = java.util.function.UnaryOperator.identity();
     private MenuSection panelsMenu;
 
 
@@ -244,10 +245,21 @@ public final class Contributions {
         return new Subscription(() -> panelListeners.remove(listener));
     }
 
+    /**
+     * Where a panel request goes before any window hears it: the window manager sends a child window's to the main
+     * window, which has the dock (workspace tabs spec 6.3). By default a request goes where it names.
+     *
+     * @param route maps a request to the one the windows hear
+     */
+    public void panelRoute(java.util.function.UnaryOperator<PanelRequest> route) {
+        panelRoute = Objects.requireNonNull(route, "route");
+    }
+
     public void requestPanel(PanelRequest request) {
         requireEdt();
+        PanelRequest routed = Objects.requireNonNull(panelRoute.apply(Objects.requireNonNull(request, "request")), "routed");
         for (Consumer<PanelRequest> listener : List.copyOf(panelListeners)) {
-            try { listener.accept(request); }
+            try { listener.accept(routed); }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A panel request listener failed", failure); }
         }
     }

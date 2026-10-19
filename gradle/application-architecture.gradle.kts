@@ -99,6 +99,22 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         "Application bypasses supported terminal API"
                     }
                 }
+                // Workspace tabs spec 6.1: the main window is made in one place, WindowManager.ensureMain. The constant pool
+                // (javap -v) also shows a constructor reference (MainWindow::new), which javap -c alone would miss.
+                val makesMain = "dev/jasper/app/workspace/MainWindow.\"<init>\""
+                val makers = mutableMapOf<String, Int>()
+                for (batch in types.chunked(100)) {
+                    val verbose = tool("javap", listOf("-classpath", classes.absolutePath, "-v", "-p") + batch)
+                    for (section in verbose.split(Regex("(?m)^Classfile ")).drop(1)) {
+                        if (!section.contains(makesMain)) continue
+                        val type = Regex("this_class: #\\d+\\s+// (\\S+)").find(section)?.groupValues?.get(1)?.replace('/', '.') ?: continue
+                        if (topLevel(type) == "dev.jasper.app.workspace.MainWindow") continue
+                        makers[type] = section.lines().count { (it.contains("invokespecial") || it.contains("REF_newInvokeSpecial")) && it.contains(makesMain) }
+                    }
+                }
+                check(makers.keys.map { topLevel(it) }.toSet() == setOf("dev.jasper.app.workspace.WindowManager") && makers.values.sum() == 1) {
+                    "MainWindow is made in exactly one place, WindowManager.ensureMain: $makers"
+                }
             }
         }
     }
