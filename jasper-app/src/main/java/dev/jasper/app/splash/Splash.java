@@ -10,14 +10,16 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.Window;
+import java.awt.geom.AffineTransform;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * The boot splash's window (spec 10.11): undecorated, unfocusable and centred on the main screen, carrying the look's
  * window icons. It appears and closes at once, with no motion, and paints each step at once through the window's own
- * graphics, because the event thread is busy starting Jasper and would not get to a queued repaint. It is a plain AWT
- * window, not a Swing one, so opening it initializes no look and feel ahead of the application's. A window that cannot
+ * graphics from a completed device-resolution image, because the event thread is busy starting Jasper and would not
+ * get to a queued repaint. It is a plain AWT window, not a Swing one, so opening it initializes no look and feel ahead
+ * of the application's. A window that cannot
  * be made is logged and the splash stays closed; start-up goes on. EDT.
  */
 public final class Splash {
@@ -88,9 +90,17 @@ public final class Splash {
         window = null;
     }
 
-    private void draw(Graphics g) {
+    void draw(Graphics g) {
         StartupSteps.Step shown = step;
-        if (shown != null) painter.paint((Graphics2D) g, shown.text(), shown.fraction());
+        if (shown == null) return;
+        var target = (Graphics2D) g;
+        var transform = target.getTransform();
+        double scaleX = transform.getScaleX();
+        double scaleY = transform.getScaleY();
+        var frame = painter.frame(shown, scaleX, scaleY);
+        // Cancel only the device scale: keep the target's origin and clip. Inverse scaling avoids
+        // squeezing ceil-rounded buffers back into logical bounds at fractional desktop scales.
+        target.drawImage(frame, AffineTransform.getScaleInstance(1 / scaleX, 1 / scaleY), null);
     }
 
     private void paintNow() {

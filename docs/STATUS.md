@@ -6,8 +6,8 @@ Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core 
 and tool windows), the terminal, the command palette, notifications, Settings, themes and looks; most features are
 bundled plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** `origin/main` is at `2c065f8cd`, with the Enterprise side stripes and plan 12 (IntelliJ classic),
-  whose entries below were written before they were merged; the Enterprise presentation series, plan 10b and Ubuntu
+- **Branches.** `origin/main` is at `a8159356c`, with the Enterprise side stripes, plan 12 (IntelliJ classic), the
+  Windows installer build fix and the splash flicker fix, whose entries below were written before they were merged; the Enterprise presentation series, plan 10b and Ubuntu
   Yaru are on it too, their entries also predating their merge. The V1 documentation overhaul is on `claude/v1-docs`,
   with `origin/main` merged in. Also unmerged: `claude/workspace-tabs` (workspace tabs and single instance, in
   progress; its STATUS entries are on that branch) and `claude/test-isolation-leaks` (the Swing test-isolation guard,
@@ -19,8 +19,9 @@ bundled plugins on the public plugin SDK. The [documentation index](README.md) l
 - **Themes.** Built in: Slate Cobalt (the default), Catppuccin Latte, Frappé, Macchiato and Mocha, and Ubuntu Yaru; the
   Enterprise plugin adds the Enterprise theme. **Looks:** the default look, and the Enterprise look while its plugin is
   on (Settings › Plugins, then restart; safe mode starts with the default look).
-- **Last recorded check.** `./gradlew check --continue` on the plan 12 branch (2026-10-18): 11,475 tests, 0 failures,
-  0 errors, 25 skipped.
+- **Last recorded checks.** `./gradlew check --continue` on the plan 12 branch (2026-10-18): 11,475 tests, 0 failures,
+  0 errors, 25 skipped; with the splash flicker fix (2026-10-19): 11,454 tests, 0 failures, 0 errors, 26 skipped, and
+  `checkThemeTool`'s known Python failure below.
 
 Bundled plugins, all enabled by default except Enterprise:
 
@@ -84,6 +85,16 @@ the packages, is rewritten. Apart from those, `AppDocumentationTest` and the bui
 the link check, code comments and strings are unchanged. `./gradlew check` passed before `origin/main` was merged in (11,437
 tests, 0 failures, 0 errors, 25 skipped); the branch is pushed for review and the guides were brought up to plan 12
 and SDK 0.18.1 when `origin/main` was merged in. Not merged into `main`.
+
+**Windows installer build — 2026-10-18** (`codex/fix-windows-launcher-build`). MSVC's export
+library and `.exp` file now go to the object directory instead of jpackage's launcher resources;
+`buildLauncher` previously rejected `jpackageapplauncher.exp` as missing Jasper's hook.
+`packaging/windows/Build-Installer.ps1` passed on Windows ARM64, including image and MSI
+verification, producing `Jasper-1.0.0-windows-aarch64-setup.exe`. Launcher core: 152 checks,
+zero failures; watcher tests passed. Broader `check --continue` failed in command-client core
+compilation (MSVC const qualifiers), Editor, File Server, Indexer, Remote and UI tests; app test
+compilation failed during overlapping builds and passed on the standalone installer rerun.
+Merged into `main`; no installer run.
 
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
@@ -884,6 +895,12 @@ are the Enterprise icon from the splash on; in a packaged Enterprise build, the 
 a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
+
+2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. All 23 splash tests pass;
+independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
+only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
+Native Windows/Linux startup acceptance remains user-run.
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;
