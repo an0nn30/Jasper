@@ -73,7 +73,25 @@ class StagedRemoteTunnelsTest {
                 assertThat(db.getAccessibleContext().getAccessibleName()).as("named by its title line").isEqualTo("db, " + MISSING_HOST);
                 assertThat(db.getAccessibleContext().getAccessibleDescription()).as("described by its live tooltip")
                     .isEqualTo("db, localhost:5432 → db.internal:5432, Host missing — edit to choose another");
-                assertThat(db.getHeight()).as("two lines fit the old row height").isBetween(2 * db.getFontMetrics(db.getFont()).getHeight() - 8, 50);
+                var textLines = all((Container) db, JLabel.class).stream()
+                    .filter(label -> "db".equals(label.getText()) || MISSING_HOST.equals(label.getText())
+                        || ":5432 → db.internal:5432".equals(label.getText())).toList();
+                assertThat(textLines).hasSize(3);
+                for (var textLine : textLines) {
+                    var bounds = javax.swing.SwingUtilities.convertRectangle(textLine.getParent(), textLine.getBounds(), db);
+                    var metrics = textLine.getFontMetrics(textLine.getFont());
+                    int baseline = textLine.getBaseline(textLine.getWidth(), textLine.getHeight());
+                    // Compact rows omit the title font's leading; its ascent and descent must still fit.
+                    assertThat(baseline).as("the ascent fits for %s", textLine.getText()).isGreaterThanOrEqualTo(metrics.getAscent());
+                    assertThat(baseline + metrics.getDescent()).as("the descent fits for %s", textLine.getText()).isLessThanOrEqualTo(bounds.height);
+                    assertThat(bounds.y).isGreaterThanOrEqualTo(0);
+                    assertThat(bounds.y + bounds.height).isLessThanOrEqualTo(db.getHeight());
+                }
+                var title = textLines.stream().filter(label -> "db".equals(label.getText())).findFirst().orElseThrow();
+                var subtitle = textLines.stream().filter(label -> label.getText().startsWith(":5432")).findFirst().orElseThrow();
+                var titleBounds = javax.swing.SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), db);
+                var subtitleBounds = javax.swing.SwingUtilities.convertRectangle(subtitle.getParent(), subtitle.getBounds(), db);
+                assertThat(subtitleBounds.y).as("the route sits below the title").isGreaterThanOrEqualTo(titleBounds.y + titleBounds.height);
                 assertThat(problems(view)).as("both rows ask for a host").isEqualTo(2);
                 click(db, 1);
                 press(canvas(db), KeyEvent.VK_ENTER, '\n');

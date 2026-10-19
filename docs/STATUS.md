@@ -8,7 +8,7 @@ serial to 4m45s parallel (46%). All 11,437 tests were retained, with zero failur
 same 25 platform skips; one new regression prevents Windows Git Bash probing root UNC paths.
 Architecture/license checks and independent review passed. Hosted checks on the final head gate merge.
 Ubuntu improved from 13m47s to 9m26s. Windows with two workers hit subprocess/startup/cleanup
-deadlines that passed serially; its single-worker limit awaits hosted verification.
+deadlines that passed serially; the single-worker hosted Windows check subsequently passed in 18m01s.
 Synchronized main at `2c065f8cd`, retaining its Enterprise theme assertions alongside portable
 font checks; full local `check` passed (11,486 tests, zero failures/errors, 25 existing skips).
 
