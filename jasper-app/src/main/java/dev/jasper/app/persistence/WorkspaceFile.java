@@ -10,8 +10,11 @@ import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,11 +25,16 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.tomlj.Toml;
+import org.tomlj.TomlArray;
+import org.tomlj.TomlParseResult;
+import org.tomlj.TomlTable;
 
 /**
  * The saved workspace, {@code workspace.toml} in the Jasper home (workspace tabs spec, section 8): each Jasper window's
- * role, bounds and maximized state, its layout, and what each of its tabs needs to come back. Writes are atomic.
- * Stateless: the caller chooses the thread; the values are immutable.
+ * role, bounds and maximized state, its layout, and what each of its tabs needs to come back. {@link #write} writes it
+ * atomically; {@link #read} never throws: it drops bad tab and window entries alone and sets an unreadable file aside as
+ * {@code workspace.toml.bad}. Stateless: the caller chooses the thread; the values are immutable.
  */
 public final class WorkspaceFile {
     /** Whether a window is the main window or a child window. */
@@ -138,6 +146,251 @@ public final class WorkspaceFile {
          */
         public List<WindowRecord> children() {
             return windows.subList(1, windows.size());
+        }
+    }
+
+    /** What {@link #read(Path)} found. */
+    public sealed interface Loaded permits Loaded.Restore, Loaded.Fresh {
+        /**
+         * The saved workspace, its bad entries dropped. A main window whose layout is empty restores the empty workspace.
+         *
+         * @param snapshot the windows to restore
+         */
+        record Restore(Snapshot snapshot) implements Loaded {
+            /** Checks the snapshot is present. */
+            public Restore {
+                Objects.requireNonNull(snapshot, "snapshot");
+            }
+        }
+
+        /**
+         * Nothing to restore: start with one terminal tab (spec 8).
+         *
+         * @param setAside where an unreadable file was moved ({@code workspace.toml.bad} beside it); empty when there was
+         *     no file or it could not be moved
+         */
+        record Fresh(Optional<Path> setAside) implements Loaded {
+            /** Checks the value is present. */
+            public Fresh {
+                Objects.requireNonNull(setAside, "setAside");
+            }
+        }
+    }
+
+    /** The largest file read: {@code ui-state.toml}'s cap (workspace plan 2, Rulings 15). */
+    static final int MAX_BYTES = 256 * 1024;
+    /** The deepest a saved tree may nest (workspace plan 2, Rulings 14); it bounds the reader's recursion. */
+    static final int MAX_DEPTH = 64;
+    private static final System.Logger LOG = System.getLogger(WorkspaceFile.class.getName());
+
+    /**
+     * Reads {@code file}; never throws, not even when tomlj's parser overflows the stack on deep nesting (workspace plan 2,
+     * Rulings 13 and 14). A bad tab entry, or a tab a group lists without one, is dropped as {@link Layout#remove(TabId)}
+     * drops it; a bad window entry is dropped; bounds and choices fall back alone. A file that cannot be read, does not
+     * parse, has another version or keeps no main window is moved to {@code workspace.toml.bad} beside it, replacing an
+     * older one.
+     *
+     * @param file the workspace file
+     * @return the windows to restore, or that Jasper starts fresh and what was set aside
+     */
+    public static Loaded read(Path file) {
+        String text;
+        try {
+            Optional<String> read = TomlStateFile.readBounded(file, MAX_BYTES, "Workspace state");
+            if (read.isEmpty()) return new Loaded.Fresh(Optional.empty());
+            text = read.get();
+        } catch (IOException unreadable) {
+            return setAside(file, unreadable);
+        }
+        try {
+            return new Loaded.Restore(parse(text));
+        } catch (IOException | RuntimeException | StackOverflowError invalid) {
+            // tomlj's parser has no nesting guard: deeply nested arrays overflow the stack inside Toml.parse.
+            return setAside(file, invalid);
+        }
+    }
+
+    private static Loaded setAside(Path file, Throwable cause) {
+        Path bad = file.resolveSibling(file.getFileName() + ".bad");
+        try {
+            Files.move(file, bad, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException failed) {
+            failed.addSuppressed(cause);
+            LOG.log(System.Logger.Level.WARNING, "Could not set aside the unreadable workspace state " + file, failed);
+            return new Loaded.Fresh(Optional.empty());
+        }
+        LOG.log(System.Logger.Level.WARNING, "Set aside the unreadable workspace state " + file + " as " + bad, cause);
+        return new Loaded.Fresh(Optional.of(bad));
+    }
+
+    private static Snapshot parse(String text) throws IOException {
+        TomlParseResult toml = Toml.parse(text);
+        if (toml.hasErrors()) throw new IOException("Invalid workspace state: " + toml.errors().getFirst());
+        Object version = toml.get(List.of("version"));
+        if (!Long.valueOf(1).equals(version)) throw new IOException("Unknown workspace state version: " + version);
+        var windows = new ArrayList<WindowRecord>();
+        var groups = new HashSet<GroupId>();
+        var tabs = new HashSet<TabId>();
+        if (toml.get(List.of("windows")) instanceof TomlArray entries)
+            for (int i = 0; i < entries.size(); i++) {
+                Optional<WindowRecord> read = window(entries.get(i));
+                if (read.isEmpty()) continue;
+                WindowRecord window = read.get();
+                List<GroupId> ids = window.layout().groups().stream().map(Group::id).toList();
+                if (window.role() == Role.MAIN && windows.stream().anyMatch(kept -> kept.role() == Role.MAIN)) {
+                    LOG.log(System.Logger.Level.WARNING, "Dropping a second main window from the workspace state");
+                } else if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)) {
+                    LOG.log(System.Logger.Level.WARNING, "Dropping a window whose groups or tabs an earlier window holds");
+                } else {
+                    groups.addAll(ids);
+                    tabs.addAll(window.layout().tabs());
+                    windows.add(window);
+                }
+            }
+        if (windows.stream().noneMatch(kept -> kept.role() == Role.MAIN)) throw new IOException("The workspace state keeps no main window");
+        return new Snapshot(windows);
+    }
+
+    /** One window entry with its bad tabs dropped; empty, and logged, when the entry itself is bad. */
+    private static Optional<WindowRecord> window(Object value) {
+        try {
+            if (!(value instanceof TomlTable entry)) throw new IllegalArgumentException("a window entry is not a table");
+            Object name = entry.get(List.of("role"));
+            Role role = "main".equals(name) ? Role.MAIN : "child".equals(name) ? Role.CHILD : null;
+            if (role == null) throw new IllegalArgumentException("unknown window role " + name);
+            Layout layout = layout(entry);
+            Map<TabId, TabRecord> records = tabs(entry);
+            for (TabId tab : layout.tabs()) {
+                if (records.containsKey(tab)) continue;
+                LOG.log(System.Logger.Level.WARNING, "Dropping tab " + tab + " from the workspace state: it has no readable entry");
+                layout = layout.remove(tab);
+            }
+            records.keySet().retainAll(Set.copyOf(layout.tabs()));
+            int extendedState = UiState.number(entry, "extended_state").filter(state -> (state & ~6) == 0).orElse(0);
+            return Optional.of(new WindowRecord(role, UiState.bounds(entry), extendedState, layout, records));
+        } catch (RuntimeException bad) {
+            LOG.log(System.Logger.Level.WARNING, "Dropping a window from the workspace state: " + bad.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /** A window's tree from its flat nodes, with the active group and the maximize falling back alone. */
+    private static Layout layout(TomlTable window) {
+        if (!(window.get(List.of("nodes")) instanceof TomlArray nodes)) throw new IllegalArgumentException("a window has no nodes");
+        var byId = new HashMap<String, TomlTable>();
+        var children = new HashMap<String, List<String>>();
+        String root = null;
+        for (int i = 0; i < nodes.size(); i++) {
+            if (!(nodes.get(i) instanceof TomlTable node)) throw new IllegalArgumentException("a node entry is not a table");
+            String id = string(node, "id");
+            if (id.isEmpty() || byId.putIfAbsent(id, node) != null) throw new IllegalArgumentException("node id " + id + " is empty or used twice");
+            String parent = string(node, "parent");
+            if (!parent.isEmpty()) children.computeIfAbsent(parent, ignored -> new ArrayList<>()).add(id);
+            else if (root == null) root = id;
+            else throw new IllegalArgumentException("a window has two root nodes");
+        }
+        if (root == null) throw new IllegalArgumentException("a window has no root node");
+        var reached = new HashSet<String>();
+        Node tree = node(root, byId, children, reached, 0);
+        if (reached.size() != byId.size()) throw new IllegalArgumentException("a node is not under the window's root");
+        Layout plain = new Layout(tree, first(tree), Optional.empty());
+        Layout active = groupId(window.get(List.of("active_group"))).filter(id -> plain.group(id).isPresent()).map(plain::activate).orElse(plain);
+        return groupId(window.get(List.of("maximized"))).filter(active.activeGroup()::equals).map(active::toggleMaximize).orElse(active);
+    }
+
+    /** The node {@code id} and everything under it; a split's children are the nodes naming it, in file order. */
+    private static Node node(String id, Map<String, TomlTable> byId, Map<String, List<String>> children, Set<String> reached, int depth) {
+        if (depth > MAX_DEPTH) throw new IllegalArgumentException("a window's tree is deeper than " + MAX_DEPTH);
+        reached.add(id);
+        TomlTable table = byId.get(id);
+        Object kind = table.get(List.of("kind"));
+        if ("group".equals(kind)) {
+            if (children.containsKey(id)) throw new IllegalArgumentException("group " + id + " is a parent");
+            if (!(table.get(List.of("tabs")) instanceof TomlArray list)) throw new IllegalArgumentException("group " + id + " has no tab list");
+            var tabs = new ArrayList<TabId>();
+            for (int i = 0; i < list.size(); i++) {
+                if (!(list.get(i) instanceof String tab)) throw new IllegalArgumentException("group " + id + " lists a tab that is not a string");
+                tabs.add(TabId.parse(tab));
+            }
+            Optional<TabId> selected = tabId(table.get(List.of("selected"))).filter(tabs::contains).or(() -> tabs.stream().findFirst());
+            return new Group(GroupId.parse(id), tabs, selected);
+        }
+        if (!"split".equals(kind)) throw new IllegalArgumentException("node " + id + " has an unknown kind " + kind);
+        Object axis = table.get(List.of("orientation"));
+        Orientation orientation = "horizontal".equals(axis) ? Orientation.HORIZONTAL : "vertical".equals(axis) ? Orientation.VERTICAL : null;
+        if (orientation == null) throw new IllegalArgumentException("split " + id + " has no orientation");
+        var parts = new ArrayList<Child>();
+        for (String child : children.getOrDefault(id, List.of()))
+            parts.add(new Child(node(child, byId, children, reached, depth + 1), weight(byId.get(child))));
+        return new Split(orientation, parts);
+    }
+
+    /** The first group in tree order. */
+    private static GroupId first(Node node) {
+        Node current = node;
+        while (current instanceof Split split) current = split.children().getFirst().node();
+        return ((Group) current).id();
+    }
+
+    /** A window's tab entries by id; a bad entry is logged and left out, and the first entry for an id wins. */
+    private static Map<TabId, TabRecord> tabs(TomlTable window) {
+        var records = new HashMap<TabId, TabRecord>();
+        if (!(window.get(List.of("tabs")) instanceof TomlArray entries)) return records;
+        for (int i = 0; i < entries.size(); i++) {
+            try {
+                if (!(entries.get(i) instanceof TomlTable entry)) throw new IllegalArgumentException("a tab entry is not a table");
+                TabId id = TabId.parse(string(entry, "id"));
+                TabRecord parsed = tab(entry);
+                if (records.putIfAbsent(id, parsed) != null) throw new IllegalArgumentException("tab " + id + " is listed twice");
+            } catch (RuntimeException bad) {
+                LOG.log(System.Logger.Level.WARNING, "Dropping a tab entry from the workspace state: " + bad.getMessage());
+            }
+        }
+        return records;
+    }
+
+    private static TabRecord tab(TomlTable entry) {
+        String kind = string(entry, "kind");
+        String title = string(entry, "title");
+        if (kind.equals("terminal")) return new TabRecord.Terminal(title, string(entry, "directory"), string(entry, "profile"));
+        if (!kind.startsWith(CONTENT)) throw new IllegalArgumentException("unknown tab kind " + kind);
+        String rest = kind.substring(CONTENT.length());
+        int colon = rest.indexOf(':');
+        if (colon < 0) throw new IllegalArgumentException("content kind " + kind + " names no restorer");
+        if (!(entry.get(List.of("state")) instanceof TomlTable table)) throw new IllegalArgumentException("a content tab has no state table");
+        var state = new HashMap<String, String>();
+        for (String key : table.keySet()) {
+            if (!(table.get(List.of(key)) instanceof String value)) throw new IllegalArgumentException("restore state " + key + " is not a string");
+            state.put(key, value);
+        }
+        return new TabRecord.Content(title, rest.substring(0, colon), rest.substring(colon + 1), state);
+    }
+
+    private static String string(TomlTable table, String key) {
+        if (table.get(List.of(key)) instanceof String value) return value;
+        throw new IllegalArgumentException(key + " is missing or not a string");
+    }
+
+    private static double weight(TomlTable node) {
+        if (node.get(List.of("weight")) instanceof Number weight) return weight.doubleValue();
+        throw new IllegalArgumentException("a node's weight is not a number");
+    }
+
+    private static Optional<GroupId> groupId(Object value) {
+        if (!(value instanceof String text) || text.isEmpty()) return Optional.empty();
+        try {
+            return Optional.of(GroupId.parse(text));
+        } catch (IllegalArgumentException malformed) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<TabId> tabId(Object value) {
+        if (!(value instanceof String text) || text.isEmpty()) return Optional.empty();
+        try {
+            return Optional.of(TabId.parse(text));
+        } catch (IllegalArgumentException malformed) {
+            return Optional.empty();
         }
     }
 

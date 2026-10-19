@@ -274,13 +274,13 @@ public final class UiState {
     }
 
     /** One window's bounds, or empty when a key is missing, not an integer or the size is not positive: it falls back alone. */
-    private static Optional<Bounds> bounds(TomlTable entry) {
+    static Optional<Bounds> bounds(TomlTable entry) {
         Optional<Integer> x = number(entry, "x"), y = number(entry, "y"), width = number(entry, "width"), height = number(entry, "height");
         if (x.isEmpty() || y.isEmpty() || width.isEmpty() || height.isEmpty() || width.get() <= 0 || height.get() <= 0) return Optional.empty();
         return Optional.of(new Bounds(x.get(), y.get(), width.get(), height.get()));
     }
 
-    private static Optional<Integer> number(TomlTable table, String key) {
+    static Optional<Integer> number(TomlTable table, String key) {
         return table.get(List.of(key)) instanceof Long value && value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE
             ? Optional.of(value.intValue()) : Optional.empty();
     }
