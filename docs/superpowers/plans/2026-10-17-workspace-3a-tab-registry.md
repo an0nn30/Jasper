@@ -29,12 +29,11 @@ Focus going into a tab, a terminal's pane or a plugin's view, makes it the windo
 plan 1 ([`2026-10-17-workspace-1-single-instance.md`](2026-10-17-workspace-1-single-instance.md)) executes before this
 one too.
 
-**Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`,
-after plans 1 and 2. Run every command from the worktree root. Line numbers were taken at `941599fc2` ("Spec: workspace
-tabs approved") and hold on the rebased branch (`57e55572f`, plans 1 and 2 written, not executed), whose rebase moved
-none of the cited jasper-app lines; jasper-ui's role catalog lines are `57e55572f`'s (fact 17). Plan 1 edits
-`JasperApplication`, so the two `JasperApplication` anchors this plan uses (`contributions.content().setFactory(separate
--> {` twice, and `windowsMayClose`) may have moved: find them by their quoted text. Every edit quotes the text it replaces, and the edit scripts stop with a message when that text is not
+**Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`
+(on `main` at `4ed94fb78`), after plans 1 and 2, which have executed. Run every command from the worktree root. Line
+numbers are from `93aa015fd`, plan 2's last commit, jasper-ui's role catalog lines included (fact 17); the two
+`JasperApplication` anchors this plan uses (`contributions.content().setFactory(separate -> {` twice, and
+`windowsMayClose`) are found by their quoted text. Every edit quotes the text it replaces, and the edit scripts stop with a message when that text is not
 found the stated number of times: re-find the quoted text, adjust the anchor and re-run; never edit around a missing
 anchor. Later tasks anchor on text earlier tasks wrote; the plan quotes that text as those tasks leave it.
 
@@ -238,7 +237,7 @@ root. `edits.py` is used the same way.
 
 ## Verified facts
 
-At `941599fc2`, unchanged at `57e55572f`, unless stated.
+At `93aa015fd`.
 
 1. `contributions/ContentRegistry.java:12-215` owns hosted tabs: hosts by window id (`:24-31`; unregistering a host
    removes, so disposes, the entries it holds), `open` reuses a (plugin, key) entry and mounts it again when it lost its
@@ -251,7 +250,7 @@ At `941599fc2`, unchanged at `57e55572f`, unless stated.
 2. `workspace/WindowContent.java`: the deck is `TerminalDeck` (`:59`), the strip `look.tabs(this)` (`:61`, `:267`) in the
    terminal column's NORTH over the deck (`:268-272`); the deck's change listener publishes the selection, tells the
    palette, updates and focuses (`:291-298`); `connectContributions` registers a `ContentHost` only when `hostsContent`
-   (`:854-867`; the warm-up rehearsal passes false, `JasperApplication.java:909`); `mountContent`/`unmountContent`
+   (`:854-867`; the warm-up rehearsal passes false, `JasperApplication.java:1090`); `mountContent`/`unmountContent`
    (`:869-896`); `selectedContent`, `tabTitle`, `tabIcon`, `tabTooltip`, `tabMenu`, `focusSelected`, `mayClose`
    (`:897-916`); `terminalTabs` (`:828-832`); `openTab` (`:994-1015`); `connectActivity` (`:1017-1052`) and
    `configurePane` (`:1056-1083`) wire a pane to the window; `selectTab`, `reorderTab`, `closeTab` (`:1097-1127`);
@@ -302,13 +301,13 @@ At `941599fc2`, unchanged at `57e55572f`, unless stated.
     runs `onFocused` when the view, the find bar or a child of theirs gains focus.
     `ApplicationActionsTest.focusingFindFieldRetargetsGlobalPaneActions` (`:80-97`) depends on it.
 15. Notifications: the activity listener `JasperApplication` adds when it composes a window passes that window's id to
-    `CommandNotifier.finished` (`JasperApplication.java:520-522`), which makes it the request's target
+    `CommandNotifier.finished` (`JasperApplication.java:526-528`), which makes it the request's target
     (`CommandNotifier.java:158`); a click on the operating system's notification raises the target window, then runs
     the activity's `activate` (`SystemNotices.java:87-99`); an in-app card shows in the target window
     (`NotificationsFeature.java:147`).
 16. `WindowTabs.refresh` (`WindowTabs.java:47-98`) picks the open curve when a tab entered the strip and the close
     curve when one left (`:53-54`, `:80`), whatever the reason.
-17. At `57e55572f`: `DesignMetrics.Role.TAB_REVEAL_INSET` (`jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java:97`)
+17. `DesignMetrics.Role.TAB_REVEAL_INSET` (`jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java:97`)
     is read only by the reveal (`WindowTabs.java:87`); `classic-roles.tsv:433` and `compact-roles.tsv:433`
     (`jasper-ui/src/test/resources/dev/jasper/ui/metrics/`) freeze it for `ClassicCatalogTest` and `DesignMetricsTest`,
     whose role lists must equal `Role.values()`; `WorkspaceMetricsTest.java:24,66` names it.
@@ -452,9 +451,9 @@ grep -c 'var requested = contributions.content().entries();' jasper-app/src/main
 grep -c 'private final JTabbedPane tabs = new TerminalDeck();' jasper-app/src/main/java/dev/jasper/app/workspace/WindowContent.java     # 1
 ```
 
-Every command prints the stated result. Then re-read plan 2's Rulings and its Tasks 1-3 "Produces" lines: where a
-`Layout` signature this plan calls differs, use plan 2's and record it in this plan's banner. Plans 1 and 2 have each
-added a `docs/STATUS.md` entry; this plan's goes above them. Create the two helper scripts (Global Constraints).
+Every command prints the stated result. Every `Layout` signature this plan calls is plan 2's as executed (checked at
+`93aa015fd`). Plan 2's `docs/STATUS.md` entry ("Workspace tabs, plan 2: the layout model and its encoding") is the top
+one, above plan 1's; this plan's goes above it. Create the two helper scripts (Global Constraints).
 
 ---
 
@@ -4570,7 +4569,7 @@ again (Rulings 28). The terminal registry splits into new groups (Rulings 19). `
   `workspace/WindowCommandPalette.java:40,105,111,155-157`, `workspace/WorkspaceConfiguration.java:34-48`,
   `workspace/TabState.java`, `terminals/PaneEntry.java`, `terminals/package-info.java`,
   `plugins/HostedTerminals.java:6,280`, `plugins/package-info.java`, `benchmark/BenchmarkRun.java`,
-  `benchmark/package-info.java`
+  `benchmark/package-info.java`, `layout/Layout.java:382,513` (two comments naming `SplitTree`)
 - Test: `jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceTabsTest.java` (new), `TerminalTabTest.java`
   (rewritten), `TabStateTest`, `TabMoveTest`, and the tests in Step 5
 - Ledger: one row renamed, two dropped, one added
@@ -5920,6 +5919,10 @@ edit(B + "BenchmarkRun.java", [
     private void retireChildrenExcept(Set<Child> retained) throws Exception {""", 1)])
 regex(B + "BenchmarkRun.java", r"window\.content\(\)\.currentTab\(\)\.panes\(\)", "panes(window)", 4)
 regex(B + "BenchmarkRun.java", r"owner\.content\(\)\.currentTab\(\)\.panes\(\)", "panes(owner)", 2)
+# Plan 2's layout comments stop naming SplitTree, which goes here.
+edit("jasper-app/src/main/java/dev/jasper/app/layout/Layout.java", [
+    ("over the unit square, by today's {@code SplitTree.navigate} rule:\n", "over the unit square:\n", 1),
+    ("    /** Distances this close are equal: today's {@code SplitTree} tolerance. */\n", "    /** Distances this close are equal. */\n", 1)])
 PY
 grep -rn 'TerminalTab\b\|SplitTree\|SplitAxis\|currentTab()' jasper-app/src/main && exit 1 || true
 ```
@@ -6295,11 +6298,12 @@ span(T, "    void nestedSplitsKeepModelRatiosAndDividerPositionsAcrossRootDelega
     }
 """)
 PY
-grep -rnE '\bTerminalTab\b|SplitTree|SplitAxis|currentTab\(\)' jasper-app/src && exit 1 || true
+grep -rnE '\bTerminalTab\b|SplitTree\b|SplitAxis|currentTab\(\)' jasper-app/src && exit 1 || true
 ```
 
 The last line prints nothing. (`.focusedPane()` stays on `TabEntry` in `WindowTerminalsTest` and `ShellExitBehaviorTest`,
-where it is the registry entry's.)
+where it is the registry entry's; `SplitTree\b` passes over plan 2's `LayoutGeometryTest`, whose comments and one test
+name cite the `SplitTreeTest` cases it ports.)
 
 - [ ] **Step 6: Ledger**
 
@@ -6759,9 +6763,9 @@ EOF
 
 **Files:**
 - Modify: `README.md:9,113`, `docs/app-architecture.md` (the `workspace` and `contributions` rows, "Window chrome"),
-  `docs/app-maintenance.md:254,628,666-667`, `docs/sdk-architecture.md:422-424`, `docs/command-palette.md:74-75`,
+  `docs/app-maintenance.md:270,644,682-683`, `docs/sdk-architecture.md:418-420`, `docs/command-palette.md:74-75`,
   `docs/benchmarks.md:93,95`, `docs/configuration.md:348,506,534-535,580,681`, `docs/remote.md:33,169`,
-  `docs/packaging.md:326,359`, `docs/STATUS.md` (top), this plan's status banner (line 3)
+  `docs/packaging.md:332,370`, `docs/STATUS.md` (top), this plan's status banner (line 3)
 
 - [ ] **Step 1: The documents**
 
@@ -6859,8 +6863,8 @@ strip, and record it in the banner and the STATUS entry.
 
 - [ ] **Step 4: STATUS, the banner, and commit**
 
-Add a new entry at the top of `docs/STATUS.md` (below the `# Jasper — Status and Handoff` title, above plan 2's entry),
-in the style of the earlier entries:
+Add a new entry at the top of `docs/STATUS.md` (below the `# Jasper — Status and Handoff` title, above plan 2's entry,
+"Workspace tabs, plan 2: the layout model and its encoding"), in the style of the earlier entries:
 
 ```markdown
 **Workspace tabs, plan 3a: the tab registry and the workspace view — <date>** (`claude/workspace-tabs`, worktree
@@ -6937,6 +6941,6 @@ EOF
 - Swing names: no new method on a component reuses an AWT method's name where a call could reach the AWT one (fact
   13, Rulings 29); `layout()` in particular would not compile.
 - Every edit script and every created, replaced or inserted file of Tasks 1 to 7 was replayed in order on a copy of
-  `57e55572f`: every anchor matches its stated count; nothing was compiled or run.
+  `93aa015fd`: every anchor matches its stated count; nothing was compiled or run.
 - Type consistency: `Tab`, `TabId`, `GroupId`, `Side`, `TerminalContent`, `WorkspaceView`, `GroupView` and
   `SplitContainer` keep one name and one signature from the task that creates them to the last task that calls them.
