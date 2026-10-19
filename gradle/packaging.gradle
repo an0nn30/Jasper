@@ -32,6 +32,9 @@ def aotRequested = providers.gradleProperty('jasper.aot').map { it == 'true' }.g
 // Shown by macOS's Local Network privacy prompt. Without the grant, connections to LAN addresses
 // fail with EHOSTUNREACH ("No route to host"), which is how Remote's SSH connections to them fail.
 def localNetworkUsage = 'Jasper connects to SSH hosts on your local network.'
+// Windows shows it as the launcher's file description, which Task Manager lists as the process name;
+// Linux packages use it as their summary and the menu entry's comment.
+def packageDescription = 'Jasper DevOps workstation'
 // Modern macOS renders the full-canvas tab artwork from this Icon Composer catalog.
 def macIconCatalog = rootProject.file('packaging/icons/macos/Assets.car')
 def macIconName = 'Jasper'
@@ -280,7 +283,7 @@ def packageApp = tasks.register('packageApp') {
         imageDir.mkdirs()
         List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'app-image',
             '--name', 'Jasper', '--app-version', context.version,
-            '--description', 'Jasper terminal', '--vendor', 'Jasper',
+            '--description', packageDescription, '--vendor', 'Jasper',
             '--input', inputDirectory.get().asFile.absolutePath, '--dest', imageDir.absolutePath,
             '--main-jar', jarTask.get().archiveFile.get().asFile.name,
             '--main-class', app.mainClass.get(),
@@ -728,7 +731,7 @@ if (normalizedHost().os == 'windows') {
                 File output = new File(temporary, 'output')
                 File work = new File(temporary, 'jpackage')
                 executeNative([context.jpackage.absolutePath, jpackageLauncherOption(), '--type', 'exe', '--name', 'Jasper',
-                    '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                    '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                     '--icon', nativeIcon.get().absolutePath,
                     '--app-image', new File(imageDirectory.get().asFile, 'Jasper').absolutePath,
                     '--dest', output.absolutePath, '--temp', work.absolutePath,
@@ -775,6 +778,9 @@ if (normalizedHost().os == 'windows') {
         aarch64: [deb: 'arm64', rpm: 'aarch64'],
     ][normalizedHost().architecture]
     def installRoot = '/opt/jasper'
+    // A terminal emulator first (desktops list TerminalEmulator entries as default-terminal choices), and a
+    // remote access tool for its SSH sessions, transfers and tunnels.
+    def menuCategories = 'System;TerminalEmulator;Network;RemoteAccess;'
 
     // jpackage's rpm spec turns rpmbuild's dependency scan off and asks the host's rpm database instead,
     // which is empty on a Debian-family build machine. Require the image's external shared libraries by
@@ -852,7 +858,7 @@ if (normalizedHost().os == 'windows') {
         }
         File desktop = new File(installed, 'lib').listFiles()?.find { it.name.endsWith('.desktop') }
         String entry = desktop?.getText('UTF-8') ?: ''
-        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains('TerminalEmulator')) {
+        if (!entry.contains("${installRoot}/bin/Jasper") || !entry.contains("${installRoot}/lib/Jasper.png") || !entry.contains("Categories=${menuCategories}")) {
             throw new GradleException("${label} verification failed: the desktop entry is missing or incomplete\n${entry}")
         }
     }
@@ -884,13 +890,13 @@ if (normalizedHost().os == 'windows') {
                     Files.copy(nativeIcon.get().toPath(), new File(resources, 'Jasper.png').toPath())
                     writeInstallScripts(context.sdkHome, resources, type)
                     List<String> args = [context.jpackage.absolutePath, jpackageLauncherOption(), '--type', type, '--name', 'Jasper',
-                        '--app-version', context.version, '--vendor', 'Jasper', '--description', 'Jasper terminal',
+                        '--app-version', context.version, '--vendor', 'Jasper', '--description', packageDescription,
                         '--about-url', 'https://github.com/an0nn30/Jasper',
                         '--icon', nativeIcon.get().absolutePath,
                         '--app-image', image.absolutePath, '--resource-dir', resources.absolutePath,
                         '--dest', output.absolutePath, '--temp', new File(temporary, 'jpackage').absolutePath,
                         '--linux-package-name', 'jasper', '--linux-shortcut',
-                        '--linux-menu-group', 'System;TerminalEmulator;',
+                        '--linux-menu-group', menuCategories,
                         '--linux-app-category', type == 'deb' ? 'x11' : 'Applications/System']
                     if (type == 'rpm') {
                         List<String> requirements = rpmLibraryRequirements(image)
