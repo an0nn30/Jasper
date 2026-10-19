@@ -172,14 +172,11 @@ class HostedUiTest {
         hosted.closeAll();
     }
 
-    @Test void fileChooserIsAvailableOnBothSurfacesAndStopsWithThePlugin() {
-        var window = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
-        var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Edit", window, true));
-        for (var surface : List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
-            assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", Optional.empty()));
-            surface.show();
-            assertThat(surface.chooseFile("Choose key", Optional.empty())).isEmpty();
-        }
+    @Test void fileChooserIsAvailableOnADialogAndStopsWithThePlugin() {
+        var dialog = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Edit", terminals.windowHandle(terminalFixture.addWindow()), true));
+        assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", Optional.empty()));
+        dialog.show();
+        assertThat(dialog.chooseFile("Choose key", Optional.empty())).isEmpty();
         open.set(false);
         assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", Optional.empty()));
         ui.closeAll();
@@ -458,29 +455,24 @@ class HostedUiTest {
                     .isEqualTo(each.slot()));
     }
 
-    @Test void windowsAndDialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
-        var manager = ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true));
-        assertThat(ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.x.tool.manager", "Manager", new java.awt.Dimension(640, 480), true)))
-            .as("an open singleton is the same window").isSameAs(manager);
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            ui.windows().create(new dev.jasper.sdk.ui.WindowSpec("dev.other.window", "Foreign", new java.awt.Dimension(10, 10), false)));
-        manager.setContent(view());
-        manager.show();
+    @Test void dialogsAreBuiltByTheApplicationAndClosedWithThePlugin() {
+        var owner = terminals.windowHandle(terminalFixture.addWindow());
         List<String> events = new ArrayList<>();
-        manager.onClosing(() -> { throw new IllegalStateException("guard failure"); });
-        manager.onClosed(() -> events.add("closed"));
-        var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", manager, true));
-        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", terminals.windowHandle(terminalFixture.addWindow()), false));
+        var prompt = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Unlock", owner, true));
+        prompt.setContent(view());
+        prompt.onClosing(() -> { throw new IllegalStateException("guard failure"); });
+        prompt.onClosed(() -> events.add("closed"));
+        var trust = ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Trust?", owner, false));
         assertThatIllegalArgumentException().as("an owner this application did not create")
             .isThrownBy(() -> ui.windows().dialog(new dev.jasper.sdk.ui.DialogSpec("Bad", new dev.jasper.sdk.WindowOwner() { }, true)));
-        assertThat(auxiliary.open()).hasSize(3);
+        assertThat(auxiliary.open()).hasSize(2);
         assertThat(auxiliary.open().get(0).requestClose()).as("a throwing guard is contained and allows the close").isTrue();
         assertThat(events).containsExactly("closed");
         assertThat(containment.failures("dev.x.tool")).isEqualTo(1);
-        assertThat(auxiliary.open()).as("the owner took its dialog with it").hasSize(1);
+        assertThat(auxiliary.open()).hasSize(1);
         ui.closeAll();
         assertThat(auxiliary.open()).isEmpty();
-        assertThatCode(() -> { prompt.close(); trust.close(); manager.setTitle("after close"); }).doesNotThrowAnyException();
+        assertThatCode(() -> { prompt.close(); trust.close(); prompt.setTitle("after close"); }).doesNotThrowAnyException();
     }
 
 

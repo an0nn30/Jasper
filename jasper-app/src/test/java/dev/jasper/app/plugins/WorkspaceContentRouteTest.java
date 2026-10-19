@@ -9,7 +9,6 @@ import dev.jasper.ui.swing.KitView;
 import dev.jasper.ui.theme.ThemeRoute;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Dimension;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
@@ -82,16 +81,8 @@ class WorkspaceContentRouteTest {
             assertThat(scroll.getBackground().getRGB() & 0xffffff).isEqualTo(workspace.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB() & 0xffffff);
             assertThat(text.getText()).isEqualTo("unsaved"); assertThat(text.getCaretPosition()).isEqualTo(3); assertThat(disposed.get()).isZero();
 
-            var window = ui.windows().create(new WindowSpec("test.kit.form", "Form", new Dimension(400, 300), false));
-            var form = kit.create(new ViewSpec(new Nodes.Text("label", ControlState.READY, "Name", Nodes.TextRole.BODY)), e -> {});
-            window.setContent(form);
-            KitView formComponent = ((HostedKitView) form).component();
-            assertThat(formComponent.route()).as("windows keep chrome").isEqualTo(ThemeRoute.CHROME);
-            assertThat(formComponent.isOpaque()).isFalse();
-            assertThat(named(formComponent, "label", JLabel.class).getForeground()).isEqualTo(chromeText);
-
             tab.close(); assertThat(disposed.get()).isEqualTo(1);
-            window.close(); ui.closeAll(); kit.close();
+            ui.closeAll(); kit.close();
         });
     }
 
@@ -116,9 +107,7 @@ class WorkspaceContentRouteTest {
             KitView component = ((HostedKitView) view).component();
             assertThat(component.route()).isEqualTo(ThemeRoute.CHROME); assertThat(component.isOpaque()).isFalse();
             assertThat(scroll.getBackground().getRGB()).as("its content is back on chrome without waiting for a reparent").isEqualTo(chromeInput);
-            var window = ui.windows().create(new WindowSpec("test.kit.form", "Form", new Dimension(400, 300), false));
-            window.setContent(view);
-            window.close(); ui.closeAll(); kit.close();
+            ui.closeAll(); kit.close();
         });
     }
 

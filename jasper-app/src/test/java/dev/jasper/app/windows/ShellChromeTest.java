@@ -33,7 +33,8 @@ class ShellChromeTest {
             var surface = new AuxiliarySurface("dev.jasper.vault.manager", "Credential Vault", AuxiliarySurface.Kind.WINDOW, false,
                 new java.awt.Dimension(820, 571), null, null, ignored -> { throw new AssertionError("No native shell in tests"); });
             var commands = new java.util.concurrent.atomic.AtomicInteger();
-            surface.onCloseCommand(() -> { commands.incrementAndGet(); return true; });
+            // Close Window closes as the close button does: through the window's closing guards, which keep it open here.
+            surface.onClosing(() -> { commands.incrementAndGet(); return false; });
             var root = new JRootPane();
             NativeShells.bindCloseWindow(root, surface);
             int menu = com.formdev.flatlaf.util.SystemInfo.isMacOS ? java.awt.event.InputEvent.META_DOWN_MASK : java.awt.event.InputEvent.CTRL_DOWN_MASK;
@@ -41,7 +42,7 @@ class ShellChromeTest {
             var action = root.getActionMap().get(root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).get(key));
             assertThat(action).as("Close Window's key is bound on the frame").isNotNull();
             action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));
-            assertThat(commands).as("it runs the window's Close Window command").hasValue(1);
+            assertThat(commands).as("it asks the window's closing guards").hasValue(1);
             root.putClientProperty(dev.jasper.app.platform.WindowInput.SHORTCUT_RECORDER,
                 new dev.jasper.app.platform.WindowInput.ShortcutRecorder(stroke -> stroke.equals(key)));
             action.actionPerformed(new java.awt.event.ActionEvent(root, java.awt.event.ActionEvent.ACTION_PERFORMED, "close"));

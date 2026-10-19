@@ -19,9 +19,7 @@ import dev.jasper.sdk.ui.Panels;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
 import dev.jasper.sdk.ui.PluginMenu;
-import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Rail;
-import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusBar;
 import dev.jasper.sdk.ui.StatusProgress;
@@ -30,7 +28,6 @@ import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.Toolbar;
 import dev.jasper.sdk.ui.ToolbarItem;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.sdk.ui.Windows;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -187,8 +184,7 @@ final class FakeUi {
             java.util.Objects.requireNonNull(handler, "handler");
             requireNamespace(spec.id(), "An action");
             spec.icon().ifPresent(context.kit()::validateIcon);
-            spec.context().id().ifPresent(owned -> requireNamespace(owned,
-                spec.context().kind() == ShortcutContext.Kind.PANEL ? "A panel context" : "A window context"));
+            spec.context().id().ifPresent(owned -> requireNamespace(owned, "A panel context"));
             if (actions.containsKey(spec.id())) throw new IllegalArgumentException("Action already registered: " + spec.id());
             var action = new Action(spec, handler);
             actions.put(spec.id(), action);
@@ -305,38 +301,21 @@ final class FakeUi {
 
     static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
-    private static dev.jasper.sdk.ui.ViewSpec titleSpec(dev.jasper.sdk.ui.ViewSpec value) {
-        if (!(value.root() instanceof dev.jasper.sdk.ui.Nodes.Stack stack)
-                || stack.role() != dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE
-                || stack.children().stream().anyMatch(node -> !(node instanceof dev.jasper.sdk.ui.Nodes.Button)
-                    && !(node instanceof dev.jasper.sdk.ui.Nodes.MenuButton)))
-            throw new IllegalArgumentException("Title actions require an INLINE Stack of Buttons and MenuButtons");
-        return value;
-    }
-    record SurfaceMount(FakeWindow surface, boolean title) { }
+    record SurfaceMount(FakeWindow surface) { }
 
-    final class FakeWindow implements PluginWindow, PluginDialog {
+    /** A plugin's dialog, or a {@code Windows.overlay}. */
+    final class FakeWindow implements PluginDialog {
         final String id; final FakeWindow owner; String title; boolean shown; boolean closed; JComponent content;
         final List<BooleanSupplier> guards = new ArrayList<>(); final List<Runnable> closedHandlers = new ArrayList<>();
         FakeWindow(String id, String title, FakeWindow owner) { this.id = id; this.title = title; this.owner = owner; }
-        final SurfaceMount bodyMount = new SurfaceMount(this, false), titleMount = new SurfaceMount(this, true);
-        FakeKitView mounted, titleActions;
+        final SurfaceMount bodyMount = new SurfaceMount(this);
+        FakeKitView mounted;
         boolean attachedSheet;
         /** The presentation a dialog asked for; plain windows and overlays have none. */
         DialogSpec.Presentation presentation;
         /** The hue of the square a dialog asked for before its title; NONE for none. */
         dev.jasper.sdk.ui.Nodes.Hue swatch = dev.jasper.sdk.ui.Nodes.Hue.NONE;
         java.util.function.BooleanSupplier ownerLive = () -> true;
-        @Override public void setTitleActions(Optional<dev.jasper.sdk.ui.UiView> actions) {
-            context.requireOpen(); java.util.Objects.requireNonNull(actions, "actions");
-            if (closed) throw new IllegalStateException("Surface is closed");
-            var next = actions.map(context.kit()::requireOwned).orElse(null);
-            if (next == titleActions) return;
-            if (next != null) { titleSpec(next.spec()); next.mount(titleMount); }
-            var previous = titleActions; titleActions = next;
-            if (next != null) next.hostSpec = FakeUi::titleSpec;
-            if (previous != null) previous.close();
-        }
         @Override public void setContent(dev.jasper.sdk.ui.UiView content) {
             context.requireOpen();var next=context.kit().requireOwned(content);
             if(closed)throw new IllegalStateException("Surface is closed");next.mount(bodyMount);
@@ -361,21 +340,6 @@ final class FakeUi {
         }
         @Override public Subscription onClosing(BooleanSupplier guard) { guards.add(guard); return () -> guards.remove(guard); }
         @Override public Subscription onClosed(Runnable handler) { if (closed) { handler.run(); return () -> {}; } closedHandlers.add(handler); return () -> closedHandlers.remove(handler); }
-        final List<BooleanSupplier> closeCommands = new ArrayList<>();
-        @Override public Subscription onCloseCommand(BooleanSupplier handler) {
-            closeCommands.add(java.util.Objects.requireNonNull(handler));
-            return () -> closeCommands.remove(handler);
-        }
-        boolean closeCommand() {
-            if (closed) return true;
-            List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
-            java.util.Collections.reverse(handlers);
-            for (BooleanSupplier handler : handlers) {
-                try { if (handler.getAsBoolean()) return false; }
-                catch (RuntimeException failure) { host.recordFailure(pluginId() + " close command: " + failure); }
-            }
-            return requestClose();
-        }
         boolean mayClose() {
             for (BooleanSupplier guard : List.copyOf(guards)) {
                 try { if (!guard.getAsBoolean()) return false; }
@@ -393,7 +357,6 @@ final class FakeUi {
             if (closed) return;
             closed = true;
             if(mounted!=null){mounted.close();mounted=null;}
-            if(titleActions!=null){titleActions.close();titleActions=null;}
             windows.remove(this);
             for (FakeWindow other : List.copyOf(windows)) if (other.owner == this) other.close();
             for (Runnable handler : List.copyOf(closedHandlers)) {
@@ -507,12 +470,11 @@ final class FakeUi {
 
     private boolean liveChooserOwner(WindowOwner owner) {
         if (owner instanceof FakeContent content) return contents.contains(content) && !content.closed;
-        if (owner instanceof FakeWindow window) return windows.contains(window) && window.shown && !window.closed;
         return owner instanceof WindowHandle terminal && context.terminals.ownsOpenWindow(terminal);
     }
     private List<java.nio.file.Path> choosePaths(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
         context.requireOpen(); java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
-        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or an open Jasper window from this host");
+        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires an open Jasper window or content tab from this host");
         FakeContent document = owner instanceof FakeContent tab ? tab : null;
         if (document != null) document.pins++;
         try {
@@ -590,17 +552,9 @@ final class FakeUi {
                 context.requireOpen();
                 java.util.Objects.requireNonNull(choice, "choice");
                 WindowOwner owner = choice.owner();
-                if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or an open Jasper window from this host");
+                if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires an open Jasper window or content tab from this host");
                 var chosen = host.takeFileChoice(choice);
                 return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : chosen;
-            }
-            @Override public PluginWindow create(WindowSpec spec) {
-                context.requireOpen();
-                requireNamespace(spec.id(), "A window");
-                if (spec.singleton()) for (FakeWindow open : windows) if (open.id.equals(spec.id())) return open;
-                var window = new FakeWindow(spec.id(), spec.title(), null);
-                windows.add(window);
-                return window;
             }
             @Override public PluginDialog overlay(OverlaySpec spec) {
                 context.requireOpen();
@@ -619,11 +573,8 @@ final class FakeUi {
                 WindowOwner owner = spec.owner();
                 FakeWindow parent = null;
                 if(owner instanceof dev.jasper.sdk.ui.UiAnchor value){var anchor=requireAnchor(value);parent=anchor.ownerSurface();
-                } else if (owner instanceof FakeWindow window) {
-                    if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
-                    parent = window;
                 } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
-                    throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a Jasper window");
+                    throw new IllegalArgumentException("A dialog's owner must be a Jasper window, a content tab or an anchor from this host");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
                 dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
                 dialog.presentation = spec.presentation();

@@ -1,7 +1,6 @@
 package dev.jasper.sdk.ui;
 
 import dev.jasper.sdk.WindowOwner;
-import java.awt.Dimension;
 import javax.swing.ImageIcon;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
@@ -43,14 +42,7 @@ class PanelAndWindowValuesTest {
             java.util.Optional.class, boolean.class)).isNotNull();
     }
 
-    @Test void windowAndDialogSpecsValidateAndCopyTheSize() {
-        var size = new Dimension(640, 480);
-        var spec = new WindowSpec("dev.x.tool.manager", "Manager", size, true);
-        size.width = 1;
-        assertThat(spec.preferredSize()).isEqualTo(new Dimension(640, 480));
-        assertThatIllegalArgumentException().isThrownBy(() -> new WindowSpec("nodot", "Manager", new Dimension(1, 1), false));
-        assertThatIllegalArgumentException().isThrownBy(() -> new WindowSpec("dev.x.tool.manager", "", new Dimension(1, 1), false));
-        assertThatIllegalArgumentException().isThrownBy(() -> new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(0, 10), false));
+    @Test void dialogSpecsValidateTheirTitleAndOwner() {
         WindowOwner owner = new WindowOwner() { };
         assertThat(new DialogSpec("Trust host?", owner, true).owner()).isSameAs(owner);
         assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Trust host?", null, true));
@@ -65,19 +57,14 @@ class PanelAndWindowValuesTest {
         assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Add Login", owner, true, DialogSpec.Presentation.CENTERED, null));
     }
 
-    @Test void oldNativeConstructorsPreserveCenteredAndOuterDefaults() throws Exception {
+    @Test void theOldNativeConstructorPreservesTheCenteredDefault() throws Exception {
         WindowOwner owner = new WindowOwner() { };
         assertThat(new DialogSpec("Old", owner, true).presentation().toString()).isEqualTo("CENTERED");
-        var old = new WindowSpec("dev.x.window", "Old", new Dimension(300, 200), true);
-        assertThat(old.sizeBasis().toString()).isEqualTo("OUTER");
-        old.preferredSize().width = 1;
-        assertThat(old.preferredSize()).isEqualTo(new Dimension(300, 200));
     }
     @Test void explicitNativeValuesRejectInvalidCombinationsBeforeUse() {
         WindowOwner owner = new WindowOwner() {};
         assertThatIllegalArgumentException().isThrownBy(() -> new DialogSpec("Sheet", owner, false, DialogSpec.Presentation.ATTACHED_SHEET));
         assertThatNullPointerException().isThrownBy(() -> new DialogSpec("Sheet", owner, true, null));
-        assertThatNullPointerException().isThrownBy(() -> new WindowSpec("dev.x.window", "Window", new Dimension(1,1), false, null));
         assertThat(new DialogSpec("Sheet", owner, true, DialogSpec.Presentation.ATTACHED_SHEET).presentation()).isEqualTo(DialogSpec.Presentation.ATTACHED_SHEET);
     }
 }

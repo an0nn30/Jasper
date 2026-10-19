@@ -79,30 +79,24 @@ class NativeShellsChromeTest {
         } finally { controller.close(); }
     }
 
-    @Test void actualChromeMountsTitleActionsOutsideBodyWithCenteredNativeTitleAndFallback() {
+    @Test void actualChromeCentresTheNativeTitleOverTheBodyAndFallsBack() {
         for (boolean supported : java.util.List.of(true, false)) {
             var surface = new AuxiliarySurface("test", "Manager", AuxiliarySurface.Kind.WINDOW, false,
                 new Dimension(900, 555), null, null, ignored -> { throw new AssertionError(); });
-            var actions = new javax.swing.JButton("Lock / Add"); actions.setPreferredSize(new Dimension(180, 36));
-            var border = actions.getBorder(); surface.setTitleActions(actions);
             var root = new JRootPane();
             try (var chrome = NativeShells.installChrome(root, surface, supported)) {
                 var bar = chrome.bar();
                 root.setSize(900, 620); layout(root);
-                assertThat(javax.swing.SwingUtilities.isDescendingFrom(actions, root)).isTrue();
-                assertThat(javax.swing.SwingUtilities.isDescendingFrom(actions, surface.holder())).isFalse();
-                assertThat(actions.getBorder()).isSameAs(border);
                 int bodyTop = javax.swing.SwingUtilities.convertPoint(surface.holder(), 0, 0, root).y;
-                assertThat(bodyTop).isGreaterThanOrEqualTo(36);
                 assertThat(chrome.body().boundsInRoot()).contains(new java.awt.Rectangle(0, bodyTop, 900, 620 - bodyTop));
-                surface.contentSize(true);
-                assertThat(NativeShells.initialSize(surface, new Dimension(924, 624), new Dimension(900, 580), new java.awt.Rectangle(0,0,2000,1500))).isEqualTo(new Dimension(924,599));
-                assertThat(root.getSize()).isEqualTo(new Dimension(900,620));
+                assertThat(NativeShells.initialSize(surface, new java.awt.Rectangle(0, 0, 2000, 1500))).isEqualTo(new Dimension(900, 555));
+                assertThat(NativeShells.initialSize(surface, new java.awt.Rectangle(0, 0, 800, 500))).as("within the usable screen")
+                    .isEqualTo(new Dimension(800, 500));
+                assertThat(root.getSize()).isEqualTo(new Dimension(900, 620));
                 if (supported) {
                     var title = (JLabel) bar.getComponent(0);
                     assertThat(title.isVisible()).isTrue();
                     assertThat(title.getX() * 2 + title.getWidth()).isEqualTo(900);
-                    assertThat(title.getX() + title.getWidth()).isLessThanOrEqualTo(surface.titleActions().getX());
                 }
             }
         }

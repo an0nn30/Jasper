@@ -4,16 +4,14 @@ import java.util.Objects;
 
 /**
  * Where an action's shortcut applies. {@link #GLOBAL} applies anywhere in a Jasper window and {@link #TERMINAL} in
- * a terminal pane, its find bar included; the owned kinds apply inside one plugin's content tabs, one panel or one
- * plugin window, which never nest. A stroke may belong to several actions; the most specific context containing the
- * focus owner wins.
+ * a terminal pane, its find bar included; the owned kinds apply inside one plugin's content tabs or one panel, which
+ * never nest. A stroke may belong to several actions; the most specific context containing the focus owner wins.
  *
  * @param kind the kind of place
- * @param owner the plugin id for {@link Kind#CONTENT}, the panel or window id for {@link Kind#PANEL} and
- *              {@link Kind#WINDOW}, empty for the others
+ * @param owner the plugin id for {@link Kind#CONTENT}, the panel id for {@link Kind#PANEL}, empty for the others
  */
 public record KeyContext(Kind kind, String owner) {
-    public enum Kind { GLOBAL, TERMINAL, CONTENT, PANEL, WINDOW }
+    public enum Kind { GLOBAL, TERMINAL, CONTENT, PANEL }
 
     public static final KeyContext GLOBAL = new KeyContext(Kind.GLOBAL, "");
     public static final KeyContext TERMINAL = new KeyContext(Kind.TERMINAL, "");
@@ -32,15 +30,12 @@ public record KeyContext(Kind kind, String owner) {
     /** Inside one panel, in whichever window shows it. */
     public static KeyContext panel(String panelId) { return new KeyContext(Kind.PANEL, panelId); }
 
-    /** Inside one plugin window. */
-    public static KeyContext window(String windowId) { return new KeyContext(Kind.WINDOW, windowId); }
-
     /** Specificity: 0 for Global, 1 for Terminal, 2 for the owned kinds. */
     public int level() {
         return switch (kind) {
             case GLOBAL -> 0;
             case TERMINAL -> 1;
-            case CONTENT, PANEL, WINDOW -> 2;
+            case CONTENT, PANEL -> 2;
         };
     }
 

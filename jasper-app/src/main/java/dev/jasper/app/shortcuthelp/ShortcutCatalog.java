@@ -43,14 +43,13 @@ final class ShortcutCatalog {
         return List.copyOf(rows);
     }
 
-    /** The Where column: Global, Terminal, a plugin's tabs, a panel or a window. */
+    /** The Where column: Global, Terminal, a plugin's tabs or a panel. */
     static String where(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
         return switch (context.kind()) {
             case GLOBAL -> "Global";
             case TERMINAL -> "Terminal";
             case CONTENT -> plugins.getOrDefault(context.owner(), context.owner()) + " tabs";
             case PANEL -> panels.getOrDefault(context.owner(), context.owner()) + " panel";
-            case WINDOW -> context.owner() + " window";
         };
     }
 
@@ -58,7 +57,7 @@ final class ShortcutCatalog {
         return switch (context.kind()) {
             case GLOBAL -> "Anywhere in a Jasper window";
             case TERMINAL -> "In a terminal pane";
-            case CONTENT, PANEL, WINDOW -> "Only in the " + where(context, plugins, panels);
+            case CONTENT, PANEL -> "Only in the " + where(context, plugins, panels);
         };
     }
 

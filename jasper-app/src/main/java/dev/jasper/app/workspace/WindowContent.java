@@ -1436,8 +1436,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                     && SwingUtilities.isDescendingFrom(focus, entry.component());
             }
             case PANEL -> contributed != null && contributed.panelContains(context.owner(), focus);
-            // Plugin windows get the Keymap in plan K4; nothing in a terminal window is inside one.
-            case WINDOW -> false;
         };
     }
 

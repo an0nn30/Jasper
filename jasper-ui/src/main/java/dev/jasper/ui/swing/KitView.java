@@ -323,18 +323,6 @@ public final class KitView extends JPanel implements AutoCloseable {
     /** The reconciler's column index for the host-assigned column: -1 none, 0 rail, 1 list. */
     int hostColumn() { return switch (managerColumn) { case NONE -> -1; case RAIL -> 0; case LIST -> 1; }; }
     /**
-     * App-only: this view is a native window's title action strip. Its icon-only menu buttons show their menu
-     * indicator on the borderless control surface, as the window title references paint them. EDT confined.
-     */
-    public void titleStrip(boolean value) {
-        requireOpen();
-        if (titleStrip == value) return;
-        titleStrip = value; refresh(); repaint();
-    }
-    /** Whether this view is presented as a window title action strip. */
-    public boolean titleStrip() { return titleStrip; }
-    private boolean titleStrip;
-    /**
      * App-only: the host shows this view's form title (a classic dialog's header strip, or a title bar the system draws),
      * so the form draws neither its title label nor a hero that only repeats it (Enterprise presentation spec 10.8). EDT
      * confined.
@@ -405,7 +393,7 @@ public final class KitView extends JPanel implements AutoCloseable {
     private boolean runWindow;
     /**
      * App-only: this view is a toolbar strip, a contributed view in a window's main toolbar. Its icon-only menu buttons
-     * show their menu indicator on the borderless control surface, as a title strip's do, and its controls keep the
+     * show their menu indicator on the borderless control surface, and its controls keep the
      * kit's control height, which the toolbar row centres. EDT confined.
      */
     public void toolbarStrip(boolean value) {

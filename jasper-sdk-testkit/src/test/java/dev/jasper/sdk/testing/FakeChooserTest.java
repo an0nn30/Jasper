@@ -1,8 +1,6 @@
 package dev.jasper.sdk.testing;
 
 import dev.jasper.sdk.PluginInfo;
-import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.Dimension;
 import java.nio.file.Path;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -12,8 +10,11 @@ class FakeChooserTest {
     @Test void scriptsMultipleFilesAndDirectoryAndDiscardsClosedOwnerResults() {
         try (var host = new FakePluginHost()) {
             var context = host.start(new PluginInfo("dev.x.chooser", "Chooser", "1", Set.of()), Set.of(), Set.of(), c -> {});
-            var owner = context.windows().create(new WindowSpec("dev.x.chooser.window", "Upload", new Dimension(500,400), true));
-            owner.show();
+            // A child window, which closes with its last tab (workspace tabs spec 6.4).
+            host.addTerminalWindow();
+            UUID child = host.addTerminalWindow();
+            UUID pane = host.addTerminalPane(host.addTerminalTab(child, "zsh"), dev.jasper.sdk.terminal.PaneInfo.unknown());
+            var owner = context.terminals().window(child).orElseThrow();
             host.queuePathSelection(List.of(Path.of("/a").toAbsolutePath(), Path.of("/b").toAbsolutePath()));
             assertThat(context.windows().chooseFiles(owner, "Files", Optional.empty())).containsExactly(Path.of("/a").toAbsolutePath(),Path.of("/b").toAbsolutePath());
             host.queuePathSelection(List.of(Path.of("/dest").toAbsolutePath()));
@@ -23,7 +24,7 @@ class FakeChooserTest {
             assertThat(context.windows().chooseSaveFile(owner, "Save As", Optional.of(Path.of("/notes/old.toml").toAbsolutePath()))).contains(Path.of("/notes/new.toml").toAbsolutePath());
             assertThat(context.windows().chooseSaveFile(owner, "Save As", Optional.empty())).as("nothing queued cancels").isEmpty();
             host.queuePathSelection(List.of(Path.of("/a").toAbsolutePath()));
-            host.duringPathSelection(owner::close);
+            host.duringPathSelection(() -> host.closeTerminalPane(pane));
             assertThat(context.windows().chooseFiles(owner, "Closed", Optional.empty())).isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.windows().chooseFiles(owner, "Stale", Optional.empty()));
         }

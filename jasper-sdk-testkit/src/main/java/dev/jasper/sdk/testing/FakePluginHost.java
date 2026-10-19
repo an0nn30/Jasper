@@ -1067,9 +1067,9 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Inspects the actual Swing content of an open plugin surface for headless form tests.
-     * @param pluginId surface owner
-     * @param title exact surface title
+     * Inspects the actual Swing content of an open plugin dialog for headless form tests.
+     * @param pluginId dialog owner
+     * @param title exact dialog title
      * @return content while open, empty after close or if absent
      */
     public java.util.Optional<javax.swing.JComponent> windowContent(String pluginId, String title) {
@@ -1080,11 +1080,11 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * The owned view mounted on an open plugin window or dialog, for driving {@code UiView} content in headless tests
+     * The owned view mounted on an open plugin dialog, for driving {@code UiView} content in headless tests
      * (secrets through {@link FakeKitView#setSecret}, intents through {@link FakeKitView#emit}). Call it on the UI thread.
-     * @param pluginId surface owner
-     * @param title exact surface title
-     * @return the mounted view while the surface is open, empty after close, for raw content or if absent
+     * @param pluginId dialog owner
+     * @param title exact dialog title
+     * @return the mounted view while the dialog is open, empty after close, for raw content or if absent
      */
     public java.util.Optional<FakeKitView> windowView(String pluginId, String title) {
         FakePluginContext context = contexts.get(pluginId);
@@ -1097,7 +1097,7 @@ public final class FakePluginHost implements AutoCloseable {
      * How an open plugin dialog is presented, as its {@code DialogSpec} asked. Call it on the UI thread.
      * @param pluginId dialog owner
      * @param title exact dialog title
-     * @return the presentation while the dialog is open; empty for windows, overlays, closed or absent dialogs
+     * @return the presentation while the dialog is open; empty for overlays and closed or absent dialogs
      * @since 0.15.4
      */
     public java.util.Optional<dev.jasper.sdk.ui.DialogSpec.Presentation> dialogPresentation(String pluginId, String title) {
@@ -1112,8 +1112,8 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread.
      * @param pluginId dialog owner
      * @param title exact dialog title
-     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for plugin
-     *     windows, {@code Windows.overlay} surfaces and closed or absent dialogs
+     * @return the swatch while the dialog (any presentation, {@code OVERLAY} dialogs included) is open; empty for
+     *     {@code Windows.overlay} surfaces and closed or absent dialogs
      * @since 0.18.0
      */
     public java.util.Optional<dev.jasper.sdk.ui.Nodes.Hue> dialogSwatch(String pluginId, String title) {
@@ -1126,7 +1126,7 @@ public final class FakePluginHost implements AutoCloseable {
     /** Shown producer-owned popover views, in creation order, for deterministic input/lifetime tests.
      * @param pluginId content producer @return live mounted views */
     public List<FakeKitView> popoverViews(String pluginId){var context=contexts.get(pluginId);if(context==null)return List.of();return context.ui.popovers.stream().filter(p->p.shown&&!p.closed&&p.content!=null).map(p->p.content).toList();}
-    /** The currently shown plugin windows. */
+    /** The open plugin dialogs and overlays as {@code id|title|shown}, in creation order; the id is {@code dialog} or {@code overlay}. */
     public List<String> windows() {
         List<String> lines = new ArrayList<>();
         for (FakePluginContext context : contexts.values())
@@ -1135,10 +1135,10 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Closes the first open window with this id as the user would, consulting its closing guards.
+     * Closes the first open dialog or overlay with this id as the user would, consulting its closing guards.
      *
-     * @param windowId the window id, or {@code dialog}
-     * @return false when a guard vetoed the close or there is no such window
+     * @param windowId {@code dialog} or {@code overlay}
+     * @return false when a guard vetoed the close, for an overlay, which the user cannot close, or when there is none
      */
     public boolean requestClose(String windowId) {
         for (FakePluginContext context : contexts.values())
@@ -1147,21 +1147,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Runs the Close Window command of the first open window with this id, as File → Close Window or Cmd/Ctrl+W
-     * would: its close-command handlers newest first, then, when none handled it, its closing guards.
-     *
-     * @param windowId the window id
-     * @return true when the window closed; false when a handler handled the command, a guard vetoed or there is no such window
-     * @since 0.8.4
-     */
-    public boolean closeCommand(String windowId) {
-        for (FakePluginContext context : contexts.values())
-            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows)) if (window.id.equals(windowId)) return window.closeCommand();
-        return false;
-    }
-
-    /**
-     * Asks the closing guards of every open plugin window, then every quit guard, as quitting or restarting Jasper
+     * Asks every plugin's content tabs' closing guard, then every quit guard, as quitting or restarting Jasper
      * does, and closes nothing. Dialogs and overlays are not asked. A quit guard whose future is still pending counts
      * as a refusal here: the fake does not pump events.
      *
@@ -1170,9 +1156,6 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public boolean requestQuit() {
         for (FakePluginContext context : contexts.values()) if (!context.ui.closeContent(List.copyOf(context.ui.contents), false).getNow(false)) return false;
-        for (FakePluginContext context : contexts.values())
-            for (FakeUi.FakeWindow window : List.copyOf(context.ui.windows))
-                if (!window.id.equals("dialog") && !window.id.equals("overlay") && !window.mayClose()) return false;
         for (FakePluginContext context : contexts.values())
             for (var guard : List.copyOf(context.ui.quitGuards)) {
                 java.util.concurrent.CompletableFuture<Boolean> decision;

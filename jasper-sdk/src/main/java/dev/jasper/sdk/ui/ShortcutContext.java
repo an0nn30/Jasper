@@ -5,13 +5,13 @@ import java.util.Optional;
 
 /**
  * Where an action's shortcut applies. A key can belong to several actions in different contexts. Where focus is, the
- * most specific applicable one runs: a panel, window or content context, then {@link #terminal()}, then
+ * most specific applicable one runs: a panel or content context, then {@link #terminal()}, then
  * {@link #global()}. A key whose action does not apply where focus is reaches the focused component instead, for
  * example the shell in a terminal pane. So does a key whose action is disabled, except in a terminal pane: there the
  * key does nothing, so the shell never receives it as a control character.
  *
  * @param kind which kind of place
- * @param id the panel's or window's id for {@link Kind#PANEL} and {@link Kind#WINDOW}; empty for the other kinds
+ * @param id the panel's id for {@link Kind#PANEL}; empty for the other kinds
  * @since 0.11.0
  */
 public record ShortcutContext(Kind kind, Optional<String> id) {
@@ -24,22 +24,16 @@ public record ShortcutContext(Kind kind, Optional<String> id) {
         /** In a content tab the plugin opened. */
         CONTENT,
         /** Inside one of the plugin's panels. */
-        PANEL,
-        /**
-         * Inside one of the plugin's windows. Window shortcuts take effect once plugin windows get the Keymap
-         * (plan K4); until then an action in this context never applies.
-         */
-        WINDOW
+        PANEL
     }
 
-    /** Checks that panel and window contexts name an id and the other kinds do not. */
+    /** Checks that a panel context names an id and the other kinds do not. */
     public ShortcutContext {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(id, "id");
-        boolean named = kind == Kind.PANEL || kind == Kind.WINDOW;
+        boolean named = kind == Kind.PANEL;
         if (named && id.filter(value -> !value.isBlank()).isEmpty())
-            throw new IllegalArgumentException("A " + kind + " context needs the id of one of the plugin's "
-                + (kind == Kind.PANEL ? "panels" : "windows"));
+            throw new IllegalArgumentException("A " + kind + " context needs the id of one of the plugin's panels");
         if (!named && id.isPresent()) throw new IllegalArgumentException("A " + kind + " context takes no id");
     }
 
@@ -72,14 +66,4 @@ public record ShortcutContext(Kind kind, Optional<String> id) {
      * @throws IllegalArgumentException when the id is null or blank
      */
     public static ShortcutContext panel(String panelId) { return new ShortcutContext(Kind.PANEL, Optional.ofNullable(panelId)); }
-
-    /**
-     * Inside one of the plugin's windows. Window shortcuts take effect once plugin windows get the Keymap
-     * (plan K4); until then an action in this context never applies.
-     *
-     * @param windowId the window's id, which starts with the plugin's id and a dot
-     * @return the context
-     * @throws IllegalArgumentException when the id is null or blank
-     */
-    public static ShortcutContext window(String windowId) { return new ShortcutContext(Kind.WINDOW, Optional.ofNullable(windowId)); }
 }

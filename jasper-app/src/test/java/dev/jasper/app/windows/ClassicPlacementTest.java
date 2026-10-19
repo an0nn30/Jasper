@@ -234,9 +234,9 @@ class ClassicPlacementTest {
             }
         }
         // A window's form (NativeShells.frame marks it with no system title): the band, never the title (plan 10b).
-        var vault = windows.window("dev.jasper.vault.manager", "Credential Vault", new Dimension(820, 571), true);
+        var licenses = windows.window("jasper.licenses", "Licenses", new Dimension(760, 520), true);
         try (var view = new KitView(context, spec, event -> { })) {
-            NativeShells.nativeMarks(vault, false).accept(view);
+            NativeShells.nativeMarks(licenses, false).accept(view);
             assertThat(view.dialogBand()).as("a classic window's footer is the band").isTrue();
             assertThat(view.hostTitled() || view.dialogCard()).as("its form keeps its title and its own fill").isFalse();
         }

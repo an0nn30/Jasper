@@ -40,7 +40,6 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -320,7 +319,7 @@ public final class NativeShells {
             frame.pack();
             var saved = state.window(surface.id()).map(value -> new Rectangle(value.x(), value.y(), value.width(), value.height())).filter(NativeShells::onSomeScreen);
             if (saved.isPresent()) frame.setBounds(saved.get());
-            else { frame.setSize(initialSize(surface, frame.getSize(), surface.holder().getSize(), usableBounds(frame))); frame.setLocationByPlatform(true); }
+            else { frame.setSize(initialSize(surface, usableBounds(frame))); frame.setLocationByPlatform(true); }
             resources.theme = themes.subscribe((resolved, chromeChanged) -> {
                 if (chromeChanged) SwingUtilities.updateComponentTreeUI(frame);
                 if (bar != null) bar.setLight(!resolved.chrome().dark());
@@ -335,13 +334,9 @@ public final class NativeShells {
         } catch (RuntimeException | Error failure) { resources.close(); throw failure; }
     }
 
-    /** Content default adds the measured actual chrome delta once; remembered bounds bypass this path. */
-    static java.awt.Dimension initialSize(AuxiliarySurface surface, java.awt.Dimension packed, java.awt.Dimension body, Rectangle usable) {
+    /** The window's preferred size within the usable screen; remembered bounds bypass this path. */
+    static java.awt.Dimension initialSize(AuxiliarySurface surface, Rectangle usable) {
         var requested = surface.preferredSize();
-        if (surface.contentSize()) {
-            requested.width += Math.max(0, packed.width - body.width);
-            requested.height += Math.max(0, packed.height - body.height);
-        }
         return new java.awt.Dimension(Math.min(requested.width, usable.width), Math.min(requested.height, usable.height));
     }
 
@@ -496,7 +491,7 @@ public final class NativeShells {
     }
 
     record ShellLayout(MacTitleBar bar, dev.jasper.app.platform.WindowBody body, AuxiliarySurface surface) implements AutoCloseable {
-        @Override public void close() { surface.onTitleActionsChanged(() -> {}); body.close(); if (bar != null) bar.close(); }
+        @Override public void close() { body.close(); if (bar != null) bar.close(); }
     }
     /** The one production chrome/body registration path for auxiliary windows and immediate dialog owners. */
     static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, boolean supported) {
@@ -528,22 +523,8 @@ public final class NativeShells {
     /** Shared, headless-testable title setup for both kinds of SDK/application auxiliary surface. */
     static MacTitleBar installTitleBar(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar = MacTitleBar.install(root, surface.holder(), () -> { }, supported);
-        surface.titleActions().setOpaque(false);
-        surface.titleActions().setVisible(surface.titleActions().getComponentCount() > 0);
-        if (bar == null && surface.kind() == AuxiliarySurface.Kind.WINDOW) {
-            var content = new JPanel(new java.awt.BorderLayout());
-            var toolbar = new JPanel(new java.awt.BorderLayout());
-            toolbar.add(surface.titleActions(), java.awt.BorderLayout.EAST);
-            toolbar.setVisible(surface.titleActions().isVisible());
-            content.add(toolbar, java.awt.BorderLayout.NORTH); content.add(surface.holder(), java.awt.BorderLayout.CENTER);
-            root.setContentPane(content);
-            surface.onTitleActionsChanged(() -> { toolbar.setVisible(surface.titleActions().isVisible()); content.revalidate(); content.repaint(); });
-        }
         if (bar != null) {
             bar.setStyle(surface.kind() == AuxiliarySurface.Kind.WINDOW ? MacTitleBar.Style.WINDOW : MacTitleBar.Style.DIALOG);
-            if (surface.kind() == AuxiliarySurface.Kind.WINDOW) {
-                bar.setAccessory(surface.titleActions()); surface.onTitleActionsChanged(bar::accessoryChanged);
-            }
             bar.setTitle(surface.title());
             bar.setTitleSwatch(surface.swatch());
             for (var child : surface.holder().getComponents()) {
@@ -702,7 +683,7 @@ public final class NativeShells {
         var close = new JMenuItem("Close Window");
         close.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcut));
         close.addActionListener(event -> {
-            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.closeCommand();
+            if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.requestClose();
         });
         file.add(close);
         if (!SystemInfo.isMacOS) {
@@ -724,7 +705,7 @@ public final class NativeShells {
         root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW).put(key, "jasper.closeWindow");
         root.getActionMap().put("jasper.closeWindow", new javax.swing.AbstractAction("Close Window") {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) {
-                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, key)) surface.closeCommand();
+                if (!dev.jasper.app.platform.WindowInput.captureShortcut(root, key)) surface.requestClose();
             }
         });
     }

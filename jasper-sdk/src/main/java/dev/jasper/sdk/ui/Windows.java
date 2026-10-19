@@ -56,13 +56,13 @@ public interface Windows {
     }
 
     /**
-     * Registers a guard asked when the user quits or restarts Jasper, after plugin windows' and content tabs' guards
+     * Registers a guard asked when the user quits or restarts Jasper, after content tabs' guards
      * and before anything closes. Guards are asked one at a time; one whose future completes with {@code false}
      * cancels the quit. A guard that throws, returns {@code null} or whose future fails allows the quit. The guard
      * runs on the UI thread and may show a modal dialog before completing its future.
      *
      * <p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
-     * Quit and a Jasper window's File &rsaquo; Quit by closing its windows through the content tabs' and plugin windows'
+     * Quit and a Jasper window's File &rsaquo; Quit by closing its windows through the content tabs'
      * closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
      * really quits (Quit Jasper Completely, a log-out or a restart).
      *
@@ -75,16 +75,6 @@ public interface Windows {
     default Subscription onQuitting(Supplier<CompletableFuture<Boolean>> guard) {
         throw new UnsupportedOperationException("Quit guards are unavailable");
     }
-
-    /**
-     * Creates a window on the UI thread; it is not shown until {@link WindowSurface#show()}.
-     *
-     * @param spec what the window is
-     * @return the window, or the open one for a singleton id
-     * @throws IllegalArgumentException when the id does not start with the plugin's id and a dot
-     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
-     */
-    PluginWindow create(WindowSpec spec);
 
     /**
      * Creates a dialog on the UI thread; it is not shown until {@link WindowSurface#show()}.
@@ -111,7 +101,7 @@ public interface Windows {
     /**
      * Selects existing local files in an owner-attached picker. The synchronous call pumps UI
      * events; closing the owner or stopping the plugin cancels and discards the result.
-     * @param owner live Jasper window or shown window created by this plugin
+     * @param owner an open Jasper window, or a content tab of this plugin
      * @param title picker title
      * @param initial initial location, or empty for the platform default
      * @return absolute normalized selected files, or an empty immutable list on cancel
@@ -126,7 +116,7 @@ public interface Windows {
 
     /**
      * Selects one local directory with the same lifetime rules as {@link #chooseFiles}.
-     * @param owner live Jasper window or shown window created by this plugin
+     * @param owner an open Jasper window, or a content tab of this plugin
      * @param title picker title
      * @param initial initial location, or empty for the platform default
      * @return absolute normalized directory, or empty on cancel
@@ -142,7 +132,7 @@ public interface Windows {
     /**
      * Asks for a local file to save to, in the platform's save dialog, which confirms replacing an existing
      * file. The same owner, lifetime and UI-thread rules as {@link #chooseFiles} apply.
-     * @param owner live Jasper window or shown window created by this plugin
+     * @param owner an open Jasper window, or a content tab of this plugin
      * @param title dialog title
      * @param initial a directory to start in, or a suggested file whose folder and name are filled in; empty for the platform default
      * @return an absolute normalized path, or empty on cancellation or owner closure

@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * What plugin windows and dialogs share. The application owns the frame, title bar, icon, menu bar,
+ * A plugin's dialog. The application owns the frame, title bar, icon, menu bar,
  * theme tracking and saved bounds (overlays use their owner’s chrome); the plugin fills the content. UI thread only. {@link #close()}
  * closes at once, without consulting {@link #onClosing} guards, and is idempotent.
  */
@@ -43,8 +43,7 @@ public interface WindowSurface extends Subscription {
 
     /**
      * Adds a guard consulted when the user tries to close the window. Overlays have no implicit user-close action. Any guard returning false keeps
-     * it open; a guard that throws is treated as allowing the close. Since 0.8.4, quitting or restarting Jasper asks the guards of every open plugin window (not dialogs or
-     * overlays) first, and a refusal cancels the quit; nothing closes while they are asked.
+     * it open; a guard that throws is treated as allowing the close.
      *
      * @param guard returns whether the window may close
      * @return the registration

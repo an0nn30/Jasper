@@ -7,8 +7,6 @@ import dev.jasper.app.windows.*;
 import dev.jasper.app.files.*;
 import dev.jasper.sdk.files.*;
 import dev.jasper.sdk.Variant;
-import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.*;
@@ -75,15 +73,8 @@ class HostedChooserTest {
         assertThat(ui.windows().chooseFiles(owner, "Cancelled", Optional.empty())).isEmpty();
     }
 
-    @Test void auxiliaryOwnerCloseAndPluginStopDisposeAndDiscardResults() {
-        var owner = ui.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(500,400), true));
-        assertThatIllegalArgumentException().isThrownBy(() -> ui.windows().chooseFiles(owner, "Upload", Optional.empty()));
-        owner.show();
-        during.set(owner::close);
-        assertThat(ui.windows().chooseFiles(owner, "Upload", Optional.empty())).isEmpty();
-        assertThat(disposed).isTrue();
+    @Test void pluginStopDisposesThePickerAndDiscardsItsResult() {
         var terminal = terminals.windowHandle(fixture.addWindow());
-        disposed.set(false);
         during.set(() -> { open.set(false); ui.closeAll(); assertThat(disposed).isTrue(); });
         assertThat(ui.windows().chooseFiles(terminal, "Upload", Optional.empty())).isEmpty();
     }
@@ -111,11 +102,6 @@ class HostedChooserTest {
         ui.windows().chooseFiles(terminals.windowHandle(id), "Open", Optional.empty());
         assertThat(requests.getLast().terminalFolder()).contains(Location.local(Path.of("/work/project")));
         assertThat(requests.getLast().initial()).isEmpty();
-        var owner = ui.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(500, 400), true));
-        owner.show();
-        fixture.activateWindow(id);
-        ui.windows().chooseFiles(owner, "Open", Optional.empty());
-        assertThat(requests.getLast().terminalFolder()).as("a plugin window uses the active pane").contains(Location.local(Path.of("/work/project")));
     }
 
     @Test void chooseOffersTheNamedSourcesStartsWhereASourceLocatesThePaneAndReturnsItsLocations() {

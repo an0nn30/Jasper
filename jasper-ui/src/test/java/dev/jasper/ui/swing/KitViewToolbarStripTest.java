@@ -11,7 +11,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
-/** Plan 3d: a contributed toolbar view is a toolbar strip, which presents an icon-only menu as a title strip does. */
+/** Plan 3d: a contributed toolbar view is a toolbar strip, which presents an icon-only menu on the borderless control surface. */
 class KitViewToolbarStripTest {
     static ViewSpec iconMenu() {
         return new ViewSpec(new Nodes.MenuButton("more", ControlState.READY, "", "more", Nodes.ButtonKind.SECONDARY, "",
@@ -26,11 +26,10 @@ class KitViewToolbarStripTest {
         } finally { context.binding().close(); context.icons().close(); }
     }
 
-    @Test void aToolbarStripPresentsAnIconOnlyMenuAsATitleStripDoes() {
+    @Test void aToolbarStripPresentsAnIconOnlyMenuOnTheBorderlessSurface() {
         Edt.run(() -> {
-            int[] plain = pixels(view -> { }), title = pixels(view -> view.titleStrip(true)), toolbar = pixels(view -> view.toolbarStrip(true));
-            assertThat(title).as("a strip changes the icon-only menu").isNotEqualTo(plain);
-            assertThat(toolbar).isEqualTo(title);
+            int[] plain = pixels(view -> { }), toolbar = pixels(view -> view.toolbarStrip(true));
+            assertThat(toolbar).as("a strip changes the icon-only menu").isNotEqualTo(plain);
         });
     }
 
@@ -100,7 +99,6 @@ class KitViewToolbarStripTest {
                 assertThat(view.toolbarStrip()).isFalse();
                 view.toolbarStrip(true);
                 assertThat(view.toolbarStrip()).isTrue();
-                assertThat(view.titleStrip()).as("a separate flag").isFalse();
                 view.close();
                 assertThatIllegalStateException().isThrownBy(() -> view.toolbarStrip(false));
             } finally { context.binding().close(); context.icons().close(); }

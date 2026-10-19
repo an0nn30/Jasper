@@ -442,7 +442,7 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
+     * @param windows builds plugin dialogs and overlays
      * @param terminals the application-wide directory of Jasper windows, tabs and panes
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
@@ -458,7 +458,7 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
+     * @param windows builds plugin dialogs and overlays
      * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
@@ -476,7 +476,7 @@ public final class PluginRuntime {
      * @param notifier receives plugin activities for Buddy
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
-     * @param windows builds plugin windows and dialogs
+     * @param windows builds plugin dialogs and overlays
      * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw

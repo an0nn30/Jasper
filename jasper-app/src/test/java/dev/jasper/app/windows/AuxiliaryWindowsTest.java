@@ -182,40 +182,6 @@ class AuxiliaryWindowsTest {
         assertThat(events).hasSize(3);
     }
 
-    @Test void theCloseCommandAsksHandlersNewestFirstThenCloses() {
-        AuxiliarySurface editor = windows.window("dev.x.editor", "Editor", new Dimension(640, 480), true);
-        List<String> asked = new ArrayList<>();
-        boolean[] handled = {true};
-        editor.onCloseCommand(() -> { asked.add("older"); return false; });
-        editor.onCloseCommand(() -> { asked.add("newer"); return handled[0]; });
-        editor.onCloseCommand(() -> { throw new IllegalStateException("boom"); });
-        editor.show();
-        assertThat(editor.closeCommand()).isFalse();
-        assertThat(asked).containsExactly("newer");
-        handled[0] = false;
-        assertThat(editor.closeCommand()).as("nothing handled it and no guard refused").isTrue();
-        assertThat(asked).containsExactly("newer", "newer", "older");
-        assertThat(editor.closed()).isTrue();
-    }
-
-    @Test void quitAsksOnlyWindowGuardsInCreationOrderAndClosesNothing() {
-        List<String> asked = new ArrayList<>();
-        boolean[] allow = {false};
-        AuxiliarySurface first = windows.window("dev.x.first", "First", new Dimension(100, 100), false);
-        first.onClosing(() -> { asked.add("first"); return true; });
-        AuxiliarySurface second = windows.window("dev.x.second", "Second", new Dimension(100, 100), false);
-        second.onClosing(() -> { asked.add("second"); return allow[0]; });
-        second.onClosing(() -> { throw new IllegalStateException("boom"); });
-        windows.dialog("Details", false, second).onClosing(() -> { asked.add("dialog"); return false; });
-        windows.overlay("Connecting", UUID.randomUUID());
-        assertThat(windows.mayQuit()).isFalse();
-        assertThat(asked).containsExactly("first", "second");
-        allow[0] = true;
-        asked.clear();
-        assertThat(windows.mayQuit()).isTrue();
-        assertThat(asked).containsExactly("first", "second");
-        assertThat(windows.open()).hasSize(4).noneMatch(AuxiliarySurface::closed);
-    }
     @Test void reentrantCloseDuringConstructionNeverShowsAndDisposesReturnedShellOnce() {
         var events = new ArrayList<String>();
         var host = new AuxiliaryWindows(UiState.inMemory(), surface -> {

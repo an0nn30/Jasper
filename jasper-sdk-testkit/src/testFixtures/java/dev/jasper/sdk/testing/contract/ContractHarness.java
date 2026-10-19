@@ -101,22 +101,16 @@ public interface ContractHarness extends AutoCloseable {
     /** Rail buttons as action ids in placement order; buttons of closed actions omitted. */
     List<String> rail();
 
-    /** Open plugin windows and dialogs as {@code id|title|shown} in creation order; a dialog's id is {@code dialog}. */
+    /** Open plugin dialogs and overlays as {@code id|title|shown} in creation order; the id is {@code dialog} or {@code overlay}. */
     List<String> windows();
 
     /** UI thread: the hue name of the square an open plugin dialog with this title draws before its title, or {@code -} when there is none. */
     String dialogSwatch(String pluginId, String title);
 
-    /** UI thread: closes the first open window with this id as the user would; false when vetoed or absent. */
+    /** UI thread: closes the first open dialog ({@code dialog}) or overlay ({@code overlay}) as the user would; false when vetoed or absent. */
     boolean requestClose(String windowId);
 
-    /**
-     * UI thread: runs the Close Window command of the first open window with this id: its close-command
-     * handlers newest first, then its closing guards. True when the window closed.
-     */
-    boolean closeCommand(String windowId);
-
-    /** UI thread: asks every open plugin window's closing guards, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
+    /** UI thread: asks every plugin's content tabs' closing guard, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
     boolean requestQuit();
 
     /**

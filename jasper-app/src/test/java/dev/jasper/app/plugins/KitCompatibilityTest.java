@@ -68,6 +68,25 @@ class KitCompatibilityTest {
         var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.terminal.ExitPolicy","CLOSE")),false);
         try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the constant that took its place").isNotNull();}
     }
+    /**
+     * Workspace tabs plan 4b: a plugin built on 0.19 that claims 0.20 and still names a plugin window's type, moves a tab
+     * with {@code move(boolean)} or names the window shortcut context is refused at load. A {@code Windows.create}
+     * reference names the removed types in its descriptor, which the check reads first.
+     */
+    @Test void thePluginWindowsSdkZeroTwentyRemovedAreRefused() throws Exception {
+        for (String type : List.of("dev.jasper.sdk.ui.PluginWindow", "dev.jasper.sdk.ui.WindowSpec", "dev.jasper.sdk.ui.WindowSpec$SizeBasis"))
+            rejects(ClassFile.of().build(ClassDesc.of("test.kit.Probe"), b -> b.constantPool().classEntry(ClassDesc.of(type))),
+                "references removed SDK type " + type.replace('.', '/') + ";", "0.20");
+        rejects(reference("dev.jasper.sdk.ui.Windows","create","(Ldev/jasper/sdk/ui/WindowSpec;)Ldev/jasper/sdk/ui/PluginWindow;"),
+            "references removed SDK type dev/jasper/sdk/ui/","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ContentTab","move","(Z)V"),"dev/jasper/sdk/ui/ContentTab#move(Z)V","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ContentTab","isSeparate","()Z"),"dev/jasper/sdk/ui/ContentTab#isSeparate()Z","0.20");
+        rejects(reference("dev.jasper.sdk.ui.ShortcutContext","window","(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;"),
+            "dev/jasper/sdk/ui/ShortcutContext#window(Ljava/lang/String;)Ldev/jasper/sdk/ui/ShortcutContext;","0.20");
+        rejects(constant("dev.jasper.sdk.ui.ShortcutContext$Kind","WINDOW"),"dev/jasper/sdk/ui/ShortcutContext$Kind#WINDOWLdev/jasper/sdk/ui/ShortcutContext$Kind;","0.20");
+        var current=candidate(">=0.20.0, <0.21",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.ui.ContentTab","moveToNewWindow","()V")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took its place").isNotNull();}
+    }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {
         for(var renamed:RENAMED_TO) {
             var candidate=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$"+renamed.get(0),renamed.get(1))),false);

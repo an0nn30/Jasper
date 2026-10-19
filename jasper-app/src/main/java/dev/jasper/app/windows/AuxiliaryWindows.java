@@ -82,7 +82,8 @@ public final class AuxiliaryWindows implements AutoCloseable {
     public AuxiliarySurface dialog(String title, boolean modal, javax.swing.JComponent anchor) {
         for(var surface:open) if(surface.shown() && javax.swing.SwingUtilities.isDescendingFrom(anchor,surface.holder()))
             return dialog(title,modal,surface);
-        if(!anchor.isShowing())throw new IllegalArgumentException("Anchor has no shown owner");
+        // Headless, nothing shows, so a content tab's anchor would always be refused; HostedAnchor.isOpen skips the same check.
+        if(!java.awt.GraphicsEnvironment.isHeadless() && !anchor.isShowing())throw new IllegalArgumentException("Anchor has no shown owner");
         var result=new AuxiliarySurface("",title,AuxiliarySurface.Kind.DIALOG,modal,new Dimension(1,1),null,null,shells);
         result.anchorOwner(anchor);return track(result);
     }
@@ -169,18 +170,6 @@ public final class AuxiliaryWindows implements AutoCloseable {
     }
 
     public List<AuxiliarySurface> open() { return List.copyOf(open); }
-
-    /**
-     * Quit and restart ask every open window's closing guards first, in creation order; the first refusal
-     * cancels them. Dialogs and overlays are not asked, and nothing closes.
-     *
-     * @return whether the quit may go ahead
-     */
-    public boolean mayQuit() {
-        for (AuxiliarySurface surface : List.copyOf(open))
-            if (surface.kind() == AuxiliarySurface.Kind.WINDOW && !surface.mayClose()) return false;
-        return true;
-    }
 
     /** Shutdown: closes everything, newest first, without consulting guards. */
     @Override public void close() {

@@ -785,11 +785,11 @@ public final class JasperApplication {
         }
     }
 
-    /** Quits a Jasper that is not resident once nothing keeps it: no terminal or plugin window, and {@code busy} false. EDT. */
+    /** Quits a Jasper that is not resident once nothing keeps it: no Jasper or auxiliary window, and {@code busy} false. EDT. */
     public void quitIfUnused(BooleanSupplier busy) {
         if (resident || quitting || stopped) return;
-        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
-        if (windows.isEmpty() && !pluginWindowsOpen && !busy.getAsBoolean()) requestShutdown();
+        boolean auxiliaryOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !auxiliaryOpen && !busy.getAsBoolean()) requestShutdown();
     }
 
     /**
@@ -1440,7 +1440,7 @@ public final class JasperApplication {
      * of any kind open and no Jasper window being opened) or with no window yet. Idle waits for start-up to settle
      * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
      * {@code --background} launch with the process already resident and windowless: they must wait for the first window
-     * like the problems posted directly. With only a plugin window open Jasper is not idle, because cards target
+     * like the problems posted directly. With only an auxiliary window open Jasper is not idle, because cards target
      * the main window: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
@@ -1772,8 +1772,8 @@ public final class JasperApplication {
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
-        boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
-        if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
+        boolean auxiliaryOpen = auxiliary != null && !auxiliary.open().isEmpty();
+        if (windows.isEmpty() && !resident && !auxiliaryOpen) requestShutdown();
         else {
             // The next window's timing says how long this process sat without one.
             if (windows.isEmpty()) trace.windowsClosed();
@@ -1883,14 +1883,14 @@ public final class JasperApplication {
      * @param mode which launch flags the replacement keeps
      * @param paths absolute paths the replacement opens
      * @return false, and nothing happens, when this process's command line cannot be determined; otherwise
-     *     true. It also returns true, with nothing changed, when a plugin window's closing guard refuses the quit.
+     *     true. It also returns true, with nothing changed, when a content tab's closing guard or a quit guard refuses.
      */
     public boolean restart(RestartMode mode, List<Path> paths) {
         if (quitting || stopped) return true;
         Optional<List<String>> planned = restartPlanner.apply(mode);
         if (planned.isEmpty()) return false;
         // A refusal leaves no relaunch behind: a later ordinary quit must not start a replacement.
-        if (!pluginWindowsMayClose()) return true;
+        if (!guardsAllowQuit()) return true;
         relaunch = RestartCommand.replacing(planned.get(), ProcessHandle.current().pid(), paths);
         quitNow();
         return true;
@@ -1962,23 +1962,22 @@ public final class JasperApplication {
         return pluginManager;
     }
 
-    /** Asks plugin windows first; any refusal leaves Jasper running with nothing changed. */
+    /** Asks the content tabs' and quit guards first; any refusal leaves Jasper running with nothing changed. */
     public void quit() {
         if (quitting || stopped) return;
-        if (!pluginWindowsMayClose()) return;
+        if (!guardsAllowQuit()) return;
         quitNow();
     }
 
-    /** Plugin windows', content tabs' and quit guards, asked before quit or restart changes anything and before the exit deadline is armed. */
-    private boolean pluginWindowsMayClose() {
+    /** Content tabs' and quit guards, asked before quit or restart changes anything and before the exit deadline is armed. */
+    private boolean guardsAllowQuit() {
         return windowsMayClose() && contributions.quitGuards().mayQuit();
     }
 
-    /** Content tabs' and plugin windows' closing guards: what closing every window asks. Quit guards are not asked. EDT. */
+    /** Content tabs' closing guards: what closing every window asks. Quit guards are not asked. EDT. */
     private boolean windowsMayClose() {
         var requested = contributions.tabs().hosted();
-        return contributions.tabs().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
-            && requested.equals(contributions.tabs().hosted());
+        return contributions.tabs().mayClose(requested) && requested.equals(contributions.tabs().hosted());
     }
 
     /**
@@ -2050,7 +2049,7 @@ public final class JasperApplication {
     }
 
     /**
-     * Closes every window through the guards closing them asks (content tabs, plugin windows) and keeps the process, its
+     * Closes every window through the guards closing them asks (content tabs) and keeps the process, its
      * plugins and configuration; with Dock presence Jasper leaves the Dock. A refusal leaves everything open. EDT.
      */
     public void toBackground() {
@@ -2063,7 +2062,7 @@ public final class JasperApplication {
         } catch (RuntimeException | Error thrown) {
             failure = thrown;
         }
-        // Every window closed whatever one threw; the plugin windows follow, and the first failure still reaches the caller.
+        // Every window closed whatever one threw; the auxiliary ones follow, and the first failure still reaches the caller.
         if (auxiliary != null) {
             try {
                 auxiliary.close();
@@ -2107,7 +2106,7 @@ public final class JasperApplication {
     }
 
     /**
-     * Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. Every window
+     * Quits without asking any guard: start-up rollback and programmatic exits, which no user asked for. Every window
      * closes; when one fails to, the shutdown is still requested and then the failure propagates. EDT.
      */
     public void quitNow() {

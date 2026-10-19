@@ -76,7 +76,7 @@ class FakeUiTest {
             });
             assertThat(host.actionSpec("dev.x.tool.absent")).isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("dev.x.tool.other", "Other")
-                .withContext(ShortcutContext.window("dev.y.manager")), invoked -> { }));
+                .withContext(ShortcutContext.panel("dev.y.hosts")), invoked -> { }));
         }
     }
 

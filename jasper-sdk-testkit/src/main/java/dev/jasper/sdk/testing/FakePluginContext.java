@@ -232,7 +232,7 @@ public final class FakePluginContext implements PluginContext {
     /** Rail buttons. */
     @Override public Rail rail() { return ui.rail(); }
 
-    /** Plugin windows and dialogs. */
+    /** Plugin dialogs, overlays, content tabs and pickers. */
     @Override public Windows windows() { return ui.windows(); }
 
     /** The host's variant, change notifications, and icons checked against the plugin's own class loader. */

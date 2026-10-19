@@ -27,14 +27,12 @@ import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginMenu;
-import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.ShortcutContext;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.sdk.ui.Column;
 import dev.jasper.sdk.ui.TableRow;
 import dev.jasper.sdk.ui.TreeItem;
@@ -42,7 +40,6 @@ import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.Option;
 import dev.jasper.sdk.ui.ViewSpec;
-import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -272,13 +269,13 @@ public abstract class PluginContractTest {
             var view=ctx.kit().create(descriptor,e -> {});
             view.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retain"),disposed::incrementAndGet));
             var alien=other.get().kit().create(descriptor,e -> {});
-            var window=ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true));
+            var owner=ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("owner","Owner"),null,kitView(ctx));
+            var window=ctx.windows().dialog(new DialogSpec("Window",owner,false));
             assertThatThrownBy(() -> window.setContent(alien)).isInstanceOf(IllegalArgumentException.class);
             window.setContent(view);window.setContent(view);
-            assertThat(h.viewRoute(view)).as("window content keeps the chrome slot").isEqualTo("CHROME");
-            assertThat(ctx.windows().create(new WindowSpec("test.owned.window","Window",new Dimension(400,300),true))).isSameAs(window);
+            assertThat(h.viewRoute(view)).as("dialog content keeps the chrome slot").isEqualTo("CHROME");
             var veto=window.onClosing(() -> false);
-            assertThat(h.requestClose("test.owned.window")).isFalse();assertThat(disposed.get()).isZero();
+            assertThat(h.requestClose("dialog")).isFalse();assertThat(disposed.get()).isZero();
             veto.close();window.close();window.close();assertThat(disposed.get()).isEqualTo(1);
             var document=ctx.kit().create(descriptor,e -> {});
             document.registerContent(new dev.jasper.sdk.ui.CustomContent("document",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea("retained"),disposed::incrementAndGet));
@@ -605,20 +602,18 @@ public abstract class PluginContractTest {
         assertThat(h.actions()).containsExactly("test.alpha.run|Run Now|false", "test.alpha.boom|Boom|true");
     }
 
-    @Test void shortcutContextsNameOnlyThePluginsOwnPanelsAndWindows() {
+    @Test void shortcutContextsNameOnlyThePluginsOwnPanels() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
             context.actions().register(ActionSpec.of("test.alpha.new", "New").withDefaultBindings("cmd+n", "ctrl+n")
                 .withContext(ShortcutContext.panel("test.alpha.hosts")), invoked -> { });
             context.actions().register(ActionSpec.of("test.alpha.save", "Save").withContext(ShortcutContext.content()), invoked -> { });
-            context.actions().register(ActionSpec.of("test.alpha.copy", "Copy")
-                .withContext(ShortcutContext.window("test.alpha.manager")), invoked -> { });
             assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.foreign", "Foreign")
                 .withContext(ShortcutContext.panel("test.beta.hosts")), invoked -> { }));
             assertThatIllegalArgumentException().isThrownBy(() -> context.actions().register(ActionSpec.of("test.alpha.near", "Near")
-                .withContext(ShortcutContext.window("test.alphabet.manager")), invoked -> { }));
+                .withContext(ShortcutContext.panel("test.alphabet.hosts")), invoked -> { }));
         });
         assertThat(h.active("test.alpha")).isTrue();
-        assertThat(h.actions()).containsExactly("test.alpha.new|New|true", "test.alpha.save|Save|true", "test.alpha.copy|Copy|true");
+        assertThat(h.actions()).containsExactly("test.alpha.new|New|true", "test.alpha.save|Save|true");
     }
 
     @Test void placementsNameOnlyThePluginsOwnActionsAndVanishWithThem() {
@@ -1184,47 +1179,11 @@ public abstract class PluginContractTest {
         assertThat(h.rail()).isEmpty();
     }
 
-    @Test void windowsAreSingletonsGuardedOwnedAndClosedWithTheirPlugin() {
-        List<String> events = Collections.synchronizedList(new ArrayList<>());
-        var manager = new AtomicReference<PluginWindow>();
-        var veto = new AtomicReference<Subscription>();
-        var alpha = new AtomicReference<PluginContext>();
-        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            alpha.set(context);
-            PluginWindow window = context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true));
-            manager.set(window);
-            assertThat(context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true))).isSameAs(window);
-            assertThatIllegalArgumentException().isThrownBy(() ->
-                context.windows().create(new WindowSpec("test.beta.window", "Foreign", new Dimension(10, 10), false)));
-            veto.set(window.onClosing(() -> false));
-            window.onClosing(() -> { throw new IllegalStateException("guard failure"); });
-            window.onClosed(() -> events.add("closed"));
-            window.show();
-            context.windows().dialog(new DialogSpec("Unlock", window, true));
-        });
-        assertThat(h.windows()).containsExactly("test.alpha.manager|Manager|true", "dialog|Unlock|false");
-        h.ui(() -> {
-            assertThat(h.requestClose("test.alpha.manager")).isFalse();
-            veto.get().close();
-            assertThat(h.requestClose("test.alpha.manager")).as("a throwing guard cannot trap the window open").isTrue();
-            assertThat(h.requestClose("test.alpha.absent")).isFalse();
-        });
-        assertThat(events).containsExactly("closed");
-        assertThat(h.windows()).as("the dialog went with its owner").isEmpty();
-        h.ui(() -> {
-            assertThatIllegalArgumentException().isThrownBy(() -> alpha.get().windows().dialog(new DialogSpec("Late", manager.get(), true)));
-            alpha.get().windows().create(new WindowSpec("test.alpha.other", "Other", new Dimension(10, 10), false)).show();
-        });
-        assertThat(h.windows()).containsExactly("test.alpha.other|Other|true");
-        h.stopAll();
-        assertThat(h.windows()).isEmpty();
-    }
-
     /** SDK 0.18: a dialog's swatch reaches the host with the dialog; NONE asks for no square. */
     @Test void aDialogCarriesItsSwatchToTheHost() {
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            PluginWindow manager = context.windows().create(new WindowSpec("test.alpha.manager", "Manager", new Dimension(640, 480), true));
-            PluginWindow other = context.windows().create(new WindowSpec("test.alpha.other", "Other", new Dimension(640, 480), true));
+            var manager = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), null, kitView(context));
+            var other = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("other", "Other"), null, kitView(context));
             context.windows().dialog(new DialogSpec("Add Login", manager, true, DialogSpec.Presentation.CENTERED, dev.jasper.sdk.ui.Nodes.Hue.BLUE));
             context.windows().dialog(new DialogSpec("Details", other, true));
         });
@@ -1235,52 +1194,23 @@ public abstract class PluginContractTest {
         });
     }
 
-    @Test void theCloseCommandAsksTheContentNewestFirstBeforeTheGuards() {
-        var handled = new java.util.concurrent.atomic.AtomicBoolean(true);
+    /** Quit asks the content tabs' guards and closes nothing; a dialog's guard is not asked. */
+    @Test void quitAsksThePluginsContentTabGuardAndClosesNothing() {
         var allow = new java.util.concurrent.atomic.AtomicBoolean(false);
         List<String> asked = Collections.synchronizedList(new ArrayList<>());
         h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            PluginWindow window = context.windows().create(new WindowSpec("test.alpha.editor", "Editor", new Dimension(640, 480), true));
-            window.onCloseCommand(() -> { asked.add("older"); return false; });
-            window.onCloseCommand(() -> { asked.add("newer"); return handled.get(); });
-            window.onCloseCommand(() -> { throw new IllegalStateException("handler failure"); });
-            window.onClosing(() -> { asked.add("guard"); return allow.get(); });
-            window.show();
-        });
-        h.ui(() -> assertThat(h.closeCommand("test.alpha.editor")).as("the newest handler that answers true keeps it open").isFalse());
-        assertThat(asked).containsExactly("newer");
-        asked.clear();
-        handled.set(false);
-        h.ui(() -> assertThat(h.closeCommand("test.alpha.editor")).as("unhandled, the guard still refuses").isFalse());
-        assertThat(asked).containsExactly("newer", "older", "guard");
-        asked.clear();
-        allow.set(true);
-        h.ui(() -> {
-            assertThat(h.closeCommand("test.alpha.editor")).isTrue();
-            assertThat(h.closeCommand("test.alpha.absent")).isFalse();
-        });
-        assertThat(asked).containsExactly("newer", "older", "guard");
-        assertThat(h.windows()).isEmpty();
-    }
-
-    @Test void quitAsksEveryPluginWindowsGuardsAndClosesNothing() {
-        var allow = new java.util.concurrent.atomic.AtomicBoolean(false);
-        List<String> asked = Collections.synchronizedList(new ArrayList<>());
-        h.start(info("test.alpha"), Set.of(), Set.of(), context -> {
-            PluginWindow first = context.windows().create(new WindowSpec("test.alpha.first", "First", new Dimension(100, 100), false));
-            first.onClosing(() -> { asked.add("first"); return true; });
-            first.show();
-            PluginWindow second = context.windows().create(new WindowSpec("test.alpha.second", "Second", new Dimension(100, 100), false));
-            second.onClosing(() -> { asked.add("second"); return allow.get(); });
+            context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("first", "First"), null, kitView(context));
+            var second = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("second", "Second"), null, kitView(context));
+            context.windows().onTabsClosing((tabs, batch) -> { asked.add(String.valueOf(tabs.size())); return CompletableFuture.completedFuture(allow.get()); });
             context.windows().dialog(new DialogSpec("Details", second, false)).onClosing(() -> { asked.add("dialog"); return false; });
         });
         h.ui(() -> assertThat(h.requestQuit()).isFalse());
-        assertThat(asked).containsExactly("first", "second");
+        assertThat(asked).containsExactly("2");
         allow.set(true);
         asked.clear();
         h.ui(() -> assertThat(h.requestQuit()).as("dialogs are not asked").isTrue());
-        assertThat(asked).containsExactly("first", "second");
-        assertThat(h.windows()).as("asking closes nothing").hasSize(3);
+        assertThat(asked).containsExactly("2");
+        assertThat(h.windows()).as("asking closes nothing").hasSize(1);
     }
 
     @Test void quitGuardsAreAskedInTurnAndOnlyAFalseDecisionRefuses() {

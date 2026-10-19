@@ -46,24 +46,8 @@ public final class AuxiliarySurface {
         }
     };
     private final List<BooleanSupplier> guards = new ArrayList<>();
-    private final List<BooleanSupplier> closeCommands = new ArrayList<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
     private final List<Runnable> activatedListeners = new ArrayList<>();
-    private final JPanel titleActions = new JPanel(new BorderLayout());
-    private Runnable titleActionsChanged = () -> { };
-    /** Stable title slot, always outside the body holder. */
-    public JComponent titleActions() { return titleActions; }
-    public void setTitleActions(JComponent content) {
-        if (closed) return;
-        titleActions.removeAll();
-        if (closed) return;
-        // Kit content in the title slot takes the shared title-strip presentation (menu indicators, control surface).
-        if (content instanceof dev.jasper.ui.swing.KitView view && !view.isClosed()) view.titleStrip(true);
-        if (content != null) titleActions.add(content, BorderLayout.CENTER);
-        titleActions.setVisible(content != null); titleActionsChanged();
-    }
-    public void titleActionsChanged() { titleActions.revalidate(); titleActions.repaint(); titleActionsChanged.run(); }
-    void onTitleActionsChanged(Runnable handler) { titleActionsChanged = handler; }
     private String title;
     private Shell shell;
     private JComponent anchorOwner;
@@ -72,9 +56,7 @@ public final class AuxiliarySurface {
     private boolean shown;
     private boolean closed;
     private Rectangle lastBounds;
-    private boolean contentSize, attachedSheet;
-    public boolean contentSize() { return contentSize; }
-    public void contentSize(boolean value) { contentSize = value; }
+    private boolean attachedSheet;
     public boolean attachedSheet() { return attachedSheet; }
     public void attachedSheet(boolean value) {
         if (value && !modal) throw new IllegalArgumentException("Attached sheets must be modal");
@@ -237,28 +219,6 @@ public final class AuxiliarySurface {
         return true;
     }
 
-    /**
-     * The window's Close Window command: handlers newest first; the first that returns true has handled it and
-     * the window stays open. Otherwise this is a user's close. One that throws has not handled it.
-     *
-     * @return true when the window closed
-     */
-    public boolean closeCommand() {
-        if (closed) return true;
-        List<BooleanSupplier> handlers = new ArrayList<>(closeCommands);
-        java.util.Collections.reverse(handlers);
-        for (BooleanSupplier handler : handlers) {
-            try { if (handler.getAsBoolean()) return false; }
-            catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window close command handler failed", failure); }
-        }
-        return requestClose();
-    }
-
-    public Subscription onCloseCommand(BooleanSupplier handler) {
-        closeCommands.add(java.util.Objects.requireNonNull(handler));
-        return new Subscription(() -> closeCommands.remove(handler));
-    }
-
     /** Closes at once, without consulting guards. Idempotent. */
     public void close() {
         if (closed) return;
@@ -270,7 +230,6 @@ public final class AuxiliarySurface {
             shell.dispose().run();
         }
         guards.clear();
-        closeCommands.clear();
         for (Runnable listener : List.copyOf(closedListeners)) {
             try { listener.run(); }
             catch (RuntimeException failure) { LOG.log(System.Logger.Level.WARNING, "A window closed listener failed", failure); }

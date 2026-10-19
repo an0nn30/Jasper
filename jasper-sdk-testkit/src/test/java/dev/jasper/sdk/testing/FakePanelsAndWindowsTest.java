@@ -6,8 +6,6 @@ import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
-import dev.jasper.sdk.ui.WindowSpec;
-import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -53,26 +51,24 @@ class FakePanelsAndWindowsTest {
         }
     }); }
 
-    @Test void fileSelectionWorksForWindowsAndDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    @Test void fileSelectionWorksForDialogsAndRequiresALiveShownOwner(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
-            var window = context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true));
-            var dialog = context.windows().dialog(new DialogSpec("Edit", window, true));
+            var tab = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), null, KitFixtures.view(context));
+            var dialog = context.windows().dialog(new DialogSpec("Edit", tab, true));
             var initial = java.util.Optional.of(directory.resolve("original"));
-            for (var surface : java.util.List.<dev.jasper.sdk.ui.WindowSurface>of(window, dialog)) {
-                assertThatIllegalStateException().isThrownBy(() -> surface.chooseFile("Choose key", initial));
-                surface.show();
-                host.queueFileSelection(java.util.Optional.of(directory.resolve("selected")));
-                assertThat(surface.chooseFile("Choose key", initial)).contains(directory.resolve("selected"));
-                assertThat(surface.chooseFile("Choose key", initial)).isEmpty();
-                assertThatIllegalArgumentException().isThrownBy(() -> surface.chooseFile(" ", initial));
-            }
-            window.close();
+            assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
+            dialog.show();
+            host.queueFileSelection(java.util.Optional.of(directory.resolve("selected")));
+            assertThat(dialog.chooseFile("Choose key", initial)).contains(directory.resolve("selected"));
+            assertThat(dialog.chooseFile("Choose key", initial)).isEmpty();
+            assertThatIllegalArgumentException().isThrownBy(() -> dialog.chooseFile(" ", initial));
+            tab.close();
             assertThatIllegalStateException().isThrownBy(() -> dialog.chooseFile("Choose key", initial));
         }
     }); }
 
-    @Test void recordsPanelsRailAndWindows() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
+    @Test void recordsPanelsRailAndDialogs() throws Exception { javax.swing.SwingUtilities.invokeAndWait(() -> {
         try (var host = new FakePluginHost()) {
             var context = host.start(INFO, Set.of(), Set.of(), plugin -> { });
             List<PanelHost> hosts = new ArrayList<>();
@@ -92,15 +88,14 @@ class FakePanelsAndWindowsTest {
             assertThat(host.openPanel("dev.x.tool.absent", window)).isNull();
             assertThat(host.failures()).hasSize(1);
 
-            var manager = context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true));
-            assertThat(context.windows().create(new WindowSpec("dev.x.tool.manager", "Manager", new Dimension(640, 480), true))).isSameAs(manager);
-            var veto = manager.onClosing(() -> false);
-            context.windows().dialog(new DialogSpec("Unlock", manager, true)).show();
-            assertThat(host.windows()).containsExactly("dev.x.tool.manager|Manager|false", "dialog|Unlock|true");
-            manager.show();
-            assertThat(host.requestClose("dev.x.tool.manager")).isFalse();
+            var manager = context.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("manager", "Manager"), null, KitFixtures.view(context));
+            var unlock = context.windows().dialog(new DialogSpec("Unlock", manager, true));
+            var veto = unlock.onClosing(() -> false);
+            unlock.show();
+            assertThat(host.windows()).containsExactly("dialog|Unlock|true");
+            assertThat(host.requestClose("dialog")).isFalse();
             veto.close();
-            assertThat(host.requestClose("dev.x.tool.manager")).isTrue();
+            manager.close();
             assertThat(host.windows()).as("the dialog went with its owner").isEmpty();
             assertThatIllegalArgumentException().isThrownBy(() -> context.windows().dialog(new DialogSpec("Late", manager, true)));
         }

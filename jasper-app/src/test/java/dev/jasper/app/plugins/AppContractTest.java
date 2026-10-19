@@ -112,7 +112,7 @@ class AppContractTest extends PluginContractTest {
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()), chooser);
     }
 
-    /** UI thread: plugin windows over shells that touch no native window. */
+    /** UI thread: plugin dialogs over shells that touch no native window. */
     static AuxiliaryWindows headlessWindows(UiState state) {
         return new AuxiliaryWindows(state, surface -> new AuxiliarySurface.Shell(() -> { }, () -> { }, () -> { }, title -> { },
             () -> new java.awt.Rectangle(0, 0, 10, 10), (title, initial) -> java.util.Optional.empty()));
@@ -384,23 +384,20 @@ class AppContractTest extends PluginContractTest {
             }
             @Override public List<String> windows() {
                 return onEdtValue(() -> auxiliary.open().stream()
-                    .map(surface -> (switch (surface.kind()) { case DIALOG -> "dialog"; case OVERLAY -> "overlay"; case WINDOW -> surface.id(); })
+                    .map(surface -> (surface.kind() == AuxiliarySurface.Kind.OVERLAY ? "overlay" : "dialog")
                         + "|" + surface.title() + "|" + surface.shown()).toList());
             }
             @Override public String dialogSwatch(String pluginId, String title) {
                 return onEdtValue(() -> auxiliary.open().stream()
-                    .filter(surface -> surface.kind() != AuxiliarySurface.Kind.WINDOW && surface.title().equals(title))
+                    .filter(surface -> surface.title().equals(title))
                     .findFirst().map(surface -> surface.swatch().name()).orElse("-"));
             }
             @Override public boolean requestClose(String windowId) {
-                return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
-                    .map(dev.jasper.app.windows.AuxiliarySurface::requestClose).orElse(false));
+                return onEdtValue(() -> auxiliary.open().stream()
+                    .filter(surface -> (surface.kind() == AuxiliarySurface.Kind.OVERLAY ? "overlay" : "dialog").equals(windowId)).findFirst()
+                    .map(surface -> surface.kind() != AuxiliarySurface.Kind.OVERLAY && surface.requestClose()).orElse(false));
             }
-            @Override public boolean closeCommand(String windowId) {
-                return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
-                    .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
-            }
-            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
+            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && contributions.quitGuards().mayQuit()); }
             @Override public UUID addTerminalWindow() { return onEdtValue(workspace); }
             @Override public UUID addContentTab(UUID windowId, String title) {
                 return onEdtValue(() -> { UUID id = UUID.randomUUID(); terminalFixture.addContentTab(windowId, id, () -> title); return id; });

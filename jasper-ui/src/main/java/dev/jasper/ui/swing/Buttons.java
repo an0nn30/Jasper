@@ -152,7 +152,7 @@ final class Buttons {
         boolean gridAction;
         /** A text button in a row of a manager detail's actions (set by the reconciler, cleared before each update): at least {@code DETAIL_ACTION_MIN_WIDTH} wide. */
         boolean detailAction;
-        /** Paints its kind's fill without the kind's outline (a title-strip menu surface). */
+        /** Paints its kind's fill without the kind's outline (a toolbar strip's menu surface). */
         boolean borderless;
         /**
          * An inner part of a composite control (a secret's reveal and copy, a crumb), not an action standing in a layout:
