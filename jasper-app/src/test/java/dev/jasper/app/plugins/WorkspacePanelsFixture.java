@@ -54,7 +54,7 @@ public final class WorkspacePanelsFixture implements AutoCloseable {
         appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(theme));
         vault = new StagedVaultHost(Files.createDirectories(home.resolve("plugins")), theme.chrome().dark(), appearance);
         vault.createVault("synthetic-workspace-password");
-        onEdt(() -> vault.surface("Credential Vault").requestClose());
+        vault.requestCloseManager();
         vault.invoke("dev.jasper.vault.lock");
         var staged = Path.of(System.getProperty("jasper.stagedPlugins"));
         var ssh = Files.createDirectories(home.resolve("synthetic-ssh"));

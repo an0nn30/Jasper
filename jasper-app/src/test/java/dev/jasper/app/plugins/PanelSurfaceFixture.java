@@ -56,7 +56,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         appearance = onEdtValue(() -> new WorkspaceAppearanceFixture(theme));
         vault = new StagedVaultHost(home, theme.chrome().dark(), appearance);
         vault.createVault("synthetic-panels-password");
-        onEdt(() -> vault.surface("Credential Vault").requestClose());
+        vault.requestCloseManager();
         vault.invoke("dev.jasper.vault.lock");
         this.enterprise = enterprise ? StagedEnterprise.start(vault.host) : null;
         Map<String, ClassLoader> exports = enterprise ? Map.of("dev.jasper.vault.api", vault.loader, "dev.jasper.enterprise.api", this.enterprise) : Map.of("dev.jasper.vault.api", vault.loader);

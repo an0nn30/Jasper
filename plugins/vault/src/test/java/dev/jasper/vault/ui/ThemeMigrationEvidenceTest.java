@@ -48,19 +48,19 @@ class ThemeMigrationEvidenceTest {
             save("unlock", unlock.view());
             unlock.close();
             var manager = new ManagerPanel(kit, id -> Optional.empty(), type -> { }, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> { }, () -> { }, () -> { }, () -> { });
+                () -> { }, () -> { }, () -> { });
             try {
-                manager.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+                manager.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
                 save("manager-empty", manager.view());
                 assertThat(node(manager.view(), ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("Nothing to show");
-                manager.refresh(List.of(new VaultManager.Row(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Example login", "fixture-user", VaultManager.Type.LOGIN)), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+                manager.refresh(List.of(new VaultManager.Row(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Example login", "fixture-user", VaultManager.Type.LOGIN)), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
                 save("manager-populated", manager.view());
                 emit(manager.view(), new UiEvent.Edited(ManagerPanel.SEARCH, "no matches"));
                 save("manager-filtered-empty", manager.view());
                 assertThat(node(manager.view(), ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("No matching entries");
-                assertThat(node(manager.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items()).hasSize(5);
+                assertThat(node(manager.view(), ManagerPanel.ADD, Nodes.MenuButton.class).items()).hasSize(5);
                 save("add-menu", manager.view());
-                manager.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
+                manager.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), false);
                 save("manager-locked", manager.view());
                 assertThat(find(manager.view(), ManagerPanel.LOCKED)).isPresent();
             } finally { manager.close(); }

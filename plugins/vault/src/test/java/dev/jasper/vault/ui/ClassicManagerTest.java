@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
 class ClassicManagerTest {
     @TempDir Path directory;
     static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of());
-    static final VaultManagerWindow.Status STATUS = new VaultManagerWindow.Status("keychain", "15 min", "/synthetic/vault.jv");
+    static final VaultManagerTab.Status STATUS = new VaultManagerTab.Status("keychain", "15 min", "/synthetic/vault.jv");
     static final Instant MODIFIED = Instant.parse("2026-09-24T12:00:00Z");
     static final List<String> VERBS = List.of("toolbar.edit", "toolbar.delete", "toolbar.copy-username", "toolbar.copy-password");
     final UUID amp = UUID.randomUUID(), proxmox = UUID.randomUUID();
@@ -64,7 +64,7 @@ class ClassicManagerTest {
         return new ManagerPanel(new FakeKit("dev.jasper.vault"), Layout.CLASSIC, id -> Optional.ofNullable(entries.get(id)),
             type -> asked.add("add." + type.name()), id -> asked.add("edit " + id), id -> asked.add("delete " + id),
             id -> asked.add("copy-public " + id), grant -> asked.add("revoke"), () -> asked.add("generate"), () -> asked.add("lock"),
-            () -> asked.add("unlock"), () -> asked.add("close"));
+            () -> asked.add("unlock"));
     }
 
     static boolean enabled(UiView view, String id) { return find(view, id).orElseThrow().state().enabled(); }
@@ -106,8 +106,7 @@ class ClassicManagerTest {
             assertThat(node(view, "status.provider", Nodes.Text.class).text()).isEqualTo("Unlocked · Keychain");
             assertThat(node(view, "status.autolock", Nodes.Text.class).text()).isEqualTo("Auto-lock: 15 min");
             assertThat(node(view, "status.path", Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.MONO_CAPTION);
-            assertThat(button(view, ManagerPanel.OKAY).label()).isEqualTo("Done");
-            assertThat(button(view, ManagerPanel.OKAY).kind()).isEqualTo(Nodes.ButtonKind.PRIMARY);
+            assertThat(node(view, ManagerPanel.ROOT, Nodes.Form.class).actions()).as("no Done: the tab strip closes the manager").isEmpty();
             panel.close();
         });
     }
@@ -119,7 +118,7 @@ class ClassicManagerTest {
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> { }, p -> { }, p -> { },
                     new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service, () -> STATUS, () -> { }, Layout.CLASSIC);
+                var window = new VaultManagerTab(context, f.lock, f.manager, service, () -> STATUS, () -> { }, Layout.CLASSIC);
                 f.manager.saveAccount(login(amp, "amp", "ubuntu", MODIFIED)); f.drain();
                 window.show(owner, Optional.of(amp));
                 var view = window.panel.view();

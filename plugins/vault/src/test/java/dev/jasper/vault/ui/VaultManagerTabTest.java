@@ -22,7 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static dev.jasper.vault.testsupport.KitViews.*;
 import static org.assertj.core.api.Assertions.*;
 
-class VaultManagerWindowTest {
+class VaultManagerTabTest {
     @TempDir Path directory;
     static final PluginInfo INFO = new PluginInfo("dev.jasper.vault", "Vault", "0.1.0", Set.of());
 
@@ -41,15 +41,15 @@ class VaultManagerWindowTest {
                     public boolean isMain() { return open[0]; }
                     public void toFront() {}
                 };
-                var windowRef = new AtomicReference<VaultManagerWindow>();
+                var windowRef = new AtomicReference<VaultManagerTab>();
                 var represented = new AtomicReference<dev.jasper.vault.service.UnlockPrompt>();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> {
                     if (prompt.owner() == owner) windowRef.get().showUnlock(prompt);
                     else represented.set(prompt);
                 }, p -> {}, p -> {}, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> {});
-                windowRef.set(window); window.show(owner, Optional.empty()); f.lock.lock(); window.changed();
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> {});
+                windowRef.set(window); window.show(terminal, Optional.empty()); f.lock.lock(); window.changed();
                 var first = service.requestUnlock(owner); var shown = window.passwordPanel;
                 type(window.panel.view(), shown.password, "retired-secret");
                 var second = service.requestUnlock(terminal);
@@ -75,7 +75,7 @@ class VaultManagerWindowTest {
                     public boolean isOpen(){return open;} public dev.jasper.sdk.Subscription onClosed(Runnable action){listeners.add(action);return ()->listeners.remove(action);}
                     public void close(){open=false;java.util.List.copyOf(listeners).forEach(Runnable::run);}
                 }
-                var anchor=new Anchor();var windowRef=new AtomicReference<VaultManagerWindow>();
+                var anchor=new Anchor();var windowRef=new AtomicReference<VaultManagerTab>();
                 var displayed=new AtomicReference<PasswordPanel>();var promptRef=new AtomicReference<dev.jasper.vault.service.UnlockPrompt>();
                 var service=new VaultService(f.lock,()->Optional.of(terminal),prompt->{
                     promptRef.set(prompt);
@@ -83,7 +83,7 @@ class VaultManagerWindowTest {
                     else {var panel=PasswordPanel.unlock(context.kit(),prompt);displayed.set(panel);prompt.onPresentationRetired(panel::close);}
                 },p->{},p->{},new FakeNotifications().group("dev.jasper.vault"));
                 service.anchoredPicker(p->{throw new AssertionError("retired picker reopened");},a->{});
-                var window=new VaultManagerWindow(context,f.lock,f.manager,service,()->new VaultManagerWindow.Status("test","off","/synthetic/vault.jv"),()->{});
+                var window=new VaultManagerTab(context,f.lock,f.manager,service,()->new VaultManagerTab.Status("test","off","/synthetic/vault.jv"),()->{});
                 windowRef.set(window);window.show(terminal,Optional.empty());f.lock.lock();window.changed();
                 var consumer=service.forConsumer(new PluginInfo("test.consumer","Consumer","1",Set.of()));
                 java.util.concurrent.CompletableFuture<Boolean> survivor;
@@ -109,8 +109,8 @@ class VaultManagerWindowTest {
                 host.addTerminalWindow();
                 var owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 window.show(owner, Optional.empty());
                 var editor = new AtomicReference<EntryEditor>();
                 window.dialog("Add SSH Key", dismiss -> {
@@ -135,19 +135,20 @@ class VaultManagerWindowTest {
                 host.addTerminalWindow();
                 WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 UUID id = UUID.randomUUID();
                 f.manager.saveNote(new Note(id, "Recovery", "line one\nline two".toCharArray(), Instant.EPOCH)); f.drain();
                 window.show(owner, Optional.of(id)); window.show(owner, Optional.of(id));
-                assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
-                var view = host.windowView("dev.jasper.vault", "Credential Vault").orElseThrow();
+                assertThat(host.contentTabs()).as("one manager tab").hasSize(1);
+                assertThat(host.windows()).isEmpty();
+                var view = host.contentView("dev.jasper.vault", "Credential Vault").orElseThrow();
                 assertThat(view).isSameAs(fake(window.panel.view()));
                 assertThat(window.panel.selected()).contains(id);
                 assertThat(node(view, ManagerPanel.ROWS, Nodes.ItemList.class).selectedIds()).containsExactly(id.toString());
                 assertThat(node(view, "row." + id + ".name", Nodes.Text.class).text()).isEqualTo("Recovery");
                 assertThat(view.spec().toString()).doesNotContain("line one");
-                assertThat(host.requestClose("dev.jasper.vault.manager")).isTrue();
+                assertThat(host.contentTab("dev.jasper.vault", "Credential Vault").orElseThrow().requestClose().join()).isTrue();
                 assertThat(window.isOpen()).isFalse();
                 assertThat(window.panel.visibleRows()).isEmpty();
                 assertThat(closed(view)).isTrue();
@@ -162,8 +163,8 @@ class VaultManagerWindowTest {
                 host.addTerminalWindow();
                 WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 Path pub = java.nio.file.Files.writeString(directory.resolve("laptop.pub"), "ssh-ed25519 AAAAfixture laptop\n");
                 UUID id = UUID.randomUUID();
                 f.lock.vault().keys().add(new SshKey(id, "laptop", "ssh-ed25519", "SHA256:fixture", "", directory.resolve("laptop"), pub, Instant.EPOCH));
@@ -183,12 +184,12 @@ class VaultManagerWindowTest {
                 PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
                 int[] prompts = {0};
-                var controller = new AtomicReference<VaultManagerWindow>();
+                var controller = new AtomicReference<VaultManagerTab>();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> {
                     prompts[0]++; assertThat(controller.get().showUnlock(prompt)).isTrue();
                 }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 controller.set(window);
                 UUID id = UUID.randomUUID();
                 f.manager.saveNote(new Note(id, "Recovery", "secret".toCharArray(), Instant.EPOCH)); f.drain();
@@ -203,7 +204,8 @@ class VaultManagerWindowTest {
                 var view = window.panel.view();
                 assertThat(window.panel.visibleRows()).isEmpty();
                 assertThat(closed(editor.get().view())).as("locking closes editors and erases their drafts").isTrue();
-                assertThat(host.windows()).containsExactly("dev.jasper.vault.manager|Credential Vault|true");
+                assertThat(host.windows()).as("the editor closed").isEmpty();
+                assertThat(host.contentView("dev.jasper.vault", "Credential Vault")).isPresent();
                 assertThat(prompts[0]).isZero();
                 press(view, ManagerPanel.UNLOCK);
                 assertThat(prompts[0]).isEqualTo(1);
@@ -212,7 +214,7 @@ class VaultManagerWindowTest {
                 assertThat(root.actions()).as("Unlock is the window's default, so Enter on a footer button unlocks as at baseline")
                     .filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
                     .satisfies(b -> { assertThat(b.label()).isEqualTo("Unlock"); assertThat(b.action()).isEqualTo(window.passwordPanel.submit); });
-                assertThat(button(view, ManagerPanel.OKAY).kind()).isEqualTo(Nodes.ButtonKind.SECONDARY);
+                assertThat(root.actions()).as("Unlock is the prompt's one action: a tab has no Done").hasSize(1);
                 assertThat(node(view, window.passwordPanel.password, Nodes.Secret.class).submitAction()).isEqualTo(window.passwordPanel.submit);
                 assertThat(root.cancelAction()).as("Escape cancels the prompt first").isEqualTo(window.passwordPanel.cancel);
                 type(view, window.passwordPanel.password, "test-password");
@@ -221,7 +223,7 @@ class VaultManagerWindowTest {
                 assertThat(f.lock.state()).isEqualTo(dev.jasper.vault.api.LockState.UNLOCKED);
                 assertThat(window.passwordPanel).isNull();
                 assertThat(find(view, ManagerPanel.UNLOCK_PREFIX + "password")).isEmpty();
-                assertThat(button(view, ManagerPanel.OKAY).kind()).isEqualTo(Nodes.ButtonKind.PRIMARY);
+                assertThat(node(view, ManagerPanel.ROOT, Nodes.Form.class).actions()).as("unlocked, no action").isEmpty();
                 window.close();
             }
         });
@@ -232,11 +234,11 @@ class VaultManagerWindowTest {
             try (var f = new VaultUiFixture(directory); var host = new FakePluginHost()) {
                 PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
-                var controller = new AtomicReference<VaultManagerWindow>();
+                var controller = new AtomicReference<VaultManagerTab>();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), prompt -> controller.get().showUnlock(prompt),
                     p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 controller.set(window);
                 window.show(owner, Optional.empty()); f.manager.invalidate(); f.lock.lock(); window.changed();
                 var view = window.panel.view();
@@ -248,9 +250,9 @@ class VaultManagerWindowTest {
                 assertThat(find(view, shown.password)).as("the field and its storage are gone").isEmpty();
                 assertThat(node(view, ManagerPanel.LOCKED, Nodes.Empty.class).title()).isEqualTo("Vault locked");
                 assertThat(f.lock.state()).isEqualTo(dev.jasper.vault.api.LockState.LOCKED);
-                // Closing the window while a prompt shows cancels it without touching the disposed view.
+                // Closing the tab while a prompt shows cancels it without touching the disposed view.
                 press(view, ManagerPanel.UNLOCK); type(view, window.passwordPanel.password, "typed-then-closed");
-                assertThat(host.requestClose(VaultManagerWindow.ID)).isTrue();
+                assertThat(host.contentTab("dev.jasper.vault", "Credential Vault").orElseThrow().requestClose().join()).isTrue();
                 assertThat(closed(view)).isTrue();
                 assertThat(window.passwordPanel).isNull();
                 assertThat(host.failures()).isEmpty();
@@ -265,8 +267,8 @@ class VaultManagerWindowTest {
                 PluginContext context = host.start(INFO, Set.of(), Set.of(), c -> { });
                 host.addTerminalWindow(); WindowHandle owner = context.terminals().windows().getFirst();
                 var service = new VaultService(f.lock, () -> Optional.of(owner), p -> { }, p -> { }, p -> { }, new FakeNotifications().group("dev.jasper.vault"));
-                var window = new VaultManagerWindow(context, f.lock, f.manager, service,
-                    () -> new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
+                var window = new VaultManagerTab(context, f.lock, f.manager, service,
+                    () -> new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), () -> { });
                 UUID id = UUID.randomUUID();
                 f.manager.saveAccount(VaultManagerTest.account(id, "secret".toCharArray())); f.drain();
                 Grant grant = new Grant("dev.jasper.ssh", id); f.lock.vault().grants().add(grant);

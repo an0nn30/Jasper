@@ -100,7 +100,7 @@ class ManagedVaultLoadingTest {
             }
             onEdt(() -> {
                 host.invoke("dev.jasper.vault.open", owner.get().id(), null);
-                var manager = host.windowView("dev.jasper.vault", "Credential Vault").orElseThrow();
+                var manager = host.contentView("dev.jasper.vault", "Credential Vault").orElseThrow();
                 assertThat(((dev.jasper.sdk.ui.Nodes.ItemList) node(manager.spec().root(), "rows")).items()).hasSize(1);
                 assertThat(host.failures()).isEmpty();
             });

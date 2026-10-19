@@ -540,7 +540,7 @@ final class FakeUi {
                     dev.jasper.sdk.ui.TabPlacement placement) {
                 context.requireOpen();java.util.Objects.requireNonNull(placement,"placement");var view=context.kit().requireOwned(content);
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
-                view.mount(spec);view.route="WORKSPACE";try{var tab=openComponent(spec,owner,view.component,placement);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
+                view.mount(spec);view.route="WORKSPACE";try{var tab=(FakeContent)openComponent(spec,owner,view.component,placement);tab.view=view;tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
             }
             private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component,
                     dev.jasper.sdk.ui.TabPlacement placement) {

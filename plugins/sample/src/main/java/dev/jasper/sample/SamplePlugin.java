@@ -8,22 +8,21 @@ import dev.jasper.sdk.plugin.Plugin;
 import dev.jasper.sdk.plugin.PluginContext;
 import dev.jasper.sdk.ui.ActionSpec;
 import dev.jasper.sdk.ui.Anchor;
+import dev.jasper.sdk.ui.ContentSpec;
+import dev.jasper.sdk.ui.ContentTab;
 import dev.jasper.sdk.ui.DialogSpec;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.PluginAction;
 import dev.jasper.sdk.ui.PluginDialog;
-import dev.jasper.sdk.ui.PluginWindow;
 import dev.jasper.sdk.ui.Side;
 import dev.jasper.sdk.ui.StandardMenu;
 import dev.jasper.sdk.ui.StatusItem;
 import dev.jasper.sdk.ui.StatusItemSpec;
 import dev.jasper.sdk.ui.ToolbarItem;
-import dev.jasper.sdk.ui.WindowSpec;
 import dev.jasper.sdk.ui.ControlState;
 import dev.jasper.sdk.ui.Nodes;
 import dev.jasper.sdk.ui.UiEvent;
 import dev.jasper.sdk.ui.ViewSpec;
-import java.awt.Dimension;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -102,12 +101,12 @@ public final class SamplePlugin implements Plugin {
             status.setText(event.terminal() ? "Sample: ready" : "Sample: " + Math.round(event.fraction().orElse(0) * 100) + "%");
             if (event.terminal()) demo[0].setEnabled(true);
         });
-        installPanelAndWindow(context, stepMillis);
+        installPanelAndAboutTab(context, stepMillis);
     }
     // example:pluginui:end
 
     // example:pluginpanels:start
-    private static void installPanelAndWindow(PluginContext context, long stepMillis) {
+    private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
         // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
         // a tile, a title, one sentence and one secondary action, centered in the panel.
         context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
@@ -122,16 +121,17 @@ public final class SamplePlugin implements Plugin {
                         context.background().execute(() -> demo(context, stepMillis));
                 }));
 
+        ContentTab[] about = {null};
         context.actions().register(ActionSpec.of("dev.jasper.sample.about", "About Sample").withIcon(FLASK), invoked -> {
-            // The application builds the frame, title bar and menu bar; a singleton comes back while it is open.
-            PluginWindow window = context.windows().create(
-                new WindowSpec("dev.jasper.sample.about-window", "About Sample", new Dimension(360, 200), true));
+            // A tab in the window the action ran in, which Jasper draws with its strip; an open About is selected again.
+            if (about[0] != null && !about[0].isClosed()) { about[0].select(); return; }
             var content = context.kit().create(new ViewSpec(new Nodes.Empty("sample.about", ControlState.READY,
                 new Nodes.Icon("sample.about.icon", ControlState.READY, FLASK, Nodes.Hue.NONE, Nodes.IconSize.EMPTY, "Sample"), "Sample Plugin",
-                "This window's chrome belongs to Jasper; its content to the plugin.",
+                "This tab's strip and window belong to Jasper; its content to the plugin.",
                 List.of(new Nodes.Button(DETAILS_BUTTON, ControlState.READY, "Details…", "", Nodes.ButtonKind.SECONDARY, DETAILS_BUTTON, "")))), event -> {
                 if (!(event instanceof UiEvent.Action action) || !action.id().equals(DETAILS_BUTTON)) return;
-                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", window, true));
+                // The tab owns the sheet, which follows it to whichever window holds it.
+                PluginDialog dialog = context.windows().dialog(new DialogSpec("Sample Details", about[0], true));
                 // A sheet's canonical body: a form card of label/value rows, then the one primary action.
                 var body = context.kit().create(new ViewSpec(new Nodes.Form("sample.details", ControlState.READY,
                     Nodes.FormKind.SHEET, "Sample Details", Optional.empty(), List.of(new Nodes.Card("sample.details.card", ControlState.READY,
@@ -144,9 +144,7 @@ public final class SamplePlugin implements Plugin {
                 dialog.setContent(body);
                 dialog.show();
             });
-            window.setContent(content);
-            window.show();
-            window.toFront();
+            about[0] = context.windows().openTab(new ContentSpec("about", "About Sample"), invoked.window(), content);
         });
         context.rail().add("dev.jasper.sample.about");
     }

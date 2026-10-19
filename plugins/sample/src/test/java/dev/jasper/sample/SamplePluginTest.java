@@ -104,7 +104,7 @@ class SamplePluginTest {
         } });
     }
 
-    @Test void mountedPanelAndWindowButtonsDispatchTheirDeclaredActions() throws Exception {
+    @Test void mountedPanelAndAboutTabButtonsDispatchTheirDeclaredActions() throws Exception {
         try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
@@ -120,7 +120,7 @@ class SamplePluginTest {
                 assertThat(run.kind()).as("an empty state's one secondary action").isEqualTo(dev.jasper.sdk.ui.Nodes.ButtonKind.SECONDARY);
                 panel.emit(new dev.jasper.sdk.ui.UiEvent.Action(run.action()));
                 assertThat(host.invoke("dev.jasper.sample.about", window, null)).isTrue();
-                var about = host.windowView("dev.jasper.sample", "About Sample").orElseThrow();
+                var about = host.contentView("dev.jasper.sample", "About Sample").orElseThrow();
                 var details = (dev.jasper.sdk.ui.Nodes.Button) ((dev.jasper.sdk.ui.Nodes.Empty) about.spec().root()).actions().getLast();
                 about.emit(new dev.jasper.sdk.ui.UiEvent.Action(details.action()));
                 var dialog = host.windowView("dev.jasper.sample", "Sample Details").orElseThrow();
@@ -184,7 +184,7 @@ class SamplePluginTest {
         }
     }
 
-    @Test void theDemoUiAddsAPanelARailButtonAndAWindow() throws Exception {
+    @Test void theDemoUiAddsAPanelARailButtonAndAnAboutTab() throws Exception {
         javax.swing.SwingUtilities.invokeAndWait(() -> { try (var host = new FakePluginHost()) {
             host.setSetting("dev.jasper.sample", "demo_ui", true);
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
@@ -196,7 +196,9 @@ class SamplePluginTest {
             assertThat(host.windows()).isEmpty();
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
-            assertThat(host.windows()).as("a singleton").containsExactly("dev.jasper.sample.about-window|About Sample|true");
+            assertThat(host.windows()).isEmpty();
+            assertThat(host.contentTabs()).as("one About tab").hasSize(1);
+            assertThat(host.contentView("dev.jasper.sample", "About Sample")).isPresent();
             assertThat(host.failures()).isEmpty();
         } });
     }

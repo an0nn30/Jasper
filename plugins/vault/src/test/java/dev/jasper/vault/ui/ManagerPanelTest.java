@@ -20,10 +20,10 @@ class ManagerPanelTest {
             assertThat(node(view, "status.provider", Nodes.Text.class).role()).isEqualTo(Nodes.TextRole.CAPTION);
             var empty = node(view, ManagerPanel.LOCKED, Nodes.Empty.class);
             assertThat(empty.title()).isEqualTo("Vault locked");
-            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(node(view, ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("Nothing to show");
             var row = new VaultManager.Row(UUID.randomUUID(), "Name", "Detail", VaultManager.Type.LOGIN);
-            panel.refresh(List.of(row), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(row), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var item = node(view, ManagerPanel.ROWS, Nodes.ItemList.class).items().getFirst();
             assertThat(((Nodes.Text) item.subtitle().getFirst()).role()).isEqualTo(Nodes.TextRole.CAPTION);
             assertThat(item.leading()).hasValueSatisfying(n -> assertThat(n).isInstanceOf(Nodes.Icon.class));
@@ -34,14 +34,14 @@ class ManagerPanelTest {
     @Test void controlsUseKitSemanticIcons() throws Exception {
         edt(() -> {
             var panel = panel(new AtomicReference<>());
-            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var view = panel.view();
-            assertThat(node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
+            assertThat(node(panel.view(), ManagerPanel.ADD, Nodes.MenuButton.class).icon()).isEqualTo("add");
             assertThat(button(view, ManagerPanel.EDIT).icon()).isEqualTo("edit");
             assertThat(button(view, ManagerPanel.EDIT).tooltip()).isEqualTo("Edit entry");
-            assertThat(button(panel.titleActions(), ManagerPanel.LOCK).icon()).isEqualTo("lock");
+            assertThat(button(panel.view(), ManagerPanel.LOCK).icon()).isEqualTo("lock");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).kind()).isEqualTo(Nodes.FieldKind.SEARCH);
-            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
+            panel.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), false);
             assertThat(button(view, ManagerPanel.UNLOCK).icon()).isEqualTo("unlock");
             panel.close();
         });
@@ -53,7 +53,7 @@ class ManagerPanelTest {
             var view = panel.view();
             var key = new VaultManager.Row(UUID.randomUUID(), "Zulu", "SHA256:fingerprint", VaultManager.Type.SSH_KEY);
             var login = new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN);
-            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(panel.visibleRows().getFirst()).isEqualTo(login);
             assertThat(node(view, "status.provider", Nodes.Text.class).text()).isEqualTo("Test");
             var rows = node(view, ManagerPanel.ROWS, Nodes.ItemList.class);
@@ -71,9 +71,9 @@ class ManagerPanelTest {
             assertThat(node(view, ManagerPanel.ROWS, Nodes.ItemList.class).selectedIds()).containsExactly(key.id().toString());
             assertThat(button(view, ManagerPanel.COPY_PUBLIC).state().enabled()).isTrue();
             emit(view, new UiEvent.Selected(ManagerPanel.KIND, Set.of(VaultManager.Type.LOGIN.name()))); assertThat(panel.selected()).isEmpty();
-            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             assertThat(panel.visibleRows()).hasSize(1);
-            panel.refresh(List.of(key, login), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), false);
+            panel.refresh(List.of(key, login), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), false);
             assertThat(panel.visibleRows()).isEmpty(); assertThat(find(view, ManagerPanel.COPY_PUBLIC)).isEmpty();
             panel.close();
         });
@@ -83,7 +83,7 @@ class ManagerPanelTest {
         edt(() -> {
             var panel = panel(new AtomicReference<>());
             var view = panel.view();
-            panel.refresh(List.of(new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN)), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+            panel.refresh(List.of(new VaultManager.Row(UUID.randomUUID(), "Alpha", "deploy", VaultManager.Type.LOGIN)), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             emit(view, new UiEvent.Edited(ManagerPanel.SEARCH, "no matches"));
             assertThat(node(view, ManagerPanel.EMPTY, Nodes.Empty.class).title()).isEqualTo("No matching entries");
             assertThat(node(view, ManagerPanel.SEARCH, Nodes.Field.class).value()).isEqualTo("no matches");
@@ -95,40 +95,38 @@ class ManagerPanelTest {
         edt(() -> {
             var added = new AtomicReference<VaultManager.Type>(); boolean[] generated = {false};
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> generated[0] = true, () -> { }, () -> { }, () -> { });
-            panel.refresh(List.of(), List.of(), new VaultManagerWindow.Status("test", "5 min", "/synthetic/vault.jv"), true);
+                () -> generated[0] = true, () -> { }, () -> { });
+            panel.refresh(List.of(), List.of(), new VaultManagerTab.Status("test", "5 min", "/synthetic/vault.jv"), true);
             var view = panel.view();
-            var items = node(panel.titleActions(), ManagerPanel.ADD, Nodes.MenuButton.class).items();
+            var items = node(panel.view(), ManagerPanel.ADD, Nodes.MenuButton.class).items();
             for (var type : VaultManager.Type.values()) {
                 var item = items.stream().filter(i -> i.label().equals(type.toString())).findFirst().orElseThrow();
-                press(panel.titleActions(), item.action());
+                press(panel.view(), item.action());
                 assertThat(added.get()).isEqualTo(type);
             }
             assertThat(items).anyMatch(i -> i.separator());
-            press(panel.titleActions(), items.getLast().action()); assertThat(generated[0]).isTrue();
+            press(panel.view(), items.getLast().action()); assertThat(generated[0]).isTrue();
             // As depicted, the category rail has no footer; password and grants are Vault commands.
             assertThat(node(view, "categories", Nodes.Panel.class).footer()).isEmpty();
             panel.close();
         });
     }
 
-    @Test void okayIsThePrimaryAndEveryCloseControlClosesTheWindow() throws Exception {
+    /** Workspace tabs plan 4b: the tab strip closes the manager, which has no Done; Escape leaves it open. */
+    @Test void theManagerHasNoDoneAndEscapeLeavesItOpen() throws Exception {
         edt(() -> {
-            int[] closes = {0};
             var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), t -> { }, id -> { }, id -> { }, id -> { }, grant -> { },
-                () -> { }, () -> { }, () -> { }, () -> closes[0]++);
-            var view = panel.view();
-            var form = node(view, ManagerPanel.ROOT, Nodes.Form.class);
-            assertThat(form.actions()).filteredOn(b -> b.kind() == Nodes.ButtonKind.PRIMARY).singleElement()
-                .satisfies(b -> assertThat(b.id()).isEqualTo(ManagerPanel.OKAY));
-            press(view, button(view, ManagerPanel.OKAY).action()); press(view, form.cancelAction());
-            assertThat(closes[0]).isEqualTo(2);
+                () -> { }, () -> { }, () -> { });
+            var form = node(panel.view(), ManagerPanel.ROOT, Nodes.Form.class);
+            assertThat(form.actions()).as("no Done").isEmpty();
+            assertThat(form.cancelAction()).as("no Escape").isEmpty();
+            assertThat(form.preview()).as("the status row stays").isPresent();
             panel.close();
         });
     }
 
     private static ManagerPanel panel(AtomicReference<VaultManager.Type> added) {
         return new ManagerPanel(new FakeKit("dev.jasper.vault"), id -> Optional.empty(), added::set, id -> { }, id -> { }, id -> { }, grant -> { },
-            () -> { }, () -> { }, () -> { }, () -> { });
+            () -> { }, () -> { }, () -> { });
     }
 }

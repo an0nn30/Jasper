@@ -33,7 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class CompositionParityTest {
     @TempDir Path directory;
-    static final VaultManagerWindow.Status STATUS = new VaultManagerWindow.Status("keychain", "15 min", "/synthetic/vault.jv");
+    static final VaultManagerTab.Status STATUS = new VaultManagerTab.Status("keychain", "15 min", "/synthetic/vault.jv");
     final UUID login = UUID.randomUUID(), key = UUID.randomUUID(), note = UUID.randomUUID();
     final Map<UUID, Object> entries = new HashMap<>();
 
@@ -52,8 +52,7 @@ class CompositionParityTest {
         var asked = new ArrayList<String>();
         var panel = new ManagerPanel(new FakeKit("dev.jasper.vault"), layout, id -> Optional.ofNullable(entries.get(id)),
             type -> asked.add("add " + type), id -> asked.add("edit " + id), id -> asked.add("delete " + id), id -> asked.add("copy-public " + id),
-            grant -> asked.add("revoke " + grant.pluginId()), () -> asked.add("generate"), () -> asked.add("lock"), () -> asked.add("unlock"),
-            () -> asked.add("close"));
+            grant -> asked.add("revoke " + grant.pluginId()), () -> asked.add("generate"), () -> asked.add("lock"), () -> asked.add("unlock"));
         return new Run(panel, asked);
     }
 
@@ -77,7 +76,7 @@ class CompositionParityTest {
     static void select(Run run, UUID id) { emit(run.panel().view(), new UiEvent.Selected(ManagerPanel.ROWS, Set.of(id.toString()))); }
 
     static void assertParity(String state, Run rows, Run classic) {
-        assertThat(reachable(classic.panel().view())).as(state).containsAll(reachable(rows.panel().view(), rows.panel().titleActions()));
+        assertThat(reachable(classic.panel().view())).as(state).containsAll(reachable(rows.panel().view()));
     }
 
     @Test void everyRowsActionHasAClassicPathInEachState() throws Exception {
@@ -103,9 +102,9 @@ class CompositionParityTest {
             var rows = run(Layout.ROWS); var classic = run(Layout.CLASSIC);
             var list = rows();
             for (var run : List.of(rows, classic)) { run.panel().refresh(list, List.of(), STATUS, true); select(run, key); }
-            var actions = new ArrayList<>(reachable(rows.panel().view(), rows.panel().titleActions()));
-            // The copies go through the plugin's CopyCards by the same act() case in both layouts; Done is checked last.
-            actions.removeIf(action -> action.startsWith("detail.") || action.equals(ManagerPanel.CLOSE));
+            var actions = new ArrayList<>(reachable(rows.panel().view()));
+            // The copies go through the plugin's CopyCards by the same act() case in both layouts.
+            actions.removeIf(action -> action.startsWith("detail."));
             assertThat(actions).contains(ManagerPanel.EDIT, ManagerPanel.DELETE, ManagerPanel.COPY_PUBLIC, ManagerPanel.LOCK, "add.LOGIN",
                 "add.SSH_KEY", "add.NOTE", ManagerPanel.ADD_GENERATE);
             for (String action : actions) { press(rows.panel().view(), action); press(classic.panel().view(), action); }
@@ -116,7 +115,6 @@ class CompositionParityTest {
             }
             assertThat(classic.panel().visibleRows()).isEqualTo(rows.panel().visibleRows()).hasSize(1);
             for (var run : List.of(rows, classic)) { run.panel().refresh(list, List.of(), STATUS, false); press(run.panel().view(), ManagerPanel.UNLOCK); }
-            press(rows.panel().view(), ManagerPanel.CLOSE); press(classic.panel().view(), ManagerPanel.CLOSE);
             assertThat(classic.asked()).isEqualTo(rows.asked());
             rows.panel().close(); classic.panel().close();
         });

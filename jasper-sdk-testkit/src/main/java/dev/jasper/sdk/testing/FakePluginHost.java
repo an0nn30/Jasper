@@ -1703,6 +1703,35 @@ public final class FakePluginHost implements AutoCloseable {
      * @return published status descriptors */
     public List<dev.jasper.sdk.ui.ContentStatus> contentStatus(dev.jasper.sdk.ui.ContentTab tab) { return ((FakeContent)tab).status; }
 
+    /**
+     * A plugin's open content tab, found by its title, as a plugin's manager or document opens it. Call it on the UI
+     * thread.
+     *
+     * @param pluginId the tab's owner
+     * @param title the tab's exact presentation title
+     * @return the tab while it is open; empty after close or if absent
+     * @since 0.20.0
+     */
+    public java.util.Optional<dev.jasper.sdk.ui.ContentTab> contentTab(String pluginId, String title) {
+        FakePluginContext context = contexts.get(pluginId);
+        if (context == null) return java.util.Optional.empty();
+        return context.ui.contents.stream().filter(content -> !content.closed && content.presentation.title().equals(title))
+            .map(content -> (dev.jasper.sdk.ui.ContentTab) content).findFirst();
+    }
+
+    /**
+     * The owned view a plugin's open content tab shows, found by its title, for driving {@code UiView} content in headless
+     * tests as {@link #windowView} does for dialogs. Call it on the UI thread.
+     *
+     * @param pluginId the tab's owner
+     * @param title the tab's exact presentation title
+     * @return the view while the tab is open; empty after close, for raw content or if absent
+     * @since 0.20.0
+     */
+    public java.util.Optional<FakeKitView> contentView(String pluginId, String title) {
+        return contentTab(pluginId, title).map(tab -> ((FakeContent) tab).view);
+    }
+
     /** A {@code Terminals.environment} contributor and the plugin that registered it. */
     record ShellContributor(FakePluginContext context, Function<Map<String, String>, Map<String, String>> contributor) { }
     final List<ShellContributor> shellContributors = new CopyOnWriteArrayList<>();

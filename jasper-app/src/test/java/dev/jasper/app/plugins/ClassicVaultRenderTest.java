@@ -25,7 +25,10 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Plan 10b's mock matching (spec 16.1.4): the staged Vault's classic composition in the real host, under the shipped
  * Enterprise kit, Plex fonts and theme (Light: the 07 mocks have no Dark), against the 07 Credential Vault mocks. Images
- * go to jasper-app/build/enterprise-compositions/light/, paired in tools/visual/pairs.json.
+ * go to jasper-app/build/enterprise-compositions/light/, paired in tools/visual/pairs.json. The manager is a content tab
+ * (workspace tabs spec 14), mounted as the host mounts one: it has no Done and no dialog band, which the mocks' window
+ * shows, and its panes take the workspace ground, so its status row, the columns' foot and the Details pane are pinned
+ * to the render, not to the mocks.
  */
 class ClassicVaultRenderTest {
     static final String V = "07 Credential Vault/Credential Vault ";
@@ -33,7 +36,8 @@ class ClassicVaultRenderTest {
         NO_SELECTION = new MockMatch.Crop(V + "2 - New menu.png", 2, 60, 1640, 1142);
     static final String[][] LOGINS = {{"amp", "ubuntu", "synthetic-password-1"}, {"Proxmox", "root", "synthetic-password-2"}};
     static final String TOOLBAR = "0+6 #ECEDEF, 6+1 #B4B8BF, 7+20 #FFFFFF, 27+1 #B4B8BF, 28+6 #ECEDEF, 34+1 #C4C7CC";
-    static final String STATUS = "0+1 #C4C7CC, 1+6 #E6E7EA, 7+1 #2655AE, 8+22 #2F65CA, 30+1 #2655AE, 31+6 #E6E7EA";
+    /** The status row at device column 1600: the tab's own row, where the mocks' window shows Done over a dialog band. */
+    static final String STATUS = "0+1 #E8E8E9, 1+29 #F7F7F8";
     @TempDir Path root;
 
     /**
@@ -46,13 +50,25 @@ class ClassicVaultRenderTest {
         return vault;
     }
 
+    /** As below for the manager, a tab: its kit view as the host mounts it, on the workspace route over its own surface. */
+    static BufferedImage render(javax.swing.JComponent manager, int width, int height) {
+        return onEdtValue(() -> {
+            manager.setSize(width, height);
+            for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(manager);
+            var image = new BufferedImage(width * 2, height * 2, BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { graphics.scale(2, 2); manager.printAll(graphics); } finally { graphics.dispose(); }
+            Color under = EnterpriseLook.resolved(false).workspace().semantic().color(SemanticColor.SURFACE_DIALOG);
+            return MockMatch.onto(image, under);
+        });
+    }
+
     /**
      * The surface's kit view and everything below it in its holder, {@code width} by {@code height} logical pixels,
      * painted at 2x over {@code surface.dialog}: what the mock crops show under a title bar or a dialog's header strip.
      * The headless windows run no shell, so a dialog's holder and view first take what the Enterprise host gives the
      * dialogs it draws in their window (plan 6b's {@code NativeShells.classicContent}: a transparent holder and
-     * {@code CLASSIC_FLAGS}, {@code hostTitled}, {@code dialogBand} and {@code dialogCard}); the manager window's view
-     * takes the band its frame gives it ({@code NativeShells.frame}, spec 10.8).
+     * {@code CLASSIC_FLAGS}, {@code hostTitled}, {@code dialogBand} and {@code dialogCard}).
      */
     static BufferedImage render(AuxiliarySurface surface, int width, int height) {
         return onEdtValue(() -> {
@@ -61,7 +77,7 @@ class ClassicVaultRenderTest {
             if (surface.kind() != AuxiliarySurface.Kind.WINDOW) {
                 holder.setOpaque(false);
                 content.hostTitled(true); content.dialogBand(true); content.dialogCard(true);
-            } else content.dialogBand(true);
+            }
             holder.setSize(width, height);
             for (int i = 0; i < 3; i++) SessionsSurfaceFixture.layout(holder);
             var view = StagedVaultHost.kitView(holder);
@@ -130,18 +146,18 @@ class ClassicVaultRenderTest {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("frame"))) {
                 vault.seedLogins(LOGINS);
-                var render = render(vault.surface("Credential Vault"), NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
+                var render = render(vault.manager(), NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
                 MockMatch.save("light/vault-frame", NO_SELECTION.read(), render);
                 bands("the toolbar row", render, 1600, 0, 70, TOOLBAR);
-                bands("the status row and Done", render, 1600, 1068, 1142, STATUS);
+                bands("the status row", render, 1600, 1082, 1142, STATUS);
                 assertThat(MockMatch.present(render, Color.decode("#C4C7CC"))).as("the classic rules").isTrue();
                 assertThat(vault.problems).isEmpty();
             }
         });
     }
 
-    static final String CATEGORIES = "0+34 #ECEDEF, 34+1 #C4C7CC, 35+24 #E1E3E6, 59+1 #C4C7CC, 60+4 #F7F7F8, 64+22 #2F65CA, 86+448 #F7F7F8, 534+1 #C4C7CC";
-    static final String ITEMS = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+22 #2F65CA, 43+22 #F7F8FA, 65+413 #FFFFFF, 478+1 #DDE0E4, 479+20 #F7F8FA, 499+1 #C4C7CC";
+    static final String CATEGORIES = "0+34 #ECEDEF, 34+1 #C4C7CC, 35+24 #E1E3E6, 59+1 #C4C7CC, 60+4 #F7F7F8, 64+22 #2F65CA, 86+455 #F7F7F8, 541+1 #E8E8E9";
+    static final String ITEMS = "0+20 #F0F1F3, 20+1 #D3D6DA, 21+22 #2F65CA, 43+22 #F7F8FA, 65+420 #FFFFFF, 485+1 #E4E5E8, 486+20 #F7F8FA, 506+1 #E8E8E9";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theCategoriesAndItemsMatchTheItemSelectedMock() throws Exception {
@@ -149,10 +165,10 @@ class ClassicVaultRenderTest {
             try (var vault = vault(root.resolve("columns"))) {
                 var ids = vault.seedLogins(LOGINS);
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
-                var render = render(vault.surface("Credential Vault"), SELECTED.logicalWidth(), SELECTED.logicalHeight());
+                var render = render(vault.manager(), SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-columns", SELECTED.read(), render);
-                bands("the Categories column", render, 6, 0, 1070, CATEGORIES);
-                bands("the Items column", render, 854, 70, 1070, ITEMS);
+                bands("the Categories column", render, 6, 0, 1084, CATEGORIES);
+                bands("the Items column", render, 854, 70, 1084, ITEMS);
                 assertThat(MockMatch.present(render, Color.decode("#F0F1F3"))).as("the table's header band").isTrue();
                 assertThat(MockMatch.present(render, Color.decode("#E1E3E6"))).as("the pane header strip").isTrue();
                 assertThat(vault.problems).isEmpty();
@@ -160,27 +176,28 @@ class ClassicVaultRenderTest {
         });
     }
 
-    static final String DETAILS = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #ECEDEF, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E6E8EB, 130+26 #FFFFFF, "
-        + "156+1 #D3D6DA, 157+8 #ECEDEF, 165+1 #C4C7CC, 166+61 #ECEDEF, 227+1 #B4B8BF, 228+22 #FEFEFE~#EEF0F2, 250+1 #B4B8BF, 251+248 #ECEDEF, "
-        + "499+1 #C4C7CC";
-    static final String DETAILS_NONE = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+474 #ECEDEF, 499+1 #C4C7CC";
+    /** The Details pane on the workspace ground ({@code #F7F7F8}), where the mocks' window shows {@code #ECEDEF}. */
+    static final String DETAILS = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+77 #F7F7F8, 102+1 #D3D6DA, 103+26 #FFFFFF, 129+1 #E4E5E8, 130+26 #FFFFFF, "
+        + "156+1 #D3D6DA, 157+8 #F7F7F8, 165+1 #C4C7CC, 166+60 #F7F7F8, 226+1 #B4B8BF, 227+22 #FEFEFE~#F6F6F6, 249+1 #B4B8BF, 250+256 #F7F7F8, "
+        + "506+1 #E8E8E9";
+    static final String DETAILS_NONE = "0+24 #E1E3E6, 24+1 #C4C7CC, 25+481 #F7F7F8, 506+1 #E8E8E9";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
     void theManagerMatchesItsMocksWithAndWithoutASelection() throws Exception {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("details"))) {
                 var ids = vault.seedLogins(LOGINS);
-                var manager = vault.surface("Credential Vault");
+                var manager = vault.manager();
                 var none = render(manager, NO_SELECTION.logicalWidth(), NO_SELECTION.logicalHeight());
                 MockMatch.save("light/vault-manager", NO_SELECTION.read(), none);
-                bands("the Details pane without a selection", none, 1600, 70, 1070, DETAILS_NONE);
+                bands("the Details pane without a selection", none, 1600, 70, 1084, DETAILS_NONE);
                 MockCrops.fontsFloor("light/vault-manager edge agreement", MockMatch.agreement(NO_SELECTION.read(), none), 0.55);
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
                 var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
-                bands("the Details pane of amp", selected, 1085, 70, 1070, DETAILS);
-                bands("the Categories column", selected, 6, 0, 1070, CATEGORIES);
-                bands("the Items column", selected, 854, 70, 1070, ITEMS);
+                bands("the Details pane of amp", selected, 1085, 70, 1084, DETAILS);
+                bands("the Categories column", selected, 6, 0, 1084, CATEGORIES);
+                bands("the Items column", selected, 854, 70, 1084, ITEMS);
                 bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);
                 toolbarVerbs(selected);
                 // The Fields grid (plan 10b final review): the mask row's 12 dots from the value column, and the username's Copy
@@ -191,7 +208,7 @@ class ClassicVaultRenderTest {
                 int copy = inkRuns(selected, 290, 315, 1400, 1580, 200, 0).getFirst()[0], show = inkRuns(selected, 345, 372, 1400, 1580, 200, 0).getFirst()[0];
                 assertThat(copy).as("the username's Copy shares the password's Show column").isEqualTo(show);
                 assertThat(show).as("the action lane, the mock's x 711").isBetween(707, 713);
-                bands("the status row and Done", selected, 1600, 1068, 1142, STATUS);
+                bands("the status row", selected, 1600, 1082, 1142, STATUS);
                 for (String colour : List.of("#2F65CA", "#E1E3E6", "#F0F1F3", "#F7F8FA", "#E6E7EA", "#C4C7CC"))
                     assertThat(MockMatch.present(selected, Color.decode(colour))).as("shows " + colour).isTrue();
                 MockCrops.fontsFloor("light/vault-manager-selected edge agreement", MockMatch.agreement(SELECTED.read(), selected), 0.55);
@@ -249,8 +266,7 @@ class ClassicVaultRenderTest {
         ClassicCompositionRenderTest.under(false, () -> {
             try (var vault = vault(root.resolve("unlock"))) {
                 vault.invoke("dev.jasper.vault.lock");
-                var manager = vault.surface("Credential Vault");
-                onEdt(manager::requestClose);
+                vault.requestCloseManager();
                 vault.invoke("dev.jasper.vault.open");
                 var unlock = vault.awaitSurface("Unlock Vault");
                 ClassicCompositionRenderTest.check("light/vault-unlock", UNLOCK, render(unlock, UNLOCK.logicalWidth(), UNLOCK.logicalHeight()),

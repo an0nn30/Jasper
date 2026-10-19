@@ -20,29 +20,27 @@ import static org.assertj.core.api.Assertions.*;
 /**
  * Enter in the staged Vault, through the real host's kit components and Swing's key-binding path, matches baseline
  * f16ae32f (Task 7 review fix round 1): the key import unlocks only from its passphrase field and never commits; the
- * manager's inline unlock is the window's default, so Enter on a footer button unlocks.
+ * manager's inline unlock is its one action, so Enter in its field unlocks, and the manager, a tab, has no Done.
  */
 class VaultEnterBaselineTest {
     static final PluginInfo CONSUMER = new PluginInfo("test.consumer", "Consumer", "0.1.0", Set.of());
     @TempDir Path root;
 
-    @Test void enterOnTheManagersFooterUnlocksWhileTheInlineUnlockShows() throws Exception {
+    @Test void enterInTheInlineUnlockUnlocksAndTheManagerTabStaysOpen() throws Exception {
         try (var vault = new StagedVaultHost(root.resolve("home"), true)) {
             vault.createVault("synthetic-enter-pass");
-            var manager = vault.surface("Credential Vault");
+            var manager = vault.manager();
             vault.invoke("dev.jasper.vault.lock");
             onEdt(() -> click(manager, "unlock"));
-            await(() -> named(manager.holder(), "unlock.password.input") != null, "inline unlock form");
+            await(() -> named(manager, "unlock.password.input") != null, "inline unlock form");
             onEdt(() -> {
                 type(manager, "unlock.password.input", "synthetic-enter-pass");
-                enter(require(manager, "okay"));
+                enter(require(manager, "unlock.password.input"));
             });
-            await(() -> node(manager, "search") != null, "Enter on Okay pressed Unlock and the entries came back");
+            await(() -> node(manager, "search") != null, "Enter in the field pressed Unlock and the entries came back");
             assertThat(onEdtValue(() -> node(manager, "unlock.password"))).isNull();
-            assertThat(onEdtValue(() -> ((dev.jasper.ui.model.Nodes.Button) node(manager, "okay")).kind()))
-                .as("Okay is the default again once unlocked").isEqualTo(dev.jasper.ui.model.Nodes.ButtonKind.PRIMARY);
-            onEdt(() -> enter(require(manager, "okay")));
-            await(() -> vault.surfaceOrNull("Credential Vault") == null, "Enter on Okay closes the unlocked manager");
+            assertThat(onEdtValue(() -> node(manager, "okay"))).as("a tab has no Done").isNull();
+            assertThat(vault.managerOrNull()).as("Enter leaves the manager open").isNotNull();
             assertThat(vault.problems).isEmpty();
         }
     }
@@ -50,7 +48,7 @@ class VaultEnterBaselineTest {
     @Test void keyImportUnlocksOnlyFromThePassphraseFieldAndEnterNeverCommits() throws Exception {
         try (var vault = new StagedVaultHost(root.resolve("home"), true)) {
             vault.createVault("synthetic-enter-pass");
-            onEdt(() -> vault.surface("Credential Vault").requestClose());
+            vault.requestCloseManager();
             Class<?> apiType = vault.loader.loadClass("dev.jasper.vault.api.VaultApi");
             var api = new AtomicReference<Object>(); var context = new AtomicReference<PluginContext>();
             vault.start(CONSUMER, Set.of(UnboundVault.ID), new Plugin() {

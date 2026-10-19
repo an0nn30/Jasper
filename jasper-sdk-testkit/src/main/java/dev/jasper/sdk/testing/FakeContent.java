@@ -24,6 +24,8 @@ final class FakeContent implements ContentTab {
     List<ContentCommand> commands=List.of();
     List<ContentStatus> status=List.of();
     WindowOwner owner;
+    /** The owned view the tab shows; null for raw content. */
+    FakeKitView view;
     boolean active,closed;
     int pins;
     Runnable focus=()->{};

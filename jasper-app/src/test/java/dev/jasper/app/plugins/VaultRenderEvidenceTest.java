@@ -40,8 +40,8 @@ class VaultRenderEvidenceTest {
                 try(var vault=new StagedVaultHost(root.resolve("companions-"+theme),!theme.equals("light"),appearance)) {
                     vault.createVault("synthetic-companion-password");
                     vault.seedReferenceItems(root.resolve("keys-"+theme),form->natural(theme,"import-ready",form));
-                    var manager=vault.surface("Credential Vault");
-                    onEdt(()->menu(manager.titleActions(),"add","Secure Note"));
+                    var manager=vault.manager();
+                    onEdt(()->menu(manager,"add","Secure Note"));
                     var note=vault.awaitSurface("Add Secure Note");natural(theme,"note",note);onEdt(note::requestClose);
                     onEdt(()->click(manager,"delete"));var delete=vault.awaitSurface("Delete entry");natural(theme,"delete",delete);onEdt(delete::requestClose);
                     vault.invoke("dev.jasper.vault.change_password");
@@ -55,7 +55,7 @@ class VaultRenderEvidenceTest {
                     Object managed=credentials.stream().filter(c->reflect(c.getClass(),c,"name",new Class<?>[0]).equals("work_rsa")).findFirst().orElseThrow();
                     var managedId=(java.util.UUID)reflect(managed.getClass(),managed,"id",new Class<?>[0]);
                     onEdt(()->{
-                        try {var field=vault.plugin.getClass().getDeclaredField("managerWindow");field.setAccessible(true);Object window=field.get(vault.plugin);reflect(window.getClass(),window,"show",new Class<?>[]{dev.jasper.sdk.terminal.WindowHandle.class,java.util.Optional.class},owner,java.util.Optional.of(managedId));}
+                        try {var field=vault.plugin.getClass().getDeclaredField("managerTab");field.setAccessible(true);Object window=field.get(vault.plugin);reflect(window.getClass(),window,"show",new Class<?>[]{dev.jasper.sdk.terminal.WindowHandle.class,java.util.Optional.class},owner,java.util.Optional.of(managedId));}
                         catch(ReflectiveOperationException e){throw new AssertionError(e);}
                         click(manager,"edit");
                     });
@@ -83,9 +83,12 @@ class VaultRenderEvidenceTest {
     private static void natural(String theme,String state,AuxiliarySurface surface) {
         onEdt(()->{
             var holder=surface.holder();var size=holder.getPreferredSize();
-            boolean manager=surface.title().equals("Credential Vault");int width=manager?900:Math.max(1,size.width),height=manager?555:Math.max(1,size.height);
-            ThemeMigrationCapture.save("vault-companions",theme,state,holder,width,height);
+            ThemeMigrationCapture.save("vault-companions",theme,state,holder,Math.max(1,size.width),Math.max(1,size.height));
         });
+    }
+    /** The manager, a tab, at the size its window had. */
+    private static void natural(String theme,String state,JComponent manager) {
+        onEdt(()->ThemeMigrationCapture.save("vault-companions",theme,state,manager,900,555));
     }
 
     private void capture(String theme, Path data) throws Exception {
@@ -103,7 +106,7 @@ class VaultRenderEvidenceTest {
                 UnboundVault.assertUnbound(StagedVaultHost.kitView(create));
                 click(create, "submit");
             });
-            var manager = vault.awaitSurface("Credential Vault");
+            var manager = vault.awaitManager();
             save(theme, "manager-empty", manager, 900, 580);
             vault.invoke("dev.jasper.vault.generate_key");
             var generator = vault.surface("Generate SSH Key");
@@ -113,7 +116,7 @@ class VaultRenderEvidenceTest {
             save(theme, "manager-locked", manager, 900, 580);
             onEdt(() -> click(manager, "unlock"));
             save(theme, "manager-unlock", manager, 900, 580);
-            onEdt(() -> manager.requestClose());
+            vault.requestCloseManager();
             vault.invoke("dev.jasper.vault.open");
             var unlock = vault.surface("Unlock Vault");
             save(theme, "unlock", unlock, 580, 300);
@@ -122,6 +125,12 @@ class VaultRenderEvidenceTest {
         } finally {
             onEdt(() -> { controller.close(); ThemeTestSupport.controller(true); });
         }
+    }
+
+    /** The manager, a tab: its component. */
+    static void save(String theme, String state, JComponent manager, int width, int height) throws Exception {
+        onEdt(() -> ThemeMigrationCapture.save(FAMILY, theme, state, manager, UIScale.scale(width), UIScale.scale(height)));
+        assertThat(Files.size(Path.of("build/theme-migration-evidence", FAMILY, theme, state + ".png"))).isPositive();
     }
 
     static void save(String theme, String state, AuxiliarySurface surface, int width, int height) throws Exception {
