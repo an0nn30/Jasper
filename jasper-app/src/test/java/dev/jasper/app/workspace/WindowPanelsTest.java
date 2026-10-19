@@ -120,6 +120,26 @@ class WindowPanelsTest {
         });
     }
 
+    /** Plan 12 Rulings 18: under flush frames the View toggle action activates the panel it opens; a plugin's toggle does not. */
+    @Test void underFlushFramesTheViewToggleActivatesThePanelAndAPluginsToggleDoesNot() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var owner = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()), themes, DockChromeTest.classicDock());
+            var model = new Contributions();
+            owner.connectContributions(model, UiState.inMemory());
+            model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("hosts"));
+            model.action("dev.x.hosts.toggle").orElseThrow().invoke(new Contributions.Invocation(owner.id(), Optional.empty()));
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("the View toggle is a user gesture").hasValue(Slot.LEFT_TOP);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNull();
+            owner.area().focusMoved(null);
+            toggle(model, owner, "dev.x.hosts");
+            assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();
+            assertThat(owner.area().focusedSlot()).as("a plugin's programmatic toggle").isEmpty();
+        });
+    }
+
     @Test void aSplitPanelOpensUnderTheFirstHalfAndBothShowAtOnce() throws Exception {
         edt(() -> {
             var model = new Contributions();

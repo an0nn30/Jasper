@@ -77,7 +77,7 @@ final class WindowContributions implements AutoCloseable {
         renderStatus();
         restoreSizes();
         for (DockStripe stripe : owner.stripes().all()) {
-            stripe.onToggle = this::togglePanel;
+            stripe.onToggle = this::toggleAndActivate;
             stripe.onMove = this::movePanel;
             stripe.onHide = this::hidePanel;
         }
@@ -186,10 +186,18 @@ final class WindowContributions implements AutoCloseable {
             case SHOW -> showPanel(request.panelId());
             case HIDE -> hidePanel(request.panelId());
             case TOGGLE -> togglePanel(request.panelId());
+            case ACTIVATING_TOGGLE -> toggleAndActivate(request.panelId());
         }
     }
 
     private void togglePanel(String id) { if (panels.containsKey(id)) dock.toggle(id); }
+
+    /** A toggle by a user gesture: a panel it shows becomes the active tool window under flush frames (plan 12 Rulings 18). */
+    private void toggleAndActivate(String id) {
+        if (!panels.containsKey(id)) return;
+        dock.toggle(id);
+        if (dock.visible(id)) owner.area().activate(id);
+    }
 
     private void showPanel(String id) { if (panels.containsKey(id)) dock.show(id); }
 
