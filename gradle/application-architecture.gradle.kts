@@ -64,6 +64,11 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                     check(to.startsWith("dev.jasper.app.dock.") || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
                         "dev.jasper.app.dock is JDK-only and holds no Swing or AWT components: $line"
                     }
+                // The workspace layout model is pure: JDK types only and nothing from java.awt.
+                if (module == app && packageOf(from) == "dev.jasper.app.layout")
+                    check(to.startsWith("dev.jasper.app.layout.") || (to.startsWith("java.") && !to.startsWith("java.awt."))) {
+                        "dev.jasper.app.layout is JDK-only and holds no Swing, AWT or file format: $line"
+                    }
                 if (module == app && packageOf(from) == "dev.jasper.app.vmoptions")
                     check(to.startsWith("dev.jasper.app.vmoptions.") || to.startsWith("com.sun.management.")
                         || (jdk(to) && !to.startsWith("java.awt.") && !to.startsWith("javax.swing."))) {
