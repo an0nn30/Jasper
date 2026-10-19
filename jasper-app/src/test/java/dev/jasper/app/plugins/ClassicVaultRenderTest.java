@@ -148,8 +148,9 @@ class ClassicVaultRenderTest {
         });
     }
 
-    static final String CATEGORIES = "0+34 surface.app, 34+1 border.window, 35+24 surface.header, 59+1 border.window, 60+4 surface.panel, "
-        + "64+22 selection.bg, 86+448 surface.panel, 534+1 border.window";
+    /** The Categories column, on surface.sidebar: the IntelliJ Light port's sidebar is not its panel (the user's 2026-10-18 direction). */
+    static final String CATEGORIES = "0+34 surface.app, 34+1 border.window, 35+24 surface.header, 59+1 border.window, 60+4 surface.sidebar, "
+        + "64+22 selection.bg, 86+448 surface.sidebar, 534+1 border.window";
     /** The Items column: its last row's rule is border.row, where the mock draws #DDE0E4 (the user's 2026-10-18 direction). */
     static final String ITEMS = "0+20 surface.tableHeader, 20+1 border.divider, 21+22 selection.bg, 43+22 surface.zebra, 65+413 surface.card, "
         + "478+1 border.row, 479+20 surface.zebra, 499+1 border.window";
@@ -174,11 +175,15 @@ class ClassicVaultRenderTest {
     /**
      * The Details pane of amp at x 1085: its header strip and rule, the Fields grid (border.row between its rows), the rule
      * over the actions and a button's gradient, on surface.panel. The mock draws the pane on #ECEDEF and the grid's rule
-     * #E6E8EB; the render's are surface.panel and border.row (the user's 2026-10-18 direction).
+     * #E6E8EB; the render's are surface.panel and border.row (the user's 2026-10-18 direction). Under the IntelliJ Light port
+     * the "Modified:" label's ink at x 1085 reads as a run of its own, so the pane is read there down to its rule at logical
+     * row 166 ({@link #DETAILS}) and from that row at x {@link #DETAILS_LOWER_X}, clear of the labels ({@link #DETAILS_LOWER}).
      */
     static final String DETAILS = "0+24 surface.header, 24+1 border.window, 25+77 surface.panel, 102+1 border.divider, 103+26 surface.card, "
-        + "129+1 border.row, 130+26 surface.card, 156+1 border.divider, 157+8 surface.panel, 165+1 border.window, 166+61 surface.panel, "
-        + "227+1 button.secondary.border, 228+22 button.secondary.bg~button.end, 250+1 button.secondary.border, 251+248 surface.panel, 499+1 border.window";
+        + "129+1 border.row, 130+26 surface.card, 156+1 border.divider, 157+8 surface.panel, 165+1 border.window";
+    static final String DETAILS_LOWER = "0+61 surface.panel, 61+1 button.secondary.border, 62+22 button.secondary.bg~button.end, "
+        + "84+1 button.secondary.border, 85+248 surface.panel, 333+1 border.window";
+    static final int DETAILS_LOWER_X = 1200;
     static final String DETAILS_NONE = "0+24 surface.header, 24+1 border.window, 25+474 surface.panel, 499+1 border.window";
 
     @Test @Timeout(value = 240, unit = TimeUnit.SECONDS)
@@ -194,7 +199,8 @@ class ClassicVaultRenderTest {
                 vault.dispatchToManager(new UiEvent.Selected("rows", Set.of(ids.getFirst().toString())));
                 var selected = render(manager, SELECTED.logicalWidth(), SELECTED.logicalHeight());
                 MockMatch.save("light/vault-manager-selected", SELECTED.read(), selected);
-                bands("the Details pane of amp", selected, 1085, 70, 1070, DETAILS);
+                bands("the Details pane of amp", selected, 1085, 70, 70 + 2 * 166, DETAILS);
+                bands("the Details pane of amp below its rule", selected, DETAILS_LOWER_X, 70 + 2 * 166, 1070, DETAILS_LOWER);
                 bands("the Categories column", selected, 6, 0, 1070, CATEGORIES);
                 bands("the Items column", selected, 854, 70, 1070, ITEMS);
                 bands("the toolbar row", selected, 1600, 0, 70, TOOLBAR);

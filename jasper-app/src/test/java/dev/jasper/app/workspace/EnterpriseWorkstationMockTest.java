@@ -71,6 +71,15 @@ class EnterpriseWorkstationMockTest {
         String[] names = {"menu row", "menu rule", "toolbar row", "toolbar rule", "tab strip", "tab rule"};
         Color[] colours = {MockProfile.role(dark, "surface.app"), MockProfile.role(dark, "border.divider"), MockProfile.role(dark, "surface.app"),
             MockProfile.painted(dark, WindowPairs.RULE), MockProfile.role(dark, "surface.tabstrip"), MockProfile.role(dark, "border.window")};
+        // The user's 2026-10-18 direction: the New UI Dark port paints the tab strip and its rule alike (#1E1F22), so the
+        // render reads them as one run, measured against the mock's strip and rule together.
+        if (MockProfile.deltaE(colours[4], colours[5]) <= 2.5) {
+            expected = new ArrayList<>(expected.subList(0, 6));
+            expected.set(4, new MockProfile.Run(expected.get(4).start(), expected.get(4).length() + expected.get(5).length(), expected.get(4).color()));
+            expected.remove(5);
+            names = java.util.Arrays.copyOf(names, 5);
+            names[4] = "tab strip and its rule";
+        }
         for (int i = 0; i < names.length; i++) same(what + names[i], actual.get(i), expected.get(i), 2, colours[i]);
     }
 

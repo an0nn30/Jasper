@@ -92,19 +92,21 @@ class SettingsPagesMockTest {
         PROBES.put("notifications", List.of(probe("System checkbox", 262, 86, "accent"), probe("table box left", 260, 300, "border.control"),
             probe("table box right", 1010, 233, "border.control"), probe("header band", 400, 233, "surface.tableHeader"), probe("Display separator", 755, 233, "border.divider"),
             probe("Source separator", 902, 233, "border.divider"), probe("header rule", 400, 243, "border.divider"), probe("heading band", 400, 255, "surface.tableHeader"),
-            probe("data row", 400, 277, "surface.card"), probe("Display arrow", 800, 275, null)));
+            // The user's 2026-10-18 direction: the Display arrow is text.placeholder, which the mock's #7A808A matched before the port.
+            probe("data row", 400, 277, "surface.card"), probe("Display arrow", 800, 275, "text.placeholder")));
         tight("notifications", "header band", "heading band");
         face("notifications", "table box left", "table box right", "header band", "Display separator", "Source separator",
             "header rule", "heading band", "data row", "Display arrow");
-        // The heading count is semibold in text.secondary and the Source cells read text.secondary (2x: "6 groups" 1825 to
-        // 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561).
-        INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14, "text.secondary"), new Ink("Default", 908, 270, 48, 14, "text.secondary")));
+        // The heading count is semibold in text.secondary through the table face's text guard ("heading count", which moves
+        // the IntelliJ Light port's text.secondary: the user's 2026-10-18 direction) and the Source cells read text.secondary
+        // (2x: "6 groups" 1825 to 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561).
+        INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14, "heading count"), new Ink("Default", 908, 270, 48, 14, "text.secondary")));
         face("notifications", "6 groups", "Default");
         // Find by Shortcut and Collapse All are each 1 px wider than the mock's (the labels' fractional advances round up), so
         // the Find by Shortcut probe takes its face 3 px inside the mock's left edge (737), which ours meets at 735.
         PROBES.put("keymap", List.of(probe("search field top", 300, 54, "border.input"), probe("Find by Shortcut face", 740, 65, "button.secondary.bg"),
             probe("tool button top", 790, 53, "button.secondary.border"), probe("tree box top", 600, 83, "border.control"), probe("header band", 600, 94, "surface.tableHeader"), probe("header rule", 600, 104, "border.divider"),
-            probe("Scope separator", 779, 94, "border.divider"), probe("Shortcut separator", 886, 94, "border.divider"), probe("Copy keycap edge", 911, 180, null)));
+            probe("Scope separator", 779, 94, "border.divider"), probe("Shortcut separator", 886, 94, "border.divider"), probe("Copy keycap edge", 911, 180, "keycap edge")));
         tight("keymap", "header band");
         face("keymap", "header rule", "Copy keycap edge");
         // Mock 07b: the band's edges and fill, the field's ring, the dot, Set's disabled fill; the selected row's keycaps
@@ -115,7 +117,8 @@ class SettingsPagesMockTest {
             probe("Copy keycap face", 915, 183, null)));
         face("keymap-recording", "Copy keycap face", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
             "recorder field", "recorder ring", "armed dot", "Set disabled");
-        PROBES.put("plugins", List.of(probe("list box", 247, 300, "border.control"), probe("list surface", 400, 400, "surface.card"), probe("search strip", 400, 56, "surface.panel"),
+        // The search strip is surface.sidebar, which the IntelliJ Light port sets apart from surface.panel (the user's 2026-10-18 direction).
+        PROBES.put("plugins", List.of(probe("list box", 247, 300, "border.control"), probe("list surface", 400, 400, "surface.card"), probe("search strip", 400, 56, "surface.sidebar"),
             probe("search strip rule", 400, 90, "border.row"), probe("heading band", 450, 99, "surface.tableHeader"), probe("selected row", 450, 120, "selection.bg"),
             probe("checkbox on the selection", 256, 133, "surface.input"), probe("active tab", 558, 113, "surface.card"), probe("inactive tab", 638, 113, "surface.stripe"),
             probe("Disable right edge", 1023, 65, "button.secondary.border"), probe("Disable top edge", 1000, 53, "button.secondary.border"), probe("second heading rule", 450, 151, "border.row"),

@@ -97,6 +97,14 @@ text = "/dev/jasper/ui/icons/LICENSE.txt"
 notice = "/dev/jasper/ui/icons/ATTRIBUTION.txt"
 
 [[component]]
+name = "IntelliJ Platform themes (the Enterprise theme)"
+version = ""
+license = "Apache-2.0"
+homepage = "https://github.com/JetBrains/intellij-community"
+text = "apache-2.0.txt"
+notice = "intellij-themes.NOTICE.txt"
+
+[[component]]
 name = "JCL over SLF4J"
 version = "1.7.36"
 license = "Apache-2.0"

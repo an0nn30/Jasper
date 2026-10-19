@@ -90,9 +90,16 @@ class SettingsChromeMockTest {
     static PaintPair box() { return new PaintPair(SemanticColor.BORDER_WINDOW, EnterpriseLook.kit().colors().dialogSurface(), SurfaceContrast.Guard.STRUCTURAL); }
 
     /**
+     * The disabled Forward glyph's darkest pixel, faded as one layer: text.primary over the header's surface.app at this
+     * share. The user's 2026-10-18 direction: the IntelliJ Light port's colours are not the mock's, so the composite is
+     * the port's, measured (#AFAFAF), not the mock's pixel.
+     */
+    static final double FADED_SHARE = 0.277;
+    /**
      * The guarded and composited colours a probe may name: the frame's header rule and the titled boxes, the sidebar rule
-     * on the navigation slot, the footer band's rule, and the recording band's edges (border.focus at the kit's edge alpha
-     * over surface.rowHover).
+     * on the navigation slot, the footer band's rule, the recording band's edges (border.focus at the kit's edge alpha
+     * over surface.rowHover), the disabled Forward glyph, a table heading's count and a keycap's edge (text.tertiary at the
+     * kit's keycap edge alpha over surface.card).
      */
     static final java.util.Map<String, java.util.function.Supplier<Color>> PAINTED = java.util.Map.of(
         "window rule", () -> MockProfile.painted(false, box()),
@@ -103,7 +110,12 @@ class SettingsChromeMockTest {
             Color focus = MockProfile.role(false, "border.focus");
             double alpha = EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_DETAIL_EDGE_ALPHA) / 255.0;
             return ColorMath.mix(focus, MockProfile.role(false, "surface.rowHover"), alpha);
-        });
+        },
+        "faded glyph", () -> ColorMath.mix(MockProfile.role(false, "text.primary"), MockProfile.role(false, "surface.app"), FADED_SHARE),
+        "heading count", () -> MockProfile.painted(false, new PaintPair(SemanticColor.TEXT_SECONDARY, dev.jasper.ui.theme.DerivedColor.SURFACE_TABLE_HEADER,
+            SurfaceContrast.Guard.TEXT)),
+        "keycap edge", () -> ColorMath.mix(MockProfile.role(false, "text.tertiary"), MockProfile.role(false, "surface.card"),
+            EnterpriseLook.kit().metrics().value(dev.jasper.ui.metrics.DesignMetrics.Role.KEYCAP_EDGE_ALPHA) / 255.0));
 
     /** {@code colour}'s value in the shipped Light theme: a {@link #PAINTED} name or a role key. */
     static Color expected(String colour) {
@@ -159,12 +171,12 @@ class SettingsChromeMockTest {
 
     /**
      * The history pair's glyphs and the footer's "?" (its glyph and its fill, the classic gradient's top), which the frame
-     * probes do not reach. The disabled Forward glyph is faded as one layer, a composite no role holds: it takes the mock's.
+     * probes do not reach. The disabled Forward glyph is faded as one layer, a composite no role holds ("faded glyph").
      */
     static List<Ink> inksOf(Page page) {
         int h = page.height();
         return List.of(new Ink("Back glyph", new Rectangle(250, 10, 15, 15), true, "text.primary"),
-            new Ink("Forward glyph", new Rectangle(275, 11, 15, 13), true, null),
+            new Ink("Forward glyph", new Rectangle(275, 11, 15, 13), true, "faded glyph"),
             new Ink("? glyph", new Rectangle(17, h - 37, 15, 15), true, "text.strong.secondary"),
             new Ink("? fill", new Rectangle(17, h - 37, 15, 15), false, "button.secondary.bg"));
     }
@@ -208,7 +220,8 @@ class SettingsChromeMockTest {
                 int h = 2 * page.height();
                 var areas = List.of(new Rectangle(0, 0, 460, h - 90), new Rectangle(462, 0, 1618, 70), new Rectangle(0, h - 90, 2080, 90));
                 var names = List.of("sidebar", "header", "footer");
-                var floors = List.of(0.97, 0.96, 0.98);
+                // The user's 2026-10-18 direction: the IntelliJ Light port; measured sidebar 0.950 and footer 0.942 at their lowest.
+                var floors = List.of(0.92, 0.96, 0.91);
                 for (int i = 0; i < areas.size(); i++) {
                     var area = areas.get(i);
                     var ours = SettingsMockMatch.crop(render[0], area); var theirs = SettingsMockMatch.crop(mock, area);

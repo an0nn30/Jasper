@@ -4,9 +4,10 @@
 Usage: check_pairs.py OUT_DIR [NAME_FILTER]
 
 For every pairs.json entry with "min_agreement", runs compare_mock.py into OUT_DIR and passes the pair when its edge
-agreement is at least that floor and every colour in "colours" is present in both images: in the mock crop as a 2x2
-block within Delta E 6 (CIE76), and in the render, which paints theme roles exactly, within Delta E 1.5 as a 2x2 block
-or a straight run of three pixels (a 1 px edge that a fractional layout position leaves one device pixel wide). Prints one PASS or FAIL line per pair and exits 1 when any pair fails. Opt-in: never part of
+agreement is at least that floor and every colour in "colours" is present in the render, which paints theme roles
+exactly, within Delta E 1.5 (CIE76) as a 2x2 block or a straight run of three pixels (a 1 px edge that a fractional layout
+position leaves one device pixel wide); since the user's 2026-10-18 direction the Enterprise theme ports IntelliJ's, so
+the colours are the theme's, not the mocks'. Prints one PASS or FAIL line per pair and exits 1 when any pair fails. Opt-in: never part of
 ./gradlew check. Render first: ./gradlew :jasper-ui:gallery -Pjasper.galleryKit=enterprise -Pjasper.galleryTheme=light
 -Pjasper.galleryScale=2
 """
@@ -23,7 +24,6 @@ HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 # The render paints role colours exactly; a tolerance of 6 would let the Enterprise neutrals stand in for one another.
 RENDER_TOLERANCE = 1.5
-MOCK_TOLERANCE = 6.0
 
 
 def lab(rgb):
@@ -76,9 +76,8 @@ def main():
         result = subprocess.run(command, capture_output=True, text=True)
         found = re.search(r"edge_agreement=([0-9.]+)", result.stdout)
         agreement = float(found.group(1)) if found else 0.0
-        mock_image, render_image = crop(mock, pair["crop"]), crop(render, pair.get("render_crop"))
-        missing = [c for c in pair.get("colours", [])
-                   if not (present(mock_image, c, MOCK_TOLERANCE) and present(render_image, c, RENDER_TOLERANCE, lines=True))]
+        render_image = crop(render, pair.get("render_crop"))
+        missing = [c for c in pair.get("colours", []) if not present(render_image, c, RENDER_TOLERANCE, lines=True)]
         ok = found is not None and agreement >= pair["min_agreement"] and not missing
         failed |= not ok
         detail = f"agreement={agreement:.3f} (floor {pair['min_agreement']:.2f})"

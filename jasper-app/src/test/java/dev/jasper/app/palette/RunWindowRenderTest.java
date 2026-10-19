@@ -162,8 +162,20 @@ public class RunWindowRenderTest {
 
     /** The probe's result in window pixels: in the mock from its window's origin, in the render the part under the list moved up. */
     static int probe(BufferedImage image, int originX, int originY, Feature feature, int shift, KitContext c) {
+        return probe(image, originX, originY, feature, shift, feature.background().apply(c));
+    }
+
+    /**
+     * The probe in the mock, on the mock's own colour where it starts: since the user's 2026-10-18 direction the theme ports
+     * IntelliJ's, so a role need not be the mock's colour; the mock still gives the layout.
+     */
+    static int mockProbe(BufferedImage mock, Feature feature) {
+        return probe(mock, MOCK_X, MOCK_Y, feature, 0, new Color(mock.getRGB(MOCK_X + feature.x(), MOCK_Y + feature.y())));
+    }
+
+    static int probe(BufferedImage image, int originX, int originY, Feature feature, int shift, Color background) {
         int steps = feature.dx() != 0 ? WIDTH : MOCK_HEIGHT;
-        int found = MockComparison.edge(image, originX + feature.x(), originY + feature.y() + shift, feature.dx(), feature.dy(), steps, feature.background().apply(c));
+        int found = MockComparison.edge(image, originX + feature.x(), originY + feature.y() + shift, feature.dx(), feature.dy(), steps, background);
         return found < 0 ? -1 : (feature.dx() != 0 ? feature.x() + found * feature.dx() : feature.y() + found * feature.dy());
     }
 
@@ -182,7 +194,7 @@ public class RunWindowRenderTest {
         features.addAll(state.equals("typing-auth") ? TYPING : OPENED);
         var misses = new ArrayList<String>();
         for (var feature : features) {
-            int expected = probe(mock, MOCK_X, MOCK_Y, feature, 0, c);
+            int expected = mockProbe(mock, feature);
             int actual = probe(render, 0, 0, feature, feature.lower() ? SHIFT : 0, c);
             assertThat(expected).as(state + ": the mock shows " + feature.name()).isNotNegative();
             String line = feature.name() + ": mock " + expected + ", render " + actual;

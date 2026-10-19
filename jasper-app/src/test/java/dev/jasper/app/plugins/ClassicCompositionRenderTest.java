@@ -51,6 +51,16 @@ class ClassicCompositionRenderTest {
         return ColorMath.hex(ColorMath.mix(subtle, MockProfile.role(dark, ground), subtle.getAlpha() / 255.0));
     }
 
+    /**
+     * The panel's faint rule at logical row {@code at} and the 20 px column header under it: one band where the two paint
+     * within the band reader's ΔE 1.5 of each other, as the New UI Dark port's do (the user's 2026-10-18 direction).
+     */
+    static String ruleAndHeader(boolean dark, int at) {
+        String rule = rule(dark, "surface.panel");
+        return MockMatch.deltaE(Color.decode(rule), MockProfile.role(dark, "surface.tableHeader")) <= 1.5
+            ? at + "+21 " + rule + "~surface.tableHeader" : at + "+1 " + rule + ", " + (at + 1) + "+20 surface.tableHeader";
+    }
+
     /** {@code pair} as the shipped theme's Light variant paints it, as hex: a guarded rule in a band. */
     static String painted(dev.jasper.ui.theme.PaintPair pair) { return ColorMath.hex(MockProfile.painted(false, pair)); }
 
@@ -68,7 +78,7 @@ class ClassicCompositionRenderTest {
      */
     static String sessions(boolean dark, int above, int below) {
         String panel = rule(dark, "surface.panel");
-        return "0+36 surface.panel, 36+1 " + panel + ", 37+20 surface.tableHeader, 57+1 border.divider, 58+" + above + " surface.card, "
+        return "0+36 surface.panel, " + ruleAndHeader(dark, 36) + ", 57+1 border.divider, 58+" + above + " surface.card, "
             + (58 + above) + "+22 selection.bg, " + (80 + above) + "+" + below + " surface.card, 235+1 border.window, 236+22 surface.panel, "
             + "258+1 " + panel + ", 259+22 surface.panel, 281+1 " + panel + ", 282+22 surface.panel, 304+1 " + panel + ", 305+22 surface.panel, "
             + "327+1 " + panel + ", 328+22 surface.panel, 350+1 " + panel + ", 351+40 surface.panel";
@@ -96,8 +106,11 @@ class ClassicCompositionRenderTest {
                     {"minecraft-local", "192.168.1.124", "dustin", "Local Network"}});
                 fixture.selectSession(ids.get(0));
                 var crop = new MockMatch.Crop(DISCONNECTED, 2136, 230, 700, 782);
+                // "Vault locked" is the warning text through the properties face's text guard, which moves the IntelliJ Light
+                // port's status.warning (the user's 2026-10-18 direction).
                 check("light/sessions-locked", crop, fixture.render(crop.logicalWidth(), crop.logicalHeight()), 4, SESSIONS_DISCONNECTED, 1, 0.55,
-                    "selection.bg", "status.warning");
+                    "selection.bg", painted(new dev.jasper.ui.theme.PaintPair(dev.jasper.ui.theme.SemanticColor.STATUS_WARNING,
+                        dev.jasper.ui.theme.SemanticColor.SURFACE_PANEL, dev.jasper.ui.theme.SurfaceContrast.Guard.TEXT)));
             }
         });
     }
@@ -121,7 +134,7 @@ class ClassicCompositionRenderTest {
 
     /** Down the tunnels table at x 4: the panel and its faint rule, the column header and its divider, a row and its faint rule. */
     static String tunnels(boolean dark) {
-        return "0+36 surface.panel, 36+1 " + rule(dark, "surface.panel") + ", 37+20 surface.tableHeader, 57+1 border.divider, 58+24 surface.card, "
+        return "0+36 surface.panel, " + ruleAndHeader(dark, 36) + ", 57+1 border.divider, 58+24 surface.card, "
             + "82+1 " + rule(dark, "surface.card") + ", 83+238 surface.card";
     }
     static final String TUNNELS_NONE = "0+20 surface.tableHeader, 20+1 border.divider, 21+300 surface.card";
@@ -149,13 +162,18 @@ class ClassicCompositionRenderTest {
 
     /**
      * Down the SFTP table at x 8: the panel and its faint rule, the column header and its divider, the selected row, the
-     * zebra rows, the faint rule over the status line and the panel.
+     * zebra rows, the faint rule over the status line and the panel. The New UI Dark port's zebra is its card (the user's
+     * 2026-10-18 direction), so there the rows read as one band.
      */
     static String sftp(boolean dark) {
         var rows = new StringBuilder();
-        for (int i = 0; i < 10; i++) rows.append(105 + 22 * i).append("+22 ").append(i % 2 == 0 ? "surface.zebra" : "surface.card").append(", ");
-        return "0+61 surface.panel, 61+1 " + rule(dark, "surface.panel") + ", 62+20 surface.tableHeader, 82+1 border.divider, 83+22 selection.bg, "
-            + rows + "325+2 surface.zebra, 327+1 " + rule(dark, "surface.panel") + ", 328+28 surface.panel";
+        if (MockProfile.role(dark, "surface.zebra").equals(MockProfile.role(dark, "surface.card"))) rows.append("105+222 surface.card, ");
+        else {
+            for (int i = 0; i < 10; i++) rows.append(105 + 22 * i).append("+22 ").append(i % 2 == 0 ? "surface.zebra" : "surface.card").append(", ");
+            rows.append("325+2 surface.zebra, ");
+        }
+        return "0+61 surface.panel, " + ruleAndHeader(dark, 61) + ", 82+1 border.divider, 83+22 selection.bg, "
+            + rows + "327+1 " + rule(dark, "surface.panel") + ", 328+28 surface.panel";
     }
     static final String SFTP_DISCONNECTED = "0+36 surface.panel, 36+1 " + rule(false, "surface.panel") + ", 37+20 surface.tableHeader, "
         + "57+1 border.divider, 58+269 surface.card, 327+1 " + rule(false, "surface.panel") + ", 328+28 surface.panel";
@@ -229,7 +247,9 @@ class ClassicCompositionRenderTest {
                 StagedVaultHost.settle();
                 var tunnelCrop = new MockMatch.Crop("04 New Tunnel/New Tunnel - Local.png", 2, 60, 1040, 898);
                 check("light/new-tunnel", tunnelCrop, fixture.renderSurface(newTunnel, tunnelCrop.logicalWidth(), tunnelCrop.logicalHeight()),
-                    18, NEW_TUNNEL, 1, NEW_TUNNEL_FLOOR, "surface.app", "surface.footer", "accent", "status.success");
+                    // The route's target edge paints hue.green, which the IntelliJ Light port sets apart from status.success
+                    // (the user's 2026-10-18 direction).
+                    18, NEW_TUNNEL, 1, NEW_TUNNEL_FLOOR, "surface.app", "surface.footer", "accent", "hue.green");
             }
         });
     }
