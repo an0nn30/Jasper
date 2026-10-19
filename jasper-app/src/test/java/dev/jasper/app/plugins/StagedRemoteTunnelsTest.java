@@ -79,11 +79,7 @@ class StagedRemoteTunnelsTest {
                 assertThat(textLines).hasSize(3);
                 for (var textLine : textLines) {
                     var bounds = javax.swing.SwingUtilities.convertRectangle(textLine.getParent(), textLine.getBounds(), db);
-                    var metrics = textLine.getFontMetrics(textLine.getFont());
-                    int baseline = textLine.getBaseline(textLine.getWidth(), textLine.getHeight());
-                    // Compact rows omit the title font's leading; its ascent and descent must still fit.
-                    assertThat(baseline).as("the ascent fits for %s", textLine.getText()).isGreaterThanOrEqualTo(metrics.getAscent());
-                    assertThat(baseline + metrics.getDescent()).as("the descent fits for %s", textLine.getText()).isLessThanOrEqualTo(bounds.height);
+                    assertTextInkFits(textLine);
                     assertThat(bounds.y).isGreaterThanOrEqualTo(0);
                     assertThat(bounds.y + bounds.height).isLessThanOrEqualTo(db.getHeight());
                 }
@@ -318,6 +314,33 @@ class StagedRemoteTunnelsTest {
             if (child instanceof Container nested) result.addAll(all(nested, type));
         }
         return result;
+    }
+
+    /** Compare the actual paint with the same centered text given ample vertical space. */
+    static void assertTextInkFits(JLabel label) {
+        int width = label.getWidth(), height = label.getHeight();
+        int padding = label.getFontMetrics(label.getFont()).getHeight();
+        var clipped = new java.awt.image.BufferedImage(width, height + 2 * padding, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var expanded = new java.awt.image.BufferedImage(width, height + 2 * padding, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = clipped.createGraphics();
+        try {
+            graphics.translate(0, padding);
+            graphics.clipRect(0, 0, width, height);
+            label.paint(graphics);
+        } finally { graphics.dispose(); }
+        graphics = expanded.createGraphics();
+        try {
+            label.setSize(width, height + 2 * padding);
+            label.paint(graphics);
+        } finally {
+            label.setSize(width, height);
+            graphics.dispose();
+        }
+        int[] expected = expanded.getRGB(0, 0, width, expanded.getHeight(), null, 0, width);
+        assertThat(java.util.Arrays.stream(expected).anyMatch(pixel -> (pixel >>> 24) != 0))
+            .as("the reference paints text for %s", label.getText()).isTrue();
+        assertThat(clipped.getRGB(0, 0, width, clipped.getHeight(), null, 0, width))
+            .as("all text ink fits vertically for %s", label.getText()).containsExactly(expected);
     }
 
     static void layout(Container root) {
