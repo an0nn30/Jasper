@@ -2012,7 +2012,8 @@
     "min_agreement": 0.5,
     "colours": [
       "#ECEDEF"
-    ]
+    ],
+    "note": "The user's 2026-10-18 direction: IntelliJ's run-configuration combo and Run replace the mock's \"Session:\", combo and Connect. Edge agreement 0.962 before, 0.666 after."
   },
   {
     "name": "composition-dark-session-toolbar",
@@ -2027,7 +2028,8 @@
     "min_agreement": 0.5,
     "colours": [
       "#3C3F44"
-    ]
+    ],
+    "note": "The user's 2026-10-18 direction: IntelliJ's run-configuration combo and Run replace the mock's \"Session:\", combo and Connect. Edge agreement 0.826 before, 0.653 after."
   },
   {
     "name": "composition-light-tunnels",

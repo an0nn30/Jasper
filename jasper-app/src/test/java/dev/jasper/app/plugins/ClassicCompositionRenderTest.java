@@ -102,8 +102,8 @@ class ClassicCompositionRenderTest {
         });
     }
 
-    /** Down the session combo at x 130: the toolbar's surface.app, the combo's ring and its gradient, in either variant. */
-    static final String TOOLBAR = "0+6 surface.app, 6+1 border.control, 7+20 button.secondary.bg~button.end, 27+1 border.control, 28+6 surface.app";
+    /** Down the session combo at x 130: the toolbar's surface.app, the combo's ring and its input box, in either variant. */
+    static final String TOOLBAR = "0+6 surface.app, 6+1 border.control, 7+20 surface.input, 27+1 border.control, 28+6 surface.app";
 
     @Test @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void theSessionToolbarViewMatchesTheWorkstationMocks() throws Exception {
@@ -114,9 +114,7 @@ class ClassicCompositionRenderTest {
                 fixture.selectSession(ids.get(1));
                 var crop = new MockMatch.Crop(dark ? DARK : CONNECTED, 660, 110, 720, 68);
                 check((dark ? "dark" : "light") + "/session-toolbar", crop, fixture.toolbarView(crop.logicalWidth(), crop.logicalHeight()), 130,
-                    TOOLBAR, 1, 0.50, dark ? new String[] {"accent", "surface.app"}
-                        // Connect's edge is accent.edge, where the mock draws #2655AE (the user's 2026-10-18 direction).
-                        : new String[] {"accent", "surface.app", "accent.edge"});
+                    TOOLBAR, 1, 0.50, "surface.input", "border.control");
             }
         });
     }
