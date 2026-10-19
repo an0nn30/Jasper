@@ -231,6 +231,14 @@ class WorkspaceFileReadTest {
         }
     }
 
+    @Test void windowsWhoseRootSplitsShareAnIdAreReadApart() throws Exception {
+        var both = new Snapshot(List.of(window(Role.MAIN, 1, 2), window(Role.CHILD, 3, 4)));
+        WorkspaceFile.write(file(), both);
+        assertThat(Files.readString(file()).split(Pattern.quote(WorkspaceFile.splitId("")), -1))
+            .as("each window's root split names itself and is the parent of its two groups").hasSize(7);
+        assertThat(WorkspaceFile.read(file())).isEqualTo(new Loaded.Restore(both));
+    }
+
     @Test void aSecondMainWindowAnEmptiedChildAndAWindowHoldingAnotherWindowsTabAreDropped() throws Exception {
         String text = WorkspaceFile.encode(snapshot());
         var mainOnly = new Loaded.Restore(new Snapshot(List.of(snapshot().main())));
