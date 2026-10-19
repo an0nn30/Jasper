@@ -150,7 +150,7 @@ All three use the same token keys:
 | `terminal.bg` | `#2B2F36` | `#FAFBFC` | `#000000` |
 | `terminal.fg` | `#F2F4F7` | `#1B1F27` | `#FFFFFF` |
 | `terminal.fg.bold` | `#FFFFFF` | `#000000` | `#FFFFFF` |
-| `terminal.cursor` | `#5B9BF5` | `#2563C9` | `#FFFFFF` |
+| `terminal.cursor` | `#F2F4F7` | `#1B1F27` | `#FFFFFF` |
 | `terminal.selection` | `#3A5A8C` | `#C9DAF2` | `#264F9E` |
 | `terminal.ansi.black` | `#4A515C` | `#1B1F27` | `#4D4D4D` |
 | `terminal.ansi.red` | `#FFA49D` | `#C42B31` | `#FF7B72` |
@@ -262,14 +262,14 @@ Against the editor background, every text role is at least 4.5:1 (lowest: Light 
   },
   "terminal": {
     "dark": {
-      "name": "Slate Cobalt Dark", "bg": "#2B2F36", "fg": "#F2F4F7", "fg.bold": "#FFFFFF", "cursor": "#5B9BF5", "selection": "#3A5A8C",
+      "name": "Slate Cobalt Dark", "bg": "#2B2F36", "fg": "#F2F4F7", "fg.bold": "#FFFFFF", "cursor": "#F2F4F7", "selection": "#3A5A8C",
       "black": "#4A515C", "red": "#FFA49D", "green": "#5FE88A", "yellow": "#FFD75F",
       "blue": "#8FC0FF", "magenta": "#EBA2FF", "cyan": "#4FE0E8", "white": "#D9DEE5",
       "bright.black": "#A5AEB9", "bright.red": "#FFCEC8", "bright.green": "#9CF5B6", "bright.yellow": "#FFE89A",
       "bright.blue": "#BEDCFF", "bright.magenta": "#F6CCFF", "bright.cyan": "#98F2F5", "bright.white": "#FFFFFF"
     },
     "light": {
-      "name": "Slate Cobalt Light", "bg": "#FAFBFC", "fg": "#1B1F27", "fg.bold": "#000000", "cursor": "#2563C9", "selection": "#C9DAF2",
+      "name": "Slate Cobalt Light", "bg": "#FAFBFC", "fg": "#1B1F27", "fg.bold": "#000000", "cursor": "#1B1F27", "selection": "#C9DAF2",
       "black": "#1B1F27", "red": "#C42B31", "green": "#1E7A46", "yellow": "#8A6200",
       "blue": "#1F5FBF", "magenta": "#7A3E9D", "cyan": "#0A728E", "white": "#5A6270",
       "bright.black": "#6B7484", "bright.red": "#B3262C", "bright.green": "#1F8043", "bright.yellow": "#946800",
