@@ -213,6 +213,26 @@ class EditorPluginTest {
         }
     }
 
+    /** Workspace tabs spec 6.5: New Editor Window, with no default key, opens an untitled document in a new child window. */
+    @Test void newEditorWindowOpensAnUntitledDocumentInANewChildWindow() throws Exception {
+        try (var host = host()) {
+            host.start(INFO, Set.of(), Set.of(), plugin());
+            UUID main = host.addTerminalWindow();
+            assertThat(host.actionSpec("dev.jasper.editor.new_window")).hasValueSatisfying(spec -> {
+                assertThat(spec.title()).isEqualTo("New Editor Window");
+                assertThat(spec.defaultBinding()).as("no default key").isEmpty();
+            });
+            assertThat(host.menu("FILE")).containsSubsequence("item:dev.jasper.editor.new", "item:dev.jasper.editor.new_window");
+            assertThat(host.invoke("dev.jasper.editor.new_window", main, null)).isTrue();
+            var tab = host.contentTabs().getFirst();
+            assertThat(host.contentTabs()).hasSize(1);
+            assertThat(tab.window().isMain()).as("a child window").isFalse();
+            assertThat(tab.window().id()).isNotEqualTo(main);
+            assertThat(tab.window().tabs()).hasSize(1);
+            assertThat(host.contentPresentation(tab).title()).startsWith("Untitled");
+        }
+    }
+
     @Test void theOpenActionUsesATerminalWindowsChooserAndClosingTheWindowLetsAFreshOneOpen() throws Exception {
         try (var host = host()) {
             host.start(INFO, Set.of(), Set.of(), plugin());

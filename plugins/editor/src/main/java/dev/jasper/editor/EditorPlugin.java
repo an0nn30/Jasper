@@ -43,7 +43,8 @@ import javax.swing.SwingUtilities;
 
 /** Edits local and remote text files in app-owned workspace tabs; publishes {@link Editor} for other plugins. */
 public final class EditorPlugin implements Plugin {
-    static final String OPEN = "dev.jasper.editor.open", NEW = "dev.jasper.editor.new", SHOW = "dev.jasper.editor.show";
+    static final String OPEN = "dev.jasper.editor.open", NEW = "dev.jasper.editor.new", SHOW = "dev.jasper.editor.show",
+        NEW_WINDOW = "dev.jasper.editor.new_window";
 
     private final Executor ui;
     private final BiFunction<PluginContext, EditorSettings.Declared, EditorEnvironment> environments;
@@ -106,6 +107,9 @@ public final class EditorPlugin implements Plugin {
             invoked -> window().openFrom(invoked.window(), invoked.pane()));
         context.actions().register(ActionSpec.of(NEW, "New Editor File").withKeywords(List.of("editor", "new", "file", "untitled")),
             invoked -> window().newUntitled(invoked.window()));
+        // Workspace tabs spec 6.5: an untitled document in a child window of its own; no default key.
+        context.actions().register(ActionSpec.of(NEW_WINDOW, "New Editor Window").withKeywords(List.of("editor", "new", "window", "untitled")),
+            invoked -> window().newUntitled(invoked.window(), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW));
         context.actions().register(ActionSpec.of(SHOW, "Show Editor").withKeywords(List.of("editor", "tabs")), invoked -> window().show());
         context.actions().register(ActionSpec.of(RecentFilesScope.ACTION, "Recent Files…").withKeywords(List.of("editor", "recent", "files", "open")),
             invoked -> context.palette().open(invoked.window(), RecentFilesScope.ID, Optional.empty(), Optional.empty()));
@@ -129,6 +133,7 @@ public final class EditorPlugin implements Plugin {
         PluginMenu file = context.menus().standard(StandardMenu.FILE);
         file.add(OPEN);
         file.add(NEW);
+        file.add(NEW_WINDOW);
     }
 
     @Override public void stop() {

@@ -307,11 +307,13 @@ public final class EditorWindow {
     public void openLocalFiles(List<Path> files) { openLocalFiles(files, owner()); }
     public void openLocalFiles(List<Path> files, WindowOwner owner) { for (Path file : files) openLocal(file, owner); }
     public void newUntitled() { newUntitled(owner()); }
-    public void newUntitled(WindowOwner owner) {
+    public void newUntitled(WindowOwner owner) { newUntitled(owner, dev.jasper.sdk.ui.TabPlacement.ACTIVE_GROUP); }
+    /** A new untitled document whose tab opens where {@code placement} puts it: New Editor Window's is a new child window. */
+    public void newUntitled(WindowOwner owner, dev.jasper.sdk.ui.TabPlacement placement) {
         origin = owner;
         var ref = new java.util.concurrent.atomic.AtomicReference<WindowOwner>();
         var session = DocumentSession.untitled(model.nextUntitledName(), sessionEnvironment(ref));
-        add(session, ref); select(session);
+        add(session, ref, placement); select(session);
     }
     public void show() { if (selectedTab == null) newUntitled(); else hosted.get(selectedTab).select(); }
     public void dispose() {
@@ -740,6 +742,11 @@ public final class EditorWindow {
     }
 
     private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef) {
+        add(session, ownerRef, dev.jasper.sdk.ui.TabPlacement.ACTIVE_GROUP);
+    }
+
+    private void add(DocumentSession session, java.util.concurrent.atomic.AtomicReference<WindowOwner> ownerRef,
+                     dev.jasper.sdk.ui.TabPlacement placement) {
         EditorSettings settings = environment.settings().get();
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
@@ -759,7 +766,7 @@ public final class EditorWindow {
         });
         model.add(session);
         numbers.put(session, nextNumber++);
-        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view());
+        var handle = context.windows().openTab(new ContentSpec("document:" + java.util.UUID.randomUUID(), session.name()), origin, tab.view(), placement);
         hosted.put(tab, handle); ownerRef.set(handle);
         handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
