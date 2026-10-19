@@ -145,7 +145,7 @@ public interface PluginContext {
     Windows windows();
 
     /**
-     * The terminal windows, tabs and panes. Finding them needs no capability; what a handle may do does.
+     * The Jasper windows, tabs and panes. Finding them needs no capability; what a handle may do does.
      *
      * @return the terminals service
      */

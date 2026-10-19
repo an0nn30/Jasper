@@ -132,9 +132,9 @@ final class FakeUi {
     final FakePluginContext context;
     final Map<String, Action> actions = new LinkedHashMap<>();
     final List<ToolbarItem> toolbar = new ArrayList<>();
-    /** Each toolbar view's built views, per terminal window; empty where the factory threw or the tree was refused. */
+    /** Each toolbar view's built views, per Jasper window; empty where the factory threw or the tree was refused. */
     final Map<ToolbarItem.View, Map<UUID, Optional<FakeKitView>>> toolbarBuilt = new java.util.IdentityHashMap<>();
-    /** A toolbar view's mount: the toolbar of one terminal window. */
+    /** A toolbar view's mount: the toolbar of one Jasper window. */
     record ToolbarMount(UUID windowId) { }
     final List<Menu> sections = new ArrayList<>();
     final List<String> topLevelIds = new ArrayList<>();
@@ -512,7 +512,7 @@ final class FakeUi {
     }
     private List<java.nio.file.Path> choosePaths(WindowOwner owner, String title, java.util.Optional<java.nio.file.Path> initial) {
         context.requireOpen(); java.util.Objects.requireNonNull(title); java.util.Objects.requireNonNull(initial);
-        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or an open Jasper window from this host");
         FakeContent document = owner instanceof FakeContent tab ? tab : null;
         if (document != null) document.pins++;
         try {
@@ -579,7 +579,7 @@ final class FakeUi {
                 context.requireOpen();
                 java.util.Objects.requireNonNull(choice, "choice");
                 WindowOwner owner = choice.owner();
-                if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+                if (!liveChooserOwner(owner)) throw new IllegalArgumentException("Picker requires a shown plugin window or an open Jasper window from this host");
                 var chosen = host.takeFileChoice(choice);
                 return context.state == FakePluginContext.State.CLOSED || !liveChooserOwner(owner) ? List.of() : chosen;
             }
@@ -594,7 +594,7 @@ final class FakeUi {
             @Override public PluginDialog overlay(OverlaySpec spec) {
                 context.requireOpen();
                 if (!context.terminals.ownsOpenWindow(spec.owner()))
-                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                    throw new IllegalArgumentException("An overlay needs an open Jasper window from this host");
                 if (host.overlays.containsKey(spec.owner().id())) throw new IllegalStateException("This window already has an overlay");
                 var overlay = new FakeWindow("overlay", spec.title(), null);
                 host.overlays.put(spec.owner().id(), overlay);
@@ -612,7 +612,7 @@ final class FakeUi {
                     if (window.closed || !windows.contains(window)) throw new IllegalArgumentException("A dialog needs an open owner window");
                     parent = window;
                 } else if (!(owner instanceof WindowHandle) && !(owner instanceof FakeContent content && contents.contains(content)))
-                    throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                    throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a Jasper window");
                 var dialog = new FakeWindow("dialog", spec.title(), parent);
                 dialog.attachedSheet = spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET;
                 dialog.presentation = spec.presentation();

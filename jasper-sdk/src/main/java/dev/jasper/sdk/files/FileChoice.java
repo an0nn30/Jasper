@@ -8,7 +8,7 @@ import java.util.Set;
 /**
  * What {@link dev.jasper.sdk.ui.Windows#choose(FileChoice)} asks for.
  *
- * @param owner         a live terminal window, a shown window of this plugin, or one of its content tabs
+ * @param owner         a live Jasper window, a shown window of this plugin, or one of its content tabs
  * @param title         the dialog title
  * @param mode          open files, save to one file, or choose a folder
  * @param multiple      whether Open may select several files; only with {@link Mode#OPEN}

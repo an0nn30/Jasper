@@ -17,7 +17,7 @@ import java.util.Optional;
 public record ShortcutContext(Kind kind, Optional<String> id) {
     /** The places a shortcut can apply. */
     public enum Kind {
-        /** Anywhere in a terminal window. */
+        /** Anywhere in a Jasper window. */
         GLOBAL,
         /** In a terminal pane, including its find bar. */
         TERMINAL,
@@ -44,7 +44,7 @@ public record ShortcutContext(Kind kind, Optional<String> id) {
     }
 
     /**
-     * Anywhere in a terminal window; the default.
+     * Anywhere in a Jasper window; the default.
      *
      * @return the context
      */

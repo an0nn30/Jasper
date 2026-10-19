@@ -36,7 +36,7 @@ public interface Windows {
      * runs on the UI thread and may show a modal dialog before completing its future.
      *
      * <p>It is asked on a real quit or restart only. A resident macOS Jasper answers Cmd+Q, Jasper &rsaquo; Quit, the Dock's
-     * Quit and a terminal window's File &rsaquo; Quit by closing its windows through the content tabs' and plugin windows'
+     * Quit and a Jasper window's File &rsaquo; Quit by closing its windows through the content tabs' and plugin windows'
      * closing guards and going to the background. That does not ask this guard, and the plugin keeps running until Jasper
      * really quits (Quit Jasper Completely, a log-out or a restart).
      *
@@ -70,10 +70,10 @@ public interface Windows {
      */
     PluginDialog dialog(DialogSpec spec);
     /**
-     * Creates centered content inside a terminal window. Show returns immediately and blocks owner
+     * Creates centered content inside a Jasper window. Show returns immediately and blocks owner
      * input, while native prompts remain usable. Escape and outside clicks do not dismiss it;
      * provide an explicit Cancel action that calls close. The owner and plugin lifetime close it.
-     * @param spec accessible title and terminal owner
+     * @param spec accessible title and owning Jasper window
      * @return the initially hidden overlay, using the dialog content/lifetime handle
      * @throws IllegalArgumentException if the owner is closed or belongs to another host
      * @throws IllegalStateException if the owner already has an overlay, the context is closed,
@@ -85,7 +85,7 @@ public interface Windows {
     /**
      * Selects existing local files in an owner-attached picker. The synchronous call pumps UI
      * events; closing the owner or stopping the plugin cancels and discards the result.
-     * @param owner live terminal window or shown window created by this plugin
+     * @param owner live Jasper window or shown window created by this plugin
      * @param title picker title
      * @param initial initial location, or empty for the platform default
      * @return absolute normalized selected files, or an empty immutable list on cancel
@@ -100,7 +100,7 @@ public interface Windows {
 
     /**
      * Selects one local directory with the same lifetime rules as {@link #chooseFiles}.
-     * @param owner live terminal window or shown window created by this plugin
+     * @param owner live Jasper window or shown window created by this plugin
      * @param title picker title
      * @param initial initial location, or empty for the platform default
      * @return absolute normalized directory, or empty on cancel
@@ -116,7 +116,7 @@ public interface Windows {
     /**
      * Asks for a local file to save to, in the platform's save dialog, which confirms replacing an existing
      * file. The same owner, lifetime and UI-thread rules as {@link #chooseFiles} apply.
-     * @param owner live terminal window or shown window created by this plugin
+     * @param owner live Jasper window or shown window created by this plugin
      * @param title dialog title
      * @param initial a directory to start in, or a suggested file whose folder and name are filled in; empty for the platform default
      * @return an absolute normalized path, or empty on cancellation or owner closure

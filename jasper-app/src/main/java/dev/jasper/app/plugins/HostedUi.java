@@ -602,7 +602,7 @@ final class HostedUi {
             choice = new dev.jasper.app.windows.PathChoice(terminal.id(), null, title, initial, mode, multiple,
                 terminalStart(terminal.id(), sources), suggestedName, sources);
             ownerClosed = wrap(terminals.onWindowClosed(terminal.id(), cancel));
-        } else throw new IllegalArgumentException("Picker requires a shown plugin window or live terminal owner from this host");
+        } else throw new IllegalArgumentException("Picker requires a shown plugin window or an open Jasper window from this host");
         Subscription stopped = tracked(cancel);
         var pin = document == null ? null : document.entry.pin();
         var documentClosed = document == null ? null : document.entry.onClosed(cancel);
@@ -751,7 +751,7 @@ final class HostedUi {
             @Override public PluginDialog overlay(OverlaySpec spec) {
                 guard("overlay");
                 if (!terminals.ownsOpenWindow(spec.owner()))
-                    throw new IllegalArgumentException("An overlay needs an open terminal window from this host");
+                    throw new IllegalArgumentException("An overlay needs an open Jasper window from this host");
                 AuxiliarySurface surface = windows.overlay(spec.title(), spec.owner().id());
                 var ownerClosed = terminals.onWindowClosed(spec.owner().id(), () -> windows.closeOwned(spec.owner().id()));
                 surface.onClosed(ownerClosed::close);
@@ -783,7 +783,7 @@ final class HostedUi {
                         surface.onClosed(ownerClosed::close);
                     }
                 }
-                else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a terminal window");
+                else throw new IllegalArgumentException("A dialog's owner must be an open window of this plugin or a Jasper window");
                 surface.attachedSheet(spec.presentation() == DialogSpec.Presentation.ATTACHED_SHEET);
                 surface.swatch(dev.jasper.ui.model.Nodes.Hue.valueOf(spec.swatch().name()));
                 if (spec.owner() instanceof OwnedContent content) {

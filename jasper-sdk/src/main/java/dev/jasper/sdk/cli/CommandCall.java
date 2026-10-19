@@ -18,7 +18,7 @@ public interface CommandCall {
     /** @return the caller's working directory, absolute */
     Path workingDirectory();
 
-    /** @return the window of the Jasper pane the command ran in, while that window is open; empty when it ran elsewhere */
+    /** @return the Jasper window of the pane the command ran in, while that window is open; empty when it ran elsewhere */
     Optional<WindowOwner> window();
 
     /**

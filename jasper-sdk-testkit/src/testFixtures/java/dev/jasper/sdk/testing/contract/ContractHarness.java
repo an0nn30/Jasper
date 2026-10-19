@@ -119,7 +119,7 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: asks every open plugin window's closing guards, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
     boolean requestQuit();
 
-    /** UI thread: adds a terminal window, which announces itself on the terminal topics. */
+    /** UI thread: adds a Jasper window, which announces itself on the terminal topics. */
     java.util.UUID addTerminalWindow();
 
     /** UI thread: adds and selects a tab in an open window. */

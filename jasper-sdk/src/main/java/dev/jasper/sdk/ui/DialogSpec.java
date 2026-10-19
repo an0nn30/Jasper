@@ -7,7 +7,7 @@ import java.util.Objects;
  * A dialog the application builds over one of its windows.
  *
  * @param title non-blank title
- * @param owner the terminal window or plugin window the dialog belongs to
+ * @param owner the Jasper window or plugin window the dialog belongs to
  * @param presentation explicit presentation; attached sheets and overlays require modality, and attached sheets a live
  *     checked owner at show
  * @param modal whether the dialog blocks its owner; {@link WindowSurface#show()} then returns only after it closes

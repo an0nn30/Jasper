@@ -24,7 +24,7 @@ public interface Terminals {
     Optional<PaneHandle> activePane();
 
     /**
-     * Every open terminal window, in opening order.
+     * Every open Jasper window, in opening order.
      *
      * @return the windows
      */

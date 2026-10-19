@@ -4,7 +4,7 @@
 plugins { `java-library` }
 
 val jasperSdkDir = file(providers.gradleProperty("jasperSdkDir").getOrElse("libs"))
-val jasperSdkVersion = providers.gradleProperty("jasperSdkVersion").getOrElse("0.18.0")
+val jasperSdkVersion = providers.gradleProperty("jasperSdkVersion").getOrElse("0.19.0")
 fun jasperJar(name: String) = files(jasperSdkDir.resolve("$name-$jasperSdkVersion.jar"))
 
 // Name the missing jar instead of failing later with "package dev.jasper.sdk... does not exist".

@@ -549,12 +549,12 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * UI thread: the toolbar views a terminal window shows, in toolbar order. The window builds each registered
+     * UI thread: the toolbar views a Jasper window shows, in toolbar order. The window builds each registered
      * {@code ToolbarItem.View} once, the first time this is asked for it, as a window builds its views when it opens; a
      * view whose factory threw or whose tree the toolbar does not admit is left out and recorded in {@link #failures()}.
      * A window that is not open, or whose views {@link #closeToolbarViews closed}, shows none and asks no factory.
      *
-     * @param windowId a terminal window
+     * @param windowId a Jasper window
      * @return the live views
      * @since 0.18.0
      */
@@ -569,7 +569,7 @@ public final class FakePluginHost implements AutoCloseable {
      * UI thread: closes a window's toolbar views, as the window does when it closes; a fake window does when its last
      * pane closes.
      *
-     * @param windowId a terminal window
+     * @param windowId a Jasper window
      * @since 0.18.0
      */
     public void closeToolbarViews(UUID windowId) {
@@ -1185,7 +1185,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a terminal window. Windows, tabs and panes announce themselves on the terminal topics like the
+     * Adds a Jasper window. Windows, tabs and panes announce themselves on the terminal topics like the
      * application's, delivered by {@link #flush()}.
      *
      * @return the new window's id
@@ -1469,7 +1469,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param sourceId a registered source
      * @param rootId   one of its roots
-     * @param windowId the terminal window the chooser belongs to
+     * @param windowId the Jasper window the chooser belongs to
      * @return the browser; the caller closes it
      * @since 0.10.0
      */
@@ -1755,7 +1755,7 @@ public final class FakePluginHost implements AutoCloseable {
      *
      * @param file the file
      * @param line the line to show, or empty
-     * @param windowId the terminal window the open came from, or empty
+     * @param windowId the Jasper window the open came from, or empty
      * @return what the editor answered; false when no plugin provides one, or it threw, which {@link #failures()} records
      * @since 0.17.1
      */

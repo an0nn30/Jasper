@@ -132,11 +132,11 @@ public final class TerminalEvents {
         }
     }
 
-    /** A terminal window opened. */
+    /** A Jasper window opened. */
     public static final Topic<WindowEvent> WINDOW_OPENED = Topic.of(PREFIX + "window_opened", WindowEvent.class);
-    /** A terminal window closed. */
+    /** A Jasper window closed. */
     public static final Topic<WindowEvent> WINDOW_CLOSED = Topic.of(PREFIX + "window_closed", WindowEvent.class);
-    /** The user turned to a terminal window. */
+    /** The user turned to a Jasper window. */
     public static final Topic<WindowEvent> WINDOW_ACTIVATED = Topic.of(PREFIX + "window_activated", WindowEvent.class);
     /** A tab opened. */
     public static final Topic<TabEvent> TAB_OPENED = Topic.of(PREFIX + "tab_opened", TabEvent.class);

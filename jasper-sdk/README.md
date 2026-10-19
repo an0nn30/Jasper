@@ -42,7 +42,7 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.18.0, <0.19"` (0.18.0 is a breaking boundary: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.19.0, <0.20"` (0.18.0 is a breaking boundary: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
 
@@ -53,7 +53,7 @@ Appearance icon loaders, arbitrary Icon arguments and palette fallback readers w
 (`editor.provide`, `Capabilities.EDITOR_PROVIDE`); `LocalSpec.running(command, workingDirectory)` opens a tab that runs
 a program instead of the shell; `CommandLine.client()` is the `jasper` command's path. Each is a default method or a
 record component behind the old constructors. The testkit adds `FakePluginHost.shellEnvironment`, `edit`,
-`editorPlugin`, `declareBundled` and `setCommandClient`. Plugins that use them declare `sdk = ">=0.18.0, <0.19"`.
+`editorPlugin`, `declareBundled` and `setCommandClient`. Plugins that use them declare `sdk = ">=0.19.0, <0.20"`.
 
 ## Command-line subcommands (SDK 0.17.0)
 
@@ -61,7 +61,7 @@ record component behind the old constructors. The testkit adds `FakePluginHost.s
 `[[subcommands]]` in `plugin.toml`. The handler runs on the UI thread with a `CommandCall` (its arguments, working
 directory, the window of the pane it ran in, `out`, `err` and `onCancelled`) and completes with the exit code. The
 testkit's `FakePluginHost.declareSubcommand` and `call` return a `FakeCommandCall` with the output and the exit code.
-Plugins that use it declare `sdk = ">=0.18.0, <0.19"`.
+Plugins that use it declare `sdk = ">=0.19.0, <0.20"`.
 
 ## Clipboard and the Tools menu (SDK 0.16.1)
 
@@ -71,7 +71,7 @@ fails is posted as "Could not copy" in the plugin's group and returns `false`; a
 Jasper quits, in each case only if the clipboard still holds it. Reading needs the new `clipboard.read` capability (`Capabilities.CLIPBOARD_READ`).
 `StandardMenu.TOOLS` is a Tools menu for utility commands, shown after Tab only while a plugin has entries in it; the
 View submenu that lists tool windows is now View › Tool Windows. The testkit models the clipboard with
-`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.18.0, <0.19"`.
+`FakePluginHost.clipboard()`. Plugins that use any of these declare `sdk = ">=0.19.0, <0.20"`.
 
 ## File workflows and progress (0.7.5)
 
@@ -103,7 +103,7 @@ registers a `FileSource` whose roots (for example saved hosts) appear in Jasper'
 when the user opens one and browses it through the plugin's `FileBrowser` on a host worker. `Windows.choose` opens
 the chooser for local places plus the sources the caller names and returns `FileLocation`s. The testkit scripts it
 with `FakePluginHost.queueFileChoice` and drives sources with `fileSources`, `fileRoots`, `locateFile` and
-`connectFileSource`. Plugins declare `sdk = ">=0.18.0, <0.19"`.
+`connectFileSource`. Plugins declare `sdk = ">=0.19.0, <0.20"`.
 
 SDK 0.10.1 lets `FileLocation.Sourced` carry `Sourced.HOME` (`~`), a root's home folder, so a source can locate a pane
 whose folder it does not know yet; `FakePluginHost.connectFileSource` runs scripted background work while it waits.
@@ -120,7 +120,7 @@ programs or computers, such as a file server; the user consents to it like any o
 it. `Windows.onQuitting` registers a guard asked when Jasper quits or restarts, after plugin windows and content tabs;
 a `false` decision cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper that only goes to
 the background on Cmd+Q does not ask them. `FakePluginHost.requestQuit` asks these guards too. Plugins declare
-`sdk = ">=0.18.0, <0.19"`.
+`sdk = ">=0.19.0, <0.20"`.
 
 SDK 0.11.0 also adds shortcut contexts. `ActionSpec.withContext(ShortcutContext)` limits where an action's shortcut applies:
 `global()` (the default), `terminal()` (a terminal pane), `content()` (the plugin's content tabs), `panel(id)` or
@@ -175,7 +175,7 @@ action, an icon or a window. Jasper posts a succeeded or failed activity in `<pl
 `FakePluginHost.notifications()` records posts as `group|SEVERITY|title|content[|Cause]`, lists declared groups and
 runs an action (`runAction`) or the body (`click`); `new FakeNotifications().group(id)` records for a component under
 test. A plugin built for 0.13 that called `notices()` moves to `notifications()` and declares
-`sdk = ">=0.18.0, <0.19"`.
+`sdk = ">=0.19.0, <0.20"`.
 
 ## Workspace opacity (SDK 0.14.1)
 
@@ -192,7 +192,7 @@ unantialiased rectangles (antialiased translucent fills fall back to software re
 lag). Everything above it (viewports, gutters, text areas) must be non-opaque, or it covers the glass. Keep selection,
 carets, find bars and banners solid. `FakePluginHost.setWorkspaceOpacity(double)` scripts the value in tests; it is
 announced on `flush()` and the fake reports it for every component, while the real host reports 1.0 for components
-outside a translucent window. Plugins that use it declare `sdk = ">=0.18.0, <0.19"`.
+outside a translucent window. Plugins that use it declare `sdk = ">=0.19.0, <0.20"`.
 
 ## Panel headers (SDK 0.14.2)
 

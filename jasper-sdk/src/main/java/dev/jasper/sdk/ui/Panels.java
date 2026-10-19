@@ -17,10 +17,10 @@ public interface Panels {
     Subscription register(PanelSpec spec, PanelFactory factory);
 
     /**
-     * Toggles this plugin's registered panel in a terminal window, creating it lazily.
+     * Toggles this plugin's registered panel in a Jasper window, creating it lazily.
      * Requests for a closed window have no effect.
      * @param panelId a registered panel id owned by this plugin
-     * @param window the terminal window
+     * @param window the Jasper window
      * @throws IllegalArgumentException when the panel is not registered by this plugin
      * @throws IllegalStateException when the context is closed or the caller is off the UI thread
      * @since 0.7.2

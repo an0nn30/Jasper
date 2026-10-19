@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** One terminal window. Handles keep an id and no Swing object; two handles for the same window are equal. EDT only. */
+/** One Jasper window. Handles keep an id and no Swing object; two handles for the same window are equal. EDT only. */
 public interface WindowHandle extends WindowOwner {
     /**
      * The window's stable id.
