@@ -241,10 +241,10 @@ family = "system"
 
 ### Desk buddy
 
-`buddy.enabled` (off by default) shows the pixel-art Jasper who floats above other windows while at least one
-terminal window is open and not minimized. Hover to make him wave; drag him anywhere (the
+`buddy.enabled` (off by default) shows the pixel-art Jasper who floats above other windows while the main
+window is open and not minimized. Hover to make him wave; drag him anywhere (the
 position is saved in `buddy.toml` in the default Jasper application directory); double-click him to bring the last
-active terminal window forward. Left alone he sits down after 20 seconds and retreats into his
+active Jasper window forward. Left alone he sits down after 20 seconds and retreats into his
 shell to sleep after a minute; hovering wakes him and earns a one-second wave. View → Show/Hide → Show
 Jasper, the command palette and right-click → Hide Jasper toggle him for the current session; a
 saved change to `buddy.enabled` resets that session choice.

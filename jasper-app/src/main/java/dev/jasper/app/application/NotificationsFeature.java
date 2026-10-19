@@ -23,8 +23,8 @@ import java.util.UUID;
 
 /**
  * The application's notification surfaces: Jasper's own groups, the built-in Notifications panel with its unread
- * badge and actions, and one card layer per terminal window, routing each requested card to its target window or the
- * window used last. EDT only; the application closes it at shutdown.
+ * badge and actions, and one card layer per attached window (the application attaches the main window's), routing each
+ * requested card to its target window or the window used last. EDT only; the application closes it at shutdown.
  */
 final class NotificationsFeature implements AutoCloseable {
     static final String PANEL_ID = "jasper.notifications";
@@ -92,7 +92,7 @@ final class NotificationsFeature implements AutoCloseable {
         if (content.id().equals(lastActive)) lastActive = windows.isEmpty() ? null : windows.keySet().iterator().next();
     }
 
-    /** A terminal window was activated: it is the default target, and cards that waited for focus show now. */
+    /** A Jasper window was activated: it is the default target, and cards that waited for focus show now. */
     void activated(WindowContent content) {
         if (closed || !windows.containsKey(content.id())) return;
         lastActive = content.id();

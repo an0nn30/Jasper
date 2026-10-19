@@ -5,7 +5,7 @@ import dev.jasper.app.presentation.Projections;
 import java.util.Objects;
 
 /**
- * What a terminal window is made of under the look (Enterprise presentation spec 9.1): the workspace's chrome and the
+ * What a Jasper window is made of under the look (Enterprise presentation spec 9.1): the workspace's chrome and the
  * shell's title facts.
  *
  * @param chrome the workspace strategies

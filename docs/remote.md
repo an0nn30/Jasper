@@ -230,8 +230,8 @@ that keeps the size goes unnoticed. Remote files are not watched for outside cha
 
 Editor operations for one connection run one at a time on one SFTP channel of the live SSH connection, opened for the
 first and closed when none are left. When the connection has closed, the next operation reconnects; sign-in prompts
-appear in the terminal window the file was opened from, or else in the active one. With no terminal window open it
-fails with "Reconnecting to prod-web needs an open terminal window for the sign-in prompt."
+appear in the Jasper window the file was opened from, or else in the active one. With no Jasper window open it
+fails with "Reconnecting to prod-web needs an open Jasper window for the sign-in prompt."
 
 Transfers appear at the bottom of the SFTP sidebar (the Transfers panel under the Enterprise look), in every window: what is copying and where,
 a progress bar, speed and time left, and **×** to cancel. A transfer that needs you shows one

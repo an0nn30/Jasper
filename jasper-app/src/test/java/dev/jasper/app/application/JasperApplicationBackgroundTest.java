@@ -768,7 +768,7 @@ class JasperApplicationBackgroundTest {
                 application.spawner = spawned::add;
                 application.staleBuild(() -> true);
             });
-            // The plugin's window is open; no terminal window can be composed headlessly, so the reopen ends there.
+            // The plugin's window is open; no Jasper window can be composed headlessly, so the reopen ends there.
             assertThatThrownBy(() -> edt(application::reopened)).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(planned).as("the update was not acted on while a window is open").hasValue(0);
             assertThat(spawned).isEmpty();
@@ -800,7 +800,7 @@ class JasperApplicationBackgroundTest {
                 application.spawner = spawned::add;
                 application.staleBuild(() -> true);
             });
-            // The plugin's window is open; the request then opens a terminal window, which cannot be composed headlessly.
+            // The plugin's window is open; the request then opens the main window, which cannot be composed headlessly.
             assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), true))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(planned).as("an update never takes an open window down").hasValue(0);
             assertThat(spawned).isEmpty();

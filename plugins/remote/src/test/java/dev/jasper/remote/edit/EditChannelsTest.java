@@ -126,7 +126,7 @@ class EditChannelsTest {
         connected = false;
         var failure = submit(identity("prod-web"), endpoint -> "never");
         assertThatThrownBy(() -> failure.get(10, TimeUnit.SECONDS))
-            .hasRootCauseMessage("Reconnecting to prod-web needs an open terminal window for the sign-in prompt.");
+            .hasRootCauseMessage("Reconnecting to prod-web needs an open Jasper window for the sign-in prompt.");
         assertThat(owners).as("nothing was opened").isEmpty();
     }
 

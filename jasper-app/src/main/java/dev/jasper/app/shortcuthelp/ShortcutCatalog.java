@@ -56,7 +56,7 @@ final class ShortcutCatalog {
 
     private static String description(KeyContext context, Map<String, String> plugins, Map<String, String> panels) {
         return switch (context.kind()) {
-            case GLOBAL -> "Anywhere in a terminal window";
+            case GLOBAL -> "Anywhere in a Jasper window";
             case TERMINAL -> "In a terminal pane";
             case CONTENT, PANEL, WINDOW -> "Only in the " + where(context, plugins, panels);
         };

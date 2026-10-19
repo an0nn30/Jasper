@@ -96,7 +96,7 @@ public final class EditChannels implements AutoCloseable {
             channel.queue.poll();
             next(channel);
             job.result.completeExceptionally(new IOException("Reconnecting to " + channel.identity.host().name()
-                + " needs an open terminal window for the sign-in prompt."));
+                + " needs an open Jasper window for the sign-in prompt."));
             return;
         }
         CompletableFuture<FileEndpoint> opening;

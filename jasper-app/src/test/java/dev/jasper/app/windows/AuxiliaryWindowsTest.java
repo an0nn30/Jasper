@@ -33,7 +33,7 @@ class AuxiliaryWindowsTest {
         assertThat(events).containsExactly("first", "first");
     }
 
-    /** Spec 13: File › Open File… asks for one existing local file over the terminal window, from its pane's folder. */
+    /** Spec 13: File › Open File… asks for one existing local file over the Jasper window, from its pane's folder. */
     @Test void openFileAsksForOneLocalFileOverTheTerminalWindow() {
         var asked = new ArrayList<PathChoice>();
         var file = java.nio.file.Path.of("notes.txt").toAbsolutePath();

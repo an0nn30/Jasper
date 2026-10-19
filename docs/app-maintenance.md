@@ -649,9 +649,9 @@ native title region reaches over the content's top padding); a prompt dialog kee
 centred 18 down; and content that draws its own title row (`INTEGRATED`, Settings, through
 `AuxiliarySurface.integratedTitle`) gets no strip, with the controls centred on its row. Attached sheets have none.
 
-In-window overlays are `AuxiliarySurface.Kind.OVERLAY`: a terminal window's progress overlay
+In-window overlays are `AuxiliarySurface.Kind.OVERLAY`: a Jasper window's progress overlay
 (`AuxiliaryWindows.overlay`, one per window) and modal overlays (`modalOverlay`, a plugin dialog presented as
-`DialogSpec.Presentation.OVERLAY`) over a terminal window, an auxiliary window or a dialog. `WindowOverlay` hosts the
+`DialogSpec.Presentation.OVERLAY`) over a Jasper window, an auxiliary window or a dialog. `WindowOverlay` hosts the
 kit's `ModalOverlay` in the window's layered pane and routes input: overlays stack, the newest above the rest takes
 keys and focus, and closing it hands them to the one below (Vault unlock over Remote's Connecting overlay). A modal
 overlay's `show` blocks in a secondary loop until it closes and lets Escape reach its form; a progress overlay returns

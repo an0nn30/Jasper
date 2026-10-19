@@ -6,9 +6,9 @@ is the binding reference.
 
 ## Opening files
 
-- **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in a terminal window's File menu or the
+- **Open in Editor…** (Cmd+O on macOS, Ctrl+O elsewhere) in the File menu or the
   palette, and **Open…** inside the Editor window.
-- **Open File…** in a terminal window's File menu or the palette (no default shortcut) opens the file you choose in
+- **Open File…** in the File menu or the palette (no default shortcut) opens the file you choose in
   the [default editor](#default-editor), as a Cmd-click does.
 - **New Editor File**, or **New File** (Cmd/Ctrl+N) inside the Editor window, for an untitled tab.
 - Drop files from the desktop onto the Editor window. Folders are ignored.
@@ -140,7 +140,7 @@ default app. When Jasper itself was started with `EDITOR` or `VISUAL` set, for e
 both and Jasper sets neither until you turn off `keep_environment_editor`; then Jasper replaces `EDITOR`, and `VISUAL`
 too when Jasper was started with one. Jasper sets `VISUAL` only then, so an export of `EDITOR` or `VISUAL` in a shell
 startup file, such as `~/.zshrc`, still wins. The page shows what Jasper's environment has. When the chosen editor
-cannot open a file (a terminal editor with no terminal window open, an app that does not start) or the Editor is off,
+cannot open a file (a terminal editor with no Jasper window open, an app that does not start) or the Editor is off,
 the file opens with the system's default app. An app editor or custom command started on its own that exits with an
 error posts a notification naming its program.
 

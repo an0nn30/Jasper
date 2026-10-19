@@ -771,7 +771,7 @@ class EditorWindowTest {
         WindowHandle handle = context.terminals().window(terminal).orElseThrow();
         assertThat(window.edit(file("a.txt", "a\n"), OptionalInt.empty(), Optional.of(handle))).isTrue();
         assertThat(host.contentOwner(host.contentTabs().getFirst())).isEqualTo(handle);
-        assertThat(window.edit(file("b.txt", "b\n"), OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a terminal window").isTrue();
+        assertThat(window.edit(file("b.txt", "b\n"), OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a Jasper window").isTrue();
         assertThat(host.contentTabs()).hasSize(2);
     }
 }

@@ -77,7 +77,7 @@ final class StagedRemoteHost implements AutoCloseable {
             loader, () -> plugin)));
         window = onEdtValue(() -> {
             var content = DesktopTestSupport.content(DesktopTestSupport.launcher(new ArrayDeque<>()));
-            // A terminal window of the registry, so Remote's dialogs may name it as their owner.
+            // A Jasper window of the registry, so Remote's dialogs may name it as their owner.
             content.connectTerminals(terminals.registry, () -> { });
             content.connectContributions(contributions);
             return content;

@@ -6,7 +6,7 @@ Opening it again brings the same window forward and preserves the search. The wi
 remembers its size and position through the normal auxiliary-window state.
 
 Rows are grouped by app category or plugin name. The table shows the action, effective
-shortcut, section/plugin and context. The context distinguishes a terminal-window
+shortcut, section/plugin and context. The context distinguishes a Jasper-window
 shortcut from a key used only in a particular field or list. Unbound actions show
 **Unassigned**; a plugin default rejected by the shortcut resolver shows its reason
 in Context (hover to read long text).
@@ -24,7 +24,7 @@ for this action. Fixed contextual keys (for example, palette navigation and Find
 Enter) are read-only.
 
 Saving writes `[keybindings]` in the active `config.toml` and applies the change to all
-terminal windows immediately. Missing settings files get the normal commented template.
+Jasper windows immediately. Missing settings files get the normal commented template.
 Unrelated settings and comments are preserved, including edits made outside Jasper.
 An invalid file, a concurrent shortcut edit, or a write failure leaves an error in the
 editor instead of claiming success. If a plugin default cannot be restored because
@@ -39,7 +39,7 @@ returns to ordinary text input; **Clear** clears the filter. Leaving the window 
 recording and releases any held-key state. OS-reserved combinations can still be
 handled by the operating system; use text search for those combinations.
 
-The catalog uses the same resolution as terminal windows, so app `[keybindings]`
+The catalog uses the same resolution as Jasper windows, so app `[keybindings]`
 overrides, plugin defaults, disabled bindings and conflicts are represented accurately.
 Configuration reloads and plugin action changes update an open reference immediately.
 The catalog covers every built-in action and every currently registered contribution,
@@ -74,7 +74,7 @@ run `./gradlew :jasper-app:shortcutHelpPreview`; PNGs are written under
 Native acceptance (user-run):
 
 - Open Help → Keyboard Shortcuts and Commands → Keyboard Shortcuts from different
-  terminal windows; only one editor opens.
+  Jasper windows; only one editor opens.
 - Click an assigned shortcut and an Unassigned row, record a new combination and save.
   Verify the menu shortcut and behavior update in both windows and survive a restart.
 - Try a conflicting combination, check Reassign, save and verify the old action is
@@ -91,5 +91,5 @@ Native acceptance (user-run):
 ## Editor window
 
 The bundled Editor's window has its own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
-They belong to that window's content, not to terminal windows, so they are not in this catalog; the
-terminal-window action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.
+They belong to the Editor's content, so they are not in this catalog; the
+action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.

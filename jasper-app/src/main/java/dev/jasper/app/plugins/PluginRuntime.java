@@ -443,7 +443,7 @@ public final class PluginRuntime {
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      */
     public PluginRuntime(Options options, ActivityNotifier notifier, SettingsReports reports,
                          Contributions contributions, AuxiliaryWindows windows, TerminalRegistry terminals) {
@@ -459,7 +459,7 @@ public final class PluginRuntime {
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      */
@@ -477,7 +477,7 @@ public final class PluginRuntime {
      * @param reports receives plugin complaints about their settings, and clears them per file
      * @param contributions the application-wide model that plugin chrome contributions are written to
      * @param windows builds plugin windows and dialogs
-     * @param terminals the application-wide directory of terminal windows, tabs and panes
+     * @param terminals the application-wide directory of Jasper windows, tabs and panes
      * @param notifications where plugins' notifications and plugin problems go
      * @param editor opens a file in the user's editor, off the UI thread; may throw
      * @param profiles the detected shell profiles
@@ -602,7 +602,7 @@ public final class PluginRuntime {
 
     /**
      * Opens a file for editing, on a worker thread: the editor a plugin provides ({@code Platform.editor}), asked on the
-     * UI thread with the active terminal window, then {@code desktop} on this thread when no plugin provides one, it
+     * UI thread with the active Jasper window, then {@code desktop} on this thread when no plugin provides one, it
      * declines or throws, or it does not answer within 30 seconds. Before the plugins start, {@code desktop} alone. Once
      * they run, an interrupted worker, such as one Jasper's quit interrupts, opens nothing and keeps its interrupt.
      *
@@ -620,7 +620,7 @@ public final class PluginRuntime {
      *
      * @param file the file
      * @param line the 1-based line, or empty for the file's start
-     * @param window the terminal window the click came from, or empty for none
+     * @param window the Jasper window the click came from, or empty for none
      * @param desktop the desktop's opener, such as {@code ConfigEditor::open}, or {@code ConfigEditor::editOrReveal} for a
      *        file a program named; its failure propagates
      * @throws IllegalStateException on the UI thread

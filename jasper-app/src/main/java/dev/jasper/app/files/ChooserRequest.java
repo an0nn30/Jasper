@@ -16,7 +16,7 @@ import java.util.UUID;
  * @param terminalFolder where the owner's focused terminal is, listed as "Terminal folder"
  * @param suggestedName Save: the file name to fill in; Open: the file to select
  * @param suffix only files ending with it are listed, ignoring case, for example {@code .zip}
- * @param ownerWindow the terminal window the chooser belongs to, for sources' sign-in prompts
+ * @param ownerWindow the Jasper window the chooser belongs to, for sources' sign-in prompts
  */
 public record ChooserRequest(String title, Mode mode, boolean multiple, Location start, Optional<Location> terminalFolder,
                              Optional<String> suggestedName, Optional<String> suffix, Optional<UUID> ownerWindow) {

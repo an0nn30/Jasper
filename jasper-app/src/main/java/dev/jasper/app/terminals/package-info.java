@@ -1,5 +1,5 @@
 /**
- * An app-native directory of terminal windows, tabs and panes for features that must not hold Swing objects
+ * An app-native directory of Jasper windows, tabs and panes for features that must not hold Swing objects
  * (the one exception is the opaque tab icon a {@link dev.jasper.app.terminals.SessionRequest} carries, which
  * this package never paints or inspects):
  * windows register entries whose structure is pulled through suppliers, publish id-only facts as

@@ -73,7 +73,7 @@ class RemoteEditingPluginTest {
         return setUp(host, server, files, dir, editor, rows, factory).panel();
     }
 
-    /** What {@link #setUp} leaves open: the SFTP panel, the terminal window and SSH pane, and Remote's context. */
+    /** What {@link #setUp} leaves open: the SFTP panel, the Jasper window and SSH pane, and Remote's context. */
     record Browsed(SftpPanel panel, UUID window, UUID pane, PluginContext context) { }
 
     /** As {@link #browse}, returning the window, the SSH pane and Remote's context too. */

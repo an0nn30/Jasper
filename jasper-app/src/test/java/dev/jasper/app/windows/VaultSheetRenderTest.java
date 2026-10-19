@@ -47,7 +47,7 @@ class VaultSheetRenderTest {
                             var surface = fixture.surface();
                             assertThat(surface.kind()).as("%s is an overlay", id).isEqualTo(AuxiliarySurface.Kind.OVERLAY);
                             assertThat(surface.modal()).isTrue();
-                            // A stand-in terminal window: a title row and a body with some text.
+                            // A stand-in Jasper window: a title row and a body with some text.
                             var owner = new JRootPane(); var body = new JPanel(new BorderLayout());
                             var text = new JLabel("  dustin@mac ~ % ssh dustin@192.168.1.120"); text.setForeground(new Color(200, 200, 200));
                             text.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13)); text.setVerticalAlignment(SwingConstants.TOP);

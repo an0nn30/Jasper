@@ -151,10 +151,10 @@ class DefaultEditorTest {
         Path emacs = install("emacs");
         choose("emacs");
         DefaultEditor defaults = detected(MAC);
-        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty())).as("no terminal window is open").isFalse();
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.empty())).as("no Jasper window is open").isFalse();
         UUID active = host.addTerminalWindow();
         host.activateTerminalWindow(active);
-        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a terminal window").isTrue();
+        assertThat(defaults.edit(file, OptionalInt.empty(), Optional.of(new WindowOwner() { }))).as("not a Jasper window").isTrue();
         assertThat(host.openRequests()).containsExactly(tab(active, emacs + " -nw " + file));
     }
 

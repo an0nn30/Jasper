@@ -137,7 +137,7 @@ class RemoteEditingTest {
         assertThat(owners).containsExactly(Optional.of(origin), Optional.of(other));
         active = Optional.empty();
         assertThatThrownBy(() -> onUi(document::revision).get(10, TimeUnit.SECONDS))
-            .hasRootCauseMessage("Reconnecting to prod needs an open terminal window for the sign-in prompt.");
+            .hasRootCauseMessage("Reconnecting to prod needs an open Jasper window for the sign-in prompt.");
     }
 
     @Test void kindsFollowLinksInOrder() throws Exception {

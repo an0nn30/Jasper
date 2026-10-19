@@ -13,7 +13,7 @@ import javax.swing.JRootPane;
  * darkness on macOS. Jasper gives the Windows and Linux system title bar no appearance hint: JBR has none. EDT only.
  *
  * @param unifiedTitle whether frames and dialogs draw the unified macOS title bar
- * @param classicMenus whether the look's terminal windows show the classic menu row; its auxiliary frames show none
+ * @param classicMenus whether the look's main window shows the classic menu row; its auxiliary frames show none
  * @param followTheme whether a frame with the system's title bar follows the theme's darkness
  * @param macOs whether this is macOS
  */

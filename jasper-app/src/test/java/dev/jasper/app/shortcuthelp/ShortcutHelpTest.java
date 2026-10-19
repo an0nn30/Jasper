@@ -92,8 +92,8 @@ class ShortcutHelpTest {
             var panel = panel(true, changes -> { throw new AssertionError("Unexpected save"); });
             var root = new JRootPane(); root.setContentPane(panel);
             var stroke = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK);
-            panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Terminal window", "connect"),
-                new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Terminal window", "")));
+            panel.setRows(List.of(new ShortcutEntry("remote.hosts", "Remote", "SSH Hosts", stroke, "Jasper window", "connect"),
+                new ShortcutEntry("copy", "Clipboard", "Copy", KeyStroke.getKeyStroke("meta C"), "Jasper window", "")));
             search(panel).setText("remote"); assertThat(panel.tree.rowCount()).isEqualTo(2);
             search(panel).setText("shift+command+h"); assertThat(panel.tree.rowCount()).isEqualTo(2);
             search(panel).setText("cmd+h"); assertThat(panel.tree.rowCount()).isZero();

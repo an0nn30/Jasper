@@ -38,7 +38,7 @@ public final class RemoteEditing {
     /**
      * @param editor the Editor's service
      * @param channels where documents queue their operations
-     * @param activeWindow the terminal window used last, for sign-in prompts once the origin window has closed
+     * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
      * @param notifications where a file the Editor cannot open is posted
      */
     public RemoteEditing(Editor editor, EditChannels channels, Supplier<Optional<WindowHandle>> activeWindow, NotificationGroup notifications) {
@@ -48,7 +48,7 @@ public final class RemoteEditing {
     /**
      * @param editor the Editor's service
      * @param channels where documents queue their operations
-     * @param activeWindow the terminal window used last, for sign-in prompts once the origin window has closed
+     * @param activeWindow the Jasper window used last, for sign-in prompts once the origin window has closed
      * @param notifications where a file the Editor cannot open is posted
      * @param hosts finds a saved host by id, in memory, for reopening recent files
      */
@@ -119,7 +119,7 @@ public final class RemoteEditing {
     /**
      * Opens a remote file in an editor tab, or selects its tab.
      *
-     * @param from the terminal window it was opened from, which owns sign-in prompts while it is open
+     * @param from the Jasper window it was opened from, which owns sign-in prompts while it is open
      */
     public void open(ConnectionIdentity identity, String path, WindowHandle from) {
         try {

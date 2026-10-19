@@ -27,7 +27,7 @@ public interface ChooserSource {
     /** @return removes the listener; the listener runs on the UI thread */
     Runnable onChanged(Runnable listener);
 
-    /** @param ownerWindow the terminal window the chooser belongs to, for sign-in prompts; empty for other owners */
+    /** @param ownerWindow the Jasper window the chooser belongs to, for sign-in prompts; empty for other owners */
     CompletableFuture<Browser> connect(String root, Optional<UUID> ownerWindow);
 
     /** @return where a terminal pane is in this source, when it can tell */

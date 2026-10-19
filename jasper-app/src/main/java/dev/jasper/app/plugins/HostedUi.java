@@ -241,7 +241,7 @@ final class HostedUi {
         return tracked(registration::close);
     }
 
-    /** A toolbar view's mount: the main toolbar of one terminal window. */
+    /** A toolbar view's mount: the main window's toolbar. */
     private record ToolbarMount(java.util.UUID windowId) { }
 
     /**

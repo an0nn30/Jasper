@@ -59,7 +59,7 @@ class PresentationReachTest {
             edt(() -> {
                 application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
                 assertThat(application[0].themes().animationsEnabled()).as("no configuration: the look still decides").isFalse();
-                assertThat(application[0].windowLook()).as("terminal windows and the rehearsal's")
+                assertThat(application[0].windowLook()).as("Jasper windows and the rehearsal's")
                     .isEqualTo(dev.jasper.app.workspace.WindowLook.of(projections))
                     .isNotEqualTo(dev.jasper.app.workspace.WindowLook.standard());
                 application[0].startPlugins(dirs());

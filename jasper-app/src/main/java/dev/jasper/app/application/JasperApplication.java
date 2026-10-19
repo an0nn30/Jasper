@@ -236,7 +236,7 @@ public final class JasperApplication {
         if (!presentation.branding().present()) steps.done();
     }
 
-    /** What terminal windows and the rehearsal's are made of under this process's presentation. */
+    /** What Jasper windows and the rehearsal's are made of under this process's presentation. */
     dev.jasper.app.workspace.WindowLook windowLook() { return dev.jasper.app.workspace.WindowLook.of(presentation.projections()); }
     /** The auxiliary windows; null before {@link #startPlugins(AppDirs)}. Tests. */
     dev.jasper.app.windows.AuxiliaryWindows auxiliary() { return auxiliary; }
@@ -1437,11 +1437,11 @@ public final class JasperApplication {
 
     /**
      * Where Jasper stands for notifications: focused, in the background, idle (resident, start-up settled, with no window
-     * of any kind open and no terminal window being opened) or with no window yet. Idle waits for start-up to settle
+     * of any kind open and no Jasper window being opened) or with no window yet. Idle waits for start-up to settle
      * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
      * {@code --background} launch with the process already resident and windowless: they must wait for the first window
      * like the problems posted directly. With only a plugin window open Jasper is not idle, because cards target
-     * terminal windows: the next one still shows what waited. EDT.
+     * Jasper windows: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
         boolean residentIdle = resident && startupSettled && !windowsOpen() && windows.opening() == 0;

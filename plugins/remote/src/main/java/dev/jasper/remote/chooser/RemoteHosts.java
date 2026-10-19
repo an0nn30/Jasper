@@ -62,7 +62,7 @@ public final class RemoteHosts implements FileSource {
      * @param panes where an SSH pane is, by pane id
      * @param resolve resolves a host's route and logins, completing on the UI thread
      * @param endpoints opens an SFTP endpoint on a resolved route, completing on the UI thread
-     * @param activeWindow the terminal window used last, for sign-in prompts when the chooser has no terminal owner
+     * @param activeWindow the Jasper window used last, for sign-in prompts when the chooser has no window owner
      */
     public RemoteHosts(Supplier<List<RemoteHost>> hosts, Predicate<UUID> connected, Function<Runnable, Subscription> hostsChanged,
                        Function<Runnable, Subscription> connectionsChanged, Function<UUID, Optional<Located>> panes,
@@ -102,7 +102,7 @@ public final class RemoteHosts implements FileSource {
         try { id = UUID.fromString(rootId); }
         catch (IllegalArgumentException unknown) { return CompletableFuture.failedFuture(new IOException("Unknown host: " + rootId)); }
         WindowHandle window = owner instanceof WindowHandle handle && handle.isOpen() ? handle : activeWindow.get().orElse(null);
-        if (window == null) return CompletableFuture.failedFuture(new IOException("Open a terminal window to connect"));
+        if (window == null) return CompletableFuture.failedFuture(new IOException("Open a Jasper window to connect"));
         var result = new CompletableFuture<FileBrowser>();
         var step = new AtomicReference<CompletableFuture<?>>();
         ConnectionIdentity known = identities.get(rootId);

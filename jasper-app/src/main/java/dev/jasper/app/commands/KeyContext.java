@@ -3,7 +3,7 @@ package dev.jasper.app.commands;
 import java.util.Objects;
 
 /**
- * Where an action's shortcut applies. {@link #GLOBAL} applies anywhere in a terminal window and {@link #TERMINAL} in
+ * Where an action's shortcut applies. {@link #GLOBAL} applies anywhere in a Jasper window and {@link #TERMINAL} in
  * a terminal pane, its find bar included; the owned kinds apply inside one plugin's content tabs, one panel or one
  * plugin window, which never nest. A stroke may belong to several actions; the most specific context containing the
  * focus owner wins.

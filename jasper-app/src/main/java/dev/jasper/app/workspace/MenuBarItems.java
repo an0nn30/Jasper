@@ -9,7 +9,7 @@ import javax.swing.JRadioButtonMenuItem;
 import javax.swing.KeyStroke;
 
 /**
- * Terminal-window menu-bar items. They show their accelerators but never fire them from the keyboard: the root input
+ * Jasper-window menu-bar items. They show their accelerators but never fire them from the keyboard: the root input
  * map is the only key path, so a key it declines (no applicable enabled action where focus is) reaches the focused
  * component instead of the menu bar's copy of the action. Clicks and mnemonics still work. Popup and context menus
  * keep ordinary items, which bind only while they are showing.

@@ -51,7 +51,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
     }
 
     /**
-     * File › Open File…'s chooser: one existing local file, chosen over terminal window {@code window} and starting in
+     * File › Open File…'s chooser: one existing local file, chosen over Jasper window {@code window} and starting in
      * {@code folder} when its pane has one; empty when cancelled. EDT.
      */
     public java.util.Optional<java.nio.file.Path> openFile(UUID window, java.util.Optional<java.nio.file.Path> folder) {
@@ -88,7 +88,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
     }
 
     /**
-     * A modal dialog that remembers its bounds under {@code id}: over the terminal window {@code ownerWindowOrNull}, or
+     * A modal dialog that remembers its bounds under {@code id}: over the Jasper window {@code ownerWindowOrNull}, or
      * application-modal with no owner when it is null. Showing it blocks until it closes.
      */
     public AuxiliarySurface modalDialog(String id, String title, Dimension preferred, UUID ownerWindowOrNull) {
@@ -96,7 +96,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
         return track(new AuxiliarySurface(id, title, AuxiliarySurface.Kind.DIALOG, true, preferred, ownerWindowOrNull, null, shells));
     }
 
-    /** Reserves one progress overlay per terminal owner, including surfaces not shown yet; modal overlays may stack over it. */
+    /** Reserves one progress overlay per Jasper window, including surfaces not shown yet; modal overlays may stack over it. */
     public AuxiliarySurface overlay(String title, UUID ownerWindow) {
         Objects.requireNonNull(ownerWindow);
         if (open.stream().anyMatch(surface -> surface.kind() == AuxiliarySurface.Kind.OVERLAY && !surface.modal()
@@ -107,7 +107,7 @@ public final class AuxiliaryWindows implements AutoCloseable {
     }
 
     /**
-     * A modal overlay over the terminal window {@code ownerWindow}: a dialog presented inside the window, over a
+     * A modal overlay over the Jasper window {@code ownerWindow}: a dialog presented inside the window, over a
      * dimmed scrim. It may stack over the window's progress overlay. Showing it blocks until it closes.
      */
     public AuxiliarySurface modalOverlay(String title, UUID ownerWindow) {

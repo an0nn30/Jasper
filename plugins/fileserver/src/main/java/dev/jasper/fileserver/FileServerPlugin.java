@@ -427,7 +427,7 @@ public final class FileServerPlugin implements Plugin {
         });
     }
 
-    /** The quit guard: asks over the active terminal window; allows the quit when there is none. */
+    /** The quit guard: asks over the active Jasper window; allows the quit when there is none. */
     CompletableFuture<Boolean> confirmQuit() {
         int count = registry.active();
         if (count == 0) return CompletableFuture.completedFuture(true);

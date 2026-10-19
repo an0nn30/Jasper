@@ -241,7 +241,7 @@ public final class DefaultEditor {
 
     /**
      * The {@code Platform.editor} file editor: opens a file in the chosen editor. A terminal editor, and a custom command
-     * that runs in a terminal, get a new tab in {@code window} when it is a terminal window, else in the active one.
+     * that runs in a terminal, get a new tab in {@code window} when it is a Jasper window, else in the active one.
      *
      * @param file the file
      * @param line 1-based, when known
@@ -263,7 +263,7 @@ public final class DefaultEditor {
         };
     }
 
-    /** A new tab running the command in the file's folder; false when no terminal window is open. */
+    /** A new tab running the command in the file's folder; false when no Jasper window is open. */
     private boolean inTab(List<String> command, Path file, Optional<WindowOwner> window) {
         Optional<WindowHandle> target = window.filter(WindowHandle.class::isInstance).map(WindowHandle.class::cast)
             .filter(WindowHandle::isOpen).or(terminals::activeWindow);

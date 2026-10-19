@@ -338,7 +338,7 @@ public class VaultPlugin implements Plugin {
         dialog.show();
     }
 
-    /** A dialog needs an owner; a prompt raised without one (a consumer with no window yet) uses any terminal window. */
+    /** A dialog needs an owner; a prompt raised without one (a consumer with no window yet) uses any Jasper window. */
     private WindowHandle owner(WindowHandle named) {
         if (named != null && named.isOpen()) return named;
         return context.terminals().activeWindow().or(() -> context.terminals().windows().stream().findFirst())

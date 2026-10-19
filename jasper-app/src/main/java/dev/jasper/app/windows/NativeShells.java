@@ -245,7 +245,7 @@ public final class NativeShells {
     }
 
     /**
-     * The kit's modal overlay inside the owner's window: a terminal window, an auxiliary window or a dialog. A modal
+     * The kit's modal overlay inside the owner's window: a Jasper window, an auxiliary window or a dialog. A modal
      * one (a dialog presented as an overlay) blocks {@code show} until it closes, as a modal dialog does, and lets
      * Escape reach its content; a progress overlay returns at once and keeps Escape from the window.
      */

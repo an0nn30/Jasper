@@ -30,7 +30,7 @@ final class FileEditors {
     /** How long a worker waits for the UI thread's answer before the desktop opens the file. */
     static final Duration WAIT = Duration.ofSeconds(30);
 
-    /** A registration: the plugin, its editor, and its own handle for an open terminal window's id. */
+    /** A registration: the plugin, its editor, and its own handle for an open Jasper window's id. */
     private record Holder(String pluginId, FileEditor editor, Function<UUID, Optional<WindowOwner>> windows) { }
 
     private final Consumer<Runnable> ui;
@@ -56,7 +56,7 @@ final class FileEditors {
     /**
      * Makes {@code pluginId}'s editor the one Jasper opens files with. UI thread.
      *
-     * @param windows the registering plugin's own handle for an open terminal window's id
+     * @param windows the registering plugin's own handle for an open Jasper window's id
      * @return removes the editor, unless a bundled plugin's has replaced it since
      * @throws IllegalStateException when a plugin provides the editor already, unless this is a bundled plugin replacing
      *     a non-bundled one's
@@ -79,7 +79,7 @@ final class FileEditors {
     /**
      * Asks the provided editor to open {@code file}. UI thread.
      *
-     * @param windowId the terminal window the open came from; the editor gets its plugin's handle while it is open
+     * @param windowId the Jasper window the open came from; the editor gets its plugin's handle while it is open
      * @return true when it opened the file; false when no plugin provides an editor, or it declined or threw
      */
     boolean edit(Path file, OptionalInt line, Optional<UUID> windowId) {
@@ -145,7 +145,7 @@ final class FileEditors {
      * without a line, then {@code desktop} when that gives false. An interrupted worker (Jasper quitting, or the asking
      * plugin's drain) opens nothing more and keeps its interrupt.
      *
-     * @param window read on the UI thread: the terminal window the open came from
+     * @param window read on the UI thread: the Jasper window the open came from
      * @param desktop the desktop's opener; its failure propagates
      * @throws IllegalStateException on the UI thread
      */

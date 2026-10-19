@@ -260,7 +260,7 @@ public final class EditorWindow {
     /**
      * Opens a local file for the default editor ({@code FileEditor.edit}): an existing file with the caret on
      * {@code line}, a missing one whose folder exists as a tab its first save creates. The tab opens in {@code window}
-     * when that is a terminal window, else in the last main window.
+     * when that is a Jasper window, else in the main window.
      *
      * @return false for a folder or a file whose folder does not exist, which the desktop then opens or reports
      */
@@ -478,7 +478,7 @@ public final class EditorWindow {
         }
     }
 
-    /** @return the terminal window the Editor was last opened from, else the active one; null when there is none */
+    /** @return the Jasper window the Editor was last opened from, else the active one; null when there is none */
     private WindowHandle lastWindow() {
         if (origin instanceof WindowHandle window && window.isOpen()) return window;
         return context.terminals().activeWindow().orElse(null);

@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** A terminal window whose openness a test controls. */
+/** A Jasper window whose openness a test controls. */
 record TestWindow(UUID id, AtomicBoolean open) implements WindowHandle {
     @Override public List<TabHandle> tabs() { return List.of(); }
     @Override public Optional<TabHandle> activeTab() { return Optional.empty(); }
