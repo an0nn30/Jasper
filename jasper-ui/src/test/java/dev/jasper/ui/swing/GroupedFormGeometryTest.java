@@ -160,8 +160,14 @@ class GroupedFormGeometryTest {
                                         // A grouped row is its choice plus its padding: the compact FULL choice, or a field in a Settings form.
                     int rowHeight=full?m(dev.jasper.ui.metrics.DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_GROUP_ROW_PADDING):FormsTest.contentHeight(context,dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT,dev.jasper.ui.metrics.Typography.Role.BODY)+2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING);
                     assertThat(find(view,"group",javax.swing.JComponent.class).getHeight()).as("%s row",kind).isEqualTo(rowHeight);
+                    // The switch row keeps its own text/control height when a native font grows the choice row.
+                    int favoriteHeight=full?rowHeight:Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTINGS_ROW_HEIGHT),
+                        2*m(dev.jasper.ui.metrics.DesignMetrics.Role.SETTING_VERTICAL_PADDING)+Math.max(
+                            find(view,"favorite.title",javax.swing.JComponent.class).getPreferredSize().height,
+                            find(view,"favorite.toggle",javax.swing.JComponent.class).getPreferredSize().height));
+                    assertThat(find(view,"favorite",javax.swing.JComponent.class).getHeight()).as("%s switch row",kind).isEqualTo(favoriteHeight);
                     // A FULL card closes with its stroke; a Settings card does not.
-                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(2*rowHeight+(full?1:0));
+                    assertThat(find(view,"options.card",javax.swing.JComponent.class).getHeight()).as("%s card",kind).isEqualTo(rowHeight+favoriteHeight+(full?1:0));
                 }
             }finally{release(context);}
         });

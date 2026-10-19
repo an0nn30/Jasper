@@ -30,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 class PresentationAttemptTest {
     static final String ID = "dev.example.look";
     @TempDir Path home;
+    private CountDownLatch terminated = new CountDownLatch(1);
 
     AppDirs dirs() { return new AppDirs(home, home.resolve("config.toml"), home.resolve("logs")); }
 
@@ -48,9 +49,10 @@ class PresentationAttemptTest {
     Optional<AttemptStore.State> state() { return new AttemptStore(home).read().of(ID).state(); }
 
     JasperApplication started(PluginSelection selection) throws Exception {
+        terminated = new CountDownLatch(1);
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
-            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
             // A trace of its own: a FIRST_PAINT an earlier test marked on the process-wide one would prove the look at once.
             application[0].trace(StartupTrace.detached());
             application[0].startPlugins(dirs());
@@ -59,8 +61,12 @@ class PresentationAttemptTest {
     }
 
     void quit(JasperApplication application, LookAndFeel original) throws Exception {
-        edt(application::quitNow);
-        edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        try {
+            edt(application::quitNow);
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).as("application and plugin loaders stopped before home cleanup").isTrue();
+        } finally {
+            edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
+        }
     }
 
     @Test void aProviderThatFailsToLoadRecordsFailedAndTheSessionKeepsItsLook() throws Exception {
@@ -133,7 +139,7 @@ class PresentationAttemptTest {
         var trace = StartupTrace.detached();
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
-            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
             application[0].trace(trace);
             application[0].startPlugins(dirs());
             application[0].presentationAttempt().pending();
@@ -196,7 +202,7 @@ class PresentationAttemptTest {
         var selection = PluginSelection.of(dirs(), null, "B", dev, false);
         JasperApplication[] application = new JasperApplication[1];
         edt(() -> {
-            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+            application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
             application[0].restartPlanner = mode -> Optional.empty();
             application[0].startPlugins(dirs());
         });

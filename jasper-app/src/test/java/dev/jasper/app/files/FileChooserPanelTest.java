@@ -142,7 +142,11 @@ class FileChooserPanelTest {
             assertThat(backBounds.getLocation()).isEqualTo(new java.awt.Point(m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING),
                 m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING)));
             assertThat(pathBounds.x).as("the box keeps its gap after Refresh").isEqualTo(refreshBounds.x + refreshBounds.width + gap);
-            assertThat(pathBounds.y + (pathBounds.height - backBounds.height) / 2).isEqualTo(backBounds.y);
+            var pathView = javax.swing.SwingUtilities.getAncestorOfClass(dev.jasper.ui.swing.KitView.class, path);
+            var lane = pathView.getParent();
+            var laneBounds = javax.swing.SwingUtilities.convertRectangle(lane.getParent(), lane.getBounds(), panel);
+            assertThat(pathBounds.y).as("the path is centered in its lane with integer layout rounding")
+                .isEqualTo(laneBounds.y + (laneBounds.height - pathBounds.height) / 2);
             var bodyFont = KitTestSupport.context().typography().font(dev.jasper.ui.metrics.Typography.Role.BODY);
             int line = (int) Math.ceil(bodyFont.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
             assertThat(pathBounds.height).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT),

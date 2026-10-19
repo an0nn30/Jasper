@@ -36,7 +36,7 @@ class SystemAppearanceTest {
     @Test void developmentLibraryDoesNotBroadenThePackagedNotificationLoader() {
         assertThat(MacNative.libraryPath("/tmp/jasper/bin/jasper-app")).isNull();
         assertThat(MacAppearance.library("/tmp/dev/libappearance.dylib", null, null)).isEqualTo(java.nio.file.Path.of("/tmp/dev/libappearance.dylib").toAbsolutePath());
-        assertThat(MacAppearance.library(null, "/Applications/Jasper.app/Contents/MacOS/Jasper", null)).isEqualTo(java.nio.file.Path.of("/Applications/Jasper.app/Contents/app/libjasper-appearance.dylib"));
+        assertThat(MacAppearance.library(null, "/Applications/Jasper.app/Contents/MacOS/Jasper", null)).isEqualTo(java.nio.file.Path.of("/Applications/Jasper.app/Contents/app/libjasper-appearance.dylib").toAbsolutePath());
         assertThat(MacAppearance.library(null, null, java.nio.file.Path.of("/tmp/dist/lib/jasper-app.jar"))).isEqualTo(java.nio.file.Path.of("/tmp/dist/lib/libjasper-appearance.dylib").toAbsolutePath());
     }
 }

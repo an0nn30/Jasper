@@ -4,8 +4,11 @@
 fixtures await application shutdown before temporary-home cleanup. Windows fixes cover native
 linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
 font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
-Bash on Windows; worktree/home comparison canonicalizes both paths. Focused local suites pass;
-hosted verification and Windows listener timeout diagnostics remain pending. No new test skips.
+Bash on Windows; worktree/home comparison canonicalizes both paths. Plugin fixtures await actual
+worker termination before deleting data; script fixtures capture files and await the shell process.
+Full local `check` passed (11,432 tests, zero failures/errors); GitHub macOS, Ubuntu and all Linux
+packaging/install checks passed. Focused checks cover the subsequent Windows fixture corrections;
+PR #1 is gated on all hosted checks. No new test skips.
 
 **Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
 failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical

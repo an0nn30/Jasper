@@ -313,9 +313,11 @@ final class StagedVaultHost implements AutoCloseable {
 
     @Override public void close() throws Exception {
         var pending = new AtomicReference<List<CompletableFuture<?>>>(List.of());
+        var workers = PluginShutdownTestSupport.capture(host);
         try {
             onEdt(() -> pending.set(host.stop()));
             CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).join();
+            workers.await();
         } finally {
             onEdt(auxiliary::close);
             try { loader.close(); } finally { if (enterpriseLoader != null) enterpriseLoader.close(); }

@@ -241,9 +241,11 @@ final class EnterpriseSettings implements AutoCloseable {
         try {
             if (dialog != null) SwingUtilities.invokeAndWait(dialog::cancel);
             if (runtime != null) {
+                var workers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime);
                 var stopping = new CompletableFuture<List<CompletableFuture<?>>>();
                 SwingUtilities.invokeAndWait(() -> stopping.complete(runtime.stop()));
                 CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+                workers.await();
             }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes != null) themes.close(); });
         } finally {

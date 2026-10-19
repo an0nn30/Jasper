@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,24 +35,29 @@ class ScriptsTest {
     record Run(int status, List<String> fields) { }
 
     Run run(byte[] script, Path home, String marker) throws Exception {
-        var builder = new ProcessBuilder(shell(), "-s").redirectError(ProcessBuilder.Redirect.DISCARD);
+        // Keep capture outside the home/work-tree fixtures and avoid a blocking reader in the shared common pool.
+        Path stdout = Files.createTempFile(dir, "script-", ".stdout");
+        Path stderr = Files.createTempFile(dir, "script-", ".stderr");
+        var builder = new ProcessBuilder(shell(), "-s").redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
         if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", shellPath(home));
         if (windows()) {
             String unixTools = Path.of(shell()).getParent().toString();
             builder.environment().put("PATH", unixTools + java.io.File.pathSeparator + builder.environment().get("PATH"));
         }
         Process process = builder.start();
-        try (var stdin = process.getOutputStream()) { stdin.write(script); }
-        var reading = CompletableFuture.supplyAsync(() -> {
-            try { return process.getInputStream().readAllBytes(); }
-            catch (IOException closed) { return new byte[0]; }
-        });
         byte[] output;
+        long started = System.nanoTime();
         try {
-            output = reading.get(10, TimeUnit.SECONDS);
-            assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("script finished").isTrue();
+            try (var stdin = process.getOutputStream()) { stdin.write(script); }
+            boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+            assertThat(finished).as("script finished after %d ms (alive=%s); stderr: %s",
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), process.isAlive(), Files.readString(stderr)).isTrue();
+            output = Files.readAllBytes(stdout);
         } finally {
-            process.destroyForcibly();
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                assertThat(process.waitFor(10, TimeUnit.SECONDS)).as("script process released its capture files").isTrue();
+            }
         }
         var fields = new ArrayList<String>();
         byte[] start = (marker + "\0").getBytes(StandardCharsets.UTF_8);
