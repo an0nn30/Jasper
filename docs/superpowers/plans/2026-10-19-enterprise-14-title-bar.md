@@ -35,11 +35,13 @@ grep -c '"window.toolbar_height" = 34' plugins/enterprise/src/main/resources/pre
 ls jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBand.java 2>/dev/null | wc -l                                                    # 0: Task 2 adds it
 ```
 
+**Lights checkpoint (before Task 3).** Only a real window shows the macOS traffic lights. Before Task 3 the controller asks the user in chat for one measurement-launch batch (their standing rule allows measurement launches when each batch is confirmed), naming what it opens: a throwaway `JFrame` on the toolchain's JBR with `apple.awt.fullWindowContent` and `apple.awt.transparentTitleBar` on its root pane and a 28 pt band, open for a few seconds and screenshotted with `screencapture`. Never `:jasper-app:run`, never while a game or VM runs. Only on their yes: measure the lights with `shots.md`'s method against 12.webp (pass: centres 23 pt apart, not 20; about 14.7 pt across; centre y about 16) and record the numbers in the execution notes. On a miss, stop and report to the user with Rulings 7's follow-up before Task 3. Without a yes, go on and leave the lights to GUI check 1.
+
 ## Global Constraints
 
 **Build and safety**
 - Java 25 on the JetBrains Runtime 25 through the Gradle toolchain. Always use `./gradlew`, never a system `gradle`, and never run `./gradlew --stop`: other sessions share the daemons.
-- Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache. Headless JUnit renders and `:jasper-ui:gallery` may run. Everything AppKit, DWM or a real window does is a GUI check for the user (Task 8).
+- Never launch the GUI (`:jasper-app:run`, `:jasper-app:bench`) and never train the AOT cache. The one exception is the lights checkpoint below, and only on the user's own yes in chat for that batch. Headless JUnit renders and `:jasper-ui:gallery` may run. Everything AppKit, DWM or a real window does is a GUI check for the user (Task 8).
 - Work only in the worktree above, with one commit per task. Every commit message ends with a blank line, `🤖 Generated with Claude Code at The Home Depot`, a blank line, then `Co-Authored-By: Claude <noreply@anthropic.com>`. Do not push, merge or rebase. Never dispatch subagents from inside a task.
 
 **The default look stays byte-identical on every platform.** Every file the headless gallery writes for Slate Cobalt Dark and Light (`dark-1x`, `light-1x`, 161 files each) must equal the Task 1 Step 0 baseline. So must jasper-app's 11 default-look renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images, and `DefaultDockPixelsTest`'s `default-dark` and `default-light`). Task 8 proves both. These changes could reach the default look, and each is kept from it:
@@ -76,8 +78,9 @@ ls jasper-app/src/main/java/dev/jasper/app/platform/MacTitleBand.java 2>/dev/nul
 1. **Another theme picked under Enterprise, especially one with its own `surface.titlebar`** (Ubuntu Yaru, or any imported IntelliJ theme). The band (macOS) and the title bar (Windows) must match the toolbar exactly: the header's `surface.app`, never the title-bar zone's colour.
    - Tests: Task 3 `ClassicMacTitleTest.anotherThemeKeepsTheBandInTheToolbarsColour`; Task 4 `ClassicWindowsTitleTest.theTitleBarIsTheToolbarsColourWithTheMenusThenTheTitle`.
 2. **Entering and leaving macOS full screen.** The band must disappear, so the toolbar meets the screen's top edge, and come back on exit. Classic dialogs and overlays must re-place against the new title inset.
-   - Tests: Task 2 `MacTitleBandTest.fullScreenRemovesTheBandAndLeavingRestoresIt`; Task 3 `ClassicMacTitleTest.fullScreenTakesTheBandOutOfTheWindow`; Task 5 `ClassicWindowOverlayTest.classicDialogsStartBelowTheClassicTitle`.
-3. **A narrow Windows window.** The menus fold into "…" and then ☰ before the title shrinks past 60 px. The title never runs under the window buttons and never gets a negative width.
+   - The band announces each inset change (`TitleInset.CHANGED`), because FlatLaf can republish full screen after the last resize.
+   - Tests: Task 2 `MacTitleBandTest.fullScreenRemovesTheBandAndLeavingRestoresIt`; Task 3 `ClassicMacTitleTest.fullScreenTakesTheBandOutOfTheWindow`; Task 5 `ClassicWindowOverlayTest.classicDialogsStartBelowTheClassicTitle` and `theLayerAndTheCardFollowATitleInsetChangeWithoutAResize`.
+3. **A narrow Windows window.** The menus fold into "…" and then ☰ before the title shrinks past 60 px. The title never runs under the window buttons and never gets a negative width, and the window buttons never shrink below their 44 px.
    - Tests: Task 4 `CollapsingMenuBarTest.aClassicTitleFollowsTheMenusAndTheMenusFoldBeforeItShrinksPastItsMinimum` and `ClassicWindowsTitleTest.aNarrowWindowFoldsTheMenusAndClipsTheTitle`.
 4. **Windows with `window.native_decorations = true`, or in Compact.** The system title bar, the in-window classic menu row and the header as the first row, exactly as on Linux, with no title inset.
    - Tests: Task 1 `DesktopFlagsTest.aClassicTitleCommitsTheDefaultLooksFlagsOnMacOsAndWindowsAndTheSystemTitleOnLinux`; Task 4 `ClassicWindowsTitleTest.withoutDecorationsTheMenusStayARowOfTheWindow`; Task 3 `ClassicMacTitleTest.compactKeepsTheSystemTitleBarWithoutTheBand`.
@@ -105,7 +108,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
 4. `ShellLook(unifiedTitle, windowMenus, followThemeAppearance)` (`presentation/ShellLook.java:10`) is constructed 14 times (`git grep -n "new ShellLook("`). `WindowLook(chrome, unifiedTitle, followThemeAppearance)` (`workspace/WindowLook.java:15`, `of` `:25-28`, `standard()` `:35`) is constructed 13 times in tests.
 5. The shipped kit: `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml:5` `title_bar = "native"` and `:72` `"window.toolbar_height" = 34`.
    - `EnterpriseLook.CHROME` (`jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java:19-22`) must equal the shipped table (`EnterpriseFixtureTest.java:28-29`).
-   - `PresentationConformanceTest.java:84` asserts 34.
+   - `PresentationConformanceTest.java:84`, `application/EnterpriseFirstWindowTest.java:40` and `plugins/EnterpriseHomeTest.java:36` assert the shipped 34.
    - `window.toolbar_height` is 28 to 64 (`config/ConfigSnapshot.java:24`).
    - **The user's own `~/.config/jasper/config.toml:15` saves `toolbar_height = 34`** (and `:12` `toolbar = "icons_and_labels"`). A saved value always overrides a look's default (spec 5.8). Read-only: never edit it.
 
@@ -157,6 +160,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
     - The title is visible by default: the initial style bits include `TITLE_VISIBLE` (`:443`), and a null `windowTitleVisible` means visible (`:285-287`).
     - `windowAppearance` takes an `NSAppearance` name as a `String` (`:289-294`).
     - IntelliJ Classic sets the first two on the root pane and `NSAppearanceNameVibrantLight`/`NSAppearanceNameVibrantDark` by theme (`intellij.md` 1.1 and 1.3).
+    - These are the Java-side properties only. The size and spacing of the lights AppKit then draws are not verified (Rulings 7; the lights checkpoint).
 19. FlatLaf republishes the root's `FlatLaf.fullWindowContent.buttonsBounds` (`FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS`) whenever macOS full screen toggles (`FullWindowContentSupport.java:134-173`, installed for every FlatLaf root on macOS, `FlatRootPaneUI.java:197-204`). In full screen its width is 0: the placeholder option `zeroInFullScreen` keys on `width == 0` (`FullWindowContentSupport.java:75-77`; `FlatClientProperties.java:334`). `MacTitleBar` already listens to that property (`MacTitleBar.java:105`).
 20. FlatLaf's title pane (`FlatTitlePane.java`):
     - `activeChanged` gives a client `TITLE_BAR_FOREGROUND` to the title in both states, so FlatLaf's own title would not dim (`:456-470`).
@@ -203,9 +207,9 @@ Each is "what — why — cost if wrong".
 3. **`Projections.Platform { MAC, WINDOWS, LINUX }`, read from `os.name` without AWT.** `LINUX` stands for every other system. `Host(Platform platform, boolean unifiedTitleSupported)` keeps a `mac()` method. — Cost: a BSD desktop counts as Linux, which is what it already gets.
 4. **The classic base keeps `title_bar = "native"`.** Only the Enterprise kit names `classic`, so a third-party `base = "classic"` kit keeps its behaviour, and the existing classic-look tests stand. — Cost: one constant.
 5. **The six projections under `classic`** (on Linux every one equals `native`'s):
-   - **`DesktopFlags`:** `screenMenuBar = menu_bar != window`, or classic on macOS; `nativeTitle = native`, or classic on Linux. macOS and Windows therefore commit `STANDARD`.
+   - **`DesktopFlags`:** `screenMenuBar = menu_bar != window`, or any classic title (macOS or Windows); `nativeTitle = native`, or classic on Linux. macOS and Windows therefore commit `STANDARD`, so the fallback there is the default look (spec 4.7). `screenMenuBar` reaches only `apple.laf.useScreenMenuBar`, `AboutWindows.aboutInApplicationMenu` (gated on macOS) and `Projections.fallback`, so on Windows it changes nothing but the fallback.
    - **`WorkspaceLook.header`:** CLASSIC unless `unified`.
-   - **`ShellLook`:** it gains `classicTitle`, true for classic on macOS or Windows. `windowMenus = !screenMenuBar`, so macOS auxiliary frames get the File menu. `followThemeAppearance` is true unless `unified`. `unifiedTitle` is unchanged.
+   - **`ShellLook`:** it gains `classicTitle`, true for classic on macOS or Windows. `windowMenus = menu_bar == window`, except under a classic title on macOS, where it is false: macOS auxiliary frames get the File menu for the screen menu bar, and Windows auxiliary frames still show no menu row. It is therefore not `!screenMenuBar` under a classic title on Windows. `followThemeAppearance` is true unless `unified`. `unifiedTitle` is unchanged.
    - **`window.native_decorations`:** hidden for a native title or on macOS; visible under classic on Windows, which honours it.
    - **`SettingsChrome.integratedTitle`:** only under `unified`, so Settings keeps its titled system or FlatLaf bar.
    - **`DialogMapping.windowTitled`:** unless `unified`, since every classic auxiliary bar shows its title.
@@ -218,7 +222,7 @@ Each is "what — why — cost if wrong".
    - It is a root-pane `fullWindowContent` + `transparentTitleBar` frame with a 28 pt band, unscaled because the native title bar does not scale.
    - The band paints the header's own fill (`ThemeZone.color(header, SURFACE_APP)`), with no rule. There is no JBR `CustomTitleBar`.
    - `windowTitleVisible` is never set, so AppKit draws the frame's existing title.
-   - — Cost: if macOS centres the title (GUI check 1), a follow-up paints it.
+   - — Cost: if macOS centres the title (GUI check 1), a follow-up paints it. The lights are one of the user's two hard requirements (with the toolbar height), and plain `fullWindowContent` + `transparentTitleBar` may keep AppKit's standard lights, 13.webp's geometry (centres 20.0 pt apart, about 12.4 pt across, centre y 13.7). `shots.md` notes IntelliJ's (23.0 pt, about 14.7 pt, y about 15.9) fits JBR scaling the controls by H/28 for a 32 pt custom title bar; nobody has checked that, nor the design's claim that a JBR custom title bar would draw standard-size lights. If the lights miss IntelliJ's (the lights checkpoint before Task 3, or GUI check 1), the user reports it and a follow-up tries JBR's `WindowDecorations.CustomTitleBar` at height 32, with its controls visible and `windowTitleVisible` untouched, and the band's height matching it.
 8. **Appearance under the band is `NSAppearanceNameVibrantLight`/`VibrantDark`, by `theme.chrome().dark()`, as IntelliJ sets it.** Every other native-titled frame keeps Aqua and DarkAqua. — Cost: if the vibrant names render worse, two string constants change.
 9. **Full screen is FlatLaf's republished buttons bounds with width 0** (Verified 19): the band hides, then shows again on any other value (null included). — Cost: if JBR reports otherwise, the band stays in full screen; a follow-up asks `FlatNativeMacLibrary.isWindowFullScreen`.
 10. **The band handles a double-click itself, as IntelliJ Classic does.**
@@ -229,8 +233,9 @@ Each is "what — why — cost if wrong".
 12. **macOS auxiliary windows keep their system title bars, and their frames show the minimal File menu in the screen menu bar** (New Window, Close Window), as the default look gives them. Dialogs show the application menu, as before. — Cost: a fuller menu is a follow-up.
 13. **On Windows the title is Jasper's `ClassicWindowTitle`, inside the menu bar, not FlatLaf's title label.**
     - FlatLaf's label would not dim with a client foreground and would start 40 px after the menus (Verified 20). Changing that needs global `UIManager` keys, which the default look must not see.
-    - IntelliJ's layout: the title starts 22 px after the menus (its 10 px menu gap plus 12 px border). The menus fold before the title drops below FlatLaf's 60 px `titleMinimumWidth`.
+    - IntelliJ's layout: the title starts 22 px after the menus (its 10 px menu gap plus 12 px border). The menus fold before the title drops below FlatLaf's 60 px `titleMinimumWidth`, and the window buttons keep their 44 px: the bar's preferred width is only its folded minimum (Task 4 Step 3), because FlatLaf squeezes the buttons before its left panel.
     - The title bar is 28 px (`TITLE_BAR_HEIGHT`), IntelliJ's computed 28 and the band's height, so the window buttons are 44 × 28.
+    - This departs from the approved design's W1, which names FlatLaf's own mechanism (`centerTitleIfMenuBarEmbedded` off). Task 8 records it as a deviation in the banner and in STATUS.
     - — Cost: if the user wants FlatLaf's title, a follow-up swaps the label for its keys.
 14. **Windows title colours.** Active: `text.secondary` on `surface.app` under `Guard.TEXT`; IntelliJ Light's `#6E6E6E` sits on that 4.5 floor. Inactive: `text.tertiary` under `Guard.INDICATOR`; IntelliJ's inactive `#999999` is 2.5:1, and a text guard would undo the dimming. Both are declared in `WindowPairs` and sampled by `WindowPairsTest`. The font is the plain UI body face. — Cost: a guard choice.
 15. **The Windows rule is the classic menu row's own 1 px `border.divider`.** FlatLaf paints it across the whole title pane (Verified 20). It is the nearest role to IntelliJ's `MenuBar.borderColor` `#D9D9D9`, and it is already the Linux row's rule. — Cost: none.
@@ -247,7 +252,7 @@ Each is "what — why — cost if wrong".
 21. **The mock tests.**
     - `EnterpriseMenuRowMockTest`, `EnterpriseWorkstationMockTest`, `RunWindowWorkspaceRenderTest` and `EnterpriseDockWindowTest` run under an explicit Linux host.
     - The workstation mock test and `ClassicHeaderTest` render the 28 px row. Their expectations shift by the 12 device px (6 px at 1×) the mocks' 34 px row is taller, each line marked as the user's 2026-10-19 direction.
-    - The toolbar pairs compare the mock's middle 56 device rows with the 28 px row and its rule. Floors move only to measured values.
+    - The toolbar pairs compare the mock's middle 56 device rows with the render's 56-row toolbar row (equal heights, so `compare_mock.py` adds no padding), or 58 rows each with the rule if the pair's colours need it. Floors move only to measured values.
     - — Cost: none.
 22. **`ChromeRenderTest` gains `enterprise-mac` and `enterprise-windows`.**
     - `enterprise` moves to the Linux host. Its image is unchanged: the host changes no pixel of a native-titled window.
@@ -412,6 +417,7 @@ static Presentation classic(Projections.Host host) {
     assertThat(ApplicationBootstrap.applyDesktop(mac, ConfigSnapshot.defaults(), true)).isEqualTo(TitleBarStyle.MAC_UNIFIED);
     assertThat(System.getProperty(MENU)).as("the screen menu bar").isEqualTo("true");
     var windows = classic(new Projections.Host(Projections.Platform.WINDOWS, false));
+    assertThat(windows.committedDesktop()).as("the default look's flags, so the fallback is the default look").isEqualTo(DesktopFlags.STANDARD);
     assertThat(ApplicationBootstrap.applyDesktop(windows, ConfigSnapshot.defaults(), false)).isEqualTo(TitleBarStyle.CUSTOM);
     assertThat(System.getProperty(FlatSystemProperties.USE_WINDOW_DECORATIONS)).as("FlatLaf's title pane").isEqualTo("true");
     assertThat(ApplicationBootstrap.applyDesktop(windows, ConfigSnapshot.defaults().toBuilder().nativeDecorations(true).build(), false))
@@ -475,14 +481,16 @@ Expected: FAIL: `Projections.Platform`, `ChromeSpec.TitleBar.CLASSIC` and the fo
     boolean classicTitle = title == ChromeSpec.TitleBar.CLASSIC && host.platform() != Platform.LINUX;
     boolean nativeTitle = title == ChromeSpec.TitleBar.NATIVE || title == ChromeSpec.TitleBar.CLASSIC && !classicTitle;
     boolean windowMenus = chrome.menuBar() == ChromeSpec.MenuBar.WINDOW;
-    // IntelliJ Classic shows its macOS menus only in the screen menu bar.
-    boolean screenMenus = !windowMenus || classicTitle && host.mac();
+    // A classic title commits the default look's flags on macOS and Windows, so a failed start falls back to the default look (spec 4.7).
+    boolean screenMenuBar = !windowMenus || classicTitle;
+    // IntelliJ Classic shows its macOS menus only in the screen menu bar; on Windows they stay in the window's title bar.
+    boolean shellWindowMenus = windowMenus && !(classicTitle && host.mac());
     ```
   - Then:
-    - `new DesktopFlags(screenMenus, nativeTitle)`;
+    - `new DesktopFlags(screenMenuBar, nativeTitle)`;
     - header `unified ? UNIFIED : CLASSIC`;
     - menus `windowMenus ? CLASSIC : STANDARD`;
-    - `new ShellLook(unified && host.unifiedTitleSupported(), !screenMenus, !unified, classicTitle)`;
+    - `new ShellLook(unified && host.unifiedTitleSupported(), shellWindowMenus, !unified, classicTitle)`;
     - hide `window.native_decorations` when `nativeTitle || host.mac()`;
     - `SettingsChrome` `integratedTitle = unified`;
     - `new DialogMapping(kind, !unified)`.
@@ -552,6 +560,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - **`public final class TitleInset`:** where a root's classic title chrome ends.
     - `public static void publish(JRootPane root, java.util.function.IntSupplier height)`.
     - `public static int of(JRootPane root)`: the published height, never below 0, or 0 when nothing is published. The client property key is `"Jasper.titleInset"`.
+    - `public static final String CHANGED = "Jasper.titleInsetChanged"` and `public static void changed(JRootPane root, int before)`, which fires `root.firePropertyChange(CHANGED, before, of(root))` (JComponent's public `int` overload, so it fires only on a real change). `publish` ends with `changed(root, ` the inset before it `)`.
+    - Why: nothing else tells a dialog or overlay that the inset moved. FlatLaf republishes the buttons bounds from its own root `componentResized` listener, "very late when toggling full screen" (`FullWindowContentSupport.java:63-65`, `:137-152`), possibly after the last resize `WindowOverlay` and `followTitleBar` see.
   - **`public static void MacAppearance.vibrant(JRootPane root, boolean dark)`:** sets `apple.awt.windowAppearance` to `"NSAppearanceNameVibrantDark"` or `"NSAppearanceNameVibrantLight"`.
   - **`public final class MacTitleDoubleClick`:**
     - `public enum Action { ZOOM, MINIMIZE, NONE }`;
@@ -616,7 +626,10 @@ class MacTitleBandTest {
         var root = root(content);
         var band = MacTitleBand.install(root, () -> FILL, () -> MacTitleDoubleClick.Action.ZOOM);
         root.setSize(800, 600);
+        var changes = new java.util.ArrayList<String>();
+        root.addPropertyChangeListener(TitleInset.CHANGED, event -> changes.add(event.getOldValue() + "->" + event.getNewValue()));
         root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(0, 0, 0, 0));
+        assertThat(changes).as("the inset change is announced without a resize").containsExactly(MacTitleBand.HEIGHT + "->0");
         layout(root);
         assertThat(band.isVisible()).isFalse();
         assertThat(content.getY()).as("the content meets the screen's top edge").isZero();
@@ -624,6 +637,7 @@ class MacTitleBandTest {
         root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, new Rectangle(7, 6, 52, 16));
         layout(root);
         assertThat(band.isVisible()).isTrue();
+        assertThat(changes).containsExactly(MacTitleBand.HEIGHT + "->0", "0->" + MacTitleBand.HEIGHT);
         assertThat(content.getY()).isEqualTo(MacTitleBand.HEIGHT);
         root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS, null);
         assertThat(band.isVisible()).as("no native window yet").isTrue();
@@ -675,7 +689,7 @@ Expected: FAIL to compile: `MacTitleBand`, `MacTitleDoubleClick` and `TitleInset
 
 - [ ] **Step 3: Implement the three classes and `MacAppearance.vibrant`**
 
-- **`TitleInset`:** the `IntSupplier` as a root client property; `of` clamps at 0.
+- **`TitleInset`:** the `IntSupplier` as a root client property; `of` clamps at 0; `publish` reads `of` first and ends with `changed(root, before)`; `changed` fires `CHANGED` as in Interfaces.
 - **`MacTitleDoubleClick`:**
   - `parse` trims; "Minimize" gives MINIMIZE and "None" gives NONE; anything else, null included, gives ZOOM.
   - `current` is a `volatile` field.
@@ -687,7 +701,7 @@ Expected: FAIL to compile: `MacTitleBand`, `MacTitleDoubleClick` and `TitleInset
 - **`MacTitleBand.install`:**
   - It puts the two root properties.
   - It wraps the root's current content pane in a `JPanel(new BorderLayout())`, the band `NORTH` and the old content `CENTER`, and sets that as the content pane.
-  - It adds a `PropertyChangeListener` on `FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS` that sets `setVisible(!fullScreen(newValue))` and revalidates the root.
+  - It adds a `PropertyChangeListener` on `FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS` that takes `int before = inset()`, sets `setVisible(!fullScreen(newValue))`, revalidates the root, then calls `TitleInset.changed(root, before)`, so dialogs and overlays re-place even when no resize follows.
   - It adds a `MouseAdapter` whose `mouseClicked` acts on `getClickCount() == 2`: for a `java.awt.Frame` ancestor, `frame.setExtendedState(afterDoubleClick(frame.getExtendedState(), doubleClick.get()))`.
   - It publishes `TitleInset.publish(root, band::inset)`.
 - **The band itself:**
@@ -829,7 +843,10 @@ class ClassicMacTitleTest {
                 var owner = new WindowContent[1];
                 mounted(themes, w -> { }, owner);
                 String json;
-                try (var in = JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) { json = new String(in.readAllBytes(), StandardCharsets.UTF_8); }
+                // edt takes a Runnable, so the read's IOException is caught here, as WindowToolbarViewsTest does.
+                try (var in = JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) {
+                    json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                } catch (java.io.IOException failure) { throw new AssertionError(failure); }
                 var titled = JasperTheme.parse(json.replace("\"accent\": \"#2563C9\"",
                     "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
                 FlatLafInstaller.install(titled, EnterpriseLook.kit());
@@ -874,7 +891,7 @@ Imports:
 - `dev.jasper.app.presentation.*`, `dev.jasper.app.config.ViewMode` and `dev.jasper.app.appearance.ThemeController`;
 - `dev.jasper.app.testsupport.EnterpriseLook`, `LayoutTestSupport` and `MockProfile`;
 - `dev.jasper.ui.theme.SemanticColor`, `dev.jasper.ui.theme.JasperTheme` and `dev.jasper.ui.swing.FlatLafInstaller`;
-- `com.formdev.flatlaf.FlatClientProperties`;
+- `com.formdev.flatlaf.FlatClientProperties`, `java.awt.Color`, `java.awt.Rectangle`, `java.nio.charset.StandardCharsets`, `java.util.ArrayDeque` and `javax.swing.*`;
 - `static DesktopTestSupport.edt` and AssertJ.
 
 `MockProfile.print` prints at 2× and `MockProfile.at(image, x, y)` reads one device pixel. Read their signatures before use, as `ChromeRenderTest` and the mock tests call them.
@@ -964,7 +981,9 @@ In `CollapsingMenuBarTest` (import `com.formdev.flatlaf.util.UIScale`):
     title.setPreferredSize(new Dimension(300, 20));
     bar.setTitle(title);
     int gap = UIScale.scale(ClassicWindowTitle.GAP), minimum = UIScale.scale(ClassicWindowTitle.MINIMUM);
-    assertThat(bar.getPreferredSize().width).as("every menu, the gap and the whole title").isEqualTo(220 + gap + 300);
+    // FlatLaf sizes its left panel from this and squeezes the window buttons first when its title area drops below 60, so the
+    // bar asks only for its folded minimum; FlatLaf's glue widening gives it its real width, and layoutContainer folds.
+    assertThat(bar.getPreferredSize().width).as("the ☰ menu, the gap and the title's minimum").isEqualTo(30 + gap + minimum);
     assertThat(bar.getComponent(bar.getComponentCount() - 1)).as("the glue FlatLaf stretches the bar by").isInstanceOf(Box.Filler.class);
     bar.setSize(800, 28); bar.doLayout();
     assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
@@ -976,7 +995,7 @@ In `CollapsingMenuBarTest` (import `com.formdev.flatlaf.util.UIScale`):
     assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.MORE);
     assertThat(shown(bar)).containsExactly(true, true, true, true, false);
     assertThat(title.getX()).isEqualTo(180 + 30 + gap);
-    assertThat(bar.getPreferredSize().width).as("folding does not shrink what the bar asks for").isEqualTo(220 + gap + 300);
+    assertThat(bar.getPreferredSize().width).as("folding does not change what the bar asks for").isEqualTo(30 + gap + minimum);
     bar.setSize(40, 28); bar.doLayout();
     assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.ALL);
     assertThat(title.getWidth()).as("never negative").isZero();
@@ -1009,6 +1028,28 @@ class ClassicWindowsTitleTest {
         root.setSize(width, 800);
         for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(root);
         return new Mounted(owner, root, frameTitle);
+    }
+
+    /** FlatLaf's window buttons, by accessible name; headless, only Close shows (the others need a Frame, FlatTitlePane.createButtons). */
+    static List<JButton> windowButtons(JRootPane root) {
+        var names = Set.of("Iconify", "Maximize", "Restore", "Close");
+        var found = new ArrayList<JButton>();
+        var pending = new ArrayDeque<Component>(List.of(root.getLayeredPane().getComponents()));
+        while (!pending.isEmpty()) {
+            var next = pending.pop();
+            if (next instanceof JButton button && button.isVisible() && names.contains(button.getAccessibleContext().getAccessibleName())) found.add(button);
+            if (next instanceof Container container) pending.addAll(List.of(container.getComponents()));
+        }
+        return found;
+    }
+
+    /** W1: the default look's window buttons, never squeezed by the menus and the title. */
+    static void assertFullWindowButtons(JRootPane root, int width) {
+        var buttons = windowButtons(root);
+        assertThat(buttons).as("%d px: Close at least", width).extracting(button -> button.getAccessibleContext().getAccessibleName()).contains("Close");
+        for (var button : buttons)
+            assertThat(button.getWidth()).as("%d px: %s keeps its 44 px", width, button.getAccessibleContext().getAccessibleName())
+                .isEqualTo(button.getPreferredSize().width).isEqualTo(UIScale.scale(44));
     }
 
     @Test void theTitleBarIsTheToolbarsColourWithTheMenusThenTheTitle() throws Exception {
@@ -1047,9 +1088,13 @@ class ClassicWindowsTitleTest {
                 var image = MockProfile.print(root, 1440, 800);
                 var rule = MockProfile.at(image, 2 * 100, 2 * top - 1);
                 assertThat(MockProfile.at(image, 2 * 1300, 2 * top - 1)).as("the rule runs under the whole title bar").isEqualTo(rule);
+                // FlatTitlePaneBorder, not the menu bar's own Matte rule: also under the window buttons and the app icon.
+                assertThat(MockProfile.at(image, 2 * (1440 - 20), 2 * top - 1)).as("the rule under the window buttons").isEqualTo(rule);
+                assertThat(MockProfile.at(image, 2 * 8, 2 * top - 1)).as("the rule under the app icon").isEqualTo(rule);
                 assertThat(rule).isNotEqualTo(toolbar);
                 assertThat(MockProfile.at(image, 2 * 1300, 2 * top - 6)).as("the bar is the toolbar's colour").isEqualTo(toolbar);
                 assertThat(TitleInset.of(root)).isEqualTo(top);
+                assertFullWindowButtons(root, 1440);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -1065,6 +1110,10 @@ class ClassicWindowsTitleTest {
                 assertThat(title.getWidth()).isNotNegative();
                 assertThat(title.getX() + title.getWidth()).as("inside the bar, clear of the window buttons")
                     .isLessThanOrEqualTo(menus.getWidth() - menus.getInsets().right);
+                assertFullWindowButtons(m.root(), 480);
+                var wider = mount(themes, true, 800);
+                assertThat(wider.owner().classicWindowTitle().getWidth()).isNotNegative();
+                assertFullWindowButtons(wider.root(), 800);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -1100,6 +1149,8 @@ class ClassicWindowsTitleTest {
 }
 ```
 
+Besides the types its body names, the helpers import `java.awt.Component`, `java.awt.Container`, `java.util.ArrayList`, `java.util.List` and `java.util.Set`.
+
 In `WindowPairsTest`:
 - `Fixture` gains `final ClassicWindowTitle title = new ClassicWindowTitle(), inactiveTitle = new ClassicWindowTitle();`, with `inactiveTitle.setActive(false)` in the constructor.
 - `restyle()` adds, for each title, `refresh()`, `setText("Workstation")` and `setSize(getPreferredSize())`.
@@ -1125,7 +1176,7 @@ Expected: FAIL to compile: `ClassicWindowTitle`, `setTitle`, `classicWindowTitle
 - **`WindowPairs`:** add the two pairs with one comment ("The Windows classic title bar's title, active and inactive (plan 14 Rulings 14): IntelliJ's TitlePane.infoForeground and inactiveInfoForeground"). Append both to `ALL`.
 - **`CollapsingMenuBar`:**
   - Add a `ClassicWindowTitle title` field. `setTitle(value)` adds it and then the glue with `super.addImpl`, like `setHeader`, then revalidates.
-  - `preferredLayoutSize`, when `title != null`, ignores the fold: every menu's `width(menu)`, plus `UIScale.scale(ClassicWindowTitle.GAP)`, plus the title's preferred width, with the height the tallest child's, plus insets.
+  - `preferredLayoutSize`, when `title != null`, ignores the fold and asks for the folded minimum: `minimumMenusWidth()`, plus `UIScale.scale(ClassicWindowTitle.GAP)`, plus `Math.min(title.getPreferredSize().width, UIScale.scale(ClassicWindowTitle.MINIMUM))`, with the height the tallest child's, plus insets. FlatTitlePane sizes its left panel from this preferred width (`menuBarPlaceholder`, `FlatTitlePane.java:275-280`) and, when its own title area drops below `titleMinimumWidth`, shrinks the window buttons first (`:312-316`, down to `buttonMinimumWidth`, `:425-430`). Asking for every menu would squeeze the 44 px buttons in any window under about 900 px. The glue widening (`:684-693`) still gives the bar its real width, and `layoutContainer`'s `fit` does the folding.
   - `minimumLayoutSize` is unchanged.
   - `layoutContainer` with a title, before the placing loop (which now also skips `title`):
     ```java
@@ -1204,8 +1255,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 - Test: `jasper-app/src/test/java/dev/jasper/app/windows/ClassicWindowOverlayTest.java`
 
 **Interfaces:**
-- Consumes: `TitleInset.of(JRootPane)` and `TitleInset.publish` (Task 2).
-- Produces: `static ComponentListener NativeShells.followTitleBar(java.awt.Container window, JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog)`, which replaces the two-argument form (one caller and one test).
+- Consumes: `TitleInset.of(JRootPane)`, `TitleInset.publish`, `TitleInset.CHANGED` and `TitleInset.changed` (Task 2).
+- Produces: `static NativeShells.TitleFollower NativeShells.followTitleBar(java.awt.Container window, JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog)`, which replaces the two-argument form (one caller and one test). `static final class TitleFollower extends ComponentAdapter implements java.beans.PropertyChangeListener`: its `componentResized` and `propertyChange` both call `dialog.windowTitleHeight(window.getInsets().top + TitleInset.of(root))`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1239,6 +1290,33 @@ In `ClassicWindowOverlayTest`, change `:72` to `NativeShells.followTitleBar(wind
         assertThat(addLogin.cardBounds().y).isZero();
     } finally { addLogin.close(); }
 }
+
+/** Review Focus 2: the title inset can change after the last resize (FlatLaf republishes full screen late); the layer and the card follow it. */
+@Test void theLayerAndTheCardFollowATitleInsetChangeWithoutAResize() {
+    var root = new JRootPane(); root.getLayeredPane().setSize(800, 600);
+    int[] inset = {28};
+    dev.jasper.app.platform.TitleInset.publish(root, () -> inset[0]);
+    var body = new JPanel(); body.setPreferredSize(new Dimension(400, 201));
+    var centred = new ClassicDialog(KitTestSupport.context(), body, "Unlock Vault", Nodes.Hue.NONE, ClassicDialog.Placement.CENTERED);
+    var unlock = WindowOverlay.classic(root, centred);
+    var window = new JPanel();
+    var titleBar = NativeShells.followTitleBar(window, root, centred);
+    root.addPropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar);
+    try {
+        unlock.show();
+        titleBar.componentResized(new ComponentEvent(window, ComponentEvent.COMPONENT_RESIZED));
+        int height = unlock.cardBounds().height;
+        assertThat(centred.getY()).isEqualTo(28);
+        inset[0] = 0;
+        dev.jasper.app.platform.TitleInset.changed(root, 28);
+        assertThat(centred.getBounds()).as("full screen: the layer covers the window").isEqualTo(new Rectangle(0, 0, 800, 600));
+        assertThat(unlock.cardBounds().y).as("still centred on the whole window").isEqualTo((600 - height) / 2);
+        inset[0] = 28;
+        dev.jasper.app.platform.TitleInset.changed(root, 0);
+        assertThat(centred.getY()).as("back below the band").isEqualTo(28);
+        assertThat(28 + unlock.cardBounds().y).isEqualTo((600 - height) / 2);
+    } finally { unlock.close(); root.removePropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar); }
+}
 ```
 
 - [ ] **Step 2: Run it to see it fail**
@@ -1249,8 +1327,9 @@ Expected: FAIL to compile: there is no three-argument `followTitleBar`.
 - [ ] **Step 3: Implement**
 
 - **`WindowOverlay.layout`:** `int top = Math.min(dev.jasper.app.platform.TitleInset.of(root), root.getLayeredPane().getHeight());` then `component.setBounds(0, top, width, height - top)`. Its comment: "below the window's classic title chrome (plan 14), else over the whole layered pane".
-- **`NativeShells.inWindow`:** take `var root = container.getRootPane();`, call `dialog.windowTitleHeight(owner.getInsets().top + dev.jasper.app.platform.TitleInset.of(root));` and `followTitleBar(owner, root, dialog)`.
-- **`followTitleBar`:** re-reads the same sum on resize. Its comment adds "and the classic title chrome inside the root (macOS's band, Windows' classic title bar)".
+- **`WindowOverlay`:** a `PropertyChangeListener insetChanged = event -> layout();` field. `show()` adds it with `root.addPropertyChangeListener(TitleInset.CHANGED, insetChanged)` beside the `resize` listener, and `close()` removes it beside `resize`.
+- **`NativeShells.inWindow`:** take `var root = container.getRootPane();`, call `dialog.windowTitleHeight(owner.getInsets().top + dev.jasper.app.platform.TitleInset.of(root));`, then `var titleBar = followTitleBar(owner, root, dialog);`, `owner.addComponentListener(titleBar)` and `root.addPropertyChangeListener(TitleInset.CHANGED, titleBar)`. The close action removes both.
+- **`followTitleBar`:** returns the `TitleFollower`, which re-reads the same sum on resize and on `TitleInset.CHANGED`. Its comment adds "and the classic title chrome inside the root (macOS's band, Windows' classic title bar), which can change without a resize".
 
 - [ ] **Step 4: Run the tests and commit**
 
@@ -1274,6 +1353,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - `plugins/enterprise/src/main/resources/plugin.toml:6`
   - `jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java:18-22`
   - `jasper-app/src/test/java/dev/jasper/app/plugins/PresentationConformanceTest.java:84`
+  - `jasper-app/src/test/java/dev/jasper/app/application/EnterpriseFirstWindowTest.java:40`
+  - `jasper-app/src/test/java/dev/jasper/app/plugins/EnterpriseHomeTest.java:36`
   - `jasper-app/src/test/java/dev/jasper/app/workspace/ChromeRenderTest.java`
 
 **Interfaces:**
@@ -1283,6 +1364,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 - **`EnterpriseLook.CHROME`:** takes `ChromeSpec.TitleBar.CLASSIC`; its comment adds "IntelliJ Classic's title (plan 14)".
 - **`PresentationConformanceTest:84`:** `.isEqualTo(28)`, with the comment `// The user's 2026-10-19 direction: IntelliJ's 28 px toolbar.`.
+- **`EnterpriseFirstWindowTest:40`** (`first.toolbarHeight()`) and **`EnterpriseHomeTest:36`** (`snapshot.toolbarHeight()`): both read the shipped kit's default, so each becomes `.isEqualTo(28)` with the same comment. `DefaultsPrecedenceTest` and `KitParserTest:174` read their own fixtures' 34 and stay.
 - **`ChromeRenderTest`:**
   - `Case` gains the window's platform, with a 3-argument constructor for the real host:
     ```java
@@ -1316,7 +1398,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `./gradlew :jasper-app:test --tests '*EnterpriseFixtureTest' --tests '*PresentationConformanceTest'`
+Run: `./gradlew :jasper-app:test --tests '*EnterpriseFixtureTest' --tests '*PresentationConformanceTest' --tests '*EnterpriseFirstWindowTest' --tests '*EnterpriseHomeTest'`
 Expected: FAIL: the shipped kit still reads `native` and 34.
 
 - [ ] **Step 3: Ship the kit**
@@ -1326,7 +1408,7 @@ Expected: FAIL: the shipped kit still reads `native` and 34.
 
 - [ ] **Step 4: Run the shipped-kit and render tests**
 
-Run: `./gradlew :jasper-app:test --tests '*EnterpriseFixtureTest' --tests '*PresentationConformanceTest' --tests '*EnterpriseKitRenderTest' --tests '*ChromeRenderTest' --tests '*ProjectionReadTest'`
+Run: `./gradlew :jasper-app:test --tests '*EnterpriseFixtureTest' --tests '*PresentationConformanceTest' --tests '*EnterpriseFirstWindowTest' --tests '*EnterpriseHomeTest' --tests '*EnterpriseKitRenderTest' --tests '*ChromeRenderTest' --tests '*ProjectionReadTest'`
 Expected: PASS. `jasper-app/build/chrome-renders/` now holds `chrome-enterprise-mac.png`, `chrome-enterprise-windows.png` and their `-palette` and `settings-` images. Open the two chrome images and confirm what each shows:
 - the band above the toolbar in one colour;
 - FlatLaf's title bar with File … Help, then the title, the rule and the toolbar below.
@@ -1397,8 +1479,9 @@ Never widen a tolerance to pass.
 
 Edit `tools/visual/pairs.json` with `python3 -I` (keep the file's formatting: `json.dumps(..., indent=2, ensure_ascii=False)` plus a trailing newline, and check the diff touches only these entries). For both `chrome-toolbar-light` and `chrome-toolbar-dark`:
 - `crop` becomes `[2, 116, 2880, 56]`: the mock's 34 px row less 3 px above and below;
-- `render_crop` becomes `[0, 50, 2880, 58]`: the 28 px row and its rule;
-- add or extend `note` with "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row and its rule."
+- `render_crop` becomes `[0, 50, 2880, 56]`: the 28 px row without its rule. Both crops are 56 rows: `compare_mock.py` pads a shorter crop with magenta and never resizes (`:91-98`), and that padding would be a spurious edge band;
+- then check that every entry of the pair's `colours` (`#F2F2F2`, `#D1D1D1`, `#C4C4C4`, `#FFFFFF` in Light; `#2B2D30` in Dark) is still present in the render's 56-row crop. If one is missing, use 58 rows on both sides instead: `crop` `[2, 115, 2880, 58]` and `render_crop` `[0, 50, 2880, 58]`, the row and its rule;
+- add or extend `note` with "The user's 2026-10-19 direction: IntelliJ's 28 px toolbar; the mock's middle 28 px against the row, equal heights." (or "…against the row and its rule, 58 rows each." for the fallback), and record the choice in the execution notes.
 
 - [ ] **Step 4: Check the pairs**
 
@@ -1459,7 +1542,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
   - The consumers row for `ShellLook` becomes `` | `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance`, `classicTitle` | windows: `ShellChrome.of`, `NativeShells`; workspace: `WindowLook` (`classicTitle`) | ``.
   - After that table, add: "`Projections.Host` gives the table the platform (macOS, Windows, or Linux for any other system) and whether the unified macOS title bar is available; the platform changes only `title_bar = "classic"`, which on Linux gives exactly `native`'s values."
   - The field rows become:
-    - `DesktopFlags.screenMenuBar`, `nativeTitle`: "false when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS; true when `title_bar = "native"`, or `"classic"` on Linux | as committed";
+    - `DesktopFlags.screenMenuBar`, `nativeTitle`: "false when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS and Windows; true when `title_bar = "native"`, or `"classic"` on Linux | as committed";
     - `WorkspaceLook.header`: "CLASSIC when `title_bar` is `native` or `classic`";
     - `ShellLook.windowMenus`: "true when `menu_bar = "window"`, except under `title_bar = "classic"` on macOS, where auxiliary frames carry the minimal File menu for the screen menu bar | as committed";
     - `ShellLook.followThemeAppearance`: "true when `title_bar` is `native` or `classic` | true";
@@ -1606,14 +1689,17 @@ Then, in the series' style, give:
   - `TitleInset`;
   - the 28 px toolbar;
 - the rulings (this plan's 24, one clause each);
+- the deviation from the approved design: "W1's `centerTitleIfMenuBarEmbedded` is replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim";
 - the deviations from the Enterprise mocks, as the user's 2026-10-19 direction:
   - macOS and Windows no longer show the mocks' native title bar or in-window menu row (the mocks stay true on Linux);
   - the toolbar is 28 px: the shifted `EnterpriseWorkstationMockTest` and `ClassicHeaderTest` expectations and the two toolbar pairs' crops, with their measured agreements;
 - the check counts, "N of N" pairs, the byte-identical gallery and the 11 identical default-look renders;
+- the lights checkpoint: its measured spacing, diameter and centre y against IntelliJ's 23 / 14.7 / 16 pt, or that the user did not approve the launch;
 - **Before checking:** "your `~/.config/jasper/config.toml` saves `window.toolbar_height = 34` (and `window.toolbar = "icons_and_labels"`), which override the look's defaults; delete those lines, or Reset them in Settings, to see the 28 px toolbar";
 - the GUI checks for the user, in this order:
   1. **macOS, Enterprise Light:**
-     - the traffic lights and the title against IntelliJ's screenshot (12.webp): their size and spacing, and whether macOS leading-aligns or centres the title (if centred, a follow-up paints it);
+     - the traffic lights against IntelliJ's screenshot (12.webp), as measured in `shots.md`. Pass: centres 23 pt apart (not 20), about 14.7 pt across, centre y about 16. Jasper's native bar today (13.webp) gives 20.0 pt, 12.4 pt and 13.7; if the band gives that, report it, and the follow-up is Rulings 7's JBR custom title bar at height 32;
+     - the title: whether macOS leading-aligns or centres it (if centred, a follow-up paints it);
      - dragging the window by the band;
      - a double-click in it with System Settings › Desktop & Dock's double-click action at Zoom, Minimize and Do Nothing.
   2. The band's colour against the toolbar, with no seam, in Enterprise Light and Dark and under another theme.
@@ -1642,7 +1728,7 @@ Then, in the series' style, give:
 - the reconciliation note: the unmerged `claude/workspace-tabs` series rules that a child window has no menu bar under Enterprise. Whichever of it and this plan merges second reconciles them; on macOS a child window then needs the screen menu bar's menus.
 - end with "Not merged, not pushed."
 
-Add a status banner under this plan's title: `> **Status (2026-10-19): executed on `claude/enterprise-title-bar` (`<first>..<last>`).** Deviations from this plan's text: <list, or none>.` Then add an `## Execution notes (2026-10-19)` section at the end with the execution rulings.
+Add a status banner under this plan's title: `> **Status (2026-10-19): executed on `claude/enterprise-title-bar` (`<first>..<last>`).** Deviations from this plan's text: <list, or none>.` The banner also names the approved design's one deviation, as its own sentence: "Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim." Then add an `## Execution notes (2026-10-19)` section at the end with the execution rulings.
 
 - [ ] **Step 7: Check the edits and commit**
 
