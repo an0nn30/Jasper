@@ -1180,7 +1180,8 @@
       "#C4C7CC",
       "#E6E7EA",
       "#2F65CA"
-    ]
+    ],
+    "note": "The user's direction of 2026-10-18: Panel rail width is hidden under the stripes look (spec 12.1), so Tabs & Panels holds only Tab height and New Windows stands a row higher than the mock."
   },
   {
     "name": "enterprise-settings-03",

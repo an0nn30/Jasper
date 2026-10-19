@@ -3,10 +3,12 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.metrics.DesignMetrics;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -27,7 +29,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Review Focus 3: dragging a tool window onto the bottom strip, a window built like WindowContent's under labelled stripes. */
+/**
+ * Review Focus 3: dragging a tool window onto the bottom strip, a window built like WindowContent's under labelled stripes;
+ * and between the side stripes, whose second groups stand at their bottom ends (the user's direction of 2026-10-18).
+ */
 class DockDragBottomStripTest {
     private CommandPaletteShortcutsTest.RecordingFocusManager keys;
     private KeyboardFocusManager previousKeys;
@@ -54,7 +59,10 @@ class DockDragBottomStripTest {
         });
     }
 
-    /** a and b on the left stripe's top group, c and e in Bottom Left (or none), d on the right stripe. */
+    /** A metric at the interface scale. */
+    private static int metric(DesignMetrics.Role role) { return UIScale.scale(EnterpriseLook.kit().metrics().value(role)); }
+
+    /** a and b on the left stripe's top group, c and e in Bottom Left (or c in Left Bottom, or none), d on the right stripe. */
     private final class Window {
         final DockState state = new DockState();
         final StripeSet.LabelledStripes stripes = new StripeSet.LabelledStripes(EnterpriseLook.kit());
@@ -63,7 +71,9 @@ class DockDragBottomStripTest {
         final JRootPane rootPane = new JRootPane();
         final DockDrag drag = new DockDrag(content, state, area, stripes);
 
-        Window(boolean bottomWindows) {
+        Window(boolean bottomWindows) { this(bottomWindows, false); }
+
+        Window(boolean bottomWindows, boolean leftBottom) {
             var header = new JPanel(); header.setPreferredSize(new Dimension(10, 30));
             var body = new JPanel(new BorderLayout());
             body.add(stripes.left(), BorderLayout.WEST); body.add(area, BorderLayout.CENTER); body.add(stripes.right(), BorderLayout.EAST);
@@ -80,6 +90,7 @@ class DockDragBottomStripTest {
             };
             for (String id : List.of("a", "b")) { state.add(id, Slot.LEFT_TOP); area.setContent(id, id.toUpperCase(), new JLabel(id)); }
             if (bottomWindows) for (String id : List.of("c", "e")) { state.add(id, Slot.BOTTOM_LEFT); area.setContent(id, id.toUpperCase(), new JLabel(id)); }
+            if (leftBottom) { state.add("c", Slot.LEFT_BOTTOM); area.setContent("c", "C", new JLabel("c")); }
             state.add("d", Slot.RIGHT_TOP); area.setContent("d", "D", new JLabel("d"));
             state.addListener(change -> { drag.cancel(); area.sync(); render(); layout(); });
             render();
@@ -118,13 +129,94 @@ class DockDragBottomStripTest {
 
         /** Presses on the label, moves past the threshold, then to {@code to}, and releases there. */
         void drop(AbstractButton source, Point to) {
+            hover(source, to);
+            mouse(source, MouseEvent.MOUSE_RELEASED, to);
+        }
+
+        /** Presses on the label, moves past the threshold, then to {@code to}, and holds it there. */
+        void hover(AbstractButton source, Point to) {
             Point from = center(source);
             mouse(source, MouseEvent.MOUSE_PRESSED, from);
             mouse(source, MouseEvent.MOUSE_DRAGGED, new Point(from.x + 20, from.y + 20));
             mouse(source, MouseEvent.MOUSE_DRAGGED, to);
-            mouse(source, MouseEvent.MOUSE_RELEASED, to);
         }
+
+        /** A point of {@code stripe}'s, across its middle at {@code y}, in content coordinates. */
+        Point on(DockStripe stripe, int y) { return SwingUtilities.convertPoint(stripe, new Point(stripe.getWidth() / 2, y), content); }
     }
+
+    @Test void aDropNearTheRightStripesBottomEndLandsInRightBottomAtThatEnd() throws Exception {
+        edt(() -> {
+            var window = new Window(false);
+            var right = window.stripes.right();
+            int end = right.getHeight() - metric(DesignMetrics.Role.RAIL_GAP);
+            var a = window.label(window.stripes.left(), "a");
+            Point to = window.on(right, end - 5);
+            window.hover(a, to);
+            Rectangle gap = right.gapBounds().orElseThrow();
+            assertThat(gap.y + gap.height).as("the gap opens at the bottom end").isEqualTo(end);
+            window.mouse(a, MouseEvent.MOUSE_RELEASED, to);
+            assertThat(window.state.ids(Slot.RIGHT_BOTTOM)).containsExactly("a");
+            Rectangle dropped = window.label(right, "a").getBounds();
+            assertThat(dropped.y + dropped.height).as("its label at the bottom end").isEqualTo(end);
+        });
+    }
+
+    @Test void aDropJustBelowTheGroupsMidpointJoinsTheSecondGroupBeforeItsLabel() throws Exception {
+        edt(() -> {
+            var window = new Window(false, true);
+            var left = window.stripes.left();
+            Rectangle b = window.label(left, "b").getBounds(), c = window.label(left, "c").getBounds();
+            // b's length stays at the top group's end while it is dragged.
+            int middle = (b.y + b.height + metric(DesignMetrics.Role.STRIPE_LABEL_GAP) + c.y) / 2;
+            var source = window.label(left, "b");
+            Point to = window.on(left, middle + 20);
+            window.hover(source, to);
+            Rectangle gap = left.gapBounds().orElseThrow();
+            assertThat(gap.y + gap.height).as("the gap ends where c starts").isEqualTo(c.y);
+            assertThat(window.label(left, "c").getBounds()).as("c stays at the bottom end").isEqualTo(c);
+            window.mouse(source, MouseEvent.MOUSE_RELEASED, to);
+            assertThat(window.state.ids(Slot.LEFT_BOTTOM)).containsExactly("b", "c");
+            assertThat(window.state.ids(Slot.LEFT_TOP)).containsExactly("a");
+            Rectangle moved = window.label(left, "c").getBounds();
+            assertThat(moved.y + moved.height).isEqualTo(left.getHeight() - metric(DesignMetrics.Role.RAIL_GAP));
+        });
+    }
+
+    @Test void aDropJustAboveTheGroupsMidpointJoinsTheTopGroup() throws Exception {
+        edt(() -> {
+            var window = new Window(false, true);
+            var left = window.stripes.left();
+            Rectangle b = window.label(left, "b").getBounds(), c = window.label(left, "c").getBounds();
+            int end = b.y + b.height + metric(DesignMetrics.Role.STRIPE_LABEL_GAP), middle = (end + c.y) / 2;
+            var source = window.label(left, "c");
+            Point to = window.on(left, middle - 20);
+            window.hover(source, to);
+            assertThat(left.gapBounds().orElseThrow().y).as("the gap opens after b").isEqualTo(end);
+            window.mouse(source, MouseEvent.MOUSE_RELEASED, to);
+            assertThat(window.state.ids(Slot.LEFT_TOP)).containsExactly("a", "b", "c");
+            assertThat(window.state.ids(Slot.LEFT_BOTTOM)).isEmpty();
+        });
+    }
+
+    @Test void aDropAtAnEmptySecondGroupsBottomEndLandsThere() throws Exception {
+        edt(() -> {
+            var window = new Window(false);
+            var left = window.stripes.left();
+            int end = left.getHeight() - metric(DesignMetrics.Role.RAIL_GAP);
+            var d = window.label(window.stripes.right(), "d");
+            Point to = window.on(left, end - 5);
+            window.hover(d, to);
+            Rectangle gap = left.gapBounds().orElseThrow();
+            assertThat(gap.y + gap.height).as("the empty group's drop space at the bottom end").isEqualTo(end);
+            window.mouse(d, MouseEvent.MOUSE_RELEASED, to);
+            assertThat(window.state.ids(Slot.LEFT_BOTTOM)).containsExactly("d");
+            Rectangle dropped = window.label(left, "d").getBounds();
+            assertThat(dropped.y + dropped.height).isEqualTo(end);
+            assertThat(window.stripes.right().isVisible()).as("the right stripe has no window left").isFalse();
+        });
+    }
+
 
     @Test void aDropBetweenTwoBottomLabelsLandsBetweenThem() throws Exception {
         edt(() -> {

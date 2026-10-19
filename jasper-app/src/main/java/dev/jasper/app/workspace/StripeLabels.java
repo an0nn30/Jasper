@@ -88,9 +88,9 @@ final class StripeLabels {
 
     /**
      * Paints a label in text space, from its start, on a whole-pixel baseline: its text, held on the stripe, a hovered tile
-     * or an open tile, then its badge's pill, both centred across {@code across}. A side label centres its {@link #line()}
-     * ({@code sideLabel}); the bottom strip centres its face's whole-pixel ascent and descent (the mocks' bottom strip sets
-     * its 24 px line's baseline at 17).
+     * or an open tile, then its badge's pill, both centred across {@code across}. A side label centres its face's capitals
+     * ({@code sideLabel}, the user's direction of 2026-10-18); the bottom strip centres its face's whole-pixel ascent and
+     * descent (the mocks' bottom strip sets its 24 px line's baseline at 17).
      */
     void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, boolean sideLabel, GeneratedTheme theme,
                boolean open, boolean hover) {
@@ -99,8 +99,8 @@ final class StripeLabels {
         g.setFont(font);
         int baseline;
         if (sideLabel) {
-            LineMetrics line = font.getLineMetrics(text, TEXT_CONTEXT);
-            baseline = Math.round((across - line.getAscent() - line.getDescent()) / 2f + line.getAscent());
+            float capHeight = (float) -font.createGlyphVector(TEXT_CONTEXT, "H").getVisualBounds().getY();
+            baseline = Math.round((across + capHeight) / 2f);
         } else {
             FontMetrics metrics = g.getFontMetrics(font);
             baseline = Math.round((across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent());

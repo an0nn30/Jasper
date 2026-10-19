@@ -84,7 +84,7 @@ class DockMockTest {
                 stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1),
                     LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of());
                 int thickness = stripe.getPreferredSize().width;
-                assertThat(thickness).as("the stripe fits its labels: the mocks' 22 and the rule").isEqualTo(23);
+                MockProfile.fonts(variant.name() + " left stripe: the stripe fits its labels, the mocks' 22 and the rule", thickness, 23, 0);
                 int height = fitted("1: SFTP", "2: File Servers");
                 var render = variant.seen(MockCrops.render(stripe, thickness, height, 2));
                 assertSecondAtTheEnd(variant.name() + " left stripe", stripe, height);
@@ -134,7 +134,7 @@ class DockMockTest {
      * A side stripe against its mock crop (the mock's 22 px fill at 2x; the stripe is the mocks' 23 with its rule): the
      * stripe and open-tile fills, one ink run per label with the mock's ink, the first label's leading ink within 2 px, and
      * under IBM Plex the other run edges within 2, the labels' line centred across the fill (the user's direction of
-     * 2026-10-18; the mocks set it along the outer edge, 4 px further out) and the share of agreeing pixels along it.
+     * 2026-10-18; the mocks set it along the outer edge, 3 px further out) and the share of agreeing pixels along it.
      */
     static void compareStripe(Variant variant, String name, BufferedImage render, BufferedImage mock, int thickness, Side side,
                               List<Integer> expectedRuns) {
@@ -169,10 +169,12 @@ class DockMockTest {
         var myLine = MockCrops.runs(crop, false, 120, 40, stripeFill, tile);
         assertThat(theirLine).as(where + ": the mock's label line").hasSize(1);
         assertThat(myLine).as(where + ": the label line").hasSize(1);
-        // The line's ink is the capitals' and lower case's above the baseline, so its middle stands within 1 px (2 at 2x)
-        // of the fill's under IBM Plex; doubled to stay whole.
+        // The line's ink is the capitals' and lower case's above the baseline, centred by the capitals, so its middle
+        // stands within half a pixel (1 at 2x) of the fill's under IBM Plex; doubled to stay whole. Its extent across, the
+        // face's cap and ascender height, is the mock's within 1 px.
         MockProfile.fonts(where + ": the label line's middle, doubled", myLine.getFirst().start() + myLine.getFirst().end(),
-            mock.getWidth() - 1, 4);
+            mock.getWidth() - 1, 2);
+        MockProfile.fonts(where + ": the label line's extent", myLine.getFirst().length(), theirLine.getFirst().length(), 2);
         // The glyphs: the agreeing share over the fill against the mock moved across to the centred line, so the two lines
         // compare letter for letter.
         MockCrops.fontsFloor(where + ": agreeing pixels", MockCrops.agreement(crop,
@@ -379,7 +381,7 @@ class DockMockTest {
                     MockCrops.write(variant.name() + "-dock", render, variant.crop(2, 180, 2880, 1578));
                     int left = 2 * (fixture.stripes.left().getWidth() - 23), right = -2 * (fixture.stripes.right().getWidth() - 23);
                     String where = variant.name() + " dock";
-                    assertThat(left).as(where + ": the stripes are the mocks' 23").isZero();
+                    MockProfile.fonts(where + ": the stripes are the mocks' 23, the dock's offset", left, 0, 0);
                     assertPlaced(where + " SFTP header", fixture.header("sftp"), 48 - 2 + left, 0, 600);
                     assertPlaced(where + " File Servers header", fixture.header("servers"), 48 - 2 + left, 944 - 180, 600);
                     assertPlaced(where + " Sessions header", fixture.header("sessions"), 2136 - 2 + right, 0, 700);

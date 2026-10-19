@@ -50,7 +50,7 @@ class LabelledStripeTest {
         return Math.round(line.getAscent() + line.getDescent()) + 2 * metric(DesignMetrics.Role.RAIL_EDGE) + metric(DesignMetrics.Role.DOCK_RULE);
     }
 
-    @Test void itShowsItsSidesWindowsByGroupWithTheirNumbersEdgeToEdge() throws Exception {
+    @Test void itShowsItsSidesWindowsByGroupWithTheirNumbers() throws Exception {
         try {
             var stripe = stripe(Side.LEFT);
             stripe.render(List.of(window("servers", "File Servers", Slot.LEFT_BOTTOM, 2), window("sftp", "SFTP", Slot.LEFT_TOP, 1),
@@ -171,9 +171,10 @@ class LabelledStripeTest {
                     for (int x = label.x * 4; x < (label.x + label.width) * 4; x++)
                         if (image.getRGB(x, y) != surface) { first = Math.min(first, x); last = Math.max(last, x); }
                 assertThat(last).as(side + ": the text is painted").isNotNegative();
-                // "SFTP" is capitals: their ink's middle stands within 1 px of the fill's middle.
-                assertThat((first + last) / 2.0 / 4).as(side + ": the capitals are centred across")
-                    .isCloseTo(label.x + label.width / 2.0, org.assertj.core.data.Offset.offset(1.0));
+                // "SFTP" is capitals, centred by their cap height: their ink's middle stands within half a pixel of the
+                // fill's middle.
+                assertThat((first + last + 1) / 2.0 / 4).as(side + ": the capitals are centred across")
+                    .isCloseTo(label.x + label.width / 2.0, org.assertj.core.data.Offset.offset(0.5));
             }
         } finally { EnterpriseLook.restoreDefault(); }
     }
@@ -230,6 +231,37 @@ class LabelledStripeTest {
             MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 1);
             Rectangle t = stripe.buttons().get(0).getBounds(), s = stripe.buttons().get(1).getBounds();
             assertThat(s.y).isEqualTo(t.y + t.height);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /**
+     * A left stripe too short for its top group, its rail actions and its second group keeps its windows: the second group
+     * still ends {@code RAIL_GAP} above the bottom and the actions follow it, where the stripe's end cuts them off; the
+     * second group's drop bounds keep their place.
+     */
+    @Test void aShortStripeGivesUpItsRailActionsBeforeItsWindows() throws Exception {
+        try {
+            var stripe = stripe(Side.LEFT);
+            var action = new AbstractAction("About Sample") { @Override public void actionPerformed(ActionEvent event) { } };
+            stripe.render(List.of(window("t", "A long top group title", Slot.LEFT_TOP, 0), window("s", "Second", Slot.LEFT_BOTTOM, 0)),
+                List.of(action));
+            var labels = new StripeLabels(EnterpriseLook.kit());
+            int rail = metric(DesignMetrics.Role.RAIL_GAP), between = metric(DesignMetrics.Role.STRIPE_LABEL_GAP);
+            int top = labels.length("A long top group title", Optional.empty()), second = labels.length("Second", Optional.empty());
+            int actions = metric(DesignMetrics.Role.RAIL_SECTION_GAP) + labels.length("About Sample", Optional.empty()) + between;
+            int slack = 6, height = 2 * rail + top + between + second + slack;
+            assertThat(actions).as("the actions need more than the slack").isGreaterThan(slack);
+            MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
+            assertThat(stripe.buttons()).extracting(AbstractButton::getToolTipText).containsExactly("A long top group title", "About Sample", "Second");
+            Rectangle t = stripe.buttons().get(0).getBounds(), about = stripe.buttons().get(1).getBounds(), s = stripe.buttons().get(2).getBounds();
+            assertThat(s.y + s.height).as("the second group at the bottom end").isEqualTo(height - rail);
+            assertThat(s.y).as("after the top group").isGreaterThanOrEqualTo(t.y + t.height + between);
+            assertThat(about.y).as("the actions follow the second group").isGreaterThanOrEqualTo(s.y + s.height);
+            stripe.beginDrag("t", "A long top group title");
+            var groups = stripe.dropGroups();
+            assertThat(groups.get(1).bounds().height).as("the second group can take a drop").isPositive();
+            assertThat(groups.get(1).bounds().contains(s.x + s.width / 2, s.y + s.height / 2)).isTrue();
+            stripe.endDrag();
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
@@ -333,11 +365,13 @@ class LabelledStripeTest {
             stripe.render(List.of(window("sftp", "SFTP", Slot.LEFT_TOP, 1), window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of(action));
             MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
             var buttons = stripe.buttons();
-            assertThat(buttons).extracting(AbstractButton::getToolTipText).containsExactly("1: SFTP", "2: File Servers", "About Sample");
-            var about = buttons.get(2);
+            assertThat(buttons).as("the stripe's order").extracting(AbstractButton::getToolTipText)
+                .containsExactly("1: SFTP", "About Sample", "2: File Servers");
+            assertThat(List.of(stripe.getComponents())).as("the accessible children's order").containsExactlyElementsOf(buttons);
+            var about = buttons.get(1);
             assertThat(about.getY()).as("RAIL_SECTION_GAP after the top group").isEqualTo(buttons.get(0).getY() + buttons.get(0).getHeight()
                 + metric(DesignMetrics.Role.RAIL_SECTION_GAP));
-            assertThat(about.getY() + about.getHeight()).as("above the second group").isLessThan(buttons.get(1).getY());
+            assertThat(about.getY() + about.getHeight()).as("above the second group").isLessThan(buttons.get(2).getY());
             buttons = List.of(buttons.get(0), about);
             buttons.get(1).doClick(0);
             assertThat(ran).containsExactly("about");

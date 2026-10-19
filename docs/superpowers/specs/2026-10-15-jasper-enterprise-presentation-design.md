@@ -16,7 +16,7 @@ Amended on 2026-10-17 with plan 7's bottom-strip ruling, made under the same aut
 Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no menu row under Enterprise).
 Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
-Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 12.1 and 12.2 (Settings hides the Panel rail width).
+Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -255,8 +255,9 @@ Established on 2026-10-15 in the worktree at `3c6e9dcc3`. Do not re-derive; test
    recipes. Guards repair contrast where a colour is painted and never change stored roles.
 5. **Behaviour stays the same.** Actions, palette scopes, verbs and keys, the Settings draft and Apply, and the
    immediate Plugins page are identical in both looks. A look changes presentation, host copy, and the effective
-   defaults of a closed list of settings that a saved value always overrides; under `motion = "none"` and
-   `title_bar = "native"` it also ignores `ui.animations.enabled` and `window.native_decorations`. Where a plugin
+   defaults of a closed list of settings that a saved value always overrides; under `motion = "none"`,
+   `title_bar = "native"` and `tool_windows = "stripes"` it also ignores `ui.animations.enabled`,
+   `window.native_decorations` and `window.rail_width`. Where a plugin
    composes differently, every action stays reachable (section 14.7).
 6. **Composition belongs to its owner.** Where a mock changes layout (a tree table instead of rows), the owner branches
    once at its composition root: plugins on whether `Workstation` is published, app pages on the `Composition` value
@@ -597,7 +598,7 @@ header honours the existing `window.toolbar` setting (10.3).
 | `title_bar` | `unified` | `native` | The OS title bar on every platform (`TitleBarStyle.NATIVE`); the workspace header becomes a chrome row under it (10.1) |
 | `menu_bar` | `system` | `window` | macOS: `apple.laf.useScreenMenuBar=false`, so each window's menu bar is a row in the window; elsewhere menus already sit in the window |
 | `window_title` | `"{context}"` | `"Workstation — {session} — {directory}"` | The frame title template (10.4) |
-| `tool_windows` | `rails` | `stripes` | Labelled stripes, the bottom strip and header strips (10.7) |
+| `tool_windows` | `rails` | `stripes` | Labelled stripes, the bottom strip and header strips (10.7), whatever `window.rail_width` says |
 | `editor_tabs` | `equal` | `classic` | Content-sized, always-visible tabs with a status dot, ×, "+" and an underline (10.5) |
 | `status_bar` | `segments` | `cells` | Ruled status cells (10.6) |
 | `palette` | `anchored` | `run_window` | The Run window and the leading "▶ Run…" status item (section 11) |
@@ -1166,7 +1167,7 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `ShellLook.followThemeAppearance` | true when `title_bar = "native"` | true |
 | `SettingsChrome.integratedTitle` | false when `title_bar = "native"` | false |
 | `SettingsChrome.collapsibleNav`, `inlineReset`; `Composition` | true, false and CLASSIC when `base = "classic"` | false, true, ROWS |
-| `SettingsChrome.hiddenKeys` | `window.native_decorations` when `title_bar = "native"`, and `ui.animations.enabled` when `motion = "none"` | `window.native_decorations` |
+| `SettingsChrome.hiddenKeys` | `window.native_decorations` when `title_bar = "native"`, and `ui.animations.enabled` when `motion = "none"`, and `window.rail_width` when `tool_windows = "stripes"` | `window.native_decorations` |
 | `SettingsChrome.fontRowCopy` | "Use the default font size" when `[type.ui]` names a face | "Use platform font size" |
 | `DialogMapping` | CLASSIC when `dialogs = "classic"`; `windowTitled` when `title_bar = "native"` | AS_REQUESTED, `windowTitled` |
 | `Branding` | `[branding]` | `Branding.NONE` |
