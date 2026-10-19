@@ -92,6 +92,94 @@ public final class AppIcons {
         }
     }
 
+    /**
+     * The icon a labelled tool window stripe's button draws for a panel's or rail action's {@code icon} (spec 10.7), a
+     * {@code logicalSize} square whose art and ink are read at paint time from the receiving component. A header
+     * strip's glyph is first unwrapped to its source. Under {@link ChromeArtwork#CLASSIC} a named icon draws IntelliJ's
+     * classic tool-window file where {@link dev.jasper.ui.icons.IconRegistry#stripeIcon} has one, authored and untinted;
+     * a plugin's path, and any other name, draws its monochrome glyph in the ink {@code ink} gives for the receiving
+     * component. Under {@link ChromeArtwork#NEW_UI} it draws what the icon rails draw: a named icon's chrome artwork, or
+     * a plugin's ordinary glyph. Any other icon is drawn as given, centred in the square and scaled down uniformly when
+     * larger. Empty for no icon: a null icon, or one whose width or height is not positive.
+     */
+    public static java.util.Optional<Icon> stripeIcon(Icon icon, ChromeArtwork artwork, int logicalSize,
+                                                      java.util.function.Function<Component, Color> ink) {
+        Objects.requireNonNull(artwork, "artwork");
+        Objects.requireNonNull(ink, "ink");
+        Icon source = icon instanceof StripGlyph strip ? strip.source() : icon;
+        if (source == null || source.getIconWidth() <= 0 || source.getIconHeight() <= 0) return java.util.Optional.empty();
+        if (source instanceof PresentationIcon presentation && presentation.pathData() != null)
+            return java.util.Optional.of(new PluginStripeIcon(presentation, artwork, logicalSize, ink));
+        java.util.Optional<String> name = source instanceof PresentationIcon presentation
+            ? java.util.Optional.of(presentation.name()) : kitName(source);
+        if (name.isPresent()) {
+            var tint = source instanceof PresentationIcon ? SemanticColor.TEXT_SECONDARY : SemanticColor.TEXT_PRIMARY;
+            return java.util.Optional.of(new NamedStripeIcon(name.get(), tint, artwork, logicalSize, ink));
+        }
+        return java.util.Optional.of(new GivenStripeIcon(source, logicalSize));
+    }
+
+    /** One stripe preparation: the chrome artwork, the icon name and the device size it was prepared at. */
+    private record StripeKey(ChromeArtwork artwork, String name, int size) { }
+    /**
+     * Prepared stripe art, built on first paint: under CLASSIC the tool-window file (empty for a name without one),
+     * under NEW_UI the chrome icon. Only a CLASSIC stripe's paint reads the stripe table.
+     */
+    private static final Map<StripeKey, java.util.Optional<dev.jasper.ui.icons.IconRegistry.PreparedIcon>> STRIPES =
+        new ConcurrentHashMap<>();
+
+    /** A built-in or semantic icon name on a labelled stripe; {@code tint} is its rail tint under New UI. */
+    private record NamedStripeIcon(String name, SemanticColor tint, ChromeArtwork artwork, int size,
+                                   java.util.function.Function<Component, Color> ink) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var theme = ThemeZone.theme(component);
+            var prepared = STRIPES.computeIfAbsent(new StripeKey(artwork, name, device), key -> switch (key.artwork()) {
+                case CLASSIC -> NAMED.stripeIcon(key.name(), key.size());
+                case NEW_UI -> java.util.Optional.of(NAMED.chromeIcon(key.name(), key.size()));
+            });
+            Icon art = prepared.isPresent()
+                ? prepared.get().icon(theme, artwork == ChromeArtwork.CLASSIC ? SemanticColor.TEXT_PRIMARY : tint)
+                : NAMED.panel(name, theme.semantic(), ink.apply(component), device);
+            art.paintIcon(component, graphics, x, y);
+        }
+    }
+
+    /** A plugin's own path on a labelled stripe: its glyph in the label ink, or its ordinary glyph under New UI. */
+    private record PluginStripeIcon(PresentationIcon source, ChromeArtwork artwork, int size,
+                                    java.util.function.Function<Component, Color> ink) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int device = getIconWidth();
+            var theme = ThemeZone.theme(component);
+            Icon art = artwork == ChromeArtwork.CLASSIC ? source.glyph(theme.semantic(), ink.apply(component), device)
+                : source.ordinary(theme, device);
+            art.paintIcon(component, graphics, x, y);
+        }
+    }
+
+    /** Any other icon on a labelled stripe, drawn as given: centred in the square, scaled down uniformly when larger. */
+    private record GivenStripeIcon(Icon source, int size) implements Icon {
+        @Override public int getIconWidth() { return UIScale.scale(size); }
+        @Override public int getIconHeight() { return getIconWidth(); }
+        @Override public void paintIcon(Component component, Graphics graphics, int x, int y) {
+            int box = getIconWidth();
+            int width = source.getIconWidth(), height = source.getIconHeight();
+            double scale = Math.min(1.0, (double) box / Math.max(width, height));
+            int left = (box - (int) Math.round(width * scale)) / 2, top = (box - (int) Math.round(height * scale)) / 2;
+            var g = (Graphics2D) graphics.create();
+            try {
+                g.clipRect(x, y, box, box);
+                g.translate(x + left, y + top);
+                if (scale < 1.0) g.scale(scale, scale);
+                source.paintIcon(component, g, 0, 0);
+            } finally { g.dispose(); }
+        }
+    }
+
     /** Native macOS tray template artwork; not a standard-control icon catalog. */
     static java.net.URL trayArtwork() {
         return Objects.requireNonNull(AppIcons.class.getClassLoader().getResource(BASE + "terminal/toolwindow/terminal.svg"));
