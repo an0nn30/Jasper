@@ -34,8 +34,9 @@ import org.tomlj.TomlTable;
 /**
  * The saved workspace, {@code workspace.toml} in the Jasper home (workspace tabs spec, section 8): each Jasper window's
  * role, bounds and maximized state, its layout, and what each of its tabs needs to come back. {@link #write} writes it
- * atomically; {@link #read} never throws: it drops bad tab and window entries alone and sets an unreadable file aside as
- * {@code workspace.toml.bad}. Stateless: the caller chooses the thread; the values are immutable.
+ * atomically; {@link #read} never throws: it drops bad tab and window entries alone, keeping a copy of the file as
+ * {@code workspace.toml.bad}, and sets an unreadable file aside under that name. Stateless: the caller chooses the
+ * thread; the values are immutable.
  */
 public final class WorkspaceFile {
     /** Whether a window is the main window or a child window. */
@@ -161,11 +162,15 @@ public final class WorkspaceFile {
          * The saved workspace, its bad entries dropped. A main window whose layout is empty restores the empty workspace.
          *
          * @param snapshot the windows to restore
+         * @param keptAside where the original file was copied ({@code workspace.toml.bad} beside it) because a window or a
+         *     tab entry was dropped, so the caller can tell the user and a later save does not lose the dropped text for
+         *     good; empty when nothing was dropped or the copy failed
          */
-        record Restore(Snapshot snapshot) implements Loaded {
-            /** Checks the snapshot is present. */
+        record Restore(Snapshot snapshot, Optional<Path> keptAside) implements Loaded {
+            /** Checks the values are present. */
             public Restore {
                 Objects.requireNonNull(snapshot, "snapshot");
+                Objects.requireNonNull(keptAside, "keptAside");
             }
         }
 
@@ -192,12 +197,13 @@ public final class WorkspaceFile {
     /**
      * Reads {@code file}; never throws, not even when tomlj's parser overflows the stack on deep nesting (workspace plan 2,
      * Rulings 13 and 14). A bad tab entry, or a tab a group lists without one, is dropped as {@link Layout#remove(TabId)}
-     * drops it; a bad window entry is dropped; bounds and choices fall back alone. A file that cannot be read, does not
-     * parse, has another version or keeps no main window is moved to {@code workspace.toml.bad} beside it, replacing an
-     * older one.
+     * drops it; a bad window entry is dropped; bounds and choices fall back alone. When a window or a tab entry was
+     * dropped, the original file is copied to {@code workspace.toml.bad} beside it, replacing an older one, and
+     * {@link Loaded.Restore#keptAside()} reports the copy. A file that cannot be read, does not parse, has another
+     * version or keeps no main window is moved to {@code workspace.toml.bad} instead.
      *
      * @param file the workspace file
-     * @return the windows to restore, or that Jasper starts fresh and what was set aside
+     * @return the windows to restore and any copy kept, or that Jasper starts fresh and what was set aside
      */
     public static Loaded read(Path file) {
         String text;
@@ -208,16 +214,44 @@ public final class WorkspaceFile {
         } catch (IOException unreadable) {
             return setAside(file, unreadable);
         }
+        Parsed parsed;
         try {
-            return new Loaded.Restore(parse(text));
+            parsed = parse(text);
         } catch (IOException | RuntimeException | StackOverflowError invalid) {
             // tomlj's parser has no nesting guard: deeply nested arrays overflow the stack inside Toml.parse.
             return setAside(file, invalid);
         }
+        return new Loaded.Restore(parsed.snapshot(), parsed.dropped() ? keepCopy(file) : Optional.empty());
+    }
+
+    /** What {@link #parse} read, and whether it dropped any window or tab entry. */
+    private record Parsed(Snapshot snapshot, boolean dropped) { }
+
+    /** Copies the original file beside itself as {@code workspace.toml.bad}; empty, and logged, when that fails. */
+    private static Optional<Path> keepCopy(Path file) {
+        Path bad = badCopy(file);
+        try {
+            Files.copy(file, bad, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException | RuntimeException failed) {
+            LOG.log(System.Logger.Level.WARNING, "Could not keep a copy of the workspace state " + file + " that dropped entries", failed);
+            return Optional.empty();
+        }
+        LOG.log(System.Logger.Level.WARNING, "Kept a copy of the workspace state " + file + " that dropped entries as " + bad);
+        return Optional.of(bad);
+    }
+
+    private static Path badCopy(Path file) {
+        return file.resolveSibling(file.getFileName() + ".bad");
+    }
+
+    /** Records a dropped window or tab entry and logs it. */
+    private static void drop(List<String> dropped, String message) {
+        dropped.add(message);
+        LOG.log(System.Logger.Level.WARNING, message);
     }
 
     private static Loaded setAside(Path file, Throwable cause) {
-        Path bad = file.resolveSibling(file.getFileName() + ".bad");
+        Path bad = badCopy(file);
         try {
             Files.move(file, bad, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException failed) {
@@ -229,14 +263,15 @@ public final class WorkspaceFile {
         return new Loaded.Fresh(Optional.of(bad));
     }
 
-    private static Snapshot parse(String text) throws IOException {
+    private static Parsed parse(String text) throws IOException {
         TomlParseResult toml = Toml.parse(text);
         if (toml.hasErrors()) throw new IOException("Invalid workspace state: " + toml.errors().getFirst());
         Object version = toml.get(List.of("version"));
         if (!Long.valueOf(1).equals(version)) throw new IOException("Unknown workspace state version: " + version);
+        var dropped = new ArrayList<String>();
         var read = new ArrayList<WindowRecord>();
         if (toml.get(List.of("windows")) instanceof TomlArray entries)
-            for (int i = 0; i < entries.size(); i++) window(entries.get(i)).ifPresent(read::add);
+            for (int i = 0; i < entries.size(); i++) window(entries.get(i), dropped).ifPresent(read::add);
         // Main windows first, so that a child whose ids clash with the main window's is the one dropped.
         read.sort(Comparator.comparing(window -> window.role() != Role.MAIN));
         var windows = new ArrayList<WindowRecord>();
@@ -245,9 +280,9 @@ public final class WorkspaceFile {
         for (WindowRecord window : read) {
             List<GroupId> ids = window.layout().groups().stream().map(Group::id).toList();
             if (window.role() == Role.MAIN && windows.stream().anyMatch(kept -> kept.role() == Role.MAIN)) {
-                LOG.log(System.Logger.Level.WARNING, "Dropping a second main window from the workspace state");
+                drop(dropped, "Dropping a second main window from the workspace state");
             } else if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)) {
-                LOG.log(System.Logger.Level.WARNING, "Dropping a window whose groups or tabs an earlier window holds");
+                drop(dropped, "Dropping a window whose groups or tabs an earlier window holds");
             } else {
                 groups.addAll(ids);
                 tabs.addAll(window.layout().tabs());
@@ -255,28 +290,31 @@ public final class WorkspaceFile {
             }
         }
         if (windows.stream().noneMatch(kept -> kept.role() == Role.MAIN)) throw new IOException("The workspace state keeps no main window");
-        return new Snapshot(windows);
+        return new Parsed(new Snapshot(windows), !dropped.isEmpty());
     }
 
-    /** One window entry with its bad tabs dropped; empty, and logged, when the entry itself is bad. */
-    private static Optional<WindowRecord> window(Object value) {
+    /**
+     * One window entry with its bad tabs dropped; empty when the entry itself is bad. Every drop is logged and recorded in
+     * {@code dropped}.
+     */
+    private static Optional<WindowRecord> window(Object value, List<String> dropped) {
         try {
             if (!(value instanceof TomlTable entry)) throw new IllegalArgumentException("a window entry is not a table");
             Object name = entry.get(List.of("role"));
             Role role = "main".equals(name) ? Role.MAIN : "child".equals(name) ? Role.CHILD : null;
             if (role == null) throw new IllegalArgumentException("unknown window role " + name);
             Layout layout = layout(entry);
-            Map<TabId, TabRecord> records = tabs(entry);
+            Map<TabId, TabRecord> records = tabs(entry, dropped);
             for (TabId tab : layout.tabs()) {
                 if (records.containsKey(tab)) continue;
-                LOG.log(System.Logger.Level.WARNING, "Dropping tab " + tab + " from the workspace state: it has no readable entry");
+                drop(dropped, "Dropping tab " + tab + " from the workspace state: it has no readable entry");
                 layout = layout.remove(tab);
             }
             records.keySet().retainAll(Set.copyOf(layout.tabs()));
             int extendedState = UiState.number(entry, "extended_state").filter(state -> (state & ~6) == 0).orElse(0);
             return Optional.of(new WindowRecord(role, UiState.bounds(entry), extendedState, layout, records));
         } catch (RuntimeException bad) {
-            LOG.log(System.Logger.Level.WARNING, "Dropping a window from the workspace state: " + bad.getMessage());
+            drop(dropped, "Dropping a window from the workspace state: " + bad.getMessage());
             return Optional.empty();
         }
     }
@@ -339,8 +377,11 @@ public final class WorkspaceFile {
         return ((Group) current).id();
     }
 
-    /** A window's tab entries by id; a bad entry is logged and left out, and the first entry for an id wins. */
-    private static Map<TabId, TabRecord> tabs(TomlTable window) {
+    /**
+     * A window's tab entries by id; a bad entry is dropped, logged and recorded in {@code dropped}, and the first entry for
+     * an id wins.
+     */
+    private static Map<TabId, TabRecord> tabs(TomlTable window, List<String> dropped) {
         var records = new HashMap<TabId, TabRecord>();
         if (!(window.get(List.of("tabs")) instanceof TomlArray entries)) return records;
         for (int i = 0; i < entries.size(); i++) {
@@ -350,7 +391,7 @@ public final class WorkspaceFile {
                 TabRecord parsed = tab(entry);
                 if (records.putIfAbsent(id, parsed) != null) throw new IllegalArgumentException("tab " + id + " is listed twice");
             } catch (RuntimeException bad) {
-                LOG.log(System.Logger.Level.WARNING, "Dropping a tab entry from the workspace state: " + bad.getMessage());
+                drop(dropped, "Dropping a tab entry from the workspace state: " + bad.getMessage());
             }
         }
         return records;
