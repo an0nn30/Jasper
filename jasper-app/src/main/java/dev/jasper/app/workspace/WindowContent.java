@@ -46,7 +46,6 @@ import javax.swing.text.JTextComponent;
 import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.SessionRequest;
-import dev.jasper.terminal.view.FileLink;
 
 /** Real window contents, independent of native JFrame construction for headless testing. */
 public final class WindowContent extends JPanel implements AutoCloseable {
@@ -57,6 +56,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Runnable onEmpty;
     /** Each tab this window shows, with its change listener. */
     private final Map<Tab, Subscription> tabListeners = new IdentityHashMap<>();
+    /** This window's side of its terminal tabs (workspace tabs spec 9.3). */
+    private final TabHost tabHost = new TabHost(this);
     /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
     private TabRegistry registry = new TabRegistry();
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
@@ -202,7 +203,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         firstTerminal = java.util.Objects.requireNonNull(action, "action");
     }
 
-    private void emit(WorkspaceActivity.Event event) {
+    void emit(WorkspaceActivity.Event event) {
         for (var listener : java.util.List.copyOf(activityListeners)) listener.accept(event);
     }
 
@@ -878,15 +879,23 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Shows a tab in this window, at the end of its active group and selected: one the registry placed here, or one this
      * window opened. A failure leaves nothing mounted and propagates.
      */
-    private void attach(Tab tab) {
+    private void attach(Tab tab) { attach(tab, false); }
+
+    /** As {@link #attach(Tab)}; with {@code opened} a new terminal tab's panes are announced as opened. */
+    private void attach(Tab tab, boolean opened) {
         JComponent component = tab.component();
         try {
             WorkspaceTheme.apply(component, themes.current());
             tabListeners.put(tab, tab.onChanged(this::update));
+            if (tab.content() instanceof TerminalTab terminal && terminals != null) terminals.tabOpened(terminal);
+            tabHost.attach(tab, opened);
             workspace.open(tab);
+            // A tab that moves in ends this window's maximize; one that opens here does not (spec 15).
+            if (tab.moving()) workspace.unmaximize();
         } catch (RuntimeException | Error failure) {
             var listener = tabListeners.remove(tab);
             if (listener != null) listener.close();
+            tabHost.detach(tab);
             workspace.remove(tab);
             WorkspaceTheme.clear(component);
             throw failure;
@@ -903,8 +912,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var listener = tabListeners.remove(tab);
         if (listener == null) return;
         listener.close();
+        tabHost.detach(tab);
         if (tab.content() instanceof TerminalTab terminal && terminals != null) terminals.tabClosed(terminal);
         if (closed) return;
+        // A tab that moves out ends the maximize; closing a tab keeps it while its group stands (spec 15).
+        if (tab.moving()) workspace.unmaximize();
         workspace.remove(tab);
         WorkspaceTheme.clear(tab.component());
         update();
@@ -919,11 +931,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (commandPalette != null) commandPalette.tabChanged();
         update();
         if (refocus) focusSelected();
-    }
-
-    /** A terminal tab's presentation: its title and icon. */
-    private static void present(Tab tab, TerminalTab terminal) {
-        tab.presentation(terminal.title(), "", terminal.icon(), false, "", "");
     }
 
     /** The selected plugin tab; null while a terminal tab is selected or the window is empty. */
@@ -1048,104 +1055,25 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         TerminalTab terminal = new TerminalTab(directory, launcher, requestOrNull, profile, program);
         Tab tab = registry.add(new TabId(terminal.id()), Tab.Kind.TERMINAL, terminal, id);
         tab.focusTarget(terminal::focusTerminal);
-        present(tab, terminal);
-        if (terminals != null) terminals.tabOpened(terminal);
-        terminal.onChanged = () -> {
-            for (TerminalPane pane : terminal.panes()) if (pane.view() == null) pane.applyTheme(themes.current());
-            present(tab, terminal);
-        };
-        terminal.onEmpty = () -> closeTab(tab);
-        terminal.onError = (message, cause) -> onLaunchFailure.accept(message, cause);
-        terminal.lastInWindow = () -> tabCount() == 1;
-        terminal.configure = pane -> configurePane(terminal, pane);
-        terminal.onPaneCreated = pane -> connectActivity(terminal, pane);
-        for (TerminalPane pane : terminal.panes()) connectActivity(terminal, pane);
-        terminal.setBackground(themes.current().surface());
-        terminal.setBackgroundOpacity((float) backgroundOpacity);
-        for (TerminalPane pane : terminal.panes()) pane.applyTheme(themes.current());
-        attach(tab);
+        attach(tab, true);
         terminal.start();
         return terminal;
     }
 
-    private void connectActivity(TerminalTab tab, TerminalPane pane) {
-        emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
-        report(new TerminalEvent.PaneOpened(tab.id(), pane.id()));
-        pane.onCommandStarted = command -> {
-            long startedAt = System.nanoTime();
-            emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); },
-                pane.watched() && isActiveAndOpen() && tab == currentTab()));
-            report(new TerminalEvent.CommandStarted(pane.id(), command));
-        };
-        pane.onTitleChanged = title -> {
-            emit(new WorkspaceActivity.TitleChanged(pane.id(), title));
-            report(new TerminalEvent.TitleChanged(pane.id(), title));
-        };
-        pane.onClosed = () -> {
-            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.CLOSED));
-            report(new TerminalEvent.PaneClosed(tab.id(), pane.id()));
-        };
-        pane.onPaneFocused = () -> {
-            emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.FOCUSED));
-            report(new TerminalEvent.PaneFocused(tab.id(), pane.id()));
-        };
-        pane.onPaneBlurred = () -> emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.BLURRED));
-        pane.onCommandFinished = (command, exitStatus, duration, workingDirectory, remote) -> {
-            emit(new WorkspaceActivity.Finished(pane.id(), command, exitStatus, duration,
-                new WorkspaceActivity.Origin(anyWindowActive.getAsBoolean(), isActiveAndOpen(),
-                    tab == currentTab(), pane.view() != null && pane.view().isFocusOwner()),
-                () -> { selectTab(tab); tab.focus(pane); pane.focusTerminal(); }));
-            report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory, remote));
-        };
-        pane.onDirectoryChanged = (directory, remote) -> report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
-        pane.onBell = () -> report(new TerminalEvent.Bell(tab.id(), pane.id()));
-        pane.onStarted = () -> report(new TerminalEvent.SessionStarted(pane.id()));
-        pane.onExited = status -> report(new TerminalEvent.SessionExited(pane.id(), status));
-        pane.onConnecting = () -> report(new TerminalEvent.SessionConnecting(pane.id()));
-    }
+    void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
 
-    private void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
+    /** This window's configuration, or null before the first one arrives. */
+    ConfigSnapshot configured() { return workspaceConfiguration.snapshot(); }
 
-    private void configurePane(TerminalTab tab, TerminalPane pane) {
-        pane.allowLaunchFocus = () -> commandPalette == null || !commandPalette.blocksActions();
-        pane.applyTheme(themes.current());
-        ConfigSnapshot configured = workspaceConfiguration.snapshot();
-        float configuredFontSize = workspaceConfiguration.configuredFontSize();
-        if (configured == null) {
-            pane.view().setFontSize(configuredFontSize);
-        } else {
-            pane.view().applyOptions(configured.viewOptions(configuredFontSize, themes.current().palette()));
-            pane.setConfiguredDim(configured.terminal().dimInactivePanes());
-            pane.setShellExitBehavior(configured.terminal().onExit());
+    /** A pane's view is ready: the first in this window runs the start-up timing, once. */
+    void terminalConfigured(TerminalPane pane) {
+        if (firstTerminalSeen) return;
+        firstTerminalSeen = true;
+        try {
+            firstTerminal.accept(pane);
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
         }
-        pane.view().setShortcutHandler(event -> dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
-        pane.view().setContextMenuHandler(event -> {
-            selectTab(tab); tab.focus(pane); pane.focusTerminal(); update();
-            JPopupMenu popup = chrome.contextMenu();
-            popup.show(pane.view(), event.getX(), event.getY());
-        });
-        pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
-        if (!firstTerminalSeen) {
-            firstTerminalSeen = true;
-            try {
-                firstTerminal.accept(pane);
-            } catch (RuntimeException failure) {
-                LOG.log(System.Logger.Level.WARNING, "The first-terminal observer failed", failure);
-            }
-        }
-    }
-
-    /**
-     * A Cmd-click on a file in {@code pane}: resolved against the pane's local directory and given to {@link #onOpenFile}.
-     * A provided session, or a shell that reports a directory on another host, opens nothing.
-     */
-    private void openFileLink(TerminalPane pane, FileLink link) {
-        Optional<Path> local = pane.localDirectory();
-        if (local.isEmpty()) return;
-        FileLinks.resolve(link.path(), local, Path.of(System.getProperty("user.home")),
-                System.getProperty("os.name", "").startsWith("Windows"), pane.wsl())
-            .ifPresent(file -> onOpenFile.accept(file, link.line()));
     }
 
     /** Shows the tab holding {@code component}, as a click on its strip entry does. */

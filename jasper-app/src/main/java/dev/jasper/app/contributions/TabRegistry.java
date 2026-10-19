@@ -192,6 +192,24 @@ public final class TabRegistry {
     }
 
     /**
+     * Moves a tab of any kind to {@code window}, at the end of that window's active group, and selects it there; its
+     * content and session are untouched. A pinned tab, one being closed or one already there stays.
+     *
+     * @param tab the tab
+     * @param window the window to move it to
+     * @throws IllegalArgumentException when no workspace {@code window} is registered
+     */
+    public void move(Tab tab, UUID window) {
+        requireEdt();
+        var next = hosts.get(Objects.requireNonNull(window, "window"));
+        if (next == null) throw new IllegalArgumentException("No workspace " + window);
+        if (tab.closed() || tab.pinned() || pending.contains(tab) || window.equals(tab.window())) return;
+        var old = hosts.get(tab.window());
+        if (old == null) return;
+        transfer(tab, old, next);
+    }
+
+    /**
      * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. When {@code next} fails, the tab
      * goes back to {@code old}, or another main window, or stays in no window, and the failure propagates.
      */

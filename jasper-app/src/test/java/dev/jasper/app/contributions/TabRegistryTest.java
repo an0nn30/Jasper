@@ -325,4 +325,26 @@ class TabRegistryTest {
         assertThatCode(() -> registry.addHost(new WorkspaceHost(window, true, tab -> {}, tab -> {}, tab -> {}, () -> {})))
             .as("its id is free again").doesNotThrowAnyException();
     }
+
+    @Test void anyTabMovesToANamedWindowAndIsSelectedThere() {
+        hosts();
+        var other = UUID.randomUUID();
+        var arrived = new ArrayList<Tab>();
+        var selected = new ArrayList<Tab>();
+        registry.addHost(new WorkspaceHost(other, false, arrived::add, arrived::remove, selected::add, () -> {}));
+        var tab = registry.add(TabId.random(), Tab.Kind.TERMINAL, new HostedContent(new JPanel()), main);
+        mounted.add(tab);
+        registry.move(tab, other);
+        assertThat(tab.window()).isEqualTo(other);
+        assertThat(mounted).as("detached from the old window").isEmpty();
+        assertThat(arrived).containsExactly(tab);
+        assertThat(selected).containsExactly(tab);
+        registry.move(tab, other);
+        assertThat(arrived).as("a move to its own window does nothing").containsExactly(tab);
+        assertThatIllegalArgumentException().isThrownBy(() -> registry.move(tab, UUID.randomUUID()));
+        var pin = tab.pin();
+        registry.move(tab, main);
+        assertThat(tab.window()).as("a pinned tab stays").isEqualTo(other);
+        pin.close();
+    }
 }
