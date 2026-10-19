@@ -115,7 +115,7 @@ class DockMockTest {
                 MockCrops.write(variant.name() + "-left-stripe", MockCrops.crop(render, 0, 0, 44, 2 * iconed), variant.crop(2, 180, 44, 2 * iconed));
                 MockProfile.fonts(variant.name() + " left stripe: the stripe fits its labels, the mocks' 22 and the rule", thickness, 23, 0);
                 assertSecondAtTheEnd(variant.name() + " left stripe", stripe, iconed);
-                assertIcons(variant, "left-stripe", render, stripe);
+                assertIcons(variant, "left-stripe", render, stripe, List.of("folder", "server"));
                 compareStripe(variant, "left-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2, 180, 44, 2 * height),
                     thickness, Side.LEFT, List.of(29, 109, 151, 301));
             } finally { EnterpriseLook.restoreDefault(); }
@@ -135,7 +135,7 @@ class DockMockTest {
                 MockCrops.write(variant.name() + "-right-stripe", MockCrops.crop(render, 2 * thickness - 44, 0, 44, 2 * iconed),
                     variant.crop(2838, 180, 44, 2 * iconed));
                 assertSecondAtTheEnd(variant.name() + " right stripe", stripe, iconed);
-                assertIcons(variant, "right-stripe", render, stripe);
+                assertIcons(variant, "right-stripe", render, stripe, List.of("network", "tunnel"));
                 compareStripe(variant, "right-stripe-text", StripeIconsTest.withoutIcons(render, stripe, 2), variant.crop(2838, 180, 44, 2 * height),
                     thickness, Side.RIGHT, List.of(29, 121, 164, 247));
             } finally { EnterpriseLook.restoreDefault(); }
@@ -158,27 +158,38 @@ class DockMockTest {
     }
 
     /**
-     * Every iconed label of {@code stripe} in {@code render} (2x, under the variant's scrim): its icon box holds its icon,
-     * upright, painted alone over its tile (the open tile, or the closed stripe's surface), as the variant's mock shows it.
-     * Each fixture here gives two of its labels an icon.
+     * Every iconed label of {@code stripe} in {@code render} (2x, under the variant's scrim): its whole icon slice
+     * ({@link StripeIconsTest#iconSlice}) is its tile (the open tile, or the closed stripe's surface) with IntelliJ's
+     * classic file for the fixture's name, in {@code art}'s order, painted upright at its icon box, as the variant's mock
+     * shows it, so the art, the gap and the margins beside the box are pinned together. Each fixture here gives two of its
+     * labels an icon.
      */
-    static void assertIcons(Variant variant, String name, BufferedImage render, DockStripe stripe) {
+    static void assertIcons(Variant variant, String name, BufferedImage render, DockStripe stripe, List<String> art) {
         var theme = EnterpriseLook.theme(variant.dark());
         var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
-        int size = StripeIconsTest.metric(dev.jasper.ui.metrics.DesignMetrics.Role.STRIPE_ICON), iconed = 0;
+        int iconed = 0;
         for (AbstractButton button : stripe.buttons()) {
             var label = (StripeLabels.Label) button;
             if (label.icon == null) continue;
-            iconed++;
-            Rectangle bounds = label.getBounds();
+            String file = art.get(iconed++);
+            Rectangle bounds = label.getBounds(), slice = StripeIconsTest.iconSlice(stripe.side(), bounds);
             Point at = labels.iconAt(stripe.side(), bounds.width, bounds.height);
             Color tile = labels.painter().stripeTile(theme, label.isSelected(), false);
-            var reference = variant.seen(StripeIconsTest.referenceImage(label.icon, label, tile != null ? tile : labels.painter().stripeSurface(theme), 2));
-            assertThat(StripeIconsTest.box(render, 2 * (bounds.x + at.x), 2 * (bounds.y + at.y), 2 * size))
-                .as(variant.name() + " " + name + ": " + label.text() + "'s icon")
-                .isEqualTo(StripeIconsTest.box(reference, 0, 0, 2 * size));
+            Color ground = tile != null ? tile : labels.painter().stripeSurface(theme);
+            var expected = new BufferedImage(2 * slice.width, 2 * slice.height, BufferedImage.TYPE_INT_RGB);
+            var g = expected.createGraphics();
+            try {
+                g.setColor(ground);
+                g.fillRect(0, 0, expected.getWidth(), expected.getHeight());
+                g.drawImage(StripeIconsTest.referenceImage(StripeIconsTest.classic(file, variant.dark()), label, ground, 2),
+                    2 * (bounds.x + at.x - slice.x), 2 * (bounds.y + at.y - slice.y), null);
+            } finally { g.dispose(); }
+            var seen = variant.seen(expected);
+            assertThat(render.getRGB(2 * slice.x, 2 * slice.y, seen.getWidth(), seen.getHeight(), null, 0, seen.getWidth()))
+                .as(variant.name() + " " + name + ": " + label.text() + "'s icon slice, " + file + " in its tile")
+                .isEqualTo(seen.getRGB(0, 0, seen.getWidth(), seen.getHeight(), null, 0, seen.getWidth()));
         }
-        assertThat(iconed).as(variant.name() + " " + name + ": its iconed labels").isEqualTo(2);
+        assertThat(iconed).as(variant.name() + " " + name + ": its iconed labels").isEqualTo(art.size());
     }
 
     /** The stripe's second label ends {@code RAIL_GAP} above its bottom end. */
@@ -279,7 +290,7 @@ class DockMockTest {
                 var render = StripeIconsTest.withoutIcons(iconed, strip, 2);
                 MockCrops.write(variant.name() + "-bottom-strip-text", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));
                 assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
-                assertIcons(variant, "bottom strip", iconed, strip);
+                assertIcons(variant, "bottom strip", iconed, strip, List.of("bell", "download"));
                 var mock = variant.crop(2, 1708, 520, 48);
                 // The render's fill (below its 2 px rule at 2x), 48 rows as the mock crop is the mock's fill.
                 var rows = MockCrops.crop(render, shift, 2, 600, 48);

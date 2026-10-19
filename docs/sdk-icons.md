@@ -20,7 +20,8 @@ looks; panels, prompts and tiles draw a monochrome glyph of the same name.
 
 Under the Enterprise look a panel's stripe label starts with its icon at 13 px: `"network"`,
 `"folder"`, `"tunnel"`, `"download"`, `"server"` and `"bell"` draw IntelliJ's classic tool-window
-icons, and any other name, a registered path included, its monochrome glyph in the label's colour.
+icons, and any other name (a registered path included) its monochrome glyph in the label's colour;
+an identity name such as `more.vertical` keeps its authored art.
 
 For original artwork, register a constrained monochrome path in a 16-unit coordinate space:
 

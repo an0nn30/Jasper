@@ -176,6 +176,27 @@ class DockDragBottomStripTest {
         });
     }
 
+    /** Review Focus 5's mirror: a side label dragged onto the bottom strip opens a gap as long as its iconed label. */
+    @Test void aSideLabelsGapOnTheBottomStripHoldsItsIcon() throws Exception {
+        edt(() -> {
+            var window = new Window(true);
+            window.icons.put("a", new PresentationIcon("folder", null));
+            window.render();
+            window.layout();
+            var strip = window.stripes.bottomStrip();
+            Rectangle c = SwingUtilities.convertRectangle(strip, window.label(strip, "c").getBounds(), window.content);
+            window.hover(window.label(window.stripes.left(), "a"), new Point(c.x + c.width / 2, c.y + c.height / 2));
+            assertThat(strip.gapBounds().orElseThrow().width).as("the gap holds A's icon and its text")
+                .isEqualTo(new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC).length("A", Optional.empty(), null) + StripeIconsTest.slice());
+            Icon ghost = window.drag.overlay().ghost();
+            assertThat(ghost).as("the ghost").isNotNull();
+            assertThat(StripeIconsTest.reference(ghost, window.content, Color.WHITE, 2)).as("Project's classic file at 13 px")
+                .isEqualTo(StripeIconsTest.reference(StripeIconsTest.classic("folder"), window.content, Color.WHITE, 2));
+            window.drag.cancel();
+            assertThat(window.state.ids(Slot.LEFT_TOP)).as("no drop").containsExactly("a", "b");
+        });
+    }
+
     @Test void aDropNearTheRightStripesBottomEndLandsInRightBottomAtThatEnd() throws Exception {
         edt(() -> {
             var window = new Window(false);

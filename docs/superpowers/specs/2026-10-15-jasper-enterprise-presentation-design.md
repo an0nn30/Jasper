@@ -1290,10 +1290,11 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   on the bottom strip, and is the same in every state. Under `[chrome] icons = "classic"` the names `network`, `folder`,
   `tunnel`, `download`, `server` and `bell` draw IntelliJ's classic tool-window icons as authored (`webToolWindow`,
   `toolWindowProject`, `toolWindowModuleDependencies`, `toolWindowAnalyzeDataflow`, `toolWindowServer`,
-  `notifications`), and any other name, a plugin's own path included, draws its monochrome glyph in the label's ink.
-  Under `new_ui` the window's ordinary icon is drawn at 13 px. A window without an icon reads text only. A dragged label
-  keeps its icon and length, and the drag's ghost is that icon. The top group stands at the stripe's top and the second
-  group (LEFT_BOTTOM, RIGHT_BOTTOM) at its bottom end, as IntelliJ's.
+  `notifications`), and any other name (a plugin's own path included) draws its monochrome glyph in the label's ink; an
+  identity name such as `more.vertical` keeps its authored art. Under `new_ui` a label draws what the icon rails draw,
+  at 13 px (a built-in name's New UI chrome artwork, a plugin path's own glyph). A window without an icon reads text
+  only. A dragged label keeps its icon and length, and the drag's ghost is that icon. The top group stands at the
+  stripe's top and the second group (LEFT_BOTTOM, RIGHT_BOTTOM) at its bottom end, as IntelliJ's.
 - **Bottom strip.** `LabelledStripes` adds a horizontal strip for the BOTTOM_LEFT and BOTTOM_RIGHT slots,
   its labels led by their icons (centred down the strip), with count pills for badges that carry a number. It is 24 px
   plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop resolution gain horizontal group rectangles, as

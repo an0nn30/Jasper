@@ -54,9 +54,12 @@ class StripeIconsTest {
     static int slice() { return metric(DesignMetrics.Role.STRIPE_ICON) + metric(DesignMetrics.Role.STRIPE_ICON_GAP); }
 
     /** IntelliJ's classic tool-window file for {@code name}, as Enterprise Light draws it. */
-    static Icon classic(String name) {
+    static Icon classic(String name) { return classic(name, false); }
+
+    /** IntelliJ's classic tool-window file for {@code name}, as Enterprise Light or Dark draws it. */
+    static Icon classic(String name, boolean dark) {
         return new IconRegistry().stripeIcon(name, metric(DesignMetrics.Role.STRIPE_ICON)).orElseThrow()
-            .icon(EnterpriseLook.theme(false), SemanticColor.TEXT_PRIMARY);
+            .icon(EnterpriseLook.theme(dark), SemanticColor.TEXT_PRIMARY);
     }
 
     /**
@@ -302,20 +305,28 @@ class StripeIconsTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
-    /** Review Focus 1: a plugin's own path leads its label in the label's ink, and nothing throws. */
+    /**
+     * Review Focus 1 and Rulings 7: a plugin's own path leads its label in the label's painted ink, closed, hovered and
+     * open, and nothing throws.
+     */
     @Test void aPluginPanelsOwnGlyphLeadsItsLabel() throws Exception {
         try {
             EnterpriseLook.install(false);
             var theme = EnterpriseLook.theme(false);
-            var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
             var mark = new PresentationIcon("test:mark", "M 2 2 L 14 14 M 2 14 L 14 2");
-            assertThatCode(() -> stripe.render(List.of(LabelledStripeTest.window("sample", "Sample", Slot.LEFT_TOP, 0, mark)), List.of()))
-                .doesNotThrowAnyException();
-            var image = MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 4);
-            var label = (StripeLabels.Label) stripe.buttons().getFirst();
-            assertThat(label.icon).isNotNull();
-            Color ink = SurfaceContrast.painted(theme, ChromePainter.OPEN_STRIPE_LABEL);
-            assertThat(LabelledStripeTest.inks(image, iconBox(Side.LEFT, label), 4, ink)).as("the glyph in the open label's ink").isTrue();
+            for (String state : List.of("closed", "hovered", "open")) {
+                boolean open = state.equals("open"), hover = state.equals("hovered");
+                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+                assertThatCode(() -> stripe.render(List.of(window("sample", "Sample", Slot.LEFT_TOP, 0, mark, open)), List.of()))
+                    .doesNotThrowAnyException();
+                var label = (StripeLabels.Label) stripe.buttons().getFirst();
+                label.getModel().setRollover(hover);
+                var image = MockCrops.render(stripe, stripe.getPreferredSize().width, 120, 4);
+                assertThat(label.icon).isNotNull();
+                Color ink = SurfaceContrast.painted(theme, open ? ChromePainter.OPEN_STRIPE_LABEL
+                    : hover ? ChromePainter.HOVERED_STRIPE_LABEL : ChromePainter.STRIPE_LABEL);
+                assertThat(LabelledStripeTest.inks(image, iconBox(Side.LEFT, label), 4, ink)).as(state + ": the glyph in the label's ink").isTrue();
+            }
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
@@ -433,6 +444,12 @@ class StripeIconsTest {
             assertThat(set.ghost(new ImageIcon())).as("an empty icon, no ghost").isNull();
             Icon folder = new PresentationIcon("folder", null);
             assertThat(new StripeSet.IconRails().ghost(folder)).as("the rails' ghost is the icon itself").isSameAs(folder);
+            // A plugin path's ghost, on the drag overlay (no button): its glyph in the closed, unhovered label's ink.
+            Icon mark = set.ghost(new PresentationIcon("test:mark", "M 2 2 L 14 14 M 2 14 L 14 2"));
+            var overlay = new javax.swing.JPanel();
+            Color ink = SurfaceContrast.painted(EnterpriseLook.theme(false), ChromePainter.STRIPE_LABEL);
+            assertThat(LabelledStripeTest.inks(referenceImage(mark, overlay, Color.WHITE, 4),
+                new Rectangle(0, 0, mark.getIconWidth(), mark.getIconHeight()), 1, ink)).as("a plugin ghost in the closed label's ink").isTrue();
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

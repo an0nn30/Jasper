@@ -102,7 +102,8 @@ public final class IconRegistry implements AutoCloseable {
     /**
      * IntelliJ's classic 13 px tool-window icon for {@code name}, light and dark, authored and untinted, for a labelled
      * tool window stripe under {@link ChromeArtwork#CLASSIC}. Every other name has no file here, and the caller draws its
-     * own glyph; an unknown or plugin name gives empty. {@link #chromeIcon(String, int, ChromeArtwork)} never changes.
+     * own glyph; an unknown or plugin name gives empty. {@link #chromeIcon(String, int, ChromeArtwork)} never returns
+     * these files: the header's and status bar's classic set is unchanged.
      */
     public synchronized java.util.Optional<PreparedIcon> stripeIcon(String name, int logicalSize) {
         requireOpen();

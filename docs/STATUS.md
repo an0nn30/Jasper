@@ -10,9 +10,11 @@ and the bottom strip) now starts, in reading order, with its tool window's or ra
 icon is the user's Set A, the classic counterpart of the panel's declared icon: `network` draws `webToolWindow`,
 `folder` `toolWindowProject`, `tunnel` `toolWindowModuleDependencies`, `download` `toolWindowAnalyzeDataflow`, `server`
 `toolWindowServer` and `bell` `notifications`; any other name, a plugin's own path included (the Sample's flask), draws
-its monochrome glyph in the label's ink. Under `new_ui` the window's ordinary icon is drawn at 13 px, and a window
-without an icon reads text only. A dragged label keeps its icon and its length, and the drag's ghost is that stripe
-icon. jasper-ui vendors 12 more unmodified SVGs (those six, light and dark) from JetBrains/intellij-community at
+its monochrome glyph in the label's ink; an identity name such as `more.vertical` keeps its authored art. Under
+`new_ui` a label draws what the icon rails draw, at 13 px (a built-in name's New UI chrome artwork, a plugin path's
+own glyph), and a window without an icon reads text only. A dragged label keeps its icon and its length, and the
+drag's ghost is that stripe icon. jasper-ui vendors 12 more unmodified SVGs (those six, light and dark) from
+JetBrains/intellij-community at
 `8062c061ff33`, hash-checked rows under `classic/toolwindows/` in `assets-classic.tsv` (26 rows), behind a stripe-only
 lazy table (`IconRegistry.stripeIcon`); every file keeps its JetBrains copyright comment except `toolWindowServer.svg`
 and `toolWindowServer_dark.svg`, which upstream ships without one (stated in `BuiltInArtworkTest`, `icons/SOURCE.md`
@@ -34,8 +36,9 @@ IntelliJ's 1.1 stretch; (14) the same untinted icon in every state; (15) rail ac
 and 12.2 are unchanged; (19) the label ink, the stripe surface and the default look's rails, ghost and drag are
 unchanged. The execution rulings R1 to R17 are in the plan's "Execution notes". Deviations from the Enterprise mocks, at
 the user's 2026-10-19 direction: the stripes' labels carry icons, so each is 17 px longer than the mocks'; `DockMockTest`
-renders the shipped icons, asserts each label's icon slice (the icon and its gap, 17 px, 34 at 2x) as its icon, and
-compares the mocks with the slices cut out, which is pixel-identical to the text-only label, so every run expectation,
+renders the shipped icons, asserts each label's whole icon slice (the icon, its gap and the margins beside it, 17 px,
+34 at 2x) as its tile with IntelliJ's classic file, and compares the mocks with the slices cut out, which is
+pixel-identical to the text-only label, so every run expectation,
 tolerance and floor and the `FONTS` lines equal plan 12's. **For the user to confirm:** this cut is a change of method
 relative to the approved design ("update honestly to the iconed stripes"), beside the 17 px longer labels. The nine
 gated stripe pairs (`dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}`) read `-text-render.png`, with a
