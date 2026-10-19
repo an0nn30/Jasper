@@ -1,0 +1,134 @@
+<section class="guide" id="palette">
+<h2>Palette</h2>
+<p>The command palette searches scopes. Jasper's own Commands scope lists every action, the bundled plugins add theirs
+(SSH hosts, tunnels, files, recent files, shell history, snippets, vault logins, file servers), and a plugin with
+{@code palette.contribute} adds its own through {@link PluginContext#palette()}. A scope answers each query with rows and
+offers up to three verbs on them; a verb can ask for a few values first in a small form, a step. The palette appears as
+the card in the default look and as the Run window in the Enterprise look; both show the same scopes. For the user's
+side, see <a href="command-palette.md">the command palette</a>.</p>
+
+<h3>How users reach a scope</h3>
+<p>The palette shows either no scope chip, searching everything, or one scope's chip. A query with no chip searches every
+scope that takes part in All ({@link ScopeSpec#withInAll(boolean)}), each as a section headed by its label, in order:
+Commands first, then contributed scopes in registration order; the list holds at most 200 rows, and a scope with more
+gets a "More in <i>Label</i>…" row that switches to its chip. The empty query shows "Recently used" and "Most used" rows
+(or "Suggested" ones when nothing was used yet). A scope's chip comes from:</p>
+<ul>
+<li>typing its label and {@code >} at the start of the query ({@code greetings > hello}; the label is matched ignoring
+case, or as the only label starting with what was typed);</li>
+<li>its shortcut action ({@link ScopeSpec#withShortcutActionId(String)}): while the palette is open, that action's
+shortcut switches to the scope's chip; while it is closed the action runs and usually opens the palette on the scope;</li>
+<li>{@link Palette#open(WindowHandle,String,Optional,Optional)} from the plugin's code;</li>
+<li>a "More in <i>Label</i>…" row, and the Run window's menu of scopes.</li>
+</ul>
+
+<h3>A scope</h3>
+<pre><code class="language-java">public final class GreetingsPlugin implements Plugin {
+    private static final String SCOPE = "dev.example.greetings.scope";
+    private static final String OPEN = "dev.example.greetings.open";
+    private static final List&lt;String&gt; GREETINGS = List.of("good morning", "hello", "hi there");
+
+    @Override public void start(PluginContext context) {
+        // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
+        context.actions().register(ActionSpec.of(OPEN, "Greetings…").withDefaultBinding("cmd+alt+g"),
+            invoked -&gt; context.palette().open(invoked.window(), SCOPE, Optional.empty(), Optional.empty()));
+        context.palette().register(new PaletteScope() {
+            @Override public ScopeSpec spec() {
+                return ScopeSpec.of(SCOPE, "Greetings", "Search greetings",
+                        List.of(new PaletteVerb("paste", "Paste"), new PaletteVerb("paste_run", "Paste and run")))
+                    .withShortcutActionId(OPEN).withItemNoun("greeting");
+            }
+            // Runs on the UI thread for every keystroke: rank what is in memory, never read files here.
+            @Override public PaletteResults search(String query, PaletteQuery palette) {
+                String needle = query.strip().toLowerCase(Locale.ROOT);
+                var rows = new ArrayList&lt;PaletteRow&gt;();
+                for (String greeting : GREETINGS)
+                    if (greeting.contains(needle)) rows.add(PaletteRow.of("greeting." + greeting, greeting).withToken(greeting));
+                return new PaletteResults(rows, needle.isEmpty() ? Optional.of("Greetings") : Optional.empty(), Optional.empty());
+            }
+            // Pasting needs a pane to paste into: the one the palette was opened from.
+            @Override public boolean available(PaletteRow row, PaletteVerb verb, PaletteQuery palette) {
+                return palette.target().isPresent();
+            }
+            @Override public void execute(PaletteRow row, PaletteVerb verb, PaletteQuery palette) {
+                palette.target().ifPresent(pane -&gt; {
+                    pane.paste("echo '" + row.token() + "'");
+                    if (verb.id().equals("paste_run")) pane.sendText("\r");
+                });
+            }
+            @Override public Subscription onChanged(Runnable listener) { return () -&gt; { }; }
+        });
+    }
+}</code></pre>
+<p>The plugin declares {@code palette.contribute}, and {@code terminal.inject} for the paste. {@link Palette#register(PaletteScope)}
+reads the {@link ScopeSpec} once and adds the scope to every window's palette; closing the registration removes it, and
+the plugin's scopes go when it stops. The id starts with the plugin's id and a dot, the shortcut action must be one the
+plugin registered before, the icon must be a known name, and an id already in use is refused.</p>
+
+<h3>The spec</h3>
+<table>
+<thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>{@code id}, {@code label}</td><td>The scope's namespaced id, and the name its chip, section heading and prefix use.</td></tr>
+<tr><td>{@code placeholder}</td><td>The card's query hint while the scope's chip is shown.</td></tr>
+<tr><td>{@code verbs}</td><td>One to three {@link PaletteVerb}s with distinct ids, bound in order to Enter, Cmd+Enter (Ctrl+Enter on Linux and Windows) and Shift+Enter. At most one has the {@link PaletteVerb.Role#SPLIT} role, the split-pane variant of the first verb, and never the first.</td></tr>
+<tr><td>{@code monospaceRows}</td><td>Rows are data values, such as commands or paths, which the card draws in the data face.</td></tr>
+<tr><td>{@code inAll}</td><td>Whether a query with no chip searches this scope; {@code true} for {@link ScopeSpec#of(String,String,String,List)}.</td></tr>
+<tr><td>{@code inRecents}</td><td>Whether the empty query may offer the scope's rows, and whether running one is recorded (see below). A scope outside All is never in recents.</td></tr>
+<tr><td>{@code shortcutActionId}</td><td>One of the plugin's actions whose shortcut reaches the scope.</td></tr>
+<tr><td>{@code description}, {@code icon}, {@code hue}, {@code itemNoun}</td><td>Presentation hints: the Run window shows the description as its help line, a square of the hue before each row (the manifest's {@code icon_hue} when the hue is NONE) and "<i>Noun</i>: …" in its detail line; it offers the SPLIT verb as "Open in a split pane". The card shows the label and none of these. The icon must be a known name, but neither view draws it.</td></tr>
+</tbody>
+</table>
+
+<h3>Searching</h3>
+<p>{@link PaletteScope#search(String,PaletteQuery)} returns {@link PaletteResults}: at most 200 {@link PaletteRow}s in
+display order, an optional section label (a heading over the rows while the scope's chip is shown) and the row to select first. The
+{@link PaletteQuery} says which window the palette is in, which pane it was opened from ({@code target}), how many rows
+the scope may return ({@code maxResults}: 200 on its own chip, its share of the 200 in All, 50 when Jasper looks a recent
+use up again) and whether to show macOS glyphs. Jasper cuts the answer to {@code maxResults}.</p>
+<p>A row has an id (unique in one answer, at most 256 characters), a title, an optional detail shown after it, a tag at
+the right (such as a shortcut), an icon, an enabled flag (a disabled row is dimmed and cannot run) and a token, any object
+of the scope's, which comes back unchanged with the row. The target pane is a handle bound to the scope's plugin: typing
+or pasting into it needs {@code terminal.inject}.</p>
+<p>Every {@link PaletteScope} method runs on the UI thread and must do no I/O: a scope that reads files keeps an index,
+refreshes it in the background, and tells the palette with the listener {@link PaletteScope#onChanged(Runnable)} gave it,
+which reruns an open query. {@link PaletteScope#activated(PaletteQuery)} is called when the palette opens on the scope's
+chip, or on All while the scope takes part, a good moment to ask the index for a refresh. Calls are contained: a failing
+{@code search} shows no rows for the scope.</p>
+
+<h3>Running a verb</h3>
+<p>When the user runs a verb, Jasper first asks {@link PaletteScope#available(PaletteRow,PaletteVerb,PaletteQuery)} again;
+{@code false} refreshes the list instead. It then asks {@link PaletteScope#step(PaletteRow,PaletteVerb,PaletteQuery)}: a
+{@link PaletteStep} replaces the list with a small form, and the step's completion does the work; with none, the palette
+closes and {@link PaletteScope#execute(PaletteRow,PaletteVerb,PaletteQuery)} runs.</p>
+<pre><code class="language-java">@Override public Optional&lt;PaletteStep&gt; step(PaletteRow row, PaletteVerb verb, PaletteQuery palette) {
+    if (!verb.id().equals("rename")) return Optional.empty();
+    return Optional.of(new PaletteStep("Rename " + row.title(),
+        List.of(new PaletteStep.Field("name", "New name", row.title())),
+        (values, done) -&gt; {
+            String name = values.get("name").strip();
+            if (name.isEmpty()) { done.accept(PaletteStep.Result.error("Enter a name")); return; }
+            rename(row, name);
+            done.accept(PaletteStep.Result.reopen(SCOPE, Optional.of("item." + name), Optional.empty()));
+        }));
+}</code></pre>
+<p>The step's fields are plain text fields; Tab and Shift+Tab move between them. The completion receives the values by
+field name and must answer exactly once, from any thread: {@link PaletteStep.Result#done()} closes the palette,
+{@link PaletteStep.Result#error(String)} keeps the form open with the message, and
+{@link PaletteStep.Result#reopen(String,Optional,Optional)} closes it and opens it again on a scope, selecting a row.
+A completion that throws before it answers shows "The plugin could not complete this step."; an answer that arrives after
+the user left the step is dropped.</p>
+
+<h3>Recents</h3>
+<p>Running a row of a scope with {@code inRecents} records the scope id, row id and title, with a count and the time, in
+{@code command-history.toml} in Jasper home (at most 50 uses; ids and titles longer than 512 characters are not recorded).
+The empty query ranks those uses by frequency and recency, and finds each again by searching its scope for its title and
+matching the row id; a row the scope no longer returns drops out. So keep row ids stable, and turn recents off with
+{@link ScopeSpec#withInRecents(boolean)} for rows that should not be written to disk, as Shell History does for commands.</p>
+
+<h3>Opening the palette</h3>
+<p>{@link Palette#open(WindowHandle,String,Optional,Optional)} opens the palette in a window on a scope, any plugin's or
+{@code jasper.commands}, or with no scope chosen with {@code jasper.all}, with an optional query and row to select; it also needs {@code palette.contribute}. On the card,
+opening the scope that is already showing dismisses it instead; the Run window focuses its field. An unknown scope id is
+ignored, and so is a request for a window that is not the active one while its palette is closed.</p>
+</section>
