@@ -10,7 +10,7 @@ plugin writer's view.
 | `jasper-sdk` | Interfaces and values plugins compile against | JDK |
 | `jasper-sdk-testkit` | `FakePluginHost` and the abstract `PluginContractTest` | JDK, SDK |
 | `dev.jasper.app.plugins` | The runtime; `PluginRuntime` is its only public type | SDK, `appearance`, `commandline`, `contributions`, `dock`, `files`, `notifications`, `persistence`, `platform`, `terminals`, `windows` |
-| `dev.jasper.app.terminals` | App-native registry of terminal windows, tabs and panes: pull-based entries, id-only events, the derived active pane | `lifecycle` |
+| `dev.jasper.app.terminals` | App-native registry of Jasper windows, their tabs and terminal tabs' panes: pull-based entries, id-only events, the derived active pane | `layout`, `lifecycle` |
 | `dev.jasper.app.contributions` | App-native EDT model of contributed actions, toolbar entries, menu sections, status entries, panels and rail actions | `dock`, `lifecycle` |
 | `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
@@ -146,11 +146,13 @@ The process stays alive while a plugin window is open.
 
 `dev.jasper.app.terminals.TerminalRegistry` is the seam between windows and everything that must
 not hold a Swing object. Each `WindowContent` registers a `WindowEntry` through
-`workspace.WindowTerminals`: records of suppliers and callbacks that read the window's tabs and
-panes on demand, so structure is never stale, plus id-only `TerminalEvent`s for what happens. The
-registry derives one fact itself, the active pane (the focused pane of the selected tab of the
-window used last), and reports it once per change; `atomically` keeps a tab or window close from
-reporting a transient "no active pane".
+`workspace.WindowTerminals`: records of suppliers and callbacks that read the window's tabs, terminal and
+content, and its terminal tabs' panes on demand, so structure is never stale, plus id-only `TerminalEvent`s for what
+happens. The registry derives one fact itself, the active pane (the pane of the active tab of the window used last,
+when that tab is a terminal tab), and reports it once per change; `atomically` keeps a tab or window close from
+reporting a transient "no active pane". A tab moved to another window is reported once, as `TabMoved`, by the window
+it arrives in: `Tab.movingFrom()` tells both windows that a detach and an attach belong to a move, and a window that
+fails to show a tab it announced takes the announcement back.
 
 In `dev.jasper.app.plugins`, `HostedTerminals` gives each plugin its own handles. A handle holds
 ids and the last values it saw and looks its target up on every call, which is what makes a closed
@@ -332,7 +334,7 @@ reuse the panel instance after hiding it. Remote requires this version so its SS
 Hosts menu/status action opens the panel even before its rail icon has been used.
 
 SDK 0.7.3 adds `Windows.overlay(OverlaySpec)`, returning a `PluginDialog` lifetime/content handle
-without creating a native dialog. HostedUi validates the terminal owner and AuxiliaryWindows reserves
+without creating a native dialog. HostedUi validates the owning Jasper window and AuxiliaryWindows reserves
 one overlay per window across plugins. WindowOverlay mounts in the root layered pane, contains
 focus/input, centers and bounds content, and removes its listeners on close. NativeShells supplies
 the owner root and file-picker ownership; workspace shortcut dispatch honors the shared root marker.
@@ -418,8 +420,8 @@ Closed handles cannot reattach or take focus.
 The application translates SDK values to `contributions.TabRegistry`/`Tab`.
 `WindowContent` hosts both terminal and plugin components; its `WorkspaceView` and
 `ToolWindowArea` remain the single renderer. Separate document windows reuse those same
-owners without starting a shell. Terminal enumeration and active-pane APIs continue to
-report terminal content only. Plugins must tolerate an empty active pane while editing.
+owners without starting a shell. `WindowHandle.tabs()` lists these tabs as content
+tabs, which have no terminal. Plugins must tolerate an empty active pane while editing.
 
 `Appearance.editorPalette()` provides semantic surface, text, caret, selection, current-line
 and gutter colors from the workspace. SDK 0.12.0 adds `WorkspacePalette`, `SyntaxPalette`, `SyntaxRole` and

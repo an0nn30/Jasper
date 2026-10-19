@@ -1,5 +1,95 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 3b: the SDK's tab and pane break — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `f3cceb7b7..5c27d93d8` (Tasks 1 to 4, after the plan's refresh commit `b6687d9df`),
+then this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-3b-sdk-tabs.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). The SDK is 0.19.0, a breaking boundary: every
+in-repo manifest, the example external plugin and every guide range declare `sdk = ">=0.19.0, <0.20"`, plugin versions
+are unchanged, and the SDK's and the testkit's Javadoc, the exception messages both runtimes throw at plugins and the
+guides say "Jasper window". `TabHandle` covers every tab: `kind()` (`TERMINAL`, `CONTENT`) and `terminal()` replace
+`panes()` and `activePane()`; `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the active
+group's selected tab of either kind; `Terminals.split` opens a terminal tab in a new group beside the pane's group and
+`openTab` one in the active group. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover content tabs, and `TAB_MOVED`
+(`TabMoved(tabId, fromWindowId, toWindowId)`) reports a move between windows in place of a close and an open; a moved
+terminal tab reports no `PANE_OPENED` or `PANE_CLOSED` and its pane keeps its id, a window the move empties reports
+`WINDOW_CLOSED`, and one opened for it `WINDOW_OPENED`, before the `TAB_MOVED`, and a window that fails to show an
+arrival takes it back (the move back, or a close). `StandardMenu.PANE` and `MenuTarget.Slot.PANE` are gone: the Tab menu
+reads Split Right, Split Down, Focus Group, the prompts, a rule and the tab commands. `ExitPolicy.CLOSE_PANE` is
+`ExitPolicy.CLOSE`. Close Others and Close Group ask plugin guards with `batch` false, as `Windows.onTabsClosing`
+defines it (true for a window or quit). App side: `TabEntry(id, windowId, kind, terminal, title, select)`, `WindowEntry`
+and `WindowTerminals` list every tab, `TerminalEvent.TabMoved`, `Tab.movingFrom()`, `WindowTerminals.tabWithdrawn`;
+`KitCompatibility` refuses the four removed members as 0.19's. The testkit and the app's contract fixture hold one pane
+per terminal tab, split into a tab of their own, list a plugin's content as a `CONTENT` tab of its window and close a
+window with its last tab; `FakePluginHost.addContentTab` and `moveTab` and `ContractHarness.addContentTab` and `moveTab`
+are new, and `PluginContractTest` checks content tabs, moves and `ExitPolicy.CLOSE` on both runtimes. Remote reads
+`TabHandle::terminal`; File Server's tests give a second pane its own tab. Rulings (plan, "Rulings"): (1) SDK 0.19.0 is
+a breaking boundary, every in-repo range is `>=0.19.0, <0.20` and plugin versions stay; (2) `TabHandle.Kind` is a nested
+enum, `kind()` is fixed for a tab's life and needs neither a capability nor the UI thread, `terminal()` needs no
+capability and `title()` keeps `terminal.observe` for every tab; (3) `TAB_MOVED` carries `TabMoved(tabId, fromWindowId,
+toWindowId)`, groups stay out of the SDK and a move within a window reports only the selection it changes; (4)
+`TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover every tab and `TAB_SELECTED` reports the window's active tab; (5)
+the window a tab arrives in reports the move after the old window let it go (`Tab.moving` becomes `Tab.movingFrom()`,
+`moving()` keeps its meaning), and a window that announced an arrival and fails to show the tab takes it back; (6) a
+moved terminal tab reports no `PANE_OPENED` or `PANE_CLOSED` and keeps its pane's id, and a window the move empties
+reports `WINDOW_CLOSED` and one opened for it `WINDOW_OPENED` before the `TAB_MOVED`, on both runtimes; (7)
+`StandardMenu.PANE` and `MenuTarget.Slot.PANE` fold into Tab; (8) `ExitPolicy.CLOSE_PANE` becomes `ExitPolicy.CLOSE` and
+the `terminal.on_exit` values stay; (9) the testkit and the contract fixture model the application: one pane per
+terminal tab, a split is a terminal tab, focusing a pane selects its tab, a plugin's content is a `CONTENT` tab and the
+last tab of any kind takes its window; (10) `KitCompatibility` lists the four removed members under "0.19"; (11) "Jasper
+window" replaces "terminal window" in everything a plugin reads, and the application's comments and user-facing text are
+plan 4's; (12) Remote needs no `TAB_MOVED` subscription, since a moved tab arrives selected; (13) the app's
+`TabEntry.Kind` is `TabHandle.Kind`'s app-native twin; (14) a content tab's registry title is its presentation title;
+(15) in `AppContractTest` every window is a `WorkspaceHost`. Deviations: (a) before Task 1 the plan was replayed on 3a's
+final code `9a60e08d0` (39 blocks, 0 failures) and refreshed in `b6687d9df`: six edit anchors (Task 3 Step 4's
+`WindowContent` edit now quotes 3a's executed `attach` and `detach`; Task 5's Enterprise owner sentence) and four
+"Before you start" lines were re-found on 3a's final text, and every other anchor matched; (b) F1: both
+`WindowTerminals.entry` replacements (Tasks 2, 3) keep 3a's D2 guard, a closed `TerminalContent` reports no pane,
+because `WindowTerminalsTest` pins the order it gives; (c) F2: the take-back of an announced arrival (`announced`,
+`tabArrived`, `tabWithdrawn`) replaces 3a's `tabClosed(published)` in place, after `tabHost.detach` and before
+`workspace.remove`, keeping 3a's tested order; `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` holds; (d) F3:
+3a's hand-off for `TerminalFixture` and `HostedTerminalsTest:219` is Task 2's as written, with no plan edit; (e) F5 and
+F6, an addition to the plan text made at pre-flight (Task 4 Step 4b): "Split pane" reads "Split" (`WindowChrome`,
+`WindowChromeTest`), jasper-ui's `StateFixtures` "Close Pane" and "Panes" read "Close Tab" and "Tabs",
+`ConfigurationControllerTest`'s `...ZoomedHiddenPanes` test is renamed, `TabHost`'s "cannot fail" comment is reworded
+and `TerminalTabTest` is renamed `TerminalContentTest` (23 path cells and one class cell of `migration.csv`); "In a
+terminal pane" stays, since a terminal tab still has one pane; (f) F7: executors and reviewers used the absolute counts
+of the pre-flight table, because the plan states deltas (`TabRegistryTest` 22, `TabMenuTest` 8 and `PluginContractTest`
+102 at the start); (g) F9: `AppContractTest.moveTab` does not refuse a plugin's own content tab as `FakePluginHost` does
+(Rulings 9), because no contract case exercises it; (h) F10: the plan's instruction for the Editor's exposure stands,
+and Task 3's reviewer ran `:jasper-plugin-editor:test` (it passes with no Editor change); (i) Task 1:
+`PluginStateStoreOptInTest` and `PresentationSelectionTest` moved to 0.19 (their pinned host SDK and in-memory ranges,
+and `e.sdk`'s too-new range to `>=0.20.0`), because they resolve plugins that `LookFixtures` writes at 0.19, so the
+brief's "keep 0.18" was wrong; `DescriptorParserTest` keeps 0.18; (j) Task 2: an unused `List` import is removed from
+`WindowTerminals`; (k) Task 3, controller ruling: `TerminalFixture.addPane` throws `IllegalArgumentException` for a
+content tab, as `FakeWorkspace` does. THD Sourcing Crypto (`~/projects/thd-sourcing-crypto-jasper-plugin`, branch
+`jasper-sdk-0.17.1` at `3740e4e`, not yet rebuilt for 0.18) stays skipped. Plan 4 removes `Windows.create`,
+`PluginWindow` and `WindowSpec` (spec 14) and bumps the SDK again, so rebuild it once, after the series' last SDK bump,
+against the jars `sdkRelease` then publishes; that rebuild includes 0.19's changes: its `plugin.toml` (`sdk = ">=0.16.1,
+<0.18"`) and `PluginPackagingTest.java:49` move to the final range, and `build.gradle.kts:8` and `README.md:28` name the
+final version; 0.18's rename still applies (`CryptoForm.java:112` and `CryptoFormTest.java:61` read
+`ChoiceKind.SEGMENTED`, now `EXCLUSIVE`); `CryptoFormTest.java:39-41` adds two panes to one tab, which the testkit
+refuses from 0.19: give `other` its own tab (`host.addTerminalPane(host.addTerminalTab(window, "zsh"), zsh())`), after
+which focusing `other` selects its tab. Its main code (`CryptoPlugin.java:30`, `:37`: `StandardMenu.TOOLS`,
+`Terminals.activePane()`) needs nothing for 0.19. Left for plan 4: `WindowHandle.isMain()`, `TabPlacement`, the
+`ContentTab` move API, `WINDOW_*` from child windows, panels in the main window only; the fakes' rule that the last tab
+takes its window with it, which the main window will not follow; `FakeWorkspace` and `TerminalFixture` keep each
+window's tabs in insertion order and add a split's or `openTab`'s tab at the end, while the application puts a split's
+group beside the target's group and `WindowHandle.tabs()` promises group-by-group order, so `TabPlacement` needs a group
+model in both fakes; and the application's user-facing "terminal window" (the shortcut help's `GLOBAL` row, Remote's
+connect and sign-in messages, the user guides; Rulings 11). Left for plan 4 as well, from the reviews: a failed move
+whose every recovery fails (every window's attach throws, F8) leaves no `TabClosed`, and plan 4 owns transfer's recovery
+and its test; the take-back can name a window already reported closed; a throwing `old.detach` during a move publishes
+nothing while `tab.window()` names the next window; and owner-less content lands in the last-added host in
+`AppContractTest` but in the first open window in `FakeUi`, so plan 4's `TabPlacement` moves it to the main window and
+pins it in the contract. `./gradlew check --continue`: **11,631 tests, 0 failures, 0 errors, 25 skipped** (from the XML
+in `*/build/test-results/test/`; `jasper-app` 3,684, `jasper-sdk` 94, `jasper-sdk-testkit` 203, `PluginContractTest` 106
+on each runtime, `TabRegistryTest` 23, `TabMoveTest` 7, `WindowTerminalsTest` 3, `KitCompatibilityTest` 14,
+`TabMenuTest` 8, `TerminalContentTest` 9; Remote's `StagedTransferLifecycleTest` is load-sensitive, timing out once
+under a full run in Task 4 and passing alone and on rerun, and it passed here). GUI checks for the user: the Tab menu in
+the standard bar and the classic Window menu (no Pane menu); a Remote SSH split opens in a new group; Remote's Split
+with Same Host disabled while an Editor tab is active and enabled again on an SSH tab; Open in Separate Window on an
+Editor tab and back (the separate window closes with its last tab). Not merged, not pushed.
+
 **Workspace tabs, plan 3a: the tab registry and the workspace view — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `f623a24bc..ea571cec8` (Tasks 1 to 6 and their fix rounds), then the documentation
 commits and the final review's fixes; [plan](superpowers/plans/2026-10-17-workspace-3a-tab-registry.md),

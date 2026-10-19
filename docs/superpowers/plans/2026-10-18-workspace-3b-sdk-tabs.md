@@ -1,5 +1,30 @@
 # Workspace tabs 3b: the SDK's tab and pane break Implementation Plan
 
+**Status: executed on 2026-10-19** (`f3cceb7b7..5c27d93d8`, then the documentation commit); see `docs/STATUS.md`.
+Deviations from the plan's text: (a) before Task 1 the plan was replayed on 3a's final code `9a60e08d0` (39 blocks, 0
+failures) and refreshed in `b6687d9df`: six edit anchors (Task 3 Step 4's `WindowContent` edit now quotes 3a's executed
+`attach` and `detach`; Task 5's Enterprise owner sentence) and four "Before you start" lines were re-found on 3a's final
+text, and every other anchor matched; (b) F1: both `WindowTerminals.entry` replacements (Tasks 2, 3) keep 3a's D2 guard,
+a closed `TerminalContent` reports no pane, because `WindowTerminalsTest` pins the order it gives; (c) F2: the take-back
+of an announced arrival (`announced`, `tabArrived`, `tabWithdrawn`) replaces 3a's `tabClosed(published)` in place, after
+`tabHost.detach` and before `workspace.remove`, keeping 3a's tested order;
+`WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` holds; (d) F3: 3a's hand-off for `TerminalFixture` and
+`HostedTerminalsTest:219` is Task 2's as written, with no plan edit; (e) F5 and F6, an addition to the plan text made at
+pre-flight (Task 4 Step 4b): "Split pane" reads "Split" (`WindowChrome`, `WindowChromeTest`), jasper-ui's
+`StateFixtures` "Close Pane" and "Panes" read "Close Tab" and "Tabs", `ConfigurationControllerTest`'s
+`...ZoomedHiddenPanes` test is renamed, `TabHost`'s "cannot fail" comment is reworded and `TerminalTabTest` is renamed
+`TerminalContentTest` (23 path cells and one class cell of `migration.csv`); "In a terminal pane" stays, since a
+terminal tab still has one pane; (f) F7: executors and reviewers used the absolute counts of the pre-flight table,
+because the plan states deltas (`TabRegistryTest` 22, `TabMenuTest` 8 and `PluginContractTest` 102 at the start); (g)
+F9: `AppContractTest.moveTab` does not refuse a plugin's own content tab as `FakePluginHost` does (Rulings 9), because
+no contract case exercises it; (h) F10: the plan's instruction for the Editor's exposure stands, and Task 3's reviewer
+ran `:jasper-plugin-editor:test` (it passes with no Editor change); (i) Task 1: `PluginStateStoreOptInTest` and
+`PresentationSelectionTest` moved to 0.19 (their pinned host SDK and in-memory ranges, and `e.sdk`'s too-new range to
+`>=0.20.0`), because they resolve plugins that `LookFixtures` writes at 0.19, so the brief's "keep 0.18" was wrong;
+`DescriptorParserTest` keeps 0.18; (j) Task 2: an unused `List` import is removed from `WindowTerminals`; (k) Task 3,
+controller ruling: `TerminalFixture.addPane` throws `IllegalArgumentException` for a content tab, as `FakeWorkspace`
+does.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The plugin SDK models what plan 3a built: every tab of a Jasper window is a tab of the SDK, a terminal tab

@@ -69,7 +69,7 @@ opens help and `FormKind.PROMPT` is a short, focused question. A `Section` holdi
 icon tile, and `PanelHeader.detail` takes a count as digits. `DialogSpec.Presentation`, the list kinds' densities,
 `ScrollPolicy`, `PickerDensity`, `Toggle.compact` and STEPPER versus SLIDER are hints. `ScopeSpec.monospaceRows` and
 the MONO roles mean data values in the data face, not the terminal font. A menu from `Menus.create` goes where the
-presentation puts plugin menus, and the PANE and TAB items may appear in a Window menu.
+presentation puts plugin menus, and the TAB items may appear in a Window menu.
 
 ### A grouped dialog
 

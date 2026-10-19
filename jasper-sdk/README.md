@@ -42,9 +42,21 @@ monochrome paths with `UiKit.registerIcon`; see [icons](../docs/sdk-icons.md).
 Panels and settings factories return `UiView`; window surfaces and tabs mount only `UiView`.
 Settings hosts supply `Nodes.Node` rows. The host owns ordinary controls and their presentation.
 Specialized content retains explicit Appearance palettes and workspace opacity.
-Bundled manifests require `sdk = ">=0.19.0, <0.20"` (0.18.0 is a breaking boundary: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
+Bundled manifests require `sdk = ">=0.19.0, <0.20"` (0.19.0 is a breaking boundary, described under Tabs of every kind below; 0.18.0 is one too: `ChoiceKind.SEGMENTED` is `EXCLUSIVE`, `ButtonPresentation.CIRCULAR` is `HELP`, and `FormKind.HERO`, `HERO_COMPACT`, `LayoutRole.HERO`, `TextRole.HERO_TITLE` and `IconSize.HERO` are `PROMPT`, `PROMPT_COMPACT`, `PROMPT_HEADER`, `PROMPT_TITLE` and `PROMPT`, and it adds the `presentation.provide` capability, `StandardMenu.SESSION` and `TRANSFER`, `ToolbarItem.View` with `ToolbarViewFactory`, `ScopeSpec.hue` and `itemNoun`, `PaletteVerb.role`, `DialogSpec.swatch`, the `Notice`, `Properties` and `Separator` nodes, `ChoiceKind.TABS`, `Field.readOnly`, `PickerFace.technicalCaption`, `EditorHint.technical()`, `IconSize.SWATCH`, `Form.footnote`, `Tree.columns`, `TableRow.cellNodes` and `TableRow.heading`, `Table.empty` and `emptyText`, and `ItemList.emptyText`, and an EXCLUSIVE choice with fewer than two or more than four options, a selected heading row, a table's empty state together with its empty text, an empty state with more than one action and more tree values than columns are refused; 0.17.1 adds `Terminals.environment`, `Platform.editor` with `FileEditor`, `LocalSpec.command`, `CommandLine.client()`, the `hidden` icon and the `TAB_INDICATOR` and `TITLEBAR` colours; 0.17.0 adds `PluginContext.commandLine()` and `[[subcommands]]`; 0.16.2 adds the `TEXT_ONSELECTION` colours; 0.16.1 adds `Platform.copy`, `copySecret`, `clipboardText`, `clipboard.read` and `StandardMenu.TOOLS`; 0.16.0 adds menu shortcuts: `MenuItem.withShortcut`; 0.15.5 added ten semantic colours for Slate Steel; 0.15.4 added the modal overlay presentation,
 `DialogSpec.Presentation.OVERLAY`; 0.15.0 was the breaking boundary: raw factories,
 Appearance icon loaders, arbitrary Icon arguments and palette fallback readers were removed).
+
+## Tabs of every kind (SDK 0.19.0)
+
+A window's tabs are terminal tabs and content tabs (an editor, a tool view, a plugin's view), and a split is a terminal
+tab in a new tab group. `WindowHandle.tabs()` lists every tab in workspace order and `activeTab()` is the active
+group's selected tab; `TabHandle.kind()` says which kind a tab is and `terminal()` is a terminal tab's one pane.
+`Terminals.split` opens a terminal tab beside the pane's group. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover
+every tab, and `TAB_MOVED` reports a tab moving to another window: a moved terminal tab reports no `PANE_OPENED` or
+`PANE_CLOSED`, and its pane keeps its id; a window the move empties reports `WINDOW_CLOSED`, and a window opened for the
+move `WINDOW_OPENED`, before the `TAB_MOVED`. The Tab menu (`StandardMenu.TAB`) holds the split, group-focus and prompt
+items; `ExitPolicy.CLOSE` closes a session's tab when it ends. The testkit adds `FakePluginHost.addContentTab` and
+`moveTab`, and `addTerminalPane` gives a terminal tab its one pane.
 
 ## Shell variables, the file editor and program tabs (SDK 0.17.1)
 
@@ -76,7 +88,7 @@ View submenu that lists tool windows is now View › Tool Windows. The testkit m
 ## File workflows and progress (0.7.5)
 
 `Windows.chooseFiles(WindowOwner, title, initialPath)` and `chooseDirectory` attach local
-pickers to a live terminal window or plugin surface. Owner closure or plugin stop cancels
+pickers to a live Jasper window or plugin surface. Owner closure or plugin stop cancels
 the picker and discards late results. They return paths only; perform file I/O off the UI thread.
 
 `StatusBar.addProgress(StatusItemSpec)` provides a stable native progress control, updated on

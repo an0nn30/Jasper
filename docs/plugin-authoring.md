@@ -191,7 +191,7 @@ states, settings pages), icons, colors for specialized content and testing, with
 
 ## Panels, the rail and windows
 
-A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:
+A panel is an owned `UiView` docked as a tool window in every Jasper window, as in IntelliJ:
 stripes of icons on the window's left and right edges, and six slots. The left and right sides each
 have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
 and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
@@ -220,7 +220,7 @@ do not add a duplicate action row inside the panel. Declare `sdk = ">=0.19.0, <0
 
 A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
 is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
-its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
+its job; the content is yours. Dialogs belong to a Jasper window or to one of your windows, so
 they are parented correctly without your plugin ever seeing a frame.
 
 <!-- example:pluginpanels -->
@@ -292,12 +292,14 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
   Keep the current text when the result is empty, and ignore results after your form closes.
   Set your manifest's minimum SDK to `>=0.7.1` when using this method.
 - The application closes a plugin's panels, windows and dialogs when the plugin stops.
-- Jasper stays running while any plugin window is open, even with no terminal window.
+- Jasper stays running while any plugin window is open, even when no other window is.
 
 ## Terminals and capabilities
 
 `context.terminals()` finds windows, tabs and panes; an action's context names the window and pane
-it was invoked on. Handles keep an id, never a Swing object, and two handles for the same pane are
+it was invoked on. A window's tabs are terminal tabs, each holding one pane, and content tabs such as an editor
+(SDK 0.19: `TabHandle.kind()` and `terminal()`); a split opens a terminal tab in a new tab group beside the pane's
+group. Handles keep an id, never a Swing object, and two handles for the same pane are
 equal. Finding things needs no capability. What a handle may do does:
 
 | Capability | Lets your plugin |
@@ -349,6 +351,11 @@ private static void installTerminalDemo(PluginContext context) {
 - **Events carry ids**, because a handle belongs to the plugin that obtained it: call
   `context.terminals().pane(event.paneId())`. They arrive later, on the event thread, and there is
   no replay: read the current state first, then subscribe.
+- **Tabs move between windows** (SDK 0.19). `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover every tab, and a
+  tab that moves to another window reports `TAB_MOVED` (`TabMoved(tabId, fromWindowId, toWindowId)`) instead of a
+  close and an open; a moved terminal tab reports no `PANE_OPENED` or `PANE_CLOSED`, and its pane keeps its id. A
+  window the move empties reports `WINDOW_CLOSED`, and a window opened for the move `WINDOW_OPENED`, before the
+  `TAB_MOVED`. Ask `pane.tab().window()` again rather than keeping a pane's window.
 - **Threads.** Everything here is event-thread only, except `sendText`, `sendBytes` and `paste`,
   which you may call from any thread; calls from one thread keep their order.
   `foregroundJob()` completes on a worker thread.
@@ -422,7 +429,7 @@ private static void connectEcho(PendingSession pending, long stepMillis) {
 - **Ending.** Complete `exited` with the status. Jasper keeps reading `output` to its end, for at
   most two seconds, so the last output is on screen before the pane says "Disconnected (exit N)".
   Completing `exited` exceptionally, or an `IOException` from a stream, is a connection failure, and
-  its message is shown. `ExitPolicy.CLOSE_PANE` closes the pane instead.
+  its message is shown. `ExitPolicy.CLOSE` closes the pane's tab instead.
 - **The remote pty** should be requested with `TerminalConnection.TERM` and the attempt's
   `columns()` and `rows()`; the pane resizes it through `resize` once it has been laid out.
 - A remote shell with Jasper's shell integration produces the same command events as a local one.
@@ -696,8 +703,8 @@ try (var host = new FakePluginHost()) {
 `host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
 `<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
 `+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
-`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
-`focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
+`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane` (a terminal tab's one pane), `addContentTab`,
+`moveTab`, `activateTerminalWindow`, `focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
 `host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
 `titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
 `flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
@@ -852,7 +859,7 @@ background executor, status and attachment return to the UI thread, and each she
 on a shared MINA session. Cancellation withdraws pending credentials and host-key prompts.
 
 In SDK 0.7.2+, `context.panels().toggle(panelId, window)` opens or hides your own
-registered panel in a terminal window. It creates the panel lazily and reuses that
+registered panel in a Jasper window. It creates the panel lazily and reuses that
 window's instance. Require `>=0.7.2` in the manifest when calling it.
 
 ### UI typography
@@ -864,12 +871,12 @@ remains part of the specialized editor contract.
 ### Centered progress overlays
 
 With SDK 0.7.3+, use `context.windows().overlay(new OverlaySpec("Connecting", window))` for
-short-lived progress inside a terminal window. Set owned `UiView` content, supply a Cancel button
+short-lived progress inside a Jasper window. Set owned `UiView` content, supply a Cancel button
 that aborts your work and calls `close()`, then call `show()` (nonblocking). There is no title bar,
 dragging, Escape dismissal or outside-click dismissal. Only one overlay may be reserved per window
 across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
 close the handle; use `onClosed` for cancellation cleanup. Native dialogs remain available for
-required credential and trust prompts. Overlays accept terminal owners from the same host only.
+required credential and trust prompts. Overlays accept Jasper window owners from the same host only.
 
 ### Status progress (SDK 0.7.5)
 
@@ -883,7 +890,7 @@ open a richer management panel. Throttle worker samples before posting UI update
 ### Local path pickers (SDK 0.7.5)
 
 `context.windows().chooseFiles(owner, title, initial)` returns an immutable list of local paths;
-`chooseDirectory` returns one optional directory. Invoke on the UI thread with a live terminal
+`chooseDirectory` returns one optional directory. Invoke on the UI thread with a live Jasper
 window or a shown plugin window. Both calls pump UI events, so revalidate selection-dependent
 state afterwards; owner closure or plugin stop cancels and discards the result. The host uses a
 native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
@@ -917,7 +924,8 @@ the app provides the tab strip, frame, window, status controls and menus. Update
 `ContentTab` with `ContentPresentation`, `ContentCommand` and `ContentStatus` snapshots,
 and set a focus callback. Pass the handle as the owner of save pickers and dialogs so those
 follow moves to another window. `move(true)` opens a separate app-managed workspace;
-`move(false)` returns to the last main workspace. Preserve the component/session during moves.
+`move(false)` returns to the last main workspace. Preserve the component/session during moves. The tab is a
+content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 
 Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch
 flag. Complete false on cancellation or save failure. Recheck edits made during an async
@@ -949,7 +957,7 @@ The manifest `icon` remains an identity image preview; it is separate from prese
 
 Old truthful SDK ranges are rejected by the pure resolver. Before initializing a plugin class,
 the loader checks effective multi-release class files for exact removed SDK members and types,
-including obsolete factory implementations, and SDK 0.18's renamed constants. Errors identify the class, the
+including obsolete factory implementations, SDK 0.18's renamed constants and the members SDK 0.19 removed. Errors identify the class, the
 member and the SDK version that removed it.
 Erased generic icon values, reflective member lookup and enum constants named by strings (`valueOf`, a
 qualified constant label in a pattern `switch`) cannot all be detected statically;
@@ -1056,7 +1064,7 @@ the rest of the window dims under a scrim, and the dialog, centred above it, fad
 16 logical pixels into place (about 220 ms, easing out); closing is its opposite (about 200 ms): the dialog lifts
 off at once and rises another 16 while it fades out. Both follow the motion setting and are instant with animations
 off. Under the Enterprise look an OVERLAY or ATTACHED_SHEET dialog is drawn in its window as a classic dialog: a
-still scrim, and a header strip with its swatch and title. The owner may be a terminal window, one of
+still scrim, and a header strip with its swatch and title. The owner may be a Jasper window, one of
 your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
 returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
 meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:
