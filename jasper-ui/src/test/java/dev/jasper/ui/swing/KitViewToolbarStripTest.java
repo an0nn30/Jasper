@@ -92,6 +92,50 @@ class KitViewToolbarStripTest {
         });
     }
 
+    /** An INLINE strip holding the GHOST Run button in {@code state}, rendered in Enterprise Light: the image and the button's bounds in it. */
+    record Run(java.awt.image.BufferedImage image, java.awt.Rectangle bounds, int iconWidth, java.awt.Dimension preferred, int buttonHeight) {
+        int centre() { return image.getRGB(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2); }
+    }
+
+    static Run run(ControlState state) {
+        var spec = new ViewSpec(new Nodes.Stack("bar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
+            new Nodes.Button("bar.run", state, "", "run", Nodes.ButtonKind.GHOST, "run", "Connect"))));
+        var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
+        try (var view = new KitView(context, spec, event -> { })) {
+            view.toolbarStrip(true);
+            var size = view.getPreferredSize();
+            var image = KitFixtures.render(view, size.width, size.height, 1);
+            var button = KitViewTest.find(view, "bar.run", Buttons.KitButton.class);
+            var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), view);
+            return new Run(image, bounds, button.getIcon().getIconWidth(), button.getPreferredSize(),
+                ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+        } finally { context.binding().close(); context.icons().close(); }
+    }
+
+    /** Plan 12 Rulings 11 and Review Focus 4: an icon-only GHOST button in a toolbar strip: flat at rest, a 16 px authored glyph. */
+    @Test void anIconOnlyGhostButtonInAToolbarStripIsFlatWithARailGlyph() {
+        Edt.run(() -> {
+            var run = run(ControlState.READY);
+            assertThat(run.iconWidth()).as("the rail glyph").isEqualTo(com.formdev.flatlaf.util.UIScale.scale(16));
+            assertThat(run.preferred()).as("the BUTTON_HEIGHT square").isEqualTo(new java.awt.Dimension(run.buttonHeight(), run.buttonHeight()));
+            assertThat(new java.awt.Color(run.image().getRGB(run.bounds().x + 2, run.bounds().y + 2), true).getAlpha()).as("flat at rest").isZero();
+            var centre = new java.awt.Color(run.centre(), true);
+            assertThat(centre.getGreen()).as("the authored green triangle, %s", centre)
+                .isGreaterThan(centre.getRed() + 40).isGreaterThan(centre.getBlue() + 40);
+        });
+    }
+
+    @Test void aDisabledRunButtonFadesItsTriangleWithoutRecolouringIt() {
+        Edt.run(() -> {
+            var enabled = new java.awt.Color(run(ControlState.READY).centre(), true);
+            var disabled = new java.awt.Color(run(new ControlState(true, false, false, "")).centre(), true);
+            assertThat(disabled.getAlpha()).as("faded").isLessThanOrEqualTo((int) (enabled.getAlpha() * .42) + 1);
+            assertThat(disabled.getAlpha()).as("still painted").isPositive();
+            assertThat(disabled.getGreen()).as("not recoloured, %s", disabled)
+                .isGreaterThan(disabled.getRed() + 40).isGreaterThan(disabled.getBlue() + 40);
+        });
+    }
+
     @Test void theFlagIsReportedAndAClosedViewRefusesIt() {
         Edt.run(() -> {
             var context = KitFixtures.context();

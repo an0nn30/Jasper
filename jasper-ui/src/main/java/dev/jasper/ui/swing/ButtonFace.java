@@ -4,6 +4,7 @@ import dev.jasper.ui.metrics.Typography;
 import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import javax.swing.JComponent;
@@ -34,6 +35,8 @@ interface ButtonFace extends Face {
     /** Paints a rich picker or dropdown face. */
     void paintPicker(JComponent owner, Graphics graphics, KitContext context, Nodes.PickerFace face, boolean empty, boolean focus,
                      boolean hover, boolean expanded);
+    /** The closed size of a rich dropdown in a toolbar strip, or null to keep the standard face's. */
+    Dimension toolbarCombo(Choices.ChoiceCombo combo);
     /** Whether picker menu rows draw their icon tiles. */
     boolean tiles();
     /** The rule above a picker menu's footer row. */

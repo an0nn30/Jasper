@@ -51,7 +51,8 @@ final class PickerMenus {
         int glyph=Math.min(size,glyphSize);
         c.icons().icon(name,c.theme().semantic(),role,glyph).paintIcon(owner,g,x+(size-glyph)/2,y+(size-glyph)/2);
     }
-    private static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}
+    /** {@code text}, ended with an ellipsis where it is wider than {@code width} in {@code fm}. */
+    static String clipped(FontMetrics fm,String text,int width){if(fm.stringWidth(text)<=width)return text;String ellipsis="…";if(fm.stringWidth(ellipsis)>width)return "";int end=text.length();while(end>0&&fm.stringWidth(text.substring(0,end)+ellipsis)>width)end=text.offsetByCodePoints(end,-1);return text.substring(0,end)+ellipsis;}
     /** A caption's type: a data value (a technical caption) in the data face, otherwise the density's caption. */
     static Typography.Role captionRole(boolean compact,boolean technical){
         return technical?Typography.Role.MONO_CAPTION:compact?Typography.Role.PICKER_CAPTION:Typography.Role.CAPTION;

@@ -187,7 +187,10 @@ public final class DesignMetrics {
         LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0),
         // Plan 12: the classic toolbar's icon-only button (IntelliJ's 22 px ActionButton) and the ▼ in an icon-only
         // dropdown's corner; only ClassicToolbarButton reads them.
-        CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4);
+        CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4),
+        // Plan 12: IntelliJ's run-configuration combo (ComboBoxButton) in a toolbar strip; only the classic buttons face reads them.
+        TOOLBAR_COMBO_HEIGHT(24), TOOLBAR_COMBO_LEADING(10), TOOLBAR_COMBO_ICON_GAP(4), TOOLBAR_COMBO_ARROW(16), TOOLBAR_COMBO_TRAILING(7),
+        TOOLBAR_COMBO_RADIUS(3), TOOLBAR_COMBO_TEXT_MAX(240);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }
