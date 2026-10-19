@@ -185,7 +185,7 @@ class JasperApplicationBackgroundTest {
             assertThat(presenceAtSwitch).as("a failure raised while the window opens still waits for it")
                 .startsWith(Delivery.Presence.NO_WINDOW);
             assertThat(presence(application)).as("the failed open is over: idle again").isEqualTo(Delivery.Presence.IDLE);
-            assertThatThrownBy(() -> edt(application::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presence(application)).as("every open, failed or not, ends its opening").isEqualTo(Delivery.Presence.IDLE);
         } finally {
             edt(application::quitNow);
@@ -198,7 +198,7 @@ class JasperApplicationBackgroundTest {
             assertThat(presence(application)).as("before residency is decided (start-up)").isEqualTo(Delivery.Presence.NO_WINDOW);
             edt(() -> application.residency(false));
             assertThat(presence(application)).as("a plain start before its first window").isEqualTo(Delivery.Presence.NO_WINDOW);
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(presence(application)).isEqualTo(Delivery.Presence.NO_WINDOW);
         } finally {
             edt(application::quitNow);
@@ -249,7 +249,7 @@ class JasperApplicationBackgroundTest {
         try {
             assertThatThrownBy(() -> edt(() -> application.open(List.of(), "menu"))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).containsExactly(false);
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).as("the second attempt shows Jasper, then hides it again").containsExactly(false, true, false);
         } finally {
             edt(application::quitNow);
@@ -261,7 +261,7 @@ class JasperApplicationBackgroundTest {
         StartupTrace cold = StartupTrace.detached();
         JasperApplication coldApplication = application(cold, () -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(coldApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> coldApplication.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(cold.windows()).extracting(window -> window.trigger()).containsExactly("cold");
         } finally {
             edt(coldApplication::quitNow);
@@ -270,7 +270,7 @@ class JasperApplicationBackgroundTest {
         warmed.mark(StartupTrace.Milestone.WARMED_UP);
         JasperApplication warmedApplication = application(warmed, () -> { }, true);
         try {
-            assertThatThrownBy(() -> edt(warmedApplication::newWindow)).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> warmedApplication.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(warmed.windows()).extracting(window -> window.trigger()).containsExactly("menu");
         } finally {
             edt(warmedApplication::quitNow);
@@ -281,7 +281,7 @@ class JasperApplicationBackgroundTest {
         JasperApplication application = application(() -> { }, true);
         try {
             edt(() -> application.residency(false));
-            assertThatThrownBy(() -> edt(() -> application.newWindow())).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThatThrownBy(() -> edt(() -> application.openFirstWindow(List.of()))).hasRootCauseInstanceOf(HeadlessException.class);
             assertThat(dock).isEmpty();
         } finally {
             edt(application::quitNow);

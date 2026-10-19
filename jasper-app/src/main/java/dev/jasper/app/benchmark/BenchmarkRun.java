@@ -5,7 +5,7 @@ import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.workspace.TerminalPane;
 import dev.jasper.app.workspace.TerminalContent;
-import dev.jasper.app.workspace.TerminalWindow;
+import dev.jasper.app.workspace.JasperWindow;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.config.TerminalOptions;
@@ -42,7 +42,7 @@ final class BenchmarkRun implements AutoCloseable {
     private final BenchmarkRendering rendering = new BenchmarkRendering();
     private final BenchmarkLifetime deadline;
     private JasperApplication application;
-    private TerminalWindow window;
+    private JasperWindow window;
     private RepaintManager previousRepaintManager;
     private volatile String phase = "startup";
     private volatile Throwable samplingFailure;
@@ -179,7 +179,7 @@ final class BenchmarkRun implements AutoCloseable {
     private static Map<String, Object> environment(BenchmarkOptions options) {
         Map<String, Object> env = new LinkedHashMap<>();
         env.put("revision", options.revision()); env.put("mode", options.memory() ? "application-memory" : "application-throughput");
-        env.put("ownership", "JasperApplication / TerminalWindow / WindowContent / TerminalPane / TerminalSession");
+        env.put("ownership", "JasperApplication / WindowManager / JasperWindow / WindowContent / TerminalPane / TerminalSession");
         env.put("jvmVendor", System.getProperty("java.vendor")); env.put("jvmVersion", System.getProperty("java.runtime.version"));
         env.put("javaHome", System.getProperty("java.home")); env.put("classpath", System.getProperty("java.class.path"));
         env.put("jvmOptions", ManagementFactory.getRuntimeMXBean().getInputArguments());
@@ -200,9 +200,9 @@ final class BenchmarkRun implements AutoCloseable {
         edt(() -> {
             previousRepaintManager = RepaintManager.currentManager(null); RepaintManager.setCurrentManager(rendering);
             application = new JasperApplication(null, launcher);
-            window = application.newWindow(directory);
+            window = application.windows().ensureMain("menu", directory).orElseThrow();
             window.content().onError = (title, message) -> samplingFailure = new IllegalStateException(title + ": " + message);
-            window.resize(new Dimension(1100, 850));
+            window.nativeWindow().setSize(new Dimension(1100, 850));
             return null;
         });
         sampler.scheduleWithFixedDelay(() -> {
@@ -216,7 +216,7 @@ final class BenchmarkRun implements AutoCloseable {
         }
         drain(window);
         result.put("paneLayout", layout());
-        result.put("windowSize", edt(() -> Map.of("width", window.size().width, "height", window.size().height)));
+        result.put("windowSize", edt(() -> Map.of("width", window.nativeWindow().getWidth(), "height", window.nativeWindow().getHeight())));
         phase = "cold-ready"; sample();
         if (options.memory()) { phase = "warm-idle"; pause(options.warmupMillis()); sample(); }
         // Interactive-only still needs populated scrollback; idle and cycles alone never emit a payload.
@@ -285,12 +285,12 @@ final class BenchmarkRun implements AutoCloseable {
             int cycle = i;
             edt(() -> {
                 for (TerminalPane pane : panes(window)) pane.view().setFontSize(cycle % 2 == 0 ? 17 : 16);
-                window.resize(new Dimension(cycle % 2 == 0 ? 1050 : 1100, 850)); return null;
+                window.nativeWindow().setSize(new Dimension(cycle % 2 == 0 ? 1050 : 1100, 850)); return null;
             });
             drain(window); pause(100);
         }
         edt(() -> { for (TerminalPane pane : panes(window)) pane.view().setFontSize(16);
-            window.resize(new Dimension(1100, 850)); return null; });
+            window.nativeWindow().setSize(new Dimension(1100, 850)); return null; });
         drain(window); sample();
     }
 
@@ -304,20 +304,20 @@ final class BenchmarkRun implements AutoCloseable {
             TerminalContent temporarySplit = edt(() -> window.content().split(Side.RIGHT)); ready(window, before + 2);
             edt(() -> { window.content().closeTab(temporarySplit); window.content().closeTab(temporaryTab); return null; });
             retireChildrenExcept(retained);
-            TerminalWindow temporaryWindow = edt(() -> {
-                TerminalWindow created = application.newWindow(directory);
+            JasperWindow temporaryWindow = edt(() -> {
+                JasperWindow created = application.windows().openTerminalWindow(directory).orElseThrow();
                 created.content().onError = (title, message) -> samplingFailure = new IllegalStateException(title + ": " + message);
                 return created;
             });
             ready(temporaryWindow, 1); drain(temporaryWindow);
-            edt(() -> { temporaryWindow.close(); return null; });
+            edt(() -> { temporaryWindow.requestClose(); return null; });
             retireChildrenExcept(retained);
             sample();
         }
     }
 
     /** Every terminal pane of {@code owner}: one per terminal tab, in workspace order. */
-    private static List<TerminalPane> panes(TerminalWindow owner) {
+    private static List<TerminalPane> panes(JasperWindow owner) {
         return owner.content().terminalTabs().stream().map(TerminalContent::pane).toList();
     }
 
@@ -344,7 +344,7 @@ final class BenchmarkRun implements AutoCloseable {
             "columns", p.session().columns(), "rows", p.session().rows(), "visible", p.view().isShowing(),
             "widthPixels", p.view().getWidth(), "heightPixels", p.view().getHeight(), "fontSize", p.view().fontSize())).toList());
     }
-    private void ready(TerminalWindow owner, int paneCount) throws Exception {
+    private void ready(JasperWindow owner, int paneCount) throws Exception {
         while (true) {
             check();
             boolean ready = edt(() -> {
@@ -356,7 +356,7 @@ final class BenchmarkRun implements AutoCloseable {
             Thread.sleep(10);
         }
     }
-    private void drain(TerminalWindow owner) throws Exception {
+    private void drain(JasperWindow owner) throws Exception {
         // Two EDT barriers allow queued resize/repaint invalidations to run; paintImmediately finishes the final image.
         edt(() -> null);
         edt(() -> { if (owner.closed()) throw new IllegalStateException("Benchmark window closed by user");

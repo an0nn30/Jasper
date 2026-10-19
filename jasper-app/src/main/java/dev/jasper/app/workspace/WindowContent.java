@@ -368,8 +368,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
      * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
      * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
-     * shows it while the look keeps that on, and otherwise it is a row in the window. TerminalWindow and the chrome
-     * renders share this path. Returns the unified bar, or null.
+     * shows it while the look keeps that on, and otherwise it is a row in the window. The main window's frame and the
+     * chrome renders share this path. Returns the unified bar, or null.
      */
     static MacTitleBar mount(JRootPane root, WindowContent content, WindowLook look, Consumer<String> nativeTitle) {
         MacTitleBar bar = installTitleBar(root, content, look.unifiedTitle(), look.followThemeAppearance(), nativeTitle);
@@ -378,6 +378,49 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // and spec 9.1's fallback row); the default look keeps today's title-bar zone.
         if (bar == null && look.followThemeAppearance()) content.chrome().chromeRow();
         if (bar != null) bar.setMenuBar(content.menuBar()); else root.setJMenuBar(content.menuBar());
+        return bar;
+    }
+
+    /**
+     * Mounts a child window's {@code content} in its frame's {@code root} (workspace tabs spec 6.3): the look's title bar
+     * (the unified macOS bar with a centred title, or the system's) showing the active tab's title, and no header,
+     * toolbar or status bar. On macOS the screen menu bar shows the same menus as the main window's, built from the same
+     * menu model, while the look keeps menus there ({@code screenMenuBar}); a child window never shows a menu row, and
+     * on Windows and Linux the title pane holds the title alone. Returns the unified bar, or null.
+     */
+    static MacTitleBar mountChild(JRootPane root, WindowContent content, WindowLook look, boolean screenMenuBar,
+                                  Consumer<String> nativeTitle) {
+        // Compact keeps the system's title bar, as the main window's does (spec 10.1).
+        boolean compact = content.viewMode == ViewMode.COMPACT;
+        MacTitleBar bar = null;
+        if (compact) root.setContentPane(content);
+        else bar = MacTitleBar.install(root, content, () -> content.onMinimumSizeChanged.run(), look.unifiedTitle());
+        if (bar != null) {
+            MacTitleBar unified = bar;
+            unified.setStyle(MacTitleBar.Style.WINDOW);
+            // The native controls sit on the title bar, which a theme may make dark on a light theme or light on a dark one.
+            content.onThemeChanged = theme -> unified.setLight(!dev.jasper.ui.theme.TitleBarTheme.of(theme.chrome()).dark());
+        } else if (content.macOs && (compact || look.followThemeAppearance())) {
+            content.onThemeChanged = theme -> dev.jasper.app.platform.MacAppearance.follow(root, theme.chrome().dark());
+        } else if (!content.macOs) {
+            // FlatLaf's title pane holds the title alone, in the chrome's colours, as the main window's does.
+            content.onThemeChanged = theme -> {
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_BACKGROUND, ThemeZone.color(null, SemanticColor.SURFACE_APP));
+                root.putClientProperty(com.formdev.flatlaf.FlatClientProperties.TITLE_BAR_FOREGROUND, ThemeZone.color(null, SemanticColor.TEXT_SECONDARY));
+            };
+        }
+        content.onThemeChanged.accept(content.theme());
+        content.followsThemeAppearance = bar == null && look.followThemeAppearance() && content.macOs;
+        if (screenMenuBar) root.setJMenuBar(content.menuBar());
+        MacTitleBar titled = bar;
+        content.onTitle = title -> {
+            nativeTitle.accept(title);
+            if (titled != null) titled.setTitle(title);
+        };
+        if (content.bodyLease != null) content.bodyLease.close();
+        content.bodyLease = dev.jasper.app.platform.WindowBody.install(root, content,
+            () -> new java.awt.Rectangle(0, 0, content.getWidth(), content.getHeight()));
+        content.update();
         return bar;
     }
 

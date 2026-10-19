@@ -37,9 +37,14 @@ import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.startup.WindowTrace;
 import dev.jasper.app.windows.AuxiliaryWindows;
 import dev.jasper.app.windows.NativeShells;
+import dev.jasper.app.workspace.JasperWindow;
+import dev.jasper.app.workspace.MainWindow;
 import dev.jasper.app.workspace.TerminalPane;
-import dev.jasper.app.workspace.TerminalWindow;
-import dev.jasper.app.workspace.WindowCallbacks;
+import dev.jasper.app.workspace.WindowContent;
+import dev.jasper.app.workspace.WindowFrame;
+import dev.jasper.app.workspace.WindowManager;
+import dev.jasper.app.workspace.WindowRole;
+import dev.jasper.app.workspace.WindowShell;
 import dev.jasper.app.workspace.WorkspaceActivity;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.rendering.FontSet;
@@ -73,7 +78,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import dev.jasper.app.terminals.TerminalRegistry;
 
-/** Application-level window and shell ownership; closing a window never exits sibling windows. */
+/**
+ * The application: its windows (through its {@link WindowManager}: one main window and any number of child windows), its
+ * shells, plugins, configuration, notifications and residency.
+ */
 public final class JasperApplication {
     private static final System.Logger LOG = System.getLogger(JasperApplication.class.getName());
     private final ThemeController themes;
@@ -81,7 +89,6 @@ public final class JasperApplication {
     ThemeController themes() { return themes; }
     private final dev.jasper.app.platform.SystemAppearance systemAppearance;
     private Runnable systemAppearanceListening = () -> { };
-    private final Set<TerminalWindow> windows = new LinkedHashSet<>();
     /** Workspace glass exists only on macOS; elsewhere plugins see {@code GlassSource.NONE} and windows make no glass requests. */
     private static final boolean WORKSPACE_GLASS = com.formdev.flatlaf.util.SystemInfo.isMacOS;
     private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
@@ -90,10 +97,10 @@ public final class JasperApplication {
     /** The trigger of a window the macOS open-file event asked for. */
     public static final String OPEN_FILE = "open-file";
     private final List<Runnable> glassListeners = new ArrayList<>();
-    /** Whether an open terminal window has been activated since the first of them opened; see {@link #presence}. */
+    /** Whether an open window has been activated since the first of them opened; see {@link #presence}. */
     private boolean activatedSinceOpen;
-    /** How many terminal windows are being opened right now (EDT): from the start of {@link #openWindow} until it returns or fails. */
-    private int openingWindows;
+    /** The start-up timing of each window being opened, from its composition until it shows. */
+    private final Map<UUID, WindowTrace> windowTraces = new HashMap<>();
     private final SessionLaunchCoordinator launches = new SessionLaunchCoordinator(Executors.newThreadPerTaskExecutor(
         Thread.ofPlatform().name("jasper-shell-launch-", 0).factory()));
     private final ConfigurationController configuration;
@@ -172,6 +179,15 @@ public final class JasperApplication {
     };
     private volatile List<String> relaunch;
     private final dev.jasper.app.contributions.Contributions contributions = new dev.jasper.app.contributions.Contributions();
+    /** Test seam: how a window's native frame is made. Production builds a {@link WindowFrame}. Before the manager, which reads it. */
+    Function<JasperWindow, WindowShell> frames = this::frameOnScreen;
+    /**
+     * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are plan 6's,
+     * which saves the windows there; until then each frame keeps what it keeps when it closes.
+     */
+    private final WindowManager windows = new WindowManager(contributions, new WindowManager.Hooks(this::composeContent,
+        window -> frames.apply(window), this::windowOpened, this::windowActivated, this::windowClosed, this::windowStateChanged,
+        window -> { }, () -> { }));
     private ActivityNotifier activityNotifier;
     private final NotificationCenter notificationCenter;
     private final NotificationsFeature notificationViews;
@@ -190,8 +206,7 @@ public final class JasperApplication {
     private int configuredLongCommandSeconds() {
         return configuration == null ? 10 : configuration.snapshot().longCommandSeconds();
     }
-    private TerminalWindow lastActive;
-    /** Every terminal window's tabs and panes, for features that must not hold Swing objects. */
+    /** Every window's tabs and terminal panes, for features that must not hold Swing objects. */
     private final TerminalRegistry terminals = new TerminalRegistry();
 
     TerminalRegistry terminals() { return terminals; }
@@ -336,7 +351,7 @@ public final class JasperApplication {
         notificationViews = new NotificationsFeature(notificationCenter, contributions,
             () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), presentation().projections().panels());
         systemNotices = new SystemNotices(notificationCenter, this::systemNotificationsEnabled,
-            new SystemNotices.Windows(this::raiseFor, notificationViews::showHistory, this::showErrors));
+            new SystemNotices.Windows(this::raiseFor, this::showHistory, this::showErrors, this::holderOf));
         incidents = new Incidents(notificationCenter.clock());
         incidentNotices = new IncidentNotices(notificationCenter, incidents, SwingUtilities::invokeLater,
             JasperApplication::afterDelay, this::pluginName, this::disablePlugin, this::showErrors);
@@ -443,23 +458,16 @@ public final class JasperApplication {
      */
     static String windowTrigger(int windowsOpened, boolean warmedUp) { return windowsOpened == 0 && !warmedUp ? "cold" : "menu"; }
 
-    /** The opacity in effect behind {@code component}: its terminal window's within that window's workspace area, else 1. */
+    /** The opacity in effect behind {@code component}: its window's within that window's workspace area, else 1. */
     private double glassOpacity(Component component) {
-        for (TerminalWindow window : windows) if (window.owns(component)) return window.content().workspaceOpacity(component);
+        for (JasperWindow window : windows.windows()) if (window.owns(component)) return window.content().workspaceOpacity(component);
         return 1.0;
     }
 
     private void glassChanged() { for (Runnable listener : List.copyOf(glassListeners)) listener.run(); }
 
-    /** A window whose tab starts where a new shell starts: the user's home, which a WSL profile reads as its Linux home. */
-    public TerminalWindow newWindow() { return openWindow(null, false, newWindowTrigger()); }
-
-    private String newWindowTrigger() {
-        return windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent());
-    }
-
-    /** A window whose tab starts in {@code directory}; null opens a detached window with no tab. */
-    public TerminalWindow newWindow(Path directory) { return openWindow(directory, directory == null, "menu"); }
+    /** Every window, which this application asks every window question (workspace tabs spec 6.1). EDT. */
+    public WindowManager windows() { return windows; }
 
     /** New windows take live settings while retaining the application startup decoration choice. */
     ConfigSnapshot windowConfiguration() {
@@ -467,28 +475,16 @@ public final class JasperApplication {
         return latest.toBuilder().viewMode(startupViewMode).build();
     }
 
-    private TerminalWindow openWindow(Path directory, boolean detached, String trigger) {
-        contributions.tabs().setFactory(separate -> {
-            var created = separate ? newWindow(null) : newWindow();
-            if (created == null) throw new IllegalStateException("Application is closing");
-            return created.content().id();
-        });
-        if (quitting) return null;
-        // Counted until composeWindow returns or fails. Incidents are always queued, so none lands inside the count; it
-        // protects what is posted directly on the EDT while composing (a plugin's panel factory posting inside
-        // connectContributions, say): that waits for the window's card, as it does before the first window of a start.
-        openingWindows++;
-        try {
-            return composeWindow(directory, detached, trigger);
-        } finally {
-            openingWindows--;
-        }
-    }
-
-    private TerminalWindow composeWindow(Path directory, boolean detached, String trigger) {
-        WindowTrace windowTrace = trace.window(trigger);
+    /**
+     * A window's content for {@code opening}, wired to this application: its launcher, configuration, contributions,
+     * notifications, terminal registry, glass and timing; the main window's alone gets the notification layer and the
+     * saved dock layout. Null while the application quits, and then no window opens. A failure closes what was made and
+     * propagates. EDT.
+     */
+    private WindowContent composeContent(WindowManager.Opening opening) {
+        if (quitting || stopped) return null;
+        WindowTrace windowTrace = trace.window(opening.trigger());
         windowsOpened++;
-        boolean first = windows.isEmpty();
         ShellLauncher launcher = suppliedLauncher != null ? suppliedLauncher : windowLauncher(launches,
             configuration == null ? ConfigSnapshot::defaults : configuration::snapshot,
             (path, settings) -> track(watchOutput(startSession(path, settings))), shellIntegrationDir, shellProfiles::resolve,
@@ -496,30 +492,33 @@ public final class JasperApplication {
         // Back in the Dock before the window exists: macOS gives a window of a hidden application neither Jasper's menu
         // bar nor focus. If composing fails nothing opened, so the presence is worked out again.
         windowOpening();
-        TerminalWindow window = null;
+        boolean macOs = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+        WindowContent content = null;
         try {
-            window = new TerminalWindow(new WindowCallbacks(
-                requested -> { if (requested == null) newWindow(); else newWindow(requested); }, this::quitRequested,
-                this::windowActivated, this::windowClosed,
-                state -> windowStateChanged(state.window(), state.showing(), state.iconified())),
-                launcher, directory, detached, themes, configuration == null ? null : windowConfiguration(), history, windowLook());
-            if (configuration != null) configuration.register(window.content());
-            window.content().connectContributions(contributions, uiState);
-            UUID windowId = window.content().id();
-            window.content().onError = (title, details) -> notificationViews.error(title, details, windowId);
-            window.content().onInfo = (title, details) -> notificationViews.info(title, details, windowId);
-            window.content().onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
-            window.content().onOpenFile = (file, line) -> openFileAt(file, line, windowId);
+            content = new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
+                directory -> windows.openTerminalWindow(directory), this::quitRequested, opening.emptied(), themes,
+                KeyBindings.defaults(macOs), history, macOs, windowLook().chrome());
+            // The first configuration a window takes keeps the start-up view mode, before any native chrome is installed.
+            if (configuration != null) content.applyConfiguration(windowConfiguration(), macOs);
+            if (configuration != null) configuration.register(content);
+            boolean main = opening.role() == WindowRole.MAIN;
+            // A child window has no dock or Zen of its own: its layout state is never saved (workspace tabs spec 6.3).
+            content.connectContributions(contributions, main ? uiState : UiState.inMemory());
+            UUID windowId = content.id();
+            content.onError = (title, details) -> notificationViews.error(title, details, windowId);
+            content.onInfo = (title, details) -> notificationViews.info(title, details, windowId);
+            content.onLaunchFailure = (details, cause) -> incidentNotices.launchFailure(windowId, details, cause);
+            content.onOpenFile = (file, line) -> openFileAt(file, line, windowId);
             // File › Open File… (spec 13): the plugins' file chooser over this window; nothing before plugins start.
-            window.content().fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
-            notificationViews.attach(window.content());
-            window.content().connectTerminals(terminals, window::toFront);
-            if (WORKSPACE_GLASS) window.content().setGlassListener(this::glassChanged);
-            window.content().onToggleBuddy = this::toggleBuddy;
-            window.content().onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
-            window.content().buddyEnabled = this::buddyEnabled;
-            window.content().anyWindowActive = () -> windows.stream().anyMatch(open -> open.content().isActiveAndOpen());
-            window.content().activity(event -> {
+            content.fileChooser = folder -> auxiliary == null ? Optional.empty() : auxiliary.openFile(windowId, folder);
+            if (main) notificationViews.attach(content);
+            content.connectTerminals(terminals, () -> windows.window(windowId).ifPresent(JasperWindow::toFront));
+            if (WORKSPACE_GLASS) content.setGlassListener(this::glassChanged);
+            content.onToggleBuddy = this::toggleBuddy;
+            content.onFirstTerminal(pane -> timeFirstTerminal(pane, windowTrace));
+            content.buddyEnabled = this::buddyEnabled;
+            content.anyWindowActive = () -> windows.windows().stream().anyMatch(open -> open.content().isActiveAndOpen());
+            content.activity(event -> {
                 switch (event) {
                     case WorkspaceActivity.Started value -> notifications.started(value.id(), value.command(),
                         value.elapsedNanos(), value.activate(), value.watched());
@@ -537,46 +536,40 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation(); window.show();
-            memoryIndicator.windows(windows.size());
+            windowTraces.put(windowId, windowTrace);
+            return content;
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
             try {
-                if (window != null) discard(window, failure);
+                if (content != null) {
+                    notificationViews.detach(content);
+                    content.forgetLayout();
+                    content.close();
+                }
+            } catch (RuntimeException | Error closing) {
+                failure.addSuppressed(closing);
             } finally {
                 updateDock();
             }
             throw failure;
         }
-        windowTrace.mark(WindowTrace.Milestone.SHOWN);
-        trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
-        startupSteps.done();
-        return window;
     }
 
-    /**
-     * Closes a window whose composition failed, without saving its bounds or dock layout: it must not become the last
-     * window closed, whose layout the next window restores. If closing it fails too, the window is still forgotten, as
-     * {@link #windowClosed} forgets one (by the window list, the notification cards and the Buddy, which would otherwise
-     * keep routing to it, and as the window used last) and its frame disposed, and each further failure is added to
-     * {@code failure} as suppressed. EDT.
-     */
-    private void discard(TerminalWindow window, Throwable failure) {
-        try {
-            window.discard();
-        } catch (RuntimeException | Error closing) {
-            failure.addSuppressed(closing);
-            try {
-                forget(window);
-            } catch (RuntimeException | Error forgetting) {
-                failure.addSuppressed(forgetting);
-            }
-            try {
-                window.nativeWindow().dispose();
-            } catch (RuntimeException | Error disposing) {
-                failure.addSuppressed(disposing);
-            }
-        }
+    /** A window's native frame under this process's look: the main window's at its saved bounds. EDT. */
+    private WindowShell frameOnScreen(JasperWindow window) {
+        var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
+        if (window.isMain()) frame.restoreLayout(uiState);
+        startupSteps.workstation();
+        return frame.shell();
+    }
+
+    /** A window shows: its timing ends, and the start-up steps with the first. EDT. */
+    private void windowOpened(JasperWindow window) {
+        memoryIndicator.windows(windows.windows().size());
+        WindowTrace windowTrace = windowTraces.remove(window.id());
+        if (windowTrace != null) windowTrace.mark(WindowTrace.Milestone.SHOWN);
+        trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
+        startupSteps.done();
     }
 
     /**
@@ -881,16 +874,20 @@ public final class JasperApplication {
         }
     }
 
-    /** The menu bar item's New Window: always a new window, in front of other applications. EDT. */
+    /**
+     * The menu bar item's New Window: a child window with a terminal tab, after the main window is restored (workspace
+     * tabs spec 6.4), in front of other applications. EDT.
+     */
     private void newWindowFromMenuBar() {
         if (quitting || stopped) return;
-        openWindow(null, false, "menu");
+        windows.openTerminalWindow(null);
         requestForeground();
     }
 
-    /** The menu bar item's Settings\u2026: over the last active window, or on its own while Jasper has none. EDT. */
+    /** The menu bar item's Settings\u2026: over the window used last, after the main window is restored (spec 6.4). EDT. */
     private void settingsFromMenuBar() {
         if (quitting || stopped) return;
+        windows.ensureMain("menu", null);
         requestForeground();
         openSettings(null, null);
     }
@@ -913,44 +910,45 @@ public final class JasperApplication {
 
     /**
      * Every outside request to show Jasper ends here: a second launch's handoff, the {@code jasper} command, the macOS
-     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3 and 5.4). With no paths it raises the
-     * last active window, or opens one where a new shell starts; each directory opens as a terminal tab and each file
-     * in the editor a plugin provides, else revealed ({@code openRequestedFile}), in the last active
-     * window, or in a new window (in the first directory) when none is open ({@code OpenPlan}). Plan 4 of the
-     * workspace-tabs series retargets this method to the main window. {@code trigger} names the caller for start-up
-     * timing. EDT.
+     * reopen and open-file events and the menu bar item (workspace-tabs spec 5.3, 5.4 and 6.4). The main window is restored
+     * first when none is open (until workspace-tabs plan 6, a new main window opens, in the first directory the request
+     * names when there is one), else raised; each other directory opens as a terminal tab in its active group and each
+     * file in the editor a plugin provides, else revealed ({@code openRequestedFile}) ({@code OpenPlan}). {@code trigger}
+     * names the caller for start-up timing. EDT.
      *
      * @param paths absolute paths to open; none raises
      * @param trigger what asked, for the window's timing line
      */
     public void open(List<Path> paths, String trigger) {
         if (quitting || stopped) return;
-        TerminalWindow target = activeWindow();
-        OpenPlan plan = OpenPlan.of(paths, target != null, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
-        if (plan.newWindow()) target = openWindow(plan.windowDirectory(), false, trigger);
-        else target.toFront();
-        openRest(target, plan);
+        Optional<MainWindow> current = windows.main();
+        OpenPlan plan = OpenPlan.of(paths, current.isPresent(), java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
+        Optional<MainWindow> target = current.isPresent() ? current : windows.ensureMain(trigger, plan.windowDirectory());
+        if (target.isEmpty()) return;
+        if (current.isPresent()) target.get().toFront();
+        openRest(target.get(), plan);
     }
 
     /**
-     * A launch's first window, timed as {@link #newWindow()} times it (a cold start unless a {@code --background} launch
-     * warmed up): its tab starts in the first directory {@code paths} names, else where a new shell starts, and the rest
-     * of the paths open in it as {@link #open} opens them (plan Ruling 13). EDT.
+     * A launch's main window, timed as a cold start unless a {@code --background} launch warmed up: its tab starts in the
+     * first directory {@code paths} names, else where a new shell starts, and the rest of the paths open in it as
+     * {@link #open} opens them (plan Ruling 13). EDT.
      *
      * @param paths the launch's absolute paths
-     * @return the window; null while the application is quitting
+     * @return the main window; empty while the application is quitting
      */
-    public TerminalWindow openFirstWindow(List<Path> paths) {
-        OpenPlan plan = OpenPlan.of(paths, false, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
-        TerminalWindow window = openWindow(plan.windowDirectory(), false, newWindowTrigger());
-        openRest(window, plan);
+    public Optional<MainWindow> openFirstWindow(List<Path> paths) {
+        boolean open = windows.main().isPresent();
+        OpenPlan plan = OpenPlan.of(paths, open, java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
+        Optional<MainWindow> window = windows.ensureMain(
+            windowTrigger(windowsOpened, trace.millis(StartupTrace.Milestone.WARMED_UP).isPresent()), plan.windowDirectory());
+        window.ifPresent(main -> openRest(main, plan));
         return window;
     }
 
-    private void openRest(TerminalWindow target, OpenPlan plan) {
-        if (target == null) return;
+    private void openRest(MainWindow target, OpenPlan plan) {
         for (Path directory : plan.tabs()) target.content().newTab(directory);
-        for (Path file : plan.files()) openRequestedFile(file, target.content().id());
+        for (Path file : plan.files()) openRequestedFile(file, target.id());
     }
 
     /**
@@ -1047,7 +1045,7 @@ public final class JasperApplication {
             if (!rehearsing) finished.run();
         }
         if (rehearsing) {
-            // This bypasses openWindow: no window timing and no FIRST_PAINT or OUTPUT_PAINTED, which would settle
+            // This bypasses the window manager: no window timing and no FIRST_PAINT or OUTPUT_PAINTED, which would settle
             // residency for a window nobody sees. Only done marks WARMED_UP.
             Rehearsal.run(() -> Rehearsal.feed(snapshot.columns(), snapshot.lines()), feed -> rehearsalWindow(feed, snapshot),
                 finished, Rehearsal.FALLBACK);
@@ -1076,18 +1074,25 @@ public final class JasperApplication {
      * window's own constructor fails there is no window to reach its frame through; nothing was shown. EDT.
      */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
-        TerminalWindow window = new TerminalWindow(Rehearsal.CALLBACKS, Rehearsal.launcher(feed), null, false, themes, snapshot,
-            new CommandHistory(), windowLook());
+        // A main window's content and frame, made here and nowhere else: the window manager never hears of it.
+        boolean macOs = com.formdev.flatlaf.util.SystemInfo.isMacOS;
+        var content = new WindowContent(WindowRole.MAIN, Rehearsal.launcher(feed), null, false, directory -> { }, () -> { },
+            () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, windowLook().chrome());
+        content.applyConfiguration(snapshot, macOs);
+        var window = new WindowFrame(content, windowLook(), snapshot, JasperWindow.Events.NONE);
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
-        Rehearsal.silence(window.content());
+        Rehearsal.silence(content);
         // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
-        Runnable close = () -> Rehearsal.closeAndDispose(window::discard, window.nativeWindow()::dispose);
+        Runnable close = () -> Rehearsal.closeAndDispose(() -> {
+            content.forgetLayout();
+            try { content.close(); } finally { window.discard(); }
+        }, window.nativeWindow()::dispose);
         // Its own layout state, in memory and never saved, carrying only Zen mode: it warms the Zen chrome when the next
         // window will show it.
         UiState rehearsalState = UiState.inMemory();
         rehearsalState.setZenMode(uiState.zenMode());
         try {
-            window.content().connectContributions(contributions, rehearsalState, false);
+            content.connectContributions(contributions, rehearsalState, false);
         } catch (RuntimeException | Error failure) {
             try {
                 close.run();
@@ -1136,7 +1141,7 @@ public final class JasperApplication {
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
         shells = new NativeShells(themes, uiState, this::nativeWindow,
-            () -> newWindow(), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
+            () -> windows.openTerminalWindow(null), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();
@@ -1189,11 +1194,6 @@ public final class JasperApplication {
             Optional.empty(), invocation -> installCommand(false)).setEnabled(commandInstall.available());
         contributions.addAction("commandline.uninstall", "Uninstall 'jasper' Command from PATH", null, commandKeywords,
             Optional.empty(), invocation -> uninstallCommand()).setEnabled(commandInstall.available());
-        contributions.tabs().setFactory(separate -> {
-            var created = separate ? newWindow(null) : newWindow();
-            if (created == null) throw new IllegalStateException("Application is closing");
-            return created.content().id();
-        });
         if (subcommandList != null) plugins.subcommandList(subcommandList);
         plugins.starting(startupSteps::plugin);
         plugins.start(selection, configuration == null ? Map.of() : configuration.snapshot().plugins(), themes.current().chrome().dark());
@@ -1380,8 +1380,7 @@ public final class JasperApplication {
          */
         void openSettings(java.util.UUID ownerOrNull, String pageOrNull) {
             if (settings == null || quitting || stopped) return;
-            java.util.UUID owner = ownerOrNull != null ? ownerOrNull
-                : lastActive != null && windows.contains(lastActive) ? lastActive.content().id() : null;
+            java.util.UUID owner = ownerOrNull != null ? ownerOrNull : windows.lastActive().map(JasperWindow::id).orElse(null);
             boolean opening = !settings.isOpen();
             settings.open(owner, pageOrNull);
             if (opening && !settings.isOpen() && vmOptions != null && !quitting && !stopped) vmOptions.settingsClosed();
@@ -1420,7 +1419,7 @@ public final class JasperApplication {
      * terminal windows: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
-        boolean residentIdle = resident && startupSettled && !windowsOpen() && openingWindows == 0;
+        boolean residentIdle = resident && startupSettled && !windowsOpen() && windows.opening() == 0;
         return presence(!windows.isEmpty(), activatedSinceOpen,
             java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow() != null, residentIdle);
     }
@@ -1535,7 +1534,7 @@ public final class JasperApplication {
 
     /** Show Problems on the configuration notification: the details over the window used last. */
     private void showConfigurationProblems() {
-        TerminalWindow target = lastActive != null && windows.contains(lastActive) ? lastActive : windows.stream().findFirst().orElse(null);
+        JasperWindow target = windows.lastActive().orElse(null);
         if (target == null) return;
         target.toFront();
         target.content().showConfigurationDetails();
@@ -1724,27 +1723,26 @@ public final class JasperApplication {
     /** Remembers a shell so shutdown can wait for it to leave before terminating the JVM. */
     TerminalSession track(TerminalSession session) { return launches.track(session); }
 
-    /** A terminal window's native window, for parenting application-built dialogs; null when it is gone. */
+    /** A window's native window, for parenting application-built dialogs; null when it is gone. */
     private java.awt.Window nativeWindow(java.util.UUID id) {
-        for (TerminalWindow window : windows) if (window.content().id().equals(id)) return window.nativeWindow();
-        return null;
+        return windows.window(id).map(JasperWindow::nativeWindow).orElse(null);
     }
 
     /**
-     * Forgets a window the application no longer holds: out of the window list, the notification cards and the Buddy's
-     * windows, no longer the one used last, and with no window left nothing counts as activated. The window list
-     * changes first, so a failure after it still leaves the window forgotten. EDT.
+     * Forgets a window the application no longer holds: out of the notification cards and the Buddy's windows, and with
+     * no window left nothing counts as activated. The window manager forgot it first. EDT.
      */
-    private void forget(TerminalWindow window) {
-        windows.remove(window);
-        memoryIndicator.windows(windows.size());
-        if (window != null) notificationViews.detach(window.content()); // tests close "the last window" with null
+    private void forget(JasperWindow window) {
+        memoryIndicator.windows(windows.windows().size());
+        if (window != null) { // tests close "the last window" with null
+            windowTraces.remove(window.id());
+            notificationViews.detach(window.content());
+        }
         buddy.removeWindow(window);
-        if (lastActive == window) lastActive = null;
         if (windows.isEmpty()) activatedSinceOpen = false;
     }
 
-    void windowClosed(TerminalWindow window) {
+    void windowClosed(JasperWindow window) {
         forget(window);
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
@@ -1752,32 +1750,32 @@ public final class JasperApplication {
         boolean pluginWindowsOpen = auxiliary != null && !auxiliary.open().isEmpty();
         if (windows.isEmpty() && !resident && !pluginWindowsOpen) requestShutdown();
         else {
-            // The next terminal window's timing says how long this process sat without one.
+            // The next window's timing says how long this process sat without one.
             if (windows.isEmpty()) trace.windowsClosed();
             updateBuddyActions();
             updateDock();
         }
     }
 
-    void windowStateChanged(TerminalWindow window, boolean showing, boolean iconified) {
-        if (!windows.contains(window)) return;
-        buddy.window(window, showing, iconified);
+    /** The Buddy is the main window's (workspace tabs spec 6.2): it shows while the main window does. */
+    private void windowStateChanged(WindowManager.State state) {
+        if (!state.window().isMain()) return;
+        buddy.window(state.window(), state.showing(), state.iconified());
         updateBuddyActions();
     }
 
     /** Coming back to a Jasper window is attention: the buddy wakes and waves. */
-    void windowActivated(TerminalWindow window) {
-        if (!windows.contains(window)) return;
-        lastActive = window;
+    void windowActivated(JasperWindow window) {
         activatedSinceOpen = true;
-        notificationViews.activated(window.content());
+        // The cards live in the main window (workspace tabs spec 6.2): coming back to any window shows those that waited.
+        windows.main().ifPresent(main -> notificationViews.activated(main.content()));
         systemNotices.focused();
-        terminals.windowActivated(window.content().id());
+        terminals.windowActivated(window.id());
         if (buddy != null && !quitting && !stopped) buddy.greet();
     }
 
     private boolean owns(Component component) {
-        for (TerminalWindow window : windows) if (window.owns(component)) return true;
+        for (JasperWindow window : windows.windows()) if (window.owns(component)) return true;
         return false;
     }
 
@@ -1785,33 +1783,36 @@ public final class JasperApplication {
 
     boolean buddyEnabled() { return buddy.enabled(); }
 
-    /** The terminal window used last, else the first open one; null with none open. EDT. */
-    private TerminalWindow activeWindow() {
-        return lastActive != null && windows.contains(lastActive) ? lastActive : windows.isEmpty() ? null : windows.iterator().next();
-    }
+    private void raiseTerminal() { windows.lastActive().ifPresent(JasperWindow::toFront); }
 
-    private void raiseTerminal() {
-        TerminalWindow target = activeWindow();
-        if (target != null) target.toFront();
-    }
     /**
-     * Brings a terminal window to the front for a click on an OS notification: the notification's own window while it
-     * is open, else the one used last, and with none open a new one. Names the window; empty while Jasper quits.
+     * Brings a window to the front for a click on an OS notification: the notification's window while it is open (the
+     * window holding its pane now, {@link #holderOf}), else the one used last, and with none open the main window,
+     * restored first. Names the window; empty while Jasper quits.
      */
     private Optional<UUID> raiseFor(Optional<UUID> target) {
         if (quitting || stopped) return Optional.empty();
-        TerminalWindow window = target.flatMap(this::openWindowWith).orElse(null);
-        if (window == null && lastActive != null && windows.contains(lastActive)) window = lastActive;
-        if (window == null && !windows.isEmpty()) window = windows.iterator().next();
-        if (window == null) window = newWindow();
-        if (window == null) return Optional.empty();
-        window.toFront();
-        return Optional.of(window.content().id());
+        Optional<JasperWindow> window = target.flatMap(windows::window).or(windows::lastActive)
+            .or(() -> windows.ensureMain("notification", null));
+        window.ifPresent(JasperWindow::toFront);
+        return window.map(JasperWindow::id);
     }
 
-    private Optional<TerminalWindow> openWindowWith(UUID id) {
-        for (TerminalWindow window : windows) if (window.content().id().equals(id)) return Optional.of(window);
-        return Optional.empty();
+    /** The Notifications panel is the main window's (workspace tabs spec 6.2): it shows there, whichever window a click raised. */
+    private void showHistory(UUID window) {
+        MainWindow target = windows.main().orElse(null);
+        if (target == null) { notificationViews.showHistory(window); return; }
+        if (!target.id().equals(window)) target.toFront();
+        notificationViews.showHistory(target.id());
+    }
+
+    /**
+     * The window that holds the pane a command's notification came from, when the click arrives: the pane's tab may have
+     * moved to another window since it posted (workspace tabs spec 9.3). Empty for any other notification.
+     */
+    private Optional<UUID> holderOf(UUID notification) {
+        return notifications.producer(notification).filter(UUID.class::isInstance).map(UUID.class::cast)
+            .flatMap(terminals::pane).flatMap(pane -> terminals.tab(pane.tabId())).map(dev.jasper.app.terminals.TabEntry::windowId);
     }
 
     /**
@@ -1834,7 +1835,7 @@ public final class JasperApplication {
     }
 
     private void updateBuddyActions() {
-        for (TerminalWindow window : List.copyOf(windows)) window.content().updateActions();
+        for (JasperWindow window : windows.windows()) window.content().updateActions();
     }
 
     /**
@@ -2030,9 +2031,14 @@ public final class JasperApplication {
     public void toBackground() {
         if (quitting || stopped) return;
         if (!windowsMayClose()) return;
-        for (TerminalWindow window : List.copyOf(windows)) window.close();
-        if (auxiliary != null) auxiliary.close();
-        updateDock();
+        try {
+            // Every child window, then the main window (workspace tabs spec 6.4).
+            windows.closeAll();
+        } finally {
+            // Every window closed whatever one threw; the plugin windows follow, and the failure still reaches the caller.
+            if (auxiliary != null) auxiliary.close();
+            updateDock();
+        }
     }
 
     /** Whether any Jasper window, terminal or plugin, is open. EDT. */
@@ -2068,8 +2074,12 @@ public final class JasperApplication {
     public void quitNow() {
         presentationAttempt().orderlyQuit();
         quitting = true;
-        for (TerminalWindow window : List.copyOf(windows)) window.close();
-        requestShutdown();
+        try {
+            windows.closeAll();
+        } finally {
+            // Every window closed whatever one threw: the process still ends, and the failure still reaches the caller.
+            requestShutdown();
+        }
     }
 
     private void requestShutdown() {

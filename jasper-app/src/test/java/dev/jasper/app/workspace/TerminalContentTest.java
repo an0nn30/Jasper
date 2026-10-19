@@ -189,12 +189,12 @@ class TerminalContentTest {
             assertThat(workspace.getMinimumSize().height).isGreaterThan(twoRows);
             javax.swing.JRootPane root = new javax.swing.JRootPane();
             root.setContentPane(content); root.setJMenuBar(content.menuBar());
-            var outer = TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2));
+            var outer = WindowFrame.minimumSize(root, new java.awt.Insets(30, 2, 2, 2));
             assertThat(outer.height).isGreaterThan(workspace.getMinimumSize().height + 32);
             assertThat(outer.width).isGreaterThan(twoColumns + 4);
             java.awt.Dimension previous = outer;
             content.toggleMaximize();
-            assertThat(TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2)).height).isLessThan(previous.height);
+            assertThat(WindowFrame.minimumSize(root, new java.awt.Insets(30, 2, 2, 2)).height).isLessThan(previous.height);
             content.close();
         });
     }
@@ -214,16 +214,16 @@ class TerminalContentTest {
         edt(() -> owner[0] = content(launcher)); pending.remove().run();
         edt(() -> {
             root[0] = new javax.swing.JRootPane(); root[0].setContentPane(owner[0]); root[0].setJMenuBar(owner[0].menuBar());
-            minimum[0] = TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2));
+            minimum[0] = WindowFrame.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2));
             owner[0].currentPane().session().write("go\n");
         });
         until(() -> owner[0].currentPane().title().equals(title));
         edt(() -> {
             owner[0].update();
             assertThat(owner[0].status().getText()).contains("long-directory-segment/");
-            assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
+            assertThat(WindowFrame.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
             owner[0].currentTerminal().rename("manual rename ".repeat(200));
-            assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
+            assertThat(WindowFrame.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
             owner[0].close();
         });
     }

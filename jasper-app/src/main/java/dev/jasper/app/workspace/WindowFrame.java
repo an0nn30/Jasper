@@ -1,10 +1,6 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.config.ConfigSnapshot;
-import dev.jasper.app.config.KeyBindings;
-import dev.jasper.app.commands.CommandHistory;
-import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.platform.ApplicationIcon;
 import dev.jasper.app.platform.MacTitleBar;
 import dev.jasper.app.platform.WindowGlass;
@@ -18,14 +14,19 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.nio.file.Path;
 import javax.swing.*;
 
-/** Native window boundary; all terminal behavior lives in the actual WindowContent component. */
-public final class TerminalWindow implements AutoCloseable {
-    private final WindowCallbacks callbacks;
+/**
+ * The native frame of one Jasper window (workspace tabs spec 6.2 and 6.3), around its {@link WindowContent}: the main
+ * window's with the look's title bar, header and menus; a child window's with a title bar and the active tab's title, the
+ * screen menu bar's menus on macOS while the look shows them there, and no menu row anywhere else. Both take the Keymap
+ * on their own root, the command palette and workspace glass. Everything testable lives in {@link JasperWindow} and
+ * {@link WindowManager}; this is never constructed in headless tests.
+ */
+public final class WindowFrame {
     private final JFrame frame = new JFrame("Jasper");
     private final WindowContent content;
+    private final JasperWindow.Events events;
     private final MacTitleBar titleBar;
     private final WindowGlass glass;
     private boolean closed;
@@ -34,53 +35,35 @@ public final class TerminalWindow implements AutoCloseable {
         @Override public void componentMoved(java.awt.event.ComponentEvent event) { rememberBounds(); }
         @Override public void componentResized(java.awt.event.ComponentEvent event) { rememberBounds(); }
     };
-    private final WindowAdapter events = new WindowAdapter() {
-        @Override public void windowClosing(WindowEvent event) { if (content.mayClose()) close(); }
-        @Override public void windowActivated(WindowEvent event) { setActive(true); callbacks.activated().accept(TerminalWindow.this); }
+    private final WindowAdapter listener = new WindowAdapter() {
+        @Override public void windowClosing(WindowEvent event) { events.closing().run(); }
+        @Override public void windowActivated(WindowEvent event) { setActive(true); }
         @Override public void windowDeactivated(WindowEvent event) { setActive(false); }
         @Override public void windowOpened(WindowEvent event) { reportState(); }
         @Override public void windowIconified(WindowEvent event) { reportState(); }
         @Override public void windowDeiconified(WindowEvent event) { reportState(); }
     };
 
-    /** A window with one tab in {@code directory}, or a detached one with no tab when it is null. */
-    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, ThemeController themes,
-                   ConfigSnapshot initial, CommandHistory history) {
-        this(callbacks, launcher, directory, directory == null, themes, initial, history);
-    }
-
     /**
-     * A {@code detached} window has no tab; any other starts one tab in {@code directory}, where null means where a
-     * new shell starts (the user's home, which a WSL profile reads as its Linux home).
-     */
-    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
-                   ThemeController themes, ConfigSnapshot initial, CommandHistory history) {
-        this(callbacks, launcher, directory, detached, themes, initial, history, WindowLook.standard());
-    }
-
-    /**
-     * As above, under {@code look}: its workspace chrome and its title bar (Enterprise presentation spec 9.1 and 10.1).
+     * The frame around {@code content}, sized for {@code initial}'s grid when it is given, not yet shown.
      *
-     * @param callbacks the application's window callbacks
-     * @param launcher starts the window's shells
-     * @param directory where the first tab starts, or null for where a new shell starts
-     * @param detached whether the window starts without a tab
-     * @param themes the application's look
-     * @param initial the configuration to apply, or null
-     * @param history the shared command history
-     * @param look the window's chrome and title facts
+     * @param content the window's content; its role decides the frame's chrome
+     * @param look the look's chrome and title facts
+     * @param initial the configuration a new window takes, or null
+     * @param events what the frame tells its window
      */
-    public TerminalWindow(WindowCallbacks callbacks, ShellLauncher launcher, Path directory, boolean detached,
-                   ThemeController themes, ConfigSnapshot initial, CommandHistory history, WindowLook look) {
-        this.callbacks = callbacks;
+    public WindowFrame(WindowContent content, WindowLook look, ConfigSnapshot initial, JasperWindow.Events events) {
+        this.content = java.util.Objects.requireNonNull(content, "content");
+        this.events = java.util.Objects.requireNonNull(events, "events");
         frame.setIconImages(ApplicationIcon.images());
-        content = new WindowContent(launcher, directory, detached, callbacks.newWindow(), callbacks.quit(), this::close, themes,
-            KeyBindings.defaults(SystemInfo.isMacOS), history, SystemInfo.isMacOS, look.chrome());
         if (initial != null) {
-            if (content.currentPane() != null) content.currentPane().setPreferredSize(InitialWindowSize.terminalArea(initial));
-            content.applyConfiguration(initial, SystemInfo.isMacOS);
+            // An empty window (a moved tab's) gives up its stand-in size, so its workspace takes the grid's (Rulings 18).
+            if (content.currentPane() == null) content.setPreferredSize(null);
+            JComponent sized = content.currentPane() != null ? content.currentPane() : content.workspace();
+            sized.setPreferredSize(InitialWindowSize.terminalArea(initial));
         }
-        titleBar = WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle);
+        titleBar = content.isMain() ? WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle)
+            : WindowContent.mountChild(frame.getRootPane(), content, look, screenMenuBar(), frame::setTitle);
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         content.installRootBindings(frame.getRootPane());
         // Native initial focus must not fall through to the first restored tool-panel control.
@@ -92,7 +75,7 @@ public final class TerminalWindow implements AutoCloseable {
             glass = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(), content::applyBackgroundOpacity);
             content.setGlassRequests((levels, dark) -> glass.request(levels.opacity(), levels.blur(), dark));
         } else glass = null;
-        frame.addWindowListener(events); frame.pack();
+        frame.addWindowListener(listener); frame.pack();
         if (initial != null) {
             updateMinimumSize();
             frame.setSize(InitialWindowSize.fit(frame.getSize(), frame.getMinimumSize(), usableBounds()));
@@ -101,7 +84,12 @@ public final class TerminalWindow implements AutoCloseable {
         content.update();
     }
 
-    /** Restore after configuration and tool panels are connected, before the native window is shown. */
+    /** Whether macOS shows this process's menus in the screen menu bar, as the look committed before AWT started. */
+    private static boolean screenMenuBar() {
+        return SystemInfo.isMacOS && Boolean.getBoolean("apple.laf.useScreenMenuBar");
+    }
+
+    /** The main window's bounds from {@code state}, checked against the current displays; before the frame shows. */
     public void restoreLayout(UiState state) {
         placement = new WindowPlacement(state);
         updateMinimumSize();
@@ -117,6 +105,14 @@ public final class TerminalWindow implements AutoCloseable {
         frame.setExtendedState(placement.extendedState());
         frame.addComponentListener(geometry);
     }
+
+    /** @return what this frame does for its window */
+    public WindowShell shell() {
+        return new WindowShell(this::show, this::toFront, this::dispose, this::discard, () -> frame, this::owns, frame::setBounds);
+    }
+
+    /** @return the native window, for painting the warm-up rehearsal */
+    public java.awt.Window nativeWindow() { return frame; }
 
     private void rememberBounds() {
         if (!closed && placement != null && frame.isShowing()) placement.observe(frame.getBounds(), frame.getExtendedState());
@@ -148,58 +144,40 @@ public final class TerminalWindow implements AutoCloseable {
     }
 
     private void setActive(boolean active) {
-        content.setActive(active);
         if (titleBar != null) titleBar.setActive(active);
+        events.activated().accept(active);
     }
 
     private void reportState() {
-        callbacks.stateChanged().accept(new WindowCallbacks.State(this, frame.isShowing(),
-            (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0));
+        events.state().accept(frame.isShowing(), (frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0);
     }
 
-    public void toFront() {
+    private void toFront() {
         if ((frame.getExtendedState() & java.awt.Frame.ICONIFIED) != 0) frame.setExtendedState(frame.getExtendedState() & ~java.awt.Frame.ICONIFIED);
         frame.toFront(); frame.requestFocus();
-        content.focusSelected();
     }
 
-    /** Whether {@code component} is this window's frame or sits inside it; used to filter toolkit key events. */
-    public boolean owns(Component component) {
+    private boolean owns(Component component) {
         return component == frame || SwingUtilities.getWindowAncestor(component) == frame;
     }
 
-    public WindowContent content() { return content; }
-    public boolean closed() { return closed; }
-    public Dimension size() { return frame.getSize(); }
-    /** The native window, for parenting application-built dialogs; never exposed to extensions. */
-    public java.awt.Window nativeWindow() { return frame; }
-    public void resize(Dimension size) { frame.setSize(size); }
+    private void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
 
-    public void show() { frame.setVisible(true); reportState(); content.focusSelected(); }
-
-    /**
-     * Closes this window without remembering it: neither its bounds nor its dock layout are saved, so a window that
-     * failed to compose, or the warm-up rehearsal's (never shown, at the default size), never becomes the last window
-     * closed, whose layout the next window restores. EDT.
-     */
+    /** Disposes the frame without remembering its bounds: its window failed to open, or it is the rehearsal's. */
     public void discard() {
-        if (closed) return;
         placement = null;
-        content.forgetLayout();
-        close();
+        dispose();
     }
 
-    @Override public void close() {
+    /** After the content closed: remembers the main window's bounds, then disposes the frame. */
+    private void dispose() {
         if (closed) return;
         rememberBounds();
         closed = true;
         frame.removeComponentListener(geometry);
-        // Save the intact dock first; plugin disposal callbacks must not change the closing window's snapshot.
         if (glass != null) glass.close();
-        content.close();
         if (placement != null) placement.save(frame.getExtendedState());
         if (titleBar != null) titleBar.close();
-        frame.removeWindowListener(events); frame.dispose();
-        callbacks.closed().accept(this);
+        frame.removeWindowListener(listener); frame.dispose();
     }
 }

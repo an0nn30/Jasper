@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Spec 16.1.4, as JUnit and headless: a window's chrome under the default, Enterprise and complement kits, the fallback
- * combination and a strength-2 covering array of the nine chrome points, mounted as TerminalWindow mounts it and printed
+ * combination and a strength-2 covering array of the nine chrome points, mounted as WindowFrame mounts it and printed
  * at 2× into jasper-app/build/chrome-renders/. Plans 6b to 9 extend {@link #check}.
  */
 class ChromeRenderTest {

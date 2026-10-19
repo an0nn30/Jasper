@@ -33,13 +33,15 @@ class SystemNoticesTest {
     private final List<UUID> errors = new ArrayList<>();
     /** What raising a window returns: the window it raised, empty while Jasper quits. */
     private Optional<UUID> raises = Optional.of(LAST_USED);
+    /** The window that holds a notification's pane now: none by default, so the notification's own target is raised. */
+    private java.util.function.Function<UUID, Optional<UUID>> holder = id -> Optional.empty();
 
     private SystemNotices notices() {
         center.register(CARDS);
         var notices = new SystemNotices(center, () -> enabled, new SystemNotices.Windows(target -> {
             raised.add(target);
             return raises.map(last -> target.orElse(last));
-        }, histories::add, errors::add));
+        }, histories::add, errors::add, id -> holder.apply(id)));
         notices.use(SystemNotifier.using(Runnable::run, clicks -> new SystemNotifier.Backend(
             message -> sent.add(message.level() + " " + message.title() + "|" + message.body()),
             withdrawn::add, () -> withdrawn.add("all"), () -> backendCalls.add("focused"), () -> backendCalls.add("close"))));
@@ -119,6 +121,18 @@ class SystemNoticesTest {
         assertThat(center.find(id).orElseThrow().read()).isTrue();
         assertThat(withdrawn).containsExactly(id.toString());
         assertThat(histories).isEmpty();
+    }
+
+    /** Workspace tabs spec 9.3: a command's tab moved to another window after its notification posted. */
+    @Test void aClickRaisesTheWindowThatHoldsThePaneNowNotTheOneItPostedFrom() {
+        UUID postedFrom = UUID.randomUUID(), holdsItNow = UUID.randomUUID();
+        holder = id -> Optional.of(holdsItNow);
+        var notices = notices();
+        var ran = new ArrayList<String>();
+        UUID id = post(request(Severity.INFO, "make").withTarget(postedFrom).withActivate(() -> ran.add("focus the pane")));
+        notices.clicked(id);
+        assertThat(raised).containsExactly(Optional.of(holdsItNow));
+        assertThat(ran).containsExactly("focus the pane");
     }
 
     @Test void aClickOnAnIncidentOpensTheErrorsWindowAtIt() {

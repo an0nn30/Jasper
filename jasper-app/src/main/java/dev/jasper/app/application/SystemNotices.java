@@ -31,12 +31,16 @@ final class SystemNotices implements AutoCloseable {
      *     open, and names it; empty while Jasper quits
      * @param showHistory shows the Notifications panel in that window
      * @param showErrors opens the Errors window at that incident
+     * @param holder the window that holds what a notification is about now (a command's pane, whose tab may have moved
+     *     since it posted), resolved when the click arrives; empty to use the notification's own target
      */
-    record Windows(Function<Optional<UUID>, Optional<UUID>> raise, Consumer<UUID> showHistory, Consumer<UUID> showErrors) {
+    record Windows(Function<Optional<UUID>, Optional<UUID>> raise, Consumer<UUID> showHistory, Consumer<UUID> showErrors,
+                   Function<UUID, Optional<UUID>> holder) {
         Windows {
             Objects.requireNonNull(raise, "raise");
             Objects.requireNonNull(showHistory, "showHistory");
             Objects.requireNonNull(showErrors, "showErrors");
+            Objects.requireNonNull(holder, "holder");
         }
     }
 
@@ -87,7 +91,8 @@ final class SystemNotices implements AutoCloseable {
     void clicked(UUID id) {
         if (closed) return;
         Optional<Notification> entry = center.find(id);
-        Optional<UUID> window = windows.raise().apply(entry.flatMap(found -> found.request().target()));
+        Optional<UUID> window = windows.raise().apply(entry.flatMap(found ->
+            windows.holder().apply(found.id()).or(() -> found.request().target())));
         if (window.isEmpty()) return;
         if (entry.isEmpty()) {
             windows.showHistory().accept(window.get());

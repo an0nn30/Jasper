@@ -690,7 +690,7 @@ class WindowCommandPaletteTest {
                 dev.jasper.app.palette.PaletteTestSupport.executeSelected(content[0].commandPalette().component());
                 assertThat(history[0].recent()).containsExactly(quit ? "quit" : "close_tab");
                 assertThat(history[0].closedFuture()).isNotDone();
-                assertThat(application.newWindow(DesktopTestSupport.HOME)).isNull();
+                assertThat(application.windows().openTerminalWindow(DesktopTestSupport.HOME)).isEmpty();
                 application.quit(); // Repeated shutdown requests retain the accepted dispatch.
             });
             history[0].closedFuture().get(5, java.util.concurrent.TimeUnit.SECONDS);

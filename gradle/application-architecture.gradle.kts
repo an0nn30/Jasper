@@ -99,20 +99,41 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         "Application bypasses supported terminal API"
                     }
                 }
-                // Workspace tabs spec 6.1: the main window is made in one place, WindowManager.ensureMain. The constant pool
-                // (javap -v) also shows a constructor reference (MainWindow::new), which javap -c alone would miss.
-                val makesMain = "dev/jasper/app/workspace/MainWindow.\"<init>\""
-                val makers = mutableMapOf<String, Int>()
+                // Workspace tabs spec 6.1, one main window per process: MainWindow, its WindowManager and the native
+                // WindowFrame are each made only at the sites below, with an explicit `new`. The constant pool (javap -v)
+                // also shows a constructor reference (X::new), which javap -c alone would miss; it counts as a site.
+                val pinned = mapOf(
+                    "dev/jasper/app/workspace/MainWindow" to listOf("dev.jasper.app.workspace.WindowManager.ensureMain"),
+                    "dev/jasper/app/workspace/WindowManager" to listOf("dev.jasper.app.application.JasperApplication.<init>"),
+                    "dev/jasper/app/workspace/WindowFrame" to listOf("dev.jasper.app.application.JasperApplication.frameOnScreen",
+                        "dev.jasper.app.application.JasperApplication.rehearsalWindow"))
+                val sites = pinned.keys.associateWith { mutableListOf<String>() }
+                val header = Regex("^  \\S.*?([\\w$.]+)\\(.*\\)( throws .*)?;$")
                 for (batch in types.chunked(100)) {
                     val verbose = tool("javap", listOf("-classpath", classes.absolutePath, "-v", "-p") + batch)
                     for (section in verbose.split(Regex("(?m)^Classfile ")).drop(1)) {
-                        if (!section.contains(makesMain)) continue
+                        if (pinned.keys.none { section.contains("$it.\"<init>\"") }) continue
                         val type = Regex("this_class: #\\d+\\s+// (\\S+)").find(section)?.groupValues?.get(1)?.replace('/', '.') ?: continue
-                        makers[type] = section.lines().count { (it.contains("invokespecial") || it.contains("REF_newInvokeSpecial")) && it.contains(makesMain) }
+                        var method = "(class)"
+                        for (line in section.lines()) {
+                            header.find(line)?.let { declared ->
+                                val name = declared.groupValues[1]
+                                method = when {
+                                    name.contains('.') -> "<init>"
+                                    name.startsWith("lambda$") -> name.removePrefix("lambda$").substringBefore('$').let { if (it == "new") "<init>" else it }
+                                    else -> name
+                                }
+                            }
+                            for ((made, list) in sites) {
+                                if (!line.contains("$made.\"<init>\"") || topLevel(type) == made.replace('/', '.')) continue
+                                if (line.contains("invokespecial")) list.add("${topLevel(type)}.$method")
+                                else if (line.contains("REF_newInvokeSpecial")) list.add("${topLevel(type)}::new")
+                            }
+                        }
                     }
                 }
-                check(makers.keys.map { topLevel(it) }.toSet() == setOf("dev.jasper.app.workspace.WindowManager") && makers.values.sum() == 1) {
-                    "MainWindow is made in exactly one place, WindowManager.ensureMain: $makers"
+                for ((made, allowed) in pinned) check(sites.getValue(made).sorted() == allowed.sorted()) {
+                    "${made.substringAfterLast('/')} is made only at ${allowed.joinToString()}: ${sites.getValue(made)}"
                 }
             }
         }

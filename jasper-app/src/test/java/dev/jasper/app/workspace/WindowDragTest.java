@@ -472,7 +472,7 @@ class WindowDragTest {
                 var source = f.drag(f.button("Files"), f.zone(Slot.BOTTOM_RIGHT));
                 assertThat(f.owner.dockDrag().target()).as("a release here would drop").isPresent();
                 assertThat(keys.dispatchers).as("the drag's Esc dispatcher").hasSize(before.size() + 1);
-                // TerminalWindow on windowDeactivated: a modal dialog opened, whose window takes the release, or
+                // WindowFrame on windowDeactivated: a modal dialog opened, whose window takes the release, or
                 // another application took focus.
                 f.owner.setActive(false);
                 assertThat(f.owner.dockDrag().active()).isFalse();
