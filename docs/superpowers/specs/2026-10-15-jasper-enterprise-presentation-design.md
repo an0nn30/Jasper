@@ -17,7 +17,7 @@ Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no m
 Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
-Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 10.3, 10.7, 11.5, 14.4 and 19.1.
+Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 11.5, 14.4, 17 and 19.1.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -721,8 +721,8 @@ data.
 
 ### 5.8 Defaults for settings
 
-The precedence is **user-saved, then kit default, then core default**, for an allowlist of five keys:
-`ui.theme.light`, `ui.theme.dark`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A kit default must pass the
+The precedence is **user-saved, then kit default, then core default**, for an allowlist of five keys: `ui.theme.light`,
+`ui.theme.dark`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A kit default must pass the
 setting's own kind check (`palette.visible_rows` 1-20, `window.toolbar_height` 28-64), and a theme must be a built-in or
 one of the providing plugin's own themes with the variant its key needs (5.9). A declared theme file that fails to load
 is dropped from the `DefaultSource` (the core default applies) and named in the plugin's problem notice.
@@ -1112,9 +1112,9 @@ incompatible minors. THD Sourcing Crypto rebuilds for 0.18. `sdkRelease` publish
 ### 8.6 SDK 0.18.1
 
 An additive release (the user, 2026-10-18): `ToolbarItem.View` admits, besides at most one PRIMARY Button, any number of
-icon-only GHOST Buttons (a blank label with an icon and a tooltip), drawn flat until hovered with their glyph at rail size;
-and two authored built-in icon names, `run` (IntelliJ's classic Run triangle) and `application` (its run-configuration icon),
-host artwork in both looks. Only Remote's manifest moves to `sdk = ">=0.18.1, <0.19"`.
+icon-only GHOST Buttons (a blank label with an icon and a tooltip), drawn flat until hovered with their glyph at rail
+size; and two authored built-in icon names, `run` (IntelliJ's classic Run triangle) and `application` (its
+run-configuration icon), host artwork in both looks. Only Remote's manifest moves to `sdk = ">=0.18.1, <0.19"`.
 
 ## 9. The app: projections and consumers
 
@@ -1127,9 +1127,9 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | Projection | Fields | Consumer |
 |---|---|---|
 | `DesktopFlags` | `screenMenuBar`, `nativeTitle` | bootstrap: desktop properties, `TitleBarStyle` |
-| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle` | workspace: `WorkspaceChrome.of` |
+| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle`, icons (NEW_UI, CLASSIC) | workspace: `WorkspaceChrome.of` |
 | `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance` | windows: `ShellChrome.of`, `NativeShells` |
-| `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
+| `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, UPPER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `kitFontSize` (from which `fontRowCopy` follows) | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
 | `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | windows (`AuxiliaryWindows`, which also hosts plugin dialogs) |
@@ -1155,7 +1155,8 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `WorkspaceLook.stripes`, `FrameStyle` | LABELLED and flush frames when `tool_windows = "stripes"` | RAILS and today's frames |
 | `WorkspaceLook.tabs` | CLASSIC when `editor_tabs = "classic"` | EQUAL |
 | `WorkspaceLook.status` | RULED when `status_bar = "cells"` | SLASH |
-| `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and CORNER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
+| `WorkspaceLook.icons` | CLASSIC when `icons = "classic"` | NEW_UI |
+| `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and UPPER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
 | `ShellLook.unifiedTitle` | true only when `title_bar = "unified"` and `MacTitleBar.isSupported()` | false |
 | `ShellLook.windowMenus` | true when `menu_bar = "window"` | as committed |
 | `ShellLook.followThemeAppearance` | true when `title_bar = "native"` | true |
@@ -1228,15 +1229,14 @@ The classic header honours `window.toolbar`. `icons` (Enterprise's default, 5.8)
 are their labels, Split marking its menu with a small ▼ in its corner. `icons_and_labels` gives each button's icon, then
 its label (Split ending in ▾). `hidden` gives no row, so the Session view and Search everywhere go with it, and the Run
 window stays reachable by ⇧⌘P and "▶ Run…". The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic
-icons under Enterprise. `window.toolbar_height` is the classic
-toolbar row's height.
+icons under Enterprise. `window.toolbar_height` is the classic toolbar row's height.
 
 **`ToolbarItem.View` admission and lifetime:**
 
-- the root is an INLINE Stack of LABEL Text, Choice (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY Button, icon-only GHOST
-  Buttons (8.6), MenuButton and Separator; anything else is refused with a message naming the node, when a window mounts the view
-  (contained and logged against the plugin; the view closes and that window shows none) and on every update (an
-  `IllegalArgumentException` to the caller), since `Toolbar.add` receives only the factory;
+- the root is an INLINE Stack of LABEL Text, Choice (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY Button,
+  icon-only GHOST Buttons (8.6), MenuButton and Separator; anything else is refused with a message naming the node, when
+  a window mounts the view (contained and logged against the plugin; the view closes and that window shows none) and on
+  every update (an `IllegalArgumentException` to the caller), since `Toolbar.add` receives only the factory;
 - the factory runs when a window's open event fires, once per window, never for the rehearsal or a pre-built window
   until it is shown; the view closes with its window or its registration;
 - a view never goes into the overflow menu: it hides while the toolbar is too narrow for it;
@@ -1284,14 +1284,14 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   pills for badges that carry a number. It is 24 px plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop
   resolution gain horizontal group rectangles, as `Rectangle` math; the six slots are unchanged.
 - **Frames.** `FrameStyle`: arc 0, gutter 0, a painted `DOCK_RULE` with a `DOCK_RULE_HIT` drag area, a header strip of
-  `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A frame is
-  also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that takes
-  no focus) and when the user opens it from its stripe or its View toggle action; both move the keyboard into it (its
-  first control that takes keys, else the frame), as IntelliJ activates a tool window. A press in the terminal column
-  hands the tint back; dragging a divider keeps it, and a plugin's own toggle opens a frame without activating it. A
-  header detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive it as a host
-  flag. Its arc and gutter are the window's kit metrics `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0 in the
-  classic catalog), which replace the static finals at `ToolWindowArea.java:53,55` (6.6).
+  `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A frame
+  is also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that
+  takes no focus) and when the user opens it from its stripe or its View toggle action; both move the keyboard into it
+  (its first control that takes keys, else the frame), as IntelliJ activates a tool window. A press in the terminal
+  column hands the tint back; dragging a divider keeps it, and a plugin's own toggle opens a frame without activating
+  it. A header detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive
+  it as a host flag. Its arc and gutter are the window's kit metrics `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0
+  in the classic catalog), which replace the static finals at `ToolWindowArea.java:53,55` (6.6).
 - **Layout per look.** The default look keeps today's ui-state keys unchanged. A non-default look saves its dock under
   its provider id, so a first Enterprise start gets Enterprise's default anchors and a return to the default look finds
   the old layout:
@@ -1810,7 +1810,7 @@ Smallest edits:
   faces, derived roles and guards.
 - `docs/app-architecture.md`: the `presentation` package, projections and chrome strategies.
 - `docs/themes.md`: plugin themes, the override keys, reserved ids.
-- `docs/configuration.md` and `config.example.toml`: "The default depends on the active look." for the four keys; the
+- `docs/configuration.md` and `config.example.toml`: "The default depends on the active look." for the five keys; the
   meaning of `"system"` and of an unset `ui.font.size`.
 - `docs/command-palette.md`: the Run window.
 - `docs/remote.md`, `docs/file-server.md`, `docs/credential-vault.md`: the menus and status text.
@@ -1834,7 +1834,7 @@ the product name anywhere but the splash; a new packaged application icon.
 
 Twelve plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
 and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 11 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+`migration.csv` rows. Order: 1 to 12 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
 
 Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
 `KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
