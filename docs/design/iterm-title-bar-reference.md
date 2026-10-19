@@ -44,7 +44,7 @@ The user's running tmux server used its default title format:
 `#S:#I:#W - "#T" #{session_alerts}`. That wrapper appeared in both Jasper and iTerm;
 it was not an escape-sequence decoding bug. With explicit user authorization,
 `~/.tmux.conf` now uses the compact forwarding format documented in
-[configuration](../configuration.md#automatic-tab-and-notification-titles).
+[the terminal guide](../terminal.md#titles).
 `set-titles on` was already enabled. Only `set-titles-string` was changed on the
 running server; the full configuration and plugins were not reloaded. Backup:
 `~/.tmux.conf.jasper-backup-20260917-145844`. The live shell title evaluated to `~`,

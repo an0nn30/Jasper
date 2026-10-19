@@ -1,83 +1,158 @@
 # Writing a Jasper plugin
 
-This guide covers what the SDK offers today (0.5): lifecycle, configuration, events,
-activities, services, actions and their placements, panels, the rail, application-built
-windows and dialogs, and terminals: finding panes, following terminal events, typing into a
-pane, opening tabs, and providing a pane's session, such as a remote connection. The contract is in the
-[design](superpowers/specs/2026-09-21-jasper-plugin-sdk-design.md); the runtime is described
-in the [SDK architecture](sdk-architecture.md).
+Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
+Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.0, task by task.
 
-## Layout
+- The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
+  exported APIs.
+- [Building plugin UI](plugin-ui.md) covers views, compositions, the node vocabulary, icons and colours.
+- [Plugin APIs](plugin-apis.md) describes the packages bundled plugins export to other plugins.
+- [SDK architecture](sdk-architecture.md) explains how the runtime discovers, loads, contains and stops plugins.
+- [Plugins](plugins.md) is the user's side: installing, reviewing, enabling and removing plugins.
 
-A plugin is a directory of jars named after its id. Exactly one jar has `plugin.toml` at its root:
+"Jasper home" below is the folder that holds `config.toml` ([configuration](configuration.md)).
+
+## A plugin project
+
+A plugin is a folder of jars. Exactly one jar holds `plugin.toml`, the manifest, at its root; the other jars are
+libraries the plugin bundles. A typical project:
+
+```text
+tool/
+  build.gradle.kts
+  src/main/java/dev/example/tool/ToolPlugin.java       the entry class
+  src/main/resources/plugin.toml                       the manifest
+  src/main/resources/settings.toml                     optional: the settings file's first contents
+  src/main/resources/icons/tool.svg                    optional: the icon the manifest names
+  src/test/java/dev/example/tool/ToolPluginTest.java
+```
+
+- Compile against `jasper-sdk` as `compileOnly`: Jasper supplies the SDK at run time, and a jar that holds classes in
+  `dev.jasper.sdk` is refused. Put the SDK and `jasper-sdk-testkit` on the test classpath.
+- A library the plugin uses is an `implementation` dependency whose jar ships beside the plugin's own. Snippets bundles
+  tomlj this way, Remote Apache MINA sshd, Credential Vault BouncyCastle and the Editor RSyntaxTextArea.
+- A `settings.toml` at the root of one of the plugin's jars (at most 1 MiB) becomes the plugin's settings file,
+  `<Jasper home>/plugins/<id>/<id>.toml`, the first time Jasper finds the plugin and that file does not exist. Ship your
+  keys in it, commented, with their meaning; without one, the file starts as a single comment line. Jasper creates the
+  file only when it is missing.
+
+### What a plugin can see
+
+Each plugin has its own class loader. It sees its own jars, the [Java runtime's modules](#the-java-runtime), the SDK
+(`dev.jasper.sdk.*`, from the application) and the exported packages of the plugins it names under `requires` that
+loaded. The application's classes and libraries are not visible: `dev.jasper.app`, `dev.jasper.terminal` and
+`dev.jasper.buddy` are refused by name. This is hygiene, not a sandbox: a plugin runs with everything the user's account
+can reach.
+
+Before a plugin's first class loads, Jasper reads every class in its jars and refuses the plugin ("*name* could not be
+loaded") when one:
+
+- is in a reserved package: `dev.jasper.sdk`, `dev.jasper.app`, `dev.jasper.terminal`, `dev.jasper.buddy`, `java`,
+  `javax`, `jdk`, or a subpackage of one;
+- is in a package that a loaded dependency exports;
+- is larger than 16 MiB;
+- references an SDK type, member or enum constant this SDK no longer has: "*class* references removed SDK *kind*
+  *name*; rebuild it for SDK *version*", *version* being the SDK that removed it.
+
+## The manifest
+
+`plugin.toml` is TOML, at most 64 KiB, at the root of exactly one of the plugin's jars. Keys at the top, tables last:
 
 ```toml
-id = "dev.example.tool"            # [a-z][a-z0-9_.-]{0,127}; "jasper" and "jasper." are reserved
+id = "dev.example.tool"
 name = "Tool"
 version = "1.0.0"
 entry = "dev.example.tool.ToolPlugin"
 sdk = ">=0.18.0, <0.19"
-capabilities = []                  # terminal.observe, terminal.selection, terminal.inject, terminal.open, session.provide, palette.contribute, files.source, network.listen, clipboard.read, terminal.environment, editor.provide, presentation.provide
-exports = []                       # packages other plugins may use
-icon = "icons/tool.svg"            # optional, SDK 0.9.3: an SVG or PNG in your jars, up to 256 KiB, shown in Settings › Plugins
-homepage = "https://example.dev/tool"  # optional, SDK 0.9.3: an http or https link on your plugin's page
-presentation = "presentation/look.kit.toml"  # optional, SDK 0.18.0: a kit file in your jars; needs presentation.provide
-themes = ["themes/look.json"]      # optional, SDK 0.18.0: Jasper theme files in your jars, offered in Settings › Appearance
-enabled_by_default = true          # optional, SDK 0.18.0: false keeps a bundled plugin off until the user turns it on
+description = "Runs the tool from the command palette."
+vendor = "Example"
+homepage = "https://example.dev/tool"
+icon = "icons/tool.svg"
+icon_hue = "blue"
+icon_selected_ink = "foreground"
+capabilities = ["palette.contribute", "terminal.inject"]
+exports = ["dev.example.tool.api"]
 
 [[requires]]
-id = "dev.example.other"
-version = ">=1.0"
-optional = false
+id = "dev.jasper.vault"
+version = ">=0.2"
+optional = true
 
-[[subcommands]]                    # optional, SDK 0.17.0: `jasper tool ...` reaches this plugin
+[[subcommands]]
 name = "tool"
 summary = "Run the tool"
 ```
 
-`icon` and `homepage` need Jasper 0.9.3 or later; an older Jasper rejects a
-manifest with keys it does not know. An icon that is missing, too large or not an SVG or PNG, and a homepage that is
-not an `http` or `https` address, are ignored: the plugin still loads, with the default icon and no link.
+| Key | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `id` | string | yes | `[a-z][a-z0-9_.-]{0,127}`; `jasper` and ids starting `jasper.` are reserved. It names the plugin's folder and settings file, and every id the plugin registers starts with it and a dot. |
+| `name` | string | yes | Must show something: not only spaces, zero-width or bidi characters. It titles the plugin's row, Settings page and notification groups. |
+| `version` | string | yes | One to three numbers separated by dots, without leading zeros or a pre-release tag; missing numbers are 0, so `1.0` is `1.0.0`. |
+| `entry` | string | yes | The qualified name of the [entry class](#the-entry-point-and-lifecycle), which must be in a package. |
+| `sdk` | string | yes | The SDK versions the plugin runs on: comparators `>=`, `>`, `<=`, `<` or `=` with a version, separated by commas, all of which must hold. A plugin for SDK 0.18.0 declares `sdk = ">=0.18.0, <0.19"`. |
+| `description` | string | no | The Overview on the plugin's details in Settings › Plugins; searched there. |
+| `vendor` | string | no | Shown in the plugin list, its details and its review sheet. |
+| `homepage` | string | no | An absolute `http` or `https` address, linked as "Plugin homepage ↗" on the plugin's details. Anything else is ignored with a warning in the log. |
+| `icon` | string | no | A jar path to an `.svg` or `.png` of at most 256 KiB: the plugin's identity art in Settings › Plugins and beside its notification groups in Settings › Appearance & Behavior › Notifications. Another file type is ignored with a warning; a missing, empty or larger file shows the default icon. |
+| `icon_hue` | string | no | The tile behind the icon: `neutral` (the default), `blue`, `green`, `amber` or `purple`. Palette scopes that set no hue take it too. Another string uses `neutral`, with a warning. |
+| `icon_selected_ink` | string | no | `authored` (the default) keeps the icon's own colours on a selected row; `foreground` draws its silhouette in the selected row's text colour. Another string uses `authored`, with a warning. |
+| `capabilities` | array of strings | no | The [capabilities](#capabilities-and-consent) the plugin uses. |
+| `exports` | array of strings | no | Packages other plugins may compile against and load from this plugin ([services](#services-and-other-plugins-apis)). Each is an exact package: its subpackages are not exported. A reserved package is an error. |
+| `requires` | array of tables | no | Plugins this one uses ([below](#requires)). |
+| `subcommands` | array of tables | no | `jasper` commands the plugin answers ([below](#subcommands)). |
+| `enabled_by_default` | boolean | no | `false` keeps a bundled plugin off until the user turns it on; the default is `true`. A development or installed copy ignores it. |
+| `presentation` | string | no | A jar path to the plugin's kit file, which makes the plugin a [look](#looks-and-themes). It needs the `presentation.provide` capability, and the capability needs the key. |
+| `themes` | array of strings | no | Jar paths to [Jasper theme files](#looks-and-themes), each named `<theme id>.json` with an id of lowercase letters, digits and dashes; an id may appear once. |
 
-A presentation provider names its kit file with `presentation` and declares `presentation.provide`; the file's format is
-section 5 of the [Enterprise presentation design](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md).
-Jasper reads it before the first window, so a change applies after a restart, and one look is active at a time: a
-`--plugin-dir` provider wins over a bundled one, which wins over an installed one, then the lowest id. A kit file that is
-invalid skips the plugin with one message naming the key, a look that did not finish starting is skipped at the next
-start until the user tries again, and `--safe-mode` uses the standard look. `enabled_by_default = false` keeps a bundled
-plugin off until the user turns it on in Settings › Plugins; development and installed plugins ignore it.
+Jar paths in `presentation` and `themes` are `/`-separated segments of lowercase letters, digits, `_`, `.` and `-`,
+with no `.` or `..` segment and no leading or trailing `/`.
 
-`[branding]` (optional) brands the look's start-up and windows: `product` is the name its splash shows (1 to 32
-characters), `icons` a folder in the kit's folder holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`,
-`icon-128.png`, `icon-256.png` and `icon-1024.png` (each a PNG of that size, at most 512 KiB), and `splash_art` a
-718 × 250 SVG of at most 256 KiB that follows the plugin artwork rules (no scripts, animation or outside resources).
-All three keys are required. A look with it replaces Jasper's icon in its windows and on the taskbar and Dock, and
-shows a splash on a start that opens a window; a look without it keeps Jasper's icon and shows none.
+A manifest that breaks a rule is not loaded. Jasper posts "A plugin could not be read" in the Plugin problems
+notifications, naming the folder and the problem, for example `Unknown key: colour`, `Missing required key: entry`,
+`name must be a string`, `capabilities names an unknown capability: terminal.read`,
+`requires names the plugin itself: dev.example.tool`, `more than one jar has a plugin.toml` or
+`plugin.toml is not valid TOML: …`. Any key the table does not list is an error. In the Jasper home's `plugins/`
+folder, a plugin's folder must be named after its id ("directory *x* holds plugin *y*; rename it to the plugin id").
 
-`themes` lists [Jasper theme files](themes.md#the-jasper-theme-format) in your jars; a file's name is its theme's id
-(`themes/look.json` is `look`). While the plugin is enabled, its themes are listed in Settings › Appearance after the
-built-in ones, captioned "From the <name> plugin", and cannot be removed or replaced there; while it is off, a setting
-that names one uses Slate Cobalt without a warning and keeps the name. A built-in id is ignored with a configuration
-warning, and when two plugins ship the same id the development copy wins, then the bundled one, then the installed one,
-then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
+A plugin whose `sdk` range excludes this Jasper's SDK is skipped and reported as "*name* was not started": "needs SDK
+*range*; this is SDK 0.18.0".
 
-The bundled Enterprise plugin (`plugins/enterprise`, off by default) is a worked presentation provider: its look is the
-kit file, IBM Plex fonts and theme its descriptor names, and its code only publishes
-`dev.jasper.enterprise.api.Workstation` while the Enterprise look is active. A plugin that composes a classic layout
-declares `requires = [{ id = "dev.jasper.enterprise", version = ">=0.1", optional = true }]`, compiles against that
-package and checks `context.services().find(Workstation.class)` in `start`, wrapped in
-`try { … } catch (NoClassDefFoundError absent) { … }` with the default layout in the catch, as Remote does for `VaultApi`:
-the package is visible only while Enterprise is loaded. An in-repo plugin names `dev.jasper.enterprise.api` only in its
-own `workstation` package, which `verifyPluginArchitecture` checks.
+### requires
 
-A `settings.toml` beside `plugin.toml` is optional: Jasper copies it in as the plugin's settings
-file, `plugins/<id>/<id>.toml`, the first time the plugin loads, so ship your keys commented with
-their meaning; declare each key with `context.settings()` (see "Declared settings" below), and `settings().file()` names the file.
-Compile against `jasper-sdk` as `compileOnly`; ship any other library as a jar in the same
-directory. A plugin cannot see the application's classes or libraries, and may not define
-classes in `dev.jasper.*` platform packages or in a package a dependency exports.
+| Key | Type | Rules |
+| --- | --- | --- |
+| `id` | string | Required. A valid plugin id, not the plugin's own, at most once per manifest. |
+| `version` | string | A range, as for `sdk`. Empty or absent admits any version. |
+| `optional` | boolean | `false` unless set. |
 
-## Entry point
+Bundled manifests write the same tables inline:
+`requires = [{ id = "dev.jasper.vault", version = ">=0.2", optional = true }]`.
+
+- A hard requirement (not optional) must be present and in range, or the plugin is skipped: "requires *id*, which is
+  not available", "requires *id* *range*; found *version*". If the provider fails to start or is skipped, so is the
+  plugin ("requires *id*, which failed to start").
+- An optional requirement never stops the plugin. Jasper does not check its version: a provider outside the range still
+  loads and still serves this plugin.
+- Every requirement, hard or optional, makes the provider's exports visible to this plugin, offers it the provider's
+  services and starts the provider first. Otherwise plugins start in id order, each after the plugins it requires. A
+  cycle skips every plugin in it ("dependency cycle").
+
+### subcommands
+
+| Key | Type | Rules |
+| --- | --- | --- |
+| `name` | string | Required. `[a-z][a-z0-9-]*`, not `help` or `version`, at most once per manifest. The user runs `jasper <name>`. |
+| `summary` | string | Required. One visible line without tabs, which `jasper --help` lists. |
+
+## The entry point and lifecycle
+
+The entry class is public, has a public no-argument constructor and implements
+[`Plugin`](sdk-reference.html#dev.jasper.sdk.plugin.Plugin); otherwise loading fails with "Cannot create entry class
+*class*: …" or "*class* does not implement Plugin". The Sample plugin (`plugins/sample`, bundled) is the source of this
+guide's examples. Apart from its Settings page it shows nothing until its `demo_*` settings (`demo_activity`,
+`demo_ui`, `demo_terminal`, `demo_session`, `demo_scope`) are turned on in Settings › Tools › Sample; they take effect
+at the next start. Its `start`:
 
 <!-- example:plugin -->
 ```java
@@ -97,17 +172,89 @@ classes in `dev.jasper.*` platform packages or in a package a dependency exports
 }
 ```
 
-`start` and `stop` run on the Swing event dispatch thread and must return promptly. If
-`start` throws, everything the context handed out is rolled back and the context is closed.
-`stop` must not block: a blocked event thread cannot be abandoned, and the application's exit
-deadline will end the process.
+- Jasper reads every plugin once, at launch, before the first window, and starts them in dependency order. Nothing
+  loads or unloads while it runs: enabling, disabling, installing, updating and removing a plugin take effect at the
+  next start.
+- `start(context)` and `stop()` run on the UI thread (the Swing event dispatch thread) and must return promptly; slow
+  work goes to `context.background()`. A callback that holds the UI thread for more than 100 ms is logged as a "Slow
+  plugin callback on the UI thread".
+- Register everything in `start`: services, settings and the settings page can be declared only there.
+- When `start` throws, Jasper closes everything the context handed out, discards the services the plugin published,
+  interrupts its background tasks and marks it failed: "*name* failed to start" in Plugin problems, with **Disable
+  Plugin** and **Show more…**, which opens the Errors window at the stack trace.
+- `stop()` is called once at shutdown, for a plugin that started, in reverse start order, before Jasper closes what the
+  plugin left open. It must not block: a blocked UI thread cannot be abandoned, and the process ends at the exit
+  deadline, four seconds after the quit. Background tasks get 1.5 seconds to finish, then are interrupted.
+- After a failed start, and after shutdown, the context is closed: contributing calls throw `IllegalStateException`,
+  `background()` rejects tasks and `log()` keeps working.
+
+### The context
+
+[`PluginContext`](sdk-reference.html#dev.jasper.sdk.plugin.PluginContext) is the plugin's view of Jasper; each plugin
+has its own, so every registration is attributed to it.
+
+| Method | Gives |
+| --- | --- |
+| `plugin()` | The plugin's [`PluginInfo`](sdk-reference.html#dev.jasper.sdk.PluginInfo): id, name, version and its granted capabilities. |
+| `log()` | A `System.Logger` named `dev.jasper.plugins.<id>`, written to Jasper's application log. |
+| `dataDirectory()` | `<Jasper home>/plugins/<id>/data/`, created when missing: the plugin's own files. |
+| `settings()` | [Declared settings](#declared-settings) and the plugin's Settings page. |
+| `background()` | An executor for slow work. Each task runs on its own virtual thread, so tasks can run at the same time; a task that throws is logged as a plugin failure. |
+| `events()` | The [event bus](#events). |
+| `activities()` | [Activities and connections](#activities-and-connections), shown on Buddy. |
+| `services()` | [Services](#services-and-other-plugins-apis) between plugins. |
+| `actions()`, `menus()`, `toolbar()`, `statusBar()`, `rail()` | [Commands and their places](#actions-and-where-they-appear). |
+| `panels()` | [Tool windows](#tool-windows). |
+| `windows()` | [Windows, dialogs, overlays and popovers](#windows-dialogs-overlays-and-popovers), [content tabs](#content-tabs) and file pickers. |
+| `kit()` | The factory for every view a plugin shows ([Building plugin UI](plugin-ui.md)). |
+| `appearance()` | Theme colours for [custom content](plugin-ui.md#custom-content). |
+| `terminals()` | [Terminal windows, tabs and panes](#terminals), [provided sessions](#providing-a-session) and [shell variables](#shell-variables-and-program-tabs). |
+| `palette()` | [Command palette scopes](#palette-scopes). |
+| `fileSources()` | [Places in Jasper's file chooser](#file-sources). |
+| `notifications()` | [Notification groups](#notifications). |
+| `commandLine()` | [`jasper` subcommands](#command-line-subcommands). |
+| `platform()` | [Opening files and web addresses](#opening-files-and-web-addresses), [the clipboard](#the-clipboard) and [the file editor role](#the-file-editor-role). |
+
+## Capabilities and consent
+
+Capabilities cover effects the user cannot see, and the roles one plugin at a time takes over. Contributions to the
+window (actions, menus, tool windows, windows, notifications, settings) need none. The constants are in
+[`Capabilities`](sdk-reference.html#dev.jasper.sdk.Capabilities); `Capabilities.ALL` lists them.
+
+| Capability | Lets the plugin | The review sheet says |
+| --- | --- | --- |
+| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to any `jasper.terminal.*` topic | See your terminals: titles, folders, the commands you run and how they end |
+| `terminal.selection` | read `PaneHandle.selection()` | Read the text you select in a terminal |
+| `terminal.inject` | call `PaneHandle.sendText`, `sendBytes` and `paste` | Type into your terminals |
+| `terminal.open` | open tabs and splits with a local request (the shell, a profile or a program), and read `Terminals.profiles()` and `onProfilesChanged` | Open terminal tabs, splits and windows, and run programs in them |
+| `session.provide` | open tabs and splits with `OpenRequest.session(...)` | Run its own terminal sessions, such as remote connections |
+| `palette.contribute` | call `Palette.register` and `Palette.open` | Add scopes to the command palette and open it |
+| `files.source` | call `FileSources.register` | Add places, such as saved hosts, to the file chooser |
+| `network.listen` | nothing is gated: declare it when the plugin accepts connections from other programs or computers | Accept connections from other programs or computers, such as serving files |
+| `clipboard.read` | call `Platform.clipboardText()` | Read text you copied to the clipboard |
+| `terminal.environment` | call `Terminals.environment` | Set environment variables in new terminal shells |
+| `editor.provide` | call `Platform.editor` | Open the files Jasper opens for editing |
+| `presentation.provide` | nothing at run time: it goes with the manifest's `presentation` key | Change Jasper's window chrome and controls after a restart |
+
+- The declared capabilities are the granted ones. An installed plugin loads only after the user allows everything it
+  declares on its review sheet ("Needs review" until then); bundled and `--plugin-dir` plugins need no review. A new
+  version that declares a capability the user has not allowed waits for a new review; one that declares the same or
+  fewer keeps its consent. [Plugins](plugins.md) shows the user's side.
+- A gated call without its capability throws
+  [`MissingCapabilityException`](sdk-reference.html#dev.jasper.sdk.MissingCapabilityException): "Plugin *id* needs
+  the capability *capability*; declare it in plugin.toml". A plugin that can work without one checks
+  `context.plugin().capabilities()` first, as the Sample does below.
+- Jasper writes gated uses to the logger `dev.jasper.app.plugins.audit` in the application log, with amounts and never
+  content: each injection (in bytes), each selection and clipboard read (in characters), each tab or split opened (with
+  the program's file name), the shell-variable and editor registrations, and the first palette use, file-source
+  registration and terminal-event subscription.
 
 ## Actions and where they appear
 
-Anything clickable is an action. Register it once and it is a command in every window's
-palette, may have a shortcut, and can be placed in the toolbar, the menu bar, the terminal's
-right-click menu and the status bar. Jasper draws all of it, so contributed chrome looks like
-built-in chrome; a plugin supplies titles, icons and handlers, never components.
+Anything clickable is an action. Register it once and it is a command in every window's command palette and a row in
+Settings › Keymap under the plugin's name; place it in the toolbar, the menus, the terminal's right-click menu, the
+status bar or the rail. Jasper draws all of it, so contributed chrome looks built in: a plugin supplies titles, icons
+and handlers, never components.
 
 <!-- example:pluginui -->
 ```java
@@ -140,88 +287,122 @@ private static void installUi(PluginContext context, long stepMillis) {
 }
 ```
 
-- **Ids** of actions, top-level menus and status items start with your plugin id and a dot.
-- **Shortcuts.** `withDefaultBinding` uses the `[keybindings]` syntax. The user's configuration
-  wins, then Jasper's own shortcuts, then plugin defaults in load order; a default that loses is
-  dropped and logged. Users rebind an action under `[keybindings]` with its quoted id. Outside macOS,
-  `cmd` means Ctrl+Shift and a default naming cmd and shift also gets alt; give a different Linux and
-  Windows key with `withDefaultBindings("cmd+s", "ctrl+s")`. `withContext(ShortcutContext.terminal())`,
-  `content()`, `panel(id)` or `window(id)` limits where the key applies (SDK 0.11.0): the most specific
-  context around focus wins, so a panel action may reuse a Global key, and a key whose action does not
-  apply reaches the focused component. A `window(id)` shortcut takes effect once plugin windows get the
-  Keymap (plan K4).
-- **Placements** may name only actions your plugin registered. Closing an action removes it from
-  everywhere it was placed.
-- **Menus** are mutable: `clear()` and `add(...)` rebuild a host list at any time.
-- **The Tools menu** (SDK 0.16.1) is the home for utility commands: `context.menus().standard(StandardMenu.TOOLS).add(id)`.
-  Jasper has no tools of its own, so the menu shows only while some plugin has entries in it; in the default look's menu
-  bar it comes after Tab, Session and Transfer and before plugins' own top-level menus. The Enterprise look's classic
-  menu bar is File, Edit, View, Session, Transfer, plugins' menus, Tools, Window, Help.
-- **The Session and Transfer menus** (SDK 0.18) hold commands for hosts and sessions and for moving files:
-  `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab in
-  the default look.
-- **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group
-  of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your
-  registration. The factory also runs inside `toolbar().add(...)` for every window already open, so finish
-  initialising what it reads before you add the view; a factory that throws is not asked again for that window. Its
-  root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one PRIMARY `Button`,
-  `MenuButton`s and `Separator`s. When a window mounts the view the host refuses any other tree by logging it, naming
-  the node, and closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the
-  node. A view never moves into the overflow menu: it hides while the toolbar is too narrow.
-- **Status items** are global: one handle updates the item in every window.
-- **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
-  Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
-  The host validates names and resolves the mounted theme on each paint. See [icons](sdk-icons.md).
-- **Threads.** Register and mutate on the event thread. Event handlers already run there, so
-  updating a status item from a handler, as the sample does, needs no marshaling.
+- **Ids.** Every id a plugin registers (actions, top-level menus, status items, tool windows, windows, palette scopes,
+  file sources, notification groups, topics) starts with the plugin id and a dot; a duplicate is refused. Action,
+  status item, tool window, window, scope and notification group ids match `[a-z][a-z0-9_-]*(\.[a-z0-9_-]+)+`, in at
+  most 128 characters (120 for a tool window, 160 for a group).
+- **The handle.** `register` returns a [`PluginAction`](sdk-reference.html#dev.jasper.sdk.ui.PluginAction):
+  `setEnabled` and `setTitle` change it everywhere it is placed, and `close()` removes it and every placement.
+- **The handler** gets an [`ActionContext`](sdk-reference.html#dev.jasper.sdk.ui.ActionContext): `window()`, the
+  window it was invoked in, and `pane()`, the pane under a terminal's right-click menu, or else the focused pane.
+- **Placements** name only actions the plugin registered.
+- **Threads.** Register and change contributions on the UI thread. Event handlers already run there, so updating a
+  status item from one, as the Sample does, needs no hand-over.
 
-## Consistent buttons, flexible layouts
+### Shortcuts
 
-Build standard UI with `Nodes` descriptors and `context.kit().create(ViewSpec, handler)`.
-Use semantic layout, typography, hue and control roles; the host owns geometry, painting,
-keyboard routing and theme refresh. Update a retained view with stable IDs to preserve input,
-selection and focus. `UiView.selectAll(fieldId)` selects live field text without editing or focusing.
-A form's primary and cancel actions own Enter and Escape through its descriptors.
+- `withDefaultBinding("cmd+alt+j")` gives a default in the `[keybindings]` syntax ([configuration](configuration.md)).
+  On Linux and Windows `cmd` means Ctrl+Shift, and a default that names cmd and shift also gets Alt: `cmd+shift+x` is
+  Ctrl+Alt+Shift+X there. `withDefaultBindings("cmd+s", "ctrl+s")` gives Linux and Windows a default of their own,
+  `none` for none.
+- The user's binding wins, then Jasper's own shortcuts, then plugin defaults in load order. A default that collides or
+  is not valid is dropped and logged in the application log: "Default shortcut '*key*' is already used by '*id*'; bind
+  the action under [keybindings] to give it one." Users bind an action under `[keybindings]` with its quoted id, or in Settings ›
+  Keymap; a binding for an action no plugin registered is reported as "Unknown action; ignored."
+- `withContext(...)` limits where the key applies, with a
+  [`ShortcutContext`](sdk-reference.html#dev.jasper.sdk.ui.ShortcutContext): `global()` (the default) anywhere in a
+  terminal window, `terminal()` in a terminal pane and its find bar, `content()` in the plugin's content tabs,
+  `panel(id)` inside one of its tool windows. The most specific context around the focus wins, so a tool window's
+  action may reuse a global key. A key whose action does not apply where the focus is reaches the focused component;
+  so does a key whose action is disabled, except in a terminal pane, where it does nothing. `window(id)` applies
+  nowhere: only Jasper's main windows dispatch plugin shortcuts.
 
-Only specialized document or preview content uses `CustomContent`: register its component and
-lifetime on its owned view. Ordinary controls must remain descriptors.
+### Menus
 
-[Building plugin UI](plugin-ui.md) walks through the compositions (grouped dialogs, docked panels, empty
-states, settings pages), icons, colors for specialized content and testing, with compiled examples.
+- `menus().standard(StandardMenu.TOOLS)` is a section at the end of a built-in menu, after a separator when the menu
+  already has items;
+  `menus().create(id, title)` is a top-level menu of the plugin's own; `menus().terminalContext()` is a section at the
+  end of every terminal pane's right-click menu.
+- A [`PluginMenu`](sdk-reference.html#dev.jasper.sdk.ui.PluginMenu) takes `add(actionId)`, `addSeparator()`,
+  `submenu(title)` and `clear()`. Each change replaces the section whole, so windows never show half of it.
 
-## Panels, the rail and windows
+| `StandardMenu` | For |
+| --- | --- |
+| `FILE`, `EDIT`, `VIEW`, `PANE`, `TAB` | Commands that belong with Jasper's own in those menus. |
+| `TOOLS` | Utility commands. |
+| `SESSION` | Connecting to hosts and working with sessions. |
+| `TRANSFER` | Moving files: file browsers, transfers and file servers. |
 
-A panel is an owned `UiView` docked as a tool window in every terminal window, as in IntelliJ:
-stripes of icons on the window's left and right edges, and six slots. The left and right sides each
-have an upper and a lower half; the bottom area, the window's full width under the sides, has a left
-and a right half. `Anchor` picks the side and `PanelSpec.withSplit()` (SDK 0.13.0) the second half;
-SFTP, for example, opens under Sessions. Register a panel once; Jasper asks your factory for one
-instance per window, the first time the panel is shown there, and gives the panel a stripe icon, a
-header (its title, an options menu and a hide button), a `<panel id>.toggle` action and a
-View › Tool Windows entry, so don't add a View menu item of your own that toggles it, and don't repeat the
-panel's title inside it. If you already have
-an action that toggles the panel, for example to give it a shortcut, register it first and name it
-with `PanelSpec.withToggleActionId(id)` (SDK 0.8.1): Tool Windows and the palette then list your action,
-with its shortcut, and Jasper registers no `<panel id>.toggle`. One panel shows per slot; the user
-can drag a panel by its stripe icon or its header to another slot or another place on a stripe, or
-use the Move to menu on either, and Jasper remembers its slot, its place on the stripe and the side's
-size. A drop on a stripe keeps the panel shown or hidden as it was; a drop on the workspace shows it.
-Your `PanelHost.onVisibility` hears a drop only when it shows your hidden panel, or when it hides
-your panel to make room in the target slot; a drop that leaves your panel shown or hidden as it was
-tells it nothing.
+Tools, Session and Transfer have no items of Jasper's own, so each shows only while a plugin has entries in it. The
+default look's menu bar is File, Edit, View, Pane, Tab, Session, Transfer, Tools, then the top-level menus: the
+plugins', then Help. The Enterprise look's is File, Edit, View, Session, Transfer, the plugins' menus, Tools, Window and
+Help, with the Pane and Tab items and the tool window toggles in Window.
 
-Since SDK 0.14.2, call `host.setHeader(new PanelHeader(detail, active, actions))` inside the panel
-factory or when its model changes. `detail` is a count or connection name; `active` adds a status dot.
-Each `PanelHeader.Action(label, icon, callback)` is an icon-only header button with an accessible name
-and tooltip. Keep callbacks scoped to that factory's window. Header state survives hiding and moving
-the panel, and callbacks become inert when the instance closes. It works the same for a kit `Panel` view
-registered with `register`: the detail, dot and actions join that panel's own header row. Use `PanelHeader.EMPTY` to clear it;
-do not add a duplicate action row inside the panel. Declare `sdk = ">=0.18.0, <0.19"` when using it.
+### The toolbar
 
-A rail button, on the left stripe after the panel icons, runs one of your actions. A plugin window
-is a frame Jasper builds: icon, macOS title bar, menu bar, theme tracking and remembered bounds are
-its job; the content is yours. Dialogs belong to a terminal window or to one of your windows, so
-they are parented correctly without your plugin ever seeing a frame.
+- `toolbar().add(ToolbarItem.action(id))` is a button with the action's title and icon;
+  `ToolbarItem.menu(icon, title, actionIds)` is a button that opens a menu of the plugin's actions. In the default look
+  plugin items sit after Jasper's Split and Zoom buttons and before Find and Settings, in the order they were added.
+  When the toolbar is too narrow, buttons move into its **More actions** menu.
+- `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group of the plugin's own controls in
+  the toolbar, one per window: the factory runs when a window opens, and for every window already open from inside
+  `toolbar().add(...)`, so finish setting up what it reads before adding the view. The view closes with its window or
+  the registration; a factory that throws is not asked again for that window. Its root is an INLINE `Stack` of LABEL
+  `Text`s, DROPDOWN, SEARCHABLE or PICKER `Choice`s, `MenuButton`s, `Separator`s and at most one `Button`, which is
+  PRIMARY. When a window mounts the view, Jasper refuses any other tree by logging it, naming the node, and closing the
+  view, and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view never moves into
+  the More actions menu: it hides while the toolbar is too narrow for it.
+
+### The status bar
+
+- `statusBar().add(new StatusItemSpec(id, Side.RIGHT, priority))` returns a
+  [`StatusItem`](sdk-reference.html#dev.jasper.sdk.ui.StatusItem). One handle drives the item in every window. LEFT
+  items sit after the shell and directory, RIGHT ones before the terminal size and the configuration state, in
+  ascending priority from left to right.
+- `setText` (line breaks become spaces; empty shows only the icon), `setIcon`, `setTooltip`, `setVisible` and
+  `setAction`: an item with an action is a button that runs one of the plugin's actions; without one it is plain text.
+- `statusBar().addProgress(spec)` returns a [`StatusProgress`](sdk-reference.html#dev.jasper.sdk.ui.StatusProgress)
+  that Jasper draws. Update it on the UI thread with one
+  [`StatusProgressState`](sdk-reference.html#dev.jasper.sdk.ui.StatusProgressState): text, detail, a spoken
+  description, a fraction (empty for indeterminate) and up to two of the plugin's actions. The secondary action shows
+  its title, such as Cancel; the primary one can open something richer, such as a transfers tool window. Throttle
+  updates from workers before posting them to the UI thread.
+
+### The rail
+
+`rail().add(actionId)` puts a button for one of the plugin's actions on the left stripe, after the tool window icons.
+Its tooltip is the action's title; give the action an icon, or the button shows a generic one. The Enterprise look's
+labelled stripes show the title.
+
+### Icons
+
+Icons are semantic names such as `"lock"`, `"server"` and `"file"`, validated when used: an unknown name throws
+`IllegalArgumentException("Unknown icon: …")`. A plugin registers glyphs of its own with
+`context.kit().registerIcon(new IconAsset("<plugin id>:<name>", path))`. [Plugin icons](sdk-icons.md) lists the
+built-in names and the artwork rules.
+
+## Tool windows
+
+A tool window is a view of the plugin's docked in every terminal window, as in IntelliJ. Register it once with
+`context.panels().register(new PanelSpec(id, title, icon, Anchor.LEFT), factory)`. Jasper asks the factory for one
+instance per window, on the UI thread, the first time the tool window is shown there; the factory returns a view made
+with the plugin's kit, and one that throws shows "This panel could not be loaded." Jasper adds:
+
+- a stripe icon, and a header with the title, an **Options** menu (**Move to** one of six places, **Hide**) and a
+  **Hide** button;
+- the action `<panel id>.toggle`, "Toggle *title*", with no default shortcut, listed in View › Tool Windows (the Window
+  menu under the Enterprise look) and the palette. To give the toggle a shortcut, register an action of your own that
+  calls `context.panels().toggle(id, invoked.window())`, register it before the tool window, and name it with
+  `PanelSpec.withToggleActionId(id)`: Tool Windows and the palette then list it, with its shortcut, and Jasper
+  registers no `<panel id>.toggle`.
+
+Do not add a View menu item that toggles the tool window, and do not repeat its title inside it.
+
+The left and right sides each have an upper and a lower half; the bottom area, the window's full width under the
+sides, has a left and a right half. [`Anchor`](sdk-reference.html#dev.jasper.sdk.ui.Anchor) picks the side and
+`PanelSpec.withSplit()` its second half: Remote's SFTP starts under Sessions. One tool window shows per place. The user
+can drag a tool window by its stripe icon or header to another place, or use Move to; Jasper remembers its place, its
+order on the stripe and the side's size, per look ([workspace](workspace.md)).
 
 <!-- example:pluginpanels -->
 ```java
@@ -270,211 +451,211 @@ private static void installPanelAndWindow(PluginContext context, long stepMillis
 }
 ```
 
-- Share your own model between panel instances; never share components.
-- `PanelHost.onClosed` tells an instance its window is gone. `onVisibility` tells it when it
-  is shown or hidden, which is the moment to start or stop refreshing.
-- `WindowSurface.onClosing` guards run when the user closes the window; returning false keeps
-  it open. Since SDK 0.8.4, quitting or restarting Jasper asks the guards of your open windows first, so a guard
-  can offer to save; a guard that returns false keeps Jasper running. `close()` closes at once.
-- `Windows.onQuitting` (SDK 0.11.0) registers a guard asked when Jasper quits or restarts, after plugin windows and
-  content tabs, even when your plugin has no window: a background server can ask "stop the running servers?".
-  Complete the future with false to keep Jasper running; a guard that throws or fails allows the quit. It is not asked
-  when a resident macOS Jasper only goes to the background (Cmd+Q closes the windows through their closing guards and
-  keeps the process), so a background server keeps running until Jasper really quits.
-- In SDK 0.8.4+, `window.onCloseCommand(() -> …)` lets your content handle File → Close Window and
-  Cmd/Ctrl+W, for example by closing a tab; return true when you handled it and false to let the
-  window close. The close button is not affected.
-- A modal dialog's `show()` returns after the dialog has closed.
-- In SDK 0.7.1+, call `window.chooseFile("Choose file", Optional.of(currentPath))` (or
-  `dialog.chooseFile`) from a Browse button on the UI thread. Pass `Optional.empty()` when there
-  is no initial path. The owner must already be shown. The native chooser returns an absolute
-  normalized `Path`, or empty on cancellation or owner closure. It does not read the file.
-  Keep the current text when the result is empty, and ignore results after your form closes.
-  Set your manifest's minimum SDK to `>=0.7.1` when using this method.
-- The application closes a plugin's panels, windows and dialogs when the plugin stops.
-- Jasper stays running while any plugin window is open, even with no terminal window.
+- Share your own model between instances; never share views or components.
+- [`PanelHost`](sdk-reference.html#dev.jasper.sdk.ui.PanelHost) is one instance's place in one window: `window()`,
+  `show()`, `hide()`, `visible()`, `onVisibility(...)`, the moment to start or stop refreshing, and `onClosed(...)`,
+  when the window closes or the tool window is removed. A drag reaches `onVisibility` only when it shows a hidden tool
+  window or hides one to make room in its new place.
+- `host.setHeader(new PanelHeader(detail, active, actions))`, from the factory or when the model changes, adds a detail
+  (a count, passed as digits, or a connection name), a status dot while `active`, and icon-only
+  [`PanelHeader.Action`](sdk-reference.html#dev.jasper.sdk.ui.PanelHeader.Action)s, each with a label for its tooltip
+  and accessible name, before Options and Hide. The header survives hiding and moving; callbacks stop when the
+  instance closes; `PanelHeader.EMPTY` clears it. A kit `Panel` view's own header row joins the tool window's header;
+  do not add a second action row inside the tool window.
+- `context.panels().toggle(id, window)` opens or hides one of the plugin's tool windows in a terminal window, creating
+  the instance the first time.
 
-## Terminals and capabilities
+## Windows, dialogs, overlays and popovers
 
-`context.terminals()` finds windows, tabs and panes; an action's context names the window and pane
-it was invoked on. Handles keep an id, never a Swing object, and two handles for the same pane are
-equal. Finding things needs no capability. What a handle may do does:
+The application builds every frame and dialog, so a plugin never sees one, and closes a plugin's tool windows, windows,
+dialogs, overlays and popovers when the plugin stops.
 
-| Capability | Lets your plugin |
-|---|---|
-| `terminal.observe` | read `PaneHandle.info()`, `foregroundJob()` and `TabHandle.title()`, and subscribe to `TerminalEvents` |
-| `terminal.selection` | read `PaneHandle.selection()` |
-| `terminal.inject` | `sendText`, `sendBytes`, `paste` |
-| `terminal.open` | `Terminals.openTab` and `split` with `OpenRequest.local()`, `localProfile(id)` or a program (`LocalSpec.running`, SDK 0.17.1), and `Terminals.profiles()` and `onProfilesChanged` |
-| `session.provide` | `Terminals.openTab` and `split` with `OpenRequest.session(...)` |
-| `files.source` | `FileSources.register`: add places, such as saved hosts, to the file chooser |
-| `network.listen` | nothing gated: declare it when your plugin accepts connections from other programs or computers, such as serving files |
-| `clipboard.read` | `Platform.clipboardText()`: read the text on the clipboard (SDK 0.16.1) |
-| `terminal.environment` | `Terminals.environment`: add variables to new local shells (SDK 0.17.1) |
-| `editor.provide` | `Platform.editor`: be the editor Jasper opens files with (SDK 0.17.1) |
-| `presentation.provide` | nothing gated: with the `presentation` key, provide Jasper's look from your kit file, from the next start (SDK 0.18.0) |
+### Windows
 
-Declare them in `plugin.toml`; the user is shown the list before your plugin loads. A gated call
-without the capability throws `MissingCapabilityException`. Jasper logs gated calls with your plugin
-id and the amount of data, never the content.
+`windows().create(new WindowSpec(id, title, size, singleton))` returns a
+[`PluginWindow`](sdk-reference.html#dev.jasper.sdk.ui.PluginWindow), shown by `show()`. Jasper owns its icon, title
+bar, menu bar (File › New Window and Close Window, and Quit on Linux and Windows), theme tracking and bounds,
+remembered under its id; `WindowSpec.SizeBasis.CONTENT` makes the size the body's instead of the frame's. Under the
+Enterprise look the window has no menu row; Cmd+W (Ctrl+W on Linux and Windows) still runs Close Window. A singleton
+id returns the window already open. Jasper keeps running while a plugin window is open, even with no terminal window.
 
-<!-- example:pluginterminal -->
+- `setContent(view)` mounts a kit view, closing the one it replaces. `setTitleActions(Optional.of(view))` puts an
+  INLINE `Stack` of `Button`s and `MenuButton`s at the trailing end of the title bar, or in a toolbar under the system
+  title bar where there is no unified one.
+- `onClosing(guard)` guards run when the user closes the window: one returning false keeps it open, and one that throws
+  allows the close. Quitting or restarting Jasper asks the guards of every open plugin window first, so a guard can
+  offer to save; a refusal keeps Jasper running.
+- `onCloseCommand(handler)` lets the content answer File › Close Window and Cmd+W (Ctrl+W on Linux and Windows), for
+  example by closing a tab: handlers run newest first, and the window closes through its guards when none returns
+  true. The close button does not ask them.
+- `close()` closes at once, without guards; `onClosed` runs once, after the window closed for any reason.
+
+### Dialogs
+
+`windows().dialog(new DialogSpec(title, owner, modal, presentation))` returns a
+[`PluginDialog`](sdk-reference.html#dev.jasper.sdk.ui.PluginDialog). The owner is a terminal window, one of the
+plugin's windows, a [content tab](#content-tabs) (a modal dialog pins the tab to its window) or a
+[`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor). A modal dialog's `show()` returns after it closes, and its
+form's Escape runs the form's cancel action. Dialogs do not remember their bounds.
+
+| [`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation) | What the default look draws |
+| --- | --- |
+| `CENTERED` | A dialog centred over its owner, sized to its content; the user cannot resize it. |
+| `ATTACHED_SHEET` | A sheet hanging from the owner's title edge. Modal only. |
+| `OVERLAY` | The dialog inside the owner's window: the rest of the window dims under a scrim and the dialog, centred above it, fades and rises 16 pixels into place in about 220 ms, then rises on as it fades out in about 200 ms; both are instant with animations off (`ui.animations.enabled = false`). The window takes no other input meanwhile. Modal only. |
+
+Under the Enterprise look an `OVERLAY` or `ATTACHED_SHEET` dialog is drawn inside its window as a classic dialog: a
+still scrim and a header strip with the title. `DialogSpec`'s `swatch` puts a small square of a hue before the title
+wherever Jasper draws it; a system title bar shows none. Credential Vault's Create Vault and Unlock Vault prompts are
+`OVERLAY` dialogs:
+
 ```java
-private static void installTerminalDemo(PluginContext context) {
-    // Capabilities are declared in plugin.toml and consented to by the user. A gated call without one
-    // throws MissingCapabilityException, so a plugin that can live without a capability checks first.
-    if (!context.plugin().capabilities().containsAll(List.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT))) {
-        context.log().log(System.Logger.Level.INFO, "The terminal demo needs terminal.observe and terminal.inject");
-        return;
-    }
-    context.actions().register(ActionSpec.of(GREET, "Insert Sample Greeting").withKeywords(List.of("sample", "type", "terminal")), invoked ->
-        // The pane the action was invoked on, or else the one the user used last. sendText adds nothing:
-        // without a newline the text waits at the prompt, and the user decides whether to run it.
-        invoked.pane().or(() -> context.terminals().activePane())
-            .ifPresent(pane -> pane.sendText("echo 'hello from the sample plugin'")));
-    context.menus().terminalContext().add(GREET);
-
-    StatusItem last = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.last", Side.LEFT, 100));
-    last.setVisible(false);
-    // Terminal events name panes by id and arrive later, on the event thread; there is no replay.
-    context.events().subscribe(TerminalEvents.COMMAND_FINISHED, finished -> {
-        last.setText(finished.command() + ": " + (finished.exitStatus().isPresent() ? "exit " + finished.exitStatus().getAsInt() : "done"));
-        last.setVisible(true);
-    });
-}
+var dialog = context.windows().dialog(new DialogSpec("Unlock Vault", window, true, DialogSpec.Presentation.OVERLAY));
+dialog.setContent(form.view());
+dialog.show();
 ```
 
-- **A pane can close at any moment.** Commands to a closed handle are ignored, queries return the
-  last value the handle saw, and `isOpen()` tells. Do not treat that as an error.
-- **Events carry ids**, because a handle belongs to the plugin that obtained it: call
-  `context.terminals().pane(event.paneId())`. They arrive later, on the event thread, and there is
-  no replay: read the current state first, then subscribe.
-- **Threads.** Everything here is event-thread only, except `sendText`, `sendBytes` and `paste`,
-  which you may call from any thread; calls from one thread keep their order.
-  `foregroundJob()` completes on a worker thread.
-- **`sendText` adds nothing.** End a command with `"\n"` if you mean to run it; leaving it out lets
-  the user look first. `paste` behaves like the user's own paste, bracketed when the program asked.
-- **Working directories are hints, and come in two kinds.** `PaneInfo.workingDirectory` is a
-  directory on this machine; `PaneInfo.remoteDirectory` is host plus path text from a shell on
-  another machine, for example after the user ran `ssh`, or in a provided session. At most one is
-  present. Both are whatever the shell last reported, unauthenticated: never open a remote path as
-  a local file, and expect a local one not to exist.
-- `PaneInfo.shell` is the launcher's label (`zsh`, `fish`) or a provided session's title.
-- To run a command in a new tab, open one with `OpenRequest.local()` or `localIn(directory)` and
-  `sendText` to the pane you get back; the tab runs the user's configured shell.
-- **Shell profiles (SDK 0.9.1).** `context.terminals().profiles()` lists the shells Jasper detected,
-  such as PowerShell or a WSL distribution (`kind()` is `ShellProfileInfo.Kind.WSL` and `detail()`
-  reads `WSL 1` or `WSL 2`). Open one with `OpenRequest.localProfile(profile.id())`; an id Jasper does
-  not list opens nothing and returns empty. On Windows, detection may finish after your plugin starts:
-  subscribe with `onProfilesChanged` and read the list again. It fires after a detection completes:
-  the first one, and each later one whose result differs (a WSL distribution or PowerShell 7
-  appearing or disappearing). Edits to the Custom shell settings may not be reported, so read
-  `profiles()` again when the current list matters. Declare `sdk = ">=0.18.0, <0.19"`.
+### Progress overlays
 
-## Providing a session
+`windows().overlay(new OverlaySpec("Connecting", window))` reserves centred, non-movable content inside a terminal
+window for short-lived work. Set a kit view with a Cancel button that stops the work and calls `close()`, then
+`show()`, which returns at once and blocks the window's input. Escape and clicks outside do not dismiss it. A window has
+at most one, across plugins: another request throws `IllegalStateException`. It closes with its window and with the
+plugin; an `OVERLAY` dialog can open over it.
 
-A provided session is a pane whose program is yours: an SSH channel, a serial line, a container
-shell. You describe it with a `SessionSpec` and open it like any tab. The pane appears at once
-with a status line and Cancel; your `connector` is then called, on the event thread, once for the
-first connect and once for every Reconnect, each time with a fresh `PendingSession`.
+### Popovers
 
-<!-- example:pluginsession -->
+`view.anchor(nodeId)` mints a [`UiAnchor`](sdk-reference.html#dev.jasper.sdk.ui.UiAnchor) from a mounted `Button` or
+PICKER `Choice` whose ancestors are visible, enabled and not busy. `windows().popover(anchor)` returns a
+[`PluginPopover`](sdk-reference.html#dev.jasper.sdk.ui.PluginPopover): set a view of the plugin's and `show()` it
+below the control (above when there is no room), at least as wide. It does not block; Escape or a click outside closes
+it and its content. Hiding, disabling, removing, retyping or moving the control, closing its surface or stopping the
+plugin closes the anchor for good; `onClosed` hears it. Credential Vault's credential picker opens over another
+plugin's anchor this way ([plugin APIs](plugin-apis.md)).
+
+### Quit guards
+
+`windows().onQuitting(() -> future)` is asked when Jasper quits or restarts, after plugin windows and content tabs, even
+when the plugin has no window: a server can ask "stop the running servers?". Complete the future with false to keep
+Jasper running; a guard that throws or fails allows the quit. A resident macOS Jasper that only closes its windows and
+stays in the background (Cmd+Q) does not ask it, so the plugin keeps running until Jasper really quits.
+
+### File pickers
+
+Every picker is Jasper's file chooser, shown over its owner: a live terminal window, a shown window of the plugin's, or
+one of its content tabs.
+Call them on the UI thread from a Browse button or a command; they pump UI events until the user answers, so recheck
+what the result depends on. Closing the owner or stopping the plugin cancels them. Paths come back absolute and
+normalised; do the file work in the background.
+
+| Call | Returns |
+| --- | --- |
+| `window.chooseFile(title, initial)` (or `dialog.chooseFile`) | One existing file, or empty on cancel. |
+| `windows().chooseFiles(owner, title, initial)` | Existing files, or an empty list. |
+| `windows().chooseDirectory(owner, title, initial)` | One folder, or empty. |
+| `windows().chooseSaveFile(owner, title, initial)` | A file to save to: pass a folder to start in, or a suggested file to fill in its folder and name. The chooser asks before replacing an existing file. |
+| `windows().choose(new FileChoice(owner, title, mode, multiple, initial, suggestedName, sources))` | [`FileLocation`](sdk-reference.html#dev.jasper.sdk.files.FileLocation)s: local paths and places in the [file sources](#file-sources) named in `sources`. |
+
+## Content tabs
+
+A content tab is a document of the plugin's in a workspace tab, as the Editor's files are. Jasper provides the tab
+strip, the window, its menus and the status bar; the plugin provides the view.
+
+- `windows().openTab(new ContentSpec(key, title), owner, view)` opens the view in the owner's window, or in the last
+  main window, and returns a [`ContentTab`](sdk-reference.html#dev.jasper.sdk.ui.ContentTab). Reopening a key the
+  plugin has open selects that tab and returns its handle, without mounting the view passed.
+- `setPresentation(new ContentPresentation(title, detail, icon, dirty, location, host))`: the tab shows "● " before the
+  title while dirty and the detail after it; its tooltip is the location, which Jasper never treats as a local path.
+- `setCommands(List<ContentCommand>)`: commands appear in the tab's right-click menu, after Open in Separate Window
+  (Move to Main Window) and before Close Tab, and their shortcuts work while the tab is selected. Commands with the
+  ids `find`, `find-next`, `find-previous`, `copy` and `paste` answer Jasper's Find, Find Next, Find Previous, Copy and
+  Paste; Close Tab and Close Pane ask the tab to close.
+- `setStatus(List<ContentStatus>)`: items in the status bar while the tab is selected, each plain text or a button.
+- `setFocusTarget`, `select()`, `isActive()`, `onActive(...)`; `move(true)` opens the tab in a separate window and
+  `move(false)` brings it back to the last main window, keeping the view and its state; `isSeparate()`.
+- Pass the `ContentTab` as the owner of dialogs and pickers, so they follow the tab to another window.
+- `windows().onTabsClosing((tabs, batch) -> future)` registers the plugin's one close guard. It receives the tabs about
+  to close and whether a window, quit or restart is closing them; complete the future with false to keep them, for
+  example after a cancelled save, and recheck edits made while an asynchronous save ran before completing with true.
+  A guard that throws, or whose future fails, keeps the tabs; registering another guard replaces the first.
+- `requestClose()` closes the tab through the guard; `close()` closes it without asking. `onClosed` is where
+  per-document work stops: a stopping plugin's tabs close after the quit guards approved.
+- A document surface is a `Nodes.Custom` in a `SplitKind.DOCUMENT` split, painted from the workspace palettes
+  ([Building plugin UI](plugin-ui.md#custom-content)). The Editor's `DocumentArea` is the reference.
+
+## Notifications
+
+`context.notifications()` posts into Jasper's notifications, from any thread. Every plugin has a default group, named
+after the plugin and shown as cards. Declare another group when some notifications should be muted apart from the rest:
+
 ```java
-private static void installSessionDemo(PluginContext context, long stepMillis) {
-    if (!context.plugin().capabilities().contains(Capabilities.SESSION_PROVIDE)) {
-        context.log().log(System.Logger.Level.INFO, "The session demo needs session.provide");
-        return;
-    }
-    context.actions().register(ActionSpec.of(ECHO, "Open Sample Echo Session").withKeywords(List.of("sample", "session", "echo")), invoked ->
-        // The pane appears at once, waiting. The connector runs on the event thread for the first connect
-        // and for every Reconnect, so it only hands the work to the background executor.
-        context.terminals().openTab(invoked.window(), OpenRequest.session(SessionSpec.of("Sample echo",
-            pending -> context.background().execute(() -> connectEcho(pending, stepMillis))))));
-}
-
-private static void connectEcho(PendingSession pending, long stepMillis) {
-    pending.status("Connecting to the sample echo…");
-    // A real connect blocks here; onCancelled is where it would be aborted.
-    var waiting = Thread.currentThread();
-    var registration = pending.onCancelled(waiting::interrupt);
-    try { Thread.sleep(stepMillis); }
-    catch (InterruptedException cancelled) { return; }
-    finally { registration.close(); }
-    // From attach on, Jasper owns the connection and closes it exactly once, even if the user cancelled meanwhile.
-    pending.attach(new EchoSession().connection());
-}
+NotificationGroup sync = context.notifications().group(new GroupSpec("dev.example.tool.sync", "Tool sync", DisplayMode.CARD));
+context.notifications().group().info("Synced", "3 hosts");
+sync.error("Could not sync", "prod: connection refused", failure);
 ```
 
-- **One attempt, one outcome.** Exactly one of `attach`, `fail` and cancellation takes effect; the
-  first wins and later calls are ignored. Every `PendingSession` method is safe from any thread.
-- **Ownership transfers at `attach`, whatever the outcome.** Jasper invokes your connection's
-  `close` exactly once: when the pane closes, when the session ends, or at once if the attempt was
-  already cancelled. Release everything that belongs to the session there, and never count on
-  `attach` having "worked".
-- **Cancellation** happens when the user presses Cancel, the pane closes, your plugin stops or
-  Jasper quits. `onCancelled` handlers run at most once, on Jasper's cleanup thread, and at once
-  when registered late. Use them to abort a blocking connect.
-- **Threads.** `output.read` runs on the session's reader thread and may block; `close` must
-  unblock it. `input.write`, `flush` and `resize` run only on Jasper's writer thread for that
-  session, so a stalled network never freezes the user's typing; when its 4 MiB queue is full the
-  pane says input was dropped. `close` runs on the cleanup thread. None of them runs on the event
-  thread, and none of them may touch Swing.
-- **Ending.** Complete `exited` with the status. Jasper keeps reading `output` to its end, for at
-  most two seconds, so the last output is on screen before the pane says "Disconnected (exit N)".
-  Completing `exited` exceptionally, or an `IOException` from a stream, is a connection failure, and
-  its message is shown. `ExitPolicy.CLOSE_PANE` closes the pane instead.
-- **The remote pty** should be requested with `TerminalConnection.TERM` and the attempt's
-  `columns()` and `rows()`; the pane resizes it through `resize` once it has been laid out.
-- A remote shell with Jasper's shell integration produces the same command events as a local one.
-  The directory it reports appears as the pane's `remoteDirectory`, never as a local one.
-- `PipedInputStream` fails once the thread that wrote last has ended. The sample uses a queue.
+- A title says what happened in a few words and carries no paths, host names or messages; those go in the content. A
+  title is one visible line of at most 200 characters and content at most 4,000; `info`, `warning` and `error` cut
+  longer content.
+- Pass the cause whenever there is a `Throwable`. Jasper records it as the plugin's incident and adds **Show more…**,
+  which opens the Errors window at its stack trace. `error(title, cause)` uses the cause's class and the first line of
+  its message as the content, reading through a `CompletionException` or `ExecutionException` to the failure behind
+  it.
+- `post(NotificationSpec)` takes the whole spec: up to 8 actions (7 with a cause), each labelled in at most 40
+  characters and run on the UI thread, expiring the notification unless made with
+  `new NotificationAction(label, run, false)`; `withActivate` for a click on the body; `withIcon`; `withWindow` to show
+  the card in a particular window (otherwise the window used last).
+- The returned [`NotificationHandle`](sdk-reference.html#dev.jasper.sdk.notifications.NotificationHandle) expires the
+  notification. It also expires when the user removes it, when its group drops it, and when the plugin stops.
+- A group id starts with the plugin id and a dot, at most 160 characters; its name is one line of at most 80.
+  `<plugin id>.activities` is Jasper's. A group's display mode (`CARD`, `STICKY`, `HISTORY`, `OFF`) is a default: the
+  user's choice in Settings › Notifications or `[notifications.groups]` wins ([notifications](notifications.md)).
+- Plugins cannot read other notifications.
+
+## Activities and connections
+
+- `context.activities().begin(ActivitySpec.of(title))` shows a card on Buddy and returns an
+  [`ActivityHandle`](sdk-reference.html#dev.jasper.sdk.activity.ActivityHandle), safe from any thread:
+  `progress(fraction, detail)` (the card reads "*N*% · *detail*"), `detail(...)`, and exactly one of `succeed`, `fail`
+  and `cancelled`; later calls are ignored, and progress between two deliveries is coalesced. An activity still open
+  when the plugin stops ends as failed.
+- When an activity succeeds or fails, Jasper posts its outcome in the group `<plugin id>.activities`, titled after the
+  activity with the final detail as content; post nothing for it yourself. A cancelled activity posts nothing.
+- `ActivitySpec`'s `activateActionId` naming one of the plugin's actions makes a click on the card, or on the outcome,
+  run that action in the window used last. Jasper offers no way to cancel an activity: it never calls
+  `ActivitySpec`'s `cancel`.
+- `context.activities().connection(ConnectionSpec.of(title, state))` announces something that is up until it is not,
+  such as a connected host: report `up`, `degraded` (needs attention, or recovering) or `down` as it changes, and
+  `close()` the [`ConnectionHandle`](sdk-reference.html#dev.jasper.sdk.activity.ConnectionHandle) once it no longer
+  matters. Every change of state is delivered; a change of detail alone is coalesced. Buddy shows a card per
+  connection, and a click runs its `activateActionId` as for activities. Open connections close when the plugin stops.
+- Anyone may subscribe to `Activities.TOPIC` (`jasper.activity`) and `Activities.CONNECTIONS` (`jasper.connection`);
+  `activities().current()` returns the latest event of each running activity.
+
+## Events
+
+- A [`Topic`](sdk-reference.html#dev.jasper.sdk.events.Topic) is an id and a payload type:
+  `Topic.of(id, Payload.class)`. Its id starts with its owner's id and a dot; `jasper.` topics are the application's.
+  One id carries one payload type: subscribing with another throws `IllegalArgumentException`.
+- `events().publish(topic, payload)` works from any thread, only on the plugin's own topics. `events().subscribe(topic,
+  handler)` is UI-thread only; any plugin that can load the payload type may subscribe, and `jasper.terminal.*` topics
+  need `terminal.observe`.
+- Publication always queues. Handlers run later on the UI thread, in one global order, never inside the publisher's
+  call and never re-entrantly; a handler that throws is logged against its plugin and others still run. There is no
+  replay: read the current state from its owner, then subscribe.
+- Application topics in [`AppEvents`](sdk-reference.html#dev.jasper.sdk.events.AppEvents): `THEME_CHANGED` after every
+  change of the chrome theme or the interface font, with the theme's variant (two dark themes in a row give two events
+  with `DARK`), and
+  `CONFIG_RELOADED` each time Jasper reads `config.toml` again (a change it noticed, or Reload Config), after every
+  plugin's settings file has been read again too.
+- A plugin's subscriptions end when it stops.
 
 ## Palette scopes
 
-A scope is one kind of searchable thing in the command palette, beside Commands. Declare
-`palette.contribute`, register a `PaletteScope` through `context.palette()`, and the scope gets a tab
-in every window's palette and a section in its All tab (`withInAll(false)` keeps a scope, such as
-Vault's secrets, out of All; `withInRecents(false)`, SDK 0.9.2, keeps its rows out of the recently and
-most used rows the empty palette offers, as History does, while they stay searchable). The spec is read once; its id must start
-with your plugin id. Search, `available`, `step` and `execute` run on the UI thread and must do no
-I/O: keep an index, refresh it in the background and tell the palette through the `onChanged`
-listener. Return at most `maxResults` rows. A verb may return a
-`PaletteStep` (a small form) instead of running at once; its completion answers `done()`,
-`error(message)` (keeps the form open) or `reopen(scopeId, rowId, query)`, which dismisses and
-reopens the palette elsewhere, in any registered scope. `Palette.open` does the same from an action;
-on the scope that is already showing it dismisses instead. A scope that names one of your actions as
-`shortcutActionId` gets that action's shortcut while the palette is open, exactly as the built-in
-Cmd+P/R/J behave. The host contains every call: a scope that throws shows no rows, an unavailable
-row, no step or nothing done, and the palette keeps working.
-
-`ScopeSpec.withHue` and `withItemNoun` (SDK 0.18) describe your rows to presentations that colour and label them by
-scope: the hue of the scope's row squares (NONE takes your manifest's `icon_hue`) and what one row is, as a lowercase
-singular noun ("session"; blank uses the label). A verb made with `PaletteVerb.Role.SPLIT` is the split-pane variant
-of your first verb; a scope has at most one, never first. The palette card draws none of them.
-
-The bundled History and Snippets plugins (`plugins/history`, `plugins/snippets`) are the worked
-example: Snippets publishes `dev.jasper.snippets.api.SnippetService` and exports that package;
-History declares `requires = [{ id = "dev.jasper.snippets", optional = true }]`, looks the service up
-once at start with `services().find`, and shows its Save as snippet… verb only when it is there. A
-plugin may bundle a library (Snippets bundles tomlj): declare it as `implementation`, and the
-application loads every jar beside the plugin's own.
-
-Credential Vault (`plugins/vault`) is the worked example for `publishPerConsumer`: every plugin that
-requires it gets its own `VaultApi` whose `credential(id)` asks the user to allow *that* plugin once or
-always, and whose futures can be cancelled to withdraw the request. Vault 0.2 adds
-`importSshKeys(owner, sources, selectedCredentialIds)` for a reviewed, durable batch of managed
-SSH keys and grants. Declare a Vault dependency of `>=0.2` for this flow. Source requests use
-`SshKeySource` IDs; the result maps those IDs to managed `CredentialDescriptor`s. Only managed
-SSH keys or password-only accounts can be selected as existing import credentials.
-
-A managed `Credential` exposes owned `keyBytes()` and no `keyPath()`; legacy path credentials
-keep their existing API. Always close credentials after use to clear their bytes and passphrases.
-The batch method has a default unsupported result for older API implementations. This extension
-belongs to Vault's exported API; it does not expose Vault internals through the Jasper SDK.
-
-The Editor (`plugins/editor`) is the worked example for an exported interface that the *caller*
-implements: `dev.jasper.editor.api.EditorDocument` is written by whoever supplies a file (Remote, for
-SFTP), while the Editor publishes `Editor` and calls the document's futures from the UI thread.
+A scope is one kind of searchable thing in the command palette, beside Commands: History, Snippets, Files, SSH and
+Vault are bundled scopes. Declare `palette.contribute`, register a
+[`PaletteScope`](sdk-reference.html#dev.jasper.sdk.palette.PaletteScope) with `context.palette().register(scope)`, and
+every window's palette offers it; closing the registration or stopping the plugin removes it.
 
 <!-- example:pluginpalette -->
 ```java
@@ -516,62 +697,282 @@ private static void installPaletteDemo(PluginContext context) {
 }
 ```
 
-## Notifications and the editor
+- **How users reach it.** The palette shows no chip, searching every scope that takes part in All, or one scope's chip.
+  A scope's chip comes from typing its label and `>` at the start of the query (`greetings >`), its shortcut action,
+  `Palette.open`, a "More in *label*…" row when All cut its rows short, or the Run window's scope menu
+  ([command palette](command-palette.md)).
+- **The spec**, a [`ScopeSpec`](sdk-reference.html#dev.jasper.sdk.palette.ScopeSpec), is read once:
+  `ScopeSpec.of(id, label, placeholder, verbs)`, with `withDescription`, `withMonospaceRows` (rows are data values, in
+  the data face), `withIcon`, `withShortcutActionId`, `withInAll(false)` (out of All and of the empty palette's
+  suggestions, as Vault's logins are), `withInRecents(false)` (searchable, but never offered among the recently and most
+  used rows, as History's commands are), `withHue` (NONE takes the manifest's `icon_hue`) and `withItemNoun` (what one
+  row is, as a lowercase singular noun such as "session"; blank uses the label).
+- **Verbs.** One to three [`PaletteVerb`](sdk-reference.html#dev.jasper.sdk.palette.PaletteVerb)s with distinct ids,
+  bound in order to Enter, Cmd+Enter (Ctrl+Enter on Linux and Windows) and Shift+Enter; their labels are the hints.
+  A verb made with `PaletteVerb.Role.SPLIT` is the split-pane variant of the first verb: at most one, never the first.
+- **Rows.** `PaletteRow.of(id, title)` with `withDetail`, `withTag`, `withIcon`, `withEnabled` and `withToken`. Ids are
+  unique in one answer and at most 256 characters; the token comes back unchanged to `available`, `step` and `execute`.
+  [`PaletteResults`](sdk-reference.html#dev.jasper.sdk.palette.PaletteResults) holds at most 200 rows, a section label
+  and the row to select first. Return at most `maxResults` rows: 200 on the scope's own chip, what is left of the
+  budget in All, 50 when the palette looks up a recent row; Jasper drops the rest.
+- **No I/O.** Every method runs on the UI thread, `search` for every keystroke. Keep an index, refresh it in the
+  background and call the `onChanged` listener, on the UI thread, to rerun the open query; each open palette registers
+  its own listener.
+- **Running a verb.** `available` is asked again just before a verb runs; false refreshes the list instead. A present
+  `step(...)` shows a small form instead of running the verb, a
+  [`PaletteStep`](sdk-reference.html#dev.jasper.sdk.palette.PaletteStep) of a title, fields and `complete`, which
+  gets the values by field name and answers once, from any thread, with `Result.done()`, `Result.error(message)` (the
+  form stays open) or `Result.reopen(scopeId, rowId, query)`, which dismisses the palette and opens it on any
+  registered scope. Without a step the palette dismisses, then `execute` runs. `activated(...)` hears the palette open
+  on the scope's chip, or on All while the scope takes part: a moment to refresh the index in the background.
+- **The target pane.** `PaletteQuery.target()` is the pane the palette was opened from, as the plugin's own handle:
+  typing into it needs `terminal.inject`.
+- **Recents.** Running a row of a scope that takes part in All and in recents records its scope id, row id and title
+  in `command-history.toml` in Jasper home. The empty palette offers it again while searching the title still returns
+  the same row id. Rows that should not be written there belong in a scope made `withInRecents(false)` or
+  `withInAll(false)`.
+- **Opening the palette.** `context.palette().open(window, scopeId, query, rowId)` opens it on any registered scope,
+  `jasper.commands` included, or with `jasper.all` on no chip; it is ignored while the palette is closed and the window
+  is not the active one. On the card, opening the scope that is already showing dismisses the palette; the Run window
+  stays open, returns to its field and applies the query and row.
+- **The shortcut action.** A scope that names one of the plugin's actions, registered earlier, as `shortcutActionId`
+  takes that action's shortcut while the palette is open: the key switches to the scope's chip (on the card, it
+  dismisses the palette when the chip is showing) instead of running the handler. Go to File… (Cmd+P, or
+  Ctrl+Alt+Shift+P on Linux and Windows), Search Shell History (Cmd+R, or Ctrl+Shift+R) and Snippets… (Cmd+J, or
+  Ctrl+Shift+J) are bundled plugins' actions that work this way.
+- **The two presentations.** The default look's card draws row icons, monospaced rows, titles, details, tags and the
+  verb hints; it does not use the scope's icon, description, hue, item noun or split verb. The Enterprise look's Run
+  window draws the scope's hue as each row's square, the description as its help line and a "*Item noun*: *detail*"
+  line, and offers the split verb as "Open in a split pane"; it does not use the scope's icon or placeholder, row icons
+  or monospaced rows.
+- **Containment.** A scope that throws shows no rows, an unavailable row, no step or nothing done, and the palette
+  keeps working.
 
-`context.notifications()` (SDK 0.14.0) posts into Jasper's notifications, from any thread. Every plugin has a default
-group, named after the plugin and shown as cards. Declare another group during `start` when some of your notifications
-should be muted apart from the rest:
+## Terminals
 
+`context.terminals()` finds windows, tabs and panes; an action's context names the window and pane it was invoked on.
+Handles keep an id, never a Swing object; two handles for the same pane are equal. Finding things needs no capability;
+what a handle may do does ([capabilities](#capabilities-and-consent)).
+
+<!-- example:pluginterminal -->
 ```java
-NotificationGroup sync = context.notifications().group(new GroupSpec("dev.example.tool.sync", "Tool sync", DisplayMode.CARD));
-context.notifications().group().info("Synced", "3 hosts");
-sync.error("Could not sync", "prod: connection refused", failure);
+private static void installTerminalDemo(PluginContext context) {
+    // Capabilities are declared in plugin.toml and consented to by the user. A gated call without one
+    // throws MissingCapabilityException, so a plugin that can live without a capability checks first.
+    if (!context.plugin().capabilities().containsAll(List.of(Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_INJECT))) {
+        context.log().log(System.Logger.Level.INFO, "The terminal demo needs terminal.observe and terminal.inject");
+        return;
+    }
+    context.actions().register(ActionSpec.of(GREET, "Insert Sample Greeting").withKeywords(List.of("sample", "type", "terminal")), invoked ->
+        // The pane the action was invoked on, or else the one the user used last. sendText adds nothing:
+        // without a newline the text waits at the prompt, and the user decides whether to run it.
+        invoked.pane().or(() -> context.terminals().activePane())
+            .ifPresent(pane -> pane.sendText("echo 'hello from the sample plugin'")));
+    context.menus().terminalContext().add(GREET);
+
+    StatusItem last = context.statusBar().add(new StatusItemSpec("dev.jasper.sample.last", Side.LEFT, 100));
+    last.setVisible(false);
+    // Terminal events name panes by id and arrive later, on the event thread; there is no replay.
+    context.events().subscribe(TerminalEvents.COMMAND_FINISHED, finished -> {
+        last.setText(finished.command() + ": " + (finished.exitStatus().isPresent() ? "exit " + finished.exitStatus().getAsInt() : "done"));
+        last.setVisible(true);
+    });
+}
 ```
 
-- A title says what happened in a few words and carries no paths, host names or messages; those go in the content.
-  A title is one line of at most 200 characters and content at most 4,000; the shortcuts cut longer content.
-- Pass the cause whenever you have a `Throwable`. Jasper records it as your plugin's incident and adds **Show more…**,
-  which opens the Errors window at its stack trace. `error(title, cause)` uses the cause's class and message as the
-  content, reading through a `CompletionException` or `ExecutionException` to the failure behind it.
-- `post(NotificationSpec)` takes the whole spec: up to 8 actions (7 with a cause), each run on the UI thread and
-  expiring the notification unless made with `new NotificationAction(label, run, false)`; `withActivate` for a click
-  on the body; `withIcon`; `withWindow` to show the card in a particular window.
-- The returned `NotificationHandle` expires the notification. It also expires when the user removes it, when its
-  group drops it, and when your plugin stops.
-- Group ids follow the panel id pattern and start with your plugin id and a dot; `<plugin-id>.activities` is Jasper's.
-- Your group's mode is a default. The user can choose another for any group in Settings › Notifications or in
-  `[notifications.groups]`, and theirs wins.
-- When one of your activities succeeds or fails, Jasper posts its outcome in `<plugin-id>.activities`; post nothing
-  for it yourself.
+- **Finding.** [`Terminals`](sdk-reference.html#dev.jasper.sdk.terminal.Terminals): `activeWindow()` (the window used
+  last, even with Jasper in the background), `activePane()`, `windows()`, and `window(id)`, `tab(id)` and `pane(id)`.
+  [`WindowHandle`](sdk-reference.html#dev.jasper.sdk.terminal.WindowHandle): `tabs()` (terminal tabs, in display
+  order), `activeTab()`, `isActive()`, `toFront()`; it is also an owner for dialogs and pickers.
+  [`TabHandle`](sdk-reference.html#dev.jasper.sdk.terminal.TabHandle): `panes()`, `activePane()`, `title()`, `select()`.
+  [`PaneHandle`](sdk-reference.html#dev.jasper.sdk.terminal.PaneHandle): `info()`, `foregroundJob()`, `selection()`,
+  `sendText`, `sendBytes`, `paste` and `focus()`.
+- **A pane can close at any moment.** Commands to a closed pane are ignored, queries return the last value the handle
+  saw, and `isOpen()` tells. Do not treat that as an error. After the plugin stops, handle queries throw
+  `IllegalStateException`; the send methods are ignored.
+- **Threads.** Everything here is UI-thread only except `sendText`, `sendBytes` and `paste`, which work from any
+  thread; calls from one thread keep their order. `foregroundJob()` completes on a worker thread.
+- **`sendText` adds nothing.** End a command with `"\n"` to run it; leaving it out lets the user look first. `paste`
+  behaves like the user's paste, bracketed when the program asked for it. Input to a pane whose session is not running
+  (still connecting, or ended) is dropped.
+- **Working directories are hints, of two kinds.** [`PaneInfo`](sdk-reference.html#dev.jasper.sdk.terminal.PaneInfo)'s
+  `workingDirectory` is a folder on this machine; `remoteDirectory` is a host and path text from a shell on another
+  machine, after the user ran `ssh` or in a provided session. At most one is present. Both are whatever the shell last
+  reported, unauthenticated: never open a remote path as a local file, and expect a local one not to exist.
+- `PaneInfo` also holds the title, the grid's columns and rows (0 before the session starts), whether shell integration
+  is on, the session's kind (`LOCAL` or `PLUGIN`, with the provider's id), its state (`CONNECTING`, `RUNNING`,
+  `EXITED`), the exit status, and `shell`: the launcher's label (`zsh`, `fish`) or a provided session's title.
+- **Opening tabs.** `openTab(window, request)` opens and selects a tab; `split(pane, Direction.RIGHT, request)` splits
+  a pane. Both return the new pane, or empty when the window or pane is gone, the split pane's session has ended, or a
+  named profile is unknown.
+  `OpenRequest.local()` and `localIn(folder)` start the user's shell (where New Tab would, or the split pane's folder),
+  `localProfile(id)` a detected shell, and `local(LocalSpec.running(command, folder))` a program instead of the shell
+  ([program tabs](#shell-variables-and-program-tabs)). A split with no profile starts the user's default profile, not
+  the split pane's.
+- **Shell profiles.** `terminals().profiles()` lists the shells Jasper detected, the platform's default first, as
+  [`ShellProfileInfo`](sdk-reference.html#dev.jasper.sdk.terminal.ShellProfileInfo): on macOS and Linux `login`, the
+  login shell; on Windows `powershell`, `pwsh` (PowerShell 7, when found), `cmd` and `wsl:<name>` for each WSL
+  distribution (`kind()` `WSL`, `detail()` `WSL 1` or `WSL 2`, followed by ` · default` for the default
+  distribution); and last, everywhere, `custom`. On Windows, detection
+  may finish after the plugin starts: `onProfilesChanged` runs after the first detection and after each later one whose
+  result differs. Edits to the Custom shell settings may not be reported, so read `profiles()` again when the current
+  list matters.
+- **Events.** [`TerminalEvents`](sdk-reference.html#dev.jasper.sdk.terminal.TerminalEvents) carry ids, because a handle
+  belongs to the plugin that obtained it: call `context.terminals().pane(event.paneId())`. They arrive later, on the UI
+  thread, without replay: read the current state first, then subscribe.
 
-`context.platform().openInEditor(file)` opens a file with the user's editor (the plugin editor `Platform.editor` registered,
-normally the Editor's [default editor](editor.md#default-editor), then the desktop, then revealing the file), in the background; a failure is posted in your plugin's group. `context.platform().browse(uri)`
-opens an http or https address in the user's browser the same way (SDK 0.10.2); any other address throws
-`IllegalArgumentException`.
+| Topic | Payload | When |
+| --- | --- | --- |
+| `WINDOW_OPENED`, `WINDOW_CLOSED`, `WINDOW_ACTIVATED` | `WindowEvent` | A terminal window opens, closes, becomes active. |
+| `TAB_OPENED`, `TAB_CLOSED`, `TAB_SELECTED` | `TabEvent` | A terminal tab opens, closes, is selected. |
+| `PANE_OPENED`, `PANE_CLOSED`, `PANE_FOCUSED`, `BELL` | `PaneEvent` | A pane opens, closes, takes the focus, rings its bell. |
+| `ACTIVE_PANE_CHANGED` | `ActivePaneChanged` | The active pane changes, or there is none. |
+| `TITLE_CHANGED` | `TitleChanged` | A pane's title changes. |
+| `CWD_CHANGED` | `CwdChanged` | The shell reports a new local or remote directory. |
+| `COMMAND_STARTED`, `COMMAND_FINISHED` | `CommandStarted`, `CommandFinished` | A command starts or ends, with its exit status, duration and directory; needs shell integration. |
+| `SESSION_STATE_CHANGED` | `SessionStateChanged` | A session starts running or ends; `CONNECTING` only for provided sessions. |
+
+## Providing a session
+
+A provided session is a pane whose program is the plugin's: an SSH channel, a serial line, a container shell. Describe
+it with a [`SessionSpec`](sdk-reference.html#dev.jasper.sdk.terminal.SessionSpec) and open it like any tab
+(`session.provide`). The pane appears at once with "Connecting…" and **Cancel**; the `connector` is then called on the
+UI thread, inside `openTab` or `split`, once for the first connect and once for every **Retry** or **Reconnect**, each
+time with a fresh [`PendingSession`](sdk-reference.html#dev.jasper.sdk.terminal.PendingSession). It must not block.
+
+<!-- example:pluginsession -->
+```java
+private static void installSessionDemo(PluginContext context, long stepMillis) {
+    if (!context.plugin().capabilities().contains(Capabilities.SESSION_PROVIDE)) {
+        context.log().log(System.Logger.Level.INFO, "The session demo needs session.provide");
+        return;
+    }
+    context.actions().register(ActionSpec.of(ECHO, "Open Sample Echo Session").withKeywords(List.of("sample", "session", "echo")), invoked ->
+        // The pane appears at once, waiting. The connector runs on the event thread for the first connect
+        // and for every Reconnect, so it only hands the work to the background executor.
+        context.terminals().openTab(invoked.window(), OpenRequest.session(SessionSpec.of("Sample echo",
+            pending -> context.background().execute(() -> connectEcho(pending, stepMillis))))));
+}
+
+private static void connectEcho(PendingSession pending, long stepMillis) {
+    pending.status("Connecting to the sample echo…");
+    // A real connect blocks here; onCancelled is where it would be aborted.
+    var waiting = Thread.currentThread();
+    var registration = pending.onCancelled(waiting::interrupt);
+    try { Thread.sleep(stepMillis); }
+    catch (InterruptedException cancelled) { return; }
+    finally { registration.close(); }
+    // From attach on, Jasper owns the connection and closes it exactly once, even if the user cancelled meanwhile.
+    pending.attach(new EchoSession().connection());
+}
+```
+
+- **The spec.** `SessionSpec.of(title, connector)`, or the full record with a tab icon (a semantic icon name) and an
+  [`ExitPolicy`](sdk-reference.html#dev.jasper.sdk.terminal.ExitPolicy): `KEEP_OPEN` (the default) keeps the pane,
+  shows how the session ended and offers Reconnect; `CLOSE_PANE` closes it. The title is the pane's until the program
+  sets one.
+- **One attempt, one outcome.** Exactly one of `attach`, `fail(message)` and cancellation takes effect; the first wins
+  and later calls are ignored. Every `PendingSession` method is safe from any thread, also after the plugin stopped.
+  `status(text)` updates the pane's line; `fail` shows its message (blank: "The connection failed") with Retry, or
+  Reconnect after a session ran. A connector that throws fails the attempt with the exception's message.
+- **Ownership moves at `attach`, whatever the outcome.** Jasper calls the connection's `close` exactly once: when the
+  pane closes, when the session ends, or at once if the attempt was already cancelled. Release everything that belongs
+  to the session there, and never count on `attach` having "worked".
+- **Cancellation** happens when the user presses Cancel, the pane closes, the plugin stops or Jasper quits.
+  `onCancelled` handlers run at most once, on Jasper's cleanup thread, and at once when registered late; use them to
+  abort a blocking connect. Cancelling before any session ran closes the pane; cancelling a reconnect shows
+  "Connection cancelled" with Reconnect.
+- **Threads.** [`TerminalConnection`](sdk-reference.html#dev.jasper.sdk.terminal.TerminalConnection)'s `output` is read
+  on the session's reader thread and may block; `close` must unblock it. `input` and `resize` are used only on Jasper's
+  writer thread for that session, so a stalled network never freezes the user's typing; when its 4 MiB queue is full,
+  a write is dropped whole and the pane says "Input dropped: the remote side is not accepting input". `close` runs on
+  the cleanup thread. None of them runs on the UI thread or may touch Swing.
+- **Ending.** Complete `exited` with the status. Jasper keeps reading `output` to its end, for at most two seconds, so
+  the last output is on screen before the pane says "Disconnected (exit *N*)". Completing `exited` exceptionally is a
+  connection failure: "Disconnected: The connection ended: *message*". An `IOException` from `output` shows
+  "Disconnected: Reading from the remote side failed: *message*", and one from `input` shows "Disconnected: Sending to
+  the remote side failed: *message*".
+- **The remote pty** should be requested with `TerminalConnection.TERM` (`xterm-256color`) and the attempt's
+  `columns()` and `rows()`; the pane resizes it through `resize` once it is laid out.
+- **Directories.** A remote shell with Jasper's shell integration produces the same command events as a local one, and
+  the directory it reports appears as the pane's `remoteDirectory`, never as a local one. A provider that finds the
+  shell's directory itself may call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any thread:
+  a display hint until the shell reports one, which never becomes a local directory or a `CWD_CHANGED` event; calls
+  before `attach`, after the session ended, or from an older attempt are ignored.
+- `PipedInputStream` fails once the thread that wrote last has ended; the Sample uses a queue.
+- Stopping the plugin cancels what it is still connecting; attached sessions stay with their panes. Remote
+  (`plugins/remote`) is the full example: connection work on the background executor, status and attachment back on
+  the UI thread, and each shell holding a reference on a shared SSH session.
+
+## Shell variables and program tabs
+
+- `context.terminals().environment(contributor)` (`terminal.environment`) adds variables to every new local shell and
+  program tab or split. The contributor runs on the UI thread for each launch, must not block or do I/O, and gets
+  Jasper's own environment, read-only. A name matches `[A-Za-z_][A-Za-z0-9_]*`; `TERM`, `COLORTERM`, `TERM_PROGRAM`,
+  `TERM_PROGRAM_VERSION` and names starting `JASPER_` are reserved, and a null value or one holding NUL is dropped;
+  each dropped entry is logged once. The user's `[terminal.env]` wins, and when two plugins set one name the first by
+  plugin id wins. WSL tabs and provided sessions get none. The Editor sets `EDITOR` this way.
+- `OpenRequest.local(LocalSpec.running(command, folder))` (`terminal.open`) opens a tab or split that runs a program
+  instead of the shell, with the default shell's environment; each word is passed as it is, without a shell. The tab
+  closes when the program exits with status 0 and stays open otherwise, whatever `terminal.on_exit` says. A
+  [`LocalSpec`](sdk-reference.html#dev.jasper.sdk.terminal.LocalSpec) names a profile or a command, not both.
+- `context.commandLine().client()` is the `jasper` command's path (inside the installed application, or the build's in
+  a development run), for a value such as `EDITOR`; empty when there is none.
+
+## File sources
+
+A file source adds places, such as saved hosts, to Jasper's file chooser (`files.source`). Remote's saved hosts are
+one.
+
+- Register a [`FileSource`](sdk-reference.html#dev.jasper.sdk.files.FileSource) with
+  `context.fileSources().register(source)`. Its `spec()`, read once, has an id that starts with the plugin id and a
+  heading; `roots()` lists what the chooser's places show
+  ([`FileRoot`](sdk-reference.html#dev.jasper.sdk.files.FileRoot): id, label, detail, whether connected); `onChanged`
+  tells the chooser the roots changed.
+- These methods run on the UI thread and do no I/O. `connect(rootId, owner)` returns a stage that completes, on any
+  thread, with a [`FileBrowser`](sdk-reference.html#dev.jasper.sdk.files.FileBrowser) that Jasper owns and closes; it
+  may ask the user to sign in over `owner`, which is null when the chooser does not belong to a terminal window. Jasper
+  cancels a `CompletableFuture` stage to abandon the attempt.
+- The browser's `home`, `list`, `stat`, `read` and `mkdir` run on a Jasper worker, one call at a time, and may block;
+  `abort()` may come from any thread. Paths are absolute and use `/`.
+- `locate(pane)` says where a terminal pane is in one of the source's roots, so a chooser opened from that pane starts
+  there (`FileLocation.Sourced.HOME` when only the root is known).
+- Ask for a place with `windows().choose(new FileChoice(owner, "Open", FileChoice.Mode.OPEN, false, Optional.empty(),
+  Optional.empty(), Set.of(sourceId)))`; the result holds `FileLocation.Local` and `FileLocation.Sourced` values.
+- A failing method shows no roots, places no pane or fails to connect ("The plugin could not connect."); a stopped
+  plugin's source leaves open choosers.
+
+## Opening files and web addresses
+
+- `context.platform().openInEditor(file)` opens a file with the user's editor in the background: the plugin that
+  [provides the editor](#the-file-editor-role) (normally the Editor, [default editor](editor.md)), then the desktop's
+  edit or open action, then revealing the file. A failure is posted in the plugin's group as "Could not open a file in
+  an editor".
+- `context.platform().browse(uri)` opens an `http` or `https` address in the user's browser, in the background; any
+  other address throws `IllegalArgumentException`, and a failure is posted as "Could not open a web address".
+- Both work from any thread.
 
 ## The clipboard
 
-Since SDK 0.16.1, `context.platform()` puts text on the clipboard and reads it, on the UI thread (elsewhere the calls throw
-`IllegalStateException`):
+`context.platform()` puts text on the clipboard and reads it, on the UI thread; elsewhere the calls throw
+`IllegalStateException`.
 
-- `copy(text)` puts text on the clipboard. When it cannot be written, for example while another program holds it, Jasper
-  posts "Could not copy" with the cause in your plugin's group and the call returns `false`; nothing is thrown.
-- `copySecret(text)` is `copy` for text that should not linger, such as a password or a decrypted value. Jasper clears the
-  clipboard 30 seconds later (retrying briefly while another program holds it), and tries once when your plugin stops and
-  once when Jasper quits, in each case only if the clipboard still holds that text: a later copy, by the user or by any
-  plugin, is left alone.
-- `clipboardText()` returns the clipboard's text, or empty when it holds none or cannot be read. It needs the
-  `clipboard.read` capability, because the clipboard often holds something the user just copied elsewhere, such as a
-  password; Jasper logs each read with your plugin id and the number of characters, never the text.
+- `copy(text)` puts text on the clipboard. When it cannot be written, for example while another program holds it,
+  Jasper posts "Could not copy" with the cause in the plugin's group and the call returns `false`; nothing is thrown.
+- `copySecret(text)` is `copy` for text that should not linger, such as a password. Jasper clears the clipboard 30
+  seconds later (retrying briefly while another program holds it), and tries once when the plugin stops and once when
+  Jasper quits, each time only if the clipboard still holds that text: a later copy, by the user or by any plugin, is
+  left alone.
+- `clipboardText()` returns the clipboard's text, or empty when it holds none or cannot be read. It needs
+  `clipboard.read`, because the clipboard often holds something the user just copied elsewhere, such as a password.
 
 Plugin code does not use the AWT clipboard (`Toolkit.getSystemClipboard()` or `getSystemSelection()`):
-`verifyPluginArchitecture` rejects both in the bundled plugins, except for the Editor's Vim registers. Declare `sdk = ">=0.18.0, <0.19"` when you use these methods.
+`verifyPluginArchitecture` rejects both in the in-repo plugins, except for the Editor's Vim registers.
 
 ## Command-line subcommands
 
-Since SDK 0.17.0 a plugin can answer `jasper <name> ...`. Declare each name under `[[subcommands]]` in `plugin.toml`:
-`name` matches `[a-z][a-z0-9-]*` (`help` and `version` are reserved) and `summary` is the line `jasper --help` shows.
-Then handle it in `start`, on the UI thread:
+A plugin can answer `jasper <name> ...` ([command line](command-line.md)). Declare each name under `[[subcommands]]`
+in `plugin.toml` ([subcommands](#subcommands)), then handle it in `start`, on the UI thread:
 
 ```java
 context.commandLine().handle("tool", call -> {
@@ -580,70 +981,61 @@ context.commandLine().handle("tool", call -> {
 });
 ```
 
-`call.arguments()` are the words after the name. `call.window()` is the window of the Jasper pane the command ran in,
-when it ran in one. `out` and `err` write to the caller's terminal from any thread. The stage's value is the exit code,
-0 to 255; anything else is 1, and a handler that throws or a stage that fails prints `jasper: <name> failed: ...` and
-exits 1. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl-C). A call still running when the
-plugin stops ends with exit code 1. When two plugins declare the same name, a bundled plugin keeps it, otherwise the
-first by plugin id, and the other gets a problem notice. In tests, `FakePluginHost.declareSubcommand` and `call` drive a
-handler. Declare `sdk = ">=0.18.0, <0.19"`.
+- `call.arguments()` are the words after the name; `call.workingDirectory()` is the caller's folder; `call.window()` is
+  the window of the Jasper pane the command ran in, when it ran in one. `out` and `err` write to the caller's terminal
+  from any thread. `call.onCancelled` hears, on the UI thread, that the caller went away (Ctrl+C).
+- The stage's value is the exit code, 0 to 255; anything else is 1. A handler that throws, or a stage that fails,
+  prints `jasper: <name> failed: <message>` and exits 1; a call still running when the plugin stops prints
+  `jasper: <name> stopped` and exits 1.
+- `handle` throws `IllegalArgumentException` for a name the manifest does not declare, one another plugin owns, or one
+  that already has a handler.
+- When two plugins declare one name, a bundled plugin keeps it, otherwise the first by plugin id, and the other gets a
+  Plugin problems notice, "A plugin command was not added". A plugin that is off still owns its names:
+  `jasper <name>` then says "jasper: *name* is unavailable (the *Plugin* plugin is off)" and exits 1.
+- `jasper --help` lists the subcommands of the plugins that were running when Jasper last started without `--config`,
+  `--safe-mode`, `--plugin-dir` or `--standalone`.
 
-## Shell variables, program tabs and the file editor
+## The file editor role
 
-SDK 0.17.1 adds four hooks. Declare `sdk = ">=0.18.0, <0.19"` when you use them.
+`context.platform().editor(fileEditor)` (`editor.provide`) makes the plugin the editor Jasper opens files with: Open in
+Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`, File › Open
+File… (a file the user chose, with no line), and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local
+terminal pane, with the path's line and the clicked window. The Editor takes this role.
 
-- `context.terminals().environment(contributor)` (needs `terminal.environment`) adds variables to each new local
-  shell and program tab. The contributor runs on the UI thread, must not block or do I/O, and gets Jasper's own
-  environment, read-only. A name matches `[A-Za-z_][A-Za-z0-9_]*`; `TERM`, `COLORTERM`, `TERM_PROGRAM`,
-  `TERM_PROGRAM_VERSION` and names starting `JASPER_` are reserved, and a value holding NUL is dropped; each dropped
-  entry is logged. A `[terminal.env]` entry still wins, and when two plugins set one name the first by plugin id wins.
-  WSL tabs and provided sessions get none.
-- `context.platform().editor(fileEditor)` (needs `editor.provide`) makes your plugin the editor Jasper opens files with:
-  Open in Editor for `config.toml`, plugin settings files and the VM options file, every plugin's `openInEditor`,
-  File › Open File… (a file the person chose, with no line), and a Cmd-click (Ctrl-click on Linux and Windows) on a file path in a local terminal pane, with the path's line and the
-  clicked window. A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown,
-  so edit the file and never run it.
-  `FileEditor.edit(file, line, window)` runs on the UI thread and returns whether it opened the file; `false`, or a
-  handler that throws, hands the file to the desktop, which for a click edits the file or shows it in the file manager
-  instead of opening it. One plugin at a time: a bundled plugin's registration replaces a non-bundled plugin's;
-  otherwise a later one throws `IllegalStateException`.
-- `OpenRequest.local(LocalSpec.running(command, workingDirectory))` opens a tab or split that runs a program instead of
-  the shell, with the default shell's environment; it needs `terminal.open`. The tab closes when the program exits with
-  status 0 and stays open otherwise, whatever `terminal.on_exit` says. A `LocalSpec` names a profile or a command, not
-  both.
-- `context.commandLine().client()` is the `jasper` command's path (inside the installed app, or the build's in a
-  development run), for a value such as `EDITOR`; empty when there is none.
+- [`FileEditor`](sdk-reference.html#dev.jasper.sdk.ui.FileEditor)`.edit(file, line, window)` runs on the UI thread,
+  must not block, and returns whether it opened the file. `false`, a handler that throws, or no answer within 30 seconds
+  hands the file to the desktop, which for a click edits the file or shows it in the file manager instead of opening
+  it.
+- A clicked path comes from program output, and an OSC 8 link's target can differ from the text shown, so edit the
+  file and never run it.
+- One plugin at a time: a bundled plugin's registration replaces one that is not bundled; otherwise a later
+  registration throws `IllegalStateException` ("The editor is already provided by *id*"). The role ends with the
+  plugin.
 
-## Rules that matter
+## Looks and themes
 
-- **Threads.** Subscribe and publish services on the event thread. `publish`, activity
-  handles, `require`/`find`, `log()` and `Subscription.close()` work from any thread. Slow
-  work goes on `context.background()`.
-- **Events.** A topic id starts with its owner's id. Only the owner publishes; anyone who can
-  load the payload type may subscribe. Delivery is queued, ordered and never re-entrant. There
-  is no replay: read current state, then listen.
-- **Activities.** `context.activities().begin(...)` returns a handle; end it exactly once.
-  Progress is coalesced. Jasper shows activities on Buddy. An activity left open when the
-  plugin stops is ended as failed.
-- **Connections.** `context.activities().connection(...)` announces something that is up until
-  it is not; report `up`, `degraded` or `down` as it changes and `close()` it once it no longer
-  matters. A new state is always delivered; a detail-only change is coalesced. Jasper shows
-  connections on Buddy. A connection left open when the plugin stops is closed. When an activity's
-  or a connection's `activateActionId` names one of your own actions, clicking its Buddy card runs
-  that action in the window the user used last.
-- **Services.** Publish interfaces from an exported package during `start` only, with
-  `publish` or, to learn who is calling, `publishPerConsumer`. Consumers must declare
-  `requires` on the provider. Put the interfaces in a separate API jar that consumers compile
-  against.
-- **Settings.** Declare them while starting (see "Declared settings" below); users edit them in Settings › Tools or in
-  `plugins/<id>/<id>.toml` (see [plugin settings](configuration.md#plugins)). Jasper checks and reports the values;
-  keep your own state under `context.dataDirectory()`.
-- **Your own threads and sockets** are yours to release, including before `start` throws.
+- **A look.** A plugin that names a kit file with `presentation` and declares `presentation.provide` provides Jasper's
+  look: its chrome and controls ([looks](looks.md) is the kit file reference). Jasper reads the kit file before the
+  first window, so a change applies after a restart. One look is active at a time: turning one on in Settings ›
+  Plugins turns the others off, and when several could load, a `--plugin-dir` look wins, then a bundled one, then an
+  installed one, then the lowest id. An invalid kit file skips the plugin with a notice naming the problem, given once
+  for each version of the look's files. A look whose last start did not finish is skipped until its files or Jasper's
+  build change or the user chooses **Try Again**, and `--safe-mode` uses the default look.
+- **Enterprise** (`plugins/enterprise`, off by default) is the worked example: its look is the kit file, IBM Plex fonts
+  and theme its manifest names, and its code only publishes `dev.jasper.enterprise.api.Workstation` while its look is
+  active ([the Enterprise look](enterprise.md)).
+- **Themes.** `themes` lists Jasper theme files in the plugin's jars ([creating themes](creating-themes.md)); a file's
+  name is its theme's id (`themes/look.json` is `look`). Jasper reads them once at start. While the plugin loads, its
+  themes are listed in Settings › Appearance after the built-in ones, captioned "From the *name* plugin", and cannot be
+  removed or replaced there; while it is off, a setting that names one uses the default theme without a warning and
+  keeps the name. A built-in id is ignored with a warning ("*Theme* is built in; the *Plugin* plugin's file is
+  ignored."), and when two plugins ship one id the development copy wins, then the bundled one, then the installed one,
+  then the lowest plugin id. A kit file's `[defaults]` may name its own plugin's themes.
 
 ## Declared settings
 
-Declare each setting while the plugin starts; the handle reads the file's value, reports bad values for you and
-saves new ones:
+Declare each setting while the plugin starts. The handle holds the file's value, reports bad values for you and saves
+new ones:
 
 ```java
 Setting<Integer> size = context.settings().declare(
@@ -653,27 +1045,128 @@ size.onChanged(points -> window.setFontSize(points));
 size.set(15);   // writes plugins/<id>/<id>.toml, keeping its comments
 ```
 
-Kinds are `bool`, `integer`, `number`, `text` (optionally with a rule and message), `choice` and `stringList`. A value
-the kind rejects falls back to the default and is reported against the file with its line; keys nothing declares are
-reported as unknown. Declaring after `start` returns throws. SDK 0.9 removed `PluginConfig` and `context.config()`.
+- **The file** is `<Jasper home>/plugins/<id>/<id>.toml` (`settings().file()`), at most 1 MiB. Jasper reads it again
+  within a second of a change and on Reload Config. Users edit it there or in Settings › Tools › *plugin name*.
+- **Keys** match `[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*`; each dot but the last names a TOML table. A key declared twice, or
+  inside another declared key, throws `IllegalArgumentException`; declaring after `start` returned throws
+  `IllegalStateException`.
+- **The spec.** [`SettingSpec`](sdk-reference.html#dev.jasper.sdk.settings.SettingSpec)`.of(key, kind, default)` with
+  `label` (required), `description`, `keywords`, `section`, `applies` (`LIVE`, the default, or `RESTART`, which labels
+  the row "Takes effect after restart"; change listeners run either way), `editor(EditorHint)` and `unit` (at most 16
+  characters, shown after a number).
 
-Settings shows a page for your plugin under Tools, generated from your declarations: rows in declaration order, a
-heading wherever `section` changes (the page's name heads rows before the first one), the description under each control, and an editor chosen by kind or by
-`editor(EditorHint...)`. An `integer` setting is a stepper and a `number` a decimal field; `unit("min")` (a short unit,
-empty for none) shows after the value of either, on generated pages and in `host.row` rows alike, and so do `EditorHint.font` (the font family picker), `EditorHint.file` (a path with Browse…) and `EditorHint.technical()` (SDK 0.18: a text field in the data face). A `stringList` is an ordered list with an entry
-below it that adds a value, on generated pages and in `host.row` rows alike. To build the page yourself, call `context.settings().page(panel)` during `start` with a
-`SettingsPanel`: `create(host)` builds an owned `UiView`, `host.row(setting)` gives you the standard `Nodes.Node` row for a declared
-setting, and `host.stage(setting, value)` sets a value from a control of your own; Settings saves them on Apply. Use
-`modified`, `apply` and `reset` only for state of your own, and `keywords` and `highlight` for search. Your panel
-lives as long as your plugin, so Settings calls `reset` before `dispose` whenever it closes a page it showed without a
-successful Apply, as on Cancel; drop unapplied state of your own there. Compose the page as the generated ones are: a
-`Nodes.Stack` with role `SETTINGS_PAGE` whose `Section`s each hold a `Card` of kind `SETTINGS` of rows (host rows keep the
-control in the trailing slot with an icon-only Reset while the value differs from its default), and the standard `Empty`
-state where a collection of your own has nothing to show. The Sample
-plugin's `SampleSettingsPanel` is a complete example; the testkit's `settingsPanel`, `pendingSettings` and
-`settingsPanelChanges` let you test it without a window.
+| [`SettingKind`](sdk-reference.html#dev.jasper.sdk.settings.SettingKind) | Value | A rejected value reports |
+| --- | --- | --- |
+| `bool()` | `Boolean` | |
+| `integer(min, max)` | `Integer` | Use a whole number from *min*–*max*. |
+| `number(min, max)` | `Double` | Use a number from *min*–*max*. |
+| `text()`, `text(rule, message)` | `String` | the message (a rule that throws rejects the value) |
+| `choice(List<Choice<T>>)` | `T`; `Choice.of(token, displayName, value)` writes the token and shows the name | Use one of: *tokens*. |
+| `stringList()`, `stringList(elementRule)` | `List<String>` | Not an allowed list element: "*x*". |
+
+- **Reading.** A value its kind rejects is replaced by the default and reported against the file, with its line; a key
+  nothing declares is reported as "Unknown setting or table; ignored." A value of the wrong TOML type, or a syntax
+  error, rejects the whole file: every setting keeps its last good value until the file is fixed. Jasper keeps a
+  `number` at `float` precision, so `0.1` reads back as `0.10000000149011612`.
+- **The handle.** [`Setting`](sdk-reference.html#dev.jasper.sdk.settings.Setting)'s `get()` works from any thread;
+  `onChanged` runs on the UI thread when the value changes, from the file or from `set`; `settings().onChanged(...)`
+  runs once after any declared value changed. `set(value)` saves from any thread, keeping the file's comments, and its
+  future completes once the handle shows the new value. It fails with `IllegalArgumentException` for a value the kind
+  rejects, and otherwise with an exception such as "*key* changed on disk. Review the new value and try again.",
+  "*file* has errors; fix them before saving settings.", "Cannot safely save *key*; review *file*.", "Plugin settings
+  exceed 1 MiB.", "Settings changed while saving. Try again." or "The plugin has stopped."
+- **The generated page.** Settings shows a page for the plugin under Tools: rows in declaration order, a heading
+  wherever `section` changes (the page's name heads the rows before the first), the description under each control, and
+  a control chosen by kind or hint: a stepper for `integer` and a decimal field for `number` (both with the unit), a
+  picker of display names for `choice`, an ordered list with an entry that adds a value for `stringList`.
+  `EditorHint.font(monospaced)` gives a font family picker, `EditorHint.file()` a path with Browse…, and
+  `EditorHint.technical()` a text field in the data face. `EditorHint.directory()` gives no folder chooser: the kind's
+  control is used. A plugin that is enabled but not running gets a page that says why, with **Open in Editor**.
+- **A page of the plugin's own.** Call `context.settings().page(panel)` once during `start` with a
+  [`SettingsPanel`](sdk-reference.html#dev.jasper.sdk.settings.SettingsPanel). `create(host)` builds an owned view each
+  time Settings opens; `host.row(setting)` gives the standard row for a declared setting (label, control, a Reset while
+  the value differs from its default, validation), and `host.stage(setting, value)` sets a value from a control of the
+  plugin's own; Settings saves both on Apply. `host.pending(setting)` returns the value Apply would save, and
+  `host.changed()` tells Settings to ask `modified()` again; call it whenever state of the plugin's own changes. Use
+  `modified`, `apply` and `reset` only for state of the plugin's own, and `keywords` and `highlight` for search. The
+  panel lives as long as the plugin, so Settings calls `reset` before `dispose` whenever it closes a page without a
+  successful Apply, as on Cancel. Compose the page as the generated ones are
+  ([Building plugin UI](plugin-ui.md#settings-pages)); the Sample's `SampleSettingsPanel` is a complete example.
+- Keep state that is not a setting under `context.dataDirectory()`.
+
+## Services and other plugins' APIs
+
+Plugins extend each other through services: an interface in an exported package, published by its provider and looked
+up by the plugins that require it. Credential Vault, the Editor, Remote, Snippets and Enterprise export APIs;
+[plugin APIs](plugin-apis.md) lists them.
+
+**Providing a service.**
+
+- List the API package under `exports`, and keep everything else in other packages.
+- During `start`, on the UI thread, call `services().publish(Api.class, implementation)`, or
+  `publishPerConsumer(Api.class, consumer -> ...)` to give each plugin that requires the provider its own instance, made
+  on the UI thread just before that plugin starts, with its
+  [`PluginInfo`](sdk-reference.html#dev.jasper.sdk.PluginInfo): attribution, not a security boundary. Credential Vault
+  does this so each grant names the plugin that asked ([grants](credential-vault.md#other-plugins-and-grants)).
+- The API must be an interface the provider loaded, in one of its exported packages ("*api* is not from one of *id*'s
+  exported packages"), and is published once across all plugins ("Service already published"). Publications become
+  visible only when `start` returns normally, and last until shutdown.
+- An API may have its callers implement an interface: Remote implements the Editor's `EditorDocument` for SFTP files,
+  whose methods the Editor calls on the UI thread and whose futures may complete on any thread. Say in the API which
+  thread calls what.
+
+**Using a service.**
+
+- Declare the provider under `requires` and compile against its API package. In the repository that is
+  `compileOnly(project(":jasper-plugin-<provider>"))`; outside it, the provider's jar from the application's bundled
+  plugins folder. Never ship the package yourself: a plugin that defines a class in a package a dependency exports is
+  refused.
+- Look the service up in `start` with `services().find(Api.class)` (empty when there is none) or `require(Api.class)`
+  (throws `ServiceUnavailableException`). Both are cache reads that work from any thread, for hard and optional
+  requirements alike, and return the same instance all session.
+- An absent optional provider's classes are not visible at all, so the first executed reference throws
+  `NoClassDefFoundError`. Catch it where the API is first used, as Remote does for the Vault
+  ([when the provider is absent](plugin-apis.md#when-the-provider-is-absent)):
+
+```java
+Optional<VaultApi> vault;
+try { vault = context.services().find(VaultApi.class); }
+catch (NoClassDefFoundError absent) { vault = Optional.empty(); }
+```
+
+- Then test `isPresent()` before running code that names the API: `vault.ifPresent(api -> …)` also throws when the
+  provider is absent, because creating the lambda loads the API class.
+- Jasper does not check an optional requirement's version, so a provider older than your range may be present: guard
+  calls to methods newer than your minimum with `catch (NoSuchMethodError older)`, as Remote does for older Editors.
+- In the repository, `verifyPluginArchitecture` lets a plugin reference only the JDK, the SDK, its own packages, the
+  libraries it bundles and the packages listed for it in `declaredImports` (`gradle/plugin-architecture.gradle.kts`);
+  `dev.jasper.enterprise.api` only from the plugin's own `workstation` package.
+
+## Rules that matter
+
+| Runs on, or may be called from | What |
+| --- | --- |
+| The UI thread only | `start` and `stop`; every registration (actions, menus, toolbar, status bar, rail, tool windows, windows, the kit, palette scopes, file sources, subcommand handlers, shell-variable contributors, the file editor); `events().subscribe`; `services().publish`; settings declarations; every `Terminals` and handle query; the clipboard. Handlers of actions, events, view events, scopes, settings changes and notification actions run there. |
+| Any thread | `events().publish`; starting activities and connections, and their handles; `services().find` and `require`; posting notifications; `PaneHandle.sendText`, `sendBytes` and `paste`; every `PendingSession` method; `Setting.get` and `set`; `openInEditor` and `browse`; `log()`; `Subscription.close()`. |
+
+- **Slow work** goes to `context.background()`, whose tasks can run at the same time. UI-thread code does no I/O and
+  returns promptly.
+- **Lifetimes.** Everything a plugin registers is a `Subscription` or a handle. Closing one is idempotent and safe from
+  any thread; on the UI thread the contribution is gone when `close()` returns. Jasper closes everything a plugin left
+  open when it stops or fails to start, newest first. The plugin's own threads, sockets and files are its own to
+  release, including before `start` throws.
+- **Failures are contained.** Every call into plugin code catches `Exception` and `LinkageError`: Jasper logs it against
+  the plugin, counts it, records an incident and posts "*name* failed in *operation*" in Plugin problems, with
+  **Disable Plugin** and **Show more…**. The plugin keeps running.
+- **Ids are namespaced.** Everything a plugin registers starts with its id and a dot; registered icons with its id and
+  a colon.
 
 ## Testing
+
+`jasper-sdk-testkit` runs a plugin against
+[`FakePluginHost`](sdk-reference.html#dev.jasper.sdk.testing.FakePluginHost), a headless, single-threaded stand-in for
+Jasper ([testkit](../jasper-sdk-testkit/README.md)). The calling thread plays the UI thread; events wait until
+`flush()`, background tasks until `runBackground()`.
 
 ```java
 try (var host = new FakePluginHost()) {
@@ -685,85 +1178,75 @@ try (var host = new FakePluginHost()) {
 }
 ```
 
-`host.settingsReports(id)` lists what the last read of the plugin's file reported, as `key: message`, and
-`host.savedSettings(id)` what `set` wrote.
+- Give the `PluginInfo` the capabilities the manifest declares; `start(info, requires, optional, plugin)` takes the
+  ids of the plugins it requires. `failures()` lists what the fake contained; `active(id)` tells whether a plugin
+  runs; `close()` stops every plugin and deletes the fake's temporary data folder (`new FakePluginHost(folder)` uses
+  yours).
+- A plugin that makes views needs the Swing event dispatch thread: run the test in `SwingUtilities.invokeAndWait`.
 
-`host.actions()`, `host.toolbar()`, `host.menu("VIEW")`, `host.status()` and
-`host.invoke(id, windowId, paneIdOrNull)` show and drive what the plugin contributed.
-`host.toolbarViews(windowId)` builds and returns a window's toolbar views, as the window does when it opens, and
-`closeToolbarViews(windowId)` closes them, as closing the window does.
-`host.panels()`, `host.openPanel(id, windowId)`, `host.rail()`, `host.windows()` and
-`host.requestClose(windowId)` cover panels and windows. The fake does not model Jasper's own
-`<panel id>.toggle` action or View › Tool Windows menu; `host.panels()` lists `id|title|ANCHOR`, with
-`+split` after the anchor for a split panel and `|<action id>` for a panel that names its own toggle.
-`host.addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `activateTerminalWindow`,
-`focusTerminalPane` and `closeTerminalPane` script a workspace; `host.sent(paneId)` and
-`host.openRequests()` show what your plugin did; `commandStarted`, `commandFinished`,
-`titleChanged`, `cwdChanged`, `sessionExited` and `bell` publish terminal events, delivered by
-`flush()`. `host.remoteCwdChanged(paneId, host, path)` reports a remote directory.
-`host.setShellProfiles(list)` scripts the detected shell profiles and runs `onProfilesChanged` listeners; `openRequests()` then ends a line with `|<profile id>` when the request named one, and a program tab's or split's
-line with `|run:<command>`, its words joined by spaces. `host.shellEnvironment(jasperEnvironment)` returns what the
-plugins' `Terminals.environment` contributors add for a new shell; `host.edit(file, line, windowId)` calls the
-`Platform.editor` file editor, `host.editorPlugin()` names its plugin and `host.declareBundled(id)`, before that
-plugin starts, makes it bundled; `host.setCommandClient(path)` sets `commandLine().client()`; a settings row's Browse…
-takes the next `host.queueFileSelection`. Give the
-`PluginInfo` you start with the capabilities your `plugin.toml` declares.
-A provided session is driven with `host.sessionState(paneId)`, `typeIntoSession`, `sessionOutput`,
-`cancelSession` and `reconnectSession`; `flush()` notices exits. The fake runs cancellation handlers
-and closes inline where Jasper uses its cleanup thread.
-`host.scopes()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep` and `executeInScope`
-drive a contributed scope as the palette would, and `scopePresentation(scopeId)` reports its hue, item noun and
-verb roles as `HUE|noun|ROLE,ROLE`; `paletteOpens()`, `openedInEditor()`
-(the files no provided editor opened) and `browsed()` record what the plugin asked for. `host.clipboard()` is the
-clipboard every plugin's `Platform` writes to: `copies()` lists `copy|<plugin id>|<text>` and `secret|<plugin id>|<text>`, `text()` and `setText(value)` read and
-set it as the user would, `failWrites(true)` makes it busy, and `expireSecrets()` runs the 30-second clear now. The fake
-does not model the UI thread, so the application's off-thread `IllegalStateException` is not reproduced. `connectionLog()` lists delivered connection events, as
-`activityLog()` does activities. `host.notifications()` records what the plugin posted: `lines()` as
-`group|SEVERITY|title|content`, with `|` and the cause's simple class name when it had one, `posts()` with their specs
-and whether they expired, `groups()` as `id|name|MODE`, and `runAction(title, label)` and `click(title)` act as the
-user would. A component that takes a `NotificationGroup` can be given `new FakeNotifications().group(id)`.
+| To test | Use |
+| --- | --- |
+| Settings | `setSetting(id, key, value)` (before `start` it is the starting file), `settingsReports(id)` as `key: message`, `savedSettings(id)`, `declared(id)`; `settingsPanel`, `settingsPanelView`, `pendingSettings`, `settingsPanelChanges`, `applySettingsPanel`, `closeSettingsPanel` |
+| Commands and chrome | `actions()`, `actionSpec(id)`, `invoke(id, windowId, paneIdOrNull)`, `toolbar()`, `toolbarViews(windowId)`, `menu("TOOLS")`, `status()`, `progress()`, `rail()` |
+| Tool windows and windows | `panels()` (each tool window's id, title, anchor, split and toggle action), `openPanel`, `panelView`, `panelHeader`, `closePanel`; `windows()`, `windowView`, `dialogPresentation`, `dialogSwatch`, `popoverViews`, `requestClose`, `closeCommand`, `requestQuit`; `queueFileSelection`, `queuePathSelection`, `queueFileChoice`, `fileChoices` |
+| Terminals | `addTerminalWindow()`, `addTerminalTab`, `addTerminalPane`, `focusTerminalPane`, `closeTerminalPane`, `setPaneInfo`, `setSelection`, `setForegroundJob`, `setShellProfiles`; `sent(paneId)`, `openRequests()`; `commandStarted`, `commandFinished`, `titleChanged`, `cwdChanged`, `remoteCwdChanged`, `sessionExited`, `bell` |
+| Provided sessions | `sessionState(paneId)`, `typeIntoSession`, `sessionOutput`, `cancelSession`, `reconnectSession`, `pumpSessions` |
+| Palette scopes | `scopes()`, `scopePresentation(id)`, `scopesInAll()`, `scopesInRecents()`, `searchScope`, `availableInScope`, `stepInScope`, `completeStep`, `executeInScope`, `paletteOpens()` |
+| Everything else | `notifications()`, `clipboard()`, `activityLog()`, `connectionLog()`, `openedInEditor()`, `browsed()`, `contentTabs()`, `fileSources()`, `connectFileSource`, `declareSubcommand(pluginId, name, summary)` before `start` (the fake reads no `plugin.toml`), then `call(name, arguments, folder)`, `setCommandClient(path)` (what `CommandLine.client()` returns), `declareBundled(pluginId)` (a bundled plugin's file editor registration wins), `shellEnvironment(map)`, `edit(file, line, windowId)`, `publishApp(topic, payload)`, `setVariant`, `setWorkspace` |
+
+Where the fake differs from Jasper:
+
+- Background tasks run one at a time on the caller, at `runBackground()`; Jasper runs each on its own thread.
+- Apart from the kit, which requires the event dispatch thread, the fake does not enforce the UI thread, so Jasper's
+  `IllegalStateException` off it is not reproduced.
+- It does not check that a service API is in an exported package, and an absent optional provider's API is still on
+  the test classpath, so the `NoClassDefFoundError` path cannot be tested there.
+- It keeps settings in memory and writes no file; a value of the wrong type keeps only that setting's last good value,
+  where Jasper rejects the whole file; `set` completes at once; `number` values stay `double`.
+- Palette calls get `maxResults` 5 and `macOs` true, and `executeInScope` skips `available`.
+- `FileSource.connect` always gets a window.
 
 ## Building the in-repo plugins
 
-Every `plugins/<name>/` directory with a `build.gradle.kts` is discovered by `settings.gradle.kts`
-as the Gradle module `:jasper-plugin-<name>`; the same tasks appear in IntelliJ's Gradle tool
-window under that name, and the modules compile with the rest of the project.
+Every `plugins/<name>/` folder with a `build.gradle.kts` is the Gradle module `:jasper-plugin-<name>`; IntelliJ's Gradle
+tool window shows the same tasks under that name, and the modules compile with the rest of the project.
 
 ```sh
 ./gradlew :jasper-plugin-snippets:build          # compile, test and jar one plugin
-./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir directory
-./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.1.0.zip
+./gradlew :jasper-plugin-snippets:stagePlugin    # plugins/snippets/build/plugin/dev.jasper.snippets/, a --plugin-dir folder
+./gradlew :jasper-plugin-snippets:pluginZip      # plugins/snippets/build/distributions/dev.jasper.snippets-0.3.0.zip
 ./gradlew pluginZips                             # every plugin, built and zipped, collected in plugins/build/zips/
 ```
 
-`stagePlugin` and `pluginZip` carry the plugin jar plus its runtime classpath (Snippets bundles
-tomlj this way), which is exactly what `stagePlugins` copies into the application image and what
-`PluginInstaller` expects; a plain `build/libs` jar is missing the bundled libraries. The id and
-version come from `plugin.toml`. A new `plugins/<name>/` directory is built, checked by
-`verifyPluginArchitecture` and zipped with nothing to register; it only needs an entry in
-`declaredImports` (`gradle/plugin-architecture.gradle.kts`) when it requires another plugin, and in
-the `stagePlugins` task (`jasper-app/build.gradle.kts`) when it ships in the application image.
-`PluginZipsTest` stages every collected zip through the installer.
+`stagePlugin` and `pluginZip` carry the plugin jar and its runtime classpath, the libraries it bundles: exactly what
+`:jasper-app:stagePlugins` copies into the application image and what an install expects. A plain `build/libs` jar
+lacks the bundled libraries. The id and version come from `plugin.toml`. A new `plugins/<name>/` folder is built,
+checked by `verifyPluginArchitecture` and zipped with nothing to register. It needs an entry in `declaredImports`
+(`gradle/plugin-architecture.gradle.kts`) when it requires another plugin, and in `stagePlugins`
+(`jasper-app/build.gradle.kts`) to ship in the application image. `PluginZipsTest` installs every collected zip through
+the installer.
 
 ## Building a plugin outside the Jasper repository
 
 Each Jasper GitHub release carries the SDK as jars: `jasper-sdk-<v>.jar` (with `-sources` and `-javadoc` jars) and
-`jasper-sdk-testkit-<v>.jar` (with `-sources`), where `<v>` is that release's `JasperSdk.VERSION`. Take them from the
-release whose SDK version your `plugin.toml` `sdk` range admits, put them in your plugin's `libs/`, and start from the
-[example external plugin](examples/external-plugin/build.gradle.kts):
+`jasper-sdk-testkit-<v>.jar` (with `-sources`), where `<v>` is the release's SDK version. Take them from a release whose
+SDK version your `sdk` range admits, put them in your plugin's `libs/`, and start from the
+[example external plugin](examples/external-plugin/README.md):
 
-- [`build.gradle.kts`](examples/external-plugin/build.gradle.kts) links the SDK as `compileOnly` (Jasper supplies it at
-  run time), puts the SDK and testkit on the test classpath with JUnit and AssertJ from Maven Central, compiles with any
-  Java 25, and adds `stagePlugin` and `pluginZip`.
+- [`build.gradle.kts`](examples/external-plugin/build.gradle.kts) links the SDK as `compileOnly`, puts the SDK and
+  testkit on the test classpath with JUnit and AssertJ from Maven Central, compiles with any Java 25, and adds
+  `stagePlugin` and `pluginZip`.
 - [`plugin.toml`](examples/external-plugin/src/main/resources/plugin.toml),
   [`HelloPlugin`](examples/external-plugin/src/main/java/dev/example/hello/HelloPlugin.java) and
   [`HelloPluginTest`](examples/external-plugin/src/test/java/dev/example/hello/HelloPluginTest.java) are a minimal
-  plugin and its `FakePluginHost` test.
+  plugin, a Tools menu command that copies a greeting, and its `FakePluginHost` test.
 
-To build the jars yourself from a Jasper checkout, run `./gradlew sdkRelease`; they land in `build/sdk-release/`. The
-example builds from them with `./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip`
-(CI does exactly this), and `-PjasperSdkVersion=<v>` selects another release's jars. The zip then installs as described
-in [Distributing a plugin](#distributing-a-plugin).
+To build the jars from a Jasper checkout, run `./gradlew sdkRelease`; they land in `build/sdk-release/`. The example
+builds from them with
+`./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip` (CI does exactly
+this), and `-PjasperSdkVersion=<v>` selects another release's jars. The released testkit holds `FakePluginHost` and the
+other fakes, not the contract suites the repository runs against Jasper. The zip installs as [Distributing a
+plugin](#distributing-a-plugin) describes.
 
 ## Running a plugin in Jasper
 
@@ -771,20 +1254,21 @@ in [Distributing a plugin](#distributing-a-plugin).
 jasper --plugin-dir /path/to/build/plugin/dev.example.tool
 ```
 
-`--plugin-dir` loads one plugin directory with consent pre-granted. Like `--safe-mode`
-(no user plugins) and `--standalone`, it never hands off to or becomes a resident process.
-Installed plugins live in `~/.config/jasper/plugins/<id>/jars/` and stay inert until the user reviews
-them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`. Every
-plugin, a `--plugin-dir` one included, gets `plugins/<id>/` with its settings file and `data/`.
+`--plugin-dir` loads one more plugin from a folder that holds its jars, directly or in `jars/`; the folder's name is
+free ([command line](command-line.md)). The plugin needs no review and is listed under **Development** in Settings ›
+Plugins. Like `--safe-mode`, the option makes the launch standalone: it never hands off to, or becomes, a resident
+Jasper. It also serves its own command socket, so `jasper <name>` reaches the plugin's subcommands only from shells in
+that Jasper's own terminal panes, and `jasper --help` does not list them. A bundled or installed copy of the same id
+with a higher version loads instead (on equal versions the development copy wins), and an id the user disabled in
+Settings › Plugins stays off. Every plugin, a `--plugin-dir` one included, keeps its settings file and `data/` in
+`<Jasper home>/plugins/<id>/`.
 
-While developing Jasper itself, `./gradlew :jasper-app:run` and the IntelliJ configuration "Jasper
-(dev home)" run with `-Djasper.home=jasper-app/build/dev-home` and the bundled plugins (sample,
-Snippets, Shell History) staged by `stagePlugins`, so your installed plugins, their consent and
-data stay untouched. To run a plugin that is not bundled from IntelliJ, run its `stagePlugin` task
-and add `--plugin-dir <its build/plugin/<id> directory>` to that configuration's program arguments
-(or `--args='--plugin-dir …'` to the Gradle `run`); it loads with consent pre-granted. To try the
-user-plugin path itself, unzip or copy a plugin directory into `jasper-app/build/dev-home/plugins/`
-and review it in File → Manage Plugins… as a user would, still without touching your system Jasper.
+While developing Jasper itself, `./gradlew :jasper-app:run` and the IntelliJ configuration "Jasper (dev home)" use
+their own Jasper home, `jasper-app/build/dev-home`, and the bundled plugins staged by `:jasper-app:stagePlugins`, so
+your installed plugins, their consent and their data stay untouched. To run a plugin that is not bundled, run its
+`stagePlugin` task and add `--plugin-dir <its build/plugin/<id> folder>` to that configuration's program arguments,
+or `--args='--plugin-dir …'` to the Gradle `run`. To try the user's path itself, unzip or copy a plugin folder into
+`jasper-app/build/dev-home/plugins/` and review it in Settings › Plugins as a user would.
 
 ## The Java runtime
 
@@ -812,290 +1296,35 @@ returns null; `jdk.javadoc`, `jdk.jshell`, `jdk.jlink`, `jdk.jpackage`, `jdk.jde
 packaged app), `jdk.dynalink` (a bundled Nashorn cannot run), `jdk.incubator.vector`, `jdk.sctp`, `jdk.xml.dom`,
 `jdk.jsobject`, `jdk.nio.mapmode`, and the JetBrains Runtime's JCEF and JOGL (`jcef`, `jogl.all`, `gluegen.rt`). A
 library that needs one of them fails with `NoClassDefFoundError` in the packaged app although it works under
-`./gradlew :jasper-app:run`, which uses the full SDK. Bundle a jar instead, or ask for the module to be added
+`./gradlew :jasper-app:run`, which uses the full JDK. Bundle a jar instead, or ask for the module to be added
 (`runtimeRootModules` in `gradle/packaging-support.gradle`).
 
-The packaged JVM loads JNA's native library from Jasper's own copy (`jna.boot.library.path`, JNA 5.14.0) and points
-pty4j at Jasper's bundled files (`pty4j.preferred.native.folder`). Both properties are process-wide. A plugin that
-bundles JNA should bundle the same version: another version fails to load its native part if it is the first in the
-process to initialise JNA. Start terminals through `context.terminals()` rather than a pty4j of your own.
+On macOS and Windows the packaged JVM loads JNA's native library from Jasper's own copy (`jna.boot.library.path`, JNA
+5.14.0) and points pty4j at Jasper's bundled files (`pty4j.preferred.native.folder`). Both properties are process-wide.
+A plugin that bundles JNA should bundle the same version: another version fails to load its native part if it is the
+first in the process to initialise JNA. Start terminals through `context.terminals()` rather than a pty4j of your own.
 
 ## Distributing a plugin
 
-Zip your plugin's jars, either at the root of the zip or inside one folder; everything else in the
-zip is ignored. Users install it from File → Manage Plugins… → Install from Zip…. Jasper unpacks
-the jars into a staging folder, checks the descriptor exactly as it does at launch (one
-`plugin.toml`, a valid id, an `sdk` range that includes this Jasper), and shows a consent dialog
-with your name, version, vendor and capabilities. The plugin is installed and loaded at the next
-restart; an update never replaces jars that a running Jasper has open.
+Zip the plugin's jars, at the root of the zip or all in one folder; everything else in the zip is ignored.
+`./gradlew :jasper-plugin-<name>:pluginZip` makes the zip of an in-repo plugin and the example's `pluginZip` that of an
+external one; for any other build, zip the plugin jar with every library jar it bundles.
 
-For an in-repo plugin the zip is `./gradlew :jasper-plugin-<name>:pluginZip` (see "Building the
-in-repo plugins"); for your own build, zip the plugin jar together with every library jar it bundles.
-To install into the Jasper you use day to day, start that Jasper (not a dev-home launch), open
-File → Manage Plugins… → Install from Zip…, pick the zip, review the consent dialog, and restart
-when asked; the plugin lands in `<Jasper home>/plugins/<id>/jars/`. Dropping the zip into
-`<Jasper home>/plugins/` does the same at the next launch, minus the dialog: the plugin then waits
-for Review… in the manager. The bundled plugins are already in the application image, so installing
-their zip only matters for a Jasper built without them.
-
-- Declare only the capabilities you use: the list is what the user is asked to allow, and a later
-  version that adds one is held back until the user reviews it again.
-- Consent is not a sandbox, and the dialog says so. Your plugin runs with everything Jasper can reach.
-- Users disable, review and remove plugins in the same window. Removal deletes the whole
-  `plugins/<id>/` (jars, settings and data) at the next launch, after a confirmation.
-- `jasper --safe-mode` starts without installed plugins, so a plugin that breaks startup can be
-  disabled or removed; the manager then offers Restart Normally.
-
-Remote (`plugins/remote`) is a worked example for `session.provide`: connection work runs on the
-background executor, status and attachment return to the UI thread, and each shell holds a reference
-on a shared MINA session. Cancellation withdraws pending credentials and host-key prompts.
-
-In SDK 0.7.2+, `context.panels().toggle(panelId, window)` opens or hides your own
-registered panel in a terminal window. It creates the panel lazily and reuses that
-window's instance. Require `>=0.7.2` in the manifest when calling it.
-
-### UI typography
-
-Use `Nodes.TextRole` and the kit's layout roles. Jasper applies the live UI font settings
-without rebuilding your controller or changing stored input. Document/editor typography
-remains part of the specialized editor contract.
-
-### Centered progress overlays
-
-With SDK 0.7.3+, use `context.windows().overlay(new OverlaySpec("Connecting", window))` for
-short-lived progress inside a terminal window. Set owned `UiView` content, supply a Cancel button
-that aborts your work and calls `close()`, then call `show()` (nonblocking). There is no title bar,
-dragging, Escape dismissal or outside-click dismissal. Only one overlay may be reserved per window
-across plugins; a competing request throws `IllegalStateException`. Owner close and plugin stop
-close the handle; use `onClosed` for cancellation cleanup. Native dialogs remain available for
-required credential and trust prompts. Overlays accept terminal owners from the same host only.
-
-### Status progress (SDK 0.7.5)
-
-Use `context.statusBar().addProgress(StatusItemSpec)` for host-rendered progress. Update the
-returned `StatusProgress` on the UI thread with one `StatusProgressState`: plain label, detail,
-spoken description, `OptionalDouble` fraction and optional primary/secondary registered action
-ids. Empty fraction means indeterminate. One handle updates every window; close removes it.
-The secondary action uses its registered title (for example Cancel); the primary action can
-open a richer management panel. Throttle worker samples before posting UI updates.
-
-### Local path pickers (SDK 0.7.5)
-
-`context.windows().chooseFiles(owner, title, initial)` returns an immutable list of local paths;
-`chooseDirectory` returns one optional directory. Invoke on the UI thread with a live terminal
-window or a shown plugin window. Both calls pump UI events, so revalidate selection-dependent
-state afterwards; owner closure or plugin stop cancels and discards the result. The host uses a
-native multiple-file picker and a themed directory picker. Paths are absolute and normalized;
-perform subsequent filesystem work in the background. Existing `WindowSurface.chooseFile`
-continues to select one file for window-owned workflows.
-
-SDK 0.8.4 adds `chooseSaveFile(owner, title, initial)` for a file to save to: pass a suggested file to
-fill in its folder and name, or a folder to start in. The platform dialog asks before replacing an
-existing file, so you need not ask again.
-
-Session providers that independently discover the attached shell's remote directory may
-call `pending.reportRemoteDirectory(new RemoteDirectory(host, path))` from any thread
-(SDK 0.8.3). The hint appears in the pane snapshot and window display until the shell
-reports OSC 7. It does not emit `CWD_CHANGED`, affect command events, or create a local
-working directory. Calls made before attach, after exit/close, or by an old reconnect
-attempt have no effect. Declare a minimum SDK of 0.8.3 when using this method.
-
-### File sources and the chooser (SDK 0.10.0)
-
-Register a `FileSource` with `context.fileSources().register(source)` (needs `files.source`). Its `spec()` id starts
-with your plugin id; `roots()` lists what appears in the chooser's navigation pane; `connect(rootId, owner)` returns a
-stage completing with a `FileBrowser` the host owns and closes. Browser methods run on a host worker and may block;
-paths are absolute and use `/`. Implement `locate(pane)` to open choosers where a terminal pane is. Ask for a file with
-`context.windows().choose(new FileChoice(owner, "Open", FileChoice.Mode.OPEN, false, Optional.empty(), Optional.empty(), Set.of(sourceId)))`;
-the result lists `FileLocation.Local` and `FileLocation.Sourced` values.
-
-### Documents in workspace tabs
-
-Use SDK 0.8.5's `Windows.openTab` for document surfaces. Supply only specialized content;
-the app provides the tab strip, frame, window, status controls and menus. Update the returned
-`ContentTab` with `ContentPresentation`, `ContentCommand` and `ContentStatus` snapshots,
-and set a focus callback. Pass the handle as the owner of save pickers and dialogs so those
-follow moves to another window. `move(true)` opens a separate app-managed workspace;
-`move(false)` returns to the last main workspace. Preserve the component/session during moves.
-
-Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch
-flag. Complete false on cancellation or save failure. Recheck edits made during an async
-save before completing true. Use `onClosed` to stop per-document work; plugin shutdown may
-force-close remaining handles after the application's quit/restart guard has approved.
-Use stable session keys when Save As changes document identity; deduplicate file paths in
-the document model, not by changing a live tab's key. Do not encode remote paths as local
-`Path` values. Use `Appearance.editorPalette()` for specialized text surfaces. Since SDK 0.12.0, use
-`workspacePalette()` and `syntaxPalette()` for specialized workspace content and syntax, and subscribe to
-`onWorkspaceChanged` to refresh them even when darkness stays the same. Palette reads and subscription registration
-belong on the UI thread; variant getters may run on any thread. Dispose subscriptions with their widgets.
-All palette values come explicitly from `Appearance`; SDK UIManager fallback readers were removed in 0.15. For an Editor-like control, reapply `editorPalette()` and `syntaxPalette()` on every
-workspace event; an event can change colors while `workspaceVariant()` remains `DARK` or `LIGHT`. Keep the document
-and undo model when changing only its styles.
-Since SDK 0.14.1, a surface that should follow a translucent window reads `Appearance.workspaceOpacity(component)` on
-the UI thread (it is 1 unless the component is in the workspace area of a translucent window, so tool and side panels
-stay opaque), fills its own background once with that alpha (`AlphaComposite.Src`, unantialiased rectangles) and keeps
-the components above it non-opaque; `onWorkspaceChanged` also fires when the opacity changes or the component moves to
-another window. Keep selection, carets and bars solid. The Editor plugin's `DocumentArea` is the reference.
-
-
-### Supported custom content
-
-The SDK 0.15 standard UI contract is kit-only. Raw ordinary-control factories, arbitrary Swing Icon
-arguments, Appearance icon loaders and UIManager palette readers are removed. `CustomContent`
-retains specialized EDITOR/PREVIEW components, explicit host palettes and workspace opacity.
-Bundled Editor's approved custom source owners are `ui/DocumentArea.java` and `vim/VimTextArea.java`.
-The manifest `icon` remains an identity image preview; it is separate from presentation glyphs.
-
-Old truthful SDK ranges are rejected by the pure resolver. Before initializing a plugin class,
-the loader checks effective multi-release class files for exact removed SDK members and types,
-including obsolete factory implementations, and SDK 0.18's renamed constants. Errors identify the class, the
-member and the SDK version that removed it.
-Erased generic icon values, reflective member lookup and enum constants named by strings (`valueOf`, a
-qualified constant label in a pattern `switch`) cannot all be detected statically;
-existing lifecycle and callback linkage containment remains in place.
-
-### Enforced custom source ownership
-
-The build gate `gradle/architecture/PluginPresentationCheck.java` runs with the selected JBR25 toolchain,
-independently of the Gradle JVM. It parses compiled authored main classes (not vendor jars), inspects
-constructor/style/graphics member references and declared paint methods, and resolves class hierarchies
-without initialization. Ordinary visible receivers cannot receive presentation setters for size/bounds,
-margin, alignment/layout, icon assignment/variants or paint flags, in addition to colors/fonts/borders.
-The receiver hierarchy determines this policy: constructing or resizing a domain Dimension stays legal.
-Domain Color/Point/Dimension, timers and undo/string APIs remain legitimate.
-Its negative fixtures invoke the same production checker, including same-package and exact-owner
-ordinary-control attempts. This is a build-time ownership check, not a reflective-code security sandbox.
-
-Exact custom sources are `plugins/editor/src/main/java/dev/jasper/editor/ui/DocumentArea.java` and
-`plugins/editor/src/main/java/dev/jasper/editor/vim/VimTextArea.java` (including nested classes whose
-SourceFile agrees). DocumentArea may construct its JComponent canvas, VimTextArea, RTextScrollPane and
-vendor-popup JMenuItem; VimTextArea may construct RSyntaxTextArea and its exact RSyntaxTextAreaUI
-subclass. EditorTab may construct DocumentArea to register it. Even these owners cannot construct
-ordinary JButton/JPanel controls. No package exemption exists.
-
-The specialized helper `plugins/editor/src/main/java/dev/jasper/editor/ui/EditorTheme.java` is allowed
-only document/gutter/scroll/viewports background and opacity, RSyntaxTextArea foreground/caret/selection,
-and JComponent opacity for gutter children. Its Gutter client property marks the single opacity follower.
-It cannot paint, construct controls, read global presentation defaults, or style arbitrary ordinary controls.
-The exact member-owner allowlist is in the checker; FlatLaf style writers remain forbidden.
-
-## Consumer migration completion
-
-`ButtonPresentation.CONTEXTUAL_EMBEDDED` reserves the same content geometry as `EMBEDDED` and keeps the control mounted, focusable, accessible and independently actionable. In an interactive row, its ink appears while the row is selected, hovered or actually keyboard-active, or while the button itself owns focus. Outside a row it paints normally. Use `EMBEDDED` for persistent actions such as a confirmed favorite; the default `STANDARD` remains unchanged. The host maps this enum directly and the testkit retains it in the descriptor.
-
-Plan 2 uses the kit as the only standard-control presentation authority. SDK 0.15 is incompatible with
-pre-0.15 raw UI factories and raw presentation icons; all eight bundled manifests cut over together.
-The [completion audit](design/theme-engine/completion.md) records exact gate scope, owner tests, headless
-rendering, distribution checks and the named Plan 3 composition owners. App host Settings error/stub
-content uses the dialog kit context and closes with its page; it is not covered by the plugin-only compiled gate.
-
-### Panel compositions (SDK 0.15.3)
-
-Give a panel with nothing to show an `Empty` as its body: the host centres it in the body at the panel-reference size.
-A note above it (for example a settings-file problem) goes in a `SplitKind.DOCUMENT` split with the `Empty` last.
-Two-line `ItemList` rows in a panel are compact: put the name first on the title line (it keeps its width before
-whatever follows it) and a `Chip` plus a `MONO_SMALL` endpoint on the second; one compact `Toggle` trails. A persistent
-footer is a VERTICAL `Stack` whose last child is a `SettingRow`; status text above it stays above the rule.
-
-`LayoutRole.ROUTE` shows a connection as equal columns, each a child `Stack` of an `Icon` beside a description and a
-`MONO_SMALL` line; the host draws the arrows between them. A DROPDOWN `Choice` may pass a `PickerFace` to show a rich
-face (a saved host's name, address and glyph) while its options stay ordinary. New glyph names: `laptop`, `target`,
-`arrow.right` and `import`.
-
-### Declared identity tile hue (SDK 0.15.1)
-
-`icon_hue = "neutral"` is optional. Its exact tokens are `neutral`, `blue`, `green`, `amber`, and `purple`;
-omission uses neutral. It chooses the receiving theme's identity tile backdrop in Plugins rows/headers
-and notification owner headers. It never recolors SVG/PNG pixels or changes their opacity or size.
-An opaque authored background can cover that tile. Missing or invalid artwork keeps the generic fallback.
-Invalid decorative strings warn and fall back to neutral; nonstring values and unrelated unknown keys are rejected.
-
-Manifests using this key must declare `sdk = ">=0.18.0, <0.19"`. Older hosts reject `icon_hue` as an unknown key
-before checking the SDK range; excluding those hosts does not change that parser ordering. To support older hosts,
-omit the key in that release's manifest. Existing manifests without the key continue to use their admitted ranges.
-The runtime checks whether the current host is admitted; it does not parse per-feature comparator policies.
-
-### Selected identity ink (SDK 0.15.2)
-
-`icon_selected_ink = "foreground"` explicitly opts an identity tile into the receiving theme's
-on-accent foreground while selected. The default, `"authored"`, preserves authored RGBA in every
-state. Normal rows, detail headers and ordinary icon routes retain authored pixels with either policy.
-The foreground silhouette uses the original composited alpha, including translucent layers and
-opaque backgrounds, at each prepared device resolution. Disabled treatment is applied once.
-All bundled monochrome identities opt in consistently; third-party omission remains authored.
-
-Only the exact lowercase tokens `authored` and `foreground` are accepted. Other strings warn and
-fall back to authored; nonstrings are invalid descriptors, and unrelated unknown keys remain invalid.
-Manifests using the key must declare `sdk = ">=0.18.0, <0.19"`. Older strict parsers reject the unknown
-key before SDK compatibility resolution; a version floor does not make an old parser accept it.
-The host's immutable identity value includes this policy in equality and receiver aliases; same-byte
-metadata updates therefore refresh selected presentation without replacing the plugin's authored art.
-This is manifest metadata, not a new SDK UI descriptor or general icon-state API.
-
-### Free-entry placeholders (SDK 0.15.3)
-
-`Nodes.ChoiceSearch` gains a fourth component, `placeholder`. A SEARCHABLE choice with free entry
-(`entry` present) shows a nonempty placeholder in the placeholder role while its text is empty, for
-example the group a blank value files a host under. It is display text only: it is never reported as an
-`Edited` value and never becomes the entry. A placeholder without free entry is rejected. The original
-three-argument constructor remains and supplies an empty placeholder.
-
-### SDK 0.15.3 summary
-
-SDK 0.15.3 adds, for plugins built against it (declare `sdk = ">=0.18.0, <0.19"`): `LayoutRole.ROUTE`; a
-`PickerFace` on DROPDOWN choices; the free-entry `ChoiceSearch.placeholder`; `SettingSpec.unit` (shown after a
-bounded integer's Settings stepper); the `border.identity` semantic color; and the icon names `laptop`, `target`,
-`arrow.right`, `import`, `clock`, `lock.keyhole`, `match.word`, `brightness`, `reset`, `expand.all` and
-`collapse.all`. [Building plugin UI](plugin-ui.md) shows the compositions they belong to.
-
-### Modal overlays (SDK 0.15.4)
-
-`DialogSpec.Presentation.OVERLAY` presents a modal dialog inside its owner's window instead of as a native window:
-the rest of the window dims under a scrim, and the dialog, centred above it, fades from transparent while rising
-16 logical pixels into place (about 220 ms, easing out); closing is its opposite (about 200 ms): the dialog lifts
-off at once and rises another 16 while it fades out. Both follow the motion setting and are instant with animations
-off. Under the Enterprise look an OVERLAY or ATTACHED_SHEET dialog is drawn in its window as a classic dialog: a
-still scrim, and a header strip with its swatch and title. The owner may be a terminal window, one of
-your windows or a `UiAnchor`; an overlay may open over the window's progress overlay. It must be modal: `show()`
-returns once it closes, its form's Escape runs the form's cancel action, and the window takes no other input
-meanwhile. The Vault's Create Vault and Unlock Vault prompts use it:
-
-```java
-var dialog = context.windows().dialog(new DialogSpec("Unlock Vault", window, true, DialogSpec.Presentation.OVERLAY));
-dialog.setContent(form.view());
-dialog.show();
-```
-
-`FakePluginHost.dialogPresentation(pluginId, title)` reports how an open dialog is presented. Declare
-`sdk = ">=0.18.0, <0.19"` to use it. `FakePluginHost.dialogSwatch(pluginId, title)` (SDK 0.18) reports the swatch
-an open dialog asked for.
-
-### Slate Steel colours (SDK 0.15.5)
-
-`SemanticColor` gains ten roles for the Slate Steel theme: `SURFACE_FIELD_RAISED`, `SURFACE_CONTROL_SELECTED`,
-`SURFACE_TABSTRIP`, `SURFACE_EMPTY_TILE`, `BORDER_FIELD_RAISED`, `BORDER_FIELD_RAISED_HOVER`,
-`TEXT_STRONG_SECONDARY`, `TEXT_FIELD_RAISED`, `SEGMENT_TRACK` and `BUTTON_SECONDARY_BORDER`. Read them with
-`context.appearance().color(role)` like any other role; the kit already paints its controls with them. Declare
-`sdk = ">=0.18.0, <0.19"` to use them.
-
-### Menu shortcuts (SDK 0.16.0)
-
-A menu item can show the current binding of an action beside its label:
-`new MenuItem(...).withShortcut("dev.example.open")`. Name an action your plugin contributes (or an app action such as
-`new_tab`); the host shows its binding in the platform's glyphs, follows the user's rebinding, and shows nothing when
-the action is unbound. Declare `sdk = ">=0.18.0, <0.19"` to use it; every bundled manifest does.
-
-### Selection text colours (SDK 0.16.2)
-
-`SemanticColor` gains `TEXT_ONSELECTION` and `TEXT_ONSELECTION_SECONDARY`, the text on `SELECTION_BG` (a selected row,
-a highlighted list or menu entry, selected text). A theme may pair its selection colour and its accent with different
-text, so text on the selection uses these, and `TEXT_ONACCENT` stays for text on `ACCENT`. `WorkspacePalette.selectionText`
-is `TEXT_ONSELECTION`. Declare `sdk = ">=0.18.0, <0.19"` to read them.
-
-### Tab indicator colours and the hidden icon (SDK 0.17.1)
-
-`SemanticColor` gains `TAB_INDICATOR`, the line along the top of the active tab, and `TAB_INDICATOR_INACTIVE`, the
-same line while the window is not focused. `SURFACE_TITLEBAR` and `TEXT_TITLEBAR` are the window header's background
-and its text and icon colour (`SURFACE_APP` and `TEXT_PRIMARY` unless the theme gives the title bar its own). The icon
-`hidden` (an eye struck through) marks a show-hidden-items toggle.
-Declare `sdk = ">=0.18.0, <0.19"` to use them.
+- Users install it from Settings › Plugins (File › Manage Plugins…): **Install from Zip…** in its Plugin options menu
+  ([installing a plugin](plugins.md#installing-a-plugin)). Jasper unpacks the jars into a staging folder, checks the
+  manifest exactly as it does at launch (one `plugin.toml`, a valid manifest, an `sdk` range that includes this
+  Jasper: "*name* *version* needs SDK *range*; this Jasper has SDK *version*"), and shows a sheet with the plugin's
+  name, version, vendor and capabilities, whose **Install** stages it. The plugin is installed at the next start, into
+  `<Jasper home>/plugins/<id>/jars/`; an update never replaces jars a running Jasper has open.
+- A zip may hold at most 4096 entries, 256 jars and 512 MiB unpacked; jar names use letters, digits, spaces and
+  `._+-`. Folders named `__MACOSX` and files starting with a dot are ignored.
+- A zip dropped into `<Jasper home>/plugins/` is installed at the next launch without the sheet; the plugin then waits
+  for **Review…** in Settings › Plugins. A zip that cannot be installed is renamed `<name>.zip.rejected`.
+- Declare only the capabilities you use: they are what the user is asked to allow, and a later version that adds one
+  is held back until the user reviews it again.
+- Consent is not a sandbox, and the review sheet says so: a plugin runs with everything the user's account can reach.
+- Users disable, review and remove plugins on the same page. Removal deletes the whole `plugins/<id>/` folder (jars,
+  settings and data) at the next start, after a confirmation
+  ([enabling, disabling and removing](plugins.md#enabling-disabling-and-removing)).
+- `jasper --safe-mode` starts without installed plugins and with the default look, so a plugin that breaks start-up
+  can be disabled or removed; Settings › Plugins then offers **Restart Normally** ([safe mode](plugins.md#safe-mode)).
