@@ -1,5 +1,148 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 4a: the main window and child windows — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `bd735c724..82a55495d` (Tasks 1 to 6 and their fix rounds, after the plan refresh),
+then this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-4a-windows.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Jasper has one main window and any number of
+child windows, all made, tracked and closed by the application's `workspace.WindowManager`: `MainWindow` is made only in
+`ensureMain`, and only when none is open (`verifyApplicationArchitecture` checks its constructor's one call site);
+`ChildWindow`s close with their last tab; closing the main window asks every window's tabs' guards and closes the child
+windows first; every outside request (handoff, `jasper`, reopen, open-file, a notification's click, a plugin's tab, the
+menu bar item) restores the main window first, which until plan 6 opens a new one; a plugin's tab asked for while the
+main window is composed opens there once it is up, and a closing main window is never taken for an absent one.
+`verifyApplicationArchitecture` and `JasperApplicationWindowsTest` pin `MainWindow`, `WindowManager` and `WindowFrame`
+to their one place each. A child window is a `WindowContent` in the CHILD role: a title bar (the active tab's title; on
+macOS the main window's menus in the screen menu bar, none under a look with in-window menus) over its workspace, in the
+main window's centre surface and glass, with the same keymap and palette, no dock, stripes, status bar, notification
+layer or Buddy; its tool window toggles open in the main window, and coming back to it shows the cards that waited. A
+child window a move empties closes after the move has reported itself: `TAB_MOVED`, then `WINDOW_CLOSED` (the SDK's
+Javadoc, README, fakes and contract test follow, the reverse of plan 3b's order). For plan 5: `Opening.bounds`,
+`moveToNewWindow(Tab, Rectangle)` with `WindowShell.place`, `windowsByActivation()`; for plan 6: `Hooks.closing` and
+`closingAll`, and, since while `closeAll` runs the main window's closed hook runs after `manager.closed(main)` with
+`closingAll` still true, a hook there that calls `ensureMain` would open a fresh main window. The main window's last tab
+leaves `EmptyWorkspace` (New Terminal Tab, Open File). `WindowFrame` (formerly `TerminalWindow`) is the one `JFrame`;
+`WindowShell` its functions, so `WindowManagerTest` and `JasperApplicationWindowsTest` run the lifecycle headlessly.
+`new_window` is gone everywhere; `new_terminal_window` (⌘N / Ctrl+Shift+N), `close_window` (⇧⌘W / none),
+`move_tab_to_new_window` and `move_tab_to_main_window` (no keys; the tab menu and the palette) are new; the menu bar
+item offers New Terminal Window; an auxiliary frame's File menu holds Close Window and, off macOS, Quit. `TabRegistry`'s
+factory, detached hosts and `move(Tab, boolean)` are gone (`TabRegistry.Windows` from the window manager); the SDK's
+`ContentTab.move(boolean)`/`isSeparate()` mean Move to New Window / Move to Main Window / "not in the main window" until
+plan 4b. An operating-system notification's click raises the window that holds its pane now (plan 3a's hand-off). The
+application's comments and user-facing text, Remote's messages and the user guides say "Jasper window" (taking over plan
+3b's leftovers, its Rulings 11). Rulings (plan, "Rulings"): (1) a child window is a `WindowContent` in the CHILD role
+with the main window's actions, menus, keymap, palette and tab registry and only its workspace mounted; (2)
+`WindowManager`, the sealed `JasperWindow`, `WindowShell` and `WindowFrame` live in `workspace`, a headless core with
+`WindowFrame` the one `JFrame`; (3) one main window per process, structurally: `MainWindow`'s one call site is
+`ensureMain`, `WindowManager`'s the application's constructor, `WindowFrame`'s `frameOnScreen` and `rehearsalWindow`;
+(4) until plan 6, restoring opens a fresh main window with one terminal tab (or in a request's first directory) and no
+child window, and `ensureMain(String, Path)` is plan 6's one method; (5) every request with no main window restores it
+first (handoff, `jasper`, reopen, open-file, a notification click, a plugin's tab, New Terminal Window, the menu bar
+item's Open Jasper, New Terminal Window and Settings…), and its Quit does not; (6) the main window alone keeps the dock
+layout, Zen, its bounds, the notification card layer and panel and the Buddy's visibility, and a child window gets an
+in-memory `UiState`; (7) a child window's title bar is the unified macOS bar in its WINDOW style or the system's, titled
+with the active tab, and on macOS its menus are in the screen menu bar only while the look keeps that on; (8) in a child
+window Toolbar, Status Bar, Rail and Zen are disabled and a panel request goes to the main window, which comes forward
+for SHOW and TOGGLE; (9) New Terminal Window opens a child window with a terminal tab in `WindowContent.directory()`
+after restoring the main window; (10) Move Tab to New Window is enabled for a selected tab in the main window and for a
+child window with another tab, a refused or failed move closes the empty window, and Move Tab to Main Window closes the
+child window it empties; (11) the tab menu reads Rename Tab, the move, then the close items and the content's commands,
+the moves stay out of the menu bar, and the toolbar's button becomes New Terminal Window; (12) Close Window (⇧⌘W on
+macOS, no key elsewhere) closes the focused window as its title bar does, a child window after its tabs' guards and the
+main window after every window's, with its child windows; (13) the registry's factory, detached hosts, `activated` and
+`move(Tab, boolean)` go for `TabRegistry.Windows`, and until plan 4b `ContentTab.move(true)`, `move(false)` and
+`isSeparate()` mean Move to New Window, Move to Main Window and "not in the main window"; (14) an operating-system
+notification's click raises the window holding its pane now, else its target, and the Notifications panel shows in the
+main window; (15) closing the main window asks every window's tabs' guards, then closes the child windows and the main
+window, and Quit and the background keep today's guards; (16) the warm-up rehearsal builds its own content and
+`WindowFrame`, never a `MainWindow`, so the manager never hears of it; (17) the benchmark's window is the main window
+and its cycles open and close a child window; (18) a child window opens at the configured grid's size, an empty one
+sizes its workspace to it, and only the main window restores saved bounds; (19) `JasperApplication.frames` is a
+package-private test seam, and `JasperApplicationWindowsTest` runs the application's windows with stand-in shells; (20)
+`open` with the main window open raises the main window, not a child window used last; (21) new files take ledger rows
+`nonvisual-helper,none,none` and the renamed `TerminalWindow` keeps its row under `WindowFrame`; (22) "Jasper window"
+replaces "terminal window" in the application's, the plugins' and the guides' words, and the main window is named where
+only it has the thing; (23) a move reports itself before the window it emptied closes (`TAB_MOVED`, then
+`WINDOW_CLOSED`) through `TabRegistry.Windows.movedOut`, so a failed attach can go back, and the SDK's Javadoc, README,
+fakes and contract follow; (24) a plugin's tab asked for while the main window is composed opens there once it is up;
+(25) `ensureMain` never takes a closing main window for an absent one; (26) a child window's workspace sits in the main
+window's `ToolWindowArea` centre surface, so it is glass as the main window's is; (27) coming back to any window shows
+the notification cards that waited, in the main window; (28) `WindowManager.Hooks` has `closing` and `closingAll` for
+plan 6, no-ops until then; (29) `Opening.bounds`, `moveToNewWindow(Tab, Rectangle)` and `windowsByActivation()` are plan
+5's. Deviations: (a) until plan 6, restoring opens a fresh main window and no child window (spec 6.4's last row; spec 18
+puts restoring in plan 6); (b) before Task 1 the plan was replayed on 3b's final code `55e6de176` (41 blocks, 7 failing
+before the refresh, 0 after) and refreshed in `bd735c724`: five anchors were re-found (Task 1 Step 3's constructor tail,
+Task 3 Step 1's `TerminalContentTest` name, Task 4 Step 1's `WorkspaceHost` count, Task 6 Step 3's dropped pair, one
+"Before you start" line) and F7's two ports of 3a's fix-round tests were applied (`TabRegistryTest`'s
+`registry.detached` probes, `WorkspaceViewTest`'s `WorkspaceHost` arity); (c) F1: Task 1 keeps `detached = empty || role
+== CHILD`, 3a's meaning, until Task 4 removes the field; (d) F2: `JasperApplicationWindowsTest` counts tabs through
+`terminalTabs()`, since `tabCount()` is package-private; (e) F3: `FakeWorkspace.move` calls `refreshActive()` once the
+source lets the tab go, so the fake reports the application's order (no active pane, `TabMoved`, the tab selected,
+`WindowClosed`), `FakeTerminalsTest` follows, and a `WindowManagerTest` probe on real windows pins it (it passed as
+read, settling 3b's "one place off"); (f) F4: executors used the pre-flight's absolute counts, which Task 2's fix round
+moved to `WindowManagerTest` 23, 25 and 27 after Tasks 2, 4 and 5 (the plan's counts were off); (g) F5: `WindowFrame`
+clears the content's fixed 900 by 650 size for an empty child window, so it opens at the grid size (Rulings 18); (h) F6:
+a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and `JasperApplicationBackgroundTest`
+and `JasperApplicationResidencyTest` (41, 16) are unchanged; (i) F8: Task 1's failed-build catch closes
+`themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is package-private in `contributions`, and,
+from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when `old.detach` throws, still attaches to
+the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move whose every attach fails stays as 3b's
+F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
+`WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
+(`lastInWindow`, `onError`, `onEmpty` reach the target) and `TabRegistryTest` the pending, closed and unknown-window
+case (the pinned and already-there cases were pinned at the base); (m) F12: a take-back naming a closed window is
+absorbed by Rulings 23 as written; (n) F14: `ResidentTray`'s class Javadoc "New Window" is reworded; (o) F15: `main` is
+26 commits ahead (a trial merge conflicts in 16 files), and 4a executed on the branch as it is, so merging `main`
+re-runs the replay; (p) Task 1's review fixes (`d3d9c70fd`): `WorkspaceView.applyTheme` restyles a hidden empty state,
+the empty state's captions follow `setBindings` (a test), and the `role()` and `WindowRole.MAIN` Javadoc is corrected;
+(q) Task 2's review fixes (`99522bb50`): `closeAll` closes every window and rethrows the first failure after the main
+window closes, the later ones suppressed; the architecture rule lost its `MainWindow` self-exemption;
+`JasperWindow.close`, `discard` and `moveToNewWindow` keep the first failure with `addSuppressed`; `requireEdt` guards
+`Contributions.panelRoute`, `JasperWindow.requestClose` and activation; a closing-all flag makes `openChild` refuse, so
+no child window outlives the main window; (r) Task 3, controller ruling: `quitNow` runs `closeAll` in a try/finally that
+always requests shutdown, and `toBackground` does the same for `auxiliary.close()` and `updateDock()`, because
+`closeAll` rethrows by design and Quit must end the process; one `JasperApplicationWindowsTest` case pins Quit, with no
+`toBackground` test (the fixture has no plugin window); (s) Task 3's review fixes (`3e477a85b`): `frameOnScreen`
+discards its frame when a later call fails, `toBackground` keeps `closeAll`'s failure first, `open` treats a closing
+main window as absent, `rehearsalWindow` closes a half-built content, and a test pins Rulings 20; (t) Task 4:
+`JasperApplicationBackgroundTest.aContentTabThatRefusesToCloseKeepsEverythingOpen` passes its host's id as the tab's
+owner, since the removed fallback had put owner-less tabs in the first host, and `isSeparate()` is true for a tab with
+no window (Rulings 13); (u) Task 4's review fixes (`743935685`): `transfer` runs `movedOut` and `select` isolated after
+the move, keeps the move's failure first and selects only an arrived tab (a four-case `TabRegistryTest`), and the F3
+probe records every event with its window's name; (v) Task 5: `ShortcutEditorIntegrationTest` queries the shortcut
+editor by the id `new_tab`, since its label search "New tab" now finds "Move Tab to New Window" first; (w) Task 6:
+`ClassicMenuRow`'s class Javadoc is reworded too (its "terminal" and "windows" split across a line, which the brief's
+grep missed), and no plugin version is bumped, since plan 4b's pre-flight bumps each changed plugin to the next minor
+from its version at execution (Editor 0.10.0, File Server 0.5.0, Remote 0.13.0, Vault 0.6.0 now); (x) Task 7, controller
+ruling: four of Task 6's wording minors are folded in, so `NotificationsFeature.activated`'s and
+`JasperApplication.presence`'s comments say the main window holds the cards, `WindowContent.mount`'s Javadoc says "a
+window frame's root", and `docs/keyboard-shortcuts.md` says the Editor's keys are its tabs' commands, not registered
+actions. Left for plan 4b: plugin windows as tabs (`Windows.create`, `PluginWindow`, `WindowSpec`,
+`ShortcutContext.Kind.WINDOW`, `KeyContext.WINDOW`; the Vault manager and the sample About), the Errors window as a tab,
+`TabPlacement`, the `ContentTab` move API, panels in the main window only in the SDK, `WindowHandle.isMain()`, and
+`WindowContent`'s comment on `KeyContext.WINDOW`'s case; from the pre-flight (F13), each needing the SDK's main window
+or `TabPlacement`: `KitCompatibility`'s 0.20 entries, `closeTab(UUID)` in `FakePluginHost` and `ContractHarness`,
+owner-less content placement pinned in the contract (`AppContractTest`'s main window is the last window added,
+`FakeUi`'s the first open one), exact event order in the contract with each event's topic and `TerminalFixture.moveTab`
+out of `registry.atomically`, the fakes' last-tab rule through `isMain()`, and a group model for `TabPlacement` in both
+fakes. `./gradlew check --continue`: **11,688 tests, 0 failures, 0 errors, 25 skipped** (from the XML in
+`*/build/test-results/test/`; `jasper-app` 3,738, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107 on
+each runtime, `WindowManagerTest` 27, `TabRegistryTest` 28, `TabMoveTest` 8, `JasperApplicationWindowsTest` 7,
+`WindowRolesTest` 9, `JasperApplicationBackgroundTest` 41, `JasperApplicationResidencyTest` 16; the build passed on its
+first run, `StagedTransferLifecycleTest` included). GUI checks for the user: Cmd+N opens a child window in the current
+terminal's folder with a title bar and no toolbar, status bar or tool windows; on macOS a child window's unified bar has
+a centred title and a focused child window shows the same menus as the main window in the screen menu bar (none at all
+under the Enterprise look, whose menus sit in the window, where its shortcuts still work: spec 6.3 as amended); a child
+window in Compact view mode; an empty child window (a moved tab's) opens at the grid size; Shift+Cmd+W, the Close Window
+item of the real frames' File menus, and the title bar close a child window (an unsaved editor asks) and the main window
+with its child windows, and the glass closes after the content; the auxiliary frames' File menu holds Close Window and,
+off macOS, Quit; the main window restores its saved bounds; keyboard focus is in the empty main workspace after its last
+tab closes, so Cmd+T opens a tab; the main window's last tab leaves New Terminal Tab and Open File; Move to New Window
+and Move to Main Window from a tab's menu keep a running command running; a tool window shortcut in a child window opens
+the tool window in the main window and leaves focus in it; Cmd+Q while resident closes every window and keeps Jasper in
+the background; the menu bar item's New Terminal Window with no window open restores the main window first; a
+translucent workspace in a child window looks as the main window's; a notification card posted while a child window is
+in front shows in the main window when a window comes forward. Not merged, not pushed.
+
 **Workspace tabs, plan 3b: the SDK's tab and pane break — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `b6687d9df..5c27d93d8` (Tasks 1 to 4, after the plan refresh), then the
 documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-3b-sdk-tabs.md),

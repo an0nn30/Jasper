@@ -1,5 +1,56 @@
 # Workspace tabs 4a: the main window and child windows Implementation Plan
 
+**Status: executed on 2026-10-19** (`bd735c724..82a55495d`, then the documentation commit); see `docs/STATUS.md`.
+Deviations from the plan's text: (a) until plan 6, restoring opens a fresh main window and no child window (spec 6.4's
+last row; spec 18 puts restoring in plan 6); (b) before Task 1 the plan was replayed on 3b's final code `55e6de176` (41
+blocks, 7 failing before the refresh, 0 after) and refreshed in `bd735c724`: five anchors were re-found (Task 1 Step 3's
+constructor tail, Task 3 Step 1's `TerminalContentTest` name, Task 4 Step 1's `WorkspaceHost` count, Task 6 Step 3's
+dropped pair, one "Before you start" line) and F7's two ports of 3a's fix-round tests were applied (`TabRegistryTest`'s
+`registry.detached` probes, `WorkspaceViewTest`'s `WorkspaceHost` arity); (c) F1: Task 1 keeps `detached = empty || role
+== CHILD`, 3a's meaning, until Task 4 removes the field; (d) F2: `JasperApplicationWindowsTest` counts tabs through
+`terminalTabs()`, since `tabCount()` is package-private; (e) F3: `FakeWorkspace.move` calls `refreshActive()` once the
+source lets the tab go, so the fake reports the application's order (no active pane, `TabMoved`, the tab selected,
+`WindowClosed`), `FakeTerminalsTest` follows, and a `WindowManagerTest` probe on real windows pins it (it passed as
+read, settling 3b's "one place off"); (f) F4: executors used the pre-flight's absolute counts, which Task 2's fix round
+moved to `WindowManagerTest` 23, 25 and 27 after Tasks 2, 4 and 5 (the plan's counts were off); (g) F5: `WindowFrame`
+clears the content's fixed 900 by 650 size for an empty child window, so it opens at the grid size (Rulings 18); (h) F6:
+a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and `JasperApplicationBackgroundTest`
+and `JasperApplicationResidencyTest` (41, 16) are unchanged; (i) F8: Task 1's failed-build catch closes
+`themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is package-private in `contributions`, and,
+from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when `old.detach` throws, still attaches to
+the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move whose every attach fails stays as 3b's
+F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
+`WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
+(`lastInWindow`, `onError`, `onEmpty` reach the target) and `TabRegistryTest` the pending, closed and unknown-window
+case (the pinned and already-there cases were pinned at the base); (m) F12: a take-back naming a closed window is
+absorbed by Rulings 23 as written; (n) F14: `ResidentTray`'s class Javadoc "New Window" is reworded; (o) F15: `main` is
+26 commits ahead (a trial merge conflicts in 16 files), and 4a executed on the branch as it is, so merging `main`
+re-runs the replay; (p) Task 1's review fixes (`d3d9c70fd`): `WorkspaceView.applyTheme` restyles a hidden empty state,
+the empty state's captions follow `setBindings` (a test), and the `role()` and `WindowRole.MAIN` Javadoc is corrected;
+(q) Task 2's review fixes (`99522bb50`): `closeAll` closes every window and rethrows the first failure after the main
+window closes, the later ones suppressed; the architecture rule lost its `MainWindow` self-exemption;
+`JasperWindow.close`, `discard` and `moveToNewWindow` keep the first failure with `addSuppressed`; `requireEdt` guards
+`Contributions.panelRoute`, `JasperWindow.requestClose` and activation; a closing-all flag makes `openChild` refuse, so
+no child window outlives the main window; (r) Task 3, controller ruling: `quitNow` runs `closeAll` in a try/finally that
+always requests shutdown, and `toBackground` does the same for `auxiliary.close()` and `updateDock()`, because
+`closeAll` rethrows by design and Quit must end the process; one `JasperApplicationWindowsTest` case pins Quit, with no
+`toBackground` test (the fixture has no plugin window); (s) Task 3's review fixes (`3e477a85b`): `frameOnScreen`
+discards its frame when a later call fails, `toBackground` keeps `closeAll`'s failure first, `open` treats a closing
+main window as absent, `rehearsalWindow` closes a half-built content, and a test pins Rulings 20; (t) Task 4:
+`JasperApplicationBackgroundTest.aContentTabThatRefusesToCloseKeepsEverythingOpen` passes its host's id as the tab's
+owner, since the removed fallback had put owner-less tabs in the first host, and `isSeparate()` is true for a tab with
+no window (Rulings 13); (u) Task 4's review fixes (`743935685`): `transfer` runs `movedOut` and `select` isolated after
+the move, keeps the move's failure first and selects only an arrived tab (a four-case `TabRegistryTest`), and the F3
+probe records every event with its window's name; (v) Task 5: `ShortcutEditorIntegrationTest` queries the shortcut
+editor by the id `new_tab`, since its label search "New tab" now finds "Move Tab to New Window" first; (w) Task 6:
+`ClassicMenuRow`'s class Javadoc is reworded too (its "terminal" and "windows" split across a line, which the brief's
+grep missed), and no plugin version is bumped, since plan 4b's pre-flight bumps each changed plugin to the next minor
+from its version at execution (Editor 0.10.0, File Server 0.5.0, Remote 0.13.0, Vault 0.6.0 now); (x) Task 7, controller
+ruling: four of Task 6's wording minors are folded in, so `NotificationsFeature.activated`'s and
+`JasperApplication.presence`'s comments say the main window holds the cards, `WindowContent.mount`'s Javadoc says "a
+window frame's root", and `docs/keyboard-shortcuts.md` says the Editor's keys are its tabs' commands, not registered
+actions.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Jasper has one main window, with all of its chrome around the main workspace, and any number of child windows,

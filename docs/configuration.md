@@ -263,7 +263,7 @@ their shells as always (process cleanup is asynchronous, so a child can briefly 
 disappears).
 
 **macOS.** While residency is on, Jasper has a menu bar item, a terminal glyph that follows the light or dark menu bar,
-with **New Window**, **Settings…** and **Quit Jasper Completely**. The item appears once start-up has settled (the first
+with **New Terminal Window**, **Settings…** and **Quit Jasper Completely**. The item appears once start-up has settled (the first
 output painted, a finished `--background` warm-up, or 2 s after the first paint), never on the start-up path.
 
 | | A window is open | No window is open |
@@ -684,8 +684,8 @@ Zen is independent of Appearance's Normal/Compact setting: Compact keeps its nat
 and floating command palette when Zen is toggled.
 
 Zen is saved immediately as `zen_mode` in `ui-state.toml` and restored before plugin panels are built on launch.
-New windows inherit the saved mode; existing windows retain their own mode. As with the dock layout, the last
-closed window saves its mode for the next launch. Missing or invalid values default to off. Normal status
+The main window opens in the saved mode and saves its mode when it closes, as it does the dock layout; a child window
+has no Zen. Missing or invalid values default to off. Normal status
 visibility, rail visibility, tool-window positions, sizes and split ratios remain intact. Status changes made
 while in Zen take effect when leaving it; toolbar changes apply immediately. The saved layout keeps the tool
 windows that showed before Zen, so a window opened in Zen is never saved as showing; moving or resizing one in Zen
@@ -710,7 +710,7 @@ or **Exit Zen Mode**, and the menu toggle remains usable even after removing its
 
 ## Shortcuts
 
-The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
+The generated template lists every supported action ID with its platform-specific default shortcut. Uncomment or add entries under `[keybindings]`. Action IDs include `new_tab`, `new_terminal_window`, `close_window`, `close_tab`, `split_right`, `split_down`, `next_tab`, `previous_tab`, `find`, `copy`, `paste`, `command_palette`, `history_palette`, `snippets_palette`, `clear_scrollback`, `clear_terminal`, `open_settings` and `reload_config`.
 
 Settings › Keymap edits these bindings without opening the file; it writes the same `[keybindings]` entries.
 

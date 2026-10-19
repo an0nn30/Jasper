@@ -94,6 +94,13 @@ cleanup runs on daemon workers; both ordinary quit and startup rollback
 queue this cleanup without blocking EDT. The two-second bound covers the application
 wait, not a promise that every cleanup succeeds or the JVM exits within two seconds.
 The process shutdown hook backs up endpoint cleanup and drains logging separately.
+Windows are one main window and any number of child windows (workspace tabs spec 6), all made and closed by the
+application's `WindowManager` (workspace): the main window has every piece of chrome around its workspace and keeps an
+empty workspace when its last tab closes; a child window (`WindowRole.CHILD` content) shows a title bar over its
+workspace and closes with its last tab. Every outside request, a plugin's tab with no window and the menu bar item
+restore the main window first; closing the main window, Quit and going to the background close the child windows, then
+the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
+`verifyApplicationArchitecture` checks.
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may
 briefly continue after the last window closes. On a packaged macOS Jasper that is
@@ -163,7 +170,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
-| `workspace` | EDT windows, their workspaces of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
+| `workspace` | EDT windows (`WindowManager`, `MainWindow`, `ChildWindow`, their `WindowFrame`s), their workspaces of tab groups (`WorkspaceView`, `GroupView`, `SplitContainer`), terminal tabs and panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
 | `layout` | Pure workspace layout model: tab and group ids, a workspace's tab groups in nested weighted splits (`Layout`, `Split`, `Group`), its active and maximized group and the groups' order of use, the operations that return a new layout, and each group's region of the unit square with its directional neighbours. JDK-only (nothing from Swing or AWT, enforced by `verifyApplicationArchitecture`); immutable values, safe on any thread. `persistence.WorkspaceFile` reads and writes it as `workspace.toml`. |
 | `commands` | EDT action registry, pure command ranking/metadata and the palette's command recents (`command-history.toml`). Registry owns listeners until registration or registry close; the application flushes recents at shutdown. |
@@ -175,7 +182,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `appearance` | EDT theme resolution and global look-and-feel installation. Subscribers own returned cancellation handles. |
 | `launch` | Immutable launch capture, shell profiles (WSL distributions, PowerShell 7, Command Prompt, the login shell, Custom) and shell integration extraction; ShellLauncher starts off EDT and delivers on EDT; the EDT-confined ShellProfileCatalog detects off EDT and is closed by the application. Receiving pane owns the session. |
 | `terminals` | App-native registry of Jasper windows, their tabs (terminal and content) and terminal tabs' panes: pull-based entries, id-only events, the derived active pane, and the app-native session request and attempt state machine. Application owns the TerminalRegistry; each window closes its own registration. |
-| `windows` | Application-built auxiliary windows and dialogs: a headless surface core and the only other native frame boundary besides TerminalWindow. Application owns AuxiliaryWindows and closes it at shutdown. |
+| `windows` | Application-built auxiliary windows and dialogs: a headless surface core and the only other native frame boundary besides WindowFrame. Application owns AuxiliaryWindows and closes it at shutdown. |
 | `files` | Jasper's file chooser: the headless `ChooserModel` over `Location`s, `Browser`s and `ChooserSource`s (the local disk is `LocalSource`/`LocalBrowser`; plugin sources are adapted in `plugins`) and the Swing `FileChooserPanel`. NativeShells shows it in a dialog and owns that dialog's worker; the model applies worker results on the EDT, drops stale ones and closes the browsers it opened. |
 | `notifications` | EDT notification center (groups, the in-memory history, read and expired state, delivery routing) and its values, the incident store with its captures and reports, plus terminal and activity notice production for Buddy. Application owns the center and the incidents and closes notifiers before companion. |
 | `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
@@ -215,7 +222,7 @@ Javadoc and copied guide examples are normal check dependencies. See the
 
 ## Window chrome
 
-Every window has a header row above its workspace of tab groups, each with its own tab strip. `WindowHeader` (workspace) centres
+The main window has a header row above its workspace of tab groups, each with its own tab strip; a child window has only its title bar. `WindowHeader` (workspace) centres
 `TitleSearchField` on the window and packs `WindowChrome`'s IntelliJ-style toolbar (tab/window,
 pane, plugin, then Find/Settings groups; tooltips carry live shortcuts) against the trailing edge.
 The field is always centred on the window; the sides give way first (toolbar labels, then controls into
@@ -226,8 +233,9 @@ that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane
 `CollapsingMenuBar`, which carries the header under the menus; with `window.native_decorations = true`
 the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
 Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
-macOS's screen menu bar off, so each terminal window's menus are a row in the window (an auxiliary frame shows none
-and binds Close Window's shortcut itself). A native-titled macOS frame's appearance follows the theme; Jasper gives the
+macOS's screen menu bar off, so the main window's menus are a row in the window (a child window shows none, and an
+auxiliary frame shows none and binds Close Window's shortcut itself). On macOS a focused child window's screen menu bar
+shows the main window's menus, built from the same model. A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).

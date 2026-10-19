@@ -92,7 +92,10 @@ final class NotificationsFeature implements AutoCloseable {
         if (content.id().equals(lastActive)) lastActive = windows.isEmpty() ? null : windows.keySet().iterator().next();
     }
 
-    /** A Jasper window was activated: it is the default target, and cards that waited for focus show now. */
+    /**
+     * A Jasper window was activated: the main window, which holds the cards, is the default target, and cards that
+     * waited for focus show now.
+     */
     void activated(WindowContent content) {
         if (closed || !windows.containsKey(content.id())) return;
         lastActive = content.id();

@@ -243,7 +243,7 @@ opacity actually in effect to `WindowContent.applyBackgroundOpacity`; painting n
 failure leaves an opaque window.
 
 - **macOS only.** Elsewhere the Opacity and Blur rows are hidden in Settings (`CorePages`, `shownWhen`), the keys stay
-  valid and are silently ignored, `TerminalWindow` constructs no `WindowGlass` (so neither it nor `MacGlass` is ever
+  valid and are silently ignored, `WindowFrame` constructs no `WindowGlass` (so neither it nor `MacGlass` is ever
   loaded), `JasperApplication` gives plugins `GlassSource.NONE` and installs no glass listener, and the launcher
   (`applicationDefaultJvmArgs`, `Jasper.cfg`) carries no `--add-opens`/`--add-exports`; `packaging.gradle` requires
   them on a macOS host and requires them absent on others.
@@ -509,13 +509,13 @@ passed to `warmUp` marks whether the rehearsal succeeded, failed or threw; it is
 content host (`connectContributions(model, state, hostsContent)` with `false`), so plugin content never opens into it;
 and its error, info and launch-failure callbacks are logged, never shown, posted as notifications or recorded as
 incidents (`Rehearsal.silence`). It uses its own in-memory `UiState`, never restores the saved window layout and is
-discarded rather than closed (`TerminalWindow.discard`, also used for a window that failed to compose), so its default
+discarded rather than closed (`WindowFrame.discard`; a window that failed to open is discarded by `WindowManager`), so its default
 size and layout never become the last window closed, which the next window restores. A process that has warmed up labels its first plain window
 `menu` rather than `cold`. Once `done` has run, on every path (a played rehearsal, a failed one, an `Error`, and the
 headless early return), `warmUp` starts one `System.gc()` on a daemon thread from a later EDT event, so the rehearsal's
 garbage does not stay in the resident heap (user decision 2026-10-03); `JasperApplication.collector` is the test seam.
 GUI behaviour is on the packaging checklist; `testMacDock` covers the native code
-headlessly, and a headless JVM cannot build a `TerminalWindow`, so some failure paths here are covered by reading only.
+headlessly, and a headless JVM cannot build a `WindowFrame`, so some failure paths here are covered by reading only.
 
 ### Unified workspace header
 

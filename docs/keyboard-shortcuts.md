@@ -91,5 +91,5 @@ Native acceptance (user-run):
 ## Editor window
 
 The bundled Editor's window has its own shortcuts, listed in its ⋯ menu and in [Editor](editor.md).
-They belong to the Editor's content, so they are not in this catalog; the
+They are its tabs' commands, not registered actions, so they are not in this catalog; the
 action **Open in Editor…** (`dev.jasper.editor.open`, Cmd/Ctrl+O) is.

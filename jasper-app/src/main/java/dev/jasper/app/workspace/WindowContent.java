@@ -364,7 +364,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Mounts {@code content} in a terminal frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
+     * Mounts {@code content} in a window frame's {@code root} under {@code look} (Enterprise presentation spec 10.1): the
      * unified macOS bar hosting the header, or the system's title bar with the header as a row in the window. Either way
      * the menu bar is the root's (the unified bar's {@code setMenuBar} puts it there too); on macOS the screen menu bar
      * shows it while the look keeps that on, and otherwise it is a row in the window. The main window's frame and the

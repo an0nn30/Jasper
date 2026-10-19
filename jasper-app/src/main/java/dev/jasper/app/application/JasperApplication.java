@@ -1441,7 +1441,7 @@ public final class JasperApplication {
      * because incidents raised while the application was built are recorded later through {@code invokeLater}, in a
      * {@code --background} launch with the process already resident and windowless: they must wait for the first window
      * like the problems posted directly. With only a plugin window open Jasper is not idle, because cards target
-     * Jasper windows: the next one still shows what waited. EDT.
+     * the main window: the next one still shows what waited. EDT.
      */
     private Delivery.Presence presence() {
         boolean residentIdle = resident && startupSettled && !windowsOpen() && windows.opening() == 0;
