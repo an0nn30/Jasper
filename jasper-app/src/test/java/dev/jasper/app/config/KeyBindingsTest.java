@@ -17,11 +17,11 @@ class KeyBindingsTest {
     @Test
     void actionCatalogCoversEveryPhaseOneActionAndUsesStableIds() {
         assertThat(EnumSet.allOf(ActionId.class)).containsExactly(
-            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.CLOSE_PANE, ActionId.ZOOM_PANE,
+            ActionId.NEW_TAB, ActionId.CLOSE_TAB, ActionId.CLOSE_GROUP, ActionId.NEW_WINDOW, ActionId.OPEN_FILE,
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_GROUP,
             ActionId.TOGGLE_ZEN_MODE,
-            ActionId.FOCUS_PANE_LEFT, ActionId.FOCUS_PANE_RIGHT,
-            ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN,
+            ActionId.FOCUS_GROUP_LEFT, ActionId.FOCUS_GROUP_RIGHT,
+            ActionId.FOCUS_GROUP_UP, ActionId.FOCUS_GROUP_DOWN,
             ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB,
             ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3,
             ActionId.SELECT_TAB_4, ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6,

@@ -110,7 +110,7 @@ class WindowChromeTest {
                 if (child instanceof JButton button) shape.add((String) button.getClientProperty("label"));
                 else if (child instanceof JSeparator separator) shape.add(separator.isVisible() ? "|" : "(|)");
             }
-            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Zoom pane", "(|)", "|", "Find", "Settings", "More actions");
+            assertThat(shape).containsExactly("New tab", "New window", "|", "Split", "Maximize group", "(|)", "|", "Find", "Settings", "More actions");
             var find = (JButton) java.util.Arrays.stream(toolbar.getComponents())
                 .filter(child -> child instanceof JButton button && "Find".equals(button.getClientProperty("label"))).findFirst().orElseThrow();
             var settings = toolbar.getComponent(toolbar.getComponentCount() - 2);

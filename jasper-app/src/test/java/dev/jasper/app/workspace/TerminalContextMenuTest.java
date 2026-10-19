@@ -46,7 +46,7 @@ class TerminalContextMenuTest {
         edt(() -> {
             JPopupMenu menu = owner[0].chrome().contextMenu();
             assertThat(labels(menu)).containsExactly("Copy", "Paste", "Find", "Clear Terminal", "Split Right", "Split Down",
-                "Zoom Pane", "Close Pane");
+                "Maximize Group", "Close Tab");
             assertThat(item(menu, "Clear Terminal").isEnabled()).isTrue();
         });
 

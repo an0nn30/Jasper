@@ -78,14 +78,14 @@ final class ShortcutCatalog {
     /** Only authored core category metadata enters this mapping, never a plugin display name. */
     private static String coreIcon(String category) { return switch(category) {
         case "Appearance"->"appearance";case "Application"->"window";case "Terminal"->"terminal";
-        case "Clipboard"->"copy";case "Search"->"search";case "Tabs"->"window";case "Panes"->"split";default->"terminal";
+        case "Clipboard"->"copy";case "Search"->"search";case "Tabs"->"window";case "Groups"->"split";default->"terminal";
     }; }
     private static String category(ActionId id) {
         return switch (id) {
             case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, SELECT_TAB_1, SELECT_TAB_2,
                 SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5, SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> "Tabs";
-            case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_PANE, ZOOM_PANE, FOCUS_PANE_LEFT, FOCUS_PANE_RIGHT,
-                FOCUS_PANE_UP, FOCUS_PANE_DOWN -> "Panes";
+            case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_GROUP, MAXIMIZE_GROUP, FOCUS_GROUP_LEFT, FOCUS_GROUP_RIGHT,
+                FOCUS_GROUP_UP, FOCUS_GROUP_DOWN -> "Groups";
             case FIND, FIND_NEXT, FIND_PREVIOUS -> "Search";
             case COPY, PASTE -> "Clipboard";
             case FONT_BIGGER, FONT_SMALLER, FONT_RESET -> "Appearance";

@@ -29,7 +29,7 @@ class ApplicationActionsTest {
             ui.invoke(ActionId.FONT_BIGGER);
             assertThat(ui.currentPane().view().fontSize()).isEqualTo(13);
             assertThat(first[0].view().fontSize()).isEqualTo(12);
-            ui.invoke(ActionId.FOCUS_PANE_LEFT); ui.invoke(ActionId.FIND);
+            ui.invoke(ActionId.FOCUS_GROUP_LEFT); ui.invoke(ActionId.FIND);
             assertThat(first[0].findBar().isVisible()).isTrue();
             assertThat(ui.action(ActionId.OPEN_SETTINGS).isEnabled()).isFalse();
             assertThat(ui.action(ActionId.RELOAD_CONFIG).isEnabled()).isFalse();

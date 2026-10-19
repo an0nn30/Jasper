@@ -77,7 +77,7 @@ final class WindowChrome {
         // In the Windows and Linux title bar the toolbar's blank space drags the window; its buttons stay clickable.
         toolbar.putClientProperty(com.formdev.flatlaf.FlatClientProperties.COMPONENT_TITLE_BAR_CAPTION,
             (java.util.function.Function<Point, Boolean>) point -> null);
-        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_PANE,
+        JMenu file = menu("File", ActionId.NEW_TAB, ActionId.NEW_WINDOW, ActionId.OPEN_FILE, ActionId.CLOSE_TAB, ActionId.CLOSE_GROUP,
             ActionId.OPEN_SETTINGS, ActionId.RELOAD_CONFIG, ActionId.QUIT);
         JMenu edit = menu("Edit", ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.FIND_NEXT,
             ActionId.FIND_PREVIOUS, ActionId.CLEAR_SCROLLBACK);
@@ -88,7 +88,7 @@ final class WindowChrome {
         zen.setAction(owner.action(ActionId.TOGGLE_ZEN_MODE));
         viewModes.add(zen);
         view.add(viewModes);
-        view.add(new MenuBarItems.Item(owner.action(ActionId.ZOOM_PANE)));
+        view.add(new MenuBarItems.Item(owner.action(ActionId.MAXIMIZE_GROUP)));
         view.addSeparator();
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
@@ -122,7 +122,7 @@ final class WindowChrome {
         addButton(ActionId.NEW_TAB, "square-plus"); addButton(ActionId.NEW_WINDOW, "app-window");
         toolbar.add(new ToolbarSeparator());
         addSplitButton();
-        addButton(ActionId.ZOOM_PANE, "maximize");
+        addButton(ActionId.MAXIMIZE_GROUP, "maximize");
         pluginSeparator.setVisible(false);
         toolbar.add(pluginSeparator);
         toolbar.add(new ToolbarSeparator());
@@ -434,8 +434,8 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    private static final ActionId[] PANE_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_PANE_LEFT,
-        ActionId.FOCUS_PANE_RIGHT, ActionId.FOCUS_PANE_UP, ActionId.FOCUS_PANE_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
+    private static final ActionId[] PANE_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_GROUP_LEFT,
+        ActionId.FOCUS_GROUP_RIGHT, ActionId.FOCUS_GROUP_UP, ActionId.FOCUS_GROUP_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
     private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
         ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
         ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
@@ -472,7 +472,7 @@ final class WindowChrome {
     private JButton addButton(ActionId id, String icon) {
         String label = switch (id) {
             case NEW_TAB -> "New tab"; case NEW_WINDOW -> "New window";
-            case SPLIT_RIGHT -> "Split"; case ZOOM_PANE -> "Zoom pane";
+            case SPLIT_RIGHT -> "Split"; case MAXIMIZE_GROUP -> "Maximize group";
             case RELOAD_CONFIG -> "Reload config"; case QUIT -> "Exit"; default -> id.label();
         };
         ReferenceButton button = new ReferenceButton(owner.action(id), id);
@@ -564,7 +564,7 @@ final class WindowChrome {
         owner.updateActions();
         JPopupMenu menu = new JPopupMenu();
         for (ActionId id : new ActionId[]{ActionId.COPY, ActionId.PASTE, ActionId.FIND, ActionId.CLEAR_TERMINAL,
-            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.ZOOM_PANE, ActionId.CLOSE_PANE}) menu.add(owner.action(id));
+            ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.MAXIMIZE_GROUP, ActionId.CLOSE_TAB}) menu.add(owner.action(id));
         if (contributions != null) {
             for (MenuSection section : contributions.model().menus()) {
                 if (section.target().type() != MenuTarget.Type.CONTEXT) continue;

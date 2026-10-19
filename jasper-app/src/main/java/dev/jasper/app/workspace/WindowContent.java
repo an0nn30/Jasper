@@ -987,15 +987,38 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean running(Tab tab) {
         return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
     }
+    /**
+     * A tab's menu (workspace plan 3a Rulings 13): Rename Tab for a terminal tab, Open in Separate Window or Move to
+     * Main Window for a plugin's tab, Close Tab, Close Others and Close Group, then the content's commands.
+     */
     JPopupMenu tabMenu(Tab tab) {
         var menu = new JPopupMenu();
-        if (tab.kind() == Tab.Kind.HOSTED) {
-            var move = new JMenuItem(tab.detached() ? "Move to Main Window" : "Open in Separate Window");
-            move.addActionListener(event -> tab.move(!tab.detached())); menu.add(move);
-            for (var command : tab.commands()) { var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
-                item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut()); item.addActionListener(event -> command.run().run()); menu.add(item); }
+        if (tab.kind() == Tab.Kind.TERMINAL)
+            menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
+        else menu.add(tabMenuItem(tab.detached() ? "Move to Main Window" : "Open in Separate Window", null, () -> tab.move(!tab.detached())));
+        menu.addSeparator();
+        menu.add(tabMenuItem("Close Tab", ActionId.CLOSE_TAB, () -> closeTab(tab)));
+        var others = tabMenuItem("Close Others", null, () -> closeOthers(tab));
+        others.setEnabled(groupTabs(tab).size() > 1);
+        menu.add(others);
+        menu.add(tabMenuItem("Close Group", ActionId.CLOSE_GROUP, () -> closeGroup(tab)));
+        if (!tab.commands().isEmpty()) menu.addSeparator();
+        for (var command : tab.commands()) {
+            var item = new JMenuItem(command.title()); item.putClientProperty("html.disable", true);
+            item.setEnabled(command.enabled()); item.setAccelerator(command.shortcut());
+            item.addActionListener(event -> command.run().run());
+            menu.add(item);
         }
-        var close = new JMenuItem("Close Tab"); close.setAccelerator(bindings().strokeFor(ActionId.CLOSE_TAB).orElse(null)); close.addActionListener(event -> closeTab(tab)); menu.add(close); dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme); return menu;
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /** A tab menu item showing {@code shortcut}'s binding, if any, that runs {@code run}. */
+    private JMenuItem tabMenuItem(String title, ActionId shortcut, Runnable run) {
+        var item = new JMenuItem(title);
+        if (shortcut != null) item.setAccelerator(bindings().strokeFor(shortcut).orElse(null));
+        item.addActionListener(event -> run.run());
+        return item;
     }
     public void focusSelected() { Tab tab = selectedTab(); if (tab != null) tab.focus(); }
     public boolean mayClose() { return registry.mayClose(() -> registry.inWindow(id)); }
@@ -1209,6 +1232,29 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!workspace.contains(tab)) return;
         if (tab.kind() == Tab.Kind.HOSTED) { tab.requestClose(); return; }
         if (terminals != null) terminals.atomically(tab::close); else tab.close();
+    }
+
+    /** The tabs of {@code tab}'s group, in strip order. */
+    private java.util.List<Tab> groupTabs(Tab tab) {
+        return workspace.model().groupOf(tab.id()).map(workspace::groupView)
+            .map(group -> java.util.List.copyOf(group.tabs())).orElse(java.util.List.of());
+    }
+
+    /** Closes the other tabs of {@code tab}'s group as one gesture (workspace plan 3a Rulings 14). */
+    void closeOthers(Tab tab) { closeTabs(groupTabs(tab).stream().filter(other -> other != tab).toList()); }
+
+    /** Closes every tab of {@code tab}'s group as one gesture (workspace plan 3a Rulings 14). */
+    void closeGroup(Tab tab) { if (tab != null) closeTabs(groupTabs(tab)); }
+
+    /**
+     * Closes {@code batch} on one decision: the plugin tabs' guards answer once and a refusal closes nothing; then every
+     * tab of the batch closes, terminal tabs included, their registry facts published as one change.
+     */
+    void closeTabs(java.util.List<Tab> batch) {
+        var live = batch.stream().filter(workspace::contains).toList();
+        if (live.isEmpty()) return;
+        Runnable close = () -> registry.requestClose(live);
+        if (terminals != null) terminals.atomically(close); else close.run();
     }
 
     boolean dispatchShortcut(KeyStroke stroke, Component source) {

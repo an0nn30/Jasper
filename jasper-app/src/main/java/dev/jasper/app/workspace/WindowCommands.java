@@ -40,7 +40,7 @@ final class WindowCommands implements AutoCloseable {
             if (id == ActionId.COMMAND_PALETTE) continue;
             String icon = switch (id) {
                 case NEW_TAB -> "square-plus"; case NEW_WINDOW -> "app-window";
-                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case ZOOM_PANE -> "maximize";
+                case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_GROUP -> "maximize";
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> "search"; case OPEN_SETTINGS -> "settings";
                 case RELOAD_CONFIG -> "refresh"; default -> null;
             };
@@ -51,7 +51,7 @@ final class WindowCommands implements AutoCloseable {
                 case OPEN_FILE -> List.of("open", "editor", "browse");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
-                case ZOOM_PANE -> List.of("maximize", "restore");
+                case MAXIMIZE_GROUP -> List.of("zoom", "restore");
                 case TOGGLE_ZEN_MODE -> List.of("view mode", "focus", "distraction free", "hide tools", "restore layout");
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> List.of("search");
                 case CLEAR_SCROLLBACK -> List.of("history", "clear");
@@ -62,9 +62,9 @@ final class WindowCommands implements AutoCloseable {
             registrations.add(registry.register(new Command(id.id(), owner.action(id), keywords)));
         }
         registrations.add(registry.register(new Command("split_right", owner.action(ActionId.SPLIT_RIGHT),
-            List.of("split", "vertical", "right", "side by side", "pane"))));
+            List.of("split", "vertical", "right", "side by side", "pane", "group"))));
         registrations.add(registry.register(new Command("split_down", owner.action(ActionId.SPLIT_DOWN),
-            List.of("split", "horizontal", "down", "above below", "pane"))));
+            List.of("split", "horizontal", "down", "above below", "pane", "group"))));
         for (var mode : ToolbarMode.values()) {
             String label = switch (mode) { case ICONS_AND_LABELS -> "Icons and Labels"; case ICONS -> "Icons Only"; case HIDDEN -> "Hidden"; };
             add(registry, "view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT), label,
@@ -134,8 +134,8 @@ final class WindowCommands implements AutoCloseable {
         boolean zen = owner.zenMode();
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
-        owner.action(ActionId.ZOOM_PANE).putValue(Command.TITLE,
-            owner.workspace().model().maximized().isPresent() ? "Restore Pane" : "Zoom Pane");
+        owner.action(ActionId.MAXIMIZE_GROUP).putValue(Command.TITLE,
+            owner.workspace().model().maximized().isPresent() ? "Restore Group" : "Maximize Group");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
         view("view.status_bar").setEnabled(!zen);

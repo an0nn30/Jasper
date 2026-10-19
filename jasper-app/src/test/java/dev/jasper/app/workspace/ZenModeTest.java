@@ -216,7 +216,7 @@ class ZenModeTest {
             var owner = window(); var model = new Contributions(); owner.connectContributions(model);
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
             var view = view(owner);
-            assertThat(item(view, "Zoom Pane").getAction()).isSameAs(owner.action(ActionId.ZOOM_PANE));
+            assertThat(item(view, "Maximize Group").getAction()).isSameAs(owner.action(ActionId.MAXIMIZE_GROUP));
             assertThat(item(child(view, "Font Size"), "Increase Font Size").getAction()).isSameAs(owner.action(ActionId.FONT_BIGGER));
             item(child(view, "Tool Windows"), "Toggle Panel").doClick();
             assertThat(owner.area().content(Slot.LEFT_TOP)).isNotNull();

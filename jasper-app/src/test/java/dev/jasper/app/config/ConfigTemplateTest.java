@@ -29,7 +29,7 @@ class ConfigTemplateTest {
 
     @Test void templateCommentsShowEachPlatformsLiteralDefaults() {
         assertThat(ConfigTemplate.text(true)).contains("# command_palette = \"cmd+shift+p\"", "# clear_scrollback = \"cmd+k\"",
-            "# close_pane = \"cmd+w\"", "# reload_config = \"none\"");
+            "# close_tab = \"cmd+w\"", "# reload_config = \"none\"");
         assertThat(ConfigTemplate.text(true)).doesNotContain("history_palette", "snippets_palette");
         assertThat(ConfigTemplate.text(false)).contains("# command_palette = \"ctrl+shift+p\"", "# clear_scrollback = \"ctrl+shift+k\"",
             "# next_tab = \"ctrl+tab\"", "cmd means Ctrl+Shift outside macOS");

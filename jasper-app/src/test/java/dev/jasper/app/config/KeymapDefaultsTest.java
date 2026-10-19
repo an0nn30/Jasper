@@ -27,7 +27,8 @@ class KeymapDefaultsTest {
         new Row("reload_config", KeyContext.GLOBAL, "none", "none"),                           // 5
         new Row("command_palette", KeyContext.GLOBAL, "cmd+shift+p", "ctrl+shift+p"),          // 14
         new Row("new_tab", KeyContext.GLOBAL, "cmd+t", "ctrl+shift+t"),                        // 22
-        new Row("close_tab", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),              // 23
+        new Row("close_tab", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                      // 23, workspace tabs spec 11
+        new Row("close_group", KeyContext.GLOBAL, "alt+cmd+w", "ctrl+alt+shift+w"),            // workspace tabs spec 11
         new Row("next_tab", KeyContext.GLOBAL, "cmd+shift+]", "ctrl+tab"),                     // 24
         new Row("previous_tab", KeyContext.GLOBAL, "cmd+shift+[", "ctrl+shift+tab"),           // 25
         new Row("select_tab_1", KeyContext.GLOBAL, "cmd+1", "ctrl+1"),                         // 26
@@ -42,13 +43,12 @@ class KeymapDefaultsTest {
         new Row("rename_tab", KeyContext.GLOBAL, "cmd+i", "ctrl+shift+i"),                     // 28
         new Row("split_right", KeyContext.GLOBAL, "cmd+d", "ctrl+shift+d"),                    // 32
         new Row("split_down", KeyContext.GLOBAL, "cmd+shift+d", "ctrl+alt+shift+d"),           // 33
-        new Row("close_pane", KeyContext.GLOBAL, "cmd+w", "ctrl+shift+w"),                     // 34
-        new Row("zoom_pane", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"),    // 35
+        new Row("maximize_group", KeyContext.GLOBAL, "cmd+shift+enter", "ctrl+alt+shift+enter"), // 35, workspace tabs spec 11
         new Row("toggle_zen_mode", KeyContext.GLOBAL, "none", "none"),                       // Zen follow-up
-        new Row("focus_pane_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36
-        new Row("focus_pane_right", KeyContext.GLOBAL, "cmd+alt+right", "ctrl+alt+shift+right"),
-        new Row("focus_pane_up", KeyContext.GLOBAL, "cmd+alt+up", "ctrl+alt+shift+up"),
-        new Row("focus_pane_down", KeyContext.GLOBAL, "cmd+alt+down", "ctrl+alt+shift+down"),
+        new Row("focus_group_left", KeyContext.GLOBAL, "cmd+alt+left", "ctrl+alt+shift+left"),  // 36
+        new Row("focus_group_right", KeyContext.GLOBAL, "cmd+alt+right", "ctrl+alt+shift+right"),
+        new Row("focus_group_up", KeyContext.GLOBAL, "cmd+alt+up", "ctrl+alt+shift+up"),
+        new Row("focus_group_down", KeyContext.GLOBAL, "cmd+alt+down", "ctrl+alt+shift+down"),
         new Row("copy", KeyContext.GLOBAL, "cmd+c", "ctrl+shift+c"),                           // 42
         new Row("paste", KeyContext.GLOBAL, "cmd+v", "ctrl+shift+v"),                          // 43
         new Row("clear_scrollback", KeyContext.TERMINAL, "cmd+k", "ctrl+shift+k"),             // 45
