@@ -40,7 +40,9 @@ class ThemeButtonsTest {
                 // IntelliJ Light's default button is a slight gradient; sample within a small tolerance.
                 assertThat(distance(fill(confirm), UIManager.getColor("Button.default.background"))).as((themeDark ? "dark" : "light")).isLessThanOrEqualTo(8);
                 for (var input : List.of(field, password, formatted)) {
-                    assertThat(input.getPreferredSize().height).isBetween(26, 34);
+                    var inputInsets = input.getInsets();
+                    assertThat(input.getPreferredSize().height).as("native input fits its font and border")
+                        .isEqualTo(input.getFontMetrics(input.getFont()).getHeight() + inputInsets.top + inputInsets.bottom);
                     assertThat(input.isEditable()).isTrue();
                 }
                 assertThat(field.getBackground()).isEqualTo(UIManager.getColor("TextField.background"));
