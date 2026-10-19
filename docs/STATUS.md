@@ -1,12 +1,14 @@
 # Jasper — Status and Handoff
 
 **CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
-`--parallel --max-workers=2`; each project's tests remain sequential. Root verifiers consume
+`--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
 root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local
 `check`, forcing all 15 Java test tasks to execute with warm build artifacts, fell from 8m48s
 serial to 4m45s parallel (46%). All 11,437 tests were retained, with zero failures/errors and the
 same 25 platform skips; one new regression prevents Windows Git Bash probing root UNC paths.
 Architecture/license checks and independent review passed. Hosted checks on the final head gate merge.
+Ubuntu improved from 13m47s to 9m26s. Windows with two workers hit subprocess/startup/cleanup
+deadlines that passed serially; its single-worker limit awaits hosted verification.
 Synchronized main at `2c065f8cd`, retaining its Enterprise theme assertions alongside portable
 font checks; full local `check` passed (11,486 tests, zero failures/errors, 25 existing skips).
 

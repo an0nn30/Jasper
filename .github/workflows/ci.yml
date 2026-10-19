@@ -50,9 +50,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
       - name: Check
         shell: bash
-        # Parallelize independent projects; bound CPU/memory contention to two workers.
+        # Windows subprocess/cleanup tests hit deadlines with concurrent test JVMs.
+        # Keep its worker count at one; Unix runners parallelize independent projects.
         # Each project keeps its default single test JVM and sequential JUnit execution.
-        run: ./gradlew check --parallel --max-workers=2 --continue --stacktrace
+        env:
+          GRADLE_WORKERS: ${{ runner.os == 'Windows' && '1' || '2' }}
+        run: ./gradlew check --parallel --max-workers="$GRADLE_WORKERS" --continue --stacktrace
       # check built the release jars; the example plugin must keep building from them.
       - name: Example external plugin
         if: runner.os == 'Linux'
