@@ -138,6 +138,7 @@ skipped, 8 failed (app 1187/141/2, Remote 278/54/6, the rest 0 failed), exactly 
       menu opens it in a new tab group beside the current one.
 - [ ] The row shows a dot for one open pane and a count for two; exiting or closing them clears it.
 - [ ] The toolbar's **Sessions** dropdown lists the distributions first ("Ubuntu (WSL 2)"); choosing one opens a tab.
-- [ ] `>ssh` in the palette lists distributions as `WSL` rows; Enter opens a tab, Ctrl+Enter splits.
+- [ ] `>ssh` in the palette lists distributions as `WSL` rows; Enter opens a tab, Ctrl+Enter connects in a new tab
+      group beside the current one.
 - [ ] ↻ after installing or removing a distribution updates the group, the dropdown and `>ssh` without a restart;
       a collapsed WSL group stays collapsed after a restart.

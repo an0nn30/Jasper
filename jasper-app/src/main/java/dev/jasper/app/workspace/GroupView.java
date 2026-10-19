@@ -79,8 +79,8 @@ final class GroupView extends JPanel {
     String title(Tab tab) { return owner.tabTitle(tab); }
     Icon icon(Tab tab) { return owner.tabIcon(tab); }
     String tooltip(Tab tab) { return owner.tabTooltip(tab); }
-    /** The Select Tab shortcut for the tab at {@code index} of this group, or empty. */
-    String shortcut(int index) { return owner.tabShortcut(index); }
+    /** The Select Tab shortcut for the tab at {@code index} of this group while it is the active group, or empty. */
+    String shortcut(int index) { return activeGroup() ? owner.tabShortcut(index) : ""; }
     /** Whether the tab is a terminal tab, which the classic tabs mark with a status dot. */
     boolean terminal(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL; }
     boolean running(Tab tab) { return owner.running(tab); }

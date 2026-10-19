@@ -27,6 +27,7 @@ import javax.swing.SwingUtilities;
  * approval. EDT only.
  */
 public final class TabRegistry {
+    private static final System.Logger LOG = System.getLogger(TabRegistry.class.getName());
     private final Map<UUID, WorkspaceHost> hosts = new LinkedHashMap<>();
     private final List<Tab> tabs = new ArrayList<>();
     private final Map<String, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>>> guards = new HashMap<>();
@@ -155,7 +156,7 @@ public final class TabRegistry {
             rollbackAttach(host, tab, failure);
             tabs.remove(tab);
             try { tab.dispose(); }
-            catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
             throw failure;
         }
         select(tab);
@@ -164,7 +165,7 @@ public final class TabRegistry {
 
     private static void rollbackAttach(WorkspaceHost host, Tab tab, Throwable failure) {
         try { host.detach().accept(tab); }
-        catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+        catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
     }
 
     private WorkspaceHost main() {
@@ -265,6 +266,21 @@ public final class TabRegistry {
         Tab.rethrow(failure);
     }
 
+    /**
+     * Removes each tab as {@link #remove(Tab)} does, whatever removing another one throws; the first failure is rethrown
+     * afterwards, the others suppressed under it.
+     *
+     * @param batch the tabs to remove
+     */
+    public void removeAll(List<Tab> batch) {
+        Throwable failure = null;
+        for (var tab : batch) {
+            try { remove(tab); }
+            catch (RuntimeException | Error thrown) { failure = Tab.keep(failure, thrown); }
+        }
+        Tab.rethrow(failure);
+    }
+
     public CompletableFuture<Boolean> approve(List<Tab> requested) { return approve(requested, true); }
 
     private CompletableFuture<Boolean> approve(List<Tab> requested, boolean batch) {
@@ -303,16 +319,27 @@ public final class TabRegistry {
         return result;
     }
 
-    /** Asks the guards about these tabs as one decision, then removes them all, or none. */
+    /**
+     * Asks the guards about these tabs as one decision, then removes them all, or none. A tab whose removal throws never
+     * keeps the others open or the next close waiting: the failure is logged as a warning, since the decision may arrive
+     * after this method has returned.
+     */
     public CompletableFuture<Boolean> requestClose(List<Tab> requested) {
         if (decision != null && closing == null) return CompletableFuture.completedFuture(false);
         if (closing != null) return pending.equals(requested) ? closing : CompletableFuture.completedFuture(false);
         var result = new CompletableFuture<Boolean>();
         closing = result;
         approve(requested, false).whenComplete((allowed, error) -> onEdt(() -> {
-            if (error == null && Boolean.TRUE.equals(allowed)) for (var tab : requested) remove(tab);
-            closing = null;
-            result.complete(error == null && Boolean.TRUE.equals(allowed));
+            boolean approved = error == null && Boolean.TRUE.equals(allowed);
+            try {
+                if (approved) removeAll(requested);
+            } catch (RuntimeException | Error failure) {
+                // Thrown here, it would end in the decision's dependent future, which nobody reads.
+                LOG.log(System.Logger.Level.WARNING, "A tab failed to close", failure);
+            } finally {
+                closing = null;
+                result.complete(approved);
+            }
         }));
         return result;
     }

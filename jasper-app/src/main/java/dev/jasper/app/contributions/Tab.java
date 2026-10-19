@@ -175,10 +175,13 @@ public final class Tab implements AutoCloseable {
         return failure;
     }
 
-    /** The failure to throw once the cleanup is done: the first one, with each later one suppressed under it. */
+    /**
+     * The failure to throw once the cleanup is done: the first one, with each later one suppressed under it; the first
+     * thrown again is not suppressed under itself.
+     */
     static Throwable keep(Throwable first, Throwable later) {
         if (first == null) return later;
-        first.addSuppressed(later);
+        if (first != later) first.addSuppressed(later);
         return first;
     }
 

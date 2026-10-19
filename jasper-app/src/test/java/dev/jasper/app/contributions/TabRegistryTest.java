@@ -326,6 +326,55 @@ class TabRegistryTest {
             .as("its id is free again").doesNotThrowAnyException();
     }
 
+    @Test void keepingTheSameFailureTwiceDoesNotSuppressItUnderItself() {
+        var failure = new IllegalStateException("shared");
+        assertThat(Tab.keep(failure, failure)).isSameAs(failure);
+        assertThat(failure.getSuppressed()).isEmpty();
+    }
+
+    @Test void aRollbackThatThrowsTheOpeningFailureAgainRethrowsIt() {
+        var failure = new IllegalStateException("mount failed");
+        registry.addHost(new WorkspaceHost(main, false, tab -> { throw failure; }, tab -> { throw failure; }, tab -> {}, () -> {}));
+        assertThatThrownBy(() -> registry.open("plugin.file", "one", "One", main, new JPanel())).isSameAs(failure);
+        assertThat(registry.hosted()).isEmpty();
+    }
+
+    @Test void aFailingRemovalNeitherStopsABatchCloseNorKeepsTheNextOneWaiting() {
+        hosts();
+        int[] disposed = {0};
+        var terminal = counted(disposed, main);
+        mounted.add(terminal);
+        terminal.onClosed(() -> { throw new IllegalStateException("close failed"); });
+        var view = registry.open("plugin.file", "a", "A", main, new JPanel());
+        var later = registry.open("plugin.file", "b", "B", main, new JPanel());
+        var logger = java.util.logging.Logger.getLogger(TabRegistry.class.getName());
+        var records = new ArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        boolean parents = logger.getUseParentHandlers();
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try {
+            var closing = registry.requestClose(List.of(terminal, view));
+            assertThat(closing).as("the decision completes").isCompletedWithValue(true);
+            assertThat(terminal.closed()).isTrue();
+            assertThat(view.closed()).as("a tab after the failing one still closes").isTrue();
+            assertThat(mounted).containsExactly(later);
+            assertThat(registry.requestClose(List.of(later))).as("the next close is not refused").isCompletedWithValue(true);
+            assertThat(later.closed()).isTrue();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setUseParentHandlers(parents);
+        }
+        assertThat(records).as("the failure is logged, not swallowed").singleElement().satisfies(record -> {
+            assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+            assertThat(record.getThrown()).hasMessage("close failed");
+        });
+    }
+
     @Test void anyTabMovesToANamedWindowAndIsSelectedThere() {
         hosts();
         var other = UUID.randomUUID();

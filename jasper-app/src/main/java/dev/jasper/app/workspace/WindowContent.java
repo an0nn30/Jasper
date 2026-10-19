@@ -306,8 +306,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         themeRegistration = themes.subscribe(this::applyTheme);
         focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
         host = registry.addHost(workspaceHost());
-        if (!detached) newTab(directory);
-        else setPreferredSize(new Dimension(900, 650));
+        if (!detached) {
+            try { newTab(directory); }
+            catch (RuntimeException | Error failure) {
+                // The focus manager outlives a window that failed to build.
+                focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+                throw failure;
+            }
+        } else setPreferredSize(new Dimension(900, 650));
     }
 
     private final JPanel body = new JPanel(new BorderLayout());
@@ -858,7 +864,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * As {@link #connectContributions(Contributions, UiState)}. A window that does not {@code hostsContent} is wired to
-     * the model but never registered as a place where plugin content opens, so the content registry cannot choose it as
+     * the model but never registered as a place where plugin content opens, so the tab registry cannot choose it as
      * the main window: the warm-up rehearsal is such a window, and content opened in it would vanish when it closes.
      */
     public void connectContributions(Contributions model, UiState state, boolean hostsContent) {
@@ -927,8 +933,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * Takes a tab out of this window before it closes or moves to another window: a terminal tab is announced closed here,
-     * and the window closes when its last tab has left. A tab whose attach failed has nothing to take out.
+     * Takes a tab out of this window once it has closed (the registry disposes it first) or as it moves to another window:
+     * a terminal tab is announced closed here, and the window closes when its last tab has left. A tab whose attach failed
+     * has nothing to take out.
      */
     private void detach(Tab tab) {
         var listener = tabListeners.remove(tab);
@@ -1248,12 +1255,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Closes {@code batch} on one decision: the plugin tabs' guards answer once and a refusal closes nothing; then every
-     * tab of the batch closes, terminal tabs included, their registry facts published as one change.
+     * tab of the batch closes, terminal tabs included, their registry facts published as one change when the guards
+     * answered at once. A batch of terminal tabs alone needs no approval and closes at once, as one change.
      */
     void closeTabs(java.util.List<Tab> batch) {
         var live = batch.stream().filter(workspace::contains).toList();
         if (live.isEmpty()) return;
-        Runnable close = () -> registry.requestClose(live);
+        boolean terminalsOnly = live.stream().allMatch(tab -> tab.kind() == Tab.Kind.TERMINAL);
+        Runnable close = terminalsOnly ? () -> registry.removeAll(live) : () -> registry.requestClose(live);
         if (terminals != null) terminals.atomically(close); else close.run();
     }
 
@@ -1344,8 +1353,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         Tab selected = selectedTab();
         for (Tab tab : tabs()) {
+            // Every tab is active while it is the window's active tab; a terminal's dimming also follows the window.
             if (tab.content() instanceof TerminalContent terminal) terminal.setActive(active && tab == selected);
-            else tab.active(tab == selected);
+            tab.active(tab == selected);
         }
         TerminalPane pane = currentPane();
         String size = pane == null || pane.session() == null ? "Starting terminal" :
@@ -1629,6 +1639,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     @Override public void close() {
         if (closed) return;
+        focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
         if (bodyLease != null) { bodyLease.close(); bodyLease = null; }
         dockDrag.cancel();
         paletteKeys.close();
@@ -1643,7 +1654,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uninstallCornerLayer();
         if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
-        focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
         // Leaving the registry removes the tabs this window still holds: each closes, a terminal tab announced closed.
         java.util.List<Tab> held = registry.inWindow(id);
         Throwable leaving = null;

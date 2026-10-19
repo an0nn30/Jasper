@@ -130,6 +130,95 @@ class TabMenuTest {
         });
     }
 
+    /** Runs {@code body} with the tab registry's log captured: what it logged. */
+    private static List<java.util.logging.LogRecord> registryLog(Runnable body) {
+        var logger = java.util.logging.Logger.getLogger(dev.jasper.app.contributions.TabRegistry.class.getName());
+        var records = new java.util.concurrent.CopyOnWriteArrayList<java.util.logging.LogRecord>();
+        var handler = new java.util.logging.Handler() {
+            @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
+            @Override public void flush() { }
+            @Override public void close() { }
+        };
+        boolean parents = logger.getUseParentHandlers();
+        logger.setUseParentHandlers(false);
+        logger.addHandler(handler);
+        try { body.run(); }
+        finally { logger.removeHandler(handler); logger.setUseParentHandlers(parents); }
+        return records;
+    }
+
+    @Test void closeGroupClosesEveryTabWhenOneTabsCloseListenerThrows() throws Exception {
+        var window = window(2);
+        edt(() -> {
+            var workspace = window.workspace();
+            var terminal = window.tabs().get(0); var other = window.tabs().get(1);
+            workspace.moveToNewGroup(other, workspace.model().activeGroup(), Side.RIGHT);
+            Tab elsewhere = model.tabs().open("dev.example.editor", "elsewhere", "elsewhere.txt", window.id(), new JPanel());
+            window.selectTab(terminal);
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(true));
+            terminal.onClosed(() -> { throw new IllegalStateException("close failed"); });
+            var logged = registryLog(() -> window.closeGroup(terminal));
+            assertThat(terminal.closed()).isTrue();
+            assertThat(view.closed()).as("the tab after the failing one closed too").isTrue();
+            assertThat(window.tabs()).containsExactly(other, elsewhere);
+            assertThat(logged).as("the failure is logged").singleElement()
+                .satisfies(record -> assertThat(record.getThrown()).hasMessage("close failed"));
+            assertThat(elsewhere.requestClose()).as("a later close still runs").isCompletedWithValue(true);
+            assertThat(elsewhere.closed()).isTrue();
+        });
+    }
+
+    @Test void aBatchCloseThatEmptiesTheWindowRunsItsEmptyHandlingAndKeepsOtherClosesWorking() throws Exception {
+        var emptied = new ArrayList<String>();
+        WindowContent[] owners = new WindowContent[2];
+        edt(() -> {
+            owners[0] = track(new WindowContent(idleLauncher(pending), HOME, path -> {}, () -> {}, () -> {
+                emptied.add("empty");
+                throw new IllegalStateException("window teardown failed");
+            }));
+            owners[0].connectContributions(model);
+            owners[1] = content(idleLauncher(pending), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
+            owners[1].connectContributions(model);
+        });
+        while (!pending.isEmpty()) pending.remove().run();
+        edt(() -> {
+            var window = owners[0];
+            var terminal = window.tabs().get(0);
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            Tab elsewhere = model.tabs().open("dev.example.editor", "elsewhere", "elsewhere.txt", owners[1].id(), new JPanel());
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> CompletableFuture.completedFuture(true));
+            var logged = registryLog(() -> window.closeGroup(terminal));
+            assertThat(emptied).as("the window's empty handling ran").containsExactly("empty");
+            assertThat(terminal.closed()).isTrue();
+            assertThat(view.closed()).isTrue();
+            assertThat(logged).singleElement().satisfies(record -> assertThat(record.getThrown()).hasMessage("window teardown failed"));
+            assertThat(elsewhere.requestClose()).as("a close in another window still runs").isCompletedWithValue(true);
+            assertThat(elsewhere.closed()).isTrue();
+        });
+    }
+
+    @Test void aTerminalOnlyCloseGroupClosesWhileAnApprovalIsPendingElsewhere() throws Exception {
+        var window = window(3);
+        edt(() -> {
+            var workspace = window.workspace();
+            var a1 = window.tabs().get(0); var a2 = window.tabs().get(1); var b1 = window.tabs().get(2);
+            workspace.moveToNewGroup(b1, workspace.model().activeGroup(), Side.RIGHT);
+            Tab view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            var answer = new CompletableFuture<Boolean>();
+            model.tabs().guard("dev.example.editor", (tabs, batch) -> answer);
+            var asking = view.requestClose();
+            assertThat(asking).as("the guard has not answered").isNotDone();
+            window.closeGroup(a1);
+            assertThat(a1.closed()).as("terminal tabs need no approval").isTrue();
+            assertThat(a2.closed()).isTrue();
+            assertThat(window.tabs()).containsExactly(b1, view);
+            answer.complete(false);
+            assertThat(asking).isCompletedWithValue(false);
+            assertThat(view.closed()).isFalse();
+        });
+    }
+
     @Test void closeTabAndCloseGroupRunFromTheirShortcuts() throws Exception {
         var window = window(3);
         edt(() -> {

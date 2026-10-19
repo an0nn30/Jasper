@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 3a: the tab registry and the workspace view — 2026-10-19** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `f623a24bc..ea571cec8` (Tasks 1 to 6 and their fix rounds), then this documentation
-commit; [plan](superpowers/plans/2026-10-17-workspace-3a-tab-registry.md),
+`.claude/worktrees/workspace-tabs`, `f623a24bc..ea571cec8` (Tasks 1 to 6 and their fix rounds), then the documentation
+commits and the final review's fixes; [plan](superpowers/plans/2026-10-17-workspace-3a-tab-registry.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Every tab of every window is a
 `contributions.Tab` in the application's `TabRegistry`, which absorbs `ContentRegistry`, `ContentEntry` and
 `ContentHost` and keeps the per-plugin close guards and batched approval; a tab holds a `TabContent`, either
@@ -74,7 +74,9 @@ so a throwing listener never leaks a session or a window; five tests (`Workspace
 `workspaceChanged` tells the palette only when the selected tab changed, as the old deck did, because the plan's Task 3
 code and Task 5 test contradicted each other (the palette stays open across a maximize); (h) Task 5, D2: a closed
 `TerminalContent` reports no pane to the terminal registry, so `ActivePaneChanged(empty)` precedes `WindowClosed` as
-before; (i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
+before when `WindowContent.close` closes a window; when a window's last tab closes, `WindowClosed` now comes before
+`ActivePaneChanged(empty)`;
+(i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
 registry hears `PaneOpened` before the activity's OPENED, and a failure ends in `PaneClosed`, `TabClosed` and a CLOSED
 for every OPENED, with `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` (11 tests, not 10); (j) Task 5's
 mechanical test ports beyond the brief: `WorkspaceViewTest.shellOf` reads `.pane().session()`, `WindowCommandsTest`
@@ -85,7 +87,19 @@ touched 22 test files, not 21; `LayoutGeometryTest`'s class Javadoc loses only "
 deleted `SplitTreeTest`; `Layout.unmaximize`'s Javadoc keeps "plans 4 and 5 call it"; (l) Task 7 also rewords
 `docs/app-architecture.md` and `docs/app-maintenance.md`, which named the removed `WindowContent.configurePane`, to
 `TabHost.configure`, and leaves `TAB_REVEAL_INSET` in the dated history of `docs/STATUS.md`,
-`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`. Every other anchor and all
+`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`;
+(m) final review: `TabRegistry.requestClose` removes every approved tab whatever another's removal throws (through the
+new `TabRegistry.removeAll`), always ends its pending close and completes its result, and logs a failure as a warning,
+since a rethrow would end in a future nobody reads; `Tab.keep`, and with it `open`'s rollback, never suppresses a
+failure under itself; a layout change gives the active tab focus only while the palette's card does not hold the
+window's input and the permanent focus owner was in the workspace, nowhere, or not showing (a closed terminal, or the
+palette that just closed to run a command), so focus in the open palette, the Run window or a tool window stays there;
+Close Others and Close Group of terminal tabs alone close at once, without the registry's approval; every tab's
+`Tab.active()` follows its window's active tab, terminal tabs included; a group outside the active one shows no Select
+Tab shortcut; a window stops hearing the focus manager first when it closes, and when its first tab fails in its
+constructor; the `WorkspaceHost.detach`, `WindowContent.detach`, `connectContributions` and `closeTabs` Javadoc and
+`docs/windows-startup-verification.md`'s Ctrl+Enter row are corrected; ten tests (`TabRegistryTest` 22, `TabMenuTest` 8,
+`WorkspaceTabsTest` 14, `WorkspaceViewTest` 11). Every other anchor and all
 other code and test text were applied as written. Left for plan 3b (the SDK break): `TabEntry` gains a kind and loses
 its pane list, `WindowEntry` lists every tab, `TabHandle.kind()`/`terminal()` replace `panes()`/`activePane()`,
 `WindowHandle.tabs()` lists every tab, TAB events cover every content and gain `TAB_MOVED`, `StandardMenu.PANE` and
@@ -95,13 +109,16 @@ pane to the same tab, and `HostedTerminalsTest` (its split assertion at `:219`) 
 tab, so `AppContractTest` never exercises the new split behaviour. Left for plan 4: an operating-system notification's
 click raises the window its command finished in, captured when `JasperApplication` composed that window, before the
 activity's "go to" follows a moved tab; resolve that window at click time once tabs move between windows. `./gradlew
-check --continue`: BUILD SUCCESSFUL, **11,599 tests, 0 failures, 0 errors, 25 skipped** (from the XML in
-`*/build/test-results/test/`; `jasper-app` 3,662, `SplitContainerTest` 10, `WorkspaceViewTest` 10, `TabRegistryTest` 19,
-`TabMoveTest` 6, `WorkspaceTabsTest` 11, `TabMenuTest` 5, `KeymapDefaultsTest` 4). GUI checks for the user: each group's
+check --continue`: **11,609 tests, 0 failures, 0 errors, 25 skipped** (from the XML in `*/build/test-results/test/`,
+`jasper-app`'s from a `:jasper-app:test` rerun: one `StagedTransferLifecycleTest` case timed out in the full run and
+passes alone; `jasper-app` 3,672, `SplitContainerTest` 10, `WorkspaceViewTest` 11, `TabRegistryTest` 22,
+`TabMoveTest` 6, `WorkspaceTabsTest` 14, `TabMenuTest` 8, `KeymapDefaultsTest` 4). GUI checks for the user: each group's
 strip in the equal and the classic tabs and its active state across windows; clicking into another group's terminal or
 plugin view (it becomes active, Cmd+W closes it); Cmd+D, Cmd+Shift+D (also beside a plugin view), dragging a divider and
 a theme change with splits; Maximize Group and Focus Group; dimming; the tab menu, and Close Group over a modified
-Editor tab (one prompt); a translucent workspace with groups; Open in Separate Window. Not merged, not pushed.
+Editor tab (one prompt); a translucent workspace with groups; Open in Separate Window; focus staying in the open
+palette, the Run window or a tool window while a background group closes (a shell exiting with `on_exit = close`),
+and Focus Group and Maximize Group run from the palette still moving focus to the group. Not merged, not pushed.
 
 **Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), the documentation commit

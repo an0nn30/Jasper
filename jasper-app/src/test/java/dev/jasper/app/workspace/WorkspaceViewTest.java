@@ -106,6 +106,19 @@ class WorkspaceViewTest {
         });
     }
 
+    @Test void onlyTheActiveGroupsTabsShowTheirSelectTabShortcut() throws Exception {
+        edt(() -> {
+            var owner = window(2);
+            var workspace = owner.workspace();
+            var left = workspace.model().activeGroup();
+            workspace.moveToNewGroup(owner.tabs().get(1), left, Side.RIGHT);
+            var right = workspace.model().activeGroup();
+            assertThat(owner.tabShortcut(0)).as("Select Tab 1 has a shortcut").isNotEmpty();
+            assertThat(workspace.groupView(right).shortcut(0)).as("the active group's first tab").isEqualTo(owner.tabShortcut(0));
+            assertThat(workspace.groupView(left).shortcut(0)).as("Select Tab acts in the active group only").isEmpty();
+        });
+    }
+
     @Test void aDividerDragWritesTheLayoutsWeights() throws Exception {
         edt(() -> {
             var owner = window(2);

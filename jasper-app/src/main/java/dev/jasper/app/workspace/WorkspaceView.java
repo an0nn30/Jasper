@@ -12,6 +12,8 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
 import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.KeyboardFocusManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -135,14 +137,29 @@ final class WorkspaceView extends JPanel {
 
     private void apply(Layout next) { apply(next, true); }
 
-    /** Renders {@code next}; with {@code refocus} the active tab takes focus when it or the shape changed (Rulings 10). */
+    /**
+     * Renders {@code next}; with {@code refocus} the active tab takes focus when it or the shape changed (Rulings 10),
+     * provided the workspace held focus when the change began.
+     */
     private void apply(Layout next, boolean refocus) {
         if (closed) return;
         Tab before = selected();
         Object previous = shape;
+        boolean held = refocus && holdsFocus();
         layout = next;
         render();
-        owner.workspaceChanged(refocus && (selected() != before || !Objects.equals(previous, shape)));
+        owner.workspaceChanged(held && (selected() != before || !Objects.equals(previous, shape)));
+    }
+
+    /**
+     * Whether focus may follow a change of this workspace: the palette's card does not hold the window's input, and the
+     * permanent focus owner is in this workspace or nowhere a person sees it (a closed terminal, or the palette that just
+     * closed to run a command). Focus in the open palette, the Run window or a tool window stays there.
+     */
+    private boolean holdsFocus() {
+        if (owner.commandPalette() != null && owner.commandPalette().blocksActions()) return false;
+        Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
+        return focus == null || !focus.isShowing() || SwingUtilities.isDescendingFrom(focus, this);
     }
 
     private void render() {

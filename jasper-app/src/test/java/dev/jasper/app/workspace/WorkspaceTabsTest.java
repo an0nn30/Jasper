@@ -285,6 +285,104 @@ class WorkspaceTabsTest {
         }
     }
 
+    @Test void aGroupCollapsingElsewhereLeavesFocusOutsideTheWorkspaceWhereItIs() throws Exception {
+        var prior = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        var focus = new FocusOwners();
+        edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(focus));
+        var outside = new JPanel();
+        try {
+            var window = window(5);
+            edt(() -> {
+                var model = new Contributions();
+                window.connectContributions(model);
+                var workspace = window.workspace();
+                var background = window.tabs().subList(1, 5);
+                workspace.moveToNewGroup(background.get(0), workspace.model().activeGroup(), Side.RIGHT);
+                for (int i = 1; i < background.size(); i++)
+                    workspace.moveToNewGroup(background.get(i), workspace.model().groupOf(background.get(i - 1).id()).orElseThrow(), Side.DOWN);
+                window.selectTab(window.tabs().get(0));
+                var inside = new JTextField();
+                var panel = new JPanel(); panel.add(inside);
+                var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), panel);
+                int[] focused = {0};
+                view.focusTarget(() -> focused[0]++);
+                // A field the person sees, outside the workspace: the palette's query, the Run window, a tool window.
+                var field = new JTextField();
+                outside.add(field); outside.addNotify();
+                assertThat(field.isShowing()).isTrue();
+                focus.own(field);
+                window.closeTab(background.get(0));
+                assertThat(window.workspace().model().groups()).as("the background group collapsed").hasSize(4);
+                assertThat(focused[0]).as("focus stays outside the workspace").isZero();
+                // Focus left in a component nobody sees, such as the palette that just closed to run a command.
+                focus.own(new JTextField());
+                window.closeTab(background.get(1));
+                assertThat(focused[0]).as("focus nowhere follows the change").isEqualTo(1);
+                focus.own(inside);
+                assertThat(window.selectedTab()).isSameAs(view);
+                window.closeTab(background.get(2));
+                assertThat(focused[0]).as("focus in the workspace follows the change").isEqualTo(2);
+                WindowCommandPaletteTest.install(window);
+                window.commandPalette().toggle();
+                assertThat(window.commandPalette().blocksActions()).isTrue();
+                window.closeTab(background.get(3));
+                assertThat(window.workspace().model().groups()).hasSize(1);
+                assertThat(window.commandPalette().isOpen()).isTrue();
+                assertThat(focused[0]).as("never while the palette holds the window's input").isEqualTo(2);
+                window.commandPalette().dismiss();
+                focus.own(null);
+            });
+        } finally {
+            edt(() -> { outside.removeNotify(); KeyboardFocusManager.setCurrentKeyboardFocusManager(prior); });
+        }
+    }
+
+    @Test void aTerminalTabIsActiveWhileItIsTheSelectedTabAsAPluginTabIs() throws Exception {
+        var window = window(2);
+        edt(() -> {
+            var model = new Contributions();
+            window.connectContributions(model);
+            var first = window.tabs().get(0); var second = window.tabs().get(1);
+            var heard = new ArrayList<Boolean>();
+            first.onActive(heard::add);
+            window.selectTab(first);
+            assertThat(first.active()).isTrue();
+            assertThat(second.active()).isFalse();
+            assertThat(heard).containsExactly(true);
+            var view = model.tabs().open("dev.example.editor", "notes", "notes.txt", window.id(), new JPanel());
+            assertThat(view.active()).isTrue();
+            assertThat(first.active()).isFalse();
+            window.setActive(false);
+            assertThat(view.active()).as("a plugin tab stays its window's active tab while the window is inactive").isTrue();
+            window.setActive(true);
+            window.selectTab(second);
+            window.setActive(false);
+            assertThat(second.active()).as("so does a terminal tab").isTrue();
+            assertThat(view.active()).isFalse();
+            assertThat(heard).containsExactly(true, false);
+        });
+    }
+
+    @Test void aWindowWhoseFirstTabFailsStopsHearingTheFocusManager() throws Exception {
+        var prior = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        var focus = new FocusOwners();
+        edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(focus));
+        try {
+            edt(() -> {
+                int before = focus.getPropertyChangeListeners("permanentFocusOwner").length;
+                // Without a launcher the first tab's pane cannot be made.
+                assertThatThrownBy(() -> content((ShellLauncher) null)).isInstanceOf(NullPointerException.class);
+                assertThat(focus.getPropertyChangeListeners("permanentFocusOwner")).hasSize(before);
+                var window = content(idleLauncher(pending));
+                assertThat(focus.getPropertyChangeListeners("permanentFocusOwner")).hasSize(before + 1);
+                window.close();
+                assertThat(focus.getPropertyChangeListeners("permanentFocusOwner")).hasSize(before);
+            });
+        } finally {
+            edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(prior));
+        }
+    }
+
     @Test void aTerminalTabWhoseAttachFailsGoesWithItsPane() throws Exception {
         var window = window(1);
         edt(() -> {

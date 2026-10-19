@@ -1,6 +1,7 @@
 # Workspace tabs 3a: the tab registry and the workspace view Implementation Plan
 
-**Status: executed on 2026-10-19** (`f623a24bc..ea571cec8`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-19** (`f623a24bc..ea571cec8`, then the documentation commits and the final review's
+fixes); see `docs/STATUS.md`.
 Deviations from the plan's text: (a) Task 2:
 `SplitContainerTest.aDividerDragMovesItsBoundaryAndReportsTheWeightsOnRelease` releases at the divider-relative `2, 50`,
 and Task 3's `WorkspaceViewTest.aDividerDragWritesTheLayoutsWeights` at `2`, because AWT delivers a release relative to
@@ -23,7 +24,9 @@ so a throwing listener never leaks a session or a window; five tests (`Workspace
 `workspaceChanged` tells the palette only when the selected tab changed, as the old deck did, because the plan's Task 3
 code and Task 5 test contradicted each other (the palette stays open across a maximize); (h) Task 5, D2: a closed
 `TerminalContent` reports no pane to the terminal registry, so `ActivePaneChanged(empty)` precedes `WindowClosed` as
-before; (i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
+before when `WindowContent.close` closes a window; when a window's last tab closes, `WindowClosed` now comes before
+`ActivePaneChanged(empty)`;
+(i) Task 5 closes again what a failed attach announced: the pane is wired before it is announced, the terminal
 registry hears `PaneOpened` before the activity's OPENED, and a failure ends in `PaneClosed`, `TabClosed` and a CLOSED
 for every OPENED, with `WorkspaceTabsTest.aFailedAttachClosesWhatItAnnounced` (11 tests, not 10); (j) Task 5's
 mechanical test ports beyond the brief: `WorkspaceViewTest.shellOf` reads `.pane().session()`, `WindowCommandsTest`
@@ -34,7 +37,19 @@ touched 22 test files, not 21; `LayoutGeometryTest`'s class Javadoc loses only "
 deleted `SplitTreeTest`; `Layout.unmaximize`'s Javadoc keeps "plans 4 and 5 call it"; (l) Task 7 rewords
 `docs/app-architecture.md` and `docs/app-maintenance.md`, which named the removed `WindowContent.configurePane`, to
 `TabHost.configure`, and leaves `TAB_REVEAL_INSET` in the dated history of `docs/STATUS.md`,
-`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`. Every other anchor and all
+`docs/design/theme-engine/temporary-paths.md` and `docs/design/theme-engine/migration.csv`;
+(m) final review: `TabRegistry.requestClose` removes every approved tab whatever another's removal throws (through the
+new `TabRegistry.removeAll`), always ends its pending close and completes its result, and logs a failure as a warning,
+since a rethrow would end in a future nobody reads; `Tab.keep`, and with it `open`'s rollback, never suppresses a
+failure under itself; a layout change gives the active tab focus only while the palette's card does not hold the
+window's input and the permanent focus owner was in the workspace, nowhere, or not showing (a closed terminal, or the
+palette that just closed to run a command), so focus in the open palette, the Run window or a tool window stays there;
+Close Others and Close Group of terminal tabs alone close at once, without the registry's approval; every tab's
+`Tab.active()` follows its window's active tab, terminal tabs included; a group outside the active one shows no Select
+Tab shortcut; a window stops hearing the focus manager first when it closes, and when its first tab fails in its
+constructor; the `WorkspaceHost.detach`, `WindowContent.detach`, `connectContributions` and `closeTabs` Javadoc and
+`docs/windows-startup-verification.md`'s Ctrl+Enter row are corrected; ten tests (`TabRegistryTest` 22, `TabMenuTest` 8,
+`WorkspaceTabsTest` 14, `WorkspaceViewTest` 11). Every other anchor and all
 other code and test text were applied as written.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
