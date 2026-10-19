@@ -67,8 +67,9 @@ class EditorDocumentPreservationTest {
                 area.append("// edit\n"); area.select(4,7);
                 var tab=editor.contentTab(); var entry=editor.contributions.content().entries().getFirst();
                 assertThat(entry.commands()).extracting(dev.jasper.app.contributions.ContentCommand::title)
-                    .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
-                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
+                    .contains("Save", "Save As…", "Save All", "Open…", "New File", "Find…", "Replace…", "Go to Line…",
+                        "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode")
+                    .as("the host's tab menu has its own Close Tab").doesNotContain("Close Tab");
                 var view=(KitView)entry.component();
                 assertThat(view.route()).isEqualTo(ThemeRoute.WORKSPACE);
                 assertThat(view.isOpaque()).isTrue();

@@ -150,7 +150,7 @@ public final class EditorWindow {
             command("save-all", "Save All", KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK, () -> saveAll()),
             new Command("open", "Open…", Optional.empty(), false, this::openChooser),
             command("new", "New File", KeyEvent.VK_N, 0, this::newUntitled),
-            new Command("close-tab", "Close Tab", Optional.of(KeyNames.stroke(KeyEvent.VK_W, 0)), false, this::closeCurrent),
+            new Command("close-tab", "Close Tab", Optional.empty(), false, this::closeCurrent),
             command("find", "Find…", KeyEvent.VK_F, 0, () -> findBar.open(false)),
             command("replace", "Replace…", KeyEvent.VK_F, InputEvent.ALT_DOWN_MASK, () -> findBar.open(true)),
             new Command("find-next", "Find Next", Optional.of(KeyNames.findAgain(false)), true, findBar::next),
@@ -764,18 +764,26 @@ public final class EditorWindow {
         handle.setFocusTarget(tab::focusText);
         handle.onActive(active -> { if (active) activate(tab); });
         handle.onClosed(() -> remove(tab));
+        handle.setCommands(contentCommands(tab));
+        activate(tab);
+        readVimrcOnce();
+        refresh();
+    }
+
+    /**
+     * What {@code tab} publishes to the host, for its tab menu and the window's Find and Copy/Paste actions: every command
+     * but Close Tab, which the host's tab menu and its Close Tab and Close Pane shortcuts provide, then Copy and Paste.
+     */
+    List<dev.jasper.sdk.ui.ContentCommand> contentCommands(EditorTab tab) {
         var descriptions = new ArrayList<dev.jasper.sdk.ui.ContentCommand>();
         for (var command : commands) {
-            if (command.id().equals("next-tab") || command.id().equals("previous-tab")) continue;
+            if (command.id().equals("close-tab")) continue;
             descriptions.add(new dev.jasper.sdk.ui.ContentCommand(command.id(), command.title(), command.stroke().orElse(null), true,
                 () -> { activate(tab); command.run().run(); }));
         }
         descriptions.add(new dev.jasper.sdk.ui.ContentCommand("copy", "Copy", KeyNames.stroke(KeyEvent.VK_C, 0), true, tab.area()::copy));
         descriptions.add(new dev.jasper.sdk.ui.ContentCommand("paste", "Paste", KeyNames.stroke(KeyEvent.VK_V, 0), true, tab.area()::paste));
-        handle.setCommands(descriptions);
-        activate(tab);
-        readVimrcOnce();
-        refresh();
+        return descriptions;
     }
 
     private void remove(EditorTab tab) {
