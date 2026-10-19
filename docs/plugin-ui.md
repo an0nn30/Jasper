@@ -192,7 +192,8 @@ confirms (set `pending` while a start or stop is in flight).
   is never selected. With no rows a `Table` shows its `empty` state (at most one action) or its `emptyText` below the
   kept headers, and an `ItemList` with no items shows its `emptyText`.
 - **Toolbar views.** An INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, at most one PRIMARY
-  `Button`, `MenuButton`s and `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
+  `Button`, icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1), `MenuButton`s and
+  `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
   [actions](plugin-authoring.md#actions-and-where-they-appear)). A choice's label is its accessible name, not a caption.
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
   title (the macOS window title row, or the header strip of a dialog the Enterprise look draws in its window); `Hue.NONE`,

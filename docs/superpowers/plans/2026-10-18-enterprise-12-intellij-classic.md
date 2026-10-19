@@ -1,5 +1,7 @@
 # Enterprise presentation 12: IntelliJ classic Implementation Plan
 
+> **Status (2026-10-18): executed on `claude/enterprise-intellij-classic` (`ef5a90cc9..e96129c86`, then the documentation commit).** Deviations from this plan's text: the spec's header amendment line also names 5.1, which Task 12 Step 1 amends; Task 12 fences Step 6's STATUS template, whose inline links failed `AppDocumentationTest`; `docs/command-palette.md` also drops "or below it" from the Run window's re-attach rule, which `UpperHome` no longer has. Deviation from approved design D awaiting the user's ruling: Rulings 17 (the focused header's guard is kept for authored values).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** After trying Enterprise the user asked for IntelliJ's classic look in five places; this plan delivers all five. The Enterprise toolbar shows IntelliJ's classic icons, which are vendored and attributed on the About page. Remote's session view becomes IntelliJ's run-configuration combo with the green Run button (SDK 0.18.1). The Enterprise theme becomes a port of IntelliJ Light and the New UI Dark theme. A clicked tool window takes the focused header tint, exactly #DFE2E9 in Light. The Run window opens centred across the window, in its upper part.
@@ -1810,7 +1812,13 @@ Expected: every gated pair PASS (record "N of N").
 
 - [ ] **Step 6: Write `docs/STATUS.md`'s new top entry and this plan's banner**
 
-The entry starts `**Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18** (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`; [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))`. Then, in the series' style, give:
+The entry starts:
+
+```markdown
+**Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18** (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`; [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
+```
+
+Then, in the series' style, give:
 - the five requests and what each became;
 - the rulings (this plan's 20, one clause each);
 - **awaiting the user's ruling:** Rulings 17 keeps `FOCUSED_HEADER`'s guard for every value, a deviation from approved design D (an authored override painting unguarded), because design D would remove the focused tint from the six Catppuccin and Yaru variants (fact 14);

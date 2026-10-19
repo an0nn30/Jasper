@@ -1,5 +1,91 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18** (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`; [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `ef5a90cc9..e96129c86`, then this documentation commit; spec 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 7.6, 7.7,
+8.2, 8.6, 10.3, 10.7, 11.5, 14.4 and 19.1 amended. After trying Enterprise the user asked for IntelliJ's classic look in
+five places. (1) **Classic icons.** jasper-ui vendors 14 unmodified SVGs from JetBrains/intellij-community at tag
+idea/2026.2.3 (`8062c061ff33`), checked against `assets-classic.tsv`; a new `[chrome] icons = "new_ui" | "classic"`
+point (Enterprise: `classic`) marks each window's header and status bar, and the About page's entry is now "IntelliJ
+Platform icons (New UI and Classic)" with an `ATTRIBUTION.txt` notice. The classic header draws them: under `icons`
+(Enterprise's new `window.toolbar` default, a fifth look-default key) 22 px icon buttons whose tooltips are their labels,
+Split marking its menu with a corner ▼; under `icons_and_labels` the icon, then the label. (2) **Remote's session view**
+is IntelliJ's run-configuration combo (the classic buttons face draws a rich DROPDOWN in a toolbar strip as
+`ComboBoxButton`: 24 px, the `application` icon, the name capped at 240 with an ellipsis, IntelliJ's arrow) and an
+icon-only GHOST `run` button, tooltip "Connect", in place of "Session:" and Connect; SDK 0.18.1 admits icon-only GHOST
+buttons in toolbar views and adds the authored `run` and `application` icons (Remote 0.14.0 requires it; Enterprise
+0.2.0). (3) **The focused header.** Under flush frames any mouse press inside a tool window, and opening it from its
+stripe or its View toggle (`PanelRequest.Op.ACTIVATING_TOGGLE`), activates it and moves the keyboard into it; a press in
+the terminal hands the tint back and dragging a divider keeps it. Light's focused header paints exactly #DFE2E9. (4)
+**The theme.** `enterprise.json` is now `convert_port`'s output from `tools/themes/enterprise/port.json` and IntelliJ's
+"IntelliJ Light" and New UI "Dark" theme files and editor schemes, pinned by a golden test, with an About entry
+"IntelliJ Platform themes (the Enterprise theme)"; accents #2675BF and `Blue5` #366ACE, Light's `surface.header.active`
+the user's #DFE2E9, Dark's its recipe, **#2C3340**; the `dark-terminal` scheme is gone. Every Enterprise test reads its
+colours from the shipped theme's roles, and `check_pairs.py` looks for a pair's colours in the render only. (5) **The
+Run window** opens at `UpperHome`: centred across the window, its top a seventh down, moved up to end at the middle while
+the work area allows, clamped into the work area (`RUN_WINDOW_HOME_SIDE`/`_BOTTOM` removed; the saved
+`[palette.run_window] left/bottom` keys are unchanged). Rulings (plan, "Rulings"): (1) one plan of twelve tasks; (2)
+14 unmodified files under `icons/classic/`, one without a `_dark` sibling serving both variants; (3) the classic chrome
+set is `add`, `split`, `zoom`, `settings`, `window.add` and `search`, any other name falling back to New UI; (4) `run`
+and `application` are authored catalog names in both looks, with vector fallbacks; (5) one About entry for both icon
+sets; (6) `[chrome] icons` projects onto `WorkspaceLook.Icons`, read only by `WorkspaceChrome`, and the default look's
+rails keep New UI; (7) classic header buttons as above, tooltips the labels; (8) `window.toolbar` joins the defaults
+allowlist and Enterprise defaults it to `icons`; (9) any number of icon-only GHOST buttons in a toolbar view, a labelled
+GHOST still refused; (10) the toolbar combo is IntelliJ's `ComboBoxButton`, only for a rich DROPDOWN in a toolbar strip
+under classic buttons; (11) an icon-only GHOST button in a toolbar strip draws a 16 px glyph in a `BUTTON_HEIGHT` square;
+(12) Remote's classic view: no label, the `application` face, a GHOST `run` Connect; (13) the port reads the vendored
+`f7377708` inputs, which convert identically at `8062c061ff33`; (14) an override key is filled only from an exact
+IntelliJ key, then port.json's overrides; (15) the accents keep white labels under the TEXT guard, superseding plan 5b's
+#3C74D6; (16) two schemes, `light` and `dark`, author "JetBrains, ported by Jasper"; (17) `FOCUSED_HEADER`'s guard is
+kept for every value; (18) activation follows IntelliJ, a plugin's own `PanelRegistry.toggle` never activating; (19)
+`UpperHome` replaces `CornerHome`; (20) colours are checked in the render only, `pairs.json` re-themed by role.
+**Awaiting the user's ruling:** Rulings 17 keeps `FOCUSED_HEADER`'s `Guard.beyond(1)` for every value, a deviation from
+approved design D (an authored `surface.header.active` override painting unguarded), because design D would remove the
+focused tint from the six Catppuccin and Ubuntu Yaru variants whose authored active header equals their header; #DFE2E9
+is 5.9 L* from Light's header and paints exactly either way. **A question for the user:** with Enterprise's 8 visible
+rows the Run window is about 427 px tall, so it is entirely in the upper half only in windows about 1000 px tall or more,
+and in shorter ones it sits just under the toolbar and crosses the middle (Rulings 19); should Enterprise show fewer
+rows? Task 9's changes that follow the theme (Step 7, file and one line each):
+`RunWindowPresentationTest`, Enterprise Light's muted texts gain the shortcut and value pairs and the mono value reads
+its guarded pair; `ClassicCompositionRenderTest`, mock probes start on the mock's own colour, Dark's faint rule and
+column header, and its zebra rows, read as one band each, "Vault locked" reads the guarded `status.warning` and New
+Tunnel's target edge `hue.green`; `ClassicVaultRenderTest`, the Categories column is `surface.sidebar` and the Details
+pane is read in two parts around its rule; `RunWindowRenderTest`, the disabled Forward glyph's composite (share 0.277,
+measured #AFAFAF), the heading count and the keycap edge come from painted pairs; `SettingsChromeMockTest`, floors
+0.97/0.96/0.98 become 0.92/0.96/0.91 (measured sidebar 0.950, footer 0.942) and the Display arrow reads
+`text.placeholder`; `SettingsPagesMockTest`, the "6 groups" count reads its guarded pair, the Copy keycap edge its
+composite and the Plugins search strip `surface.sidebar`; `DockMockTest`, `HEADER_FLOOR` 0.94 becomes 0.87 (measured
+0.907) and `STRIPE_FLOOR` 0.92 becomes 0.85 (measured 0.882); `EnterpriseChromeTargetsTest`, the tab indicator is
+IntelliJ's `EditorTabs.underlineColor` (#4083C9, #3574F0) and the scrim the converter's (0x40, 0x8C);
+`EnterpriseWorkstationMockTest`, Dark's tab strip and its rule (#1E1F22) read as one run; `PaintedContrastTest`, the
+BLUE-square fixture gives Enterprise Light a blue equal to its accent; `pairs.json`, `classic-notifications-groups`'s
+floor 0.80 becomes 0.75 (0.923 before, 0.788 after). Step 8's hand removals from `pairs.json` (79 values in 42 pairs,
+each with a note): #2F65CA (old Light `accent`, `selection.bg`, `tab.indicator`, `hue.blue`) mapped to #4083C9 (28
+pairs), #042C99 (26) and #2675BF (`chrome-tabs-light`); #2A2C30 (Dark `border.window`) to #1E1F22
+(`chrome-toolbar-dark` and the four `dock-dark-kit-*-header` pairs); #2E3135 (Dark `surface.card` and its kin) to
+#1E1F22, #393B40 and #FFFFFF (`enterprise-dark-fileservers`; the last two also `chrome-tabs-dark`); #3D74D6 (Dark
+`selection.bg`) to #2E436E (`enterprise-dark-sftp`, `chrome-tabs-dark`) and (Dark `accent`) to #366ACE
+(`chrome-tabs-dark`); #3A3D42 (`surface.panel.raised`, `surface.tabstrip`) to #323437 (`chrome-tabs-dark`); #50545B
+(`surface.control.selected`, `border.field.raised`, `border.menu`) to #1E1F22 and #43454A (`dock-dark-left-stripe`,
+`dock-dark-right-stripe`); #FFFFFF (Light `surface.card` and its kin) to #C4C4C4 (`chrome-tabs-light`); #2E9E4F
+(`status.success`, `hue.green`) to #34B171 (`classic-new-tunnel`); #C4C7CC (Light `border.window`) to #D1D1D1
+(`chrome-dialog-add-login-footer`); and three mock literals no theme role held: #2D984D
+(`classic-new-file-server-ftp`), #E8EEFA (`classic-file-servers`) and #8E949C (`chrome-dialog-unlock-strip`). Task 8
+records the session toolbar pairs' agreement under IntelliJ's combo (0.962 to 0.666 Light, 0.826 to 0.653 Dark, floor
+0.50). Deviations from the plan's text: the spec's amendment line also names 5.1, which Task 12 amends; Task 12 fences the STATUS template in the plan's Step 6, whose inline links
+failed `AppDocumentationTest`; `docs/command-palette.md` also drops "or below it" from the Run window's re-attach rule,
+which `UpperHome` no longer has; otherwise none beyond the plan's Rulings. `./gradlew check --continue`: **11,469 tests, 0 failures, 0 errors, 25 skipped**;
+`check_pairs.py` passes 101 of 101 gated pairs; the headless gallery is byte-identical to `faeec76f3`'s (Slate Cobalt Dark and Light, 322 files)
+and so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome,
+palette and settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user:
+under Enterprise, the toolbar's classic icons in Light and Dark, with their tooltips and Split's menu; View › Toolbar's
+Icons & Labels; the session combo against IntelliJ's, with a long host name and with no saved sessions; Run's hover and
+disabled states, and connecting by Run; clicking blank space, a header strip and a stripe label in each tool window (the
+tint, and typing goes there), dragging a divider (the tint stays), then clicking the terminal; the Light focused header
+against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
+the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
+window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away
+and back; the About page's IntelliJ entries. Not merged, not pushed.
+
 **Enterprise presentation: side stripes at the user's direction — 2026-10-18** (`claude/enterprise-stripes`, worktree
 `.claude/worktrees/enterprise-stripes`, from `main` at `4ed94fb78`: `095e220b9`, `4b55dbfb7`, then this documentation
 commit, then the review's fixes; spec 3, 9.1, 10.7, 12.1 and 12.2 amended). After trying Enterprise the user asked for side stripes that fit their labels,

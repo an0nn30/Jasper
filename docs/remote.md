@@ -20,8 +20,8 @@ Choose a host to focus its most recently used running session, or connect in a n
 is open. **Manage Sessions...** opens the hosts panel, including when no hosts are saved.
 The list updates when hosts are added, edited, imported or removed.
 
-Under the Enterprise look the toolbar shows **Session:** with a dropdown (saved hosts, then WSL distributions, then
-**Manage Sessions…**) and **Connect**, which focuses a running pane for the chosen host or opens one. The Sessions panel
+Under the Enterprise look the toolbar shows the session combo (saved hosts, then WSL distributions, then
+**Manage Sessions…**) and the Run button, tooltip **Connect**, which focuses a running pane for the chosen host or opens one. The Sessions panel
 is a Name/Host/Port tree over the selected host's Properties, Tunnels is a Type/Local/Remote/Via table whose rows start
 or stop on Enter or a double click, SFTP's tools read **Hidden files** and **Upload** over a Modified column, and
 Transfers (**Cmd+Alt+3**, Alt+3 elsewhere) is a bottom panel. The panels start with Sessions and Tunnels on the right,
