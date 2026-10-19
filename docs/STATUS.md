@@ -18,9 +18,8 @@ end, the stripe's bottom. `DockMockTest` renders each side stripe as tall as its
 place, compares the glyphs against the mock moved across to the centred line (agreement 0.933 to 0.947 for 0.92), and
 asserts File Servers and Tunnels at their stripes' bottom ends in the whole dock, a user-directed deviation from the 01
 and 08 mocks, as is the 05 Settings Window mock's Panel rail width, now hidden (`enterprise-settings-02`, with a note); the whole dock and the bottom strip now meet the mocks' places with no extra stripe thickness. All 25 dock
-pairs pass `check_pairs.py`; the default look is byte-identical (`DefaultDockPixelsTest`, the headless gallery's 322
-files). `:jasper-app:test`: **3,500 tests, 0 failures, 0 errors, 19 skipped**; `verifyApplicationArchitecture` and
-`:jasper-app:javadoc` pass; the whole `check` was not run. GUI checks for the user: the stripes' width and centred
+pairs pass `check_pairs.py` (all 101 pairs: 101 PASS, 0 FAIL); the default look is byte-identical (`DefaultDockPixelsTest`, the headless gallery's 322
+files, dark and light against `4ed94fb78`). `./gradlew check`: **11,437 tests, 0 failures, 0 errors, 25 skipped**. GUI checks for the user: the stripes' width and centred
 labels, drag and drop onto both groups of both stripes, and the Window page without Panel rail width under Enterprise.
 Not merged, not pushed.
 
