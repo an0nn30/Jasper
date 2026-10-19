@@ -180,7 +180,7 @@ At `2c065f8cd`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
     The About entry "IntelliJ Platform icons (New UI and Classic)" (`about/licenses/notices.toml:92-97`) names `ATTRIBUTION.txt`. That file does not enumerate files.
 14. The 12 files, all `width="13" height="13" viewBox="0 0 13 13"` and using only `svg`, `g`, `path` and `rect`, are at `https://raw.githubusercontent.com/JetBrains/intellij-community/8062c061ff33e22041d9f1844db5b8b8a6b5e4d7/platform/icons/src/toolwindows/`. Their SHA-256 values were verified twice by the research (`mapping.md`, `critic.md` §1) and are listed in Task 1 Step 1. All except `toolWindowServer(.svg, _dark.svg)` start with `<!-- Copyright 2000-2021 JetBrains s.r.o.` and contain `Apache 2.0`.
 15. `DesignMetrics.Role`:
-    - It ends with plan 12's `CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4),` and the `TOOLBAR_COMBO_*` roles, the last being `TOOLBAR_COMBO_TEXT_MAX(240);` (`jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java:186-189`).
+    - It ends with plan 12's `CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4),` and the `TOOLBAR_COMBO_*` roles, the last being `TOOLBAR_COMBO_TEXT_MAX(240);` (`jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java:185-190`).
     - The frozen tables `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv` and `classic-roles.tsv` (705 rows each, no header, `NAME\tvalue`, last row `TOOLBAR_COMBO_TEXT_MAX\t240`) must list every role in enum order (`DesignMetricsTest.java:41`, `ClassicCatalogTest.java:24`).
     - `NativeStyles.metric(role)` is `UIScale.scale(kit.metrics().value(role))` (`jasper-ui/.../swing/NativeStyles.java:86`).
 16. The stripe ink pairs: `ChromePainter.stripeLabel(theme, open, hover)` paints `STRIPE_LABEL`, `HOVERED_STRIPE_LABEL` or `OPEN_STRIPE_LABEL`, which are `TEXT_PRIMARY` under `Guard.TEXT` (`jasper-ui/.../swing/ChromePainter.java:305-307`, `:355-357`). `stripeTile(theme, open, hover)` is null for a closed, unhovered label (`:349-352`).
@@ -188,11 +188,11 @@ At `2c065f8cd`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
 **Mock tests and pairs**
 
 17. `DockMockTest` (`jasper-app/src/test/java/dev/jasper/app/workspace/DockMockTest.java`):
-    - The left and right stripe tests are at `:98-127`. They render `fitted(top, second)` tall (`:136-140`) and call `compareStripe(..., List.of(29, 109, 151, 301))` and `List.of(29, 121, 164, 247)`.
-    - `compareStripe` (`:158-209`) writes `<variant>-<name>-render.png` with `MockCrops.write` and asserts the runs, the line and `STRIPE_FLOOR` 0.85 (`:96`).
-    - `theBottomStripMatchesTheMocks` (`:222-286`) renders 330 wide and crops `rows` 600 wide.
-    - `theWholeDockIsArrangedAsTheMocks` (`:419-449`) uses `DockFixture`.
-18. `tools/visual/pairs.json` holds nine stripe pairs, `dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}` (`:1664-2030`). Their `"render"` is `jasper-app/build/dock-renders/<variant>-<name>-render.png`, and `check_pairs.py` compares each with the mock crop through `compare_mock.py`, without resizing.
+    - The left and right stripe tests are at `:98-128`. They render `fitted(top, second)` tall (`:136-140`) and call `compareStripe(..., List.of(29, 109, 151, 301))` and `List.of(29, 121, 164, 247)`.
+    - `compareStripe` (`:158-203`) writes `<variant>-<name>-render.png` with `MockCrops.write` and asserts the runs, the line and `STRIPE_FLOOR` 0.85 (`:96`).
+    - `theBottomStripMatchesTheMocks` (`:222-285`) renders 330 wide and crops `rows` 600 wide.
+    - `theWholeDockIsArrangedAsTheMocks` (`:419-450`) uses `DockFixture`.
+18. `tools/visual/pairs.json` holds nine stripe pairs, `dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}` (`:1663-2029`). Their `"render"` is `jasper-app/build/dock-renders/<variant>-<name>-render.png`, and `check_pairs.py` compares each with the mock crop through `compare_mock.py`, without resizing.
 
 ## Rulings
 
@@ -289,7 +289,7 @@ rm -rf "$base" && mkdir -p "$base/app"
 for theme in dark light; do
   ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R "jasper-ui/build/gallery/$theme-1x" "$base/gallery-$theme-1x"
 done
-./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest'
+./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest' --rerun
 for f in jasper-app/build/chrome-renders/chrome-default*.png jasper-app/build/chrome-renders/settings-default*.png \
          jasper-app/build/chrome-renders/chrome-complement*.png jasper-app/build/chrome-renders/settings-complement*.png \
          jasper-app/build/chrome-renders/chrome-fallback*.png jasper-app/build/chrome-renders/settings-fallback*.png \
@@ -573,10 +573,10 @@ Expected: PASS.
 
 **Files:**
 - Modify: `jasper-ui/src/main/java/dev/jasper/ui/metrics/DesignMetrics.java`, `jasper-ui/src/test/resources/dev/jasper/ui/metrics/compact-roles.tsv`, `classic-roles.tsv`
-- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/StripeLabels.java`, `LabelledStripe.java`, `BottomStrip.java` (constructor and `Label` only), `StripeSet.java`, `DockChrome.java`, `WindowContent.java:273`, `ToolStripe.java` (extract `actionIcon`)
+- Modify: `jasper-app/src/main/java/dev/jasper/app/workspace/StripeLabels.java`, `LabelledStripe.java`, `BottomStrip.java` (constructor, `Label`, and its `length` and `paint` calls; Execution notes R6), `StripeSet.java`, `DockChrome.java`, `WindowContent.java:273`, `ToolStripe.java` (extract `actionIcon`)
 - Modify (constructor arguments): every `new LabelledStripe(`, `new BottomStrip(`, `new StripeSet.LabelledStripes(`, `new StripeLabels(` and `.stripes(` call in `jasper-app/src/test` (find them with `grep -rn "new LabelledStripe(\|new BottomStrip(\|new StripeSet.LabelledStripes(\|new StripeLabels(\|\.stripes(EnterpriseLook\|\.stripes(Kit" jasper-app/src/test`). The sites are in `DockMockTest`, `BottomStripTest`, `StripeSetTest`, `DockDragBottomStripTest`, `DockFixture` and `LabelledStripeTest`. Each adds `ChromeArtwork.CLASSIC`; `StripeSetTest:29`'s default case adds `ChromeArtwork.NEW_UI`. Every `labels.length(text, badge)` call for a window label adds `null`. The rail-action length at `LabelledStripeTest:251` becomes `labels.length("About Sample", Optional.empty(), labels.icon(ToolStripe.actionIcon(action)))`, because a rail action always leads with an icon.
 - Create: `jasper-app/src/test/java/dev/jasper/app/workspace/StripeIconsTest.java`
-- Test: `LabelledStripeTest` (a fixture overload and the `:251` edit), `DesignMetricsTest`, `ClassicCatalogTest`, `EnterpriseDockWindowTest` and `DockChromeMatrixTest` (one window-level case each, Step 1)
+- Test: `LabelledStripeTest` (a fixture overload, its `fitted(Kit)` helper taking `Math.max(line, STRIPE_ICON)` (Execution notes R8) and the `:250-251` edits), `DesignMetricsTest`, `ClassicCatalogTest`, `EnterpriseDockWindowTest` and `DockChromeMatrixTest` (one window-level case each, Step 1)
 - Modify: `docs/design/theme-engine/migration.csv` (one row)
 
 **Interfaces:**
@@ -846,7 +846,7 @@ Expected: PASS. `DockDragTest`'s rail ghosts are unchanged.
   - Every existing assertion runs unchanged on `withoutIcons(render, strip, 2)`, written as `-bottom-strip-text`.
 - **`fitted`** calls `labels.length(text, Optional.empty(), null)` with `new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC)`.
 
-`SLICE` is `UIScale.scale(STRIPE_ICON + STRIPE_ICON_GAP)` in logical pixels (17 at 1x). At 2x the cut removes `2 * SLICE` device pixels per iconed label.
+`SLICE` is `StripeIconsTest`'s, `metric(STRIPE_ICON) + metric(STRIPE_ICON_GAP)` in logical pixels (17 at 1x; Execution notes R9). At 2x the cut removes `2 * SLICE` device pixels per iconed label.
 
 - [ ] **Step 2: Give `DockFixture`'s panels their shipped icons**
 
@@ -979,7 +979,7 @@ Expected: every gated `dock-` pair PASS (25 of 25) and `dock pairs identical`, w
   "`IconRegistry.stripeIcon` gives a labelled stripe IntelliJ's classic 13 px tool-window icons (the `toolwindows/` rows of `assets-classic.tsv`) for network, folder, tunnel, download, server and bell; it is a table of its own, so the classic chrome set is unchanged."
 - **`docs/app-architecture.md`:** after `:242` ("… (`assets-classic.tsv`)."), add:
 
-  "The labelled stripes and the bottom strip are not receivers: `DockChrome.stripes` gives them the look's `ChromeArtwork`, and they draw each label's icon at 13 px through `AppIcons.stripeIcon`, IntelliJ's classic tool-window icon under CLASSIC where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's ink."
+  "The labelled stripes and the bottom strip are not receivers: `DockChrome.stripes` gives them the look's `ChromeArtwork`, and they draw each label's icon at 13 px through `AppIcons.stripeIcon`: under CLASSIC, IntelliJ's classic tool-window icon where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's ink; under NEW_UI, the icon the rails draw."
 
 Check the removals and the additions:
 
@@ -1011,7 +1011,7 @@ for theme in dark light; do
   ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R "jasper-ui/build/gallery/$theme-1x" "$out/gallery-$theme-1x"
   diff -r "$base/gallery-$theme-1x" "$out/gallery-$theme-1x" && echo "$theme: identical ($(ls "$out/gallery-$theme-1x" | wc -l) files)"
 done
-./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest'
+./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest' --rerun
 mkdir -p "$out/app"
 for f in jasper-app/build/chrome-renders/chrome-default*.png jasper-app/build/chrome-renders/settings-default*.png \
          jasper-app/build/chrome-renders/chrome-complement*.png jasper-app/build/chrome-renders/settings-complement*.png \
@@ -1102,3 +1102,69 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 Expected: the hygiene script prints nothing, `AppDocumentationTest` passes and the commit succeeds.
+
+## Execution notes (2026-10-19)
+
+**Refresh.** The worktree is on `claude/enterprise-stripe-icons` at `0381b1f0b`, two plan commits on `2c065f8cd`. `git diff 2c065f8cd HEAD` outside `docs/` is empty, so every code anchor is `2c065f8cd`'s, and nothing has merged since. The four refresh greps print `1`, `1`, `1` and `0`. Every path, signature, quoted text and line number in Verified facts, the seven tasks and Task 7's documents was re-read against the worktree (the code, the tests, the role tables, `pairs.json`, the spec, the four guides, `SOURCE.md`, `ATTRIBUTION.txt`, `notices.toml` and the fetch script). They hold, except these, corrected in place:
+- `DesignMetrics.Role`'s plan 12 roles end at `:185-190` (was `:186-189`).
+- `DockMockTest`: the side stripe tests are `:98-128`, `compareStripe` `:158-203`, `theBottomStripMatchesTheMocks` `:222-285` and `theWholeDockIsArrangedAsTheMocks` `:419-450`.
+- `pairs.json`'s nine stripe entries are `:1663-2029`.
+
+The other text changes made in place are rulings R6, R8, R9, R12 and R14. The 12 hashes in Task 1 Step 1 match the research's `mapping.md`. No Gradle ran during the refresh.
+
+**Tasks** (unchanged; one commit each): 1, the classic tool-window icons in jasper-ui; 2, the stripe icon resolver; 3, side stripe labels lead with their icon; 4, the bottom strip's labels lead with their icon; 5, drag keeps the icon and the ghost is the stripe icon; 6, the mock tests and pairs follow the iconed stripes; 7, documentation, STATUS and the whole build.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Finding | Ruling |
+| --- | --- | --- | --- |
+| 1 × 2 | `IconRegistry.stripeIcon(String, int)` returning `Optional<PreparedIcon>` | Task 2 calls it with the device size `UIScale.scale(13)` (inside 1 to 512) and `.icon(theme, TEXT_PRIMARY)`; agrees. When the presence check runs is not stated. | R1 |
+| 1 × 3 | `IconRegistry.stripeIcon` in `StripeIconsTest.classic` and `EnterpriseDockWindowTest` | Agrees. | none |
+| 1 × 7 | `SOURCE.md`, `ATTRIBUTION.txt`, the `ui-architecture.md` sentence, spec 10.7's file names | The same six names and twelve files. Agrees. | none |
+| 2 × 3 | `AppIcons.stripeIcon(Icon, ChromeArtwork, int, Function)`; `StripeLabels.icon` and `ink` | The logical size `StripeLabels` passes and the state `ink` reads are not stated. | R2, R3 |
+| 2 × 5 | The ghost, `labels.icon(icon)` through `AppIcons.stripeIcon`, painted in `DockDropOverlay` | The overlay is not a button, so the ink is the closed, unhovered one (Rulings 7). Agrees. | none |
+| 2 × 7 | `docs/app-architecture.md`'s new sentence | Its "else" read as if NEW_UI stripes drew the monochrome glyph. | R14 |
+| 3 × 4 | `BottomStrip.java`, `StripeIconsTest`'s helpers, `BottomStripTest` | Task 3's Files said "constructor and `Label` only" while its Step 3 changes the `length` and `paint` calls. Task 4 changes `render` and `paintLabel` only. | R6, R7 |
+| 3 × 5 | `LabelledStripe` and `BottomStrip` `beginDrag`; `StripeSet`; `ToolStripe`; `LabelledStripeTest`'s five `beginDrag` calls (`:260`, `:283`, `:315`, `:328`, `:345`, confirmed); `DockDragBottomStripTest`'s constructor call | Task 3 passes `own.icon` for an owned label and `null` for a foreign one; Task 5 replaces only the foreign `null`. Agrees. | none |
+| 3 × 6 | `DockMockTest` (Task 3: constructor arguments and `fitted`'s `null`; Task 6: the rewrite); `DockFixture` (Task 3: `CLASSIC`; Task 6: the icons); `StripeIconsTest`'s helpers; `LabelledStripeTest.window(..., Icon)` | `SLICE` is defined two ways (Task 3: sum of the scaled metrics; Task 6: the scaled sum). `reference` returns `int[]`, which Task 6 cannot put under the Vault scrim. | R9, R10 |
+| 4 × 5 | `BottomStrip`: `beginDrag` (Task 5) and `render` and `paintLabel` (Task 4) | Disjoint methods. Agrees. | none |
+| 4 × 6 | `BottomStrip`'s iconed render and `withoutIcons`' columns in `theBottomStripMatchesTheMocks`; the `-bottom-strip` write | Which existing write becomes `-text` is not stated. | R11 |
+| 5 × 6 | none (Task 6 does not drag) | none | none |
+| 6 × 7 | `pairs.json` counts | 101 gated pairs unchanged plus nine ungated `-iconed` pairs; Task 7 Step 5's "N of N" stays 101. Agrees. | none |
+| 1 to 6 × 7 | Task 1 Step 0's and Task 7 Step 3's default-look renders | An up-to-date `:jasper-app:test` would skip the render tests and leave earlier files to be copied. | R12 |
+| 1 | itself | Consistent. The network step is Step 2 (the fetch), not Step 3. | R4, R17 |
+| 2 | itself | `aNameWithoutStripeArtDrawsItsMonochromeGlyphUnderClassic` names no `Icon` type and expects the logical 13 where the resolver passes the device size. | R1, R5 |
+| 3 | itself | Files against Step 3 on `BottomStrip` (R6); `Point` is not imported (R7); `LabelledStripeTest.fitted(Kit)` keeps the old thickness rule (R8); `SLICE` as a class-load constant (R9). | R6 to R9 |
+| 4 | itself | Files names `BottomStripTest`, which no step edits. | R15 |
+| 5 | itself | Consistent: `DockDrag` has no `ghost` field today, `drag.overlay()` exists, and `DockDropOverlay` has `highlight()` and `placeholder()` beside which `ghost()` goes. | none |
+| 6 | itself | `assertIcons` needs a scrimmed reference image; which writes are `-text`; the write order. | R10, R11 |
+| 7 | itself | Consistent once R12 and R14 apply. | R12, R14 |
+
+### Rulings
+
+- **R1. When the resolver looks for a classic file.** `AppIcons.stripeIcon` decides the icon's kind when it is called: empty, a `StripGlyph` unwrapped, a `PresentationIcon` with a path, a named icon, or another `Icon`. For a named icon under CLASSIC, whether `NAMED.stripeIcon(name, deviceSize)` has a file is decided on first paint at that size and cached with the prepared icon (key: artwork, name, device size). — why: Task 2 Step 3 prepares on first paint, and Rulings 4 loads the table only when a CLASSIC stripe paints — cost if wrong: none; deciding at creation would move the first load from paint to render, both under Enterprise only.
+- **R2. The logical icon size.** `StripeLabels(Kit, ChromeArtwork)` keeps the logical `kit.metrics().value(STRIPE_ICON)` and passes it to `AppIcons.stripeIcon` as `logicalSize`. `length`, `thickness` and `iconAt` use the scaled `styles.metric(...)`. — why: `AppIcons.stripeIcon` scales `logicalSize` itself, and `NativeStyles` gives only scaled values — cost if wrong: an icon scaled twice at a UI scale other than 1, which `StripeIconTest`'s `UIScale.scale(13)` checks would catch.
+- **R3. The label ink's state.** `StripeLabels.ink(Component c)` takes `theme = ThemeZone.theme(c)`. For an `AbstractButton`, `open = isSelected()` and `hover = getModel().isRollover()`, the state `paintLabel` reads; for anything else both are false. — why: the glyph must take the text's ink in every state (Rulings 7 and 14) — cost if wrong: a plugin glyph in another state's ink; `aPluginPanelsOwnGlyphLeadsItsLabel` checks the open ink.
+- **R4. The network.** Task 1 Step 2 (`python3 -I tools/icons/fetch-classic-icons.py`) is the only network step: curl from the pinned `raw.githubusercontent.com` URLs, every SHA-256 checked before any write. If the network is unavailable or a hash differs, stop and report. Never hand-write, edit, copy (the scratchpad's `upstream/` included) or substitute an SVG. — why: the user's byte-identical vendoring and the orchestrator's instruction — cost if wrong: unvetted artwork in the product.
+- **R5. Task 2's monochrome-glyph test.** `aNameWithoutStripeArtDrawsItsMonochromeGlyphUnderClassic` uses `new PresentationIcon(name, null)` for `history`, `key` and `more.vertical`, and expects `panel(name, theme.semantic(), INK.apply(label), UIScale.scale(13))`, the device size the resolver passes. — why: the other Task 2 bodies use `UIScale.scale(13)`; the tests run at scale 1, so the value is 13 either way — cost if wrong: none at scale 1.
+- **R6. `BottomStrip` in Task 3.** Task 3 changes its constructor, builds `new StripeLabels.Label(window, null, this::paintLabel)`, passes `label.icon` to every `length` call (`beginDrag`'s own label and `items`) and `false` for `icon` to `paint`. Step 3's text governs; the Files line now says so. — why: the changed `length` and `paint` signatures (MVP rule, no overloads) force these edits to compile — cost if wrong: none.
+- **R7. Imports.** `paintLabel`'s `Point at = labels.iconAt(...)` needs `import java.awt.Point;` in `LabelledStripe` (Task 3) and `BottomStrip` (Task 4), and `StripeLabels` needs it for `iconAt`'s return type. — why: none of the three imports it today — cost if wrong: a compile error that the step's own run shows.
+- **R8. `LabelledStripeTest.fitted(Kit)`.** Task 3 changes it to `Math.max(line, metric(STRIPE_ICON)) + 2 * RAIL_EDGE + DOCK_RULE` and its comment to match. Task 3's Test line now says so. — why: Rulings 12 changes the thickness rule. Today's helper equals the new rule only while the line is at least 13, which holds for both fonts it measures (IBM Plex 12 and body 24), so no expectation moves — cost if wrong: none; left alone, the helper would state the old rule.
+- **R9. `SLICE`.** Everywhere (Tasks 3 to 6, `DockDragBottomStripTest`, `DockMockTest`) `SLICE` is `StripeIconsTest`'s `metric(STRIPE_ICON) + metric(STRIPE_ICON_GAP)`, the sum of the scaled metrics as `StripeLabels.length` adds them. It is read after `EnterpriseLook.install`: a static method (`slice()`) or a value computed inside each test, never a `static final` set when the class loads. Task 6's `UIScale.scale(STRIPE_ICON + STRIPE_ICON_GAP)` is replaced in place. — why: production's length is the sum of the two scaled metrics, and the two forms differ only at a fractional scale — cost if wrong: none at the tests' scale 1.
+- **R10. `StripeIconsTest`'s helpers.** They are package-private `static`, since `DockMockTest`, `DockDragBottomStripTest`, `EnterpriseDockWindowTest` and `DockChromeMatrixTest` call them.
+  - `reference(icon, receiver, ground, scale)` paints as `MockCrops.render` does: a `TYPE_INT_RGB` image `icon.getIconWidth() * scale` square, filled with `ground`, then `g.scale(scale, scale)` with default hints and `icon.paintIcon(receiver, g, 0, 0)`. It returns that image's pixels.
+  - A companion `referenceImage(...)` returns the image itself. Task 6's `assertIcons` compares `box(render, ...)` with the pixels of `variant.seen(referenceImage(...))`; the scrim is per pixel.
+
+  why: an `int[]` cannot be put under the scrim, and the reference must rasterise as the render does — cost if wrong: false failures under the Vault mock's scrim.
+- **R11. Task 6's writes.**
+  - Side stripes: before `compareStripe`, write the iconed stripe as `MockCrops.write(variant.name() + "-" + name, ...)`. It is cropped as `compareStripe` crops (x 0 on the left, `2 * thickness - 44` on the right, 44 wide, the full `2 * (height + 2 * SLICE)` height) beside `variant.crop(..., 2 * (height + 2 * SLICE))`. Then `compareStripe(..., name + "-text", withoutIcons(render, stripe, 2), ...)` writes `-text-render.png`.
+  - Bottom strip: today's `MockCrops.write(variant.name() + "-bottom-strip", ...)` line becomes `-bottom-strip-text`, over `withoutIcons(render, strip, 2)`, with its unchanged 520 × 50 crops. A new write, `-bottom-strip`, holds the iconed render at `520 + 4 * SLICE` beside `variant.crop(2, 1706, 520 + 4 * SLICE, 50)`.
+  - The iconed writes come before any assertion of their test.
+
+  why: the gated pairs must read the cut at today's sizes and the `-iconed` pairs the iconed render at Step 4's sizes; writing first keeps both images when an assertion fails — cost if wrong: a gated pair reading the wrong file, which Step 5's `diff` would show.
+- **R12. `--rerun` on the default-look renders.** Task 1 Step 0's and Task 7 Step 3's `ChromeRenderTest` and `DefaultDockPixelsTest` run now carries `--rerun`, as the `DockMockTest` runs already do. — why: an up-to-date `:jasper-app:test` would skip them and the copies would be an earlier run's files — cost if wrong: about a minute per run.
+- **R13. Anchors.** The line numbers listed under Refresh are corrected in place; every other anchor stands as written. — why: the code is `2c065f8cd`'s — cost if wrong: none; an executor re-finds a moved anchor and never edits around a missing one.
+- **R14. `docs/app-architecture.md`.** Task 7's sentence now reads "...through `AppIcons.stripeIcon`: under CLASSIC, IntelliJ's classic tool-window icon where `IconRegistry.stripeIcon` has one, else the icon's monochrome glyph in the label's ink; under NEW_UI, the icon the rails draw." — why: Rulings 10; the old wording read as if NEW_UI stripes drew the monochrome glyph — cost if wrong: none.
+- **R15. `BottomStripTest` in Task 4.** It is run, not edited. Its windows have null icons, so its geometry is unchanged. — why: Task 4 Step 1 adds tests only to `StripeIconsTest` — cost if wrong: none.
+- **R16. A flaky test.** A timing-sensitive test that fails once is re-run alone (`--tests` naming that class, with `--rerun`) before it counts as a failure; a second failure is real and is reported. — why: the orchestrator's note — cost if wrong: one extra run.
+- **R17. Task 1 Step 0's preconditions.** `git diff --quiet 2c065f8cd HEAD -- . ':(exclude)docs'` still passes after this refresh commit, which touches only this plan, and the tree is clean. — why: checked — cost if wrong: none.
