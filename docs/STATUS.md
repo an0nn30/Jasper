@@ -32,6 +32,17 @@ rejection reasons now survive MINA session cleanup, with deterministic regressio
 passed on Ubuntu and macOS: 11,430 tests each, zero failures/errors (53/25 existing platform skips).
 The Ubuntu external SDK plugin check/ZIP build also passed (one additional test). No skips or
 layout tolerances added; actionlint, source hygiene and independent review passed.
+
+**Windows installer build — 2026-10-18** (`codex/fix-windows-launcher-build`). MSVC's export
+library and `.exp` file now go to the object directory instead of jpackage's launcher resources;
+`buildLauncher` previously rejected `jpackageapplauncher.exp` as missing Jasper's hook.
+`packaging/windows/Build-Installer.ps1` passed on Windows ARM64, including image and MSI
+verification, producing `Jasper-1.0.0-windows-aarch64-setup.exe`. Launcher core: 152 checks,
+zero failures; watcher tests passed. Broader `check --continue` failed in command-client core
+compilation (MSVC const qualifiers), Editor, File Server, Indexer, Remote and UI tests; app test
+compilation failed during overlapping builds and passed on the standalone installer rerun.
+Merged into `main`; no installer run.
+
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
@@ -831,6 +842,12 @@ are the Enterprise icon from the splash on; in a packaged Enterprise build, the 
 a `--background` resident opens its first window and after Quit then reopen; no splash with `--background` (the resident's later windows still carry the icon), `--no-window` or
 `--safe-mode`; a start that fails after the splash opened leaves no splash behind; the default look shows no splash and
 Jasper's icon. Not merged, not pushed.
+
+2026-10-19 splash flicker fix: each step is completed in an offscreen image at the window graphics' actual X/Y
+scale and copied once, retaining fractional HiDPI resolution, origin and clipping. All 23 splash tests pass;
+independent review found no actionable issues. Serial `./gradlew check --continue`: Java XML **11,454 tests, 0 failures, 0 errors, 26 skipped**;
+only the previously documented `checkThemeTool.test_deeply_nested_input_is_a_message` assertion fails.
+Native Windows/Linux startup acceptance remains user-run.
 
 **Enterprise presentation, plan 5b: the Enterprise plugin — 2026-10-17** (`claude/enterprise-provider`, worktree
 `.claude/worktrees/enterprise-5`, `4b373d85b..45616955d`, then this documentation commit and the final review's fixes;

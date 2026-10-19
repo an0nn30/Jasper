@@ -1,5 +1,6 @@
 package dev.jasper.app.splash;
 
+import dev.jasper.app.startup.StartupSteps;
 import dev.jasper.ui.icons.EncodedArtwork;
 import java.awt.Color;
 import java.awt.Font;
@@ -154,6 +155,18 @@ public final class SplashPainter {
         } finally {
             g.dispose();
         }
+    }
+
+    /** Completes a step offscreen at the target's device scale before any of it is presented. */
+    BufferedImage frame(StartupSteps.Step step, double scaleX, double scaleY) {
+        var image = new BufferedImage((int) Math.ceil(WIDTH * scaleX), (int) Math.ceil(HEIGHT * scaleY),
+            BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = image.createGraphics();
+        try {
+            g.scale(scaleX, scaleY);
+            paint(g, step.text(), step.fraction());
+        } finally { g.dispose(); }
+        return image;
     }
 
     /** The fill's width in pixels: the fraction of the 718 px bar, rounded; no easing. */
