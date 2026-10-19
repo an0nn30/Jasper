@@ -184,7 +184,10 @@ public final class DesignMetrics {
         KEYCAP_DETAIL_EDGE_ALPHA(0),
         // Plan 9b: an item list's heading row with its two rules where the table face bands list headings, and a two-line
         // item list's row; 0 keeps a heading as tall as the rows and measures a row from its lines (the classic Plugins list).
-        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0);
+        LIST_HEADING_HEIGHT(0), LIST_TWO_LINE_ROW_HEIGHT(0),
+        // Plan 12: the classic toolbar's icon-only button (IntelliJ's 22 px ActionButton) and the ▼ in an icon-only
+        // dropdown's corner; only ClassicToolbarButton reads them.
+        CHROME_ICON_BUTTON(22), CHROME_ICON_CARET(4);
         /** The role's value in {@link DesignMetrics#DEFAULT}; every reading goes through a catalog. */
         private final int declared;
         Role(int value) { declared = value; }

@@ -3,6 +3,8 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.formdev.flatlaf.ui.FlatUIUtils;
+import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.config.ToolbarMode;
@@ -14,9 +16,14 @@ import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.icons.ChromeArtwork;
+import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,10 +38,12 @@ import org.junit.jupiter.api.Test;
 class ClassicHeaderTest {
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
-    static WorkspaceChrome classic() {
+    static WorkspaceChrome classic() { return classic(WorkspaceLook.Icons.NEW_UI); }
+
+    static WorkspaceChrome classic(WorkspaceLook.Icons icons) {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC, WorkspaceLook.Stripes.RAILS,
             WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
-            WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
+            icons), new TitleFormat("{context}"));
     }
 
     static List<String> labels(WindowToolbar bar) {
@@ -48,8 +57,11 @@ class ClassicHeaderTest {
         void width(int width) { root.setSize(width, 400); LayoutTestSupport.layoutTree(root); LayoutTestSupport.layoutTree(root); }
     }
 
-    static Window window(ThemeController themes, boolean view) {
-        var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+    static Window window(ThemeController themes, boolean view) { return window(themes, view, WorkspaceLook.Icons.NEW_UI); }
+
+    static Window window(ThemeController themes, boolean view, WorkspaceLook.Icons icons) {
+        var chrome = classic(icons);
+        var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, chrome);
         owner.setToolbarHeight(34);
         var model = new Contributions();
         owner.connectContributions(model);
@@ -59,8 +71,14 @@ class ClassicHeaderTest {
             owner.connectTerminals(new TerminalRegistry(), () -> { });
         }
         var root = new JRootPane();
-        WindowContent.mount(root, owner, new WindowLook(classic(), false, true), title -> { });
+        WindowContent.mount(root, owner, new WindowLook(chrome, false, true), title -> { });
         return new Window(owner, root);
+    }
+
+    static ClassicToolbarButton labelled(WindowToolbar bar, String label) {
+        for (Component child : bar.getComponents())
+            if (child instanceof ClassicToolbarButton button && label.equals(button.getClientProperty("label"))) return button;
+        throw new AssertionError(label);
     }
 
     @Test void theClassicRowIsTheMocks() throws Exception {
@@ -140,9 +158,11 @@ class ClassicHeaderTest {
             var window = window(themes, false);
             window.owner().setToolbarMode(ToolbarMode.ICONS);
             window.width(1440);
-            var first = (ClassicToolbarButton) window.owner().chrome().windowToolbar().getComponent(0);
+            var bar = window.owner().chrome().windowToolbar();
+            var first = (ClassicToolbarButton) bar.getComponent(0);
             assertThat(first.getText()).as("icons only").isNull();
-            assertThat(first.getPreferredSize().width).as("square").isEqualTo(first.getPreferredSize().height);
+            assertThat(first.getPreferredSize()).as("IntelliJ's 22 px square").isEqualTo(new Dimension(scale(22), scale(22)));
+            assertThat(first.getY()).as("centred in the row").isEqualTo((bar.getHeight() - scale(22)) / 2);
             // A disabled icon is drawn faded, as a disabled label is.
             ClassicToolbarButton maximize = null;
             for (Component child : window.owner().chrome().windowToolbar().getComponents())
@@ -164,12 +184,100 @@ class ClassicHeaderTest {
 
     /** The strongest alpha {@code component} paints on a transparent image. */
     static int strongestAlpha(javax.swing.JComponent component) {
-        var image = new java.awt.image.BufferedImage(component.getWidth(), component.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        return alphaIn(component, new Rectangle(0, 0, component.getWidth(), component.getHeight()));
+    }
+
+    /** The strongest alpha {@code component}, painted on a transparent image, has in {@code area}. */
+    static int alphaIn(javax.swing.JComponent component, Rectangle area) {
+        var image = painted(component);
+        var inside = area.intersection(new Rectangle(0, 0, image.getWidth(), image.getHeight()));
+        int strongest = 0;
+        for (int y = inside.y; y < inside.y + inside.height; y++)
+            for (int x = inside.x; x < inside.x + inside.width; x++) strongest = Math.max(strongest, image.getRGB(x, y) >>> 24);
+        return strongest;
+    }
+
+    /** {@code component} painted on a transparent image of its size. */
+    static BufferedImage painted(javax.swing.JComponent component) {
+        var image = new BufferedImage(component.getWidth(), component.getHeight(), BufferedImage.TYPE_INT_ARGB);
         var g = image.createGraphics();
         try { component.paint(g); } finally { g.dispose(); }
-        int strongest = 0;
-        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) strongest = Math.max(strongest, image.getRGB(x, y) >>> 24);
-        return strongest;
+        return image;
+    }
+
+    static int scale(int value) { return UIScale.scale(value); }
+
+    /** Rulings 7: icons and labels draws the icon, then the label; icons alone a 22 px square; Split marks its menu in its corner. */
+    @Test void iconButtonsAreTwentyTwoSquaresAndIconsAndLabelsDrawTheIconThenTheLabel() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var window = window(themes, false);
+            var bar = window.owner().chrome().windowToolbar();
+            window.owner().setToolbarMode(ToolbarMode.ICONS_AND_LABELS);
+            window.width(1440);
+            var session = labelled(bar, "New Session");
+            int text = session.getFontMetrics(session.getFont()).stringWidth("New Session");
+            assertThat(session.getPreferredSize().width).isEqualTo(2 * scale(8) + scale(16) + scale(6) + text);
+            session.setSize(session.getPreferredSize());
+            assertThat(alphaIn(session, new Rectangle(scale(8), 0, scale(16), session.getHeight()))).as("the icon before the label").isPositive();
+            window.owner().setToolbarMode(ToolbarMode.ICONS);
+            window.width(1440);
+            var split = labelled(bar, "Split");
+            assertThat(split.getPreferredSize()).isEqualTo(new Dimension(scale(22), scale(22)));
+            assertThat(split.getToolTipText()).isEqualTo("Split pane right or down");
+            split.setSize(split.getPreferredSize());
+            var corner = new Rectangle(scale(22) - scale(7), scale(22) - scale(5), scale(5), scale(3));
+            assertThat(alphaIn(split, corner)).as("Split's corner ▼").isPositive();
+            var maximize = labelled(bar, "Maximize");
+            maximize.setSize(maximize.getPreferredSize());
+            assertThat(alphaIn(maximize, corner)).as("no ▼ without a menu").isZero();
+        });
+    }
+
+    /** Review Focus 5. */
+    @Test void asTheRowNarrowsIconButtonsKeepTheirSquaresAndSplitItsCornerArrow() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var window = window(themes, true);
+            window.owner().setToolbarMode(ToolbarMode.ICONS);
+            var bar = window.owner().chrome().windowToolbar();
+            for (int width = 1440; width >= 420; width -= 40) {
+                window.width(width);
+                for (Component child : bar.getComponents())
+                    if (child instanceof ClassicToolbarButton button && button.isVisible() && button.getWidth() > 0)
+                        assertThat(button.getSize()).as(width + " " + button.getClientProperty("label")).isEqualTo(new Dimension(scale(22), scale(22)));
+            }
+        });
+    }
+
+    /** Rulings 3 and 7: under the classic set the buttons paint IntelliJ's classic artwork. */
+    @Test void underTheClassicSetTheButtonsPaintIntelliJsClassicIcons() throws Exception {
+        edt(() -> {
+            var themes = ThemeTestSupport.controller(true);
+            var window = window(themes, false, WorkspaceLook.Icons.CLASSIC);
+            window.owner().setToolbarMode(ToolbarMode.ICONS);
+            window.width(1440);
+            var session = labelled(window.owner().chrome().windowToolbar(), "New Session");
+            session.setSize(session.getPreferredSize());
+            int size = scale(16), x = (session.getWidth() - size) / 2, y = (session.getHeight() - size) / 2;
+            var actual = painted(session).getSubimage(x, y, size, size);
+            var expected = new BufferedImage(session.getWidth(), session.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var g = expected.createGraphics();
+            try {
+                FlatUIUtils.setRenderingHints(g);
+                new IconRegistry().chromeIcon("add", size, ChromeArtwork.CLASSIC).icon(ThemeZone.theme(session), SemanticColor.TEXT_PRIMARY)
+                    .paintIcon(session, g, x, y);
+            } finally { g.dispose(); }
+            var centre = expected.getSubimage(x, y, size, size);
+            int differing = 0, inked = 0;
+            for (int row = 0; row < size; row++)
+                for (int column = 0; column < size; column++) {
+                    if (actual.getRGB(column, row) != centre.getRGB(column, row)) differing++;
+                    if (centre.getRGB(column, row) >>> 24 != 0) inked++;
+                }
+            assertThat(inked).as("the classic add icon has ink").isPositive();
+            assertThat(differing).as("New Session paints the classic add icon").isZero();
+        });
     }
 
     @Test void theDefaultHeaderIsTodays() throws Exception {

@@ -132,17 +132,17 @@ final class WindowChrome {
         toolbar.finish();
     }
 
-    /** A classic toolbar button for {@code id} in {@code into} (spec 10.3), its icon {@code icon} under icons only. */
-    ClassicToolbarButton classicButton(WindowToolbar into, ActionId id, String label, ClassicToolbarButton.Glyph glyph, String icon, int priority) {
-        var button = new ClassicToolbarButton(owner.action(id), label, glyph, false, AppIcons.icon(icon));
+    /** A classic toolbar button for {@code id} in {@code into} (spec 10.3): the icon {@code icon}, then its label when shown. */
+    ClassicToolbarButton classicButton(WindowToolbar into, ActionId id, String label, String icon, int priority) {
+        var button = new ClassicToolbarButton(owner.action(id), label, false, AppIcons.icon(icon));
         WindowToolbar.entry(button, priority, () -> WindowToolbar.menuItem(owner.action(id)));
         into.add(button);
         return button;
     }
 
-    /** The classic "Split ▾": a label and a caret opening Split Right and Split Down. */
+    /** The classic "Split ▾": its icon, label and caret (a corner ▼ under icons only) opening Split Right and Split Down. */
     void classicSplit() {
-        var split = new ClassicToolbarButton(null, "Split", ClassicToolbarButton.Glyph.NONE, true, AppIcons.icon("columns-2"));
+        var split = new ClassicToolbarButton(null, "Split", true, AppIcons.icon("columns-2"));
         split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
         WindowToolbar.entry(split, 90, () -> {
             var menu = new JMenu("Split");

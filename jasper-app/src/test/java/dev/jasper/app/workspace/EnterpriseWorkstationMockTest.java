@@ -83,26 +83,38 @@ class EnterpriseWorkstationMockTest {
         // "+" and "New Session": toolbar padding 8, button padding 8, the glyph 6 before the label (mock ink 38-51, 66-199).
         var expected = MockProfile.inks(mock, new Rectangle(X + 4, 112, 400, 64), 12, 25);
         var actual = MockProfile.inks(render, new Rectangle(4, 112 - Y, 400, 64), 12, 25);
+        // The user's 2026-10-18 direction: classic icon then label. The add icon's ink begins 3 px into it and is 10 wide;
+        // the label follows the 16 px icon and its 6 px gap where it followed the 7 px "+" and its 6 px gap.
+        int[] shift = {2 * 3, 2 * ((16 + 6) - (7 + 6))};
         for (int i = 0; i < 2; i++) {
-            assertThat(actual.get(i).start() + X).as(what + "ink " + i + " starts").isCloseTo(expected.get(i).start(), within(4));
-            if (i == 0) assertThat(actual.get(i).width()).as(what + "the + glyph's width").isCloseTo(expected.get(i).width(), within(4));
+            assertThat(actual.get(i).start() + X).as(what + "ink " + i + " starts").isCloseTo(expected.get(i).start() + shift[i], within(4));
+            // The user's 2026-10-18 direction: classic icon then label.
+            if (i == 0) assertThat(actual.get(i).width()).as(what + "the add icon's width").isCloseTo(2 * 10, within(4));
             else MockProfile.fonts(what + "New Session's ink width", actual.get(i).width(), expected.get(i).width(), 4);
-            assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top(), within(3));
+            // The user's 2026-10-18 direction: classic icon then label. The add icon's 10 px ink, 3 px into the icon centred in
+            // the 24 px button, tops out 2 px above the 7 px "+" centred there.
+            int rise = i == 0 ? 2 * 2 : 0;
+            assertThat(actual.get(i).top() + Y).as(what + "ink " + i + " top").isCloseTo(expected.get(i).top() - rise, within(3));
         }
         // The search field: x 2116-2715, y 122-165 in the mock.
         var field = mounted.field();
         // The field ends 6 before Settings…, whose label follows the face.
-        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116, 4);
+        // The user's 2026-10-18 direction: classic icon then label (Settings… gains its 16 px icon and 6 px gap).
+        MockProfile.fonts(what + "search field left", 2 * field.x + X, 2116 - 2 * (16 + 6), 4);
         assertThat(2 * field.width).as(what + "search field width").isCloseTo(600, within(2));
         assertThat(2 * field.y + Y).as(what + "search field top").isCloseTo(122, within(2));
         assertThat(2 * field.height).as(what + "search field height").isCloseTo(44, within(2));
         // "Settings…" at the trailing edge: ink 2742-2846 in the mock.
         var settings = MockProfile.inks(mock, new Rectangle(2722, 112, 160, 64), 12, 25);
-        var rendered = MockProfile.inks(render, new Rectangle(2722 - X, 112 - Y, 160, 64), 12, 25);
+        // The user's 2026-10-18 direction: classic icon then label. The crop widens left by the icon and its gap. Settings…
+        // is disabled here (no settings opener), so its grey icon, faded at 0.42, lies about ΔE 19 from the row: the
+        // render's crop reads ink from ΔE 12.
+        var rendered = MockProfile.inks(render, new Rectangle(2722 - 44 - X, 112 - Y, 160 + 44, 64), 12, 12);
         assertThat(settings).as("the mock's Settings…").hasSize(1);
-        assertThat(rendered).as(what + "Settings…").hasSize(1);
-        MockProfile.fonts(what + "Settings… starts", rendered.getFirst().start() + X, settings.getFirst().start(), 4);
-        assertThat(rendered.getFirst().end() + X).as(what + "Settings… ends").isCloseTo(settings.getFirst().end(), within(4));
+        // The user's 2026-10-18 direction: classic icon then label.
+        assertThat(rendered).as(what + "Settings…'s icon, then its label").hasSize(2);
+        MockProfile.fonts(what + "Settings… starts", rendered.getLast().start() + X, settings.getFirst().start(), 4);
+        assertThat(rendered.getLast().end() + X).as(what + "Settings… ends").isCloseTo(settings.getFirst().end(), within(4));
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})

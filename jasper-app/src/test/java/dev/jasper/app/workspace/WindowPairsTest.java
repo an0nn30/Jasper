@@ -89,7 +89,7 @@ class WindowPairsTest {
         final ClassicTabs.Entry first, second;
         final JMenuBar menus = new JMenuBar();
         final ClassicToolbarButton button = new ClassicToolbarButton(new AbstractAction("Go") {
-            @Override public void actionPerformed(ActionEvent event) { } }, "Go", ClassicToolbarButton.Glyph.PLUS, true, null);
+            @Override public void actionPerformed(ActionEvent event) { } }, "Go", true, null);
         final ClassicHeader header = new ClassicHeader();
         final TitleSearchField field;
         final RunItem run, activeRun, slashRun, slashActiveRun;
