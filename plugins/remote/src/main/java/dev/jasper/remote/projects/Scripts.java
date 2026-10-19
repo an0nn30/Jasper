@@ -28,6 +28,7 @@ final class Scripts {
         var quoted = folders.stream().filter(Scripts::usable).map(ShellText::quote).toList();
         if (quoted.isEmpty()) return bytes(out);
         out.append("for d in ").append(String.join(" ", quoted)).append("\ndo\n");
+        out.append("  case \"$d\" in /) continue ;; esac\n");
         out.append("  case \"$HOME/\" in \"${d%/}\"/*) continue ;; esac\n");
         if (!literals.isEmpty()) {
             out.append("  for n in ").append(String.join(" ", literals.stream().map(ShellText::quote).toList())).append("\n  do\n");

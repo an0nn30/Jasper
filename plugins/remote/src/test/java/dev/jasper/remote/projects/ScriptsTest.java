@@ -114,6 +114,13 @@ class ScriptsTest {
         assertThat(home.resolve("src/pwned")).doesNotExist();
     }
 
+    @Test void existsNeverProbesTheRootEvenWhenHomeIsNotAbsolute() throws Exception {
+        String script = "HOME=relative\n" + new String(Scripts.exists(List.of("/"), Set.of("usr")), StandardCharsets.UTF_8);
+        var run = run(script.getBytes(StandardCharsets.UTF_8), null, Scripts.EXISTS);
+        assertThat(run.status()).isZero();
+        assertThat(run.fields()).as("the filesystem root is never a project candidate").isEmpty();
+    }
+
     @Test void findListsFilesSkippingExcludedFoldersAndAMissingRootExitsThree() throws Exception {
         Path root = Files.createDirectories(dir.resolve("app"));
         Files.createDirectories(root.resolve("node_modules/x"));
