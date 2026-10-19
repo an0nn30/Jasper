@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.appearance.ThemeTestSupport;
+import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
@@ -266,6 +267,49 @@ class WindowManagerTest {
             notes.moveToMainWindow();
             assertThat(notes.window()).isEqualTo(main.id());
             assertThat(child.closed()).isTrue();
+        });
+        launch();
+    }
+
+    @Test void theWindowCommandsOpenCloseAndMoveWindows(@TempDir Path folder) throws Exception {
+        Path directory = Files.createDirectories(folder.resolve("work"));
+        MainWindow[] main = new MainWindow[1];
+        edt(() -> {
+            main[0] = manager.ensureMain("cold", null).orElseThrow();
+            main[0].content().newTab(directory);
+        });
+        launch();
+        edt(() -> main[0].content().invoke(ActionId.NEW_TERMINAL_WINDOW));
+        launch();
+        assertThat(started).as("New Terminal Window: in the current terminal's directory").last().isEqualTo(directory);
+        edt(() -> {
+            ChildWindow child = manager.children().getFirst();
+            child.content().invoke(ActionId.CLOSE_WINDOW);
+            assertThat(child.closed()).as("Close Window").isTrue();
+            Tab tab = main[0].content().selectedTab();
+            main[0].content().invoke(ActionId.MOVE_TAB_TO_NEW_WINDOW);
+            ChildWindow moved = manager.children().getFirst();
+            assertThat(tab.window()).isEqualTo(moved.id());
+            moved.content().updateActions();
+            assertThat(moved.content().action(ActionId.MOVE_TAB_TO_NEW_WINDOW).isEnabled()).as("its only tab stays").isFalse();
+            assertThat(moved.content().action(ActionId.MOVE_TAB_TO_MAIN_WINDOW).isEnabled()).isTrue();
+            moved.content().invoke(ActionId.MOVE_TAB_TO_MAIN_WINDOW);
+            assertThat(tab.window()).isEqualTo(main[0].id());
+            assertThat(moved.closed()).isTrue();
+            main[0].content().updateActions();
+            assertThat(main[0].content().action(ActionId.MOVE_TAB_TO_MAIN_WINDOW).isEnabled()).isFalse();
+            main[0].content().invoke(ActionId.CLOSE_WINDOW);
+            assertThat(manager.isEmpty()).as("Close Window on the main window closes it").isTrue();
+        });
+    }
+
+    @Test void aChildWindowsTabMenuMovesToTheMainWindow() throws Exception {
+        edt(() -> {
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            var menu = child.content().tabMenu(child.content().selectedTab());
+            var titles = new ArrayList<String>();
+            for (var item : menu.getComponents()) if (item instanceof javax.swing.JMenuItem entry) titles.add(entry.getText());
+            assertThat(titles).containsExactly("Rename Tab", "Move to Main Window", "Close Tab", "Close Others", "Close Group");
         });
         launch();
     }

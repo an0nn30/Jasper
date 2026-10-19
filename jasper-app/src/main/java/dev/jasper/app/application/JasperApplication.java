@@ -849,7 +849,7 @@ public final class JasperApplication {
     private void showIndicator(boolean show) {
         if (show && removeIndicator == null && !quitting && !stopped) {
             removeIndicator = residentIndicator.apply(new dev.jasper.app.platform.ResidentTray.Actions(
-                () -> open(List.of(), "menu"), this::newWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
+                () -> open(List.of(), "menu"), this::newTerminalWindowFromMenuBar, this::settingsFromMenuBar, this::quit));
         } else if (!show && removeIndicator != null) {
             Runnable remove = removeIndicator;
             removeIndicator = null;
@@ -887,10 +887,10 @@ public final class JasperApplication {
     }
 
     /**
-     * The menu bar item's New Window: a child window with a terminal tab, after the main window is restored (workspace
-     * tabs spec 6.4), in front of other applications. EDT.
+     * The menu bar item's New Terminal Window: a child window with a terminal tab, after the main window is restored
+     * (workspace tabs spec 6.4 and 6.5), in front of other applications. EDT.
      */
-    private void newWindowFromMenuBar() {
+    private void newTerminalWindowFromMenuBar() {
         if (quitting || stopped) return;
         windows.openTerminalWindow(null);
         requestForeground();
@@ -1165,8 +1165,8 @@ public final class JasperApplication {
         }
         activityNotifier = new ActivityNotifier(buddy.companion(), this::raiseTerminal);
         uiState = UiState.load(dirs.uiState(), presentation().projections().dockLayout().key());
-        shells = new NativeShells(themes, uiState, this::nativeWindow,
-            () -> windows.openTerminalWindow(null), this::quit, dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
+        shells = new NativeShells(themes, uiState, this::nativeWindow, this::quit,
+            dev.jasper.app.windows.ShellChrome.of(presentation.projections().shell()));
         auxiliary = new AuxiliaryWindows(uiState, shells::create, shells::choosePaths, presentation.projections().dialogs());
         auxiliary.onAllClosed = () -> {
             if (windows.isEmpty() && !resident && !quitting) requestShutdown();

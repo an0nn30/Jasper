@@ -60,7 +60,6 @@ public final class NativeShells {
     private final ThemeController themes;
     private final UiState state;
     private final Function<UUID, Window> terminalWindows;
-    private final Runnable newWindow;
     private final Runnable quit;
     private final Map<AuxiliarySurface, Window> natives = new HashMap<>();
     /** Classic dialogs drawn inside their owner's window (spec 10.8): they have no native window of their own. */
@@ -72,13 +71,11 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a terminal window's native window by id, or returns null
-     * @param newWindow opens a terminal window
+     * @param terminalWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
-                        Runnable newWindow, Runnable quit) {
-        this(themes, state, terminalWindows, newWindow, quit, ShellChrome.standard());
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows, Runnable quit) {
+        this(themes, state, terminalWindows, quit, ShellChrome.standard());
     }
 
     /**
@@ -86,17 +83,16 @@ public final class NativeShells {
      *
      * @param themes the application's look
      * @param state remembered window bounds
-     * @param terminalWindows finds a terminal window's native window by id, or returns null
-     * @param newWindow opens a terminal window
+     * @param terminalWindows finds a Jasper window's native window by id, or returns null
      * @param quit quits the application
      * @param shell the look's title bar, menu row and appearance
      */
-    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows,
-                        Runnable newWindow, Runnable quit, ShellChrome shell) {
+    public NativeShells(ThemeController themes, UiState state, Function<UUID, Window> terminalWindows, Runnable quit,
+                        ShellChrome shell) {
         this.shell = Objects.requireNonNull(shell);
         this.themes = Objects.requireNonNull(themes); this.state = Objects.requireNonNull(state);
         this.terminalWindows = Objects.requireNonNull(terminalWindows);
-        this.newWindow = Objects.requireNonNull(newWindow); this.quit = Objects.requireNonNull(quit);
+        this.quit = Objects.requireNonNull(quit);
     }
 
     /**
@@ -696,18 +692,19 @@ public final class NativeShells {
         };
     }
 
-    /** A minimal menu bar: macOS otherwise shows only the application menu while this window has focus. */
+    /**
+     * A minimal menu bar, Close Window and, off macOS, Quit (workspace tabs spec 6.6): macOS otherwise shows only the
+     * application menu while this window has focus.
+     */
     private JMenuBar menuBar(AuxiliarySurface surface) {
         int shortcut = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
         var file = new JMenu("File");
-        var open = new JMenuItem("New Window");
-        open.addActionListener(event -> newWindow.run());
         var close = new JMenuItem("Close Window");
         close.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcut));
         close.addActionListener(event -> {
             if (!dev.jasper.app.platform.WindowInput.captureShortcut(surface.holder(), close.getAccelerator())) surface.closeCommand();
         });
-        file.add(open); file.add(close);
+        file.add(close);
         if (!SystemInfo.isMacOS) {
             var exit = new JMenuItem("Quit");
             exit.addActionListener(event -> quit.run());

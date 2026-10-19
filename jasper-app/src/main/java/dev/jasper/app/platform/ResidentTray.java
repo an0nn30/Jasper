@@ -20,8 +20,9 @@ import javax.swing.SwingUtilities;
 
 /**
  * Jasper's icon outside its windows, the one owner of it. A resident Jasper shows it once start-up has settled: on
- * macOS the menu bar item with New Window, Settings… and Quit Jasper Completely; on Windows the notification-area icon
- * with Open Jasper and Quit Jasper (a windowless Windows process is otherwise invisible). On Windows the same icon
+ * macOS the menu bar item with New Terminal Window, Settings… and Quit Jasper Completely; on Windows the
+ * notification-area icon with Open Jasper and Quit Jasper (a windowless Windows process is otherwise invisible). On
+ * Windows the same icon
  * carries the system notifications' balloons (spec section 9): a notification sent while Jasper is away shows its
  * balloon from the resident icon, or from an icon added for the purpose and removed when Jasper is focused again. A
  * click on a balloon or on the icon activates the most recent notification, if it is still unread, since
@@ -41,15 +42,15 @@ public final class ResidentTray {
      *
      * @param open Windows: opens a window or raises the open one (also a double-click on the icon, unless a notification
      *     waits to be clicked)
-     * @param newWindow macOS: always opens a new window
+     * @param newTerminalWindow macOS: opens a window with a terminal tab, after the main window is restored
      * @param settings macOS: opens Settings
      * @param quit quits completely, through the normal quit path
      */
-    public record Actions(Runnable open, Runnable newWindow, Runnable settings, Runnable quit) {
+    public record Actions(Runnable open, Runnable newTerminalWindow, Runnable settings, Runnable quit) {
         /** Rejects nulls. */
         public Actions {
             Objects.requireNonNull(open, "open");
-            Objects.requireNonNull(newWindow, "newWindow");
+            Objects.requireNonNull(newTerminalWindow, "newTerminalWindow");
             Objects.requireNonNull(settings, "settings");
             Objects.requireNonNull(quit, "quit");
         }
@@ -57,7 +58,7 @@ public final class ResidentTray {
 
     /** One menu entry; a null label is a separator. */
     enum Entry {
-        OPEN("Open Jasper"), NEW_WINDOW("New Window"), SETTINGS("Settings…"), SEPARATOR(null),
+        OPEN("Open Jasper"), NEW_TERMINAL_WINDOW("New Terminal Window"), SETTINGS("Settings…"), SEPARATOR(null),
         QUIT("Quit Jasper"), QUIT_COMPLETELY("Quit Jasper Completely");
 
         final String label;
@@ -67,7 +68,7 @@ public final class ResidentTray {
         Runnable action(Actions actions) {
             return switch (this) {
                 case OPEN -> actions.open();
-                case NEW_WINDOW -> actions.newWindow();
+                case NEW_TERMINAL_WINDOW -> actions.newTerminalWindow();
                 case SETTINGS -> actions.settings();
                 case QUIT, QUIT_COMPLETELY -> actions.quit();
                 case SEPARATOR -> () -> { };
@@ -118,7 +119,7 @@ public final class ResidentTray {
     }
 
     static List<Entry> entries(boolean mac) {
-        return mac ? List.of(Entry.NEW_WINDOW, Entry.SETTINGS, Entry.SEPARATOR, Entry.QUIT_COMPLETELY)
+        return mac ? List.of(Entry.NEW_TERMINAL_WINDOW, Entry.SETTINGS, Entry.SEPARATOR, Entry.QUIT_COMPLETELY)
             : List.of(Entry.OPEN, Entry.SEPARATOR, Entry.QUIT);
     }
 

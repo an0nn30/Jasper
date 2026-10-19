@@ -62,7 +62,7 @@ class ApplicationActionsTest {
             for (int i = 0; i < ui.menuBar().getMenuCount(); i++) if ("File".equals(ui.menuBar().getMenu(i).getText())) fileMenu = ui.menuBar().getMenu(i);
             var labels = new ArrayList<String>();
             for (var child : fileMenu.getMenuComponents()) if (child instanceof JMenuItem item) labels.add(item.getText());
-            assertThat(labels).containsSubsequence("New Window", "Open File…");
+            assertThat(labels).containsSubsequence("New Terminal Window", "Open File…", "Close Window");
             var command = ui.commands().find("open_file").orElseThrow();
             assertThat(command.title()).as("spec 14.7: also a palette command").isEqualTo("Open File…");
             assertThat(command.keywords()).contains("open file", "open", "editor", "browse");

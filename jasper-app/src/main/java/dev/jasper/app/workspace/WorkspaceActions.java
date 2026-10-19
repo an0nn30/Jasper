@@ -50,7 +50,10 @@ final class WorkspaceActions {
         switch (id) {
             case COMMAND_PALETTE -> owner.commandPalette().open(PaletteScope.ALL_ID);
             case NEW_TAB -> owner.newTab(owner.directory());
-            case NEW_WINDOW -> owner.requestNewWindow();
+            case NEW_TERMINAL_WINDOW -> owner.requestNewTerminalWindow();
+            case CLOSE_WINDOW -> owner.requestCloseWindow();
+            case MOVE_TAB_TO_NEW_WINDOW -> owner.moveToNewWindow(owner.selectedTab());
+            case MOVE_TAB_TO_MAIN_WINDOW -> owner.moveToMainWindow(owner.selectedTab());
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
             case CLOSE_TAB -> owner.closeTab(owner.selectedTab());
@@ -113,7 +116,10 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_TERMINAL_WINDOW, CLOSE_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    // A child window's only tab stays: that window already is its own (workspace tabs spec 6.5).
+                    case MOVE_TAB_TO_NEW_WINDOW -> owner.selectedTab() != null && (owner.isMain() || owner.tabCount() > 1);
+                    case MOVE_TAB_TO_MAIN_WINDOW -> owner.selectedTab() != null && !owner.isMain();
                     case TOGGLE_ZEN_MODE -> owner.isMain();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();

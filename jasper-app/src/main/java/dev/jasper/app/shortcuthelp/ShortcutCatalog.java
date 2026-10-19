@@ -82,7 +82,8 @@ final class ShortcutCatalog {
     }; }
     private static String category(ActionId id) {
         return switch (id) {
-            case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, SELECT_TAB_1, SELECT_TAB_2,
+            case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, MOVE_TAB_TO_NEW_WINDOW, MOVE_TAB_TO_MAIN_WINDOW,
+                SELECT_TAB_1, SELECT_TAB_2,
                 SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5, SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 -> "Tabs";
             case SPLIT_RIGHT, SPLIT_DOWN, CLOSE_GROUP, MAXIMIZE_GROUP, FOCUS_GROUP_LEFT, FOCUS_GROUP_RIGHT,
                 FOCUS_GROUP_UP, FOCUS_GROUP_DOWN -> "Groups";

@@ -68,7 +68,7 @@ class TabMenuTest {
         edt(() -> {
             var keys = window.bindings();
             var menu = window.tabMenu(window.selectedTab());
-            assertThat(titles(menu)).containsExactly("Rename Tab", "Close Tab", "Close Others", "Close Group");
+            assertThat(titles(menu)).containsExactly("Rename Tab", "Move to New Window", "Close Tab", "Close Others", "Close Group");
             assertThat(item(menu, "Rename Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.RENAME_TAB).orElseThrow());
             assertThat(item(menu, "Close Tab").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_TAB).orElseThrow());
             assertThat(item(menu, "Close Group").getAccelerator()).isEqualTo(keys.strokeFor(ActionId.CLOSE_GROUP).orElseThrow());
@@ -77,7 +77,7 @@ class TabMenuTest {
             int[] saved = {0};
             view.commands(List.of(new ContentCommand("save", "Save", null, true, () -> saved[0]++)));
             var hosted = window.tabMenu(view);
-            assertThat(titles(hosted)).containsExactly("Open in Separate Window", "Close Tab", "Close Others", "Close Group", "Save");
+            assertThat(titles(hosted)).containsExactly("Move to New Window", "Close Tab", "Close Others", "Close Group", "Save");
             assertThat(item(hosted, "Close Others").isEnabled()).as("the terminal tab shares its group").isTrue();
             item(hosted, "Save").doClick();
             assertThat(saved[0]).isEqualTo(1);
@@ -238,7 +238,8 @@ class TabMenuTest {
     @Test void theFileViewAndTabMenusNameTabsAndGroups() throws Exception {
         var window = window(1);
         edt(() -> {
-            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Window", "Open File…", "Close Tab", "Close Group");
+            assertThat(items(window, "File")).containsSubsequence("New Tab", "New Terminal Window", "Open File…", "Close Tab", "Close Group",
+                "Close Window");
             assertThat(items(window, "View")).contains("Maximize Group");
             assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Group Left", "Focus Group Right",
                 "Focus Group Up", "Focus Group Down", "Previous Prompt", "Next Prompt", "Next Tab", "Previous Tab", "Rename Tab",

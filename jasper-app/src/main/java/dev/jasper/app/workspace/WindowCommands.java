@@ -39,7 +39,7 @@ final class WindowCommands implements AutoCloseable {
         for (ActionId id : ActionId.values()) {
             if (id == ActionId.COMMAND_PALETTE) continue;
             String icon = switch (id) {
-                case NEW_TAB -> "square-plus"; case NEW_WINDOW -> "app-window";
+                case NEW_TAB -> "square-plus"; case NEW_TERMINAL_WINDOW -> "app-window";
                 case SPLIT_RIGHT, SPLIT_DOWN -> "columns-2"; case MAXIMIZE_GROUP -> "maximize";
                 case FIND, FIND_NEXT, FIND_PREVIOUS -> "search"; case OPEN_SETTINGS -> "settings";
                 case RELOAD_CONFIG -> "refresh"; default -> null;
@@ -49,6 +49,10 @@ final class WindowCommands implements AutoCloseable {
             var keywords = new ArrayList<String>(); keywords.add(id.id().replace('_', ' '));
             keywords.addAll(switch (id) {
                 case OPEN_FILE -> List.of("open", "editor", "browse");
+                case NEW_TERMINAL_WINDOW -> List.of("new window", "shell", "child window");
+                case CLOSE_WINDOW -> List.of("window", "close");
+                case MOVE_TAB_TO_NEW_WINDOW -> List.of("detach", "separate window", "child window");
+                case MOVE_TAB_TO_MAIN_WINDOW -> List.of("attach", "main window");
                 case OPEN_SETTINGS -> List.of("preferences", "configuration");
                 case RELOAD_CONFIG -> List.of("configuration", "refresh");
                 case MAXIMIZE_GROUP -> List.of("zoom", "restore");

@@ -37,6 +37,7 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     JasperWindow(WindowManager manager, WindowContent content) {
         this.manager = Objects.requireNonNull(manager, "manager");
         this.content = Objects.requireNonNull(content, "content");
+        content.onCloseWindow = this::requestClose;
     }
 
     /** @return the window's content: its workspace and actions, and the main window's chrome */
