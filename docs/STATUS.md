@@ -91,7 +91,7 @@ icon's ink tops out above the "+") and reads the render's Settings… crop from 
 Task 9 Step 8's #E6E7EA near match above; the final review's fixes: an activating toggle that replaces a window no
 longer hands focus back to the terminal first, an activated frame's keyboard skips a toolbar row of buttons, a frame
 is focusable only while it holds the keyboard (never a Tab stop), and spec 6.4, 10.8 and 16.1 are amended; otherwise
-none beyond the plan's Rulings. `./gradlew check --continue`: **11,469 tests, 0 failures, 0 errors, 25 skipped** before the final review's fixes, which add six tests; `check_pairs.py` passes 101
+none beyond the plan's Rulings. `./gradlew check --continue` after the final review's fixes: **11,475 tests, 0 failures, 0 errors, 25 skipped**; `check_pairs.py` passes 101
 of 101 gated pairs; the headless gallery is byte-identical to `faeec76f3`'s (Slate Cobalt Dark and Light, 322 files) and
 so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and
 settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under
