@@ -22,8 +22,8 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class FilesScopeTest {
-    static final ProjectKey APP = ProjectKey.local(Path.of("/w/app"));
-    static final ProjectKey LIB = ProjectKey.local(Path.of("/w/lib"));
+    static final ProjectKey APP = ProjectKey.local(Path.of("/w/app").toAbsolutePath());
+    static final ProjectKey LIB = ProjectKey.local(Path.of("/w/lib").toAbsolutePath());
     @TempDir Path root;
 
     final Projects projects = new Projects();
@@ -91,7 +91,7 @@ class FilesScopeTest {
             host.executeInScope(FilesScope.ID, readme, "copy-path", window, null);
             host.executeInScope(FilesScope.ID, readme, "terminal", window, null);
             assertThat(opened).containsExactly("README.md");
-            assertThat(copied).containsExactly(Path.of("/w/app/README.md").toString());
+            assertThat(copied).containsExactly(Path.of("/w/app/README.md").toAbsolutePath().toString());
             assertThat(terminals).containsExactly("README.md");
             assertThat(host.searchScope(FilesScope.ID, "", window, null)).containsExactly(readme + "|README.md|true");
             current.set(Optional.of(LIB));

@@ -106,6 +106,15 @@ class FtpEngineTest {
         assertThat(condition.getAsBoolean()).as(what).isTrue();
     }
 
+    // Observe completion before opening the target: a concurrent reader can prevent replacement on Windows.
+    void awaitUpload(String path, long bytes) throws InterruptedException {
+        await(() -> events.stream().anyMatch(event -> event instanceof ServerEvent.Transferred done
+            && done.direction() == ServerEvent.Direction.UPLOAD && done.path().equals(path) && done.bytes() == bytes),
+            "upload completed: " + path);
+        assertThat(events).anyMatch(event -> event instanceof ServerEvent.Transferred done
+            && done.direction() == ServerEvent.Direction.UPLOAD && done.path().equals(path) && done.bytes() == bytes && done.complete());
+    }
+
     static String content(Path file) {
         try { return Files.readString(file); } catch (IOException missing) { return null; }
     }
@@ -156,11 +165,14 @@ class FtpEngineTest {
         assertThat(client.login("dustin", "pw")).isTrue();
         client.setFileType(FTP.BINARY_FILE_TYPE);
         assertThat(store(client, "/docs/new.txt", "abc")).isTrue();
-        await(() -> "abc".equals(content(shared.resolve("docs/new.txt"))), "the upload is committed");
+        awaitUpload("/docs/new.txt", 3);
+        assertThat(shared.resolve("docs/new.txt")).hasContent("abc");
         assertThat(store(client, "/docs/a.txt", "replaced")).isTrue();
-        await(() -> "replaced".equals(content(shared.resolve("docs/a.txt"))), "the file is replaced");
+        awaitUpload("/docs/a.txt", 8);
+        assertThat(shared.resolve("docs/a.txt")).hasContent("replaced");
         assertThat(client.appendFile("/docs/a.txt", new ByteArrayInputStream("!".getBytes(StandardCharsets.UTF_8)))).isTrue();
-        await(() -> "replaced!".equals(content(shared.resolve("docs/a.txt"))), "the append lands");
+        awaitUpload("/docs/a.txt", 1);
+        assertThat(shared.resolve("docs/a.txt")).hasContent("replaced!");
         client.setRestartOffset(2);
         assertThat(store(client, "/docs/a.txt", "zz")).as("resuming part-way through is refused").isFalse();
         assertThat(content(shared.resolve("docs/a.txt"))).isEqualTo("replaced!");

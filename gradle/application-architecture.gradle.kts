@@ -3,11 +3,15 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // Bytecode, rather than imports, catches fully-qualified references and inferred type edges.
 val app = project(":jasper-app")
 val buddy = project(":jasper-buddy")
 val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitecture") {
     dependsOn(":jasper-app:classes", ":jasper-buddy:jar", ":jasper-terminal:jar", ":jasper-sdk:jar")
+    inputs.files(listOf(app, buddy).map { verificationClasspaths.getValue(it.path) })
     doLast {
         val launcher = app.extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -47,7 +51,7 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                 "Flat app production types remain; only Main belongs at the root"
             }
             val output = tool("jdeps", listOf("--multi-release", "25", "-verbose:class", "-filter:none",
-                "--class-path", module.configurations.getByName("runtimeClasspath").asPath.ifEmpty { classes.absolutePath }, classes.absolutePath))
+                "--class-path", verificationClasspaths.getValue(module.path).asPath.ifEmpty { classes.absolutePath }, classes.absolutePath))
             val edge = Regex("^\\s*(dev\\.jasper\\.\\S+)\\s+->\\s+(\\S+).*$")
             val graph = mutableMapOf<String, MutableSet<String>>()
             output.lineSequence().forEach { line ->

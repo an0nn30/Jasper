@@ -140,7 +140,9 @@ class NativeShellsChromeTest {
                 assertThat(bar.getHeight()).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(30));
                 assertThat(bar.controlsHeight()).as("controls centred 21 down").isEqualTo(2 * com.formdev.flatlaf.util.UIScale.scale(21));
                 var title = (JLabel) bar.getComponent(0);
-                assertThat(title.getY() + title.getHeight() / 2).isEqualTo(com.formdev.flatlaf.util.UIScale.scale(21));
+                int desiredCenter = com.formdev.flatlaf.util.UIScale.scale(21);
+                assertThat(title.getY() + title.getHeight() / 2).as("title stays inside its band when the native font is tall")
+                    .isEqualTo(Math.min(desiredCenter, bar.getHeight() - (title.getHeight() + 1) / 2));
                 assertThat(row(bar, bar.getHeight() - line)).as("no rule; the band continues the dialog")
                     .isEqualTo(semantic.color(dev.jasper.ui.theme.SemanticColor.SURFACE_DIALOG));
             }

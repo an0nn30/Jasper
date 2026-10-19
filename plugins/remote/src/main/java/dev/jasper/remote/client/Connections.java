@@ -533,7 +533,7 @@ public final class Connections {
                 ui.execute(() -> status.accept("Authenticating…"));
                 try { var auth = session.auth(); shared.resources.add(auth::cancel); auth.verify(current.authTimeout()); }
                 catch (IOException denied) {
-                    String rejection = session.getAttribute(HostKeyVerifier.REJECTION);
+                    String rejection = shared.verifier.rejection();
                     if (rejection != null) throw new Failures.Failure(rejection);
                     String text = String.valueOf(denied.getMessage());
                     if (text.contains("timeout") || text.contains("timed out")) throw new Failures.Failure("Timed out after " + current.authTimeout().toSeconds() + " s");

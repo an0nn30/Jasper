@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 @Timeout(30)
+@org.junit.jupiter.api.extension.ExtendWith(CommandListenerTest.VirtualThreadDump.class)
 class CommandListenerTest {
     @TempDir Path dir;
     private final List<CommandListener> bound = new ArrayList<>();
@@ -58,8 +59,23 @@ class CommandListenerTest {
     /** Everything Jasper wrote until it closed the connection. */
     private static String readAll(SocketChannel client) throws IOException {
         var bytes = new ByteArrayOutputStream();
-        ByteBuffer buffer = ByteBuffer.allocate(4096);
-        while (client.read(buffer.clear()) >= 0) bytes.write(buffer.array(), 0, buffer.position());
+        // Windows' blocking AF_UNIX read can remain asleep after a fast peer has replied and closed.
+        // Readiness-driven reads still require EOF; a large buffer drains flood replies within the shutdown grace.
+        ByteBuffer buffer = ByteBuffer.allocate(64 * 1024);
+        client.configureBlocking(false);
+        try (var selector = java.nio.channels.Selector.open()) {
+            client.register(selector, java.nio.channels.SelectionKey.OP_READ);
+            while (true) {
+                int count = client.read(buffer.clear());
+                if (count < 0) break;
+                if (count > 0) bytes.write(buffer.array(), 0, count);
+                else {
+                    selector.select(1_000);
+                    selector.selectedKeys().clear();
+                    if (Thread.currentThread().isInterrupted()) throw new IOException("Interrupted waiting for peer EOF");
+                }
+            }
+        }
         return bytes.toString(StandardCharsets.UTF_8);
     }
 
@@ -221,6 +237,35 @@ class CommandListenerTest {
         assertThat(exchange(request(token(), List.of("300")))).isEqualTo(CommandProtocol.exit(1));
         assertThat(exchange(request(token(), List.of("-1")))).isEqualTo(CommandProtocol.exit(1));
         assertThat(exchange(request(token(), List.of("255")))).isEqualTo(CommandProtocol.exit(255));
+    }
+
+    @Test void repeatedImmediateRepliesAlwaysDeliverTheirExitFrame() throws Exception {
+        bind(invocation -> CompletableFuture.completedFuture(Integer.parseInt(invocation.arguments().getFirst())));
+        for (int round = 0; round < 100; round++) {
+            for (int code : new int[] {300, -1, 255}) {
+                assertThat(exchange(request(token(), List.of(Integer.toString(code)))))
+                    .as("round %s, exit %s", round, code)
+                    .isEqualTo(CommandProtocol.exit(code == 255 ? 255 : 1));
+            }
+        }
+    }
+
+    /** JUnit's standard thread dump omits virtual threads, including the command reader and writer. */
+    static final class VirtualThreadDump implements org.junit.jupiter.api.extension.PreInterruptCallback {
+        @Override public void beforeThreadInterrupt(org.junit.jupiter.api.extension.PreInterruptContext interrupted,
+                org.junit.jupiter.api.extension.ExtensionContext context) throws Exception {
+            Path output = Path.of("build/reports/tests/command-listener-threads").toAbsolutePath();
+            Files.createDirectories(output);
+            Path dump = Files.createTempFile(output, "threads-", ".txt");
+            String suffix = System.getProperty("os.name").startsWith("Windows") ? ".exe" : "";
+            Process diagnostic = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "jcmd" + suffix).toString(),
+                Long.toString(ProcessHandle.current().pid()), "Thread.dump_to_file", "-overwrite", dump.toString())
+                .redirectErrorStream(true).redirectOutput(output.resolve("jcmd.log").toFile()).start();
+            try {
+                if (diagnostic.waitFor(5, TimeUnit.SECONDS)) System.out.println(Files.readString(dump));
+                else System.out.println("Virtual thread dump timed out: " + dump);
+            } finally { diagnostic.destroyForcibly(); }
+        }
     }
 
     @Test void aDispatcherThatThrowsOrFailsExitsOne() throws Exception {

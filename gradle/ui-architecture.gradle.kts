@@ -2,10 +2,14 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 
+@Suppress("UNCHECKED_CAST")
+val verificationClasspaths = extra["verificationClasspaths"] as Map<String, org.gradle.api.artifacts.Configuration>
+
 // UI is independent of every other Jasper module; pure value/parser packages never use Swing.
 val uiProject = project(":jasper-ui")
 val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
     dependsOn(":jasper-ui:classes")
+    inputs.files(verificationClasspaths.getValue(uiProject.path))
     doLast {
         val launcher = uiProject.extensions.getByType<JavaToolchainService>().launcherFor {
             languageVersion = JavaLanguageVersion.of(25)
@@ -14,7 +18,7 @@ val verifyUiArchitecture = tasks.register("verifyUiArchitecture") {
         val bin = launcher.metadata.installationPath.dir("bin").asFile
         val suffix = if (System.getProperty("os.name").startsWith("Windows")) ".exe" else ""
         val classes = uiProject.layout.buildDirectory.dir("classes/java/main").get().asFile
-        val classpath = uiProject.configurations.getByName("runtimeClasspath").asPath
+        val classpath = verificationClasspaths.getValue(uiProject.path).asPath
         val process = ProcessBuilder(listOf(bin.resolve("jdeps$suffix").absolutePath,
             "--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none",
             "--class-path", classpath, classes.absolutePath)).redirectErrorStream(true).start()

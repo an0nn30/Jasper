@@ -83,9 +83,11 @@ class SampleSurfacesEvidenceTest {
                 });
             }
         } finally {
+            var pluginWorkers = runtime.get() == null ? null : PluginShutdownTestSupport.capture(runtime.get());
             var done = new CompletableFuture<List<CompletableFuture<?>>>();
             onEdt(() -> done.complete(runtime.get() == null ? List.of() : runtime.get().stop()));
             CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+            if (pluginWorkers != null) pluginWorkers.await();
             onEdt(() -> { windows.close(); themes.close(); ThemeTestSupport.controller(true); });
         }
     }

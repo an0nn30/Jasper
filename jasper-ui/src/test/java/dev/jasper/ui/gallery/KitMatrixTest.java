@@ -31,6 +31,26 @@ class KitMatrixTest {
         return captures;
     }
 
+    @Test void largeFixtureFontsDoNotChangeTheGalleryScaleOrLeakDeveloperFonts() {
+        Edt.run(() -> {
+            Object[] before = {null};
+            javax.swing.UIManager.getDefaults().forEach((key, value) -> { if ("defaultFont".equals(key)) before[0] = value; });
+            String scale = System.getProperty("flatlaf.uiScale");
+            float expected = com.formdev.flatlaf.util.UIScale.getUserScaleFactor();
+            KitGallery.installed(KitFixtures.light(), Kit.DEFAULT, (context, focus) -> {
+                for (int i = 0; i < 20; i++) {
+                    javax.swing.UIManager.put("defaultFont", KitGallery.font(Kit.DEFAULT, i % 2 == 0));
+                    assertThat(com.formdev.flatlaf.util.UIScale.getUserScaleFactor()).isEqualTo(expected);
+                    assertThat(KitGallery.font(Kit.DEFAULT, false).getSize()).isEqualTo(Math.round(13 * expected));
+                }
+            });
+            Object[] after = {null};
+            javax.swing.UIManager.getDefaults().forEach((key, value) -> { if ("defaultFont".equals(key)) after[0] = value; });
+            assertThat(after[0]).isSameAs(before[0]);
+            assertThat(System.getProperty("flatlaf.uiScale")).isEqualTo(scale);
+        });
+    }
+
     @Test void everyFixtureRendersUnderTheDefaultKitOverTheThemeSet() {
         for (var theme : KitFixtures.themes()) {
             var captures = captures(theme, Kit.DEFAULT);

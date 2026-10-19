@@ -87,7 +87,9 @@ public final class SettingsSurfacePreview {
                     });
                 }
             } finally {
+                var pluginWorkers=dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]);
                 var stopping=new CompletableFuture<List<CompletableFuture<?>>>();SwingUtilities.invokeAndWait(()->stopping.complete(runtime[0].stop()));CompletableFuture.allOf(stopping.get().toArray(CompletableFuture[]::new)).get(10,TimeUnit.SECONDS);
+                pluginWorkers.await();
                 SwingUtilities.invokeAndWait(()->{windows.close();controller[0].close();});
             }
         } finally {try(var paths=Files.walk(home)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}

@@ -73,7 +73,21 @@ class StagedRemoteTunnelsTest {
                 assertThat(db.getAccessibleContext().getAccessibleName()).as("named by its title line").isEqualTo("db, " + MISSING_HOST);
                 assertThat(db.getAccessibleContext().getAccessibleDescription()).as("described by its live tooltip")
                     .isEqualTo("db, localhost:5432 → db.internal:5432, Host missing — edit to choose another");
-                assertThat(db.getHeight()).as("two lines fit the old row height").isBetween(2 * db.getFontMetrics(db.getFont()).getHeight() - 8, 50);
+                var textLines = all((Container) db, JLabel.class).stream()
+                    .filter(label -> "db".equals(label.getText()) || MISSING_HOST.equals(label.getText())
+                        || ":5432 → db.internal:5432".equals(label.getText())).toList();
+                assertThat(textLines).hasSize(3);
+                for (var textLine : textLines) {
+                    var bounds = javax.swing.SwingUtilities.convertRectangle(textLine.getParent(), textLine.getBounds(), db);
+                    assertTextInkFits(textLine);
+                    assertThat(bounds.y).isGreaterThanOrEqualTo(0);
+                    assertThat(bounds.y + bounds.height).isLessThanOrEqualTo(db.getHeight());
+                }
+                var title = textLines.stream().filter(label -> "db".equals(label.getText())).findFirst().orElseThrow();
+                var subtitle = textLines.stream().filter(label -> label.getText().startsWith(":5432")).findFirst().orElseThrow();
+                var titleBounds = javax.swing.SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), db);
+                var subtitleBounds = javax.swing.SwingUtilities.convertRectangle(subtitle.getParent(), subtitle.getBounds(), db);
+                assertThat(subtitleBounds.y).as("the route sits below the title").isGreaterThanOrEqualTo(titleBounds.y + titleBounds.height);
                 assertThat(problems(view)).as("both rows ask for a host").isEqualTo(2);
                 click(db, 1);
                 press(canvas(db), KeyEvent.VK_ENTER, '\n');
@@ -300,6 +314,33 @@ class StagedRemoteTunnelsTest {
             if (child instanceof Container nested) result.addAll(all(nested, type));
         }
         return result;
+    }
+
+    /** Compare the actual paint with the same centered text given ample vertical space. */
+    static void assertTextInkFits(JLabel label) {
+        int width = label.getWidth(), height = label.getHeight();
+        int padding = label.getFontMetrics(label.getFont()).getHeight();
+        var clipped = new java.awt.image.BufferedImage(width, height + 2 * padding, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var expanded = new java.awt.image.BufferedImage(width, height + 2 * padding, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = clipped.createGraphics();
+        try {
+            graphics.translate(0, padding);
+            graphics.clipRect(0, 0, width, height);
+            label.paint(graphics);
+        } finally { graphics.dispose(); }
+        graphics = expanded.createGraphics();
+        try {
+            label.setSize(width, height + 2 * padding);
+            label.paint(graphics);
+        } finally {
+            label.setSize(width, height);
+            graphics.dispose();
+        }
+        int[] expected = expanded.getRGB(0, 0, width, expanded.getHeight(), null, 0, width);
+        assertThat(java.util.Arrays.stream(expected).anyMatch(pixel -> (pixel >>> 24) != 0))
+            .as("the reference paints text for %s", label.getText()).isTrue();
+        assertThat(clipped.getRGB(0, 0, width, clipped.getHeight(), null, 0, width))
+            .as("all text ink fits vertically for %s", label.getText()).containsExactly(expected);
     }
 
     static void layout(Container root) {
