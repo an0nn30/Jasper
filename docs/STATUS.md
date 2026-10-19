@@ -45,7 +45,7 @@ gated stripe pairs (`dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-st
 note, and nine ungated `-iconed` pairs show the real iconed `-render.png` beside the mock crop widened by the slices,
 for `compare_all.py`; no other pair's crop or floor changed. Deviations from the plan's text: Task 7 also re-wraps spec 16.1 item 4,
 whose line the added test names pushed past 120 columns; the plan's "322 files each" for the gallery is 161 per theme,
-322 in all, as earlier entries count them. `./gradlew check --continue`: **11,502 tests, 0 failures, 0 errors, 25
+322 in all, as earlier entries count them. `./gradlew check --continue`: **11,503 tests, 0 failures, 0 errors, 25
 skipped**; `check_pairs.py` passes 101 of 101 gated pairs, the 25 dock pairs' output equal to plan 12's; the headless
 gallery is byte-identical to `2c065f8cd`'s (Slate Cobalt Dark and Light, 322 files) and so are the 11 default-look
 jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
