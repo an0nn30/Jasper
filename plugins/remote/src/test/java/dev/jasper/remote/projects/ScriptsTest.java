@@ -47,7 +47,13 @@ class ScriptsTest {
         if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", shellPath(home));
         if (windows()) {
             String unixTools = Path.of(shell()).getParent().toString();
-            builder.environment().put("PATH", unixTools + java.io.File.pathSeparator + builder.environment().get("PATH"));
+            // Windows may supply Path instead of PATH; duplicate spellings can discard the override.
+            var environment = builder.environment();
+            String path = environment.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase("PATH"))
+                .map(Map.Entry::getValue).findFirst().orElse("");
+            environment.keySet().removeIf(key -> key.equalsIgnoreCase("PATH"));
+            environment.put("PATH", unixTools + java.io.File.pathSeparator + path);
         }
         Process process = builder.start();
         byte[] output;
