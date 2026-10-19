@@ -179,8 +179,10 @@ class PaintedContrastTest {
                     new Sampled("count", listView, "h.count"), new Sampled("selected detail", listView, "a.detail"));
                 var pairs = RunWindowPresentation.pairs(enterprise);
                 assertThat(guarded).as("every declared Run window text pair is sampled").hasSameSizeAs(pairs);
-                // The muted texts the mocks draw under 4.5:1 in Enterprise Light; every other text pair holds there as authored.
-                var mutedInEnterprise = java.util.Set.of(RunWindowPresentation.ROW_DETAIL, RunWindowPresentation.COUNT, RunWindowPresentation.SELECTED_DETAIL);
+                // The muted texts Enterprise Light (the user's 2026-10-18 direction: the IntelliJ Light port) authors under 4.5:1;
+                // every other text pair holds there as authored.
+                var mutedInEnterprise = java.util.Set.of(RunWindowPresentation.SHORTCUT, RunWindowPresentation.valuePair(enterprise),
+                    RunWindowPresentation.ROW_DETAIL, RunWindowPresentation.COUNT, RunWindowPresentation.SELECTED_DETAIL);
                 var window = new SurfacePanel(kit, SurfacePanel.Kind.RUN_WINDOW, () -> 24, () -> 40);
                 var box = new SurfacePanel(kit, SurfacePanel.Kind.BOX);
                 var field = new SurfacePanel(kit, SurfacePanel.Kind.FIELD);

@@ -2,8 +2,8 @@
 
     python3 -m unittest discover -s tools/themes -p 'test_*.py'
 
-Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/ and the built-in Catppuccin themes from the current
-output (then review the diff).
+Set JASPER_THEME_UPDATE_GOLDEN=1 to rewrite testdata/expected/, the built-in Catppuccin themes and the Enterprise theme
+from the current output (then review the diff).
 """
 
 import contextlib
@@ -955,6 +955,27 @@ class BuiltIn(unittest.TestCase):
 
     def test_the_shipped_catppuccin_license_is_the_vendored_one(self):
         self.assertEqual((BUILT_IN_THEMES / "catppuccin.LICENSE.txt").read_bytes(), (CATPPUCCIN / "LICENSE").read_bytes())
+
+    ENTERPRISE = pathlib.Path(__file__).resolve().parents[2] / "plugins/enterprise/src/main/resources/themes/enterprise.json"
+    PORT = pathlib.Path(__file__).resolve().parent / "enterprise" / "port.json"
+
+    def test_a_port_fills_override_keys_from_exact_keys_only(self):
+        spec = json.loads(self.PORT.read_text(encoding="utf-8"))
+        doc = tool.convert_port(spec, "port.json")
+        light, dark = doc["ui"]["light"], doc["ui"]["dark"]
+        self.assertEqual(light["surface.header"], "#F2F2F2")         # intellijlaf: ToolWindow.Header.inactiveBackground = panel
+        self.assertEqual(light["surface.header.active"], "#DFE2E9")  # port.json replaces IntelliJ Light's #E2E6EC
+        self.assertNotIn("surface.header.active", dark)               # New UI Dark has only "*.background": the recipe
+        self.assertEqual(dark["surface.header"], "#2B2D30")
+        self.assertEqual((light["accent"], dark["accent"]), ("#2675BF", "#366ACE"))
+        self.assertEqual(list(doc["terminal"]), ["light", "dark"])
+        self.assertEqual((doc["terminal"]["light"]["name"], doc["terminal"]["dark"]["name"]), ("Enterprise Light", "Enterprise Dark"))
+
+    def test_the_enterprise_theme_is_the_port_of_intellij_light_and_new_ui_dark(self):
+        text = tool.dump(tool.convert_port(json.loads(self.PORT.read_text(encoding="utf-8")), "port.json"))
+        if UPDATE:
+            self.ENTERPRISE.write_text(text, encoding="utf-8")
+        self.assertEqual(text, self.ENTERPRISE.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

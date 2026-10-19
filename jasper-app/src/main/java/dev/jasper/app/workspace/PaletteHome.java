@@ -7,11 +7,11 @@ import java.util.Optional;
 
 /**
  * Where the palette's view lives in its window and how a drag attaches it there (Enterprise presentation spec 11.5):
- * dropped from the title field ({@link TitleFieldHome}) or at the bottom-left of the dock work area ({@link CornerHome}).
+ * dropped from the title field ({@link TitleFieldHome}) or centred in the window's upper part ({@link UpperHome}).
  * The three-argument {@code WorkspaceChrome.of} picks one from the look's palette. Every rectangle is in the palette
  * overlay's coordinates. EDT only.
  */
-sealed interface PaletteHome permits TitleFieldHome, CornerHome {
+sealed interface PaletteHome permits TitleFieldHome, UpperHome {
     /**
      * What a home reads of its window.
      *

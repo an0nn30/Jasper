@@ -61,11 +61,11 @@ class LookRowsTest {
     @Test void theLooksImpliedSettingsAreNotBuiltAndLeaveNoEmptySection() throws Exception {
         edt(() -> {
             var classic = context(SettingsChromeTest.CLASSIC, KitTestSupport::context);
-            assertThat(rows("window", classic)).doesNotContain("window.native_decorations").contains("window.toolbar");
+            assertThat(rows("window", classic)).doesNotContain("window.native_decorations", "window.rail_width").contains("window.toolbar");
             assertThat(rows("appearance", classic)).doesNotContain("ui.animations.enabled").contains("window.view_mode");
             assertThat(sections("appearance", classic)).doesNotContain("Animations").contains("View mode");
             var linux = context(LINUX_DEFAULT, KitTestSupport::context);
-            assertThat(rows("window", linux)).as("the default look off macOS").contains("window.native_decorations");
+            assertThat(rows("window", linux)).as("the default look off macOS").contains("window.native_decorations", "window.rail_width");
             assertThat(rows("appearance", linux)).contains("ui.animations.enabled");
             assertThat(sections("appearance", linux)).contains("Animations");
         });

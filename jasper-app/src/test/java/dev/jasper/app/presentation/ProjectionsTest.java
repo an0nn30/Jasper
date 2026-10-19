@@ -16,11 +16,12 @@ class ProjectionsTest {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(classic.desktop()).isEqualTo(new DesktopFlags(false, true));
         assertThat(classic.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH));
+            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH,
+            WorkspaceLook.Icons.CLASSIC));
         assertThat(classic.shell()).isEqualTo(new ShellLook(false, true, true));
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(classic.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(classic.composition()).isEqualTo(Composition.CLASSIC);
         assertThat(classic.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.CLASSIC, true));
         assertThat(classic.motion()).isEqualTo(Motion.NONE);
@@ -33,7 +34,8 @@ class ProjectionsTest {
         var mac = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC);
         assertThat(mac.desktop()).isEqualTo(DesktopFlags.STANDARD);
         assertThat(mac.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED,
-            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD));
+            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI));
         assertThat(mac.shell()).isEqualTo(new ShellLook(true, false, false));
         assertThat(mac.settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of("window.native_decorations"), false));
         assertThat(mac.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.AS_REQUESTED, false));
@@ -70,7 +72,7 @@ class ProjectionsTest {
         for (var dialogs : ChromeSpec.DialogKind.values()) for (var motion : ChromeSpec.MotionKind.values())
         for (String template : new String[] {"{context}", "Workstation — {session} — {directory}"}) {
             if (menu == ChromeSpec.MenuBar.WINDOW && title != ChromeSpec.TitleBar.NATIVE) continue;
-            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion);
+            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI);
             for (var host : new Projections.Host[] {MAC, LINUX})
                 assertThatCode(() -> Projections.of(chrome, true, true, "p", host)).doesNotThrowAnyException();
             built++;
@@ -113,11 +115,23 @@ class ProjectionsTest {
         assertThat(Presentation.standard(MAC).fallback(MAC).projections().dockLayout().key()).as("the fallback").isEmpty();
     }
 
+    /** The user's direction of 2026-10-18: labelled stripes fit their labels, so Settings hides the Panel rail width. */
+    @Test void labelledStripesHideThePanelRailWidth() {
+        var d = ChromeSpec.DEFAULT;
+        var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
+            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons());
+        for (var host : new Projections.Host[] {MAC, LINUX}) {
+            assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
+            assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+            assertThat(Projections.fallback(DesktopFlags.STANDARD, host).settings().hiddenKeys()).doesNotContain("window.rail_width");
+        }
+    }
+
     /** Plan 9a: the kit file's Settings chrome and composition reach the projection. */
     @Test void theClassicSettingsChromeAndComposition() {
         var shipped = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(shipped.settings()).isEqualTo(new SettingsChrome(false, true, false,
-            Set.of("window.native_decorations", "ui.animations.enabled"), true));
+            Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(shipped.composition()).isEqualTo(Composition.CLASSIC);
     }
 
@@ -141,7 +155,15 @@ class ProjectionsTest {
     /** Plan 8b: the kit's run_window palette reaches the projection. */
     @Test void theRunWindowPaletteReachesTheProjection() {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC).palette()).isEqualTo(PaletteLook.DEFAULT);
+    }
+
+    /** Plan 12 Rulings 6: the kit's [chrome] icons is the workspace look's icons; the default look and the fallback keep New UI. */
+    @Test void theIconsPointIsTheWorkspaceLooksIcons() {
+        assertThat(Projections.of(ChromeSpec.CLASSIC, true, false, "p", MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.CLASSIC);
+        assertThat(Projections.standard(MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.NEW_UI);
+        for (var committed : new DesktopFlags[] {DesktopFlags.STANDARD, new DesktopFlags(false, true)})
+            assertThat(Projections.fallback(committed, MAC).workspace().icons()).as("%s", committed).isEqualTo(WorkspaceLook.Icons.NEW_UI);
     }
 }

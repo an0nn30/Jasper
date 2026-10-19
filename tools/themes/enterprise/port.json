@@ -1,0 +1,14 @@
+{
+  "name": "Enterprise",
+  "author": "JetBrains, ported by Jasper",
+  "light": {
+    "theme": "Light.theme.json", "scheme": "Light.xml", "scheme_name": "Enterprise Light",
+    "roles": {"accent": "#2675BF", "surface.card": "contentBackground"},
+    "overrides": {"surface.header.active": "#DFE2E9"}
+  },
+  "dark": {
+    "theme": "expUI/expUI_dark.theme.json", "scheme": "expUI/expUI_darkScheme.xml", "scheme_name": "Enterprise Dark",
+    "roles": {"accent": "Blue5"},
+    "overrides": {}
+  }
+}

@@ -25,7 +25,10 @@ class SettingsPagesMockTest {
     static final double FLOOR = 0.93;
     /** A probe whose target lies within PROBE of its surroundings (a row rule, a band, a strip) is held this close. */
     static final double TIGHT_PROBE = 1;
-    /** Per page, the probes: a name, a logical point of the content and the mock's pixel there is the target. */
+    /**
+     * Per page, the probes: a name, a logical point of the content and the colour it should show
+     * ({@link SettingsChromeMockTest#expected}); a probe naming none (a composited pixel no role holds) takes the mock's.
+     */
     static final Map<String, List<SettingsChromeMockTest.Probe>> PROBES = new LinkedHashMap<>();
     /** The probes held within {@link #TIGHT_PROBE}, by page id and name ("id/name"). */
     static final Set<String> TIGHT = new java.util.HashSet<>();
@@ -52,117 +55,129 @@ class SettingsPagesMockTest {
      */
     static final Map<String, String> RESIDUAL = new LinkedHashMap<>();
 
-    static SettingsChromeMockTest.Probe probe(String name, int x, int y) { return new SettingsChromeMockTest.Probe(name, x, y); }
+    static SettingsChromeMockTest.Probe probe(String name, int x, int y, String colour) { return new SettingsChromeMockTest.Probe(name, x, y, colour); }
     static void tight(String id, String... names) { for (String name : names) TIGHT.add(id + "/" + name); }
     static void face(String id, String... names) { for (String name : names) FACE.add(id + "/" + name); }
     static void half(String id, int pixels, String... names) { for (String name : names) HALF.put(id + "/" + name, pixels); }
     static void residual(String id, String cause, String... names) { for (String name : names) RESIDUAL.put(id + "/" + name, cause); }
 
-    /** An ink box: a text's name and its logical rectangle in the content, wide enough for both the mock's and ours. */
-    record Ink(String name, int x, int y, int width, int height) { }
+    /**
+     * An ink box: a text's name, its logical rectangle in the content, wide enough for both the mock's and ours, and the
+     * role its ink is.
+     *
+     * @param name the text
+     * @param x logical x
+     * @param y logical y
+     * @param width logical width
+     * @param height logical height
+     * @param colour the role key of its ink
+     */
+    record Ink(String name, int x, int y, int width, int height, String colour) { }
 
     static {
-        PROBES.put("appearance", List.of(probe("Light preview ring", 430, 111), probe("Light radio dot", 437, 164),
-            probe("first row rule", 700, 182), probe("second row rule", 700, 221), probe("Dark theme dropdown top", 1000, 191),
-            probe("Theme box bottom", 1000, 313), probe("Workspace box top", 1000, 334),
-            // The unchecked box's edge is plan 4b's border.hover (#909399), ΔE 5 from the mock's #9AA0A8: the probes take the
-            // box's inside and the body just above its edge, which hold its place to the pixel.
-            probe("Enable opacity checkbox", 266, 364), probe("above the Enable opacity checkbox", 266, 357), probe("Background blur checkbox", 262, 440)));
+        PROBES.put("appearance", List.of(probe("Light preview ring", 430, 111, "accent"), probe("Light radio dot", 437, 164, "accent"),
+            probe("first row rule", 700, 182, "border.row"), probe("second row rule", 700, 221, "border.row"), probe("Dark theme dropdown top", 1000, 191, "button.secondary.border"),
+            probe("Theme box bottom", 1000, 313, "window rule"), probe("Workspace box top", 1000, 334, "window rule"),
+            // The unchecked box's edge is plan 4b's border.hover, where the mock draws #9AA0A8: the probes take the box's
+            // inside and the body just above its edge, which hold its place to the pixel.
+            probe("Enable opacity checkbox", 266, 364, "surface.input"), probe("above the Enable opacity checkbox", 266, 357, "surface.app"), probe("Background blur checkbox", 262, 440, "accent")));
         tight("appearance", "first row rule", "second row rule");
         face("appearance", "Theme box bottom", "Workspace box top", "Enable opacity checkbox", "above the Enable opacity checkbox", "Background blur checkbox");
-        PROBES.put("window", List.of(probe("Toolbar & Status Bar box top", 700, 53), probe("first row rule", 700, 102),
-            probe("third row rule", 700, 180), probe("row rule start", 262, 102), probe("row rule inset", 255, 102),
-            probe("row rule end", 1015, 102), probe("Toolbar height spinner top", 940, 111), probe("Show status bar checkbox", 262, 160),
-            probe("Tabs & Panels box top", 700, 285)));
+        PROBES.put("window", List.of(probe("Toolbar & Status Bar box top", 700, 53, "window rule"), probe("first row rule", 700, 102, "border.row"),
+            probe("third row rule", 700, 180, "border.row"), probe("row rule start", 262, 102, "border.row"), probe("row rule inset", 255, 102, "surface.app"),
+            probe("row rule end", 1015, 102, "surface.app"), probe("Toolbar height spinner top", 940, 111, "border.input"), probe("Show status bar checkbox", 262, 160, "accent"),
+            probe("Tabs & Panels box top", 700, 285, "window rule")));
         tight("window", "first row rule", "third row rule", "row rule start", "row rule inset", "row rule end");
         face("window", "Tabs & Panels box top");
-        PROBES.put("notifications", List.of(probe("System checkbox", 262, 86), probe("table box left", 260, 300),
-            probe("table box right", 1010, 233), probe("header band", 400, 233), probe("Display separator", 755, 233),
-            probe("Source separator", 902, 233), probe("header rule", 400, 243), probe("heading band", 400, 255),
-            probe("data row", 400, 277), probe("Display arrow", 800, 275)));
+        PROBES.put("notifications", List.of(probe("System checkbox", 262, 86, "accent"), probe("table box left", 260, 300, "border.control"),
+            probe("table box right", 1010, 233, "border.control"), probe("header band", 400, 233, "surface.tableHeader"), probe("Display separator", 755, 233, "border.divider"),
+            probe("Source separator", 902, 233, "border.divider"), probe("header rule", 400, 243, "border.divider"), probe("heading band", 400, 255, "surface.tableHeader"),
+            // The user's 2026-10-18 direction: the Display arrow is text.placeholder, which the mock's #7A808A matched before the port.
+            probe("data row", 400, 277, "surface.card"), probe("Display arrow", 800, 275, "text.placeholder")));
         tight("notifications", "header band", "heading band");
         face("notifications", "table box left", "table box right", "header band", "Display separator", "Source separator",
             "header rule", "heading band", "data row", "Display arrow");
-        // The heading count is semibold in text.secondary and the Source cells read text.secondary (2x: "6 groups" 1825 to
-        // 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561, #5C6370).
-        INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14), new Ink("Default", 908, 270, 48, 14)));
+        // The heading count is semibold in text.secondary through the table face's text guard ("heading count", which moves
+        // the IntelliJ Light port's text.secondary: the user's 2026-10-18 direction) and the Source cells read text.secondary
+        // (2x: "6 groups" 1825 to 1918 and 501 to 522, 630 ink pixels; "Default" 1826 to 1900 and 544 to 561).
+        INKS.put("notifications", List.of(new Ink("6 groups", 908, 249, 56, 14, "heading count"), new Ink("Default", 908, 270, 48, 14, "text.secondary")));
         face("notifications", "6 groups", "Default");
         // Find by Shortcut and Collapse All are each 1 px wider than the mock's (the labels' fractional advances round up), so
         // the Find by Shortcut probe takes its face 3 px inside the mock's left edge (737), which ours meets at 735.
-        PROBES.put("keymap", List.of(probe("search field top", 300, 54), probe("Find by Shortcut face", 740, 65),
-            probe("tool button top", 790, 53), probe("tree box top", 600, 83), probe("header band", 600, 94), probe("header rule", 600, 104),
-            probe("Scope separator", 779, 94), probe("Shortcut separator", 886, 94), probe("Copy keycap edge", 911, 180)));
+        PROBES.put("keymap", List.of(probe("search field top", 300, 54, "border.input"), probe("Find by Shortcut face", 740, 65, "button.secondary.bg"),
+            probe("tool button top", 790, 53, "button.secondary.border"), probe("tree box top", 600, 83, "border.control"), probe("header band", 600, 94, "surface.tableHeader"), probe("header rule", 600, 104, "border.divider"),
+            probe("Scope separator", 779, 94, "border.divider"), probe("Shortcut separator", 886, 94, "border.divider"), probe("Copy keycap edge", 911, 180, "keycap edge")));
         tight("keymap", "header band");
         face("keymap", "header rule", "Copy keycap edge");
-        // Mock 07b: the band's edges #C9D7F2 and fill #EEF2FA, the field's ring #2F65CA, the dot #D03A3A, Set's disabled fill #E1E3E6;
-        // the selected row's keycaps stand in light boxes (#F7F8F9) on its accent fill.
-        PROBES.put("keymap-recording", List.of(probe("edited row selected", 600, 183), probe("band top edge", 600, 195),
-            probe("band fill", 300, 240), probe("band at the tree's left", 250, 240), probe("band bottom edge", 600, 254),
-            probe("recorder field", 500, 213), probe("recorder ring", 600, 202), probe("armed dot", 295, 213), probe("Set disabled", 1000, 213),
-            probe("Copy keycap face", 915, 183)));
+        // Mock 07b: the band's edges and fill, the field's ring, the dot, Set's disabled fill; the selected row's keycaps
+        // stand in light boxes on its accent fill (their faces and edges composited, which no role holds: the mock's).
+        PROBES.put("keymap-recording", List.of(probe("edited row selected", 600, 183, "selection.bg"), probe("band top edge", 600, 195, "band edge"),
+            probe("band fill", 300, 240, "surface.rowHover"), probe("band at the tree's left", 250, 240, "surface.rowHover"), probe("band bottom edge", 600, 254, "band edge"),
+            probe("recorder field", 500, 213, "surface.input"), probe("recorder ring", 600, 202, "border.focus"), probe("armed dot", 295, 213, "status.danger"), probe("Set disabled", 1000, 213, "surface.header"),
+            probe("Copy keycap face", 915, 183, null)));
         face("keymap-recording", "Copy keycap face", "edited row selected", "band top edge", "band fill", "band at the tree's left", "band bottom edge",
             "recorder field", "recorder ring", "armed dot", "Set disabled");
-        PROBES.put("plugins", List.of(probe("list box", 247, 300), probe("list surface", 400, 400), probe("search strip", 400, 56),
-            probe("search strip rule", 400, 90), probe("heading band", 450, 99), probe("selected row", 450, 120),
-            probe("checkbox on the selection", 256, 133), probe("active tab", 558, 113), probe("inactive tab", 638, 113),
-            probe("Disable right edge", 1023, 65), probe("Disable top edge", 1000, 53), probe("second heading rule", 450, 151),
+        // The search strip is surface.sidebar, which the IntelliJ Light port sets apart from surface.panel (the user's 2026-10-18 direction).
+        PROBES.put("plugins", List.of(probe("list box", 247, 300, "border.control"), probe("list surface", 400, 400, "surface.card"), probe("search strip", 400, 56, "surface.sidebar"),
+            probe("search strip rule", 400, 90, "border.row"), probe("heading band", 450, 99, "surface.tableHeader"), probe("selected row", 450, 120, "selection.bg"),
+            probe("checkbox on the selection", 256, 133, "surface.input"), probe("active tab", 558, 113, "surface.card"), probe("inactive tab", 638, 113, "surface.stripe"),
+            probe("Disable right edge", 1023, 65, "button.secondary.border"), probe("Disable top edge", 1000, 53, "button.secondary.border"), probe("second heading rule", 450, 151, "border.row"),
             // The split's divider between the list and the details paints no rule (mock 08; a painted one stood at 2x 1078).
-            probe("between the list and the details", 539, 400)));
-        // The second heading's rule is held to PROBE: border.row #E4E5E8 lies ΔE 2.1 from the mock's #DDE0E4 on every heading
-        // rule (the band is ΔE 6 away); ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule pins its colour.
+            probe("between the list and the details", 539, 400, "surface.app")));
+        // The second heading's rule is border.row, held to PROBE; ClassicListHeadingsTest.aLaterHeadingKeepsItsOwnTopRule pins its colour.
         tight("plugins", "search strip", "heading band", "inactive tab", "between the list and the details");
         face("plugins", "heading band", "second heading rule", "selected row", "checkbox on the selection", "active tab", "inactive tab");
-        PROBES.put("terminal.shell", List.of(probe("arguments box top", 400, 205), probe("arguments box bottom", 400, 248),
-            probe("arguments box interior", 400, 230), probe("Remove left edge", 919, 217), probe("Add Variable… right edge", 1010, 317),
-            probe("Add Variable… top edge", 960, 305)));
+        PROBES.put("terminal.shell", List.of(probe("arguments box top", 400, 205, "border.control"), probe("arguments box bottom", 400, 248, "border.control"),
+            probe("arguments box interior", 400, 230, "surface.card"), probe("Remove left edge", 919, 217, "border.divider"), probe("Add Variable… right edge", 1010, 317, "button.secondary.border"),
+            probe("Add Variable… top edge", 960, 305, "button.secondary.border")));
         face("terminal.shell", "arguments box top", "arguments box bottom", "arguments box interior", "Remove left edge",
             "Add Variable… right edge", "Add Variable… top edge");
-        PROBES.put("command-palette", List.of(probe("box top", 600, 53), probe("box bottom", 900, 108), probe("spinner left edge", 929, 83)));
-        PROBES.put("desk-buddy", List.of(probe("box bottom", 700, 108)));
+        PROBES.put("command-palette", List.of(probe("box top", 600, 53, "window rule"), probe("box bottom", 900, 108, "window rule"), probe("spinner left edge", 929, 83, "border.input")));
+        PROBES.put("desk-buddy", List.of(probe("box bottom", 700, 108, "window rule")));
         // Edit Custom VM Options… and Reveal are each 1 px wider than the mock's (Task 3's rounded label advances) and 7 apart
         // (INLINE_GAP) against 6, so the left edge lies 3 px early: the probe takes its face, Reveal's right edge the row's end.
-        PROBES.put("system", List.of(probe("Run in background checkbox", 262, 82), probe("Edit Custom VM Options… face", 790, 213),
-            probe("Reveal right edge", 1010, 219)));
+        PROBES.put("system", List.of(probe("Run in background checkbox", 262, 82, "accent"), probe("Edit Custom VM Options… face", 790, 213, "button.secondary.bg"),
+            probe("Reveal right edge", 1010, 219, "button.secondary.border")));
         face("system", "Edit Custom VM Options… face", "Reveal right edge");
-        PROBES.put("terminal.font", List.of(probe("fallback list top", 400, 172), probe("second fallback row", 400, 196),
-            probe("fallback list bottom", 400, 215), probe("Ligatures checkbox", 262, 276)));
+        PROBES.put("terminal.font", List.of(probe("fallback list top", 400, 172, "border.control"), probe("second fallback row", 400, 196, "surface.zebra"),
+            probe("fallback list bottom", 400, 215, "border.control"), probe("Ligatures checkbox", 262, 276, "accent")));
         tight("terminal.font", "second fallback row");
         face("terminal.font", "fallback list bottom", "Ligatures checkbox");
-        PROBES.put("terminal.cursor", List.of(probe("row rule", 700, 102), probe("box bottom", 700, 147)));
+        PROBES.put("terminal.cursor", List.of(probe("row rule", 700, 102, "border.row"), probe("box bottom", 700, 147, "window rule")));
         tight("terminal.cursor", "row rule");
         String vault = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.vault"), editor = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.editor");
         String files = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.fileserver"), index = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.indexer");
         String remote = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.remote"), sample = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.sample");
         String history = dev.jasper.app.plugins.PluginRuntime.settingsPageId("dev.jasper.history");
-        PROBES.put(vault, List.of(probe("first row rule", 700, 110), probe("second row rule", 700, 158), probe("box bottom", 700, 211),
-            probe("Generated keys folder field left edge", 791, 135)));
+        PROBES.put(vault, List.of(probe("first row rule", 700, 110, "border.row"), probe("second row rule", 700, 158, "border.row"), probe("box bottom", 700, 211, "window rule"),
+            probe("Generated keys folder field left edge", 791, 135, "border.input")));
         tight(vault, "first row rule", "second row rule");
         face(vault, "second row rule", "box bottom");
         half(vault, 1, "second row rule", "box bottom");
-        PROBES.put(editor, List.of(probe("first row rule", 700, 110), probe("General box bottom", 700, 164), probe("second box top", 700, 185)));
+        PROBES.put(editor, List.of(probe("first row rule", 700, 110, "border.row"), probe("General box bottom", 700, 164, "window rule"), probe("second box top", 700, 185, "window rule")));
         tight(editor, "first row rule");
         face(editor, "General box bottom", "second box top");
         half(editor, 1, "General box bottom", "second box top");
-        PROBES.put(files, List.of(probe("first row rule", 700, 110), probe("box bottom", 700, 227), probe("port range field left edge", 791, 190)));
+        PROBES.put(files, List.of(probe("first row rule", 700, 110, "border.row"), probe("box bottom", 700, 227, "window rule"), probe("port range field left edge", 791, 190, "border.input")));
         tight(files, "first row rule");
         face(files, "box bottom");
         half(files, 2, "box bottom");
-        PROBES.put(index, List.of(probe("Projects box top", 600, 53), probe("projects table top", 400, 70), probe("projects header band", 400, 80), probe("projects header rule", 400, 91),
-            probe("projects table left", 260, 120), probe("projects table right", 1010, 80)));
+        PROBES.put(index, List.of(probe("Projects box top", 600, 53, "window rule"), probe("projects table top", 400, 70, "border.control"), probe("projects header band", 400, 80, "surface.tableHeader"), probe("projects header rule", 400, 91, "border.divider"),
+            probe("projects table left", 260, 120, "border.control"), probe("projects table right", 1010, 80, "border.control")));
         tight(index, "projects header band");
         residual(index, "the fixture indexes no project, so the plugin's page shows its empty state for the mock's table",
             "projects table top", "projects header band", "projects header rule", "projects table left", "projects table right");
         // The fixture's empty state in place of the mock's four projects (Rulings 16: fixture text): 0.930, rounded down.
         FLOORS.put(index, 0.92);
-        PROBES.put(remote, List.of(probe("first row rule", 700, 110), probe("fifth row rule", 700, 300), probe("box bottom", 700, 353)));
+        PROBES.put(remote, List.of(probe("first row rule", 700, 110, "border.row"), probe("fifth row rule", 700, 300, "border.row"), probe("box bottom", 700, 353, "window rule")));
         tight(remote, "first row rule", "fifth row rule");
         face(remote, "fifth row rule", "box bottom");
         half(remote, 2, "fifth row rule", "box bottom");
         // The host rows take the Reset menu (spec 12.1), so the checkboxes lead their labels; as on Appearance, the unchecked
-        // edge is border.hover (#909399, ΔE 5 from the mock's #9AA0A8), so the probes take the box's inside and the body above it.
-        PROBES.put(sample, List.of(probe("first checkbox", 266, 86), probe("above the first checkbox", 266, 79)));
+        // edge is border.hover, where the mock draws #9AA0A8, so the probes take the box's inside and the body above it.
+        PROBES.put(sample, List.of(probe("first checkbox", 266, 86, "surface.input"), probe("above the first checkbox", 266, 79, "surface.app")));
         face(sample, "first checkbox", "above the first checkbox");
-        PROBES.put(history, List.of(probe("list top", 700, 126), probe("row rule", 700, 286), probe("box bottom", 700, 339)));
+        PROBES.put(history, List.of(probe("list top", 700, 126, "border.control"), probe("row rule", 700, 286, "border.row"), probe("box bottom", 700, 339, "window rule")));
         tight(history, "row rule");
         face(history, "row rule", "box bottom");
         residual(history, "the mock's trivial-commands list scrolls after five rows under a horizontal scroll bar; ours shows eight",
@@ -190,11 +205,12 @@ class SettingsPagesMockTest {
             String name = key + "/" + probe.name();
             double limit = TIGHT.contains(name) ? TIGHT_PROBE : SettingsChromeMockTest.PROBE, distance = Double.MAX_VALUE;
             // A HALF probe's target may lie up to its pixels higher in the render (logical pixels, two 2x rows each).
+            int expected = SettingsChromeMockTest.expected(probe, mock, x, y);
             for (int up = 0; up <= 2 * HALF.getOrDefault(name, 0) && distance > limit; up += 2)
-                distance = Math.min(distance, SettingsMockMatch.deltaE(render.getRGB(actualX, actualY - up), mock.getRGB(x, y)));
+                distance = Math.min(distance, SettingsMockMatch.deltaE(render.getRGB(actualX, actualY - up), expected));
             if (distance <= limit) continue;
-            String failure = String.format("%s at (%d, %d): render #%06X, mock #%06X, ΔE %.1f", name, probe.x(), probe.y(),
-                render.getRGB(actualX, actualY) & 0xFFFFFF, mock.getRGB(x, y) & 0xFFFFFF, distance);
+            String failure = String.format("%s at (%d, %d): render #%06X, expected %s #%06X, ΔE %.1f", name, probe.x(), probe.y(),
+                render.getRGB(actualX, actualY) & 0xFFFFFF, probe.colour() == null ? "the mock's" : probe.colour(), expected & 0xFFFFFF, distance);
             if (RESIDUAL.containsKey(name)) System.out.println("Residual (plan 9b Task 7: " + RESIDUAL.get(name) + "): " + failure);
             else if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
             else failures.add(failure);
@@ -224,11 +240,12 @@ class SettingsPagesMockTest {
         for (var box : INKS.getOrDefault(key, List.of())) {
             var pixels = new Rectangle(2 * box.x(), 2 * box.y(), 2 * box.width(), 2 * box.height());
             int[] ours = ink(render, pixels), theirs = ink(mock, pixels);
-            double distance = SettingsMockMatch.deltaE(ours[0], theirs[0]), amount = Math.abs(ours[1] - theirs[1]) / (double) Math.max(1, theirs[1]);
+            int colour = SettingsChromeMockTest.expected(box.colour()).getRGB();
+            double distance = SettingsMockMatch.deltaE(ours[0], colour), amount = Math.abs(ours[1] - theirs[1]) / (double) Math.max(1, theirs[1]);
             if (distance <= SettingsChromeMockTest.PROBE && amount <= INK_AMOUNT) continue;
             String name = key + "/" + box.name();
-            String failure = String.format("%s ink: render #%06X, mock #%06X, ΔE %.1f; amount %d against %d", name, ours[0] & 0xFFFFFF,
-                theirs[0] & 0xFFFFFF, distance, ours[1], theirs[1]);
+            String failure = String.format("%s ink: render #%06X, %s #%06X, ΔE %.1f; amount %d against the mock's %d", name, ours[0] & 0xFFFFFF,
+                box.colour(), colour & 0xFFFFFF, distance, ours[1], theirs[1]);
             if (FACE.contains(name) && !SettingsChromeMockTest.PLEX) System.out.println(SettingsChromeMockTest.UNCHECKED + failure);
             // An ink amount is as rasterizer-dependent as the body share, so it is asserted where the shares are (Rulings 16).
             else if (!SettingsChromeMockTest.MAC) System.out.println("Not asserted off macOS (Rulings 16): " + failure);

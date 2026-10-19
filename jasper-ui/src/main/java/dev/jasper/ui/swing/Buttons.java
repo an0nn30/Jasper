@@ -80,9 +80,10 @@ final class Buttons {
             button.circular=value.presentation()==Nodes.ButtonPresentation.HELP;
             button.contextual = value.presentation() == Nodes.ButtonPresentation.CONTEXTUAL_EMBEDDED;
             button.embedded = embedded;
+            button.toolbarStrip = view.toolbarStrip();
             if (hostArtwork != null) { button.setIcon(hostArtwork.icon(context(), button.iconRole(false), button.stripInk)); button.putClientProperty("Jasper.button.icon", null); }
             else {
-                int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), (embedded || button.panel) && value.label().isEmpty() ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
+                int extent=UIScale.scale(button.stripInk != null ? context().metrics().value(DesignMetrics.Role.PANEL_HEADER_CONTRIBUTED_GLYPH) : button.orderedAction || button.orderedCommand ? context().metrics().value(DesignMetrics.Role.ORDERED_GLYPH) : button.panelDetail && value.label().isEmpty() ? context().metrics().value(DesignMetrics.Role.PANEL_DETAIL_ACTION_GLYPH) : context().icons().size(context().metrics(), value.label().isEmpty() && (embedded || button.panel || button.toolbarStrip) ? Nodes.IconSize.RAIL : Nodes.IconSize.CONTROL));
                 button.setIcon(value.icon().isEmpty() ? null : button.stripInk != null ? context().icons().panel(value.icon(), context().theme().semantic(), button.stripInk, extent)
                     : button.panel || button.panelDetail || button.panelRow
                     ? context().icons().panel(value.icon(),context().theme(),button.iconRole(false),extent)
@@ -163,6 +164,8 @@ final class Buttons {
         boolean panelEmpty;
         /** Content-sized for a host arrangement (ButtonPresentation.EMBEDDED): no minimum height and no resting or hover fill. */
         boolean embedded, contextual, panelRow;
+        /** In a toolbar strip (set from {@link KitView#toolbarStrip()} on every refresh): an icon-only button there draws its glyph at the rail size. */
+        boolean toolbarStrip;
         float disabledOpacity=.42f;
         /** A severity tinting the glyph at rest and on hover (a favourite's warning star); null takes the kind's text colour. */
         Nodes.Severity iconSeverity;

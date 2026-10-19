@@ -54,7 +54,7 @@ abstract class DockStripe extends JPanel {
     /** Every button, in the stripe's order. */
     abstract List<AbstractButton> buttons();
 
-    /** Sets {@code window.rail_width} in logical pixels; the caller validates the range. */
+    /** Sets {@code window.rail_width} in logical pixels; the caller validates the range. Only the icon rails follow it. */
     abstract void setRailWidth(int width);
 
     /** Shows every group for a drag of {@code id}, whose stripe label is {@code label}, and lifts its button out. */

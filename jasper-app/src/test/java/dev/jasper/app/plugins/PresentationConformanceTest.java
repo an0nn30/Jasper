@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.about.ThirdPartyNotices;
 import dev.jasper.app.config.CoreSettings;
+import dev.jasper.app.presentation.ChromeSpec;
 import dev.jasper.app.presentation.FontFile;
 import dev.jasper.app.testsupport.EnterpriseResources;
 import java.awt.Font;
@@ -27,7 +28,7 @@ class PresentationConformanceTest {
     /** Every key of spec 5.1's kit file. */
     static final Set<String> KEYS = Set.of("kit", "base",
         "chrome/title_bar", "chrome/menu_bar", "chrome/window_title", "chrome/tool_windows", "chrome/editor_tabs", "chrome/status_bar",
-        "chrome/palette", "chrome/dialogs", "chrome/motion",
+        "chrome/palette", "chrome/dialogs", "chrome/motion", "chrome/icons",
         "controls/toggle", "controls/exclusive", "controls/tabs", "controls/group", "controls/form_label", "controls/empty",
         "controls/table", "controls/tree", "controls/stepper", "controls/ordered_list", "controls/buttons", "controls/tag",
         "controls/route", "controls/prompt",
@@ -38,6 +39,7 @@ class PresentationConformanceTest {
         "type/data/family", "type/data/regular", "type/data/medium",
         "colors/dialog_surface", "colors/navigation_surface",
         "defaults/ui.theme.light", "defaults/ui.theme.dark", "defaults/palette.visible_rows", "defaults/window.toolbar_height",
+        "defaults/window.toolbar",
         "branding/product", "branding/icons", "branding/splash_art");
     /** The official IBM Plex 1.1.0 files (verified fact 11), by their name in the plugin. */
     static final Map<String, String> SUMS = Map.of(
@@ -51,7 +53,7 @@ class PresentationConformanceTest {
         var descriptor = DescriptorParser.parse(Files.readString(EnterpriseResources.RESOURCES.resolve("plugin.toml")));
         assertThat(descriptor.id()).isEqualTo("dev.jasper.enterprise");
         assertThat(descriptor.name()).isEqualTo("Enterprise");
-        assertThat(descriptor.version()).isEqualTo(Version.parse("0.1.0"));
+        assertThat(descriptor.version()).isEqualTo(Version.parse("0.2.0"));
         assertThat(descriptor.entry()).isEqualTo("dev.jasper.enterprise.EnterprisePlugin");
         assertThat(descriptor.capabilities()).containsExactly(DescriptorParser.PRESENTATION_PROVIDE);
         assertThat(descriptor.exports()).containsExactly("dev.jasper.enterprise.api");
@@ -74,11 +76,13 @@ class PresentationConformanceTest {
         assertThat(facts.problem()).as("every token in range, the constraint held, every file present").isEmpty();
         var parsed = facts.parsed().orElseThrow();
         assertThat(parsed.classicBase()).isTrue();
+        assertThat(parsed.chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
         assertThat(parsed.dropped()).as("the [defaults] themes resolve").isEmpty();
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_LIGHT)).isEqualTo("enterprise");
         assertThat(parsed.defaults().value(CoreSettings.UI_THEME_DARK)).isEqualTo("enterprise");
         assertThat(parsed.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(8);
         assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR_HEIGHT)).isEqualTo(34);
+        assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
     }
 
     @Test void theFontsAreIbmsDecodeAndEveryWeightResolvesToItsFamily() throws Exception {

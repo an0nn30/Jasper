@@ -55,12 +55,12 @@ class BottomStripTest {
             assertThat(groups).extracting(DockDropResolver.Group::axis).containsOnly(DockDropResolver.Axis.HORIZONTAL);
             assertThat(groups.get(0).bounds().x + groups.get(0).bounds().width).isEqualTo(groups.get(1).bounds().x);
             assertThat(groups.get(0).buttons()).hasSize(2);
-            // A wider Panel rail moves the labels with the side stripes, not the strip's height.
+            // window.rail_width moves neither the strip's height nor its labels: the side stripes fit their labels.
             strip.setRailWidth(40);
             strip.setSize(900, strip.getPreferredSize().height);
             strip.doLayout();
             assertThat(strip.getPreferredSize().height).as("independent of window.rail_width").isEqualTo(25);
-            assertThat(strip.buttons().get(0).getX()).as("the wider stripes' fill").isEqualTo(39);
+            assertThat(strip.buttons().get(0).getX()).as("still the stripes' fill").isEqualTo(fill);
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

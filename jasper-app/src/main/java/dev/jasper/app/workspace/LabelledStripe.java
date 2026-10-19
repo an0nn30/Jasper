@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
@@ -29,12 +28,16 @@ import javax.swing.Action;
  * One of the classic look's labelled tool window stripes (spec 10.7): each window as a label, "N: " first when its
  * toggle ends in a digit, read bottom to top on the left stripe and top to bottom on the right, on {@code surface.stripe},
  * an open window's label on {@code surface.control.selected}; the top group's labels from {@code RAIL_GAP} below the top,
- * then the second group's, then on the left the plugins' rail actions; a 1 px rule along the edge toward the workspace.
- * A label's line lies along the stripe's outer edge, as the mocks set it, so a stripe thicker than its line widens on its
- * inner side. A badge ends its label with a count pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
+ * then on the left the plugins' rail actions, and the second group's at the stripe's bottom end, in order, its last label
+ * {@code RAIL_GAP} above it, as IntelliJ's bottom group (the user's direction of 2026-10-18); a 1 px rule along the edge
+ * toward the workspace.
+ * The stripe is as thick as a label's line and its two rail edges, the text's capitals centred across it;
+ * {@code window.rail_width} does not apply (the user's direction of 2026-10-18). A badge ends its label with a count
+ * pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
  * During a dock drag both groups show (an empty group as the dragged label's drop space), the dragged label is lifted
- * out and its length stays at the end of its group, and a gap as long as it opens where it would drop. Labels past the
- * stripe's end are cut off by it. EDT only.
+ * out and its length stays at the end of its group, and a gap as long as it opens where it would drop. On a stripe too
+ * short for everything the rail actions follow the second group, and labels past the stripe's end are cut off by it.
+ * EDT only.
  */
 final class LabelledStripe extends DockStripe {
     /** Where the last layout put everything; during a drag, also each group's drop bounds and the gap. */
@@ -53,7 +56,6 @@ final class LabelledStripe extends DockStripe {
     private final EnumMap<Slot.Group, List<StripeLabels.Label>> groups = new EnumMap<>(Slot.Group.class);
     private final Map<String, StripeLabels.Label> byId = new LinkedHashMap<>();
     private final List<StripeLabels.Label> actions = new ArrayList<>();
-    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     private boolean dragging;
     private String lifted;
     private int liftedLength;
@@ -96,8 +98,9 @@ final class LabelledStripe extends DockStripe {
             describe(label);
             actions.add(label);
         }
-        for (Slot.Group group : GROUPS) groups.get(group).forEach(this::add);
+        groups.get(Slot.Group.TOP).forEach(this::add);
         actions.forEach(this::add);
+        groups.get(Slot.Group.SECOND).forEach(this::add);
         revalidate();
         repaint();
     }
@@ -135,18 +138,14 @@ final class LabelledStripe extends DockStripe {
     @Override boolean emptyWithout(String id) { return actions.isEmpty() && byId.keySet().stream().allMatch(id::equals); }
 
     @Override List<AbstractButton> buttons() {
-        var all = new ArrayList<AbstractButton>();
-        for (Slot.Group group : GROUPS) all.addAll(groups.get(group));
+        var all = new ArrayList<AbstractButton>(groups.get(Slot.Group.TOP));
         all.addAll(actions);
+        all.addAll(groups.get(Slot.Group.SECOND));
         return List.copyOf(all);
     }
 
-    @Override void setRailWidth(int width) {
-        if (railWidth == width) return;
-        railWidth = width;
-        revalidate();
-        repaint();
-    }
+    /** A labelled stripe fits its labels: {@code window.rail_width} does not apply. */
+    @Override void setRailWidth(int width) { }
 
     @Override void beginDrag(String id, String label) {
         dragging = true;
@@ -191,7 +190,7 @@ final class LabelledStripe extends DockStripe {
     @Override void refreshTheme() { repaint(); }
 
     @Override public Dimension getMinimumSize() {
-        return new Dimension(labels.thickness(railWidth, this), labels.styles().metric(DesignMetrics.Role.RAIL_MIN_HEIGHT));
+        return new Dimension(labels.thickness(), labels.styles().metric(DesignMetrics.Role.RAIL_MIN_HEIGHT));
     }
 
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
@@ -202,27 +201,43 @@ final class LabelledStripe extends DockStripe {
         gap = placement.gap;
     }
 
-    /** The two groups down from {@code RAIL_GAP}, then the actions; the drop groups meet after the top group. */
+    /**
+     * The top group down from {@code RAIL_GAP}, then the actions; the second group ends {@code RAIL_GAP} above the bottom,
+     * or follows the top group on a stripe too short for both; actions with no room before it follow it. The drop groups
+     * meet midway between.
+     */
     private Placement place(boolean withGap) {
         var placement = new Placement();
         var styles = labels.styles();
-        int rule = styles.metric(DesignMetrics.Role.DOCK_RULE);
+        int rule = styles.metric(DesignMetrics.Role.DOCK_RULE), edge = styles.metric(DesignMetrics.Role.RAIL_GAP);
         int across = Math.max(0, getWidth() - rule), x = side == Side.LEFT ? 0 : rule;
         int between = styles.metric(DesignMetrics.Role.STRIPE_LABEL_GAP);
-        int y = column(Slot.Group.TOP, styles.metric(DesignMetrics.Role.RAIL_GAP), x, across, between, withGap, placement);
-        int split = y;
-        y = column(Slot.Group.SECOND, y, x, across, between, withGap, placement);
-        if (!actions.isEmpty()) {
-            y += styles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
-            for (StripeLabels.Label action : actions) {
-                int length = labels.length(action.text(), Optional.empty());
-                placement.bounds.put(action, new Rectangle(x, y, across, length));
-                y += length + between;
-            }
-        }
-        placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), split));
-        placement.groups.put(Slot.Group.SECOND, new Rectangle(0, split, getWidth(), Math.max(0, getHeight() - split)));
+        int y = column(Slot.Group.TOP, edge, x, across, between, withGap, placement);
+        int actionsLength = actions.isEmpty() ? 0 : styles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
+        for (StripeLabels.Label action : actions) actionsLength += labels.length(action.text(), Optional.empty()) + between;
+        // The second group's extent, its gap or drop space included, from a dry run of its column.
+        int extent = column(Slot.Group.SECOND, 0, x, across, between, withGap, new Placement());
+        int start = Math.max(y, getHeight() - edge - Math.max(0, extent - between));
+        boolean actionsFirst = y + actionsLength <= start;
+        if (actionsFirst) y = actions(y, x, across, between, placement);
+        int end = column(Slot.Group.SECOND, start, x, across, between, withGap, placement);
+        if (!actionsFirst) actions(end, x, across, between, placement);
+        int boundary = Math.clamp((y + start) / 2, 0, Math.max(0, getHeight()));
+        placement.groups.put(Slot.Group.TOP, new Rectangle(0, 0, getWidth(), boundary));
+        placement.groups.put(Slot.Group.SECOND, new Rectangle(0, boundary, getWidth(), Math.max(0, getHeight() - boundary)));
         return placement;
+    }
+
+    /** Lays the rail actions out downward from y, {@code RAIL_SECTION_GAP} first, and returns where the next label starts. */
+    private int actions(int y, int x, int across, int between, Placement placement) {
+        if (actions.isEmpty()) return y;
+        y += labels.styles().metric(DesignMetrics.Role.RAIL_SECTION_GAP);
+        for (StripeLabels.Label action : actions) {
+            int length = labels.length(action.text(), Optional.empty());
+            placement.bounds.put(action, new Rectangle(x, y, across, length));
+            y += length + between;
+        }
+        return y;
     }
 
     /** The group's shown labels, the lifted one left out. */

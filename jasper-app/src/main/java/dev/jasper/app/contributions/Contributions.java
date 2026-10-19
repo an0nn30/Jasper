@@ -53,7 +53,11 @@ public final class Contributions {
 
     /** A request to show, hide or toggle a panel in one window; each window answers only its own. */
     public record PanelRequest(UUID windowId, String panelId, Op op) {
-        public enum Op { SHOW, HIDE, TOGGLE }
+        public enum Op {
+            SHOW, HIDE, TOGGLE,
+            /** A toggle by the user's View action: a panel it shows becomes the active tool window under flush frames (Enterprise plan 12 Rulings 18). */
+            ACTIVATING_TOGGLE
+        }
     }
 
     private final Map<String, PanelEntry> panels = new LinkedHashMap<>();
@@ -153,7 +157,7 @@ public final class Contributions {
         panels.put(id, entry);
         if (toggleActionId.isEmpty())
             panelToggles.put(id, addAction(toggle, "Toggle " + title, icon, List.of("panel", "show", "hide"), Optional.empty(),
-                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.TOGGLE))));
+                invocation -> requestPanel(new PanelRequest(invocation.windowId(), id, PanelRequest.Op.ACTIVATING_TOGGLE))));
         rebuildPanelsMenu();
         changed(Kind.PANELS);
         return entry;

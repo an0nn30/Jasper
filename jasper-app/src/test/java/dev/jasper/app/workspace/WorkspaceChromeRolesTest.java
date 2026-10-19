@@ -40,7 +40,8 @@ class WorkspaceChromeRolesTest {
                 .singleElement().satisfies(label -> assertThat(label.getFont()).isEqualTo(ThemeZone.font(Typography.Role.STATUS_PATH)));
             // The title bar, status bar and stripes are the native chrome's receiving contexts for original artwork.
             for (JComponent receiver : List.<JComponent>of(owner.chrome().header(), owner.status(), owner.leftStripe(), owner.rightStripe()))
-                assertThat(receiver.getClientProperty("Jasper.chromeArtwork")).as(receiver.getAccessibleContext().getAccessibleName()).isEqualTo(Boolean.TRUE);
+                assertThat(receiver.getClientProperty("Jasper.chromeArtwork")).as(receiver.getAccessibleContext().getAccessibleName())
+                    .isEqualTo(dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
             assertThat(owner.windowTabs().getClientProperty("Jasper.chromeArtwork")).isNull();
         }
     }

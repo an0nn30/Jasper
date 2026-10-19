@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import dev.jasper.app.config.ConfigSnapshot;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
@@ -51,7 +50,6 @@ final class BottomStrip extends DockStripe {
     private final StripeLabels labels;
     private final EnumMap<Slot, List<StripeLabels.Label>> groups = new EnumMap<>(Slot.class);
     private final Map<String, StripeLabels.Label> byId = new LinkedHashMap<>();
-    private int railWidth = ConfigSnapshot.DEFAULT_RAIL_WIDTH;
     private boolean dragging;
     private String lifted;
     private int liftedLength;
@@ -116,12 +114,8 @@ final class BottomStrip extends DockStripe {
         return List.copyOf(all);
     }
 
-    @Override void setRailWidth(int width) {
-        if (railWidth == width) return;
-        railWidth = width;
-        revalidate();
-        repaint();
-    }
+    /** The strip and its labels' lead do not follow {@code window.rail_width}. */
+    @Override void setRailWidth(int width) { }
 
     @Override void beginDrag(String id, String label) {
         dragging = true;
@@ -195,7 +189,7 @@ final class BottomStrip extends DockStripe {
     private Placement place(boolean withGap) {
         var placement = new Placement();
         int rule = labels.styles().metric(DesignMetrics.Role.DOCK_RULE), across = Math.max(0, getHeight() - rule);
-        int lead = labels.thickness(railWidth, this) - rule;
+        int lead = labels.thickness() - rule;
         int x = lead;
         var left = new ArrayList<Rectangle>();
         for (Item item : items(Slot.BOTTOM_LEFT, withGap)) {

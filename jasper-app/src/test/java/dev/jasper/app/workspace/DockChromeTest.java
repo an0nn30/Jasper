@@ -12,7 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 class DockChromeTest {
     /** The default window chrome with the classic dock: the combination the dock tests build windows with. */
     static final WorkspaceLook CLASSIC_DOCK = new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED,
-        WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.FLUSH);
+        WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.FLUSH,
+        WorkspaceLook.Icons.NEW_UI);
 
     /** A window chrome with the classic dock and the default window chrome. */
     static WorkspaceChrome classicDock() { return WorkspaceChrome.of(CLASSIC_DOCK, new dev.jasper.app.presentation.TitleFormat("{context}")); }

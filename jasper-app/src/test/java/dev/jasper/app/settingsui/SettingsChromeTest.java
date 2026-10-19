@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class SettingsChromeTest {
     /** The Enterprise look's projection (spec 9.1's table). */
     static final SettingsChrome CLASSIC = new SettingsChrome(false, true, false,
-        Set.of("window.native_decorations", "ui.animations.enabled"), true);
+        Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true);
     static final Path FILE = Path.of("/fixture/config.toml");
 
     static AuxiliaryWindows windows() {
