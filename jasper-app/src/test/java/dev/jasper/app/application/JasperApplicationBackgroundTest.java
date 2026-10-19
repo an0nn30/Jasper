@@ -468,7 +468,7 @@ class JasperApplicationBackgroundTest {
     }
 
     @Test void aProcessThatIsNotResidentKeepsTheOrdinaryHandlerEvenWithAPresence() throws Exception {
-        // --standalone, --safe-mode, run_in_background = false or a failed bind: a presence is installed, nothing prepares it.
+        // --safe-mode, --config, another home or run_in_background = false: a presence is installed, nothing prepares it.
         var terminated = new CountDownLatch(1);
         var recorded = new Answer();
         var answer = new Answer();

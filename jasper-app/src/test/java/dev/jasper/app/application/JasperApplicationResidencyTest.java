@@ -153,6 +153,13 @@ class JasperApplicationResidencyTest {
         }
     }
 
+    @Test void aQuittingApplicationTakesNoMoreRequests() throws Exception {
+        JasperApplication application = application(() -> { });
+        edt(() -> assertThat(application.acceptsRequests()).isTrue());
+        edt(application::quit);
+        edt(() -> assertThat(application.acceptsRequests()).as("plan Ruling 23").isFalse());
+    }
+
     @Test void anOpenDoesNotThrowOnceTheApplicationHasQuit() throws Exception {
         JasperApplication application = application(() -> { });
         edt(() -> application.residency(true));

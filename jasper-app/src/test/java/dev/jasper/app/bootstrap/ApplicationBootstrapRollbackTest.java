@@ -41,8 +41,11 @@ class ApplicationBootstrapRollbackTest {
         DesktopTestSupport.edt(() -> assertThatThrownBy(() -> ApplicationBootstrap.compose(service, () -> history,
             owned -> new JasperApplication(service, DesktopTestSupport.launcher(new ArrayDeque<>()), owned, null,
                 () -> { calls.incrementAndGet(); terminated.countDown(); }),
-            app -> endpoint[0] = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
-                request -> LaunchRequest.Response.OK),
+            app -> {
+                endpoint[0] = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
+                    request -> LaunchRequest.Response.OK);
+                app.onShutdown(endpoint[0]::close);
+            },
             app -> { assertThat(endpoint[0]).isNotNull(); throw original; })).isSameAs(original));
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(calls).hasValue(1);
@@ -84,7 +87,7 @@ class ApplicationBootstrapRollbackTest {
                 try {
                     var application = ApplicationBootstrap.compose(service, () -> history,
                         owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
-                        app -> endpoint, app -> { if (presentationFails) throw original; });
+                        app -> app.onShutdown(endpoint::close), app -> { if (presentationFails) throw original; });
                     application.quit();
                 } catch (Throwable caught) { failure.set(caught); }
                 finally { javax.swing.SwingUtilities.invokeLater(marker::countDown); }
@@ -110,7 +113,7 @@ class ApplicationBootstrapRollbackTest {
         var terminated = new CountDownLatch(1);
         DesktopTestSupport.edt(() -> ApplicationBootstrap.compose(service, CommandHistory::new,
             owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
-            app -> null, app -> { }).quit());
+            app -> { }, app -> { }).quit());
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("warm-up application terminated").isTrue();
     }
 }

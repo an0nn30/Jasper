@@ -78,8 +78,7 @@ class AppArgumentsTest {
         AppArguments dev = parse("--plugin-dir", "build/../out", "--safe-mode");
         assertThat(dev.pluginDir()).isEqualTo(cwd.resolve("out"));
         assertThat(dev.safeMode()).isTrue();
-        assertThat(parse("--standalone").standalone()).isTrue();
-        rejected(new String[]{"--safe-mode", "--safe-mode"}, new String[]{"--standalone", "--standalone"}, new String[]{"--plugin-dir"},
+        rejected(new String[]{"--safe-mode", "--safe-mode"}, new String[]{"--plugin-dir"},
             new String[]{"--plugin-dir", "--help"}, new String[]{"--plugin-dir", ""}, new String[]{"--plugin-dir", "a", "--plugin-dir", "b"});
         assertThat(AppArguments.USAGE).contains("--safe-mode", "--plugin-dir <path>");
     }

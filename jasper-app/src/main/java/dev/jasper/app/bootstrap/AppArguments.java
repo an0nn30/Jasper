@@ -16,7 +16,6 @@ import java.util.stream.Stream;
  * @param background {@code --background}: the login item's windowless start
  * @param safeMode {@code --safe-mode}
  * @param pluginDir {@code --plugin-dir}, or null
- * @param standalone {@code --standalone}
  * @param homeOverride whether the home came from {@code jasper.home} or {@code JASPER_HOME}
  * @param noWindow {@code --no-window}: the {@code jasper} command's windowless start
  * @param replacing {@code --replacing}: the process a restart's replacement waits for; not in the usage
@@ -25,10 +24,10 @@ import java.util.stream.Stream;
  * @param given the arguments as {@code main} received them, which a restart replays
  */
 record AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir,
-                    boolean standalone, boolean homeOverride, boolean noWindow, OptionalLong replacing,
-                    Path workingDirectory, List<Path> paths, List<String> given) {
+                    boolean homeOverride, boolean noWindow, OptionalLong replacing, Path workingDirectory,
+                    List<Path> paths, List<String> given) {
     static final String USAGE = "Usage: jasper [--config <path>] [--background] [--no-window] [--safe-mode] "
-        + "[--plugin-dir <path>] [--standalone] [--help] [<path>...]";
+        + "[--plugin-dir <path>] [--help] [<path>...]";
 
     AppArguments {
         Objects.requireNonNull(replacing, "replacing");
@@ -37,55 +36,10 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
         given = List.copyOf(given);
     }
 
-    /** The form that predates residency: an ordinary foreground launch. */
-    AppArguments(Path configOverride, boolean help) {
-        this(configOverride, help, false);
-    }
-
-    /** The form that predates plugins: every plugin option off. */
-    AppArguments(Path configOverride, boolean help, boolean background) {
-        this(configOverride, help, background, false, null, false);
-    }
-
-    /** The form that predates the home override: the OS-default home. */
-    AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir, boolean standalone) {
-        this(configOverride, help, background, safeMode, pluginDir, standalone, false);
-    }
-
-    /** The form that predates {@code --no-window}. */
-    AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir, boolean standalone,
-                 boolean homeOverride) {
-        this(configOverride, help, background, safeMode, pluginDir, standalone, homeOverride, false);
-    }
-
-    /** The form that predates paths: a launch in the current directory that names none. */
-    AppArguments(Path configOverride, boolean help, boolean background, boolean safeMode, Path pluginDir, boolean standalone,
-                 boolean homeOverride, boolean noWindow) {
-        this(configOverride, help, background, safeMode, pluginDir, standalone, homeOverride, noWindow, OptionalLong.empty(),
-            Path.of("").toAbsolutePath(), List.of(), List.of());
-    }
-
     /** Records whether the application home was overridden ({@code jasper.home} or {@code JASPER_HOME}). */
     AppArguments withHomeOverride(boolean value) {
-        return new AppArguments(configOverride, help, background, safeMode, pluginDir, standalone, value, noWindow, replacing,
+        return new AppArguments(configOverride, help, background, safeMode, pluginDir, value, noWindow, replacing,
             workingDirectory, paths, given);
-    }
-
-    /**
-     * A standalone launch never hands off to a resident process, never binds the shared endpoint and
-     * is never resident: it is a different Jasper (another home, config or plugin set) or a recovery
-     * launch that must not reopen the process it is escaping.
-     */
-    boolean standaloneLaunch() {
-        return configOverride != null || safeMode || pluginDir != null || standalone || homeOverride;
-    }
-
-    /**
-     * A launch whose configuration or plugin set is not the installed app's serves its own command socket, which only
-     * its own shells reach. A home override alone does not: its socket already lives in its own home.
-     */
-    boolean privateCommands() {
-        return configOverride != null || safeMode || pluginDir != null || standalone;
     }
 
     /**
@@ -106,7 +60,7 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
     static AppArguments parse(String[] args, Path workingDirectory) {
         Path override = null;
         Path pluginDir = null;
-        boolean help = false, background = false, safeMode = false, standalone = false, noWindow = false;
+        boolean help = false, background = false, safeMode = false, noWindow = false;
         OptionalLong replacing = OptionalLong.empty();
         Stream.Builder<Path> paths = Stream.builder();
         for (int i = 0; i < args.length; i++) {
@@ -127,10 +81,6 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
                     if (safeMode) throw invalid("Duplicate --safe-mode option.");
                     safeMode = true;
                 }
-                case "--standalone" -> {
-                    if (standalone) throw invalid("Duplicate --standalone option.");
-                    standalone = true;
-                }
                 case "--config" -> {
                     if (override != null) throw invalid("Duplicate --config option.");
                     override = path(args, ++i, "--config", "a file path", workingDirectory);
@@ -150,7 +100,7 @@ record AppArguments(Path configOverride, boolean help, boolean background, boole
             }
         }
         if (noWindow && background) throw invalid("--no-window and --background cannot be combined.");
-        return new AppArguments(override, help, background, safeMode, pluginDir, standalone, false, noWindow, replacing,
+        return new AppArguments(override, help, background, safeMode, pluginDir, false, noWindow, replacing,
             workingDirectory, paths.build().toList(), List.of(args));
     }
 

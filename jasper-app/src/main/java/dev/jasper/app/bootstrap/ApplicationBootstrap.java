@@ -46,13 +46,16 @@ public final class ApplicationBootstrap {
 
     public static void main(String[] args) {
         StartupTrace.current().mark(StartupTrace.Milestone.MAIN_ENTERED);
-        int result = start(args, System.out, System.err, ApplicationBootstrap::prepare, ApplicationBootstrap::prepareDesktop);
+        int result = start(args, System.out, System.err, environmentDirs(), ApplicationBootstrap::prepare, ApplicationBootstrap::prepareDesktop);
         if (result != 0) System.exit(result);
     }
 
-    /** What the boundary hands the desktop: the service, the arguments, the home, the log (null without the pre-pass) and the selection. */
+    /**
+     * What the boundary hands the desktop: the service, the arguments, the home, the log (null without the pre-pass), the
+     * selection and the home's owner, whose lock and endpoints this process holds (null only where a test builds one).
+     */
     record Startup(ConfigService service, AppArguments options, AppDirs dirs, AppLog log,
-                   dev.jasper.app.plugins.PluginSelection selection) { }
+                   dev.jasper.app.plugins.PluginSelection selection, Instance instance) { }
 
     /** What the pre-pass made: the log, open from here on, and the plugin selection. */
     record Prepared(AppLog log, dev.jasper.app.plugins.PluginSelection selection) { }
@@ -89,15 +92,15 @@ public final class ApplicationBootstrap {
             AppDirs dirs = startup.dirs();
             AppLog log = acquired.own(Objects.requireNonNull(startup.log(), "the desktop needs the pre-pass's log"));
             UnexpectedExceptions exceptions = acquired.own(installUnexpectedExceptionHandler());
-            var endpoint = new AtomicReference<HandoffSocket>();
-            var commands = new AtomicReference<CommandListener>();
+            Instance instance = Objects.requireNonNull(startup.instance(), "the desktop needs the home's owner");
+            // A failed start closes the endpoints and exits; the lock goes with the process, never before it (plan Ruling 24).
+            acquired.own((AutoCloseable) instance::closeEndpoints);
             var attempt = startup.selection().attempt();
             Thread shutdown = Thread.ofPlatform().name("jasper-log-shutdown").unstarted(() -> {
                 try {
                     // An orderly quit before the look proved itself clears its pending mark; any other exit leaves it (spec 4.6).
                     try { attempt.exiting(); } catch (RuntimeException unrecorded) { LOG.log(System.Logger.Level.WARNING, "Could not update the presentation attempt record", unrecorded); }
-                    if (endpoint.get() != null) endpoint.get().close();
-                    if (commands.get() != null) commands.get().close();
+                    instance.closeEndpoints();
                 }
                 finally { exceptions.close(); log.close(); }
             });
@@ -109,15 +112,16 @@ public final class ApplicationBootstrap {
             // Off the EDT and before the first window: an optional prewarm of the built-in icons.
             dev.jasper.ui.icons.IconRegistry.prepareBuiltIns();
             StartupSteps steps = opened.get();
-            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, endpoint, commands, steps));
-            // The posted EDT composition owns service; the process hook owns logging, the endpoint and the command
-            // listener.
+            SwingUtilities.invokeLater(() -> startDesktop(startup, dirs, log, exceptions, shutdown, steps));
+            // The posted EDT composition owns service; the process hook owns logging and the endpoints; the instance lock
+            // lasts as long as the process.
             acquired.transfer();
         } catch (RuntimeException | Error failure) {
             acquired.rollback(failure);
             // A splash already posted opens first, then closes: start-up failed (spec 10.11). Nothing without one.
             abandon(opened.get(), SwingUtilities::invokeLater);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
+            exitAfterFailedStart();
         }
     }
 
@@ -246,75 +250,87 @@ public final class ApplicationBootstrap {
         return background && MacDock.available(osName, appPath) ? Map.of("apple.awt.UIElement", "true") : Map.of();
     }
 
-    private static void startDesktop(Startup startup, AppDirs dirs, AppLog log,
-                                     UnexpectedExceptions exceptions, Thread shutdown, AtomicReference<HandoffSocket> endpoint,
-                                     AtomicReference<CommandListener> commands, StartupSteps steps) {
-        ConfigService service = startup.service(); AppArguments options = startup.options();
+    private static void startDesktop(Startup startup, AppDirs dirs, AppLog log, UnexpectedExceptions exceptions,
+                                     Thread shutdown, StartupSteps steps) {
+        ConfigService service = startup.service(); AppArguments options = startup.options(); Instance instance = startup.instance();
         try {
             StartupTrace.current().mark(StartupTrace.Milestone.TOOLKIT_READY);
-            boolean resident = service.initialState().snapshot().backgroundEnabled();
+            boolean resident = residentRole(options, service.initialState().snapshot().backgroundEnabled());
             Path home = Path.of(System.getProperty("user.home"));
             String appPath = System.getProperty("jpackage.app-path");
-            boolean standalone = options.standaloneLaunch();
-            if (!standalone && options.background() && !resident) {
-                reconcileLoginItem(false, appPath, home);
-                LOG.log(System.Logger.Level.INFO,
-                    "Started with --background while system.run_in_background is off; exiting");
-                service.close(); System.exit(0); return;
+            if (options.background() && !resident) {
+                if (options.residencyAllowed()) reconcileLoginItem(false, appPath, home);
+                if (instance.declineIfIdle()) {
+                    LOG.log(System.Logger.Level.INFO, "Started with --background, but this launch is not resident; exiting");
+                    service.close(); System.exit(0); return;
+                }
+                // A launch already handed this process a request it answered: it starts as an ordinary launch and
+                // carries the request out (plan Ruling 20). On macOS it began without a Dock icon; its first window
+                // brings it back, as a resident's does.
+                LOG.log(System.Logger.Level.INFO, "Started with --background, not resident, holding a request; starting as usual");
             }
+            boolean warmUp = options.background() && resident;
             presenting(steps, () -> compose(service, () -> new CommandHistory(dirs.commandHistory()),
                 history -> {
-                    JasperApplication application = createApplication(service, history, dirs, options, commands, startup.selection(), steps);
+                    JasperApplication application = createApplication(service, history, dirs, options, instance, startup.selection(), steps);
                     exceptions.forwardTo(application::unexpected);
                     return application;
                 }, application -> {
-                    if (!standalone)
+                    if (options.residencyAllowed())
                         application.loginItems(loginItemReconciler(enabled -> reconcileLoginItem(enabled, appPath, home)));
-                    if (!residentRole(options, resident)) return null;
-                    Path source = HandoffSocket.codeLocation();
-                    var bound = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
-                        HandoffSocket.answering((request, updated) -> {
-                            SwingUtilities.invokeLater(() -> handoffHandler(application).accept(request, updated));
-                            return true;
-                        }, source, HandoffSocket.lastModified(source)));
-                    endpoint.set(bound);
-                    return bound;
+                    application.residency(resident);
+                    // From here the application closes the endpoints at quit, as the process hook does at exit.
+                    application.onShutdown(instance::closeEndpoints);
+                    // The requests held since the lock was taken run now, in arrival order; later handoffs are answered
+                    // once the event thread has taken them, and none once the application quits (spec 5.3).
+                    instance.serve(handoffHandler(application), application::acceptsRequests, SwingUtilities::invokeLater,
+                        application.commands());
                 }, application -> {
                     if (options.noWindow()) {
-                        serveWithoutWindow(application, commands.get());
+                        serveWithoutWindow(application, instance.commands());
                         return;
                     }
-                    if (!options.background()) {
-                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
-                            application.presentationAttempt().pending();
-                        steps.workspace();
-                        long window = System.nanoTime();
-                        application.newWindow();
-                        StartupTrace.current().phase("first window", window);
-                        return;
-                    }
-                    if (!application.resident()) {
-                        LOG.log(System.Logger.Level.WARNING, standalone
-                            ? "Started with --background, but a --config, --safe-mode, --plugin-dir or --standalone launch is always standalone and cannot be resident; exiting"
-                            : "Started with --background but the handoff endpoint is unavailable; exiting");
-                        application.quitNow();
-                    } else {
-                        if (attemptBeforePresenting(options, application.resident(), GraphicsEnvironment.isHeadless()))
-                            application.presentationAttempt().pending();
+                    // A --background start that is not resident gets here only to carry out a request: it presents as usual.
+                    if (attemptBeforePresenting(options, application.resident() || !warmUp, GraphicsEnvironment.isHeadless()))
+                        application.presentationAttempt().pending();
+                    if (warmUp) {
                         application.warmUp(() -> StartupTrace.current().mark(StartupTrace.Milestone.WARMED_UP));
+                        return;
                     }
+                    steps.workspace();
+                    long window = System.nanoTime();
+                    // The first window takes the first directory the launch names; its other paths open in it (plan Ruling 13).
+                    application.openFirstWindow(options.paths());
+                    StartupTrace.current().phase("first window", window);
                 }));
         } catch (RuntimeException | Error failure) {
             abandon(steps, Runnable::run);
-            // Also covers failure before composition took ownership (for example initial role resolution).
-            var remaining = new StartupResources(); remaining.own(service); remaining.rollback(failure);
+            // Also covers failure before composition took ownership (for example initial role resolution). The lock goes
+            // with the process, never before it (plan Ruling 24).
+            var remaining = new StartupResources(); remaining.own(service); remaining.own((AutoCloseable) instance::closeEndpoints);
+            remaining.rollback(failure);
             LOG.log(System.Logger.Level.ERROR, "Application startup failed", failure);
-            closeLogAfterStartupFailure(log, () -> { exceptions.close(); removeShutdownHook(shutdown); });
+            closeLogAfterStartupFailure(log, () -> { exceptions.close(); removeShutdownHook(shutdown); exitAfterFailedStart(); });
         }
     }
 
+    /**
+     * Ends a process whose start failed after it claimed its home, once the event thread has run what was posted before
+     * (the splash closing; at most 2 s): the instance lock is released with the process, so no later launch owns the home
+     * while this one still shuts down (plan Ruling 24).
+     */
+    private static void exitAfterFailedStart() {
+        Thread.ofPlatform().name("jasper-failed-start").start(() -> {
+            var drained = new java.util.concurrent.CountDownLatch(1);
+            SwingUtilities.invokeLater(drained::countDown);
+            try { drained.await(2, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            System.exit(1);
+        });
+    }
+
     private static JasperApplication createApplication(ConfigService service, CommandHistory history, AppDirs dirs,
-                                                       AppArguments options, AtomicReference<CommandListener> commands,
+                                                       AppArguments options, Instance instance,
                                                        dev.jasper.app.plugins.PluginSelection selection, StartupSteps steps) {
         long began = System.nanoTime();
         var acquired = new StartupResources();
@@ -360,11 +376,10 @@ public final class ApplicationBootstrap {
             if (MacDock.available())
                 application.backgroundOnQuit(new DockControl(dockShow(MacDock::show, ApplicationIcon::installTaskbarIcon),
                     MacDock::prepare, MacDock::poweringOff), !options.background());
-            if (!options.privateCommands()) application.subcommandList(dirs.subcommandList());
+            application.subcommandList(dirs.subcommandList());
+            // New local shells name the socket this owner serves (JASPER_COMMAND_SOCKET).
+            if (instance.commandSocket() != null) application.commandSocket(instance.commandSocket());
             application.startPlugins(dirs);
-            // After the plugins started, so a call that arrives first finds its handler.
-            CommandListener listener = serveCommands(application, options, dirs, acquired);
-            if (listener != null) commands.set(listener);
             StartupTrace.current().phase("application", began);
             acquired.transfer();
             return application;
@@ -385,10 +400,14 @@ public final class ApplicationBootstrap {
         };
     }
 
-    /** EDT acquisition transaction; factories keep resource creation explicit and rollback testable. */
+    /**
+     * EDT acquisition transaction; factories keep resource creation explicit and rollback testable. {@code ready} runs
+     * once the application exists, before {@code present}: residency, endpoint cleanup and the requests the owner has
+     * held since it took the lock.
+     */
     static JasperApplication compose(ConfigService service, Supplier<CommandHistory> openHistory,
                                      Function<CommandHistory, JasperApplication> openApplication,
-                                     Function<JasperApplication, HandoffSocket> bindEndpoint,
+                                     Consumer<JasperApplication> ready,
                                      Consumer<JasperApplication> present) {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Desktop composition requires the EDT");
         var acquired = new StartupResources();
@@ -398,13 +417,7 @@ public final class ApplicationBootstrap {
             JasperApplication application = openApplication.apply(history);
             acquired.own((AutoCloseable) application::quitNow);
             acquired.release(history); acquired.release(service);
-            HandoffSocket endpoint = bindEndpoint.apply(application);
-            if (endpoint != null) {
-                // The application owns endpoint cleanup even if presentation fails below.
-                // Rollback queues quit; it must never take the endpoint's process lock on EDT.
-                application.onShutdown(endpoint::close);
-            }
-            application.residency(endpoint != null);
+            ready.accept(application);
             present.accept(application);
             acquired.transfer();
             return application;
@@ -464,15 +477,32 @@ public final class ApplicationBootstrap {
         }
     }
 
-    /** Startup boundary: parsing, the handoff attempt and the first read finish before the desktop callback runs. */
-    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error,
+    /** The home this process's environment names: {@code jasper.home}, else {@code JASPER_HOME}, else the OS default. */
+    static AppDirs environmentDirs() {
+        return AppDirs.resolve(System.getProperty("os.name"), System.getenv(), Path.of(System.getProperty("user.home")),
+            System.getProperty("jasper.home"));
+    }
+
+    /** The test entry without the pre-pass: the owner's lock and endpoints are released once {@code launch} returns. */
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, AppDirs dirs,
                      java.util.function.BiConsumer<ConfigService, AppArguments> launch) {
-        return start(args, out, error, startup -> launch.accept(startup.service(), startup.options()));
+        return start(args, out, error, dirs, startup -> {
+            try { launch.accept(startup.service(), startup.options()); }
+            finally { startup.instance().close(); }
+        });
     }
-    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, Consumer<Startup> launch) {
-        return start(args, out, error, Preparation.NONE, launch);
+
+    /** The test entry without the pre-pass; the caller closes the startup's instance. */
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, AppDirs dirs, Consumer<Startup> launch) {
+        return start(args, out, error, dirs, Preparation.NONE, launch);
     }
-    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, Preparation prepare, Consumer<Startup> launch) {
+
+    /**
+     * Startup boundary: parsing, claiming {@code dirs} (workspace-tabs spec 5.1 to 5.3: the instance lock or a handoff,
+     * before any toolkit initialization) and the first read finish before the desktop callback runs. Returns the exit code.
+     */
+    static int start(String[] args, java.io.PrintStream out, java.io.PrintStream error, AppDirs dirs, Preparation prepare,
+                     Consumer<Startup> launch) {
         AppArguments options;
         try { options = AppArguments.parse(args, Path.of(System.getProperty("user.dir"))); }
         catch (IllegalArgumentException failure) { error.println(failure.getMessage()); return 2; }
@@ -480,23 +510,18 @@ public final class ApplicationBootstrap {
         String os = System.getProperty("os.name");
         // AppKit reads this as the toolkit initialises.
         launchProperties(options.background(), os, System.getProperty("jpackage.app-path")).forEach(System::setProperty);
-        Path home = Path.of(System.getProperty("user.home"));
-        AppDirs dirs = AppDirs.resolve(os, System.getenv(), home, System.getProperty("jasper.home"));
         options = options.withHomeOverride(dirs.overridden());
         // Before any toolkit initialization: a handed-off launch must cost almost nothing and must
         // not settle a second icon into the Dock on its way out.
-        if (handsOff(options, dirs)) return 0;
-        if (alreadyResident(options, dirs)) {
-            LOG.log(System.Logger.Level.INFO, "Started with --background while a resident Jasper is running; exiting");
-            return 0;
-        }
-        if (alreadyServing(options, dirs)) {
-            LOG.log(System.Logger.Level.INFO, "Started with --no-window while a Jasper serves the jasper command; exiting");
-            return 0;
-        }
+        var claim = SingleInstance.claim(options, dirs, SingleInstance.Timing.STANDARD, LaunchFailure.reporter(error));
+        if (claim instanceof SingleInstance.Claim.Done done) return done.code();
+        Instance instance = ((SingleInstance.Claim.Owner) claim).instance();
         Path file = options.configOverride() == null ? dirs.configFile() : options.configOverride();
         var acquired = new StartupResources();
-        Prepared prepared = prepare.prepare(dirs, options);
+        acquired.own(instance);
+        Prepared prepared;
+        try { prepared = prepare.prepare(dirs, options); }
+        catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
         if (prepared.log() != null) acquired.own(prepared.log());
         StartupTrace.current().look(prepared.selection().presentation().look());
         long read = System.nanoTime();
@@ -506,87 +531,19 @@ public final class ApplicationBootstrap {
         StartupTrace.current().phase("config", read);
         StartupTrace.current().mark(StartupTrace.Milestone.CONFIG_LOADED);
         try {
-            launch.accept(new Startup(service, options, dirs, prepared.log(), prepared.selection()));
+            launch.accept(new Startup(service, options, dirs, prepared.log(), prepared.selection(), instance));
             acquired.transfer();
             return 0;
         } catch (RuntimeException | Error failure) { acquired.rollback(failure); throw failure; }
     }
 
-    /**
-     * True when a resident process accepted this launch and there is nothing left to do. A standalone
-     * launch ({@code --config}, {@code --safe-mode}, {@code --plugin-dir}, {@code --standalone}, an overridden
-     * home) never hands off, because the resident process holds a different configuration or plugin set, or is the very
-     * process a recovery launch is escaping; neither does a resident process starting up, nor a {@code --no-window}
-     * launch, which would be handed a window when it is there to serve the {@code jasper} command.
-     */
-    static boolean handsOff(AppArguments options, AppDirs dirs) {
-        if (options.background() || options.noWindow() || options.standaloneLaunch()) return false;
-        // Windows lets only this freshly launched process bring a window forward; the resident needs that right by the
-        // time it shows its window. Grant before sending, including when an existing window can be raised immediately.
-        WindowsForeground.allow(System.getProperty("os.name"), HandoffSocket.ownerPid(dirs.daemonToken()));
-        Path source = HandoffSocket.codeLocation();
-        var answer = HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), LaunchRequest.of(source,
-            HandoffSocket.lastModified(source), options.workingDirectory(), options.paths(), java.util.List.of()));
-        return answer == LaunchRequest.Response.OK || answer == LaunchRequest.Response.UPDATED;
-    }
-
-    /**
-     * True for a {@code --background} launch (the login item) while another process already owns the endpoint. That
-     * launch could only lose the bind, and would first have spent seconds of the login starting plugins and rehearsing a
-     * window, competing with the resident it would lose to. A standalone launch is left to its own refusal later.
-     */
-    static boolean alreadyResident(AppArguments options, AppDirs dirs) {
-        return options.background() && !options.standaloneLaunch() && HandoffSocket.live(dirs.daemonSocket());
-    }
-
-    /** Residency needs the shared endpoint, so a standalone launch ({@code --config}, {@code --safe-mode},
-     *  {@code --plugin-dir}, {@code --standalone}) never claims it: a later plain launch would otherwise be
-     *  handed a window built from that configuration or plugin set. */
+    /** Residency applies only to the default home launched without start-up flags, and only when it is on (spec 5.2). */
     static boolean residentRole(AppArguments options, boolean enabled) {
-        return enabled && !options.standaloneLaunch();
+        return enabled && options.residencyAllowed();
     }
 
     /** How long a --no-window Jasper that is not resident waits for its first call. */
     static final int NO_CALL_GRACE_MILLIS = 30_000;
-
-    /** The command socket a launch serves: its own for a private launch, otherwise its home's shared one. */
-    static Path commandSocket(AppArguments options, AppDirs dirs) {
-        return options.privateCommands() ? dirs.commandSocket(ProcessHandle.current().pid()) : dirs.commandSocket();
-    }
-
-    /**
-     * Binds the command socket this launch serves ({@link #bindCommands}), owned by {@code acquired} until start-up
-     * completes and closed at quit, and names it in the application's new local shells. Null when none binds. EDT.
-     */
-    static CommandListener serveCommands(JasperApplication application, AppArguments options, AppDirs dirs,
-                                         StartupResources acquired) {
-        CommandListener listener = bindCommands(options, dirs, application.commands());
-        if (listener != null) {
-            acquired.own(listener);
-            application.onShutdown(listener::close);
-            application.commandSocket(listener.socket());
-        }
-        return listener;
-    }
-
-    /**
-     * Binds the command socket this launch serves ({@link #commandSocket}). A launch that finds another Jasper serving
-     * its home's shared socket serves a private one instead, as a private launch does, so that its own shells reach it
-     * rather than the other Jasper; a {@code --no-window} launch exists only to serve the shared socket and does not.
-     * Null when nothing binds.
-     */
-    static CommandListener bindCommands(AppArguments options, AppDirs dirs, CommandDispatcher dispatcher) {
-        CommandListener listener = CommandListener.bind(commandSocket(options, dirs), dispatcher);
-        if (listener != null || options.noWindow() || options.privateCommands() || !CommandListener.live(dirs.commandSocket()))
-            return listener;
-        LOG.log(System.Logger.Level.INFO, "Another Jasper serves the jasper command for this home; this one serves its own shells");
-        return CommandListener.bind(dirs.commandSocket(ProcessHandle.current().pid()), dispatcher);
-    }
-
-    /** True for a {@code --no-window} launch while another Jasper already serves the command: it would only lose the bind. */
-    static boolean alreadyServing(AppArguments options, AppDirs dirs) {
-        return options.noWindow() && !options.privateCommands() && CommandListener.live(dirs.commandSocket());
-    }
 
     /**
      * A {@code --no-window} launch, which the {@code jasper} command makes to serve a call: no window. A Jasper that is

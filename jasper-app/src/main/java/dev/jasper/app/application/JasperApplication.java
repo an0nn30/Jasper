@@ -857,6 +857,14 @@ public final class JasperApplication {
     }
 
     /**
+     * Whether this process still takes a second launch's request: false once it quits, so the launch tries again and
+     * takes the home once this process has gone (plan Ruling 23). EDT.
+     *
+     * @return true until the application quits
+     */
+    public boolean acceptsRequests() { return !quitting && !stopped; }
+
+    /**
      * A second launch handed its request to this process (workspace-tabs spec 5.3). The start-up flags it could not
      * apply are named in a notice. When it ran another build ({@code updated}) and this process's own jar has changed on
      * disk since it started, a process with no window open restarts into the new build, the replacement opening
