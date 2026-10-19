@@ -117,8 +117,8 @@ class PluginSettingsPagesEvidenceTest {
                 assertThat(rows.subList(0, 3)).extracting(line -> line.substring(line.indexOf(" card ") + 1)).containsOnly(rows.getFirst().substring(rows.getFirst().indexOf(" card ") + 1));
             }
         } finally {
-            if (runtime[0] != null) { var done = new CompletableFuture<List<CompletableFuture<?>>>(); SwingUtilities.invokeAndWait(() -> done.complete(runtime[0].stop()));
-                CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); }
+            if (runtime[0] != null) { var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(runtime[0]); var done = new CompletableFuture<List<CompletableFuture<?>>>(); SwingUtilities.invokeAndWait(() -> done.complete(runtime[0].stop()));
+                CompletableFuture.allOf(done.get().toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS); pluginWorkers.await(); }
             SwingUtilities.invokeAndWait(() -> { windows.close(); if (themes[0] != null) themes[0].close();
                 javax.swing.UIManager.put("PasswordField.showCapsLock", priorCaps[0]); ThemeTestSupport.controller(true); });
             try (var paths = Files.walk(home)) { for (var path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); }

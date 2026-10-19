@@ -5,7 +5,8 @@ fixtures await application shutdown before temporary-home cleanup. Windows fixes
 linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
 font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
 Bash on Windows; worktree/home comparison canonicalizes both paths. Plugin fixtures await actual
-worker termination before deleting data; script fixtures capture files and await the shell process.
+worker termination before deleting data. Runtime shutdown retains plugin classloaders until worker
+cleanup completes, preserving the bounded stop grace. Shell fixtures use finite-file stdin and captures.
 Full local `check` passed (11,432 tests, zero failures/errors); GitHub macOS, Ubuntu and all Linux
 packaging/install checks passed. Focused checks cover the subsequent Windows fixture corrections;
 PR #1 is gated on all hosted checks. No new test skips.

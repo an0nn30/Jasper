@@ -62,8 +62,10 @@ class PresentationAttemptTest {
 
     void quit(JasperApplication application, LookAndFeel original) throws Exception {
         try {
+            var pluginWorkers = dev.jasper.app.plugins.PluginShutdownTestSupport.capture(application.pluginRuntime());
             edt(application::quitNow);
-            assertThat(terminated.await(5, TimeUnit.SECONDS)).as("application and plugin loaders stopped before home cleanup").isTrue();
+            assertThat(terminated.await(5, TimeUnit.SECONDS)).as("application stopped before home cleanup").isTrue();
+            pluginWorkers.await();
         } finally {
             edt(() -> { try { UIManager.setLookAndFeel(original); } catch (Exception failure) { throw new AssertionError(failure); } });
         }

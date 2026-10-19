@@ -14,7 +14,9 @@ public final class PluginShutdownTestSupport {
     /** Captures workers before stop so teardown can await their actual termination off the EDT. */
     public static Workers capture(PluginRuntime runtime) throws Exception {
         PluginHost host = (PluginHost) field(PluginRuntime.class, "host").get(runtime);
-        return host == null ? new Workers(List.of()) : capture(host);
+        var workers = host == null ? new Workers(List.of()) : capture(host);
+        return new Workers(workers.executors(), (java.util.concurrent.CompletableFuture<?>)
+            field(PluginRuntime.class, "resourcesClosed").get(runtime));
     }
 
     static Workers capture(PluginHost host) {
@@ -30,7 +32,8 @@ public final class PluginShutdownTestSupport {
     }
 
     /** The workers owned by this fixture before its plugins stop. */
-    public record Workers(List<ExecutorService> executors) {
+    public record Workers(List<ExecutorService> executors, java.util.concurrent.CompletableFuture<?> resourcesClosed) {
+        Workers(List<ExecutorService> executors) { this(executors, java.util.concurrent.CompletableFuture.completedFuture(null)); }
         /** Waits for accepted tasks and their finally blocks before deleting fixture files. */
         public void await() throws InterruptedException {
             if (SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Do not wait for plugin workers on the EDT");
@@ -39,6 +42,10 @@ public final class PluginShutdownTestSupport {
                 if (!executor.isShutdown()) throw new AssertionError("Stop plugins before waiting for their workers");
                 if (!executor.awaitTermination(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS))
                     throw new AssertionError("Plugin workers did not finish resource cleanup after stop");
+            }
+            try { resourcesClosed.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS); }
+            catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException failure) {
+                throw new AssertionError("Plugin resources did not close after worker termination", failure);
             }
         }
     }

@@ -102,19 +102,116 @@ class PluginRuntimeTest {
 
     private static void settle() { for (int i = 0; i < 3; i++) onEdt(() -> { }); }
 
-    /** Waits for what {@link PluginRuntime#stop} left running, which ends with closing the plugins' classloaders. */
+    /** Waits for the bounded shutdown grace returned by {@link PluginRuntime#stop}. */
     private static void await(List<CompletableFuture<?>> pending) throws Exception {
         CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
     }
 
     /** Stops the plugins and waits until their jars are closed: Windows cannot delete a jar a classloader holds open. */
-    private static void stopAndWait(PluginRuntime runtime) throws Exception { await(AppContractTest.onEdtValue(runtime::stop)); }
+    private static void stopAndWait(PluginRuntime runtime) throws Exception {
+        var workers = PluginShutdownTestSupport.capture(runtime);
+        await(AppContractTest.onEdtValue(runtime::stop));
+        workers.await();
+    }
 
     private Path probe(Path parent, String id) throws Exception {
         Path directory = parent.resolve(id);
         PluginJars.build(directory, "probe.jar", PluginJars.descriptor(id, "1.0.0", "fix.probe.Main"),
             Map.of("fix.probe.Main", FIXTURE), List.of());
         return directory;
+    }
+
+    @Test void shutdownKeepsPluginClassesAvailableUntilWorkerCleanupFinishes() throws Exception {
+        assertShutdownKeepsCleanupClasses(false);
+    }
+
+    @Test void shutdownKeepsPluginClassesAvailableForConnectionsAttachedAfterCancellation() throws Exception {
+        assertShutdownKeepsCleanupClasses(true);
+    }
+
+    private void assertShutdownKeepsCleanupClasses(boolean lateConnection) throws Exception {
+        Path bundled = root.resolve("bundled");
+        PluginJars.build(bundled.resolve("dev.example.cleanup"), "cleanup.jar",
+            PluginJars.descriptor("dev.example.cleanup", "1.0.0", "fix.cleanup.Main"), Map.of(
+                "fix.cleanup.Main", """
+                    package fix.cleanup;
+                    import java.util.concurrent.*;
+                    public final class Main implements dev.jasper.sdk.plugin.Plugin {
+                        public static final CountDownLatch RUNNING = new CountDownLatch(1);
+                        public static final CountDownLatch RELEASE = new CountDownLatch(1);
+                        public static final CompletableFuture<String> CLOSED = new CompletableFuture<>();
+                        public static final CountDownLatch CLEANING = new CountDownLatch(1);
+                        public static final CountDownLatch CLOSE_RELEASE = new CountDownLatch(1);
+                        public static Runnable FINISH;
+                        public static final Runnable CLOSE = () -> {
+                            CLEANING.countDown();
+                            try { CLOSE_RELEASE.await(); CLOSED.complete(Late.close()); }
+                            catch (Throwable failure) { CLOSED.completeExceptionally(failure); }
+                        };
+                        public void start(dev.jasper.sdk.plugin.PluginContext context) {
+                            context.background().execute(() -> {
+                                RUNNING.countDown();
+                                try { new CountDownLatch(1).await(); }
+                                catch (InterruptedException stopping) {
+                                    try { RELEASE.await(); if (FINISH != null) FINISH.run(); else CLOSED.complete(Late.close()); }
+                                    catch (Throwable failure) { CLOSED.completeExceptionally(failure); }
+                                }
+                            });
+                        }
+                    }
+                    """,
+                "fix.cleanup.Late", """
+                    package fix.cleanup;
+                    public final class Late { public static String close() { return "closed"; } }
+                    """), List.of());
+        PluginRuntime runtime = runtime(bundled, root.resolve("user"), null, false, new ArrayList<>());
+        onEdt(() -> runtime.start(Map.of(), true));
+        var field = PluginRuntime.class.getDeclaredField("loaders");
+        field.setAccessible(true);
+        var loader = (ClassLoader) ((List<?>) field.get(runtime)).getFirst();
+        Class<?> main = loader.loadClass("fix.cleanup.Main");
+        var running = (java.util.concurrent.CountDownLatch) main.getField("RUNNING").get(null);
+        var release = (java.util.concurrent.CountDownLatch) main.getField("RELEASE").get(null);
+        var closed = (CompletableFuture<?>) main.getField("CLOSED").get(null);
+        var cleaning = (java.util.concurrent.CountDownLatch) main.getField("CLEANING").get(null);
+        var closeRelease = (java.util.concurrent.CountDownLatch) main.getField("CLOSE_RELEASE").get(null);
+        if (lateConnection) {
+            var hostField = PluginRuntime.class.getDeclaredField("host");
+            hostField.setAccessible(true);
+            var host = (PluginHost) hostField.get(runtime);
+            var sessions = new HostedSessions("dev.example.cleanup", host.containment, host.cleanup,
+                id -> null, name -> null);
+            var pending = new AtomicReference<dev.jasper.sdk.terminal.PendingSession>();
+            var request = sessions.request(dev.jasper.sdk.terminal.SessionSpec.of("late", pending::set));
+            var attempt = new dev.jasper.app.terminals.SessionAttempt(UUID.randomUUID(), 80, 24,
+                request.cleanup(), Runnable::run);
+            onEdt(() -> request.connector().accept(attempt));
+            attempt.cancel();
+            var close = (Runnable) main.getField("CLOSE").get(null);
+            main.getField("FINISH").set(null, (Runnable) () -> pending.get().attach(
+                new dev.jasper.sdk.terminal.TerminalConnection(new java.io.ByteArrayInputStream(new byte[0]),
+                    new java.io.ByteArrayOutputStream(), (columns, rows) -> { }, new CompletableFuture<>(), close)));
+        }
+        var workers = PluginShutdownTestSupport.capture(runtime);
+        try {
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            await(AppContractTest.onEdtValue(runtime::stop));
+            assertThat(closed).isNotDone();
+            release.countDown();
+            if (lateConnection) {
+                assertThat(cleaning.await(5, TimeUnit.SECONDS)).isTrue();
+                for (var executor : workers.executors()) assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> workers.resourcesClosed().get(100, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+                closeRelease.countDown();
+            }
+            assertThat(closed.get(5, TimeUnit.SECONDS)).isEqualTo("closed");
+        } finally {
+            release.countDown();
+            closeRelease.countDown();
+            workers.await();
+        }
+        assertThat(loader.getResource("fix/cleanup/Late.class")).isNull();
     }
 
     @Test void manifestArtworkIsCachedBeforeSettingsAndClearedAtStop() throws Exception {
@@ -208,9 +305,7 @@ class PluginRuntimeTest {
         assertThat(data.resolve("reloaded")).hasContent("yes");
         assertThat(data.resolve("theme")).hasContent("LIGHT");
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         settle();
         assertThat(data.resolve("stopped")).hasContent("yes");
         onEdt(() -> assertThat(deck.notices()).as("the activity it left open ends with it, and so does its card").isEmpty());
@@ -246,9 +341,7 @@ class PluginRuntimeTest {
         });
         assertThat(root.resolve("absent/dev.example.link/data/shown")).hasContent(window.toString());
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         settle();
         onEdt(() -> assertThat(deck.notices()).as("stopping closes the plugin's connections").isEmpty());
     }
@@ -381,9 +474,7 @@ class PluginRuntimeTest {
         assertThat(failed.message()).contains("dev.example.absent");
         assertThat(failed.snapshot()).isNull();
 
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
     }
 
         @Test void aChangedSettingsFileReachesThePluginWithoutAConfigReload() throws Exception {
@@ -405,9 +496,7 @@ class PluginRuntimeTest {
             onEdt(runtime::pollSettingsNow);
             settle();
             assertThat(reports).filteredOn(r -> !r.startsWith("clear ")).singleElement().asString().startsWith("dev.example.probe.toml: ");
-            var pending = new AtomicReference<List<CompletableFuture<?>>>();
-            onEdt(() -> pending.set(runtime.stop()));
-            CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+            stopAndWait(runtime);
         }
 
     @Test void whatKeptPluginsFromRunningIsListedAsProblems() throws Exception {
@@ -493,9 +582,7 @@ class PluginRuntimeTest {
         assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of("EDITOR", "vim"))))
             .as("the failed plugin's contributor went with it").isEqualTo(Map.of("EDITOR", "probe --wait", "VISUAL", "probe --wait"));
         assertThatIllegalStateException().as("off the UI thread").isThrownBy(() -> runtime.shellVariables(Map.of()));
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         assertThat(AppContractTest.onEdtValue(() -> runtime.shellVariables(Map.of()))).as("after the plugin stopped").isEmpty();
     }
 
@@ -535,9 +622,7 @@ class PluginRuntimeTest {
         Path edited = root.resolve("absent/dev.example.editor/data/edited");
         assertThat(Files.readAllLines(edited)).containsExactly("during.txt");
         onEdt(() -> assertThatIllegalStateException().as("never on the UI thread").isThrownBy(() -> runtime.open(during, desktop::add)));
-        var pending = new AtomicReference<List<CompletableFuture<?>>>();
-        onEdt(() -> pending.set(runtime.stop()));
-        CompletableFuture.allOf(pending.get().toArray(CompletableFuture[]::new)).get(5, TimeUnit.SECONDS);
+        stopAndWait(runtime);
         runtime.open(after, desktop::add);
         assertThat(desktop).containsExactly(before, after);
         assertThat(Files.readAllLines(edited)).as("a stopped plugin's editor is not asked").containsExactly("during.txt");

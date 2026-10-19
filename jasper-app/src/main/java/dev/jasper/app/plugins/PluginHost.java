@@ -227,6 +227,13 @@ final class PluginHost {
         return pending;
     }
 
+    /** Waits for workers, then cleanup callbacks queued by late session attachments. Called on the UI thread. */
+    CompletableFuture<Void> workersTerminated() {
+        requireUi();
+        return CompletableFuture.allOf(contexts.values().stream().map(HostedContext::terminated)
+            .toArray(CompletableFuture[]::new)).thenCompose(ignored -> cleanup.drained());
+    }
+
     /** Settings pages for running plugins that declared settings or gave a page of their own, in start order. UI thread. */
     List<SettingsPage> settingsPages(PageContext context) {
         requireUi();

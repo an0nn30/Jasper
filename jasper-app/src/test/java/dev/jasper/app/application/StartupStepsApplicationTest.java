@@ -11,6 +11,7 @@ import dev.jasper.app.startup.StartupSteps;
 import dev.jasper.app.testsupport.BrandingFixtures;
 import dev.jasper.app.testsupport.LookFixtures;
 import java.nio.file.Path;
+import dev.jasper.app.plugins.PluginShutdownTestSupport;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Map;
@@ -47,8 +48,11 @@ class StartupStepsApplicationTest {
         } finally {
             try {
                 if (application[0] != null) {
+                    var runtime = application[0].pluginRuntime();
+                    var pluginWorkers = runtime == null ? null : PluginShutdownTestSupport.capture(runtime);
                     edt(application[0]::quitNow);
                     assertThat(terminated.await(5, TimeUnit.SECONDS)).as("shutdown completes before temporary home cleanup").isTrue();
+                    if (pluginWorkers != null) pluginWorkers.await();
                 }
             } finally { UIManager.setLookAndFeel(original); }
         }
@@ -75,8 +79,11 @@ class StartupStepsApplicationTest {
         } finally {
             try {
                 if (application[0] != null) {
+                    var runtime = application[0].pluginRuntime();
+                    var pluginWorkers = runtime == null ? null : PluginShutdownTestSupport.capture(runtime);
                     edt(application[0]::quitNow);
                     assertThat(terminated.await(5, TimeUnit.SECONDS)).as("shutdown completes before temporary home cleanup").isTrue();
+                    if (pluginWorkers != null) pluginWorkers.await();
                 }
             } finally { UIManager.setLookAndFeel(original); }
         }

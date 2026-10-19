@@ -36,9 +36,14 @@ class ScriptsTest {
 
     Run run(byte[] script, Path home, String marker) throws Exception {
         // Keep capture outside the home/work-tree fixtures and avoid a blocking reader in the shared common pool.
+        Path input = Files.createTempFile(dir, "script-", ".sh");
+        Files.write(input, script);
         Path stdout = Files.createTempFile(dir, "script-", ".stdout");
         Path stderr = Files.createTempFile(dir, "script-", ".stderr");
-        var builder = new ProcessBuilder(shell(), "-s").redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
+        // Give Bash a finite script without depending on native Windows pipe EOF delivery.
+        // Keep -s, as the SSH invocation does, but provide EOF through a regular file rather than a Java pipe.
+        var builder = new ProcessBuilder(shell(), "-x", "-s").redirectInput(input.toFile())
+            .redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
         if (home == null) builder.environment().remove("HOME"); else builder.environment().put("HOME", shellPath(home));
         if (windows()) {
             String unixTools = Path.of(shell()).getParent().toString();
@@ -48,7 +53,6 @@ class ScriptsTest {
         byte[] output;
         long started = System.nanoTime();
         try {
-            try (var stdin = process.getOutputStream()) { stdin.write(script); }
             boolean finished = process.waitFor(10, TimeUnit.SECONDS);
             assertThat(finished).as("script finished after %d ms (alive=%s); stderr: %s",
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), process.isAlive(), Files.readString(stderr)).isTrue();
@@ -80,6 +84,13 @@ class ScriptsTest {
             return i;
         }
         return -1;
+    }
+
+    @Test void aScriptWithoutExecOrExitFinishesAtEndOfInput() throws Exception {
+        byte[] script = ("printf '" + Scripts.LIST + "\\000finished\\000'\n").getBytes(StandardCharsets.UTF_8);
+        var run = run(script, dir, Scripts.LIST);
+        assertThat(run.status()).isZero();
+        assertThat(run.fields()).containsExactly("finished");
     }
 
     @Test void existsReportsLiteralAndGlobMarkersBelowHomeOnly() throws Exception {
