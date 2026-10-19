@@ -1,8 +1,10 @@
 package dev.jasper.app.layout;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -301,6 +303,124 @@ public final class Layout {
         return new Layout(next, heir, kept, recent, tabOrders);
     }
 
+    /**
+     * Opens {@code tab} in a new group on {@code side} of {@code group}, selected and active. The new group takes half of
+     * {@code group}'s space: a parent split of the side's orientation gains it as a sibling, otherwise the two share a new
+     * split in {@code group}'s place. Clears the maximize.
+     *
+     * @param tab a tab not in the layout
+     * @param group a group of the layout holding tabs
+     * @param side where the new group goes
+     * @return the new layout
+     * @throws IllegalArgumentException when the tab is in the layout, or the group is not or holds no tabs
+     */
+    public Layout split(TabId tab, GroupId group, Side side) {
+        Objects.requireNonNull(tab, "tab");
+        Objects.requireNonNull(side, "side");
+        if (contains(tab)) throw new IllegalArgumentException("Tab " + tab + " is already in the layout");
+        if (requireGroup(group).tabs().isEmpty()) throw new IllegalArgumentException("The empty workspace's group cannot be split");
+        return beside(tab, group, side);
+    }
+
+    /**
+     * Moves {@code tab} into a new group on {@code side} of {@code group}, as {@link #split(TabId, GroupId, Side)} opens
+     * one; a source group left empty is removed first, as {@link #remove(TabId)} removes it.
+     *
+     * @param tab a tab of the layout
+     * @param group a group of the layout; the tab's own only when it holds other tabs
+     * @param side where the new group goes
+     * @return the new layout
+     * @throws IllegalArgumentException when the tab or the group is not in the layout, or the tab is the group's only tab
+     */
+    public Layout moveToNewGroup(TabId tab, GroupId group, Side side) {
+        Objects.requireNonNull(side, "side");
+        GroupId source = requireGroupOf(tab);
+        Group target = requireGroup(group);
+        if (source.equals(group) && target.tabs().size() == 1)
+            throw new IllegalArgumentException("Tab " + tab + " is the only tab of group " + group + " and cannot split it");
+        return remove(tab).beside(tab, group, side);
+    }
+
+    /**
+     * Sets the weights of the split at {@code path} (workspace plan 2, Rulings 3), from a divider drag. Keeps the maximize.
+     *
+     * @param path the child indexes from the root to the split; empty for the root
+     * @param weights one per child, positive and finite; normalized to sum to 1
+     * @return the new layout
+     * @throws IllegalArgumentException when no split is at the path or the weights do not fit it
+     */
+    public Layout resize(List<Integer> path, List<Double> weights) {
+        return new Layout(resized(root, List.copyOf(path), 0, List.copyOf(weights)), activeGroup, maximized, recent, tabOrders);
+    }
+
+    /**
+     * Maximizes {@code group} and activates it, or restores it when it is the maximized group. A layout with one group is
+     * returned unchanged.
+     *
+     * @param group a group of the layout
+     * @return the new layout
+     * @throws IllegalArgumentException when the group is not in the layout
+     */
+    public Layout toggleMaximize(GroupId group) {
+        requireGroup(group);
+        if (root instanceof Group) return this;
+        if (maximized.filter(group::equals).isPresent()) return unmaximize();
+        return new Layout(root, group, Optional.of(group), recent, tabOrders);
+    }
+
+    /**
+     * The layout with no group maximized; plans 4 and 5 call it when a tab moves out to another window (workspace plan 2,
+     * Rulings 5).
+     *
+     * @return the new layout, or this one when no group is maximized
+     */
+    public Layout unmaximize() {
+        return maximized.isEmpty() ? this : new Layout(root, activeGroup, Optional.empty(), recent, tabOrders);
+    }
+
+    /**
+     * The group in {@code direction} from {@code group} over the unit square, by today's {@code SplitTree.navigate} rule:
+     * of the groups wholly on that side that overlap it across the direction, the nearest, then the one whose centre is
+     * nearest across; a tie goes to the first in tree order. The maximize is ignored.
+     *
+     * @param group a group of the layout
+     * @param direction the direction
+     * @return the neighbour, or empty at the workspace's edge (navigation does not wrap)
+     * @throws IllegalArgumentException when the group is not in the layout
+     */
+    public Optional<GroupId> neighbour(GroupId group, Side direction) {
+        Objects.requireNonNull(direction, "direction");
+        requireGroup(group);
+        Map<GroupId, Region> regions = bounds();
+        Region current = regions.get(group);
+        GroupId best = null;
+        double bestForward = Double.POSITIVE_INFINITY;
+        double bestAcross = Double.POSITIVE_INFINITY;
+        for (var entry : regions.entrySet()) {
+            Region candidate = entry.getValue();
+            if (entry.getKey().equals(group) || !ahead(current, candidate, direction) || !overlaps(current, candidate, direction)) continue;
+            double forward = forward(current, candidate, direction);
+            double across = across(current, candidate, direction);
+            if (forward < bestForward - EPSILON || (Math.abs(forward - bestForward) <= EPSILON && across < bestAcross - EPSILON)) {
+                best = entry.getKey();
+                bestForward = forward;
+                bestAcross = across;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    /**
+     * Each group's region of the unit square; a maximized group is placed where it sits in the tree.
+     *
+     * @return the regions by group, in tree order
+     */
+    public Map<GroupId, Region> bounds() {
+        var regions = new LinkedHashMap<GroupId, Region>();
+        place(root, new Region(0, 0, 1, 1), regions);
+        return Collections.unmodifiableMap(regions);
+    }
+
     /** Equal when the trees, the active groups and the maximized groups are equal; the order of use is ignored. */
     @Override public boolean equals(Object other) {
         return other instanceof Layout layout && root.equals(layout.root) && activeGroup.equals(layout.activeGroup)
@@ -388,6 +508,87 @@ public final class Layout {
             case Group group -> group.id().equals(id);
             case Split split -> split.children().stream().anyMatch(child -> holds(child.node(), id));
         };
+    }
+
+    /** Distances this close are equal: today's {@code SplitTree} tolerance. */
+    private static final double EPSILON = 1.0e-12;
+
+    /** {@code tab} in a new group on {@code side} of {@code group}, selected and active; clears the maximize. */
+    private Layout beside(TabId tab, GroupId group, Side side) {
+        Group created = new Group(GroupId.random(), List.of(tab), Optional.of(tab));
+        Node next = replace(root, group, found -> new Split(side.orientation(), side.leading()
+            ? List.of(new Child(created, 0.5), new Child(found, 0.5))
+            : List.of(new Child(found, 0.5), new Child(created, 0.5))));
+        return activated(next, created.id(), true);
+    }
+
+    /** {@code node} with the split at {@code path} (from {@code depth} on) given {@code weights}. */
+    private static Node resized(Node node, List<Integer> path, int depth, List<Double> weights) {
+        if (!(node instanceof Split split)) throw new IllegalArgumentException("No split at " + path);
+        List<Child> children = split.children();
+        if (depth == path.size()) {
+            if (weights.size() != children.size())
+                throw new IllegalArgumentException("The split at " + path + " has " + children.size() + " children, not " + weights.size() + " weights");
+            var sized = new ArrayList<Child>();
+            for (int i = 0; i < children.size(); i++) sized.add(new Child(children.get(i).node(), weights.get(i)));
+            return new Split(split.orientation(), sized);
+        }
+        int index = path.get(depth);
+        if (index < 0 || index >= children.size()) throw new IllegalArgumentException("No split at " + path);
+        var next = new ArrayList<>(children);
+        next.set(index, new Child(resized(children.get(index).node(), path, depth + 1, weights), children.get(index).weight()));
+        return new Split(split.orientation(), next);
+    }
+
+    /** Puts each group under {@code node} into {@code into} with its share of {@code region}; the last child takes the rest. */
+    private static void place(Node node, Region region, Map<GroupId, Region> into) {
+        switch (node) {
+            case Group group -> into.put(group.id(), region);
+            case Split split -> {
+                boolean horizontal = split.orientation() == Orientation.HORIZONTAL;
+                double start = horizontal ? region.x() : region.y();
+                double length = horizontal ? region.width() : region.height();
+                double offset = 0;
+                List<Child> children = split.children();
+                for (int i = 0; i < children.size(); i++) {
+                    double size = i == children.size() - 1 ? length - offset : length * children.get(i).weight();
+                    place(children.get(i).node(), horizontal
+                        ? new Region(start + offset, region.y(), size, region.height())
+                        : new Region(region.x(), start + offset, region.width(), size), into);
+                    offset += size;
+                }
+            }
+        }
+    }
+
+    private static boolean ahead(Region current, Region candidate, Side direction) {
+        return switch (direction) {
+            case LEFT -> candidate.right() <= current.x() + EPSILON;
+            case RIGHT -> candidate.x() >= current.right() - EPSILON;
+            case UP -> candidate.bottom() <= current.y() + EPSILON;
+            case DOWN -> candidate.y() >= current.bottom() - EPSILON;
+        };
+    }
+
+    private static boolean overlaps(Region current, Region candidate, Side direction) {
+        return direction.orientation() == Orientation.HORIZONTAL
+            ? Math.min(current.bottom(), candidate.bottom()) - Math.max(current.y(), candidate.y()) > EPSILON
+            : Math.min(current.right(), candidate.right()) - Math.max(current.x(), candidate.x()) > EPSILON;
+    }
+
+    private static double forward(Region current, Region candidate, Side direction) {
+        return switch (direction) {
+            case LEFT -> Math.max(0.0, current.x() - candidate.right());
+            case RIGHT -> Math.max(0.0, candidate.x() - current.right());
+            case UP -> Math.max(0.0, current.y() - candidate.bottom());
+            case DOWN -> Math.max(0.0, candidate.y() - current.bottom());
+        };
+    }
+
+    private static double across(Region current, Region candidate, Side direction) {
+        return direction.orientation() == Orientation.HORIZONTAL
+            ? Math.abs(current.centerY() - candidate.centerY())
+            : Math.abs(current.centerX() - candidate.centerX());
     }
 
     /** Adds the groups under {@code node} to {@code into}, in tree order. */
