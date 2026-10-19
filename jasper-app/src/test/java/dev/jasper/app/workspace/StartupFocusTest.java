@@ -36,7 +36,7 @@ class StartupFocusTest {
         until(() -> owners[0].currentPane().view() != null);
         edt(() -> {
             var owner = owners[0];
-            var first = owner.currentTab();
+            var first = owner.currentTerminal();
             var view = owner.currentPane().view();
             assertThat(policies[0].getDefaultComponent(owner)).isSameAs(view);
             assertThat(owner.currentPane().isFocusable()).as("the placeholder leaves the tab order after startup").isFalse();

@@ -14,28 +14,28 @@ class HostedContentTest {
     @AfterEach void cleanup() throws Exception {closeOwners();}
     @Test void fileSelectionHasNoTerminalAndUsesTheSharedTabStrip() throws Exception {
         edt(()->{
-            var owner=content(launcher(new ArrayDeque<>())); var terminal=owner.currentTab();
+            var owner=content(launcher(new ArrayDeque<>())); var terminal=owner.currentTerminal();
             var model=new Contributions();owner.connectContributions(model);
             var panel=new JTextArea("text");
             var entry=model.tabs().open("dev.editor","file","File",owner.id(),panel);
             entry.presentation("File","host",new ImageIcon(),true,"/etc/file","host");
-            assertThat(owner.currentTab()).isNull(); assertThat(owner.currentPane()).isNull();
+            assertThat(owner.currentTerminal()).isNull(); assertThat(owner.currentPane()).isNull();
             assertThat(owner.terminalTabs()).containsExactly(terminal);
             assertThat(owner.selectedContent()).isSameAs(entry);
             assertThat(owner.windowTabs().tabList().getComponentCount()).isEqualTo(2);
-            assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).isFalse();
+            assertThat(owner.action(ActionId.SPLIT_RIGHT).isEnabled()).as("a split beside a plugin view (Rulings 11)").isTrue();
             int[] find={0};entry.commands(List.of(new ContentCommand("find","Find",KeyStroke.getKeyStroke("meta F"),true,()->find[0]++)));
             owner.invoke(ActionId.FIND);assertThat(find[0]).isEqualTo(1);
             owner.workspace().activeGroupView().reorder(owner.tabs().get(1), 0);assertThat(owner.selectedContent()).isSameAs(entry);
             owner.selectTab(terminal);assertThat(owner.currentPane()).isNotNull();
             entry.select();assertThat(owner.selectedContent()).isSameAs(entry);
-            entry.requestClose();assertThat(owner.currentTab()).isSameAs(terminal);
+            entry.requestClose();assertThat(owner.currentTerminal()).isSameAs(terminal);
         });
     }
     @Test void documentOnlyShortcutIsInstalledAndRemovedOnSelectionChange() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
-            var terminal = owner.currentTab();
+            var terminal = owner.currentTerminal();
             var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);
             var model = new Contributions(); owner.connectContributions(model);
             var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());

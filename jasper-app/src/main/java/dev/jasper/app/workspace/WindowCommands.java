@@ -135,7 +135,7 @@ final class WindowCommands implements AutoCloseable {
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Action.SELECTED_KEY, zen);
         owner.action(ActionId.TOGGLE_ZEN_MODE).putValue(Command.TITLE, zen ? "Exit Zen Mode" : "Enter Zen Mode");
         owner.action(ActionId.ZOOM_PANE).putValue(Command.TITLE,
-            owner.currentTab() != null && owner.currentTab().tree().zoomed() ? "Restore Pane" : "Zoom Pane");
+            owner.workspace().model().maximized().isPresent() ? "Restore Pane" : "Zoom Pane");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
         view("view.status_bar").setEnabled(!zen);

@@ -10,6 +10,9 @@ final class TabState {
         renamedTitle = title == null || title.isBlank() ? null : title;
     }
 
+    /** The name the user gave, if any. */
+    java.util.Optional<String> renamed() { return java.util.Optional.ofNullable(renamedTitle); }
+
     String title(String shellTitle, Path workingDirectory) {
         if (renamedTitle != null) {
             return renamedTitle;

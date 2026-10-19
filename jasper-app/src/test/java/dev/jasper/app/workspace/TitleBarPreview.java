@@ -29,14 +29,14 @@ public final class TitleBarPreview {
                 try (var bar = WindowContent.installTitleBar(root, owner, true, title -> {})) {
                     for (boolean themeDark : new boolean[]{true, false}) {
                         owner.selectVariant(themeDark);
-                        while (owner.tabCount() > 1) owner.closeTab(owner.currentTab());
-                        owner.currentTab().rename("zsh");
+                        while (owner.tabCount() > 1) owner.closeTab(owner.currentTerminal());
+                        owner.currentTerminal().rename("zsh");
                         render(root, owner, bar, output, themeDark, "single", 830);
-                        owner.newTab(HOME); owner.currentTab().rename("zsh");
+                        owner.newTab(HOME); owner.currentTerminal().rename("zsh");
                         render(root, owner, bar, output, themeDark, "shell-tabs", 830);
-                        owner.currentTab().rename("Reviewing the notification implementation");
+                        owner.currentTerminal().rename("Reviewing the notification implementation");
                         owner.selectTab(owner.tabs().get(0));
-                        owner.currentTab().rename("tmux");
+                        owner.currentTerminal().rename("tmux");
                         owner.chrome().search().setContext("Claude Code — Reviewing the notification implementation", "Claude Code — Reviewing the notification implementation", dev.jasper.app.platform.AppIcons.named("TERMINAL"));
                         render(root, owner, bar, output, themeDark, "tmux-tabs", 830);
                         render(root, owner, bar, output, themeDark, "narrow", 450);

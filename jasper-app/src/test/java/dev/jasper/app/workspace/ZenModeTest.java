@@ -57,7 +57,7 @@ class ZenModeTest {
             Rectangle normal = new Rectangle(owner.workspace().getBounds());
             var panels = state.panels(); var sizes = state.dock();
             List<JComponent> contents = Arrays.stream(Slot.values()).map(owner.area()::content).toList();
-            var tab = owner.currentTab();
+            var tab = owner.currentTerminal();
             toggle(owner); LayoutTestSupport.layoutTree(owner);
             assertThat(owner.toolbar().isVisible()).isTrue(); assertThat(owner.status().isVisible()).isFalse();
             assertThat(owner.chrome().search().isVisible()).isTrue();
@@ -67,7 +67,7 @@ class ZenModeTest {
             assertThat(owner.workspace().getWidth()).isGreaterThan(normal.width);
             assertThat(owner.workspace().getHeight()).isGreaterThan(normal.height);
             assertThat(state.panels()).isEqualTo(panels); assertThat(state.dock()).isEqualTo(sizes);
-            assertThat(owner.currentTab()).isSameAs(tab);
+            assertThat(owner.currentTerminal()).isSameAs(tab);
             toggle(owner); LayoutTestSupport.layoutTree(owner);
             assertThat(owner.workspace().getBounds()).isEqualTo(normal);
             assertThat(Arrays.stream(Slot.values()).map(owner.area()::content).toList()).containsExactlyElementsOf(contents);

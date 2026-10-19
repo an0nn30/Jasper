@@ -96,9 +96,9 @@ class WindowPairsTest {
 
         Fixture(ThemeController themes) {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, CLASSIC);
-            owner.currentTab().rename("Local: ~");
+            owner.currentTerminal().rename("Local: ~");
             owner.newTab(DesktopTestSupport.HOME);
-            owner.currentTab().rename("Mac: ~");
+            owner.currentTerminal().rename("Mac: ~");
             owner.update();
             tabs = ClassicTabsTest.tabs(owner, 400);
             first = tabs.entries().get(0); second = tabs.entries().get(1);

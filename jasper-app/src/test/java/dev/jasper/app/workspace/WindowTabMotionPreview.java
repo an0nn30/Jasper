@@ -24,7 +24,7 @@ public final class WindowTabMotionPreview {
                     owner.selectVariant(!appearance.equals("light"));
                     if (appearance.equals("glass")) owner.applyBackgroundOpacity(.55);
                     var model = new Contributions(); owner.connectContributions(model);
-                    owner.closeTab(owner.currentTab());
+                    owner.closeTab(owner.currentTerminal());
                     var first = model.tabs().open("preview", "first", "tmux", owner.id(), terminalText());
                     first.select();
                     var clock = new AtomicLong();

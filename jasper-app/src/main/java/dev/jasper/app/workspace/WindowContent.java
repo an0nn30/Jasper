@@ -19,6 +19,8 @@ import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.WorkspaceHost;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.dock.DockState;
 import dev.jasper.app.persistence.UiState;
@@ -58,6 +60,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Map<Tab, Subscription> tabListeners = new IdentityHashMap<>();
     /** This window's side of its terminal tabs (workspace tabs spec 9.3). */
     private final TabHost tabHost = new TabHost(this);
+    /** Where focus goes: focus going into a plugin's view, or a pane, makes its tab the active tab (Rulings 26). */
+    private final KeyboardFocusManager focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+    private final java.beans.PropertyChangeListener focusOwners = event -> {
+        if (event.getNewValue() instanceof Component focused) tabFocused(tabHolding(focused));
+    };
     /** Where this window's tabs live: a registry of its own until it joins the application's (connectContributions). */
     private TabRegistry registry = new TabRegistry();
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
@@ -137,6 +144,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private Runnable glassListener = () -> {};
     private BiConsumer<GlassLevels, Boolean> glassRequests = (levels, dark) -> {};
     private WindowTerminals terminals;
+    /** The tab the palette last heard was active: a layout change that keeps it, such as a maximize, leaves the palette open. */
+    private Tab paletteTab;
     private boolean active = true;
     Consumer<ResolvedTheme> onThemeChanged = theme -> {};
     private Runnable openSettings, reloadConfiguration, migrateConfiguration;
@@ -188,9 +197,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return new Subscription(() -> {});
         activityListeners.add(listener);
         try {
-            for (TerminalTab tab : terminalTabs())
-                for (TerminalPane pane : tab.panes())
-                    listener.accept(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
+            for (TerminalContent terminal : terminalTabs())
+                listener.accept(new WorkspaceActivity.PaneState(terminal.pane().id(), WorkspaceActivity.State.OPENED));
         } catch (RuntimeException | Error failure) { activityListeners.remove(listener); throw failure; }
         return new Subscription(() -> activityListeners.remove(listener));
     }
@@ -296,6 +304,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
         add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
         themeRegistration = themes.subscribe(this::applyTheme);
+        focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
         host = registry.addHost(workspaceHost());
         if (!detached) newTab(directory);
         else setPreferredSize(new Dimension(900, 650));
@@ -825,9 +834,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         chrome.windowOpened();
     }
 
-    java.util.List<TerminalTab> terminalTabs() {
-        var result = new ArrayList<TerminalTab>();
-        for (Tab tab : tabs()) if (tab.content() instanceof TerminalTab terminal) result.add(terminal);
+    /** This window's terminal tabs in workspace order. */
+    public java.util.List<TerminalContent> terminalTabs() {
+        var result = new ArrayList<TerminalContent>();
+        for (Tab tab : tabs()) if (tab.content() instanceof TerminalContent terminal) result.add(terminal);
         return result;
     }
 
@@ -877,25 +887,37 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /**
      * Shows a tab in this window, at the end of its active group and selected: one the registry placed here, or one this
-     * window opened. A failure leaves nothing mounted and propagates.
+     * window opened. A failure leaves nothing mounted, closes again what it announced, and propagates.
      */
-    private void attach(Tab tab) { attach(tab, false); }
+    private void attach(Tab tab) { attach(tab, false, null, null); }
 
-    /** As {@link #attach(Tab)}; with {@code opened} a new terminal tab's panes are announced as opened. */
-    private void attach(Tab tab, boolean opened) {
+    /**
+     * As {@link #attach(Tab)}; with {@code opened} a new terminal tab's pane is announced as opened, and with
+     * {@code beside} the tab opens in a new group on {@code side} of that group.
+     */
+    private void attach(Tab tab, boolean opened, GroupId beside, Side side) {
         JComponent component = tab.component();
+        TerminalContent published = null;
         try {
             WorkspaceTheme.apply(component, themes.current());
             tabListeners.put(tab, tab.onChanged(this::update));
-            if (tab.content() instanceof TerminalTab terminal && terminals != null) terminals.tabOpened(terminal);
+            if (tab.content() instanceof TerminalContent terminal && terminals != null) {
+                published = terminal;
+                terminals.tabOpened(terminal);
+            }
             tabHost.attach(tab, opened);
-            workspace.open(tab);
+            if (beside == null) workspace.open(tab); else workspace.openBeside(tab, beside, side);
             // A tab that moves in ends this window's maximize; one that opens here does not (spec 15).
             if (tab.moving()) workspace.unmaximize();
         } catch (RuntimeException | Error failure) {
             var listener = tabListeners.remove(tab);
             if (listener != null) listener.close();
+            // A new tab's pane closes while it still reports here, so its announcement is closed again (Rulings 28).
+            if (opened && tab.content() instanceof TerminalContent terminal) {
+                try { terminal.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            }
             tabHost.detach(tab);
+            if (published != null) terminals.tabClosed(published);
             workspace.remove(tab);
             WorkspaceTheme.clear(component);
             throw failure;
@@ -913,7 +935,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (listener == null) return;
         listener.close();
         tabHost.detach(tab);
-        if (tab.content() instanceof TerminalTab terminal && terminals != null) terminals.tabClosed(terminal);
+        if (tab.content() instanceof TerminalContent terminal && terminals != null) terminals.tabClosed(terminal);
         if (closed) return;
         // A tab that moves out ends the maximize; closing a tab keeps it while its group stands (spec 15).
         if (tab.moving()) workspace.unmaximize();
@@ -924,11 +946,15 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (workspace.isEmpty()) onEmpty.run();
     }
 
-    /** The workspace's layout changed: the registry hears the selection, the palette its origin; the active tab takes focus when {@code refocus}. */
+    /**
+     * The workspace's layout changed: the registry hears the selection, the palette a new active tab; the active tab takes
+     * focus when {@code refocus}.
+     */
     void workspaceChanged(boolean refocus) {
         if (closed) return;
         if (terminals != null) terminals.tabSelected();
-        if (commandPalette != null) commandPalette.tabChanged();
+        Tab now = selectedTab();
+        if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
         update();
         if (refocus) focusSelected();
     }
@@ -959,7 +985,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     String tabTooltip(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL ? tabTitle(tab) : tab.location(); }
     /** Whether a terminal tab's shell runs, which its strip entry tells assistive technology. */
     boolean running(Tab tab) {
-        return tab.content() instanceof TerminalTab terminal && terminal.focusedPane() != null && terminal.focusedPane().running();
+        return tab.content() instanceof TerminalContent terminal && terminal.pane().running();
     }
     JPopupMenu tabMenu(Tab tab) {
         var menu = new JPopupMenu();
@@ -1028,8 +1054,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     TabStrip tabBar() { return workspace.activeGroupView().strip(); }
     private void refreshTabs() { workspace.refresh(); }
 
-    public TerminalTab currentTab() { Tab tab = selectedTab(); return tab != null && tab.content() instanceof TerminalTab terminal ? terminal : null; }
-    public TerminalPane currentPane() { return currentTab() == null ? null : currentTab().focusedPane(); }
+    /** The active tab's terminal; null while a plugin's tab is active or the workspace is empty. */
+    public TerminalContent currentTerminal() {
+        Tab tab = selectedTab();
+        return tab != null && tab.content() instanceof TerminalContent terminal ? terminal : null;
+    }
+    public TerminalPane currentPane() { return currentTerminal() == null ? null : currentTerminal().pane(); }
     /**
      * Where a tab or window opened from here starts: the current pane's {@link TerminalPane#inheritableDirectory};
      * null, meaning where a new shell starts, when there is no pane or it has no directory of its own.
@@ -1039,25 +1069,93 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** A tab whose shell starts in {@code directory}; null means where a new shell starts (the user's home). */
     public void newTab(Path directory) { openTab(directory); }
 
-    TerminalTab openTab(Path directory) { return openTab(directory, null); }
+    TerminalContent openTab(Path directory) { return openTab(directory, null); }
 
     /** {@code requestOrNull} makes the tab's first pane a provided session instead of a local shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull) { return openTab(directory, requestOrNull, Optional.empty()); }
 
     /** As above; {@code profile} names a local first pane's shell profile, empty for the user's default. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile) {
         return openTab(directory, requestOrNull, profile, Optional.empty());
     }
 
     /** As above; {@code program} runs in the local first pane instead of its shell. */
-    TerminalTab openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
+    TerminalContent openTab(Path directory, SessionRequest requestOrNull, Optional<String> profile, Optional<java.util.List<String>> program) {
+        return openTerminal(directory, requestOrNull, profile, program, null, null);
+    }
+
+    /**
+     * A terminal tab starting in {@code directory} (null: where a new shell starts), in the active group, or in a new
+     * group on {@code side} of {@code beside} when that is given. Null once the window has closed.
+     */
+    private TerminalContent openTerminal(Path directory, SessionRequest requestOrNull, Optional<String> profile,
+                                         Optional<java.util.List<String>> program, GroupId beside, Side side) {
         if (closed) return null;
-        TerminalTab terminal = new TerminalTab(directory, launcher, requestOrNull, profile, program);
-        Tab tab = registry.add(new TabId(terminal.id()), Tab.Kind.TERMINAL, terminal, id);
+        TabId tabId = TabId.random();
+        TerminalContent terminal = new TerminalContent(tabId, directory, launcher, requestOrNull, profile, program);
+        Tab tab = registry.add(tabId, Tab.Kind.TERMINAL, terminal, id);
         tab.focusTarget(terminal::focusTerminal);
-        attach(tab, true);
+        try {
+            attach(tab, true, beside, side);
+        } catch (RuntimeException | Error failure) {
+            // attach mounted nothing; the registered tab and its pane go with the failure (workspace plan 3a Rulings 28).
+            try { tab.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
         terminal.start();
         return terminal;
+    }
+
+    /**
+     * Split Right or Split Down (workspace tabs spec 11, workspace plan 3a Rulings 11): a terminal tab in a new group on
+     * {@code side} of the active group; beside a running terminal in its directory with its profile, otherwise (beside a
+     * plugin's view or a terminal whose shell ended) where a new tab from here starts, with the default profile. On an
+     * empty workspace it opens in the empty group. Null once the window has closed.
+     */
+    public TerminalContent split(Side side) {
+        TerminalContent target = currentTerminal();
+        if (target != null && target.pane().running())
+            return openBeside(target, side, null, null, target.pane().profile(), Optional.empty());
+        return openTerminal(directory(), null, Optional.empty(), Optional.empty(), workspace.model().activeGroup(), side);
+    }
+
+    /**
+     * A terminal tab in a new group on {@code side} of {@code target}'s group (spec 9.4), starting in
+     * {@code directoryOrNull}, else where {@code target} is; a request makes it a provided session. Null when the target
+     * is not this window's or its shell is not running.
+     */
+    TerminalContent openBeside(TerminalContent target, Side side, Path directoryOrNull, SessionRequest requestOrNull,
+                               Optional<String> profile, Optional<java.util.List<String>> program) {
+        Tab beside = target == null ? null : tab(target);
+        if (closed || beside == null || !target.pane().running()) return null;
+        GroupId group = workspace.model().groupOf(beside.id()).orElseThrow();
+        Path directory = directoryOrNull == null ? target.pane().inheritableDirectory() : directoryOrNull;
+        return openTerminal(directory, requestOrNull, profile, program, group, side);
+    }
+
+    /** Maximize Group: the active group fills the workspace, or the splits come back. */
+    void toggleMaximize() { workspace.toggleMaximize(); }
+
+    /** Focus Group: the neighbouring group that way takes focus with its selected tab; nothing past the edge. */
+    void focusGroup(Side side) { workspace.neighbour(side).ifPresent(workspace::activate); }
+
+    /** The terminal tab holding {@code pane}; null when none of this window's does. */
+    TerminalContent terminalOf(TerminalPane pane) {
+        for (TerminalContent terminal : terminalTabs()) if (terminal.pane() == pane) return terminal;
+        return null;
+    }
+
+    /**
+     * Focus went into {@code tab} (a click, a traversal, a focus request): it becomes the window's active tab and its
+     * group the active group, while focus stays where it went (workspace plan 3a Rulings 26). Null, or a tab that is
+     * already active, changes nothing.
+     */
+    void tabFocused(Tab tab) { if (!closed && tab != null) workspace.focused(tab); }
+
+    /** The tab whose component holds {@code component}; null when none of this window's does. */
+    Tab tabHolding(Component component) {
+        for (Tab tab : tabs()) if (SwingUtilities.isDescendingFrom(component, tab.component())) return tab;
+        return null;
     }
 
     void report(TerminalEvent event) { if (terminals != null) terminals.publish(event); }
@@ -1200,7 +1298,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (closed) return;
         Tab selected = selectedTab();
         for (Tab tab : tabs()) {
-            if (tab.content() instanceof TerminalTab terminal) terminal.setActive(active && tab == selected);
+            if (tab.content() instanceof TerminalContent terminal) terminal.setActive(active && tab == selected);
             else tab.active(tab == selected);
         }
         TerminalPane pane = currentPane();
@@ -1312,36 +1410,27 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Updates all retained panes without reparenting them; the native boundary hooks in last. */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         if (closed) return;
-        var retained = terminalTabs();
-        retained.forEach(TerminalTab::beginThemeUpdate);
-        try {
-            if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
-            if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
-            for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
-            area.refreshTheme();
-            area.setTerminalBackground(theme.surface());
-            workspace.applyTheme(theme, updateDelegates);
-            for (Tab tab : new ArrayList<>(tabListeners.keySet()))
-                if (tab.kind() == Tab.Kind.HOSTED) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
-            if (updateDelegates && contributed != null) contributed.refreshTheme();
-            for (TerminalTab tab : retained) {
-                WorkspaceTheme.apply(tab, theme);
-                tab.setBackground(theme.surface());
-                for (TerminalPane pane : tab.panes()) {
-                    // Zoom detaches sibling panes from the visible component hierarchy.
-                    if (updateDelegates && !SwingUtilities.isDescendingFrom(pane, this)) SwingUtilities.updateComponentTreeUI(pane);
-                    pane.applyTheme(theme);
-                }
-            }
-            setBackground(theme.surface());
-            chrome.refreshTheme();
-            if (commandPalette != null) commandPalette.refreshTheme();
-            onThemeChanged.accept(theme); update();
-            requestGlass();
-            revalidate(); repaint();
-        } finally {
-            retained.forEach(TerminalTab::endThemeUpdate);
+        if (updateDelegates) SwingUtilities.updateComponentTreeUI(bindingRoot == null ? this : bindingRoot);
+        if (updateDelegates && (bindingRoot == null || menuBar().getParent() == null)) SwingUtilities.updateComponentTreeUI(menuBar());
+        for (DockStripe stripe : stripes.all()) stripe.refreshTheme();
+        area.refreshTheme();
+        area.setTerminalBackground(theme.surface());
+        // A group the maximize keeps out of the tree updates its delegates there; split positions follow the weights.
+        workspace.applyTheme(theme, updateDelegates);
+        for (Tab tab : new ArrayList<>(tabListeners.keySet()))
+            if (tab.kind() == Tab.Kind.HOSTED) WorkspaceTheme.apply(tab.component(), theme, () -> tabListeners.containsKey(tab));
+        if (updateDelegates && contributed != null) contributed.refreshTheme();
+        for (TerminalContent terminal : terminalTabs()) {
+            WorkspaceTheme.apply(terminal, theme);
+            terminal.setBackground(theme.surface());
+            terminal.pane().applyTheme(theme);
         }
+        setBackground(theme.surface());
+        chrome.refreshTheme();
+        if (commandPalette != null) commandPalette.refreshTheme();
+        onThemeChanged.accept(theme); update();
+        requestGlass();
+        revalidate(); repaint();
     }
 
     /**
@@ -1374,7 +1463,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         boolean glass = value < 1f;
         area.setGlass(value);
         workspace.setGlass(glass);
-        for (TerminalTab tab : terminalTabs()) tab.setBackgroundOpacity(value);
+        for (TerminalContent terminal : terminalTabs()) terminal.setBackgroundOpacity(value);
         workspace.refresh();
         repaint();
         glassListener.run();
@@ -1508,6 +1597,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uninstallCornerLayer();
         if (cornerLayer != null) { cornerLayer.removePropertyChangeListener("preferredSize", cornerResized); cornerLayer = null; }
         themeRegistration.close();
+        focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
         // Leaving the registry removes the tabs this window still holds: each closes, a terminal tab announced closed.
         java.util.List<Tab> held = registry.inWindow(id);
         Throwable leaving = null;

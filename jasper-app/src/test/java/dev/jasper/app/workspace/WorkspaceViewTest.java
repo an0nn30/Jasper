@@ -51,7 +51,7 @@ class WorkspaceViewTest {
     }
 
     private static dev.jasper.terminal.session.TerminalSession shellOf(Tab tab) {
-        return ((TerminalTab) tab.content()).focusedPane().session();
+        return ((TerminalContent) tab.content()).pane().session();
     }
 
     private static void layout(WindowContent owner) { LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner); }

@@ -1,6 +1,7 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.palette.PaletteScope;
 import dev.jasper.terminal.view.TerminalAction;
 import dev.jasper.terminal.view.TerminalView;
@@ -43,7 +44,7 @@ final class WorkspaceActions {
             String key = contentCommand(id);
             if (key != null) { content.commands().stream().filter(c -> c.id().equals(key) && c.enabled()).findFirst().ifPresent(c -> c.run().run()); return; }
         }
-        TerminalTab tab = owner.currentTab();
+        TerminalContent terminal = owner.currentTerminal();
         TerminalPane pane = owner.currentPane();
         TerminalView view = pane == null ? null : pane.view();
         switch (id) {
@@ -52,24 +53,23 @@ final class WorkspaceActions {
             case NEW_WINDOW -> owner.requestNewWindow();
             case OPEN_FILE -> owner.openFile();
             case QUIT -> owner.requestQuit();
-            case CLOSE_TAB -> owner.closeTab(tab);
-            case CLOSE_PANE -> tab.closePane(pane);
-            case SPLIT_RIGHT -> tab.split(SplitTree.Axis.RIGHT);
-            case SPLIT_DOWN -> tab.split(SplitTree.Axis.DOWN);
-            case ZOOM_PANE -> tab.toggleZoom();
+            case CLOSE_TAB, CLOSE_PANE -> owner.closeTab(owner.selectedTab());
+            case SPLIT_RIGHT -> owner.split(Side.RIGHT);
+            case SPLIT_DOWN -> owner.split(Side.DOWN);
+            case ZOOM_PANE -> owner.toggleMaximize();
             case TOGGLE_ZEN_MODE -> owner.toggleZenMode();
-            case FOCUS_PANE_LEFT -> tab.navigate(SplitTree.Direction.LEFT);
-            case FOCUS_PANE_RIGHT -> tab.navigate(SplitTree.Direction.RIGHT);
-            case FOCUS_PANE_UP -> tab.navigate(SplitTree.Direction.UP);
-            case FOCUS_PANE_DOWN -> tab.navigate(SplitTree.Direction.DOWN);
+            case FOCUS_PANE_LEFT -> owner.focusGroup(Side.LEFT);
+            case FOCUS_PANE_RIGHT -> owner.focusGroup(Side.RIGHT);
+            case FOCUS_PANE_UP -> owner.focusGroup(Side.UP);
+            case FOCUS_PANE_DOWN -> owner.focusGroup(Side.DOWN);
             case NEXT_TAB -> owner.selectRelative(1);
             case PREVIOUS_TAB -> owner.selectRelative(-1);
             case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                  SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                 owner.selectInGroup(id.ordinal() - ActionId.SELECT_TAB_1.ordinal());
             case RENAME_TAB -> {
-                String name = owner.askTabName(tab.title());
-                if (name != null) tab.rename(name);
+                String name = owner.askTabName(terminal.title());
+                if (name != null) terminal.rename(name);
             }
             case FIND -> pane.findBar().open();
             case FIND_NEXT -> pane.findBar().next();
@@ -112,8 +112,8 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE -> true;
-                    case SPLIT_RIGHT, SPLIT_DOWN, PASTE -> running;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();
                     case FIND, FIND_NEXT, FIND_PREVIOUS, PREVIOUS_PROMPT, NEXT_PROMPT,
@@ -121,6 +121,11 @@ final class WorkspaceActions {
                     case SELECT_TAB_1, SELECT_TAB_2, SELECT_TAB_3, SELECT_TAB_4, SELECT_TAB_5,
                          SELECT_TAB_6, SELECT_TAB_7, SELECT_TAB_8, SELECT_TAB_9 ->
                         id.ordinal() - ActionId.SELECT_TAB_1.ordinal() < owner.groupTabCount();
+                    case ZOOM_PANE -> owner.workspace().model().groups().size() > 1;
+                    case FOCUS_PANE_LEFT -> owner.workspace().neighbour(Side.LEFT).isPresent();
+                    case FOCUS_PANE_RIGHT -> owner.workspace().neighbour(Side.RIGHT).isPresent();
+                    case FOCUS_PANE_UP -> owner.workspace().neighbour(Side.UP).isPresent();
+                    case FOCUS_PANE_DOWN -> owner.workspace().neighbour(Side.DOWN).isPresent();
                     default -> present;
                 });
                 action(id).setEnabled(enabled);

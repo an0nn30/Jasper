@@ -3,7 +3,7 @@ package dev.jasper.app.plugins;
 import dev.jasper.app.launch.ShellProfile;
 import dev.jasper.app.terminals.PaneEntry;
 import dev.jasper.app.terminals.PaneSnapshot;
-import dev.jasper.app.terminals.SplitAxis;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.terminals.TabEntry;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.WindowEntry;
@@ -277,7 +277,7 @@ final class HostedTerminals implements Terminals {
         Optional<PaneEntry> entry = registry.pane(target.id());
         if (entry.isEmpty()) return Optional.empty();
         gate.audit(capability(request), "split pane " + target.id() + running(spec));
-        return entry.get().split().apply(direction == Direction.RIGHT ? SplitAxis.RIGHT : SplitAxis.DOWN, spec)
+        return entry.get().split().apply(direction == Direction.RIGHT ? Side.RIGHT : Side.DOWN, spec)
             .map(Pane::new);
     }
 

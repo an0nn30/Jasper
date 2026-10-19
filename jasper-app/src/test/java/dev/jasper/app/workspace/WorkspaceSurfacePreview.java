@@ -104,8 +104,8 @@ public final class WorkspaceSurfacePreview {
         until(() -> result[0].owner().currentPane().view() != null);
         edt(() -> result[0].owner().newTab(screenshots));
         while (!pending.isEmpty()) pending.remove().run();
-        until(() -> result[0].owner().terminalTabs().stream().allMatch(tab -> tab.focusedPane() != null
-            && tab.focusedPane().view() != null && tab.focusedPane().directory().equals(screenshots)));
+        until(() -> result[0].owner().terminalTabs().stream().allMatch(tab -> tab.pane() != null
+            && tab.pane().view() != null && tab.pane().directory().equals(screenshots)));
         Thread.sleep(300);
         edt(() -> result[0].owner().update());
         return result[0];
@@ -172,7 +172,7 @@ public final class WorkspaceSurfacePreview {
         var longWindow = window(deep, dark, 1);
         try {
             edt(() -> { longWindow.owner().setStatusVisible(true);
-                longWindow.owner().currentTab().rename("A deliberately long terminal tab title that must clip inside its equal-width slot"); });
+                longWindow.owner().currentTerminal().rename("A deliberately long terminal tab title that must clip inside its equal-width slot"); });
             capture(longWindow, output.resolve("tabs/dark-long-titles-791x712.png"), 791, 712, 2, manifest);
             capture(longWindow, output.resolve("tabs/dark-long-titles-narrow-520x360.png"), 520, 360, 2, manifest);
         } finally { close(longWindow); }
@@ -280,7 +280,7 @@ public final class WorkspaceSurfacePreview {
         // Headless views are never displayable, so they never publish their grid; ask each to fit its laid-out size,
         // as a shown view does after a resize, then let the fixture prompt redraw for the new width.
         edt(() -> {
-            for (TerminalTab tab : window.owner().terminalTabs()) for (TerminalPane pane : tab.panes()) {
+            for (TerminalContent tab : window.owner().terminalTabs()) for (TerminalPane pane : java.util.List.of(tab.pane())) {
                 if (pane.view() == null || pane.view().getWidth() <= 0) continue;
                 try {
                     var fit = pane.view().getClass().getDeclaredMethod("resizeSessionToFit");

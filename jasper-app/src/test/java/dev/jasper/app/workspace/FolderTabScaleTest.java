@@ -19,7 +19,7 @@ class FolderTabScaleTest {
             String requestedScale = System.getProperty("flatlaf.uiScale");
             if (requestedScale != null) assertThat(UIScale.getUserScaleFactor()).as("actual test JVM scale").isEqualTo(Float.parseFloat(requestedScale));
             System.out.println("FolderTabScaleTest observed scale=" + UIScale.getUserScaleFactor());
-            owner.currentTab().rename("first"); owner.newTab(HOME); owner.currentTab().rename("second"); owner.update();
+            owner.currentTerminal().rename("first"); owner.newTab(HOME); owner.currentTerminal().rename("second"); owner.update();
             var strip = owner.windowTabs();
             for (int height : new int[]{20, 30, 72}) {
                 owner.setTabHeight(height); WindowTabsTest.layout(strip, UIScale.scale(800), UIScale.scale(height));

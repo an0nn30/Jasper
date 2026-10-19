@@ -51,14 +51,14 @@ class NetworkShareDirectoryTest {
     /** As a plugin can open a tab on any directory: its shell starts at home, and a split or new tab of it starts where a new shell starts. */
     @Test void aPaneOnAnotherHostPassesNothingOn() throws Exception {
         WindowContent owner = window();
-        TerminalTab[] tab = new TerminalTab[1];
+        TerminalContent[] tab = new TerminalContent[1];
         edt(() -> tab[0] = owner.openTab(SHARE, null, Optional.empty(), Optional.empty()));
-        until(() -> tab[0].focusedPane().running());
+        until(() -> tab[0].pane().running());
         edt(() -> {
-            assertThat(tab[0].focusedPane().inheritableDirectory()).isNull();
+            assertThat(tab[0].pane().inheritableDirectory()).isNull();
             assertThat(owner.directory()).as("for a new tab or window").isNull();
         });
-        TerminalPane split = split(tab[0]);
+        TerminalPane split = split(owner, tab[0]);
 
         edt(() -> assertThat(split.directory()).isEqualTo(HOME));
         assertThat(starts).as("the window's tab, the tab on the share and its split").containsExactly(HOME, HOME, HOME);
@@ -67,11 +67,11 @@ class NetworkShareDirectoryTest {
     /** The control: a WSL profile's pane on its distribution's share passes it on, and the split's {@code --cd} is its Linux path. */
     @Test void aWslPanePassesItsOwnShareOn() throws Exception {
         WindowContent owner = window();
-        TerminalTab[] tab = new TerminalTab[1];
+        TerminalContent[] tab = new TerminalContent[1];
         edt(() -> tab[0] = owner.openTab(WSL_SHARE, null, Optional.of(UBUNTU.id()), Optional.empty()));
-        until(() -> tab[0].focusedPane().running());
-        edt(() -> assertThat(tab[0].focusedPane().inheritableDirectory()).isEqualTo(WSL_SHARE));
-        TerminalPane split = split(tab[0]);
+        until(() -> tab[0].pane().running());
+        edt(() -> assertThat(tab[0].pane().inheritableDirectory()).isEqualTo(WSL_SHARE));
+        TerminalPane split = split(owner, tab[0]);
 
         edt(() -> assertThat(split.directory()).isEqualTo(WSL_SHARE));
         assertThat(commands.getLast()).containsExactly("wsl.exe", "-d", "Ubuntu", "--cd", "/home/me");
@@ -80,11 +80,11 @@ class NetworkShareDirectoryTest {
     /** A pane of any other profile has no WSL share to pass on: without WSL, {@code wsl.localhost} is a name the network may answer. */
     @Test void aPaneOutsideAWslProfilePassesNoWslShareOn() throws Exception {
         WindowContent owner = window();
-        TerminalTab[] tab = new TerminalTab[1];
+        TerminalContent[] tab = new TerminalContent[1];
         edt(() -> tab[0] = owner.openTab(WSL_SHARE, null, Optional.empty(), Optional.empty()));
-        until(() -> tab[0].focusedPane().running());
-        edt(() -> assertThat(tab[0].focusedPane().inheritableDirectory()).isNull());
-        TerminalPane split = split(tab[0]);
+        until(() -> tab[0].pane().running());
+        edt(() -> assertThat(tab[0].pane().inheritableDirectory()).isNull());
+        TerminalPane split = split(owner, tab[0]);
 
         edt(() -> assertThat(split.directory()).isEqualTo(HOME));
     }
@@ -106,9 +106,9 @@ class NetworkShareDirectoryTest {
         return owner[0];
     }
 
-    private static TerminalPane split(TerminalTab tab) throws Exception {
+    private static TerminalPane split(WindowContent owner, TerminalContent tab) throws Exception {
         TerminalPane[] pane = new TerminalPane[1];
-        edt(() -> pane[0] = tab.split(tab.focusedPane(), SplitTree.Axis.RIGHT, null));
+        edt(() -> pane[0] = owner.openBeside(tab, dev.jasper.app.layout.Side.RIGHT, null, null, tab.pane().profile(), Optional.empty()).pane());
         until(() -> pane[0].running());
         return pane[0];
     }

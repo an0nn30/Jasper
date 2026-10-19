@@ -39,8 +39,8 @@ class TabMoveTest {
     @Test void aTerminalTabMovedBetweenWindowsKeepsItsSession() throws Exception {
         edt(() -> {
             Tab tab = source.selectedTab();
-            var terminal = (TerminalTab) tab.content();
-            var pane = terminal.focusedPane();
+            var terminal = (TerminalContent) tab.content();
+            var pane = terminal.pane();
             var session = pane.session(); var view = pane.view();
             assertThat(session).as("its shell started").isNotNull();
             model.tabs().move(tab, target.id());
@@ -69,7 +69,7 @@ class TabMoveTest {
             source.activity(before::add); target.activity(after::add);
             before.clear(); after.clear(); facts.clear();
             Tab tab = source.selectedTab();
-            var pane = ((TerminalTab) tab.content()).focusedPane();
+            var pane = ((TerminalContent) tab.content()).pane();
             model.tabs().move(tab, target.id());
             assertThat(after).as("a moved pane is not opened again").isEmpty();
             assertThat(facts).contains(new TerminalEvent.TabClosed(source.id(), tab.id().value()),
@@ -95,7 +95,7 @@ class TabMoveTest {
             var finished = new ArrayList<WorkspaceActivity.Finished>();
             source.activity(event -> { if (event instanceof WorkspaceActivity.Finished done) finished.add(done); });
             Tab tab = source.selectedTab();
-            var pane = ((TerminalTab) tab.content()).focusedPane();
+            var pane = ((TerminalContent) tab.content()).pane();
             pane.onCommandFinished.accept("make", OptionalInt.of(0), Duration.ofSeconds(3), Optional.empty(), Optional.empty());
             assertThat(finished).hasSize(1);
             model.tabs().move(tab, target.id());

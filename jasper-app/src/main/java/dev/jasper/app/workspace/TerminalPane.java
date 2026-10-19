@@ -104,8 +104,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     Runnable onClosed = () -> {};
 
     /**
-     * This pane took keyboard focus. Separate from {@link #onFocused}, which the tab owns to track
-     * its active pane; this one is for whoever cares that the user is now looking here.
+     * This pane took keyboard focus. Separate from {@link #onFocused}, with which its window makes the pane's tab
+     * the active tab; this one is for whoever cares that the user is now looking here.
      */
     Runnable onPaneFocused = () -> {};
 

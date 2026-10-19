@@ -93,15 +93,15 @@ class TerminalTitleIntegrationTest {
 
     @Test void tabsAndNativeTitlesFollowForegroundJobsWithoutShellIntegration() throws Exception {
         Fixture f = open(List.of("/bin/bash", "--noprofile", "--norc", "-l", "-i"), "bash");
-        until(() -> f.content.currentTab().title().equals("bash"));
+        until(() -> f.content.currentTerminal().title().equals("bash"));
         edt(() -> f.content.currentPane().session().write("sleep 30\r"));
-        until(() -> f.content.currentTab().title().equals("sleep"));
+        until(() -> f.content.currentTerminal().title().equals("sleep"));
         edt(() -> {
             assertThat(f.nativeTitles.getLast()).isEqualTo("sleep");
             assertThat(f.content.currentPane().shellIntegrationDetected()).isFalse();
             f.content.currentPane().session().write(new byte[]{3});
         });
-        until(() -> f.content.currentTab().title().equals("bash"));
+        until(() -> f.content.currentTerminal().title().equals("bash"));
     }
 
     @Test void tmuxForwardsPaneTitlesToTheOuterTab(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
@@ -118,7 +118,7 @@ class TerminalTitleIntegrationTest {
             Fixture f = open(List.of(tmux.get().toString(), "-L", socket, "-f", config.toString(),
                 "new-session", "/bin/sh", script.toString()), "tmux");
             edt(() -> f.content.currentPane().session().write("Reviewing files\r"));
-            until(() -> f.content.currentTab().title().equals("Reviewing files"));
+            until(() -> f.content.currentTerminal().title().equals("Reviewing files"));
             edt(() -> {
                 assertThat(f.nativeTitles.getLast()).isEqualTo("Reviewing files");
                 assertThat(f.content.currentPane().title()).isEqualTo("Reviewing files");
@@ -186,14 +186,14 @@ class TerminalTitleIntegrationTest {
         edt(() -> f.content.currentPane().session().write("Editor document\n"));
         until(() -> f.content.tabs().get(0).title().equals("Editor document"));
         edt(() -> {
-            f.content.currentTab().rename("Pinned name");
+            f.content.currentTerminal().rename("Pinned name");
             f.content.currentPane().session().write("Another document\n");
         });
         until(() -> f.content.currentPane().title().equals("Another document"));
         edt(() -> {
             assertThat(f.content.tabs().get(0).title()).isEqualTo("Pinned name");
             assertThat(f.deck.notices()).isEmpty();
-            f.content.currentTab().rename("");
+            f.content.currentTerminal().rename("");
             assertThat(f.content.tabs().get(0).title()).isEqualTo("Another document");
         });
     }

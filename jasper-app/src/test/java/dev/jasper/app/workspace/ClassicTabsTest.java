@@ -68,9 +68,9 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                owner.currentTab().rename("Local: ~");
+                owner.currentTerminal().rename("Local: ~");
                 owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename(title);
+                owner.currentTerminal().rename(title);
                 owner.update();
                 var strip = tabs(owner, 800);
                 assertThat(strip.entries().get(0).getFont().getFontName(java.util.Locale.ROOT)).as("a Latin title").startsWith("IBM Plex Sans");
@@ -85,9 +85,9 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                owner.currentTab().rename("Local: ~");
+                owner.currentTerminal().rename("Local: ~");
                 owner.newTab(DesktopTestSupport.HOME);
-                owner.currentTab().rename("Mac: ~");
+                owner.currentTerminal().rename("Mac: ~");
                 owner.update();
                 var strip = tabs(owner, 800);
                 var first = strip.entries().get(0);
@@ -118,7 +118,7 @@ class ClassicTabsTest {
             ThemeController themes = EnterpriseLook.controller(false);
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
-                for (int i = 0; i < 5; i++) { owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log"); }
+                for (int i = 0; i < 5; i++) { owner.newTab(DesktopTestSupport.HOME); owner.currentTerminal().rename("ssh build-" + i + " tail -f /var/log/app.log"); }
                 owner.update();
                 var strip = tabs(owner, 600);
                 var last = strip.entries().getLast();
@@ -138,7 +138,7 @@ class ClassicTabsTest {
 
                 // Past the minimum the strip clips its last tabs, and the + stays at its trailing edge, over them.
                 for (int i = owner.tabCount(); i < 15; i++) {
-                    owner.newTab(DesktopTestSupport.HOME); owner.currentTab().rename("ssh build-" + i + " tail -f /var/log/app.log");
+                    owner.newTab(DesktopTestSupport.HOME); owner.currentTerminal().rename("ssh build-" + i + " tail -f /var/log/app.log");
                 }
                 owner.update();
                 tabs(owner, 600);
@@ -232,7 +232,7 @@ class ClassicTabsTest {
             try {
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
                 String title = "<html><img src=http://example.invalid/x.png>" + "x".repeat(1000);
-                owner.currentTab().rename(title);
+                owner.currentTerminal().rename(title);
                 owner.update();
                 var strip = tabs(owner, 800);
                 var entry = strip.entries().get(0);
@@ -244,7 +244,7 @@ class ClassicTabsTest {
                     .isEqualTo(entry.getFontMetrics(entry.getFont()).stringWidth(WindowTabs.capped(title)));
                 var item = (JMenuItem) strip.tabList().getComponent(0);
                 assertThat(item.getText()).hasSizeLessThanOrEqualTo(201).startsWith("<html><img").endsWith("\u2026");
-                owner.currentTab().rename("short");
+                owner.currentTerminal().rename("short");
                 owner.update();
                 String shortcut = owner.tabShortcut(0);
                 assertThat(entry.getToolTipText()).as("the tip carries the shortcut")

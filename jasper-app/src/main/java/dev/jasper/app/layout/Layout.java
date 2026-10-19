@@ -379,7 +379,7 @@ public final class Layout {
     }
 
     /**
-     * The group in {@code direction} from {@code group} over the unit square, by today's {@code SplitTree.navigate} rule:
+     * The group in {@code direction} from {@code group} over the unit square:
      * of the groups wholly on that side that overlap it across the direction, the nearest, then the one whose centre is
      * nearest across; a tie goes to the first in tree order. The maximize is ignored.
      *
@@ -510,7 +510,7 @@ public final class Layout {
         };
     }
 
-    /** Distances this close are equal: today's {@code SplitTree} tolerance. */
+    /** Distances this close are equal. */
     private static final double EPSILON = 1.0e-12;
 
     /** {@code tab} in a new group on {@code side} of {@code group}, selected and active; clears the maximize. */

@@ -28,10 +28,10 @@ class WindowContentFirstTerminalTest {
         until(() -> seen.size() == 1);
         TerminalPane first = seen.getFirst();
         assertThat(first.view()).isNotNull();
-        TerminalTab[] second = new TerminalTab[1];
+        TerminalContent[] second = new TerminalContent[1];
         edt(() -> second[0] = content[0].openTab(DesktopTestSupport.HOME, null));
         pending.poll().run();
-        until(() -> second[0].panes().getFirst().view() != null);
+        until(() -> second[0].pane().view() != null);
         edt(() -> { });
         assertThat(seen).containsExactly(first);
     }

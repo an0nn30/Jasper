@@ -108,19 +108,18 @@ class ShortcutContextDispatchTest {
         });
     }
 
-    @Test void closePaneClosesTheFocusedPaneThenTheTabWithItsLastPane() throws Exception {
-        // A split needs a running shell, so the launcher's queued work runs between the steps, as in TerminalTabTest.
+    @Test void closePaneClosesTheActiveTabAndAGroupGoesWithItsLastTab() throws Exception {
+        // The launcher's queued work runs between the steps, so the split inherits from a running shell, as in TerminalTabTest.
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
-        TerminalTab[] tab = new TerminalTab[1];
         edt(() -> { owner[0] = content(idleLauncher(pending), true); owner[0].newTab(HOME); });
         while (!pending.isEmpty()) pending.remove().run();
-        edt(() -> { tab[0] = owner[0].currentTab(); tab[0].split(SplitTree.Axis.RIGHT); });
+        edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT));
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {
-            assertThat(tab[0].panes()).hasSize(2);
+            assertThat(owner[0].workspace().model().groups()).hasSize(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
-            assertThat(tab[0].panes()).hasSize(1);
+            assertThat(owner[0].workspace().model().groups()).as("the split's group goes with its tab").hasSize(1);
             assertThat(owner[0].tabCount()).isEqualTo(2);
             assertThat(owner[0].dispatchShortcut(mac("cmd+w"), owner[0].currentPane())).isTrue();
             assertThat(owner[0].tabCount()).isEqualTo(1);

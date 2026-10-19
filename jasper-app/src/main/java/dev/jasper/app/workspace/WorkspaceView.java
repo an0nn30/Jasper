@@ -96,6 +96,12 @@ final class WorkspaceView extends JPanel {
     }
 
     void select(Tab tab) { if (contains(tab)) apply(layout.select(tab.id())); }
+
+    /**
+     * Focus went into {@code tab}: it becomes the active tab without being focused again, so focus stays where it went
+     * (Rulings 26); nothing changes while it already is the active tab, so no focus request loops back here.
+     */
+    void focused(Tab tab) { if (contains(tab) && selected() != tab) apply(layout.select(tab.id()), false); }
     void activate(GroupId group) { apply(layout.activate(group)); }
     /** Moves {@code tab} to {@code index} of {@code group}, which may be another group. */
     void moveTab(Tab tab, GroupId group, int index) {

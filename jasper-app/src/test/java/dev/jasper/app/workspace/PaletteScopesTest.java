@@ -648,7 +648,7 @@ class PaletteScopesTest {
                     if (mode == 0) palette.dismiss();
                     else if (mode == 1) { registration.close(); content.scopes().register(fake); }
                     else {
-                        var oldTab = content.currentTab();
+                        var oldTab = content.currentTerminal();
                         content.newTab(DesktopTestSupport.HOME); content.closeTab(oldTab);
                     }
                     palette.open(fake.id()); dev.jasper.app.palette.PaletteTestSupport.query(palette.component()).setText("beta");

@@ -23,61 +23,64 @@ final class TabHost {
     TabHost(WindowContent owner) { this.owner = Objects.requireNonNull(owner, "owner"); }
 
     /**
-     * Wires a terminal tab to this window; a tab of another kind needs nothing. With {@code opened} its panes are
-     * announced as new first; a tab arriving from another window keeps its panes unannounced.
+     * Wires a terminal tab to this window; a tab of another kind needs nothing. With {@code opened} its pane is announced
+     * as new once it reports here, so its close reports too; a tab arriving from another window keeps its pane
+     * unannounced.
      */
     void attach(Tab tab, boolean opened) {
-        if (!(tab.content() instanceof TerminalTab terminal)) return;
+        if (!(tab.content() instanceof TerminalContent terminal)) return;
+        TerminalPane pane = terminal.pane();
         terminal.onChanged = () -> {
-            for (TerminalPane pane : terminal.panes()) if (pane.view() == null) pane.applyTheme(owner.theme());
+            if (pane.view() == null) pane.applyTheme(owner.theme());
             present(tab, terminal);
         };
         terminal.onEmpty = () -> owner.closeTab(tab);
         terminal.onError = (message, cause) -> owner.onLaunchFailure.accept(message, cause);
         terminal.lastInWindow = () -> owner.tabCount() == 1;
-        terminal.configure = pane -> configure(tab, terminal, pane);
-        terminal.onPaneCreated = pane -> { announce(tab, pane); wire(tab, terminal, pane); };
+        terminal.configure = ready -> configure(tab, ready);
         terminal.setBackground(owner.theme().surface());
         terminal.setBackgroundOpacity((float) owner.backgroundOpacity());
-        for (TerminalPane pane : terminal.panes()) {
-            pane.applyTheme(owner.theme());
-            if (opened) announce(tab, pane);
-            wire(tab, terminal, pane);
-            if (pane.view() != null) { bind(tab, terminal, pane); behave(pane); }
-        }
+        pane.applyTheme(owner.theme());
+        wire(tab, pane);
+        if (opened) announce(tab, pane);
+        if (pane.view() != null) { bind(tab, pane); behave(pane); }
         present(tab, terminal);
     }
 
     /** Unwires a terminal tab from this window before it closes or moves on. */
     void detach(Tab tab) {
-        if (!(tab.content() instanceof TerminalTab terminal)) return;
+        if (!(tab.content() instanceof TerminalContent terminal)) return;
         terminal.onChanged = () -> { };
         terminal.onEmpty = () -> { };
         terminal.onError = (message, cause) -> { };
         terminal.lastInWindow = () -> false;
-        terminal.configure = pane -> { };
-        terminal.onPaneCreated = pane -> { };
-        for (TerminalPane pane : terminal.panes()) unwire(pane);
+        terminal.configure = ready -> { };
+        unwire(terminal.pane());
     }
 
     /** A terminal tab's presentation: its title and icon. */
-    static void present(Tab tab, TerminalTab terminal) {
+    static void present(Tab tab, TerminalContent terminal) {
         tab.presentation(terminal.title(), "", terminal.icon(), false, "", "");
     }
 
-    /** A pane that has just opened: this window's activity and the terminal registry hear of it. */
+    /**
+     * A pane that has just opened: the terminal registry, whose listeners cannot fail it, then this window's activity
+     * hear of it.
+     */
     private void announce(Tab tab, TerminalPane pane) {
-        owner.emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
         owner.report(new TerminalEvent.PaneOpened(tab.id().value(), pane.id()));
+        owner.emit(new WorkspaceActivity.PaneState(pane.id(), WorkspaceActivity.State.OPENED));
     }
 
     /** The pane reports its activity and facts to this window from now on. */
-    private void wire(Tab tab, TerminalTab terminal, TerminalPane pane) {
+    private void wire(Tab tab, TerminalPane pane) {
         UUID tabId = tab.id().value();
+        // Focus going into the pane makes its tab the window's active tab, focus staying put (Rulings 26).
+        pane.onFocused = () -> owner.tabFocused(tab);
         pane.onCommandStarted = command -> {
             long startedAt = System.nanoTime();
             owner.emit(new WorkspaceActivity.Started(pane.id(), command, () -> System.nanoTime() - startedAt,
-                () -> goTo(tab, terminal, pane), pane.watched() && owner.isActiveAndOpen() && tab == owner.selectedTab()));
+                () -> goTo(tab, pane), pane.watched() && owner.isActiveAndOpen() && tab == owner.selectedTab()));
             owner.report(new TerminalEvent.CommandStarted(pane.id(), command));
         };
         pane.onTitleChanged = title -> {
@@ -97,7 +100,7 @@ final class TabHost {
             owner.emit(new WorkspaceActivity.Finished(pane.id(), command, exitStatus, duration,
                 new WorkspaceActivity.Origin(owner.anyWindowActive.getAsBoolean(), owner.isActiveAndOpen(),
                     tab == owner.selectedTab(), pane.view() != null && pane.view().isFocusOwner()),
-                () -> goTo(tab, terminal, pane)));
+                () -> goTo(tab, pane)));
             owner.report(new TerminalEvent.CommandFinished(pane.id(), command, exitStatus, duration, workingDirectory, remote));
         };
         pane.onDirectoryChanged = (directory, remote) -> owner.report(new TerminalEvent.DirectoryChanged(pane.id(), directory, remote));
@@ -107,21 +110,20 @@ final class TabHost {
         pane.onConnecting = () -> owner.report(new TerminalEvent.SessionConnecting(pane.id()));
     }
 
-    /** "Go to": the tab, wherever it is now, then the pane (workspace plan 3a Rulings 18). */
-    private static void goTo(Tab tab, TerminalTab terminal, TerminalPane pane) {
+    /** "Go to": the tab, wherever it is now, then its pane (workspace plan 3a Rulings 18). */
+    private static void goTo(Tab tab, TerminalPane pane) {
         tab.select();
-        terminal.focus(pane);
         pane.focusTerminal();
     }
 
     /** A pane whose view just became ready: this window's configuration, its handlers and the first-terminal timing. */
-    private void configure(Tab tab, TerminalTab terminal, TerminalPane pane) {
+    private void configure(Tab tab, TerminalPane pane) {
         pane.applyTheme(owner.theme());
         ConfigSnapshot configured = owner.configured();
         if (configured == null) pane.view().setFontSize(owner.configuredFontSize());
         else pane.view().applyOptions(configured.viewOptions(owner.configuredFontSize(), owner.theme().palette()));
         behave(pane);
-        bind(tab, terminal, pane);
+        bind(tab, pane);
         owner.terminalConfigured(pane);
     }
 
@@ -134,17 +136,18 @@ final class TabHost {
     }
 
     /** The view's shortcut, context-menu and file-link handlers, and its launch focus, go to this window. */
-    private void bind(Tab tab, TerminalTab terminal, TerminalPane pane) {
+    private void bind(Tab tab, TerminalPane pane) {
         pane.allowLaunchFocus = () -> owner.commandPalette() == null || !owner.commandPalette().blocksActions();
         pane.view().setShortcutHandler(event -> owner.dispatchShortcut(KeyStroke.getKeyStrokeForEvent(event), pane.view()));
         pane.view().setContextMenuHandler(event -> {
-            owner.selectTab(tab); terminal.focus(pane); pane.focusTerminal(); owner.update();
+            owner.selectTab(tab); pane.focusTerminal(); owner.update();
             owner.chrome().contextMenu().show(pane.view(), event.getX(), event.getY());
         });
         pane.view().setFileLinkHandler(link -> openFileLink(pane, link));
     }
 
     private static void unwire(TerminalPane pane) {
+        pane.onFocused = () -> { };
         pane.onCommandStarted = command -> { };
         pane.onTitleChanged = title -> { };
         pane.onClosed = () -> { };

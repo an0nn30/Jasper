@@ -33,20 +33,20 @@ class TabShortcutsTest {
                     ? KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET, modifier | InputEvent.SHIFT_DOWN_MASK)
                     : KeyStroke.getKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
                 var root = new BindingRoot(); root.setContentPane(owner); owner.installRootBindings(root);
-                var first = owner.currentTab(); owner.newTab(HOME); var second = owner.currentTab();
+                var first = owner.currentTerminal(); owner.newTab(HOME); var second = owner.currentTerminal();
                 owner.selectTab(first);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_2, modifier))).isTrue();
-                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(owner.currentTerminal()).isSameAs(second);
                 assertThat(root.activate(next)).isTrue();
-                assertThat(owner.currentTab()).isSameAs(first);
+                assertThat(owner.currentTerminal()).isSameAs(first);
                 assertThat(root.activate(previous)).isTrue();
-                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(owner.currentTerminal()).isSameAs(second);
                 assertThat(root.activate(KeyStroke.getKeyStroke(KeyEvent.VK_9, modifier)))
                     .as("no ninth tab: the key reaches the focused component").isFalse();
-                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(owner.currentTerminal()).isSameAs(second);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,
                     modifier | InputEvent.SHIFT_DOWN_MASK | InputEvent.ALT_DOWN_MASK), owner)).isFalse();
-                assertThat(owner.currentTab()).isSameAs(second);
+                assertThat(owner.currentTerminal()).isSameAs(second);
                 assertThat(owner.action(ActionId.SELECT_TAB_2).getValue(Action.ACCELERATOR_KEY))
                     .isEqualTo(KeyStroke.getKeyStroke(KeyEvent.VK_2, modifier));
                 owner.close();
@@ -60,10 +60,10 @@ class TabShortcutsTest {
             var bindings = KeyBindings.withOverrides(false, Map.of("previous_tab", "alt+{", "next_tab", "alt+}"));
             try (var owner = new WindowContent(launcher(new ArrayDeque<>()), HOME, path -> {}, () -> {}, () -> {},
                     ThemeTestSupport.controller(true), bindings)) {
-                var first = owner.currentTab(); owner.newTab(HOME);
+                var first = owner.currentTerminal(); owner.newTab(HOME);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_OPEN_BRACKET,
                     InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), owner)).isTrue();
-                assertThat(owner.currentTab()).isSameAs(first);
+                assertThat(owner.currentTerminal()).isSameAs(first);
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_C,
                     InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), new JTextField())).isFalse();
                 assertThat(owner.dispatchShortcut(KeyStroke.getKeyStroke(KeyEvent.VK_CLOSE_BRACKET,

@@ -49,7 +49,7 @@ public final class FlatTabsPreview {
                 owner.installRootBindings(roots[0]);
             });
             while (!pending.isEmpty()) pending.remove().run();
-            until(() -> owners[0].terminalTabs().stream().allMatch(tab -> tab.focusedPane().view() != null)
+            until(() -> owners[0].terminalTabs().stream().allMatch(tab -> tab.pane().view() != null)
                 && sessions.stream().allMatch(session -> session.title().equals("fixture")));
             edt(() -> {
                 var owner = owners[0]; var root = roots[0];

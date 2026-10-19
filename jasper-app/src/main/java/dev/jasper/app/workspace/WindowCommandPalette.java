@@ -37,7 +37,7 @@ final class WindowCommandPalette implements AutoCloseable {
     private final Overlay overlay = new Overlay();
     private final Drag drag = new Drag();
     private JRootPane root;
-    private TerminalTab originTab;
+    private TerminalContent originTab;
     private TerminalPane originPane;
     private Component priorFocus;
     private boolean closed;
@@ -102,13 +102,13 @@ final class WindowCommandPalette implements AutoCloseable {
                 if (root == null || !owner.isActiveAndOpen()
                         || !SwingUtilities.isDescendingFrom(owner, root.getLayeredPane())) return;
                 owner.updateActions();
-                originTab = owner.currentTab(); originPane = owner.currentPane();
+                originTab = owner.currentTerminal(); originPane = owner.currentPane();
                 priorFocus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             } else if (view.modeless()) {
                 // An opener focusing the open Run window from elsewhere: Escape then returns where the person was now.
                 Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
                 if (focus != null && !controller.owns(focus) && SwingUtilities.isDescendingFrom(focus, owner)) {
-                    originTab = owner.currentTab(); originPane = owner.currentPane(); priorFocus = focus;
+                    originTab = owner.currentTerminal(); originPane = owner.currentPane(); priorFocus = focus;
                 }
             }
             boolean modeless = view.modeless();
@@ -152,9 +152,9 @@ final class WindowCommandPalette implements AutoCloseable {
     boolean blocksActions() { return isOpen() && !view.modeless(); }
 
     private boolean validOrigin() {
-        return owner.isActiveAndOpen() && owner.currentTab() == originTab
+        return owner.isActiveAndOpen() && owner.currentTerminal() == originTab
             && owner.currentPane() == originPane
-            && (originPane == null || originTab != null && originTab.panes().contains(originPane));
+            && (originPane == null || originTab != null && originTab.pane() == originPane);
     }
 
     private void restoreAndHide() {

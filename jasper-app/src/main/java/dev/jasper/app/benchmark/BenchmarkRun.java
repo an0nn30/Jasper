@@ -2,9 +2,9 @@ package dev.jasper.app.benchmark;
 
 import dev.jasper.app.application.JasperApplication;
 import dev.jasper.app.launch.ShellLauncher;
-import dev.jasper.app.workspace.SplitTree;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.workspace.TerminalPane;
-import dev.jasper.app.workspace.TerminalTab;
+import dev.jasper.app.workspace.TerminalContent;
 import dev.jasper.app.workspace.TerminalWindow;
 import dev.jasper.app.workspace.WindowContent;
 import dev.jasper.terminal.config.GridSize;
@@ -211,7 +211,7 @@ final class BenchmarkRun implements AutoCloseable {
         ready(window, 1);
         for (int i = 1; i < panes; i++) {
             int index = i;
-            edt(() -> { window.content().currentTab().split(index % 2 == 0 ? SplitTree.Axis.DOWN : SplitTree.Axis.RIGHT); return null; });
+            edt(() -> { window.content().split(index % 2 == 0 ? Side.DOWN : Side.RIGHT); return null; });
             ready(window, i + 1);
         }
         drain(window);
@@ -277,19 +277,19 @@ final class BenchmarkRun implements AutoCloseable {
         for (int i = 0; i < options.cycles(); i++) {
             AtomicInteger completed = new AtomicInteger();
             int count = edt(() -> {
-                var panes = window.content().currentTab().panes();
+                var panes = panes(window);
                 for (TerminalPane pane : panes) pane.view().findAsync(new SearchQuery("jasper", false, true), ignored -> completed.incrementAndGet());
                 return panes.size();
             });
             await(() -> completed.get() == count, "search callbacks");
             int cycle = i;
             edt(() -> {
-                for (TerminalPane pane : window.content().currentTab().panes()) pane.view().setFontSize(cycle % 2 == 0 ? 17 : 16);
+                for (TerminalPane pane : panes(window)) pane.view().setFontSize(cycle % 2 == 0 ? 17 : 16);
                 window.resize(new Dimension(cycle % 2 == 0 ? 1050 : 1100, 850)); return null;
             });
             drain(window); pause(100);
         }
-        edt(() -> { for (TerminalPane pane : window.content().currentTab().panes()) pane.view().setFontSize(16);
+        edt(() -> { for (TerminalPane pane : panes(window)) pane.view().setFontSize(16);
             window.resize(new Dimension(1100, 850)); return null; });
         drain(window); sample();
     }
@@ -298,10 +298,11 @@ final class BenchmarkRun implements AutoCloseable {
         phase = "tab-split-window-cycles";
         for (int i = 0; i < options.cycles(); i++) {
             Set<Child> retained = Set.copyOf(children);
-            TerminalTab temporaryTab = edt(() -> { window.content().newTab(directory); return window.content().currentTab(); });
-            ready(window, 1);
-            edt(() -> { temporaryTab.split(SplitTree.Axis.RIGHT); return null; }); ready(window, 2);
-            edt(() -> { window.content().closeTab(temporaryTab); return null; });
+            int before = edt(() -> panes(window).size());
+            TerminalContent temporaryTab = edt(() -> { window.content().newTab(directory); return window.content().currentTerminal(); });
+            ready(window, before + 1);
+            TerminalContent temporarySplit = edt(() -> window.content().split(Side.RIGHT)); ready(window, before + 2);
+            edt(() -> { window.content().closeTab(temporarySplit); window.content().closeTab(temporaryTab); return null; });
             retireChildrenExcept(retained);
             TerminalWindow temporaryWindow = edt(() -> {
                 TerminalWindow created = application.newWindow(directory);
@@ -313,6 +314,11 @@ final class BenchmarkRun implements AutoCloseable {
             retireChildrenExcept(retained);
             sample();
         }
+    }
+
+    /** Every terminal pane of {@code owner}: one per terminal tab, in workspace order. */
+    private static List<TerminalPane> panes(TerminalWindow owner) {
+        return owner.content().terminalTabs().stream().map(TerminalContent::pane).toList();
     }
 
     private void retireChildrenExcept(Set<Child> retained) throws Exception {
@@ -334,7 +340,7 @@ final class BenchmarkRun implements AutoCloseable {
     }
 
     private List<Map<String, Object>> layout() throws Exception {
-        return edt(() -> window.content().currentTab().panes().stream().map(p -> Map.<String, Object>of(
+        return edt(() -> panes(window).stream().map(p -> Map.<String, Object>of(
             "columns", p.session().columns(), "rows", p.session().rows(), "visible", p.view().isShowing(),
             "widthPixels", p.view().getWidth(), "heightPixels", p.view().getHeight(), "fontSize", p.view().fontSize())).toList());
     }
@@ -343,7 +349,7 @@ final class BenchmarkRun implements AutoCloseable {
             check();
             boolean ready = edt(() -> {
                 if (owner.closed()) throw new IllegalStateException("Benchmark window closed by user");
-                var panes = owner.content().currentTab().panes();
+                var panes = panes(owner);
                 return panes.size() == paneCount && panes.stream().allMatch(p -> p.view() != null);
             });
             if (ready && children.stream().allMatch(c -> c.session != null && c.pid() != null)) return;
@@ -354,7 +360,7 @@ final class BenchmarkRun implements AutoCloseable {
         // Two EDT barriers allow queued resize/repaint invalidations to run; paintImmediately finishes the final image.
         edt(() -> null);
         edt(() -> { if (owner.closed()) throw new IllegalStateException("Benchmark window closed by user");
-            for (TerminalPane pane : owner.content().currentTab().panes()) if (pane.view() != null)
+            for (TerminalPane pane : panes(owner)) if (pane.view() != null)
                 pane.view().paintImmediately(0, 0, pane.view().getWidth(), pane.view().getHeight()); return null; });
     }
     private void check() throws Exception {

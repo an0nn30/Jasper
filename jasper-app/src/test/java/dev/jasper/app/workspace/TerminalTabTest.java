@@ -2,6 +2,8 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.layout.Side;
+import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.terminal.config.GridSize;
 import dev.jasper.terminal.session.SessionLaunchOptions;
 
@@ -14,6 +16,7 @@ import dev.jasper.terminal.session.TerminalSession;
 import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 
+/** Terminal tabs: one pane each, in groups (workspace tabs spec 9.2). */
 @DisabledOnOs(OS.WINDOWS)
 class TerminalTabTest {
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
@@ -37,17 +40,17 @@ class TerminalTabTest {
         edt(() -> {
             owners[0].close();
             assertThat(owners[1].currentPane().running()).isTrue();
-            TerminalTab original = owners[1].currentTab();
+            TerminalContent original = owners[1].currentTerminal();
             owners[1].newTab(HOME);
             owners[1].selectTab(original);
             owners[1].workspace().activeGroupView().reorder(owners[1].tabs().get(0), 1);
-            assertThat(owners[1].currentTab()).isSameAs(original);
+            assertThat(owners[1].currentTerminal()).isSameAs(original);
             owners[1].close();
         });
         while (!pending.isEmpty()) pending.remove().run();
         edt(() -> {});
     }
-    @Test void splitsAndZoomReuseSessionsAndRenameSurvivesShellTitle() throws Exception {
+    @Test void splitsAndMaximizeReuseSessionsAndRenameSurvivesShellTitle() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher(pending)));
@@ -55,19 +58,21 @@ class TerminalTabTest {
         TerminalPane[] first = new TerminalPane[1];
         edt(() -> {
             first[0] = owner[0].currentPane();
-            owner[0].currentTab().rename("work");
-            owner[0].currentTab().split(SplitTree.Axis.RIGHT);
+            owner[0].currentTerminal().rename("work");
+            owner[0].invoke(ActionId.SPLIT_RIGHT);
         });
         pending.remove().run();
         edt(() -> {
-            TerminalTab tab = owner[0].currentTab();
-            tab.toggleZoom(); tab.navigate(SplitTree.Direction.LEFT); tab.toggleZoom();
-            assertThat(tab.focusedPane()).isSameAs(first[0]);
+            TerminalContent work = owner[0].terminalOf(first[0]);
+            owner[0].toggleMaximize(); owner[0].focusGroup(Side.LEFT); owner[0].toggleMaximize();
+            assertThat(owner[0].currentPane()).isSameAs(first[0]);
+            assertThat(owner[0].workspace().model().maximized()).isEmpty();
             assertThat(first[0].running()).isTrue();
-            assertThat(tab.title()).isEqualTo("work");
-            tab.closePane(first[0]);
-            assertThat(tab.panes()).hasSize(1);
-            assertThat(tab.focusedPane().running()).isTrue();
+            assertThat(work.title()).isEqualTo("work");
+            owner[0].closeTab(work);
+            assertThat(owner[0].tabCount()).isEqualTo(1);
+            assertThat(owner[0].workspace().model().groups()).hasSize(1);
+            assertThat(owner[0].currentPane().running()).isTrue();
             owner[0].close();
         });
     }
@@ -90,7 +95,8 @@ class TerminalTabTest {
             assertThat(errors.getFirst()).startsWith("Could not start the terminal: ");
             assertThat(owner[0].currentPane()).isSameAs(first[0]);
             assertThat(first[0].running()).isTrue();
-            assertThat(owner[0].currentTab().panes()).hasSize(1);
+            assertThat(owner[0].tabCount()).as("the failed split's tab closed").isEqualTo(1);
+            assertThat(owner[0].workspace().model().groups()).as("and its group with it").hasSize(1);
             owner[0].close();
         });
     }
@@ -131,45 +137,42 @@ class TerminalTabTest {
         }, "bash");
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher)); pending.remove().run();
-        edt(() -> { owner[0].currentTab().rename("manual"); owner[0].currentPane().session().write("go\n"); });
+        edt(() -> { owner[0].currentTerminal().rename("manual"); owner[0].currentPane().session().write("go\n"); });
         until(() -> owner[0].currentPane().title().equals("new-shell-title"));
         edt(() -> {
-            assertThat(owner[0].currentTab().title()).isEqualTo("manual");
-            owner[0].currentTab().rename("");
-            assertThat(owner[0].currentTab().title()).isEqualTo("new-shell-title");
+            assertThat(owner[0].currentTerminal().title()).isEqualTo("manual");
+            assertThat(owner[0].currentTerminal().renamed()).contains("manual");
+            owner[0].currentTerminal().rename("");
+            assertThat(owner[0].currentTerminal().title()).isEqualTo("new-shell-title");
+            assertThat(owner[0].selectedTab().title()).as("the tab's presentation follows").isEqualTo("new-shell-title");
             owner[0].close();
         });
     }
 
-    @Test void dividerRatioSurvivesZoomAndStaleRendererCannotChangeClosedBranches() throws Exception {
+    @Test void weightsSurviveMaximizeAndAStaleSplitChangesNothing() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher(pending))); pending.remove().run();
         edt(() -> owner[0].invoke(ActionId.SPLIT_RIGHT)); pending.remove().run();
-        javax.swing.JSplitPane[] old = new javax.swing.JSplitPane[1];
         edt(() -> {
-            old[0] = (javax.swing.JSplitPane) owner[0].currentTab().getComponent(0);
-            old[0].setSize(1000, 600); old[0].doLayout();
-        });
-        edt(() -> {});
-        edt(() -> {
-            old[0].setDividerLocation(0.7);
-            assertThat(((SplitTree.Branch) owner[0].currentTab().tree().root().orElseThrow()).ratio()).isCloseTo(0.7, within(0.002));
-            owner[0].currentTab().toggleZoom(); owner[0].currentTab().toggleZoom();
-            javax.swing.JSplitPane restored = (javax.swing.JSplitPane) owner[0].currentTab().getComponent(0);
-            restored.setSize(1000, 600); restored.doLayout();
-        });
-        edt(() -> {});
-        edt(() -> {
-            javax.swing.JSplitPane restored = (javax.swing.JSplitPane) owner[0].currentTab().getComponent(0);
-            assertThat(restored.getDividerLocation()).isBetween(685, 705);
-            owner[0].currentTab().closePane(owner[0].currentPane());
-            old[0].setDividerLocation(0.3);
-            assertThat(owner[0].currentTab().panes()).hasSize(1);
+            owner[0].setSize(1000, 600); LayoutTestSupport.layoutTree(owner[0]);
+            var old = owner[0].workspace().split(List.of());
+            owner[0].workspace().resizeSplit(List.of(), List.of(0.7, 0.3));
+            owner[0].toggleMaximize(); owner[0].toggleMaximize();
+            LayoutTestSupport.layoutTree(owner[0]);
+            var restored = owner[0].workspace().split(List.of());
+            assertThat(restored).as("the maximize rebuilt the split").isNotSameAs(old);
+            assertThat(restored.weights().get(0)).isCloseTo(0.7, within(1e-9));
+            int available = restored.getWidth() - SplitContainer.dividerSize();
+            assertThat(restored.children().get(0).getWidth()).isCloseTo((int) Math.round(available * 0.7), within(1));
+            owner[0].closeTab(owner[0].currentTerminal());
+            old.setWeights(List.of(0.2, 0.8));
+            assertThat(owner[0].workspace().model().groups()).hasSize(1);
+            assertThat(owner[0].tabCount()).isEqualTo(1);
             owner[0].close();
         });
     }
-    @Test void layoutMinimumIncludesLargeFontsNestedSplitsAndVisibleChrome() throws Exception {
+    @Test void layoutMinimumIncludesLargeFontsNestedGroupsAndVisibleChrome() throws Exception {
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> owner[0] = content(launcher(pending))); pending.remove().run();
@@ -177,19 +180,20 @@ class TerminalTabTest {
         edt(() -> owner[0].invoke(ActionId.SPLIT_DOWN)); pending.remove().run();
         edt(() -> {
             var content = owner[0];
-            for (TerminalPane pane : content.currentTab().panes()) pane.view().setFontSize(72);
-            var panes = content.currentTab().panes();
+            var panes = content.terminalTabs().stream().map(TerminalContent::pane).toList();
+            for (TerminalPane pane : panes) pane.view().setFontSize(72);
             int twoColumns = panes.get(0).view().getMinimumSize().width + panes.get(1).view().getMinimumSize().width;
             int twoRows = panes.get(1).view().getMinimumSize().height + panes.get(2).view().getMinimumSize().height;
-            assertThat(content.currentTab().getMinimumSize().width).isGreaterThan(twoColumns);
-            assertThat(content.currentTab().getMinimumSize().height).isGreaterThan(twoRows);
+            var workspace = content.workspace();
+            assertThat(workspace.getMinimumSize().width).isGreaterThan(twoColumns);
+            assertThat(workspace.getMinimumSize().height).isGreaterThan(twoRows);
             javax.swing.JRootPane root = new javax.swing.JRootPane();
             root.setContentPane(content); root.setJMenuBar(content.menuBar());
             var outer = TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2));
-            assertThat(outer.height).isGreaterThan(content.currentTab().getMinimumSize().height + 32);
+            assertThat(outer.height).isGreaterThan(workspace.getMinimumSize().height + 32);
             assertThat(outer.width).isGreaterThan(twoColumns + 4);
             java.awt.Dimension previous = outer;
-            content.currentTab().toggleZoom();
+            content.toggleMaximize();
             assertThat(TerminalWindow.minimumSize(root, new java.awt.Insets(30, 2, 2, 2)).height).isLessThan(previous.height);
             content.close();
         });
@@ -218,7 +222,7 @@ class TerminalTabTest {
             owner[0].update();
             assertThat(owner[0].status().getText()).contains("long-directory-segment/");
             assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
-            owner[0].currentTab().rename("manual rename ".repeat(200));
+            owner[0].currentTerminal().rename("manual rename ".repeat(200));
             assertThat(TerminalWindow.minimumSize(root[0], new java.awt.Insets(30, 2, 2, 2))).isEqualTo(minimum[0]);
             owner[0].close();
         });

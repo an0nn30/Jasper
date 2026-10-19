@@ -52,7 +52,7 @@ class WindowTabMotionTest {
     @Test void closingReleasesResourcesImmediatelyAndSurvivorsExpandAtRecordedSpeed() throws Exception {
         edt(() -> {
             var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(475);
-            var closing = f.owner.currentTab(); var pane = closing.focusedPane(); int[] released = {0};
+            var closing = f.owner.currentTerminal(); var pane = closing.pane(); int[] released = {0};
             pane.onClosed = () -> released[0]++;
             f.owner.closeTab(closing); f.strip.refresh();
             assertThat(released[0]).isEqualTo(1);
@@ -63,7 +63,7 @@ class WindowTabMotionTest {
             f.advance(350);
             assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
             assertThat(f.strip.motionRunning()).isFalse();
-            f.owner.closeTab(f.owner.currentTab()); f.strip.refresh();
+            f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
             assertThat(f.strip.isVisible()).as("one tab keeps its strip").isTrue();
             assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
             assertThat(f.strip.motionRunning()).isFalse();
@@ -74,7 +74,7 @@ class WindowTabMotionTest {
         edt(() -> {
             var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(100);
             var before = f.entry("third").getBounds();
-            f.owner.currentTab().rename("a much longer title"); f.strip.refresh();
+            f.owner.currentTerminal().rename("a much longer title"); f.strip.refresh();
             f.owner.selectTab(f.owner.terminalTabs().get(0)); f.strip.refresh();
             assertThat(f.entry("a much longer title").getBounds()).isEqualTo(before);
             f.advance(375);
@@ -87,7 +87,7 @@ class WindowTabMotionTest {
         edt(() -> {
             var f = fixture(); f.add("second"); f.advance(490); f.add("third"); f.advance(75);
             var before = f.entry("first").getBounds();
-            f.owner.closeTab(f.owner.currentTab()); f.strip.refresh();
+            f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
             assertThat(f.entry("first").getBounds()).isEqualTo(before);
             f.add("fourth");
             f.strip.setSize(601, 30); f.strip.doLayout();
@@ -133,7 +133,7 @@ class WindowTabMotionTest {
                 themes.get().configureAnimations(false);
                 var owner = content(launcher(new ArrayDeque<>()), themes.get());
                 owner.setAnimations(AnimationSettings.defaults());
-                owner.currentTab().rename("first"); owner.update();
+                owner.currentTerminal().rename("first"); owner.update();
                 var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
                 strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
                 var f = new Fixture(owner, strip, clock);
@@ -169,14 +169,14 @@ class WindowTabMotionTest {
     }
 
     private Fixture fixture() {
-        var owner = content(launcher(new ArrayDeque<>())); owner.currentTab().rename("first"); owner.update();
+        var owner = content(launcher(new ArrayDeque<>())); owner.currentTerminal().rename("first"); owner.update();
         var clock = new AtomicLong(); var strip = new WindowTabs(owner.workspace().activeGroupView(), clock::get);
         strips.add(strip); strip.refresh(); strip.setSize(800, 30); strip.doLayout();
         return new Fixture(owner, strip, clock);
     }
     private record Fixture(WindowContent owner, WindowTabs strip, AtomicLong clock) {
         Container entry(String title) { return named(strip, "select:" + title).getParent(); }
-        void add(String title) { owner.newTab(HOME); owner.currentTab().rename(title); strip.refresh(); }
+        void add(String title) { owner.newTab(HOME); owner.currentTerminal().rename(title); strip.refresh(); }
         void advance(int millis) { clock.addAndGet(millis * 1_000_000L); strip.animate(clock.get()); }
     }
 }

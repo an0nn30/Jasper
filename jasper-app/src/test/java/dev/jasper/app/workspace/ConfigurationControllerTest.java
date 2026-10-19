@@ -301,7 +301,7 @@ class ConfigurationControllerTest {
     @Test @DisabledOnOs(OS.WINDOWS)
     void existingTerminalHandlerUsesReloadedBindingsAndPreservesSelectionAndZoomedHiddenPanes() throws Exception {
         start(""); edt(this::owner); launchAll();
-        var owner = owners.getFirst(); var tab = owner.currentTab(); var retained = owner.currentPane();
+        var owner = owners.getFirst(); var tab = owner.currentTerminal(); var retained = owner.currentPane();
         until(() -> {
             retained.view().dispatchEvent(new java.awt.event.MouseEvent(retained.view(), java.awt.event.MouseEvent.MOUSE_PRESSED,
                 0, 0, 2, 2, 2, false, java.awt.event.MouseEvent.BUTTON1));
@@ -312,10 +312,10 @@ class ConfigurationControllerTest {
             owner.invoke(ActionId.SPLIT_RIGHT);
         }); launchAll();
         var sibling = owner.currentPane();
-        edt(() -> { tab.toggleZoom(); owner.newTab(HOME); });
+        edt(() -> { owner.toggleMaximize(); owner.newTab(HOME); });
         reload("[terminal.font]\nsize=20\n[keybindings]\nnew_tab='Ctrl+F12'\n"); launchAll();
         edt(() -> {
-            assertThat(tab.tree().zoomed()).isTrue();
+            assertThat(owner.workspace().model().maximized()).isPresent();
             assertThat(retained.view().selectedText()).contains("alpha");
             assertThat(retained.view().fontSize()).isEqualTo(20);
             assertThat(sibling.view().fontSize()).isEqualTo(20);
@@ -323,7 +323,7 @@ class ConfigurationControllerTest {
                 java.awt.event.InputEvent.CTRL_DOWN_MASK, java.awt.event.KeyEvent.VK_F12, java.awt.event.KeyEvent.CHAR_UNDEFINED);
             terminalKey(retained.view(), key);
             assertThat(key.isConsumed()).isTrue();
-            assertThat(owner.tabCount()).isEqualTo(3);
+            assertThat(owner.tabCount()).as("the split is a tab of its own").isEqualTo(4);
             assertThat(retained.view().selectedText()).contains("alpha");
         });
     }
@@ -331,15 +331,15 @@ class ConfigurationControllerTest {
     @Test @DisabledOnOs(OS.WINDOWS)
     void fullLiveOptionsReachEveryRetainedAndPendingPaneWithStableSessions() throws Exception {
         start(""); edt(() -> { owner(); owner(); }); launchAll();
-        var first = owners.getFirst(); var retained = first.currentPane(); var tab = first.currentTab();
+        var first = owners.getFirst(); var retained = first.currentPane(); var tab = first.currentTerminal();
         var session = retained.session();
         edt(() -> first.invoke(ActionId.SPLIT_RIGHT)); launchAll();
         var sibling = first.currentPane();
-        edt(() -> { tab.toggleZoom(); first.newTab(HOME); });
+        edt(() -> { first.toggleMaximize(); first.newTab(HOME); });
         reload(liveSettings(18));
         launchAll();
         edt(() -> {
-            assertThat(tab.tree().zoomed()).isTrue();
+            assertThat(first.workspace().model().maximized()).isPresent();
             assertThat(retained.session()).isSameAs(session);
             for (var pane : List.of(retained, sibling, first.currentPane(), owners.get(1).currentPane())) {
                 var options = pane.view().options();
@@ -364,7 +364,7 @@ class ConfigurationControllerTest {
             assertThat(field(retained.view(), "inactiveDim")).isEqualTo(.65f);
             first.setActive(true);
             assertThat(field(first.currentPane().view(), "inactiveDim")).isEqualTo(0f);
-            first.selectTab(tab); tab.toggleZoom(); tab.focus(retained);
+            first.selectTab(tab); first.toggleMaximize(); first.selectTab(tab);
             assertThat(field(sibling.view(), "inactiveDim")).isEqualTo(.65f);
         });
     }

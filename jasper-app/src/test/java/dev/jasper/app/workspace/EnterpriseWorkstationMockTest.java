@@ -31,9 +31,9 @@ class EnterpriseWorkstationMockTest {
     /** The mocks' window: the 34 px toolbar row, "Local: ~" and the selected "Mac: ~", a configuration warning. EDT. */
     static void workstation(WindowContent owner) {
         owner.setToolbarHeight(34);
-        owner.currentTab().rename("Local: ~");
+        owner.currentTerminal().rename("Local: ~");
         owner.newTab(DesktopTestSupport.HOME);
-        owner.currentTab().rename("Mac: ~");
+        owner.currentTerminal().rename("Mac: ~");
         owner.setConfigurationState(RuledCellsTest.state(ConfigDiagnostic.Severity.WARNING));
         owner.update();
     }

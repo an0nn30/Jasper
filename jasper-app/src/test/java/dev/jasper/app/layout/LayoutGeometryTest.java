@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-/** Spec 7.3: splits, new groups, sizes, maximize, regions and neighbours; today's SplitTreeTest cases, ported. */
+/** Spec 7.3: splits, new groups, sizes, maximize, regions and neighbours; SplitTreeTest cases, ported. */
 class LayoutGeometryTest {
     /** The group {@code split} made for tab {@code n}. */
     static Group fresh(Layout split, int n) {
