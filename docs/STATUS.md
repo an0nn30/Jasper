@@ -1,5 +1,12 @@
 # Jasper — Status and Handoff
 
+**macOS/Windows CI follow-up — 2026-10-19** (`codex/ubuntu-rendering-tests`, PR #1): Startup
+fixtures await application shutdown before temporary-home cleanup. Windows fixes cover native
+linker artifacts and const-correct C fixtures, portable filesystem fixtures, FTP completion waits,
+font-aware rendering assertions and stable gallery scale. Remote shell tests now run through Git
+Bash on Windows; worktree/home comparison canonicalizes both paths. Focused local suites pass;
+hosted verification and Windows listener timeout diagnostics remain pending. No new test skips.
+
 **Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
 failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical
 fonts lack symbols/CJK; CI installs DejaVu and Noto CJK. Settings mock fixtures explicitly select

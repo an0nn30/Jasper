@@ -48,6 +48,7 @@ final class Scripts {
             .append("cd -- ").append(ShellText.quote(root)).append(" 2>/dev/null || exit 3\n")
             .append("command -v git >/dev/null 2>&1 || exit 4\n")
             .append("top=$(git -c core.fsmonitor=false rev-parse --show-toplevel 2>/dev/null) || exit 4\n")
+            .append("top=$(cd -- \"$top\" 2>/dev/null && pwd -P) || exit 4\n")
             .append("home=$(cd -- \"${HOME:-/nonexistent}\" 2>/dev/null && pwd -P)\n")
             .append("[ \"$top\" = \"$home\" ] && exit 4\n")
             .append("printf '").append(LIST).append("\\000'\n")

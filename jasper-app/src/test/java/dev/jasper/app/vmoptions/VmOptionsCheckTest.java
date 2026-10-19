@@ -37,7 +37,7 @@ class VmOptionsCheckTest {
         + "Error occurred during initialization of VM\nUnable to use AOT cache.\n";
     private static final String CLASSPATH = "/app/jasper-app.jar" + File.pathSeparator + "/app/b.jar";
     /** The cache check with the bundled options alone. */
-    private static final List<String> BUNDLED_CACHE = List.of("/java", "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions",
+    private static final List<String> BUNDLED_CACHE = List.of(Path.of("/java").toString(), "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions",
         "-XX:AOTCache=/app/jasper.aot", "-XX:AOTMode=on", "-cp", CLASSPATH, "-version");
     private static final VmOptionsCheck.Outcome TIMED_OUT = new VmOptionsCheck.Outcome(-1, "", true);
 
@@ -59,9 +59,9 @@ class VmOptionsCheckTest {
             : ok()).check(parsed("-XX:+NoSuchFlag\n-Xmx1g\n")).orElseThrow();
         assertThat(findings.unrecognized()).containsExactly("-XX:+NoSuchFlag");
         assertThat(findings.fatal()).isEmpty();
-        assertThat(runs.getFirst()).containsExactly("/java", "-XX:-IgnoreUnrecognizedVMOptions", "-XX:+NoSuchFlag", "-version");
+        assertThat(runs.getFirst()).containsExactly(Path.of("/java").toString(), "-XX:-IgnoreUnrecognizedVMOptions", "-XX:+NoSuchFlag", "-version");
         assertThat(runs.get(2)).as("then the line-up as launched")
-            .containsExactly("/java", "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:+NoSuchFlag", "-Xmx1g", "-version");
+            .containsExactly(Path.of("/java").toString(), "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:+NoSuchFlag", "-Xmx1g", "-version");
     }
 
     @Test void aJvmThatRejectsTheOptionsIsRecoverable() throws IOException {
@@ -87,7 +87,7 @@ class VmOptionsCheckTest {
         assertThat(findings.cacheUsedOptions()).as("the cache starts with the bundled options alone, so the options are to blame").isTrue();
         assertThat(findings.cacheChecked()).isTrue();
         assertThat(runs.subList(runs.size() - 2, runs.size())).as("the cache with the line-up, then once more with the bundled options alone")
-            .containsExactly(List.of("/java", "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:AOTCache=/app/jasper.aot", "-XX:+UseZGC",
+            .containsExactly(List.of(Path.of("/java").toString(), "-Xmx256m", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:AOTCache=/app/jasper.aot", "-XX:+UseZGC",
                 "-XX:AOTMode=on", "-cp", CLASSPATH, "-version"), BUNDLED_CACHE);
         runs.clear();
         var untrained = check(IMAGE, command -> ok()).check(parsed("-XX:+UseZGC\n")).orElseThrow();
@@ -175,7 +175,7 @@ class VmOptionsCheckTest {
     @Test void afterASkippedCacheTheCacheIsCheckedEvenWithoutCustomOptions() throws IOException {
         var findings = check(TRAINED, command -> command.contains("-XX:AOTMode=on") ? new VmOptionsCheck.Outcome(1, SEALED, false) : ok())
             .checkWithCache(parsed("# only a comment\n")).orElseThrow();
-        assertThat(runs).singleElement().satisfies(command -> assertThat(command).containsExactly("/java", "-Xmx256m",
+        assertThat(runs).singleElement().satisfies(command -> assertThat(command).containsExactly(Path.of("/java").toString(), "-Xmx256m",
             "-XX:+IgnoreUnrecognizedVMOptions", "-XX:AOTCache=/app/jasper.aot", "-XX:AOTMode=on", "-cp", CLASSPATH, "-version"));
         assertThat(findings).isEqualTo(new VmOptionsCheck.Findings(List.of(), Optional.empty(), Optional.of(SEALED_FATAL), false, true));
         runs.clear();

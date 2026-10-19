@@ -31,7 +31,7 @@ class ThemeButtonsTest {
                 SwingUtilities.updateComponentTreeUI(parent);
                 SwingUtilities.updateComponentTreeUI(dialog);
                 assertThat(button.getUI()).isInstanceOf(FlatButtonUI.class);
-                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(13f);
+                assertThat(button.getFont().getSize2D()).as("form font").isEqualTo(UIManager.getFont("defaultFont").getSize2D());
                 // FlatLaf sizes the text button to its line inside margin and border (20 to 28 with the macOS faces).
                 var insets = button.getInsets();
                 assertThat(button.getPreferredSize().height).isEqualTo(button.getFontMetrics(button.getFont()).getHeight() + insets.top + insets.bottom);

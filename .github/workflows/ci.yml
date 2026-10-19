@@ -56,3 +56,14 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: ./gradlew -p docs/examples/external-plugin -PjasperSdkDir="$PWD/build/sdk-release" check pluginZip --stacktrace
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-diagnostics-${{ matrix.os }}
+          path: |
+            **/build/test-results/**
+            **/build/reports/tests/**
+            jasper-app/build/enterprise-settings/**
+            jasper-app/build/chrome-renders/**
+          retention-days: 7

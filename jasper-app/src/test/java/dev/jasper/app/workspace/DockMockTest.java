@@ -262,12 +262,12 @@ class DockMockTest {
                 fixture.render(1);
                 fixture.focus("sftp");
                 var render = variant.seen(fixture.render(2));
-                compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), 48, 180, 600);
-                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), 48, 944, 600);
-                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), 2136, 1014, 700);
+                compareHeader(variant, kind + "-sftp-header", render, fixture.header("sftp"), fixture.nativeCount("sftp"), 48, 180, 600);
+                compareHeader(variant, kind + "-servers-header", render, fixture.header("servers"), fixture.nativeCount("servers"), 48, 944, 600);
+                compareHeader(variant, kind + "-tunnels-header", render, fixture.header("tunnels"), fixture.nativeCount("tunnels"), 2136, 1014, 700);
                 fixture.focus("sessions");
                 render = variant.seen(fixture.render(2));
-                compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), 2136, 180, 700);
+                compareHeader(variant, kind + "-sessions-header", render, fixture.header("sessions"), fixture.nativeCount("sessions"), 2136, 180, 700);
             }
         } finally { EnterpriseLook.restoreDefault(); }
     }
@@ -278,9 +278,10 @@ class DockMockTest {
      * stand from the trailing edge, whatever the face), each icon's extent within {@link #GLYPH_EXTENT} and its ink within
      * {@link Variant#glyphInkTolerance} (one glyph box and one ink for every action), and each text run's ink; the other
      * text edges (a text run's end within 3, a later run's start within 2) and the agreeing pixels of the text, left of the
-     * icons, follow the title's advance width and glyphs and are asserted under IBM Plex.
+     * icons, follow the title's advance width and glyphs and are asserted under IBM Plex. A native count's width must
+     * equal its independent platform label render, whose integer advances differ from the browser mock's.
      */
-    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, int mockX, int mockY, int mockWidth) {
+    static void compareHeader(Variant variant, String name, BufferedImage render, Rectangle header, String nativeCount, int mockX, int mockY, int mockWidth) {
         String where = variant.name() + " " + name;
         assertThat(2 * header.width).as(where + ": the frame's width").isEqualTo(mockWidth);
         assertThat(2 * header.height).as(where + ": 24 and the rule").isEqualTo(50);
@@ -310,13 +311,30 @@ class DockMockTest {
             } else {
                 if (i == 0) assertThat(run.start()).as(where + " title starts").isBetween(mockRun.start() - 2, mockRun.start() + 2);
                 else MockProfile.fonts(where + " run " + i + " start", run.start(), mockRun.start(), 2);
-                MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
+                if (nativeCount != null && i == 1) {
+                    // Native JLabel uses integer glyph advances: the same Plex face can make "(2)" narrower on
+                    // Windows than in the browser mock. Keep the mock's start, and require the exact ink width of
+                    // the specified text/COUNT role rendered independently by this platform's label rasterizer.
+                    assertThat(run.length()).as(where + " native count width")
+                        .isEqualTo(nativeCountWidth(nativeCount, surface, run.ink()));
+                } else MockProfile.fonts(where + " run " + i + " end", run.end(), mockRun.end(), 3);
                 assertThat(MockCrops.near(run.ink(), mockRun.ink(), 24)).as(where + " run " + i + " ink").isTrue();
             }
         }
         int text = Math.max(8, firstIcon - 8);
         MockCrops.fontsFloor(where + ": agreeing pixels",
             MockCrops.agreement(MockCrops.crop(mine, 0, 0, text, 50), MockCrops.crop(mock, 0, 0, text, 50), 24), HEADER_FLOOR);
+    }
+
+    private static int nativeCountWidth(String text, Color surface, Color ink) {
+        var label = new javax.swing.JLabel(text);
+        label.setFont(dev.jasper.app.platform.ThemeZone.font(dev.jasper.ui.metrics.Typography.Role.COUNT));
+        label.setForeground(ink);
+        label.setBackground(surface);
+        label.setOpaque(true);
+        var runs = MockCrops.runs(MockCrops.render(label, 100, 24, 2), false, 60, 10, surface);
+        assertThat(runs).as("one independently rendered count").hasSize(1);
+        return runs.getFirst().length();
     }
 
     /** The four borrowed kit header strips against the mocks' (every mock header is a plugin panel's). */

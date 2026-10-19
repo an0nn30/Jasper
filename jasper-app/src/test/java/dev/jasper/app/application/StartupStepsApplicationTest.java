@@ -14,6 +14,8 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
@@ -31,19 +33,24 @@ class StartupStepsApplicationTest {
         var shown = new ArrayList<StartupSteps.Step>();
         var closed = new AtomicInteger();
         var steps = StartupSteps.of("JasperOps", selection.loading().size(), shown::add, closed::incrementAndGet);
+        var terminated = new CountDownLatch(1);
         var original = UIManager.getLookAndFeel();
         JasperApplication[] application = new JasperApplication[1];
         try {
             edt(() -> {
-                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
                 application[0].startupSteps(steps);
                 application[0].startPlugins(dirs());
             });
             assertThat(shown).containsExactly(new StartupSteps.Step("Loading plugin: Example", 3, 5));
             assertThat(closed).hasValue(0);
         } finally {
-            edt(() -> { if (application[0] != null) application[0].quitNow(); });
-            UIManager.setLookAndFeel(original);
+            try {
+                if (application[0] != null) {
+                    edt(application[0]::quitNow);
+                    assertThat(terminated.await(5, TimeUnit.SECONDS)).as("shutdown completes before temporary home cleanup").isTrue();
+                }
+            } finally { UIManager.setLookAndFeel(original); }
         }
     }
 
@@ -55,18 +62,23 @@ class StartupStepsApplicationTest {
         assertThat(selection.presentation().branding().present()).isFalse();
         var closed = new AtomicInteger();
         var steps = StartupSteps.of("JasperOps", selection.loading().size(), step -> { }, closed::incrementAndGet);
+        var terminated = new CountDownLatch(1);
         var original = UIManager.getLookAndFeel();
         JasperApplication[] application = new JasperApplication[1];
         try {
             edt(() -> {
-                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, () -> { }, null, null, selection);
+                application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
                 application[0].startupSteps(steps);
             });
             assertThat(closed).hasValue(1);
             assertThat(steps.active()).isFalse();
         } finally {
-            edt(() -> { if (application[0] != null) application[0].quitNow(); });
-            UIManager.setLookAndFeel(original);
+            try {
+                if (application[0] != null) {
+                    edt(application[0]::quitNow);
+                    assertThat(terminated.await(5, TimeUnit.SECONDS)).as("shutdown completes before temporary home cleanup").isTrue();
+                }
+            } finally { UIManager.setLookAndFeel(original); }
         }
     }
 }

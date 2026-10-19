@@ -164,8 +164,11 @@ static void request_limit(void) {
     free(argument);
 }
 
+typedef struct { const char *entries[3]; } environment_pair;
+
 static const char *pairs(const char *name, void *context) {
-    const char *const *pair = context;
+    const environment_pair *environment = context;
+    const char *const *pair = environment->entries;
     for (; pair[0] != NULL; pair += 2) if (strcmp(pair[0], name) == 0) return pair[1];
     return NULL;
 }
@@ -173,20 +176,20 @@ static const char *pairs(const char *name, void *context) {
 /* Rules the shared vectors cannot express: the application never sees a relative or padded JASPER_HOME. */
 static void home_rules(void) {
     char out[JC_MAX_PATH];
-    const char *relative[] = { "JASPER_HOME", "rel/dir", NULL };
-    const char *padded[] = { "JASPER_HOME", "  /srv/j  ", NULL };
-    const char *blank_socket[] = { "JASPER_COMMAND_SOCKET", " ", NULL };
-    const char *windows_relative[] = { "JASPER_HOME", "rel", NULL };
-    const char *none[] = { NULL };
-    check(jc_socket_path(JC_OS_LINUX, pairs, relative, "/home/ann", "/tmp/w", out, sizeof out) == 0, "a relative home");
+    environment_pair relative = {{ "JASPER_HOME", "rel/dir", NULL }};
+    environment_pair padded = {{ "JASPER_HOME", "  /srv/j  ", NULL }};
+    environment_pair blank_socket = {{ "JASPER_COMMAND_SOCKET", " ", NULL }};
+    environment_pair windows_relative = {{ "JASPER_HOME", "rel", NULL }};
+    environment_pair none = {{ NULL }};
+    check(jc_socket_path(JC_OS_LINUX, pairs, &relative, "/home/ann", "/tmp/w", out, sizeof out) == 0, "a relative home");
     check_text(out, "/tmp/w/rel/dir/daemon/commands", "a relative home resolves from the working directory");
-    check(jc_socket_path(JC_OS_LINUX, pairs, padded, "/home/ann", "/tmp", out, sizeof out) == 0, "a padded home");
+    check(jc_socket_path(JC_OS_LINUX, pairs, &padded, "/home/ann", "/tmp", out, sizeof out) == 0, "a padded home");
     check_text(out, "/srv/j/daemon/commands", "surrounding spaces are not part of the home");
-    check(jc_socket_path(JC_OS_LINUX, pairs, blank_socket, "/home/ann", "/tmp", out, sizeof out) == 0, "a blank socket");
+    check(jc_socket_path(JC_OS_LINUX, pairs, &blank_socket, "/home/ann", "/tmp", out, sizeof out) == 0, "a blank socket");
     check_text(out, "/home/ann/.config/jasper/daemon/commands", "a blank JASPER_COMMAND_SOCKET is ignored");
-    check(jc_socket_path(JC_OS_WINDOWS, pairs, windows_relative, "C:\\Users\\ann", "C:\\w", out, sizeof out) == 0, "a relative Windows home");
+    check(jc_socket_path(JC_OS_WINDOWS, pairs, &windows_relative, "C:\\Users\\ann", "C:\\w", out, sizeof out) == 0, "a relative Windows home");
     check_text(out, "C:\\w\\rel\\daemon\\commands", "a relative Windows home");
-    check(jc_socket_path(JC_OS_LINUX, pairs, none, "/home/ann", "/tmp", out, 10) == -1, "a socket path that does not fit");
+    check(jc_socket_path(JC_OS_LINUX, pairs, &none, "/home/ann", "/tmp", out, 10) == -1, "a socket path that does not fit");
 }
 
 static char *trim_line(char *line) {

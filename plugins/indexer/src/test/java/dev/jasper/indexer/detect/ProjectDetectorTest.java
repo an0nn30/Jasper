@@ -37,14 +37,14 @@ class ProjectDetectorTest {
     }
 
     @Test void localAncestorsStopBelowHomeAndTheFileSystemRoot() {
-        Path home = Path.of("/Users/me");
-        assertThat(ProjectDetector.localAncestors(Path.of("/Users/me/src/app/lib"), home))
-            .containsExactly(Path.of("/Users/me/src/app/lib"), Path.of("/Users/me/src/app"), Path.of("/Users/me/src"));
+        Path home = Path.of("/Users/me").toAbsolutePath();
+        assertThat(ProjectDetector.localAncestors(Path.of("/Users/me/src/app/lib").toAbsolutePath(), home))
+            .containsExactly(Path.of("/Users/me/src/app/lib").toAbsolutePath(), Path.of("/Users/me/src/app").toAbsolutePath(), Path.of("/Users/me/src").toAbsolutePath());
         assertThat(ProjectDetector.localAncestors(home, home)).isEmpty();
-        assertThat(ProjectDetector.localAncestors(Path.of("/opt/tool"), home)).containsExactly(Path.of("/opt/tool"), Path.of("/opt"));
-        assertThat(ProjectDetector.localAncestors(Path.of("/"), home)).isEmpty();
-        assertThat(ProjectDetector.localAncestors(Path.of("/Users/me/src/../src/app"), home))
-            .as("normalized first").containsExactly(Path.of("/Users/me/src/app"), Path.of("/Users/me/src"));
+        assertThat(ProjectDetector.localAncestors(Path.of("/opt/tool").toAbsolutePath(), home)).containsExactly(Path.of("/opt/tool").toAbsolutePath(), Path.of("/opt").toAbsolutePath());
+        assertThat(ProjectDetector.localAncestors(Path.of("/").toAbsolutePath(), home)).isEmpty();
+        assertThat(ProjectDetector.localAncestors(Path.of("/Users/me/src/../src/app").toAbsolutePath(), home))
+            .as("normalized first").containsExactly(Path.of("/Users/me/src/app").toAbsolutePath(), Path.of("/Users/me/src").toAbsolutePath());
     }
 
     @Test void remoteAncestorsStopBeforeTheRoot() {

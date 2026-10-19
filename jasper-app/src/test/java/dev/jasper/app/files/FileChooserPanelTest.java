@@ -142,8 +142,11 @@ class FileChooserPanelTest {
             assertThat(backBounds.getLocation()).isEqualTo(new java.awt.Point(m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_SIDE_PADDING),
                 m(dev.jasper.ui.metrics.DesignMetrics.Role.CHOOSER_TOOLBAR_VERTICAL_PADDING)));
             assertThat(pathBounds.x).as("the box keeps its gap after Refresh").isEqualTo(refreshBounds.x + refreshBounds.width + gap);
-            assertThat(pathBounds.y).isEqualTo(backBounds.y);
-            assertThat(pathBounds.height).isEqualTo(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT));
+            assertThat(pathBounds.y + (pathBounds.height - backBounds.height) / 2).isEqualTo(backBounds.y);
+            var bodyFont = KitTestSupport.context().typography().font(dev.jasper.ui.metrics.Typography.Role.BODY);
+            int line = (int) Math.ceil(bodyFont.getLineMetrics("Ag", new java.awt.font.FontRenderContext(null, true, true)).getHeight());
+            assertThat(pathBounds.height).isEqualTo(Math.max(m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_HEIGHT),
+                line + m(dev.jasper.ui.metrics.DesignMetrics.Role.FIELD_VERTICAL_PADDING)));
             assertThat(pathBounds.x + pathBounds.width).as("the box reaches the trailing tools").isEqualTo(toolsBounds.x - gap);
             for (String id : List.of("back", "forward", "up", "refresh")) {
                 var button = KitTestSupport.require(panel, id, JComponent.class);

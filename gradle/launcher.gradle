@@ -213,8 +213,10 @@ def nativeBuild = { Map spec ->
                 ['-o', output.absolutePath]
             break
         default:
+            // Export sidecars belong with the objects, not among jpackage's launcher resources.
             link = [msvcTool('cl.exe'), '/nologo'] + objects + (spec.resources ?: []).collect { it.absolutePath } +
-                ["/Fe${output.absolutePath}".toString(), '/link', '/OPT:REF', '/INCREMENTAL:NO', '/MANIFEST:NO', '/STACK:1048576'] +
+                ["/Fe${output.absolutePath}".toString(), '/link',
+                 "/IMPLIB:${new File(work, output.name + '.lib').absolutePath}".toString(), '/OPT:REF', '/INCREMENTAL:NO', '/MANIFEST:NO', '/STACK:1048576'] +
                 (spec.subsystem ? ["/SUBSYSTEM:${spec.subsystem}".toString()] : []) + (spec.libraries ?: [])
     }
     runLauncherTool(link, host.os == 'windows' ? msvc() : null, work, "linking ${output.name}", hint)

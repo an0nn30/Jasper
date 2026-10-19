@@ -32,6 +32,7 @@ subprojects {
         jvmArgs("--enable-native-access=ALL-UNNAMED")
         // A hung test fails by name instead of holding a CI runner until the job times out.
         systemProperty("junit.jupiter.execution.timeout.default", "5m")
+        systemProperty("junit.jupiter.execution.timeout.threaddump.enabled", "true")
         // CI logs are the only view of a Linux or Windows failure, so print the assertion message too.
         testLogging {
             events("failed")
