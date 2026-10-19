@@ -43,7 +43,7 @@ class EditorDocumentPreservationTest {
             var invocation = new dev.jasper.app.commandline.Invocation(List.of("editor", "--wait", file.toString()), root,
                 Optional.empty(), text -> { }, err::append);
             exit = editor.host.commands.dispatch(invocation).toCompletableFuture();
-            StagedVaultHost.await(() -> onEdtValue(() -> editor.contributions.content().entries().size() == 1), "the file's tab");
+            StagedVaultHost.await(() -> onEdtValue(() -> editor.contributions.tabs().hosted().size() == 1), "the file's tab");
             StagedVaultHost.await(() -> onEdtValue(() -> editor.documentText().getText().equals("message\n")), "the file's text");
             assertThat(exit).as("waiting for the tab to close").isNotDone();
         }
@@ -65,7 +65,7 @@ class EditorDocumentPreservationTest {
                 area.setText("int foo = 42;\nfoo += 1;\n");
                 call(call(editor.selectedTab(),"session"),"setStyle",new Class<?>[]{String.class},"text/java");
                 area.append("// edit\n"); area.select(4,7);
-                var tab=editor.contentTab(); var entry=editor.contributions.content().entries().getFirst();
+                var tab=editor.contentTab(); var entry=editor.contributions.tabs().hosted().getFirst();
                 assertThat(entry.commands()).extracting(dev.jasper.app.contributions.ContentCommand::title)
                     .contains("Save", "Save As…", "Save All", "Open…", "New File", "Close Tab", "Find…", "Replace…", "Go to Line…",
                         "Toggle Comment", "Revert to Saved", "Language…", "Toggle Soft Wrap", "Toggle Vim Mode");
@@ -236,7 +236,7 @@ class EditorDocumentPreservationTest {
                 area.setCaretPosition(0); measure(area);
                 call(editor.editorWindow(),"toggleVim");
                 var vim=((Optional<?>)call(editor.selectedTab(),"vimEditor")).orElseThrow();
-                var view=(KitView)editor.contributions.content().entries().getFirst().component();
+                var view=(KitView)editor.contributions.tabs().hosted().getFirst().component();
                 feed(editor,vim,"/line<Left>");
                 var status=named(view,"vim.status",JLabel.class);
                 assertThat(status.getText()).isEqualTo("/line");

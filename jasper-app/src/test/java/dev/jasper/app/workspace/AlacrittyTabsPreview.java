@@ -60,7 +60,7 @@ public final class AlacrittyTabsPreview {
                 render(root, owner, output, "light-two", 1040);
                 var contributions = new dev.jasper.app.contributions.Contributions();
                 owner.connectContributions(contributions);
-                var document = contributions.content().open("preview.editor", "config", "config.yml", owner.id(), new javax.swing.JTextArea("key: value"));
+                var document = contributions.tabs().open("preview.editor", "config", "config.yml", owner.id(), new javax.swing.JTextArea("key: value"));
                 document.presentation("config.yml", "", dev.jasper.app.platform.AppIcons.named("FILE"), false, "config.yml", "");
                 for (boolean themeDark : new boolean[]{true, false}) {
                     owner.selectVariant(themeDark);
@@ -74,7 +74,7 @@ public final class AlacrittyTabsPreview {
                 owner.selectTab(owner.terminalTabs().get(1)); render(root, owner, output, "light-chrome-dark-workspace", 1040);
                 owner.applyBackgroundOpacity(.5); render(root, owner, output, "glass", 1040);
                 owner.applyBackgroundOpacity(1); owner.selectVariant(true);
-                var fourth = contributions.content().open("preview.editor", "fourth", "README.md", owner.id(), new javax.swing.JTextArea());
+                var fourth = contributions.tabs().open("preview.editor", "fourth", "README.md", owner.id(), new javax.swing.JTextArea());
                 owner.selectTab(owner.terminalTabs().getFirst()); render(root, owner, output, "dark-four", 1040);
                 fourth.requestClose(); document.requestClose(); owner.closeTab(owner.terminalTabs().get(1));
                 render(root, owner, output, "dark-single", 1040);

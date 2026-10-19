@@ -17,7 +17,7 @@ class HostedContentTest {
             var owner=content(launcher(new ArrayDeque<>())); var terminal=owner.currentTab();
             var model=new Contributions();owner.connectContributions(model);
             var panel=new JTextArea("text");
-            var entry=model.content().open("dev.editor","file","File",owner.id(),panel);
+            var entry=model.tabs().open("dev.editor","file","File",owner.id(),panel);
             entry.presentation("File","host",new ImageIcon(),true,"/etc/file","host");
             assertThat(owner.currentTab()).isNull(); assertThat(owner.currentPane()).isNull();
             assertThat(owner.terminalTabs()).containsExactly(terminal);
@@ -38,7 +38,7 @@ class HostedContentTest {
             var terminal = owner.currentTab();
             var root = new JRootPane(); root.setContentPane(owner); owner.installRootBindings(root);
             var model = new Contributions(); owner.connectContributions(model);
-            var entry = model.content().open("dev.editor", "a", "A", owner.id(), new JPanel());
+            var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
             int[] saves = {0};
             var stroke = KeyStroke.getKeyStroke("meta S");
             entry.commands(List.of(new ContentCommand("save", "Save", stroke, true, () -> saves[0]++)));
@@ -59,13 +59,13 @@ class HostedContentTest {
             var rehearsal = content(launcher(new ArrayDeque<>()));
             rehearsal.connectContributions(model, UiState.inMemory(), false);
             rehearsal.setActive(true);
-            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(entry.window()).as("the main host stays the real window").isEqualTo(real.id());
             assertThat(real.selectedContent()).isSameAs(entry);
             assertThat(rehearsal.selectedContent()).isNull();
             assertThat(rehearsal.mayClose()).isTrue();
             rehearsal.close();
-            assertThat(model.content().entries()).as("closing the rehearsal takes nothing with it").containsExactly(entry);
+            assertThat(model.tabs().hosted()).as("closing the rehearsal takes nothing with it").containsExactly(entry);
             assertThat(real.selectedContent()).isSameAs(entry);
         });
     }
@@ -75,12 +75,12 @@ class HostedContentTest {
             var rehearsal = content(launcher(new ArrayDeque<>()));
             rehearsal.connectContributions(model, UiState.inMemory(), false);
             var created = new WindowContent[1];
-            model.content().setFactory(separate -> {
+            model.tabs().setFactory(separate -> {
                 created[0] = content(launcher(new ArrayDeque<>()));
                 created[0].connectContributions(model, UiState.inMemory());
                 return created[0].id();
             });
-            var entry = model.content().open("dev.editor", "a", "A", null, new JPanel());
+            var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(created[0]).as("a real window was asked for").isNotNull();
             assertThat(entry.window()).isEqualTo(created[0].id());
             assertThat(rehearsal.selectedContent()).isNull();
@@ -94,7 +94,7 @@ class HostedContentTest {
                 assertThat(owner.terminalTabs()).isEmpty();
                 assertThat(owner.currentPane()).isNull();
                 var model = new Contributions(); owner.connectContributions(model);
-                var entry = model.content().open("dev.editor", "a", "A", owner.id(), new JPanel());
+                var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
                 assertThat(entry.detached()).isTrue();
                 assertThat(owner.selectedContent()).isSameAs(entry);
             }

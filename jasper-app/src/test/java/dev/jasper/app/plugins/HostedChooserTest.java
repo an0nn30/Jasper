@@ -42,8 +42,8 @@ class HostedChooserTest {
     @Test void ownedDocumentPinsAcrossChooserAndOwnerClosureDiscardsResult() {
         var containment=new Containment(() -> true);
         var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
-        contributions.content().setFactory(separate -> {
-            UUID id=fixture.addWindow();contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id,separate,e -> {},e -> {},e -> {},() -> {}));return id;
+        contributions.tabs().setFactory(separate -> {
+            UUID id=fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,separate,e -> {},e -> {},e -> {},() -> {}));return id;
         });
         var disposed=new java.util.concurrent.atomic.AtomicInteger();
         var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});

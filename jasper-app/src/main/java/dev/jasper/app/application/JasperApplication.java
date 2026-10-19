@@ -468,7 +468,7 @@ public final class JasperApplication {
     }
 
     private TerminalWindow openWindow(Path directory, boolean detached, String trigger) {
-        contributions.content().setFactory(separate -> {
+        contributions.tabs().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
@@ -1189,7 +1189,7 @@ public final class JasperApplication {
             Optional.empty(), invocation -> installCommand(false)).setEnabled(commandInstall.available());
         contributions.addAction("commandline.uninstall", "Uninstall 'jasper' Command from PATH", null, commandKeywords,
             Optional.empty(), invocation -> uninstallCommand()).setEnabled(commandInstall.available());
-        contributions.content().setFactory(separate -> {
+        contributions.tabs().setFactory(separate -> {
             var created = separate ? newWindow(null) : newWindow();
             if (created == null) throw new IllegalStateException("Application is closing");
             return created.content().id();
@@ -1950,9 +1950,9 @@ public final class JasperApplication {
 
     /** Content tabs' and plugin windows' closing guards: what closing every window asks. Quit guards are not asked. EDT. */
     private boolean windowsMayClose() {
-        var requested = contributions.content().entries();
-        return contributions.content().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
-            && requested.equals(contributions.content().entries());
+        var requested = contributions.tabs().hosted();
+        return contributions.tabs().mayClose(requested) && (auxiliary == null || auxiliary.mayQuit())
+            && requested.equals(contributions.tabs().hosted());
     }
 
     /**

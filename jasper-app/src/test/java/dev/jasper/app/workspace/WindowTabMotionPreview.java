@@ -25,7 +25,7 @@ public final class WindowTabMotionPreview {
                     if (appearance.equals("glass")) owner.applyBackgroundOpacity(.55);
                     var model = new Contributions(); owner.connectContributions(model);
                     owner.closeTab(owner.currentTab());
-                    var first = model.content().open("preview", "first", "tmux", owner.id(), terminalText());
+                    var first = model.tabs().open("preview", "first", "tmux", owner.id(), terminalText());
                     first.select();
                     var clock = new AtomicLong();
                     var strip = new WindowTabs(owner, clock::get);
@@ -36,9 +36,9 @@ public final class WindowTabMotionPreview {
                     owner.installRootBindings(root);
                     strip.refresh(); root.setSize(800, 420); LayoutTestSupport.layoutTree(root);
                     render(root, strip, output, appearance + "-single");
-                    var second = model.content().open("preview", "second", "amp", owner.id(), terminalText());
+                    var second = model.tabs().open("preview", "second", "amp", owner.id(), terminalText());
                     strip.refresh(); frames(root, strip, clock, output, appearance + "-reveal");
-                    var third = model.content().open("preview", "third", "pve-root", owner.id(), terminalText());
+                    var third = model.tabs().open("preview", "third", "pve-root", owner.id(), terminalText());
                     strip.refresh(); frames(root, strip, clock, output, appearance + "-open");
                     third.requestClose(); strip.refresh(); frames(root, strip, clock, output, appearance + "-close");
                     first.select(); strip.refresh(); frames(root, strip, clock, output, appearance + "-switch");

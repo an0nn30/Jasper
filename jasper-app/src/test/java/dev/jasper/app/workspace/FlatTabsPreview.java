@@ -57,7 +57,7 @@ public final class FlatTabsPreview {
                 for (int i = 0; i < titles.length; i++) owner.terminalTabs().get(i).rename(titles[i]);
                 var contributions = new dev.jasper.app.contributions.Contributions();
                 owner.connectContributions(contributions);
-                var document = contributions.content().open("preview.editor", "config", "config.yml", owner.id(), new javax.swing.JTextArea("key: value"));
+                var document = contributions.tabs().open("preview.editor", "config", "config.yml", owner.id(), new javax.swing.JTextArea("key: value"));
                 document.presentation("config.yml", "", dev.jasper.app.platform.AppIcons.named("FILE"), false, "config.yml", "");
                 for (boolean themeDark : new boolean[]{true, false}) {
                     owner.selectVariant(themeDark);

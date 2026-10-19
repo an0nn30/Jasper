@@ -38,7 +38,7 @@ class PresentationOwnershipTest {
                 var document = child.getDocument(); child.select(1, 4);
                 int rootListeners = root.getContainerListeners().length;
                 int childListeners = child.getPropertyChangeListeners().length;
-                var entry = model.content().open("test", "shallow", "Shallow", owner.id(), root);
+                var entry = model.tabs().open("test", "shallow", "Shallow", owner.id(), root);
                 assertThat(root.getClientProperty("Jasper.workspaceTheme")).as("the variant matches: no workspace override").isNull();
                 assertThat(root.getContainerListeners()).hasSize(rootListeners);
                 assertThat(child.getPropertyChangeListeners()).hasSize(childListeners);
@@ -48,7 +48,7 @@ class PresentationOwnershipTest {
                 themes.configure(true, dev.jasper.app.config.TerminalSchemeChoice.MATCH);
                 assertThat(child.getDocument()).isSameAs(document);
                 assertThat(child.getSelectedText()).isEqualTo("eta");
-                model.content().remove(entry);
+                model.tabs().remove(entry);
                 assertThat(root.getClientProperty("Jasper.zone")).isNull();
                 assertThat(root.getClientProperty("Jasper.workspaceTheme")).isNull();
                 assertThat(child.getPropertyChangeListeners()).hasSize(childListeners);

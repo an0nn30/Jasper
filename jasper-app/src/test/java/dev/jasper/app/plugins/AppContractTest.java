@@ -137,11 +137,11 @@ class AppContractTest extends PluginContractTest {
         var dark = new java.util.concurrent.atomic.AtomicBoolean(true);
         AuxiliaryWindows auxiliary = onEdtValue(AppContractTest::headlessWindows);
         TerminalFixture terminalFixture = onEdtValue(TerminalFixture::new);
-        onEdt(() -> contributions.content().setFactory(separate -> {
+        onEdt(() -> contributions.tabs().setFactory(separate -> {
             UUID id = terminalFixture.addWindow();
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(id, separate,
+            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id, separate,
                 entry -> {}, entry -> {}, entry -> {
-                    for (var other : contributions.content().inWindow(id)) other.active(other == entry);
+                    for (var other : contributions.tabs().inWindow(id)) other.active(other == entry);
                 }, () -> {}));
             return id;
         }));
@@ -375,7 +375,7 @@ class AppContractTest extends PluginContractTest {
                 return onEdtValue(() -> auxiliary.open().stream().filter(surface -> surface.id().equals(windowId)).findFirst()
                     .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
             }
-            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.content().mayClose(contributions.content().entries()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
+            @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
             @Override public UUID addTerminalWindow() { return onEdtValue(terminalFixture::addWindow); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {

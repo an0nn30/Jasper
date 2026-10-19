@@ -100,7 +100,7 @@ final class WindowStatusBar extends JPanel {
         updateText();
     }
 
-    void setContent(dev.jasper.app.contributions.ContentEntry entry) {
+    void setContent(dev.jasper.app.contributions.Tab entry) {
         showingContent = entry != null;
         var items = entry == null ? java.util.List.<dev.jasper.app.contributions.ContentStatus>of() : entry.status();
         if (!items.equals(contentStatus)) {

@@ -553,10 +553,10 @@ final class HostedUi {
 
     private final java.util.Map<AuxiliarySurface, OwnedWindow> ownedWindows = new java.util.HashMap<>();
 
-    private final java.util.Map<dev.jasper.app.contributions.ContentEntry, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
+    private final java.util.Map<dev.jasper.app.contributions.Tab, OwnedContent> ownedContent = new java.util.IdentityHashMap<>();
     private final class OwnedContent implements dev.jasper.sdk.ui.ContentTab {
-        final dev.jasper.app.contributions.ContentEntry entry;
-        OwnedContent(dev.jasper.app.contributions.ContentEntry entry) { this.entry = entry; }
+        final dev.jasper.app.contributions.Tab entry;
+        OwnedContent(dev.jasper.app.contributions.Tab entry) { this.entry = entry; }
         public void setPresentation(dev.jasper.sdk.ui.ContentPresentation v) { requireUi("content presentation"); if(entry.closed())return; entry.presentation(v.title(), v.detail(), icon(v.icon()), v.dirty(), v.location(), v.host()); }
         public void setCommands(List<dev.jasper.sdk.ui.ContentCommand> values) { requireUi("content commands"); entry.commands(values.stream().map(v ->
             new dev.jasper.app.contributions.ContentCommand(v.id(), v.title(), v.shortcut(), v.enabled(), () -> containment.run(pluginId, "content command", v.run()))).toList()); }
@@ -678,7 +678,7 @@ final class HostedUi {
                     if (terminals.ownsOpenWindow(handle)) window = handle.id();
                     else if (!terminals.ownsWindow(handle)) throw new IllegalArgumentException("Foreign workspace owner");
                 }
-                var entry = model.content().open(pluginId, spec.key(), spec.title(), window, component);
+                var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component);
                 var existing = ownedContent.get(entry); if (existing != null) return existing;
                 var owned = new OwnedContent(entry); ownedContent.put(entry, owned);
                 Runnable cleanup = entry::close;
@@ -688,7 +688,7 @@ final class HostedUi {
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 HostedUi.this.guard("content close guard");
-                var registration = model.content().guard(pluginId, (entries,batch) -> {
+                var registration = model.tabs().guard(pluginId, (entries,batch) -> {
                     var result = new java.util.concurrent.CompletableFuture<Boolean>();
                     boolean invoked = containment.run(pluginId, "content close guard", () -> {
                         try { guard.apply(entries.stream().map(ownedContent::get).map(v -> (dev.jasper.sdk.ui.ContentTab)v).toList(),batch)

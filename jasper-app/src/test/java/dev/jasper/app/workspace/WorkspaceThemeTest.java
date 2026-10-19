@@ -39,10 +39,10 @@ class WorkspaceThemeTest {
             var owner = content(launcher(new ArrayDeque<>()), themes);
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             var panel = new JPanel(); panel.putClientProperty("FlatLaf.style", "arc: 7");
-            var entry = model.content().open("test", "file", "File", owner.id(), panel);
+            var entry = model.tabs().open("test", "file", "File", owner.id(), panel);
             assertThat(panel.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             assertThat(panel.getClientProperty("Jasper.workspaceTheme")).isNull();
-            model.content().remove(entry);
+            model.tabs().remove(entry);
             assertThat(panel.getClientProperty("Jasper.zone")).isNull();
             assertThat(panel.getClientProperty("Jasper.workspace.dark")).isNull();
             assertThat(panel.getClientProperty("FlatLaf.style")).isEqualTo("arc: 7");
@@ -72,16 +72,16 @@ class WorkspaceThemeTest {
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             try (var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
                     ThemeTestSupport.controller(false))) {
-                detached.connectContributions(model); model.content().setFactory(separate -> detached.id());
+                detached.connectContributions(model); model.tabs().setFactory(separate -> detached.id());
                 var text = new JTextArea("retained document"); var document = text.getDocument();
-                var entry = model.content().open("test", "move", "Move", owner.id(), text);
+                var entry = model.tabs().open("test", "move", "Move", owner.id(), text);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
-                model.content().move(entry, true);
+                model.tabs().move(entry, true);
                 assertThat(detached.selectedContent()).isSameAs(entry);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
                 assertThat(text.getClientProperty("Jasper.workspaceTheme")).isNull();
                 assertThat(text.getDocument()).isSameAs(document);
-                model.content().move(entry, false);
+                model.tabs().move(entry, false);
                 assertThat(owner.selectedContent()).isSameAs(entry);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             }

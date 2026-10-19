@@ -74,11 +74,11 @@ final class StagedEditorHost implements AutoCloseable {
         terminals = onEdtValue(TerminalFixture::new);
         onEdt(() -> {
             var main = terminals.addWindow(); var separate = terminals.addWindow();
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(main, false,
+            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, false,
                 e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> e.active(true), () -> { }));
-            contributions.content().addHost(new dev.jasper.app.contributions.ContentHost(separate, true,
+            contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, true,
                 e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> e.active(true), () -> { }));
-            contributions.content().setFactory(detached -> detached ? separate : main);
+            contributions.tabs().setFactory(detached -> detached ? separate : main);
         });
         host = AppContractTest.host(data.resolve("home"), Duration.ofMillis(200), contributions, new AtomicBoolean(dark), auxiliary,
             terminals.registry, new NotificationsFixture(problems), new CopyOnWriteArrayList<>(), new CopyOnWriteArrayList<>(),

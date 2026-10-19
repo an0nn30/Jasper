@@ -7,8 +7,8 @@ import dev.jasper.app.config.ConfigDiagnostic;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.config.ConfigSnapshot;
 import com.formdev.flatlaf.util.UIScale;
-import dev.jasper.app.contributions.ContentHost;
-import dev.jasper.app.contributions.ContentRegistry;
+import dev.jasper.app.contributions.WorkspaceHost;
+import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.contributions.ContentStatus;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.terminals.PaneSnapshot;
@@ -212,9 +212,9 @@ class RuledCellsTest {
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
             try {
-                var registry = new ContentRegistry();
+                var registry = new TabRegistry();
                 var window = UUID.randomUUID();
-                registry.addHost(new ContentHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                registry.addHost(new WorkspaceHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
                 var entry = registry.open("dev.x.editor", "notes", "notes.txt", window, new JPanel());
                 entry.presentation("notes.txt", "", null, false, "/work/notes.txt", "");
                 entry.status(List.of(new ContentStatus("Ln 12, Col 4", null, null), new ContentStatus("Plain Text", null, null),

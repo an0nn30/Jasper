@@ -51,8 +51,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     private final Consumer<Path> newWindow;
     private final Runnable quit;
     private final Runnable onEmpty;
-    private final java.util.Map<Component, dev.jasper.app.contributions.ContentEntry> hosted = new IdentityHashMap<>();
-    private dev.jasper.app.contributions.ContentRegistry contentRegistry;
+    private final java.util.Map<Component, dev.jasper.app.contributions.Tab> hosted = new IdentityHashMap<>();
+    private dev.jasper.app.contributions.TabRegistry contentRegistry;
     private Subscription contentHost;
     private Runnable bringToFront = () -> {};
     private final boolean detached;
@@ -859,14 +859,14 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
-            contentRegistry = model.content();
-            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.ContentHost(id, detached,
+            contentRegistry = model.tabs();
+            contentHost = contentRegistry.addHost(new dev.jasper.app.contributions.WorkspaceHost(id, detached,
                 this::mountContent, this::unmountContent, entry -> selectTab(entry.component()), () -> bringToFront.run()));
         }
         rebind();
     }
 
-    private void mountContent(dev.jasper.app.contributions.ContentEntry entry) {
+    private void mountContent(dev.jasper.app.contributions.Tab entry) {
         JComponent component = entry.component();
         try {
             WorkspaceTheme.apply(component, themes.current());
@@ -885,7 +885,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         // After the mount stands: a failing glass handler must not roll it back.
         if (backgroundOpacity < 1) glassListener.run();
     }
-    private void unmountContent(dev.jasper.app.contributions.ContentEntry entry) {
+    private void unmountContent(dev.jasper.app.contributions.Tab entry) {
         if (!hosted.containsKey(entry.component())) return;
         var listener = contentListeners.remove(entry.component());
         if (listener != null) listener.close();
@@ -894,7 +894,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (backgroundOpacity < 1) glassListener.run();
         if (tabs.getTabCount() == 0 && !closed) onEmpty.run();
     }
-    public dev.jasper.app.contributions.ContentEntry selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
+    public dev.jasper.app.contributions.Tab selectedContent() { return hosted.get(tabs.getSelectedComponent()); }
     Component selectedComponent() { return tabs.getSelectedComponent(); }
     String tabTitle(Component component) {
         var entry = hosted.get(component);
@@ -1157,7 +1157,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         return shortcutTarget(stroke, source).isPresent();
     }
 
-    private static boolean nativeContentClipboard(dev.jasper.app.contributions.ContentEntry document, KeyStroke stroke) {
+    private static boolean nativeContentClipboard(dev.jasper.app.contributions.Tab document, KeyStroke stroke) {
         return document.commands().stream().anyMatch(command ->
             stroke.equals(command.shortcut()) && (command.id().equals("copy") || command.id().equals("paste")));
     }

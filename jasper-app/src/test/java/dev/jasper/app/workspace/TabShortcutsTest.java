@@ -81,7 +81,7 @@ class TabShortcutsTest {
                 var model = new Contributions(); owner.connectContributions(model);
                 var editor = new JPanel(); var area = new JTextArea(); var field = new JTextField();
                 editor.add(area); editor.add(field);
-                model.content().open("dev.x", "a", "A", owner.id(), editor);
+                model.tabs().open("dev.x", "a", "A", owner.id(), editor);
                 CommandPaletteShortcutsTest.install(owner);
                 assertThat(manager.dispatchers).hasSize(1);
                 AWTKeyStroke ctrlTab = AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, InputEvent.CTRL_DOWN_MASK);

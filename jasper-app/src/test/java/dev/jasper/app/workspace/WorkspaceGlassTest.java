@@ -273,11 +273,11 @@ class WorkspaceGlassTest {
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             int[] runs = {0};
             owner.setGlassListener(() -> runs[0]++);
-            model.content().open("dev.editor", "opaque", "Opaque", owner.id(), new JPanel()).requestClose();
+            model.tabs().open("dev.editor", "opaque", "Opaque", owner.id(), new JPanel()).requestClose();
             assertThat(runs[0]).as("an opaque window has no glass to announce").isZero();
             owner.applyBackgroundOpacity(0.6);
             runs[0] = 0;
-            var entry = model.content().open("dev.editor", "glass", "Glass", owner.id(), new JPanel());
+            var entry = model.tabs().open("dev.editor", "glass", "Glass", owner.id(), new JPanel());
             assertThat(runs[0]).as("mounted").isEqualTo(1);
             entry.requestClose();
             assertThat(runs[0]).as("unmounted").isEqualTo(2);
@@ -291,7 +291,7 @@ class WorkspaceGlassTest {
             var hosted = new JPanel();
             var inside = new JPanel();
             hosted.add(inside);
-            model.content().open("dev.editor", "glass", "Glass", owner.id(), hosted);
+            model.tabs().open("dev.editor", "glass", "Glass", owner.id(), hosted);
             var side = new JPanel();
             var sideChild = new JPanel();
             side.add(sideChild);
@@ -329,11 +329,11 @@ class WorkspaceGlassTest {
             owner.setGlassListener(() -> { throw new AssertionError("a plugin handler failed"); });
             var component = new JPanel();
             org.assertj.core.api.Assertions.assertThatThrownBy(
-                () -> model.content().open("dev.editor", "glass", "Glass", owner.id(), component))
+                () -> model.tabs().open("dev.editor", "glass", "Glass", owner.id(), component))
                 .as("errors other than contained ones propagate").isInstanceOf(AssertionError.class);
             assertThat(owner.tabStrip().indexOfComponent(component)).as("the registry rolled the mount back").isEqualTo(-1);
             assertThat(owner.selectedContent()).isNull();
-            assertThat(model.content().entries()).isEmpty();
+            assertThat(model.tabs().hosted()).isEmpty();
         });
     }
 

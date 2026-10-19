@@ -339,7 +339,7 @@ class WindowPanelsTest {
             owner.connectContributions(model, UiState.inMemory());
             List<String> events = new ArrayList<>();
             // The selected tab is hosted content, so focusing the selection runs this instead of focusing a terminal.
-            var doc = model.content().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
+            var doc = model.tabs().open("dev.x", "doc", "Doc", owner.id(), new JPanel());
             doc.focusTarget(() -> events.add("focus"));
             for (String name : List.of("a", "b"))
                 model.addPanel("dev.x." + name, name.toUpperCase(java.util.Locale.ROOT), new ImageIcon(), Slot.LEFT_TOP, site -> {

@@ -25,8 +25,9 @@ import dev.jasper.app.files.ChooserSource;
  * EDT-only; callbacks into contributors are their concern to contain.
  */
 public final class Contributions {
-    private final ContentRegistry content = new ContentRegistry();
-    public ContentRegistry content() { return content; }
+    private final TabRegistry tabs = new TabRegistry();
+    /** Every window's tabs (workspace tabs spec 9.1): the application's one registry. */
+    public TabRegistry tabs() { return tabs; }
     private final QuitGuards quitGuards = new QuitGuards();
     public QuitGuards quitGuards() { return quitGuards; }
 

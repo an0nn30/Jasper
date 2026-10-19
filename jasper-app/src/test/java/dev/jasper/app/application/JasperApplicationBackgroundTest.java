@@ -1,7 +1,7 @@
 package dev.jasper.app.application;
 
 import dev.jasper.app.commands.CommandHistory;
-import dev.jasper.app.contributions.ContentHost;
+import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.notifications.Delivery;
 import dev.jasper.app.notifications.NotificationCenter;
 import dev.jasper.app.platform.AppDirs;
@@ -324,8 +324,8 @@ class JasperApplicationBackgroundTest {
         JasperApplication application = settled(() -> { }, true);
         try {
             edt(() -> {
-                var content = application.contributions().content();
-                content.addHost(new ContentHost(UUID.randomUUID(), false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                var content = application.contributions().tabs();
+                content.addHost(new WorkspaceHost(UUID.randomUUID(), false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
                 content.open("dev.example.editor", "notes.txt", "notes.txt", null, new JLabel("unsaved"));
                 content.guard("dev.example.editor", (entries, batch) -> {
                     asked.incrementAndGet();

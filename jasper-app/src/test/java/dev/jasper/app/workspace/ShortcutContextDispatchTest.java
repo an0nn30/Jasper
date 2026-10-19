@@ -45,7 +45,7 @@ class ShortcutContextDispatchTest {
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), pane)).isTrue();
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), panelField)).isTrue();
             var editor = new JPanel(); var inside = new JTextArea(); editor.add(inside);
-            model.content().open("dev.x", "a", "A", owner.id(), editor);
+            model.tabs().open("dev.x", "a", "A", owner.id(), editor);
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), inside)).isTrue();
             assertThat(owner.dispatchShortcut(mac("cmd+alt+j"), owner)).isTrue();
             assertThat(ran).containsExactly("global", "panel", "content", "global");
