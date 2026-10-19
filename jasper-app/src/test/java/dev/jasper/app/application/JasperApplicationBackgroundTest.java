@@ -142,6 +142,33 @@ class JasperApplicationBackgroundTest {
         }
     }
 
+    /**
+     * A {@code --background} launch whose setting is off but which holds a request (plan Ruling 20) began as an accessory
+     * application: its window needs the Dock presence a resident's gets, and it keeps it, since it quits with its last window.
+     */
+    @Test void aHiddenLaunchThatIsNotResidentShowsItselfInTheDockBeforeItsFirstWindow() throws Exception {
+        JasperApplication application = application(() -> { }, false);
+        try {
+            edt(() -> application.residency(false));
+            assertThat(dock).as("nothing opened yet").isEmpty();
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "handoff"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("in the Dock before the window is composed, and not hidden again").containsExactly(true);
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    @Test void aLaunchThatIsNotResidentAndWasNeverHiddenLeavesTheDockAlone() throws Exception {
+        JasperApplication application = application(() -> { }, true);
+        try {
+            edt(() -> application.residency(false));
+            assertThatThrownBy(() -> edt(() -> application.open(List.of(), "handoff"))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(dock).as("it was in the Dock from the start").isEmpty();
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
     private static Delivery.Presence presence(JasperApplication application) throws Exception {
         Delivery.Presence[] held = new Delivery.Presence[1];
         edt(() -> held[0] = application.notificationCenter().presence());

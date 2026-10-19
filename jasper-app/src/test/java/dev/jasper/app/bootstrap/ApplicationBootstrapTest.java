@@ -178,17 +178,35 @@ class ApplicationBootstrapTest {
         ApplicationBootstrap.reconcileLoginItem(true, null, fakeHome);
         assertThat(plist).doesNotExist();
     }
+    /**
+     * The {@code Consumer<Startup>} form leaves the owner to its caller, so only {@code start}'s own rollback can release the
+     * home here: a failed {@code main} must not keep the lock, whose endpoints answer handoffs on non-daemon threads.
+     */
     @Test void failedDesktopDispatchClosesConfigurationAndPreservesError() throws Exception {
         var received = new AtomicReference<ConfigService>();
         var original = new AssertionError("desktop dispatch");
         try {
             assertThatThrownBy(() -> ApplicationBootstrap.start(new String[]{"--config", directory.resolve("config.toml").toString()},
-                System.out, System.err, dirs(), (service, options) -> { received.set(service); throw original; })).isSameAs(original);
+                System.out, System.err, dirs(), startup -> { received.set(startup.service()); throw original; })).isSameAs(original);
             assertThat(received.get().reload()).isCompletedExceptionally();
-            try (var again = dev.jasper.app.residency.InstanceLock.tryAcquire(dirs().instanceLock()).orElseThrow()) {
-                assertThat(again.file()).as("the rollback released the home").isEqualTo(dirs().instanceLock());
+            assertThat(dirs().daemonSocket()).as("its endpoint is closed").doesNotExist();
+            try (var again = dev.jasper.app.residency.InstanceLock.tryAcquire(dirs().instanceLock())
+                    .orElseThrow(() -> new AssertionError("the rollback kept the home"))) {
+                assertThat(again.file()).isEqualTo(dirs().instanceLock());
             }
         } finally { if (received.get() != null) received.get().close(); }
+    }
+
+    @Test void aFailedPrePassReleasesTheHome() throws Exception {
+        var original = new AssertionError("pre-pass");
+        assertThatThrownBy(() -> ApplicationBootstrap.start(new String[0], System.out, System.err, dirs(),
+            (dirs, options) -> { throw original; }, startup -> { throw new AssertionError("a failed pre-pass never starts"); }))
+            .isSameAs(original);
+        assertThat(dirs().daemonSocket()).as("its endpoint is closed").doesNotExist();
+        try (var again = dev.jasper.app.residency.InstanceLock.tryAcquire(dirs().instanceLock())
+                .orElseThrow(() -> new AssertionError("the rollback kept the home"))) {
+            assertThat(again.file()).isEqualTo(dirs().instanceLock());
+        }
     }
 
     @Test void onlyAPackagedMacLoginLaunchStartsHiddenFromTheDock() throws Exception {

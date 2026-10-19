@@ -1934,11 +1934,13 @@ public final class JasperApplication {
     }
 
     /**
-     * Whether this process switches its Dock presence now: a resident macOS Jasper that is not quitting. Quitting for
+     * Whether this process switches its Dock presence now: a resident macOS Jasper that is not quitting, or a
+     * {@code --background} launch that is not resident after all but carries out a request, which began hidden and
+     * needs the Dock for its first window (once visible it stays so, as it quits with its last window). Quitting for
      * real never touches the Dock, so a log-out or shutdown never waits on AppKit. EDT.
      */
     private boolean dockFollowsWindows() {
-        return dock != null && resident && !quitting && !stopped;
+        return dock != null && (resident || !dock.visible()) && !quitting && !stopped;
     }
 
     /**
