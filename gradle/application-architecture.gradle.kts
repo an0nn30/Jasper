@@ -23,7 +23,7 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
         }
         val supported = setOf("view.BuddyCompanion", "notice.BuddyNotice", "notice.BuddyNoticeId",
             "config.BuddyOptions", "config.BuddyPosition").map { "dev.jasper.buddy.$it" }.toSet()
-        // The dock model is pure: JDK types only, and from java.awt only two value classes.
+        // The dock model is pure: JDK types and the layout's values only, and from java.awt only two value classes.
         val dockAwt = setOf("java.awt.Rectangle", "java.awt.Point")
         fun topLevel(name: String) = name.substringBefore('$')
         fun packageOf(name: String) = name.substringBeforeLast('.')
@@ -61,7 +61,8 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         "SDK types are confined to dev.jasper.app.plugins: $line"
                     }
                 if (module == app && packageOf(from) == "dev.jasper.app.dock")
-                    check(to.startsWith("dev.jasper.app.dock.") || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
+                    check(to.startsWith("dev.jasper.app.dock.") || to.startsWith("dev.jasper.app.layout.")
+                        || (to.startsWith("java.") && !to.startsWith("java.awt.")) || to in dockAwt) {
                         "dev.jasper.app.dock is JDK-only and holds no Swing or AWT components: $line"
                     }
                 // The workspace layout model is pure: JDK types only and nothing from java.awt.
