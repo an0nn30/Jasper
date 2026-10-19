@@ -564,6 +564,18 @@ public final class PluginRuntime {
         subcommandList = file;
     }
 
+    /**
+     * Whether a plugin declares {@code name} as a {@code jasper} subcommand, whether or not it runs; false before the
+     * plugins start. Any thread.
+     *
+     * @param name the first argument of a call
+     * @return true when the call is a plugin's
+     */
+    public boolean declaresSubcommand(String name) {
+        PluginHost current = host;
+        return current != null && current.commands.declares(name);
+    }
+
     /** Runs {@code jasper <subcommand>} calls in the plugins that answer them. */
     public dev.jasper.app.commandline.CommandDispatcher commands() {
         return invocation -> {

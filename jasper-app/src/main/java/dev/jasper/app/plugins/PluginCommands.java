@@ -53,6 +53,9 @@ final class PluginCommands implements CommandDispatcher {
     /** The owners, by name. */
     List<Subcommands.Owner> owners() { return table.all(); }
 
+    /** Whether a plugin declares {@code name} as a subcommand, whether or not it runs. */
+    boolean declares(String name) { return table.owner(name).isPresent(); }
+
     /**
      * Registers a plugin's handler.
      *

@@ -298,6 +298,7 @@ class PluginRuntimeTest {
         Path list = root.resolve("subcommands.tsv");
         PluginRuntime runtime = runtime(bundled, user, null, false, new ArrayList<>());
         onEdt(() -> runtime.subcommandList(list));
+        assertThat(runtime.declaresSubcommand("alpha")).as("before the plugins start").isFalse();
         onEdt(() -> runtime.start(Map.of(), true));
         assertThat(runtime.statusLines())
             .anySatisfy(line -> assertThat(line).contains("dev.example.alpha", "ACTIVE"))
@@ -305,6 +306,9 @@ class PluginRuntimeTest {
         assertThat(run(runtime, "beta", 1)).isEqualTo("jasper: beta is unavailable (the dev.example.beta plugin is off)\n");
         assertThat(run(runtime, "alpha", 1)).as("running, but it never called handle").isEqualTo("jasper: alpha is unavailable (the dev.example.alpha plugin is off)\n");
         assertThat(run(runtime, "gamma", 2)).isEqualTo("jasper: unknown command gamma; run jasper --help for the list\n");
+        assertThat(runtime.declaresSubcommand("alpha")).isTrue();
+        assertThat(runtime.declaresSubcommand("beta")).as("declared, though its plugin waits for consent").isTrue();
+        assertThat(runtime.declaresSubcommand("gamma")).isFalse();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (!Files.exists(list) && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(dev.jasper.app.commandline.SubcommandList.read(list)).as("--help lists only what runs").containsExactly(

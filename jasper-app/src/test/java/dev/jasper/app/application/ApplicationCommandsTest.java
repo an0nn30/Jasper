@@ -6,6 +6,7 @@ import dev.jasper.app.commandline.Invocation;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.ConfigService;
 import dev.jasper.app.workspace.DesktopTestSupport;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,52 @@ class ApplicationCommandsTest {
         var exit = application.commands().dispatch(new Invocation(List.of("editor"), dir, Optional.empty(), text -> { }, err::append));
         assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
         assertThat(err).hasToString("jasper: Jasper's plugins are not running\n");
+        DesktopTestSupport.edt(application::quitNow);
+    }
+
+    @Test void commandArgumentsArePathsOnlyWhenEveryOneExistsAndNoSubcommandClaimsTheFirst() throws Exception {
+        Path notes = Files.writeString(dir.resolve("notes.txt"), "");
+        Path src = Files.createDirectory(dir.resolve("src"));
+        Path editor = Files.writeString(dir.resolve("editor"), "");
+        assertThat(JasperApplication.commandPaths(dir, List.of(), name -> false)).as("no arguments: a raise").contains(List.of());
+        assertThat(JasperApplication.commandPaths(dir, List.of("notes.txt", "./src", src.toString()), name -> false))
+            .contains(List.of(notes, src, src));
+        assertThat(JasperApplication.commandPaths(dir, List.of("notes.txt", "missing.txt"), name -> false)).isEmpty();
+        assertThat(JasperApplication.commandPaths(dir, List.of("editor"), "editor"::equals)).as("a subcommand wins").isEmpty();
+        assertThat(JasperApplication.commandPaths(dir, List.of("./editor"), "editor"::equals)).contains(List.of(editor));
+        assertThat(JasperApplication.commandPaths(dir, List.of("editr"), "editor"::equals)).as("a word that names nothing").isEmpty();
+    }
+
+    @Test void aCallNamingFilesOpensThemAndIsAnsweredOnceTheyAreOpen() throws Exception {
+        JasperApplication application = application(() -> { });
+        Files.writeString(dir.resolve("notes.txt"), "");
+        DesktopTestSupport.edt(application::quitNow);   // open is then inert: no window can be composed headlessly
+        var err = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("notes.txt"), dir, Optional.empty(), text -> { }, err::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isZero();
+        assertThat(err).as("a path call, not a plugin's subcommand").isEmpty();
+    }
+
+    @Test void aWordThatNamesNothingIsStillACommand() throws Exception {
+        JasperApplication application = application(() -> { });
+        var err = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("editr"), dir, Optional.empty(), text -> { }, err::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(err).hasToString("jasper: Jasper's plugins are not running\n");
+        DesktopTestSupport.edt(application::quitNow);
+    }
+
+    @Test void aCallThatStartsWithAPathSaysWhichOthersAreMissing() throws Exception {
+        Files.writeString(dir.resolve("notes.txt"), "");
+        assertThat(JasperApplication.missingPaths(dir, List.of("notes.txt", "gone.txt", "src/x"), name -> false))
+            .containsExactly("gone.txt", "src/x");
+        assertThat(JasperApplication.missingPaths(dir, List.of("gone.txt", "notes.txt"), name -> false)).as("a command, as before").isEmpty();
+        assertThat(JasperApplication.missingPaths(dir, List.of("notes.txt", "gone.txt"), "notes.txt"::equals)).as("a subcommand").isEmpty();
+        JasperApplication application = application(() -> { });
+        var err = new StringBuilder();
+        var exit = application.commands().dispatch(new Invocation(List.of("notes.txt", "gone.txt"), dir, Optional.empty(), text -> { }, err::append));
+        assertThat(exit.toCompletableFuture().get(5, TimeUnit.SECONDS)).isEqualTo(1);
+        assertThat(err).hasToString("jasper: no such file or folder: gone.txt\n");
         DesktopTestSupport.edt(application::quitNow);
     }
 

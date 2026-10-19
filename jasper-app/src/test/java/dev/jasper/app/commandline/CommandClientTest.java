@@ -127,6 +127,16 @@ class CommandClientTest {
         assertThat(seen.get()).isEmpty();
     }
 
+    @Test void pathsAreACallThatNamesTheCallersFolder() throws Exception {
+        var seen = new AtomicReference<Invocation>();
+        bind(invocation -> { seen.set(invocation); return CompletableFuture.completedFuture(0); });
+        String absolute = dir.resolve("notes.txt").toString();
+        assertThat(run(atSocket(), List.of("./notes.txt", "src", absolute)).exit()).isZero();
+        assertThat(seen.get().arguments()).as("sent as given: Jasper tells a path from a subcommand")
+            .containsExactly("./notes.txt", "src", absolute);
+        assertThat(seen.get().workingDirectory().toRealPath()).isEqualTo(dir.toRealPath());
+    }
+
     @Test void theHomeComesFromJasperHomeWhenNoSocketIsNamed() throws Exception {
         bind(invocation -> CompletableFuture.completedFuture(5));
         assertThat(run(Map.of("JASPER_HOME", dir.toString()), List.of("editor")).exit()).isEqualTo(5);
@@ -298,7 +308,7 @@ class CommandClientTest {
     @Test void helpListsTheSubcommandsJasperLastRecorded() throws Exception {
         Result bare = run(atSocket(), List.of("--help"));
         assertThat(bare.exit()).isZero();
-        assertThat(bare.out()).startsWith("Usage: jasper").contains("Start Jasper once to list the plugin commands.");
+        assertThat(bare.out()).startsWith("Usage: jasper [PATH...]").contains("Start Jasper once to list the plugin commands.");
         SubcommandList.write(dir.resolve("daemon").resolve("subcommands"),
             List.of(new SubcommandList.Entry("editor", "Open files in Jasper's Editor", "Editor")));
         Result listed = run(atSocket(), List.of("--help"));

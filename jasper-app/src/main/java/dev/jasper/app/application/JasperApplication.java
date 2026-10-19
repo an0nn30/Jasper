@@ -665,22 +665,86 @@ public final class JasperApplication {
     }
 
     /**
-     * What the command socket runs: no arguments opens a window or raises one, as a launch would; anything else is a
-     * plugin's subcommand. Called on listener threads.
+     * What the command socket runs (workspace-tabs spec 5.4): no arguments raises or opens a window, as a launch would;
+     * a subcommand a plugin declares runs in that plugin; otherwise arguments that all name existing files or folders
+     * open as a launch's paths do ({@code commandPaths}), and a call whose first argument names one while others name
+     * nothing says which ({@code missingPaths}). A raise or a path call is answered once it has run. Called on listener
+     * threads.
      */
     public CommandDispatcher commands() {
         return invocation -> {
-            if (invocation.arguments().isEmpty()) {
-                SwingUtilities.invokeLater(() -> open(List.of(), HANDOFF));
-                return CompletableFuture.completedFuture(0);
-            }
             PluginRuntime runtime = plugins;
+            java.util.function.Predicate<String> subcommand = name -> runtime != null && runtime.declaresSubcommand(name);
+            Optional<List<Path>> paths = commandPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
+            if (paths.isPresent()) {
+                var opened = new CompletableFuture<Integer>();
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        open(paths.get(), HANDOFF);
+                        opened.complete(0);
+                    } catch (RuntimeException failure) {
+                        opened.completeExceptionally(failure);
+                    }
+                });
+                return opened;
+            }
+            List<String> missing = missingPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
+            if (!missing.isEmpty()) {
+                invocation.err("jasper: no such file or folder: " + String.join(", ", missing) + "\n");
+                return CompletableFuture.completedFuture(1);
+            }
             if (runtime == null) {
                 invocation.err("jasper: Jasper's plugins are not running\n");
                 return CompletableFuture.completedFuture(1);
             }
             return runtime.commands().dispatch(invocation);
         };
+    }
+
+    /**
+     * The {@code jasper} command's arguments as a launch's paths (workspace-tabs plan 1, Ruling 11): none is a raise; a
+     * first argument {@code subcommand} accepts is a plugin's call; otherwise every argument, resolved against the
+     * caller's folder, must name an existing file or folder. Any thread.
+     *
+     * @param workingDirectory the caller's folder
+     * @param arguments everything after {@code jasper}
+     * @param subcommand whether a plugin declares a name as its subcommand
+     * @return the absolute paths to open (none to raise), or empty when the call is not about paths
+     */
+    static Optional<List<Path>> commandPaths(Path workingDirectory, List<String> arguments,
+                                             java.util.function.Predicate<String> subcommand) {
+        if (arguments.isEmpty()) return Optional.of(List.of());
+        if (subcommand.test(arguments.getFirst())) return Optional.empty();
+        try {
+            List<Path> paths = arguments.stream().map(argument -> workingDirectory.resolve(argument).toAbsolutePath().normalize()).toList();
+            return paths.stream().allMatch(java.nio.file.Files::exists) ? Optional.of(paths) : Optional.empty();
+        } catch (java.nio.file.InvalidPathException notAPath) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The arguments that name nothing, when the first names an existing file or folder and no plugin declares it as a
+     * subcommand (workspace-tabs plan 1, Ruling 11): such a call meant paths, so it is told which are missing rather than
+     * that it is an unknown command. Any thread.
+     *
+     * @param workingDirectory the caller's folder
+     * @param arguments everything after {@code jasper}
+     * @param subcommand whether a plugin declares a name as its subcommand
+     * @return the missing arguments as given, in order; empty when the call is not about paths or all exist
+     */
+    static List<String> missingPaths(Path workingDirectory, List<String> arguments, java.util.function.Predicate<String> subcommand) {
+        if (arguments.isEmpty() || subcommand.test(arguments.getFirst()) || !exists(workingDirectory, arguments.getFirst()))
+            return List.of();
+        return arguments.stream().filter(argument -> !exists(workingDirectory, argument)).toList();
+    }
+
+    private static boolean exists(Path workingDirectory, String argument) {
+        try {
+            return java.nio.file.Files.exists(workingDirectory.resolve(argument));
+        } catch (java.nio.file.InvalidPathException notAPath) {
+            return false;
+        }
     }
 
     /** Quits a Jasper that is not resident once nothing keeps it: no terminal or plugin window, and {@code busy} false. EDT. */

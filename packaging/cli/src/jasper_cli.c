@@ -61,12 +61,15 @@ typedef socklen_t jc_length;
 #define MAX_OPTIONS 64
 
 static const char USAGE[] =
-    "Usage: jasper [--config <path>] [--safe-mode] [--plugin-dir <path>] [--standalone]\n"
+    "Usage: jasper [PATH...]\n"
+    "       jasper [--config <path>] [--safe-mode] [--plugin-dir <path>] [PATH...]\n"
     "       jasper COMMAND [ARGUMENTS...]\n"
     "       jasper --help\n"
     "\n"
-    "With no arguments, opens a Jasper window; with options, starts Jasper with them. With a COMMAND, runs it in\n"
-    "the running Jasper, starting Jasper first when it is not running.\n";
+    "With no arguments, brings Jasper forward. With PATH arguments, opens each file in the editor and each folder as\n"
+    "a terminal tab; a COMMAND of the same name wins, so write ./NAME for such a file. With options, starts Jasper\n"
+    "with them; a Jasper that is already running keeps its own and says so. With a COMMAND, runs it in the running\n"
+    "Jasper. Jasper is started first when it is not running.\n";
 
 static void pause_millis(int millis) {
 #ifdef _WIN32
