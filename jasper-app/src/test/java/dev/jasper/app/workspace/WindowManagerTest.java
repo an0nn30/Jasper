@@ -10,6 +10,7 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.testsupport.IdleTerminalSession;
@@ -274,6 +275,25 @@ class WindowManagerTest {
             notes.moveToMainWindow();
             assertThat(notes.window()).isEqualTo(main.id());
             assertThat(child.closed()).isTrue();
+        });
+        launch();
+    }
+
+    @Test void aPluginsTabPlacedBesideOpensAGroupAndOnePlacedInANewWindowAChildWindow() throws Exception {
+        edt(() -> {
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
+            MainWindow main = manager.main().orElseThrow();
+            assertThat(main.content().workspace().model().groups()).hasSize(1);
+            Tab beside = model.tabs().open("dev.example.editor", "beside", "beside.txt", null, new JPanel(),
+                TabRegistry.Placement.SPLIT_RIGHT);
+            assertThat(main.content().workspace().model().groups()).as("a new group").hasSize(2);
+            assertThat(beside.group()).isNotEqualTo(notes.group());
+            Tab selected = main.content().selectedTab();
+            Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            assertThat(away.window()).isEqualTo(manager.children().getFirst().id());
+            assertThat(manager.children().getFirst().content().tabCount()).isEqualTo(1);
+            assertThat(main.content().workspace().model().groups()).as("the main window is not touched").hasSize(2);
+            assertThat(main.content().selectedTab()).isSameAs(selected);
         });
         launch();
     }

@@ -119,7 +119,10 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: asks every open plugin window's closing guards, then every quit guard, as quitting Jasper does, closing nothing; true when the quit may go ahead. */
     boolean requestQuit();
 
-    /** UI thread: adds a Jasper window, which announces itself on the terminal topics. */
+    /**
+     * UI thread: adds a Jasper window, which announces itself on the terminal topics: the main window when none is open,
+     * which stays open when its last tab leaves, else a child window, which closes with its last tab.
+     */
     java.util.UUID addTerminalWindow();
 
     /** UI thread: adds and selects a terminal tab in an open window; {@link #addTerminalPane} gives it its one pane. */
@@ -134,14 +137,17 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: the user focused this pane, which selects its tab. */
     void focusTerminalPane(java.util.UUID paneId);
 
-    /** UI thread: closes a pane with its tab; the last tab takes its window with it. */
+    /** UI thread: closes a pane with its tab; a child window's last tab takes the window with it. */
     void closeTerminalPane(java.util.UUID paneId);
 
     /** UI thread: adds and selects a content tab, as the application or another plugin shows a document; it has no pane. */
     java.util.UUID addContentTab(java.util.UUID windowId, String title);
 
-    /** UI thread: moves a tab the test added to another open window, where it is selected; a window left with no tab closes. */
+    /** UI thread: moves a tab the test added to another open window, where it is selected; a child window left with no tab closes. */
     void moveTab(java.util.UUID tabId, java.util.UUID windowId);
+
+    /** UI thread: closes a tab the test added, of either kind, its pane with it; a child window's last tab takes the window with it. */
+    void closeTab(java.util.UUID tabId);
 
     /** UI thread: sets the text selected in a pane. */
     void selectInPane(java.util.UUID paneId, String text);

@@ -11,11 +11,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The windows, tabs and panes a test scripts, with the application's rules (workspace tabs spec 9.4): a terminal tab
- * holds one pane, a split opens a terminal tab of its own, the active pane is the pane of the active tab of the window
- * activated last when that tab is a terminal tab, focusing a pane selects its tab, a pane closes with its tab and the last
- * tab takes its window with it, a tab moved to another window is announced once as a move, and every change is
- * announced on the terminal topics.
+ * The windows, tabs and panes a test scripts, with the application's rules (workspace tabs spec 6, 9.4 and 15). The
+ * window opened while no main window is open is the main window, which stays open with an empty workspace when its last
+ * tab leaves; any other window is a child window, which closes with its last tab. A window's tabs sit in groups and are
+ * listed group by group: a new tab opens at the end of the active group, a split or a placement beside it opens a new
+ * group after it, closing a group's selected tab selects the tab the group showed before it, and closing a group's last
+ * tab makes the group used before it active. A terminal tab holds one pane, a split opens a terminal tab of its own, the
+ * active pane is the pane of the active tab of the window activated last when that tab is a terminal tab, focusing a pane
+ * selects its tab, a pane closes with its tab, a tab moved to another window is announced once as a move, and every
+ * change is announced on the terminal topics.
  */
 final class FakeWorkspace {
     static final class Pane {
@@ -24,12 +28,26 @@ final class FakeWorkspace {
         final List<String> sent = new ArrayList<>();
         Pane(Tab tab, PaneInfo info) { this.tab = tab; this.info = info; }
     }
+    /** One group of a window's tabs; {@code recent} holds them most recently selected first. */
+    static final class Group {
+        final List<Tab> recent = new ArrayList<>();
+    }
     static final class Tab {
-        final UUID id = UUID.randomUUID(); final TabHandle.Kind kind; Window window; String title; Pane pane; boolean open = true;
+        final UUID id = UUID.randomUUID(); final TabHandle.Kind kind; Window window; Group group; String title; Pane pane; boolean open = true;
         Tab(Window window, TabHandle.Kind kind, String title) { this.window = window; this.kind = kind; this.title = title; }
     }
     static final class Window {
-        final UUID id = UUID.randomUUID(); final List<Tab> tabs = new ArrayList<>(); Tab selected; boolean open = true; boolean detached;
+        final UUID id = UUID.randomUUID();
+        /** Whether this is the main window, which outlives its last tab. */
+        final boolean main;
+        /** Every tab, group by group. */
+        final List<Tab> tabs = new ArrayList<>();
+        /** The groups that hold tabs, most recently active first: the first is the active group. */
+        final List<Group> recent = new ArrayList<>();
+        Tab selected; boolean open = true;
+        Window(boolean main) { this.main = main; }
+        /** @return the active group, or null in an empty workspace */
+        Group active() { return recent.isEmpty() ? null : recent.getFirst(); }
     }
 
     private final FakePluginHost host;
@@ -52,6 +70,8 @@ final class FakeWorkspace {
     List<Pane> everyOpenPane() { return everyPane.stream().filter(pane -> pane.open).toList(); }
 
     Optional<Window> window(UUID id) { return windows.stream().filter(window -> window.id.equals(id)).findFirst(); }
+    /** @return the main window, while it is open */
+    Optional<Window> main() { return windows.stream().filter(window -> window.main).findFirst(); }
     Optional<Tab> tab(UUID id) { return everyTab.stream().filter(tab -> tab.open && tab.id.equals(id)).findFirst(); }
     Optional<Pane> pane(UUID id) { return everyPane.stream().filter(pane -> pane.open && pane.id.equals(id)).findFirst(); }
     Optional<Pane> anyPane(UUID id) { return everyPane.stream().filter(pane -> pane.id.equals(id)).findFirst(); }
@@ -66,49 +86,75 @@ final class FakeWorkspace {
         host.publishApp(TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(Optional.ofNullable(now)));
     }
 
+    /** A window: the main window when none is open, else a child window. */
     Window addWindow() {
-        var window = new Window();
+        var window = new Window(main().isEmpty());
         windows.add(window);
         host.publishApp(TerminalEvents.WINDOW_OPENED, new TerminalEvents.WindowEvent(window.id));
         return window;
     }
 
     /** A terminal tab, selected; {@link #addPane} gives it its one pane. */
-    Tab addTab(Window window, String title) { return addTab(window, TabHandle.Kind.TERMINAL, title); }
+    Tab addTab(Window window, String title) { return addTab(window, TabHandle.Kind.TERMINAL, title, null); }
 
-    /** A tab of {@code kind}, selected. */
-    Tab addTab(Window window, TabHandle.Kind kind, String title) {
-        var tab = announceTab(window, kind, title);
+    /** A tab of {@code kind}, selected, at the end of the active group. */
+    Tab addTab(Window window, TabHandle.Kind kind, String title) { return addTab(window, kind, title, null); }
+
+    /** A tab of {@code kind}, selected, in a new group after {@code beside}; at the end of the active group when it is null. */
+    Tab addTab(Window window, TabHandle.Kind kind, String title, Group beside) {
+        var tab = announceTab(window, kind, title, beside);
         select(tab);
         return tab;
     }
 
     /**
-     * A terminal tab with its one pane, as the application opens one for {@code openTab} or a split: announced, given its
-     * pane, then selected, so the active pane goes straight to the new pane.
+     * A terminal tab with its one pane, as the application opens one for {@code openTab}: announced, given its pane, then
+     * selected, so the active pane goes straight to the new pane.
      */
-    Pane openTerminal(Window window, String title, PaneInfo info) {
-        var pane = addPane(announceTab(window, TabHandle.Kind.TERMINAL, title), info);
+    Pane openTerminal(Window window, String title, PaneInfo info) { return openTerminal(window, title, info, null); }
+
+    /** As {@link #openTerminal(Window, String, PaneInfo)}, a split's tab in a new group after {@code beside}. */
+    Pane openTerminal(Window window, String title, PaneInfo info, Group beside) {
+        var pane = addPane(announceTab(window, TabHandle.Kind.TERMINAL, title, beside), info);
         select(pane.tab);
         return pane;
     }
 
-    private Tab announceTab(Window window, TabHandle.Kind kind, String title) {
+    private Tab announceTab(Window window, TabHandle.Kind kind, String title, Group beside) {
         var tab = new Tab(window, kind, title);
         everyTab.add(tab);
-        window.tabs.add(tab);
+        place(tab, window, beside);
         host.publishApp(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window.id, tab.id));
         return tab;
     }
 
+    /** Puts {@code tab} at the end of {@code window}'s active group, or in a new group after {@code beside}. */
+    private void place(Tab tab, Window window, Group beside) {
+        Group group = beside == null ? window.active() : null;
+        Group after = beside != null ? beside : group;
+        int index = window.tabs.size();
+        if (after != null) for (int i = 0; i < window.tabs.size(); i++) if (window.tabs.get(i).group == after) index = i + 1;
+        if (group == null) { group = new Group(); window.recent.add(group); }
+        tab.window = window;
+        tab.group = group;
+        window.tabs.add(index, tab);
+        group.recent.add(tab);
+    }
+
     void select(Tab tab) {
-        if (!tab.open || tab.window.selected == tab) return;
-        tab.window.selected = tab;
-        host.publishApp(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(tab.window.id, tab.id));
+        if (!tab.open) return;
+        Window window = tab.window;
+        tab.group.recent.remove(tab);
+        tab.group.recent.addFirst(tab);
+        window.recent.remove(tab.group);
+        window.recent.addFirst(tab.group);
+        if (window.selected == tab) return;
+        window.selected = tab;
+        host.publishApp(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window.id, tab.id));
         refreshActive();
         // As the application's window does on every selection: each content tab is active while it is its window's selected tab.
         for (var content : host.contentTabs())
-            if (content instanceof FakeContent shown && !shown.closed && shown.tab.window == tab.window) shown.active(shown.tab == tab);
+            if (content instanceof FakeContent shown && !shown.closed && shown.tab.window == window) shown.active(shown.tab == tab);
     }
 
     /** A terminal tab's one pane; a second, or one in a content tab, is refused. */
@@ -137,26 +183,27 @@ final class FakeWorkspace {
         refreshActive();
     }
 
-    /** Moves a tab to another open window, where it is selected; a window left with no tab closes after the move is announced. */
+    /**
+     * Moves a tab to the end of another open window's active group, where it is selected; a child window left with no
+     * tab closes after the move is announced.
+     */
     void move(Tab tab, Window to) {
         if (!tab.open || !to.open || tab.window == to) return;
         Window from = tab.window;
-        from.tabs.remove(tab);
-        if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
+        if (takeOut(tab)) reselect(from);
         // As the application's window does: the active pane is reported as soon as the source lets the tab go.
         refreshActive();
-        tab.window = to;
-        to.tabs.add(tab);
+        place(tab, to, null);
         host.publishApp(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(tab.id, from.id, to.id));
         select(tab);
-        if (from.tabs.isEmpty()) closeWindow(from);
+        if (from.tabs.isEmpty() && !from.main) closeWindow(from);
         refreshActive();
     }
 
     /** A pane closes with its tab. */
     void close(Pane pane) { if (pane.open) close(pane.tab); }
 
-    /** Closes a tab, its pane with it; the last tab takes its window with it. */
+    /** Closes a tab, its pane with it; a child window's last tab takes the window with it. */
     void close(Tab tab) {
         if (!tab.open) return;
         Window window = tab.window;
@@ -167,11 +214,27 @@ final class FakeWorkspace {
             host.publishApp(TerminalEvents.PANE_CLOSED, new TerminalEvents.PaneEvent(tab.id, pane.id));
         }
         tab.open = false;
-        window.tabs.remove(tab);
+        boolean selected = takeOut(tab);
         host.publishApp(TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(window.id, tab.id));
-        if (window.selected == tab) { window.selected = null; if (!window.tabs.isEmpty()) select(window.tabs.get(0)); }
-        if (window.tabs.isEmpty()) closeWindow(window);
+        if (selected) reselect(window);
+        if (window.tabs.isEmpty() && !window.main) closeWindow(window);
         refreshActive();
+    }
+
+    /** Takes {@code tab} out of its window's groups; true when it was the window's selected tab. */
+    private boolean takeOut(Tab tab) {
+        Window window = tab.window;
+        window.tabs.remove(tab);
+        tab.group.recent.remove(tab);
+        if (tab.group.recent.isEmpty()) window.recent.remove(tab.group);
+        if (window.selected != tab) return false;
+        window.selected = null;
+        return true;
+    }
+
+    /** Its selected tab left: the tab the active group showed before it, else the group used before, takes over. */
+    private void reselect(Window window) {
+        if (!window.recent.isEmpty()) select(window.active().recent.getFirst());
     }
 
     private void closeWindow(Window window) {

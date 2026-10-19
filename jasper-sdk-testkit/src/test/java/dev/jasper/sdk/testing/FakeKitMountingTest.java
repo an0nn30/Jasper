@@ -193,9 +193,9 @@ class FakeKitMountingTest {
                 var view=context.kit().create(new ViewSpec(new Nodes.Text("body",ControlState.READY,"Document",Nodes.TextRole.BODY)),e -> {});
                 var tab=context.windows().openTab(new ContentSpec("doc","Document"),null,view);
                 var selected=java.nio.file.Path.of("selected").toAbsolutePath();host.queuePathSelection(List.of(selected));
-                host.duringPathSelection(() -> {tab.move(true);assertThat(tab.isSeparate()).isFalse();assertThat(tab.requestClose().join()).isFalse();});
+                host.duringPathSelection(() -> {tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();assertThat(tab.requestClose().join()).isFalse();});
                 assertThat(context.windows().chooseFiles(tab,"Choose",Optional.empty())).containsExactly(selected);
-                tab.move(true);assertThat(tab.isSeparate()).isTrue();
+                tab.moveToNewWindow();assertThat(tab.window().isMain()).isFalse();
                 host.queuePathSelection(List.of(selected));host.duringPathSelection(tab::close);
                 assertThat(context.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
                 assertThatThrownBy(view::spec).isInstanceOf(IllegalStateException.class);

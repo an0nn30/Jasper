@@ -42,18 +42,18 @@ class HostedChooserTest {
     @Test void ownedDocumentPinsAcrossChooserAndOwnerClosureDiscardsResult() {
         var containment=new Containment(() -> true);
         var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
-        java.util.function.Supplier<UUID> window = () -> {
-            UUID id=fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
+        java.util.function.Function<Boolean, UUID> window = first -> {
+            UUID id=first?fixture.addMainWindow():fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
         };
-        UUID main=window.get();
-        contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> contributions.tabs().move(tab, window.get())));
+        UUID main=window.apply(true);
+        contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> contributions.tabs().move(tab, window.apply(false))));
         var disposed=new java.util.concurrent.atomic.AtomicInteger();
         var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
         view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));
         var tab=ui.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,view);
-        during.set(() -> {tab.move(true);assertThat(tab.isSeparate()).isFalse();assertThat(tab.requestClose().join()).isFalse();});
+        during.set(() -> {tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();assertThat(tab.requestClose().join()).isFalse();});
         assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).hasSize(2);
-        tab.move(true);assertThat(tab.isSeparate()).isTrue();
+        tab.moveToNewWindow();assertThat(tab.window().isMain()).isFalse();
         during.set(tab::close);
         assertThat(ui.windows().chooseFiles(tab,"Choose",Optional.empty())).isEmpty();
         assertThat(disposed.get()).isEqualTo(1);kit.close();ui.closeAll();

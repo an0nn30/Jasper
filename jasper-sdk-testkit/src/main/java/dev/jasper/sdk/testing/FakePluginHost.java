@@ -1185,7 +1185,8 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a Jasper window. Windows, tabs and panes announce themselves on the terminal topics like the
+     * Adds a Jasper window: the main window when none is open, which stays open when its last tab leaves, else a child
+     * window, which closes with its last tab. Windows, tabs and panes announce themselves on the terminal topics like the
      * application's, delivered by {@link #flush()}.
      *
      * @return the new window's id
@@ -1228,7 +1229,7 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void focusTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::focus); }
     /**
-     * Closes a pane with its tab; the last tab takes its window with it.
+     * Closes a pane with its tab; a child window's last tab takes the window with it.
      *
      * @param paneId the pane
      */
@@ -1251,8 +1252,8 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Moves a tab the test added to another open window, where it is selected, as dragging it there does: a terminal
      * tab's pane keeps its id and session with no {@code PANE_OPENED} or {@code PANE_CLOSED}, the move is announced on
-     * {@code TAB_MOVED}, and a window left with no tab closes after it. A plugin moves its own content tab with
-     * {@code ContentTab.move}.
+     * {@code TAB_MOVED}, and a child window left with no tab closes after it. A plugin moves its own content tab with
+     * {@code ContentTab.moveToNewWindow} or {@code moveToMainWindow}.
      *
      * @param tabId an open tab the test added
      * @param windowId another open window
@@ -1263,8 +1264,24 @@ public final class FakePluginHost implements AutoCloseable {
         var window = workspace.window(windowId).orElseThrow(() -> new IllegalArgumentException("No such window: " + windowId));
         for (FakePluginContext context : contexts.values())
             if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
-                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.move");
+                throw new IllegalArgumentException("A plugin moves its own content tab with ContentTab.moveToNewWindow or moveToMainWindow");
         workspace.move(tab, window);
+    }
+
+    /**
+     * Closes a tab the test added, of either kind, as its close button does: a terminal tab's pane closes with it, and a
+     * child window's last tab takes the window with it. A plugin closes its own content tab with {@code ContentTab.close}
+     * or {@code requestClose}.
+     *
+     * @param tabId an open tab the test added
+     * @since 0.20.0
+     */
+    public void closeTab(UUID tabId) {
+        var tab = workspace.tab(tabId).orElseThrow(() -> new IllegalArgumentException("No such tab: " + tabId));
+        for (FakePluginContext context : contexts.values())
+            if (context.ui.contents.stream().anyMatch(content -> content.tab == tab))
+                throw new IllegalArgumentException("A plugin closes its own content tab with ContentTab.close");
+        workspace.close(tab);
     }
     /**
      * Replaces what a pane reports, without an event.

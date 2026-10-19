@@ -286,8 +286,8 @@ public abstract class PluginContractTest {
             assertThat(h.viewRoute(document)).as("a view before it is mounted").isEqualTo("CHROME");
             var tab=ctx.windows().openTab(new dev.jasper.sdk.ui.ContentSpec("doc","Document"),null,document);
             assertThat(h.viewRoute(document)).as("workspace content takes the workspace slot").isEqualTo("WORKSPACE");
-            tab.move(true);assertThat(tab.isSeparate()).isTrue();assertThat(h.viewRoute(document)).as("a move keeps it").isEqualTo("WORKSPACE");
-            tab.move(false);assertThat(tab.isSeparate()).isFalse();assertThat(h.viewRoute(document)).isEqualTo("WORKSPACE");
+            tab.moveToNewWindow();assertThat(tab.window().isMain()).isFalse();assertThat(h.viewRoute(document)).as("a move keeps it").isEqualTo("WORKSPACE");
+            tab.moveToMainWindow();assertThat(tab.window().isMain()).isTrue();assertThat(h.viewRoute(document)).isEqualTo("WORKSPACE");
             var guard=ctx.windows().onTabsClosing((tabs,batch) -> CompletableFuture.completedFuture(false));
             assertThat(tab.requestClose().join()).isFalse();assertThat(disposed.get()).isEqualTo(1);
             guard.close();assertThat(tab.requestClose().join()).isTrue();assertThat(disposed.get()).isEqualTo(2);
@@ -318,6 +318,8 @@ public abstract class PluginContractTest {
         var second = new AtomicReference<PluginContext>();
         h.start(new PluginInfo("test.overlay1", "First", "1.0.0", Set.of()), Set.of(), Set.of(), first::set);
         h.start(new PluginInfo("test.overlay2", "Second", "1.0.0", Set.of()), Set.of(), Set.of(), second::set);
+        h.addTerminalWindow();
+        // The overlay's owner is a child window (workspace tabs spec 14), which closes with its last tab.
         UUID window = h.addTerminalWindow();
         UUID tab = h.addTerminalTab(window, "local");
         UUID pane = h.addTerminalPane(tab, "shell", Path.of("/"));
@@ -1464,18 +1466,25 @@ public abstract class PluginContractTest {
     }
 
     @Test void aTabMovedToAnotherWindowKeepsItsPaneAndReportsOnlyTheMove() {
+        // The main window outlives its last tab; the windows below are child windows (workspace tabs spec 6.4).
+        UUID main = h.addTerminalWindow();
+        h.addTerminalPane(h.addTerminalTab(main, "main"), "zsh", Path.of("/"));
         UUID first = h.addTerminalWindow(), stays = h.addTerminalTab(first, "stays");
         h.addTerminalPane(stays, "zsh", Path.of("/"));
         UUID moving = h.addTerminalTab(first, "build"), pane = h.addTerminalPane(moving, "make", Path.of("/src"));
         UUID second = h.addTerminalWindow(), other = h.addTerminalTab(second, "other");
         h.addTerminalPane(other, "zsh", Path.of("/"));
         List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        List<Object> ordered = Collections.synchronizedList(new ArrayList<>());
         var alpha = new AtomicReference<PluginContext>();
         h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
             alpha.set(context);
             for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.TAB_CLOSED, TerminalEvents.TAB_MOVED,
                     TerminalEvents.PANE_OPENED, TerminalEvents.PANE_CLOSED, TerminalEvents.WINDOW_CLOSED))
                 context.events().subscribe(topic, heard::add);
+            for (var topic : List.of(TerminalEvents.ACTIVE_PANE_CHANGED, TerminalEvents.TAB_MOVED, TerminalEvents.TAB_SELECTED,
+                    TerminalEvents.WINDOW_CLOSED))
+                context.events().subscribe(topic, event -> ordered.add(java.util.Map.entry(topic, event)));
         });
         h.flush();
         heard.clear();
@@ -1491,11 +1500,21 @@ public abstract class PluginContractTest {
             assertThat(terminals.window(second).orElseThrow().activeTab().map(TabHandle::id)).as("it arrives selected").contains(moving);
             assertThat(terminals.window(first).orElseThrow().tabs()).extracting(TabHandle::id).containsExactly(stays);
         });
+        // The active window a move empties reports no active pane as it lets the tab go, then the move, the arrival's
+        // selection and, last, its close, as the application's window does (workspace plan 4a's real-window probe).
+        h.activateTerminalWindow(first);
+        h.flush();
         heard.clear();
+        ordered.clear();
         h.moveTab(stays, second);
         h.flush();
         assertThat(heard).as("the window the move empties closes after the move").containsExactly(
             new TerminalEvents.TabMoved(stays, first, second), new TerminalEvents.WindowEvent(first));
+        assertThat(ordered).containsExactly(
+            java.util.Map.entry(TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(Optional.empty())),
+            java.util.Map.entry(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(stays, first, second)),
+            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(second, stays)),
+            java.util.Map.entry(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(first)));
         h.ui(() -> assertThat(alpha.get().terminals().window(first)).isEmpty());
     }
 
@@ -1527,7 +1546,7 @@ public abstract class PluginContractTest {
             assertThat(alpha.get().terminals().window(window).orElseThrow().activeTab()).contains(opened);
         });
         heard.clear();
-        h.ui(() -> tab.get().move(true));
+        h.ui(() -> tab.get().moveToNewWindow());
         h.flush();
         assertThat(heard).hasSize(2).first().isInstanceOf(TerminalEvents.WindowEvent.class);
         UUID separate = ((TerminalEvents.WindowEvent) heard.getFirst()).windowId();
@@ -1540,6 +1559,134 @@ public abstract class PluginContractTest {
             assertThat(alpha.get().terminals().tab(id)).isEmpty();
             assertThat(alpha.get().terminals().window(separate)).as("its last tab took the window with it").isEmpty();
             assertThat(alpha.get().terminals().window(window)).isPresent();
+        });
+    }
+
+    /** Workspace tabs spec 6.4: the main window keeps an empty workspace when its last tab closes; a child window closes. */
+    @Test void theMainWindowOutlivesItsLastTabWhileAChildWindowClosesWithIt() {
+        UUID main = h.addTerminalWindow(), first = h.addTerminalTab(main, "zsh");
+        UUID firstPane = h.addTerminalPane(first, "zsh", Path.of("/"));
+        UUID child = h.addTerminalWindow(), second = h.addTerminalTab(child, "make");
+        UUID secondPane = h.addTerminalPane(second, "make", Path.of("/src"));
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.WINDOW_OPENED, TerminalEvents.WINDOW_CLOSED)) context.events().subscribe(topic, heard::add);
+        });
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            assertThat(terminals.window(main).orElseThrow().isMain()).as("the first window is the main window").isTrue();
+            assertThat(terminals.window(child).orElseThrow().isMain()).as("a later one is a child window").isFalse();
+        });
+        h.flush();
+        heard.clear();
+        h.closeTerminalPane(firstPane);
+        h.closeTerminalPane(secondPane);
+        h.flush();
+        assertThat(heard).as("only the child window closes").containsExactly(new TerminalEvents.WindowEvent(child));
+        h.ui(() -> {
+            var window = alpha.get().terminals().window(main).orElseThrow();
+            assertThat(window.tabs()).isEmpty();
+            assertThat(window.activeTab()).as("an empty workspace").isEmpty();
+            assertThat(window.isMain()).isTrue();
+            assertThat(alpha.get().terminals().window(child)).isEmpty();
+        });
+        UUID another = h.addTerminalWindow();
+        h.ui(() -> assertThat(alpha.get().terminals().window(another).orElseThrow().isMain()).as("the main window is still open").isFalse());
+        // A tab the test added closes as its close button closes it, of either kind.
+        UUID notes = h.addContentTab(another, "notes.txt");
+        h.flush();
+        heard.clear();
+        h.closeTab(notes);
+        h.flush();
+        assertThat(heard).as("a child window's last tab takes it").containsExactly(new TerminalEvents.WindowEvent(another));
+    }
+
+    /** Workspace tabs spec 6.5 and 14: a plugin's tab moves to a new child window and back, and says which window holds it. */
+    @Test void aContentTabMovesToANewChildWindowAndBackToTheMainWindow() {
+        UUID main = h.addTerminalWindow(), shell = h.addTerminalTab(main, "zsh");
+        h.addTerminalPane(shell, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
+        h.ui(() -> {
+            var tab = alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("notes", "Notes"), null, kitView(alpha.get()));
+            assertThat(tab.window().id()).as("no owner: the main window").isEqualTo(main);
+            assertThat(tab.window().isMain()).isTrue();
+            tab.moveToMainWindow();
+            assertThat(tab.window().id()).as("already there").isEqualTo(main);
+            tab.moveToNewWindow();
+            var child = tab.window();
+            assertThat(child.isMain()).isFalse();
+            assertThat(child.tabs()).singleElement().satisfies(only -> assertThat(only.kind()).isEqualTo(TabHandle.Kind.CONTENT));
+            assertThat(alpha.get().terminals().window(main).orElseThrow().tabs()).extracting(TabHandle::id).containsExactly(shell);
+            tab.moveToNewWindow();
+            assertThat(tab.window()).as("a child window's only tab stays").isEqualTo(child);
+            tab.moveToMainWindow();
+            assertThat(tab.window().id()).isEqualTo(main);
+            assertThat(child.isOpen()).as("the child window closed with its last tab").isFalse();
+            tab.close();
+            assertThat(tab.window().id()).as("a closed tab names the last window that held it").isEqualTo(main);
+        });
+    }
+
+    /** Workspace tabs spec 14's TabPlacement: the end of the active group, a new group after it, or a new child window. */
+    @Test void aPlacementPutsANewContentTabInTheActiveGroupBesideItOrInANewWindow() {
+        UUID main = h.addTerminalWindow(), left = h.addTerminalTab(main, "left");
+        UUID pane = h.addTerminalPane(left, "zsh", Path.of("/"));
+        UUID right = h.addTerminalTab(main, "right");
+        h.addTerminalPane(right, "zsh", Path.of("/"));
+        List<Object> heard = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE, Capabilities.TERMINAL_OPEN), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.WINDOW_OPENED, TerminalEvents.TAB_OPENED, TerminalEvents.TAB_SELECTED))
+                context.events().subscribe(topic, event -> heard.add(java.util.Map.entry(topic, event)));
+        });
+        var below = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        var active = new AtomicReference<Optional<UUID>>();
+        h.ui(() -> {
+            var terminals = alpha.get().terminals();
+            var windows = alpha.get().windows();
+            var owner = terminals.window(main).orElseThrow();
+            UUID split = terminals.split(terminals.pane(pane).orElseThrow(), Direction.RIGHT, OpenRequest.local()).orElseThrow().tab().id();
+            terminals.tab(left).orElseThrow().select();
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("here", "Here"), owner, kitView(alpha.get()));
+            var placedBelow = windows.openTab(new dev.jasper.sdk.ui.ContentSpec("below", "Below"), owner, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN);
+            List<UUID> ids = owner.tabs().stream().map(TabHandle::id).toList();
+            assertThat(ids).hasSize(5);
+            assertThat(ids.subList(0, 2)).as("the active group's tabs come first").containsExactly(left, right);
+            assertThat(ids.getLast()).as("the split's group stays last").isEqualTo(split);
+            UUID here = ids.get(2), placed = ids.get(3);
+            assertThat(owner.activeTab().map(TabHandle::id)).as("a placed tab opens selected").contains(placed);
+            windows.openTab(new dev.jasper.sdk.ui.ContentSpec("next", "Next"), owner, kitView(alpha.get()));
+            assertThat(owner.tabs().stream().map(TabHandle::id).toList()).as("the new group is the active group")
+                .hasSize(6).startsWith(left, right, here, placed).endsWith(split);
+            active.set(owner.activeTab().map(TabHandle::id));
+            below.set(placedBelow);
+        });
+        h.flush();
+        heard.clear();
+        var away = new AtomicReference<dev.jasper.sdk.ui.ContentTab>();
+        h.ui(() -> away.set(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("away", "Away"),
+            alpha.get().terminals().window(main).orElseThrow(), kitView(alpha.get()), dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW)));
+        h.flush();
+        var placed = new AtomicReference<List<UUID>>();
+        h.ui(() -> placed.set(List.of(away.get().window().id(), away.get().window().tabs().getFirst().id())));
+        assertThat(heard).as("the new child window opens, then the tab, selected in it").containsExactly(
+            java.util.Map.entry(TerminalEvents.WINDOW_OPENED, new TerminalEvents.WindowEvent(placed.get().get(0))),
+            java.util.Map.entry(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(placed.get().get(0), placed.get().get(1))),
+            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(placed.get().get(0), placed.get().get(1))));
+        h.ui(() -> {
+            var owner = alpha.get().terminals().window(main).orElseThrow();
+            assertThat(away.get().window().isMain()).as("a new child window").isFalse();
+            assertThat(away.get().window().tabs()).hasSize(1);
+            assertThat(owner.tabs()).as("the owner's window is not touched").hasSize(6);
+            assertThat(owner.activeTab().map(TabHandle::id)).as("nor its active tab").isEqualTo(active.get());
+            assertThat(alpha.get().windows().openTab(new dev.jasper.sdk.ui.ContentSpec("below", "Again"), null, kitView(alpha.get()),
+                dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW)).as("an open key is selected where it is").isSameAs(below.get());
+            assertThat(below.get().window().id()).isEqualTo(main);
         });
     }
 
@@ -1575,7 +1722,7 @@ public abstract class PluginContractTest {
             alpha.set(context);
             for (var topic : List.of(TerminalEvents.TAB_OPENED, TerminalEvents.PANE_OPENED, TerminalEvents.TAB_SELECTED,
                     TerminalEvents.ACTIVE_PANE_CHANGED))
-                context.events().subscribe(topic, heard::add);
+                context.events().subscribe(topic, event -> heard.add(java.util.Map.entry(topic, event)));
         });
         h.flush();
         heard.clear();
@@ -1587,9 +1734,10 @@ public abstract class PluginContractTest {
             openedTab.set(opened.get().tab().id());
         });
         h.flush();
-        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(window, openedTab.get()),
-            new TerminalEvents.PaneEvent(openedTab.get(), opened.get().id()), new TerminalEvents.TabEvent(window, openedTab.get()),
-            new TerminalEvents.ActivePaneChanged(Optional.of(opened.get().id())));
+        assertThat(heard).containsExactly(java.util.Map.entry(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window, openedTab.get())),
+            java.util.Map.entry(TerminalEvents.PANE_OPENED, new TerminalEvents.PaneEvent(openedTab.get(), opened.get().id())),
+            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window, openedTab.get())),
+            java.util.Map.entry(TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(Optional.of(opened.get().id()))));
         heard.clear();
         var split = new AtomicReference<PaneHandle>();
         var splitTab = new AtomicReference<UUID>();
@@ -1599,9 +1747,10 @@ public abstract class PluginContractTest {
             splitTab.set(split.get().tab().id());
         });
         h.flush();
-        assertThat(heard).containsExactly(new TerminalEvents.TabEvent(window, splitTab.get()),
-            new TerminalEvents.PaneEvent(splitTab.get(), split.get().id()), new TerminalEvents.TabEvent(window, splitTab.get()),
-            new TerminalEvents.ActivePaneChanged(Optional.of(split.get().id())));
+        assertThat(heard).containsExactly(java.util.Map.entry(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window, splitTab.get())),
+            java.util.Map.entry(TerminalEvents.PANE_OPENED, new TerminalEvents.PaneEvent(splitTab.get(), split.get().id())),
+            java.util.Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window, splitTab.get())),
+            java.util.Map.entry(TerminalEvents.ACTIVE_PANE_CHANGED, new TerminalEvents.ActivePaneChanged(Optional.of(split.get().id()))));
     }
 
     @Test void shellProfilesAreListedWatchedAndOpenedByIdOnly() {
@@ -2260,24 +2409,24 @@ public abstract class PluginContractTest {
                 assertThat(windows.openTab(new dev.jasper.sdk.ui.ContentSpec("file", "Again"), null, kitView(context.get()))).isSameAs(tab);
                 var disposed = new AtomicInteger(); tab.onClosed(disposed::incrementAndGet);
                 var dialog = windows.dialog(new DialogSpec("Question", tab, true));
-                dialog.show(); tab.move(true);
-                assertThat(tab.isSeparate()).isFalse();
+                dialog.show(); tab.moveToNewWindow();
+                assertThat(tab.window().isMain()).isTrue();
                 assertThat(tab.requestClose().join()).isFalse();
-                dialog.close(); tab.move(true);
-                assertThat(tab.isSeparate()).isTrue();
-                tab.move(false); assertThat(tab.isSeparate()).isFalse();
+                dialog.close(); tab.moveToNewWindow();
+                assertThat(tab.window().isMain()).isFalse();
+                tab.moveToMainWindow(); assertThat(tab.window().isMain()).isTrue();
                 var answer = new CompletableFuture<Boolean>();
                 windows.onTabsClosing((tabs, batch) -> answer);
                 var closing = tab.requestClose();
                 assertThat(tab.requestClose()).isSameAs(closing);
-                tab.move(true); assertThat(tab.isSeparate()).isFalse();
+                tab.moveToNewWindow(); assertThat(tab.window().isMain()).isTrue();
                 answer.complete(false);
                 assertThat(closing.join()).isFalse(); assertThat(tab.isClosed()).isFalse();
                 windows.onTabsClosing((tabs, batch) -> CompletableFuture.failedFuture(new IllegalStateException("save failed")));
                 assertThat(tab.requestClose().join()).isFalse();
                 windows.onTabsClosing((tabs, batch) -> CompletableFuture.completedFuture(true));
                 assertThat(tab.requestClose().join()).isTrue();
-                tab.close(); tab.select(); tab.move(true);
+                tab.close(); tab.select(); tab.moveToNewWindow();
                 assertThat(disposed.get()).isEqualTo(1);
                 assertThat(component.getText()).isEqualTo("keep this text");
                 assertThatIllegalArgumentException().isThrownBy(() -> windows.dialog(new DialogSpec("Closed", tab, true)));

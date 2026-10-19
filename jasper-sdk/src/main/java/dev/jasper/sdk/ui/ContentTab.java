@@ -21,10 +21,29 @@ public interface ContentTab extends WindowOwner, AutoCloseable {
     void setFocusTarget(Runnable focus);
     /** Selects and raises the current host, focusing its content. */
     void select();
-    /** @param separate true moves to a new separate workspace; false moves to the last main workspace */
-    void move(boolean separate);
-    /** @return whether the content lives in a separate window */
-    boolean isSeparate();
+    /**
+     * Move Tab to New Window: a new child window takes the tab and its content. A child window's only tab, a tab with a
+     * modal prompt open and a tab being closed stay where they are.
+     *
+     * @since 0.20.0
+     */
+    void moveToNewWindow();
+    /**
+     * Move Tab to Main Window: the end of the main window's active group takes the tab and its content, the main window
+     * restored first when none is open. A tab the main window holds, a tab with a modal prompt open and a tab being
+     * closed stay where they are.
+     *
+     * @since 0.20.0
+     */
+    void moveToMainWindow();
+    /**
+     * The window that holds the tab; {@link dev.jasper.sdk.terminal.WindowHandle#isMain()} tells the main window from a
+     * child window.
+     *
+     * @return the window, or the last window that held the tab once it is closed
+     * @since 0.20.0
+     */
+    dev.jasper.sdk.terminal.WindowHandle window();
     /** @return whether the content is selected in its host */
     boolean isActive();
     /** @return whether the handle has been disposed */

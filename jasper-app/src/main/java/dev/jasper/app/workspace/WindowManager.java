@@ -85,7 +85,7 @@ public final class WindowManager {
     private JasperWindow lastActive;
     private int openings;
     private boolean openingMain;
-    /** While {@link #closeAll()} runs: no child window opens, so none outlives the main window. */
+    /** While {@link #closeAll()} runs: no window opens, so no child window outlives the main window and no fresh one opens. */
     private boolean closingAll;
 
     /**
@@ -103,7 +103,7 @@ public final class WindowManager {
         // window a move empties closes after the move.
         model.tabs().windows(new TabRegistry.Windows(() -> openingMain ? null : ensureMain("plugin", null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting")), this::isMain,
-            this::moveToNewWindow, this::movedOut));
+            this::moveToNewWindow, this::movedOut, this::emptyWindow));
         model.panelRoute(this::routePanel);
     }
 
@@ -369,6 +369,17 @@ public final class WindowManager {
     private void movedOut(UUID window) {
         for (ChildWindow child : List.copyOf(children))
             if (child.id().equals(window) && child.content().tabCount() == 0) child.close();
+    }
+
+    /**
+     * An empty child window for a plugin's tab placed in a new window (workspace tabs spec 14's
+     * {@code TabPlacement.NEW_WINDOW}), after the main window; null while the main window is being composed.
+     */
+    private UUID emptyWindow() {
+        if (openingMain) return null;
+        if (ensureMain("plugin", null).isEmpty()) throw new IllegalStateException("The main window is closing or Jasper is quitting");
+        return openChild(true, null, null).map(JasperWindow::id)
+            .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting"));
     }
 
     void activated(JasperWindow window) {

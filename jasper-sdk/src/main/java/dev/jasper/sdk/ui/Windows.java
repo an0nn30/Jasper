@@ -15,8 +15,34 @@ public interface Windows {
     /** Create a nonblocking popup attached to a host-issued live capability.
      * @param anchor attachment authority from this host @return initially hidden popup */
     PluginPopover popover(UiAnchor anchor);
-    /** Opens an owned view as content; moving retains it, final closure disposes it. */
-    ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content);
+    /**
+     * Opens an owned view as a content tab at the end of the active group of the owner's window
+     * ({@link TabPlacement#ACTIVE_GROUP}); moving retains it, final closure disposes it.
+     *
+     * @param spec the tab's key and title
+     * @param owner the window the tab opens in, or a content tab whose window it opens in; null, or a closed window, for
+     *              the main window
+     * @param content the plugin's owned view
+     * @return the new tab, or the open tab with the same key, selected
+     */
+    default ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content) {
+        return openTab(spec, owner, content, TabPlacement.ACTIVE_GROUP);
+    }
+
+    /**
+     * Opens an owned view as a content tab where {@code placement} puts it; moving retains it, final closure disposes it.
+     *
+     * @param spec the tab's key and title
+     * @param owner the window the tab opens in, or a content tab whose window it opens in; null, or a closed window, for
+     *              the main window
+     * @param content the plugin's owned view
+     * @param placement where a new tab goes; the open tab with the same key is selected where it is
+     * @return the new tab, or the open tab with the same key, selected
+     * @throws IllegalArgumentException for a foreign owner or a closed content tab
+     * @throws IllegalStateException when the plugin's context is closed or the caller is off the UI thread
+     * @since 0.20.0
+     */
+    ContentTab openTab(ContentSpec spec, WindowOwner owner, UiView content, TabPlacement placement);
 
     /** Registers this plugin's batch closing guard. No requested content closes unless every guard accepts.
      * A pending decision blocks moves; failures refuse close. Runs for tab, window, quit and restart closes.

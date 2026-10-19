@@ -150,15 +150,15 @@ class EditorWindowTest {
         var handle = host.contentTabs().getFirst();
         var component = host.contentComponent(handle);
         tab.area().append(" after");
-        handle.move(true);
-        assertThat(handle.isSeparate()).isTrue();
+        handle.moveToNewWindow();
+        assertThat(handle.window().isMain()).isFalse();
         assertThat(host.contentComponent(handle)).isSameAs(component);
         assertThat(tab.area().getText()).isEqualTo("before after");
         assertThat(tab.session().dirty()).isTrue();
         tab.area().undoLastAction();
         assertThat(tab.area().getText()).isEqualTo("before");
-        handle.move(false);
-        assertThat(handle.isSeparate()).isFalse();
+        handle.moveToMainWindow();
+        assertThat(handle.window().isMain()).isTrue();
     }
 
     @Test void openingAFileThatIsStillLoadingSelectsItsTab() throws Exception {
@@ -506,7 +506,7 @@ class EditorWindowTest {
     @Test void statusActionsTargetTheirOwnDocumentAcrossWindows() throws Exception {
         var first = opened(file("first.txt", "one"));
         var firstHandle = host.contentTabs().getFirst();
-        firstHandle.move(true);
+        firstHandle.moveToNewWindow();
         var wrap = host.contentStatus(firstHandle).stream().filter(item -> item.text().startsWith("Wrap:")).findFirst().orElseThrow();
         var second = opened(file("second.txt", "two"));
         boolean original = first.session().wrap();

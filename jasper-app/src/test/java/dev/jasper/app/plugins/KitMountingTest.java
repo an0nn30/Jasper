@@ -25,7 +25,7 @@ class KitMountingTest {
             var disposed=new AtomicInteger();var original=kit.create(HostedKitTest.custom(Nodes.CustomKind.EDITOR,"doc"),e -> {});
             var editor=new JTextArea("unsaved");var document=editor.getDocument();original.registerContent(new CustomContent("doc",Nodes.CustomKind.EDITOR,editor,disposed::incrementAndGet));
             var spec=new ContentSpec("doc","Document");var tab=ui.windows().openTab(spec,null,original);var entry=model.tabs().hosted().getFirst();
-            failMain.set(true);assertThatThrownBy(() -> tab.move(true)).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
+            failMain.set(true);assertThatThrownBy(() -> tab.moveToNewWindow()).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
             assertThat(entry.window()).isNull();assertThat(entry.closed()).isFalse();failMain.set(false);
             var incoming=kit.create(new ViewSpec(new Nodes.Text("body",ControlState.READY,"Unused",Nodes.TextRole.BODY)),e -> {});
             assertThat(ui.windows().openTab(spec,null,incoming)).isSameAs(tab);

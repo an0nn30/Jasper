@@ -140,12 +140,13 @@ class AppContractTest extends PluginContractTest {
         // Every window is a workspace, as every application window is (workspace plan 3b Rulings 15): a plugin's tab is a
         // content tab of the window that shows it, the window it moves to reports the move, and a window whose last tab
         // left closes, taking its workspace with it.
-        // The window manager's part: the window added last that no move made is the main window (workspace plan 4a).
+        // The window manager's part (workspace plan 4a): the window added while none is open is the main window, which
+        // outlives its last tab; every other window is a child window, whose only tab stays where it is.
         UUID[] main = new UUID[1];
-        java.util.Set<UUID> separate = new java.util.HashSet<>();
-        java.util.function.Function<Boolean, UUID> workspace = forMove -> {
-            UUID id = terminalFixture.addWindow();
-            if (forMove) separate.add(id); else main[0] = id;
+        java.util.function.Supplier<UUID> workspace = () -> {
+            boolean first = main[0] == null;
+            UUID id = first ? terminalFixture.addMainWindow() : terminalFixture.addWindow();
+            if (first) main[0] = id;
             var tabs = contributions.tabs();
             var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id,
                 tab -> tab.movingFrom().ifPresentOrElse(from -> terminalFixture.moveTab(tab.id().value(), id),
@@ -154,7 +155,8 @@ class AppContractTest extends PluginContractTest {
                 entry -> {
                     for (var other : tabs.inWindow(id)) other.active(other == entry);
                     terminalFixture.selectTab(entry.id().value());
-                }, () -> {}));
+                }, () -> {}, tab -> Optional.empty(),
+                (tab, group, side) -> terminalFixture.addContentTab(id, tab.id().value(), tab::title, true)));
             terminalFixture.onWindowClosed(id, () -> {
                 registration.close();
                 if (id.equals(main[0])) main[0] = null;
@@ -162,8 +164,12 @@ class AppContractTest extends PluginContractTest {
             return id;
         };
         onEdt(() -> contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(
-            () -> main[0] != null ? main[0] : workspace.apply(false), id -> !separate.contains(id),
-            tab -> contributions.tabs().move(tab, workspace.apply(true)))));
+            () -> main[0] != null ? main[0] : workspace.get(), id -> id.equals(main[0]),
+            tab -> {
+                boolean only = terminalFixture.registry.window(tab.window()).map(window -> window.tabs().get().size() == 1).orElse(false);
+                if (!tab.window().equals(main[0]) && only) return;
+                contributions.tabs().move(tab, workspace.get());
+            }, window -> { }, workspace)));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();
@@ -395,11 +401,12 @@ class AppContractTest extends PluginContractTest {
                     .map(dev.jasper.app.windows.AuxiliarySurface::closeCommand).orElse(false));
             }
             @Override public boolean requestQuit() { return onEdtValue(() -> contributions.tabs().mayClose(contributions.tabs().hosted()) && auxiliary.mayQuit() && contributions.quitGuards().mayQuit()); }
-            @Override public UUID addTerminalWindow() { return onEdtValue(() -> workspace.apply(false)); }
+            @Override public UUID addTerminalWindow() { return onEdtValue(workspace); }
             @Override public UUID addContentTab(UUID windowId, String title) {
                 return onEdtValue(() -> { UUID id = UUID.randomUUID(); terminalFixture.addContentTab(windowId, id, () -> title); return id; });
             }
             @Override public void moveTab(UUID tabId, UUID windowId) { onEdt(() -> terminalFixture.moveTab(tabId, windowId)); }
+            @Override public void closeTab(UUID tabId) { onEdt(() -> terminalFixture.closeTab(tabId)); }
             @Override public UUID addTerminalTab(UUID windowId, String title) { return onEdtValue(() -> terminalFixture.addTab(windowId, title)); }
             @Override public UUID addTerminalPane(UUID tabId, String title, java.nio.file.Path directory) {
                 return onEdtValue(() -> terminalFixture.addPane(tabId, title, directory));

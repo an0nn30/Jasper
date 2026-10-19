@@ -38,6 +38,7 @@ class VaultManagerWindowTest {
                     public Optional<dev.jasper.sdk.terminal.TabHandle> activeTab() { return terminal.activeTab(); }
                     public boolean isActive() { return true; }
                     public boolean isOpen() { return open[0]; }
+                    public boolean isMain() { return open[0]; }
                     public void toFront() {}
                 };
                 var windowRef = new AtomicReference<VaultManagerWindow>();

@@ -564,11 +564,13 @@ final class HostedUi {
             new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
         public void select() { requireUi("select content"); entry.select(); }
-        public void move(boolean separate) {
-            requireUi("move content");
-            if (separate) entry.moveToNewWindow(); else entry.moveToMainWindow();
+        public void moveToNewWindow() { requireUi("move content"); entry.moveToNewWindow(); }
+        public void moveToMainWindow() { requireUi("move content"); entry.moveToMainWindow(); }
+        public WindowHandle window() {
+            requireUi("content window");
+            // A tab no window could take back (its move failed everywhere) names no window.
+            return terminals.windowHandle(entry.window() != null ? entry.window() : new java.util.UUID(0, 0));
         }
-        public boolean isSeparate() { requireUi("content host"); return !entry.inMainWindow(); }
         public boolean isActive() { requireUi("content active"); return entry.active(); }
         public boolean isClosed() { requireUi("content closed"); return entry.closed(); }
         public java.util.concurrent.CompletableFuture<Boolean> requestClose() { requireUi("close content"); return entry.requestClose(); }
@@ -653,18 +655,20 @@ final class HostedUi {
 
     Windows windows() {
         return new Windows() {
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
                 guard("openTab");
+                java.util.Objects.requireNonNull(placement, "placement");
                 var view = kit.requireOwned(content);
                 var existing = ownedContent.values().stream().filter(c -> c.entry.key().equals(spec.key())).findFirst();
-                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component());
+                if(existing.isPresent()) return openComponent(spec, owner, existing.get().entry.component(), placement);
                 // Reserve before publishing: a view cannot be owned by two surface lifetimes.
                 view.mount(spec);
                 // Workspace content takes the workspace theme slot, as terminals and editors do, on an opaque workspace
                 // surface; its specialized content paints its own background or glass above that. Moves keep both.
                 view.route(dev.jasper.ui.theme.ThemeRoute.WORKSPACE, true);
                 try {
-                    var tab = openComponent(spec, owner, view.component());
+                    var tab = openComponent(spec, owner, view.component(), placement);
                     tab.onClosed(view::close);
                     return tab;
                 } catch(RuntimeException | Error failure) {
@@ -672,7 +676,8 @@ final class HostedUi {
                     view.unmount(spec);throw failure;
                 }
             }
-            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
                 guard("openTab");
                 java.util.UUID window = null;
                 if (owner != null) {
@@ -681,7 +686,12 @@ final class HostedUi {
                     if (terminals.ownsOpenWindow(handle)) window = handle.id();
                     else if (!terminals.ownsWindow(handle)) throw new IllegalArgumentException("Foreign workspace owner");
                 }
-                var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component);
+                var entry = model.tabs().open(pluginId, spec.key(), spec.title(), window, component, switch (placement) {
+                    case ACTIVE_GROUP -> dev.jasper.app.contributions.TabRegistry.Placement.ACTIVE_GROUP;
+                    case SPLIT_RIGHT -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_RIGHT;
+                    case SPLIT_DOWN -> dev.jasper.app.contributions.TabRegistry.Placement.SPLIT_DOWN;
+                    case NEW_WINDOW -> dev.jasper.app.contributions.TabRegistry.Placement.NEW_WINDOW;
+                });
                 var existing = ownedContent.get(entry); if (existing != null) return existing;
                 var owned = new OwnedContent(entry); ownedContent.put(entry, owned);
                 Runnable cleanup = entry::close;

@@ -981,7 +981,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** The registry-facing side of this window's workspace (workspace tabs spec 9.1). */
     private WorkspaceHost workspaceHost() {
         return new WorkspaceHost(id, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
-            tab -> workspace.model().groupOf(tab));
+            tab -> workspace.model().groupOf(tab),
+            (tab, group, side) -> attach(tab, false, group != null ? group : workspace.model().activeGroup(), side));
     }
 
     /**

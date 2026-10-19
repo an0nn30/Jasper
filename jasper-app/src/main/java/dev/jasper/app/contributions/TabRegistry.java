@@ -1,6 +1,7 @@
 package dev.jasper.app.contributions;
 
 import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.TabId;
 import dev.jasper.app.lifecycle.Subscription;
 import java.awt.Toolkit;
@@ -39,6 +40,18 @@ public final class TabRegistry {
     private CompletableFuture<Boolean> decision;
     private CompletableFuture<Boolean> closing;
 
+    /** Where {@link #open} puts a new plugin's tab: the app's twin of the SDK's {@code TabPlacement} (workspace tabs spec 14). */
+    public enum Placement {
+        /** At the end of the window's active group. */
+        ACTIVE_GROUP,
+        /** In a new group to the right of the active group. */
+        SPLIT_RIGHT,
+        /** In a new group below the active group. */
+        SPLIT_DOWN,
+        /** In a new child window of its own, opened empty for it: the owner's window is not touched. */
+        NEW_WINDOW
+    }
+
     /**
      * How the registry reaches the windows (workspace tabs spec 6.4 and 6.5); the window manager gives it.
      *
@@ -46,14 +59,18 @@ public final class TabRegistry {
      *     and a plugin's tab asked for then opens there once it is up
      * @param isMain whether a window is the main window
      * @param newWindow moves a tab into a new child window, or leaves it where it is
-     * @param movedOut a move of a tab out of this window has ended, whether or not the tab left: the window manager closes
-     *     a child window the move left empty now, never in the middle of the move
+     * @param movedOut a move of a tab out of this window has ended, whether or not the tab left, or a tab placed in it
+     *     failed to show: the window manager closes a child window left empty now, never in the middle of the move
+     * @param emptyWindow opens an empty child window for a tab placed in a new window and gives its id; null when none
+     *     opens (the main window is being composed, or a test plays the windows), and the tab then opens where an
+     *     {@link Placement#ACTIVE_GROUP} one would
      */
-    public record Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
+    public record Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut,
+                          Supplier<UUID> emptyWindow) {
         /** Requires every function. */
         public Windows {
             Objects.requireNonNull(main, "main"); Objects.requireNonNull(isMain, "isMain"); Objects.requireNonNull(newWindow, "newWindow");
-            Objects.requireNonNull(movedOut, "movedOut");
+            Objects.requireNonNull(movedOut, "movedOut"); Objects.requireNonNull(emptyWindow, "emptyWindow");
         }
 
         /**
@@ -64,7 +81,20 @@ public final class TabRegistry {
          * @param newWindow moves a tab into a new child window, or leaves it where it is
          */
         public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow) {
-            this(main, isMain, newWindow, window -> { });
+            this(main, isMain, newWindow, window -> { }, () -> null);
+        }
+
+        /**
+         * Windows as a test plays them, where no window opens for a tab placed in a new window: it opens where an
+         * {@link Placement#ACTIVE_GROUP} one would.
+         *
+         * @param main the main window's id
+         * @param isMain whether a window is the main window
+         * @param newWindow moves a tab into a new child window, or leaves it where it is
+         * @param movedOut a move of a tab out of a window has ended, whether or not the tab left
+         */
+        public Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
+            this(main, isMain, newWindow, movedOut, () -> null);
         }
     }
 
@@ -167,13 +197,24 @@ public final class TabRegistry {
     }
 
     /**
-     * Opens a plugin's view as a tab in {@code owner}'s window, or the main window when {@code owner} is null or not
-     * registered, and selects it. A (plugin, key) already open is selected again, and attached to a window again when
-     * it lost its own. While the main window is being composed, a tab for it waits ({@link #mainOpened},
-     * {@link #mainFailed}).
+     * Opens a plugin's view as a tab at the end of the active group of {@code owner}'s window, or the main window when
+     * {@code owner} is null or not registered, and selects it. A (plugin, key) already open is selected again, and
+     * attached to a window again when it lost its own. While the main window is being composed, a tab for it waits
+     * ({@link #mainOpened}, {@link #mainFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
+        return open(plugin, key, title, owner, component, Placement.ACTIVE_GROUP);
+    }
+
+    /**
+     * As {@link #open(String, String, String, UUID, JComponent)}, the new tab where {@code placement} puts it: in that
+     * window's active group or a new group beside it, or in a new child window of its own (workspace tabs spec 14). A
+     * (plugin, key) already open is selected where it is. One asked for while the main window is being composed waits
+     * for it and opens at the end of its active group, whatever its placement.
+     */
+    public Tab open(String plugin, String key, String title, UUID owner, JComponent component, Placement placement) {
         requireEdt();
+        Objects.requireNonNull(placement, "placement");
         for (var tab : tabs) if (tab.kind() == Tab.Kind.HOSTED && tab.plugin().equals(plugin) && tab.key().equals(key)) {
             if (tab.window() == null) {
                 WorkspaceHost retry = owner != null ? hosts.get(owner) : null;
@@ -192,16 +233,30 @@ public final class TabRegistry {
         }
         var tab = new Tab(this, TabId.random(), Tab.Kind.HOSTED, plugin, key, title, new HostedContent(Objects.requireNonNull(component)));
         WorkspaceHost host = owner != null ? hosts.get(owner) : null;
+        // A new child window of its own, opened empty for the tab: the owner's window is not touched (workspace tabs plan 4b).
+        UUID child = placement == Placement.NEW_WINDOW && windows != null ? windows.emptyWindow().get() : null;
+        if (child != null) host = Objects.requireNonNull(hosts.get(child), "The new window registered no workspace");
         if (host == null) host = main();
         tabs.add(tab);
         if (host == null) { waitForMain(tab); return tab; }
         tab.window(host.id());
-        try { host.attach().accept(tab); }
+        try {
+            switch (placement) {
+                case SPLIT_RIGHT -> host.attachBeside().attach(tab, null, Side.RIGHT);
+                case SPLIT_DOWN -> host.attachBeside().attach(tab, null, Side.DOWN);
+                case ACTIVE_GROUP, NEW_WINDOW -> host.attach().accept(tab);
+            }
+        }
         catch (RuntimeException | Error failure) {
             rollbackAttach(host, tab, failure);
             tabs.remove(tab);
             try { tab.dispose(); }
             catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
+            // The child window opened for the tab is left empty: it closes, its failure kept behind the attach's.
+            if (child != null) {
+                try { windows.movedOut().accept(child); }
+                catch (RuntimeException | Error closing) { Tab.keep(failure, closing); }
+            }
             throw failure;
         }
         select(tab);
@@ -231,7 +286,7 @@ public final class TabRegistry {
      * The main window has opened (workspace tabs spec 6.4): the tabs that waited for it open there, in the order they
      * were asked for, and the last one that opened is selected. One that fails to open there is removed, so disposed;
      * its failure, like a failing selection's, is logged as a warning, since its caller has already returned, and keeps
-     * no other tab out.
+     * no other tab out. When the main window closes again while they open, the tabs not yet shown wait for the next one.
      *
      * @param main the main window's id
      */
@@ -240,12 +295,14 @@ public final class TabRegistry {
         Objects.requireNonNull(main, "main");
         var batch = List.copyOf(waiting);
         waiting.clear();
-        WorkspaceHost host = null;
+        if (!batch.isEmpty()) Objects.requireNonNull(hosts.get(main), "The main window registered no workspace");
         Tab opened = null;
         for (var tab : batch) {
             // One closed, or given a window of its own meanwhile, no longer waits.
             if (tab.closed() || !tabs.contains(tab) || tab.window() != null) continue;
-            if (host == null) host = Objects.requireNonNull(hosts.get(main), "The main window registered no workspace");
+            // Looked up for each tab: an earlier one's opening may have closed the main window again.
+            WorkspaceHost host = hosts.get(main);
+            if (host == null) { waitForMain(tab); continue; }
             try {
                 tab.window(host.id());
                 host.attach().accept(tab);
@@ -344,11 +401,15 @@ public final class TabRegistry {
      */
     private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {
         // Change ownership before removal: an emptied old window may unregister itself synchronously.
+        boolean wasActive = tab.active();
         tab.active(false);
         try { tab.window(next.id()); }
         catch (RuntimeException | Error refused) {
-            // The tab never left: it names the window that holds it again (workspace plan 4a's final review).
+            // The tab never left: it names the window that holds it again (workspace plan 4a's final review), as active as
+            // it was (its re-review).
             try { tab.window(old.id()); }
+            catch (RuntimeException | Error again) { Tab.keep(refused, again); }
+            try { tab.active(wasActive); }
             catch (RuntimeException | Error again) { Tab.keep(refused, again); }
             throw refused;
         }

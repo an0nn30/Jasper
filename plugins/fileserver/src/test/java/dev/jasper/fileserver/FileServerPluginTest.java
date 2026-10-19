@@ -521,6 +521,7 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
+            host.addTerminalWindow();
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
             UUID pane = host.addTerminalPane(tab, pane(Optional.empty()));
             var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);

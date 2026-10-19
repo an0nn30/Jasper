@@ -21,7 +21,7 @@ class TerminalRegistryTest {
         final UUID id = UUID.randomUUID();
         final List<TabEntry> tabs = new ArrayList<>();
         TabEntry selected;
-        final WindowEntry entry = new WindowEntry(id, () -> List.copyOf(tabs), () -> Optional.ofNullable(selected), () -> true, () -> { },
+        final WindowEntry entry = new WindowEntry(id, () -> List.copyOf(tabs), () -> Optional.ofNullable(selected), () -> true, () -> true, () -> { },
             directory -> Optional.empty());
     }
 

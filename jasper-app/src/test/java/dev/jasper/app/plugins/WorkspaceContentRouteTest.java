@@ -76,7 +76,7 @@ class WorkspaceContentRouteTest {
             component.setSize(60, 60); var g = image.createGraphics(); try { component.paint(g); } finally { g.dispose(); }
             assertThat(image.getRGB(59, 0) >>> 24).as("the surface paints opaque").isEqualTo(255);
 
-            tab.move(true);
+            tab.moveToNewWindow();
             assertThat(component.route()).as("a move keeps the slot").isEqualTo(ThemeRoute.WORKSPACE);
             assertThat(scroll.getBackground().getAlpha()).as("and resamples the destination's opacity").isEqualTo(102);
             assertThat(scroll.getBackground().getRGB() & 0xffffff).isEqualTo(workspace.semantic().color(dev.jasper.ui.theme.SemanticColor.SURFACE_INPUT).getRGB() & 0xffffff);

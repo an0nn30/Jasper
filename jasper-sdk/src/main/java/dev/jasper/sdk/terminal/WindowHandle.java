@@ -43,6 +43,16 @@ public interface WindowHandle extends WindowOwner {
      */
     boolean isOpen();
 
+    /**
+     * Whether this is the main window, the one with Jasper's toolbar, tool windows and status bar, which stays open
+     * when its last tab closes; any other window is a child window, a title bar over its tabs, which closes with its
+     * last tab (workspace tabs spec 6).
+     *
+     * @return true for the main window while it is open
+     * @since 0.20.0
+     */
+    boolean isMain();
+
     /** Raises the window. Ignored once it is closed. */
     void toFront();
 }

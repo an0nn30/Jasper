@@ -536,12 +536,14 @@ final class FakeUi {
     final List<FakePopover> popovers=new ArrayList<>();
     Windows windows() {
         return new Windows() {
-            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content) {
-                context.requireOpen();var view=context.kit().requireOwned(content);
+            @Override public dev.jasper.sdk.ui.ContentTab openTab(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, dev.jasper.sdk.ui.UiView content,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
+                context.requireOpen();java.util.Objects.requireNonNull(placement,"placement");var view=context.kit().requireOwned(content);
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
-                view.mount(spec);view.route="WORKSPACE";try{var tab=openComponent(spec,owner,view.component);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
+                view.mount(spec);view.route="WORKSPACE";try{var tab=openComponent(spec,owner,view.component,placement);tab.onClosed(view::close);return tab;}catch(RuntimeException | Error failure){view.route="CHROME";view.unmount(spec);throw failure;}
             }
-            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component) {
+            private dev.jasper.sdk.ui.ContentTab openComponent(dev.jasper.sdk.ui.ContentSpec spec, WindowOwner owner, JComponent component,
+                    dev.jasper.sdk.ui.TabPlacement placement) {
                 context.requireOpen();
                 for(var entry:contents)if(entry.key.equals(spec.key())){entry.select();return entry;}
                 if (owner instanceof FakeContent tab) {
@@ -551,13 +553,19 @@ final class FakeUi {
                 if (owner != null && (!(owner instanceof WindowHandle handle) || !context.terminals.ownsWindow(handle)))
                     throw new IllegalArgumentException("Content requires a workspace owner");
                 if (owner == null || !((WindowHandle)owner).isOpen()) {
-                    var window = host.workspace.windows.stream().filter(w -> w.open && !w.detached).findFirst().orElseGet(host.workspace::addWindow);
+                    // The main window, as the application restores it first when none is open (workspace tabs spec 6.4).
+                    var window = host.workspace.main().orElseGet(host.workspace::addWindow);
                     owner = context.terminals.windowHandle(window.id);
                 }
-                // A plugin's content is a content tab of its window (workspace tabs spec 14).
-                var shown = host.workspace.window(((WindowHandle) owner).id()).orElseThrow();
-                var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title()));
-                contents.add(entry);entry.select();return entry;
+                // A plugin's content is a content tab of its window (workspace tabs spec 14), placed as asked: in a new child
+                // window of its own, opened for it, the owner's window untouched.
+                var shown = placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW ? host.workspace.addWindow()
+                    : host.workspace.window(((WindowHandle) owner).id()).orElseThrow();
+                if (placement == dev.jasper.sdk.ui.TabPlacement.NEW_WINDOW) owner = context.terminals.windowHandle(shown.id);
+                var beside = placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_RIGHT || placement == dev.jasper.sdk.ui.TabPlacement.SPLIT_DOWN ? shown.active() : null;
+                var entry=new FakeContent(FakeUi.this,spec,owner,component,host.workspace.addTab(shown,dev.jasper.sdk.terminal.TabHandle.Kind.CONTENT,spec.title(),beside));
+                contents.add(entry);entry.select();
+                return entry;
             }
             @Override public Subscription onTabsClosing(java.util.function.BiFunction<List<dev.jasper.sdk.ui.ContentTab>,Boolean,java.util.concurrent.CompletableFuture<Boolean>> guard) {
                 context.requireOpen();contentGuard=guard;return ()->{if(contentGuard==guard)contentGuard=(tabs,batch)->java.util.concurrent.CompletableFuture.completedFuture(true);};

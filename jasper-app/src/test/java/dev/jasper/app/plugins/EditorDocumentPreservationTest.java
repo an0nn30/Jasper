@@ -88,8 +88,8 @@ class EditorDocumentPreservationTest {
                 var syntax=editor.context.appearance().syntaxPalette();
                 assertThat(keyword).isEqualTo(syntax.style(dev.jasper.sdk.ui.SyntaxRole.KEYWORD).color());
                 assertThat(opacity(editor)).isEqualTo(.8);
-                var pin=entry.pin();tab.move(true);assertThat(tab.isSeparate()).isFalse();pin.close();tab.move(true);
-                assertThat(tab.isSeparate()).isTrue();assertThat(entry.component()).isSameAs(view);
+                var pin=entry.pin();tab.moveToNewWindow();assertThat(tab.window().isMain()).isTrue();pin.close();tab.moveToNewWindow();
+                assertThat(tab.window().isMain()).isFalse();assertThat(entry.component()).isSameAs(view);
                 assertThat(opacity(editor)).as("destination opacity resampled").isEqualTo(.45);
                 assertThat(area.getBackground().getAlpha()).isZero();
                 assertThat(editor.context.appearance().variant()).isEqualTo(dev.jasper.sdk.Variant.LIGHT);
@@ -114,7 +114,7 @@ class EditorDocumentPreservationTest {
                 for(var id:List.of("find.case","find.word","find.regex"))assertThat(named(view,id,AbstractButton.class).isSelected()).isTrue();
                 assertThat(named(view,"find.bar",javax.swing.JComponent.class).isVisible()).isTrue();
                 assertThat(named(view,"find.status",JLabel.class).getForeground()).as("a caption").isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_TERTIARY));
-                tab.move(false);assertThat(opacity(editor)).isEqualTo(.8);
+                tab.moveToMainWindow();assertThat(opacity(editor)).isEqualTo(.8);
                 call(area,"undoLastAction");assertThat(area.getText()).isEqualTo("int foo = 42;\nfoo += 1;\n");
                 call(area,"redoLastAction");
                 measure(area);
@@ -197,7 +197,7 @@ class EditorDocumentPreservationTest {
                 var surface=(javax.swing.JComponent)call(editor.selectedTab(),"surface");
                 Integer nativeTrack = null;
                 for(var detached:List.of(false,true)) {
-                    editor.contentTab().move(detached);
+                    if (detached) editor.contentTab().moveToNewWindow(); else editor.contentTab().moveToMainWindow();
                     String state=detached ? "document-scroll-moved" : "document-scroll-main";
                     dev.jasper.sdk.contracts.ThemeMigrationCapture.save("editor-hosted","mixed",state,surface,600,300);
                     var image=new java.awt.image.BufferedImage(600,300,java.awt.image.BufferedImage.TYPE_INT_ARGB);
@@ -264,7 +264,7 @@ class EditorDocumentPreservationTest {
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
                 assertThat(named(view,"vim.status",JLabel.class).getForeground()).isEqualTo(next.semantic().color(dev.jasper.ui.theme.SemanticColor.TEXT_PRIMARY));
                 assertThat(output.getViewport().getViewPosition().y).isZero();
-                editor.contentTab().move(true);
+                editor.contentTab().moveToNewWindow();
                 assertThat(editor.documentText().getDocument()).isSameAs(state[2]);
                 assertThat(output.getViewport().getViewPosition().y).as("moving preserves output scroll").isZero();
                 feed(editor,state[0],"<CR>\"qp");

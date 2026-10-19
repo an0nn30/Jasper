@@ -23,6 +23,7 @@ class RemoteScopeTest {
             @Override public Optional<TabHandle> activeTab() { return Optional.empty(); }
             @Override public boolean isActive() { return true; }
             @Override public boolean isOpen() { return true; }
+            @Override public boolean isMain() { return true; }
             @Override public void toFront() { }
         };
     }

@@ -114,6 +114,7 @@ final class HostedTerminals implements Terminals {
         }
         @Override public boolean isActive() { requireUi("isActive"); return registry.window(id).map(window -> window.active().getAsBoolean()).orElse(false); }
         @Override public boolean isOpen() { requireUi("isOpen"); return registry.window(id).isPresent(); }
+        @Override public boolean isMain() { requireUi("isMain"); return registry.window(id).map(window -> window.main().getAsBoolean()).orElse(false); }
         @Override public void toFront() { requireUi("toFront"); registry.window(id).ifPresent(window -> window.toFront().run()); }
         @Override public boolean equals(Object other) { return other instanceof WindowHandle handle && handle.id().equals(id); }
         @Override public int hashCode() { return id.hashCode(); }
