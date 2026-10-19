@@ -1081,6 +1081,35 @@ public abstract class PluginContractTest {
         assertThat(h.active("test.alpha")).isTrue();
     }
 
+    /** SDK 0.18.1: a toolbar view also admits icon-only GHOST buttons; a labelled GHOST is still refused. */
+    @Test void aToolbarViewAdmitsIconOnlyGhostButtons() {
+        var ready = dev.jasper.sdk.ui.ControlState.READY;
+        List<dev.jasper.sdk.ui.UiEvent> seen = new CopyOnWriteArrayList<>();
+        var admitted = new AtomicReference<dev.jasper.sdk.ui.UiView>();
+        var run = new dev.jasper.sdk.ui.Nodes.Button("bar.run", ready, "", "run", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "run", "Connect");
+        var spec = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+            new dev.jasper.sdk.ui.Nodes.Choice("bar.host", ready, dev.jasper.sdk.ui.Nodes.ChoiceKind.DROPDOWN,
+                List.of(new dev.jasper.sdk.ui.Option("mac", "Mac", Optional.empty())), "mac", "Session", "host"),
+            run,
+            new dev.jasper.sdk.ui.Nodes.Button("bar.stop", ready, "", "close", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "stop", "Stop"))));
+        h.start(info("test.alpha"), Set.of(), Set.of(), context -> context.toolbar().add(ToolbarItem.view(window -> {
+            var view = context.kit().create(spec, seen::add);
+            admitted.set(view);
+            return view;
+        })));
+        var window = new AtomicReference<UUID>();
+        h.ui(() -> window.set(h.addTerminalWindow()));
+        h.ui(() -> {
+            assertThat(h.openToolbarViews(window.get())).containsExactly("bar");
+            h.clickToolbarViewButton(window.get(), "bar.run");
+            var labelled = new dev.jasper.sdk.ui.ViewSpec(new dev.jasper.sdk.ui.Nodes.Stack("bar", ready, dev.jasper.sdk.ui.Nodes.LayoutRole.INLINE, List.of(
+                new dev.jasper.sdk.ui.Nodes.Button("bar.edit", ready, "Edit", "", dev.jasper.sdk.ui.Nodes.ButtonKind.GHOST, "edit", ""))));
+            assertThatIllegalArgumentException().isThrownBy(() -> admitted.get().update(labelled)).withMessageContaining("bar.edit");
+            assertThat(admitted.get().spec()).isEqualTo(spec);
+        });
+        assertThat(seen).containsExactly(new dev.jasper.sdk.ui.UiEvent.Action("run"));
+    }
+
     /** Review fix (plan 3d): SEARCHABLE and PICKER choices and a menu button are admitted beside a label and a DROPDOWN. */
     @Test void aToolbarViewAdmitsSearchableAndPickerChoicesAndMenuButtons() {
         var ready = dev.jasper.sdk.ui.ControlState.READY;
