@@ -358,8 +358,8 @@ public final class WindowManager {
     }
 
     /**
-     * A move took a tab out of {@code window} and has reported itself: a child window it left empty closes now, so listeners
-     * hear {@code TAB_MOVED} before that window's {@code WINDOW_CLOSED} (workspace tabs spec 6.4).
+     * A move of a tab out of {@code window} has ended, whether or not the tab left: a child window it left empty closes now,
+     * so listeners hear {@code TAB_MOVED} before that window's {@code WINDOW_CLOSED} (workspace tabs spec 6.4).
      */
     private void movedOut(UUID window) {
         for (ChildWindow child : List.copyOf(children))

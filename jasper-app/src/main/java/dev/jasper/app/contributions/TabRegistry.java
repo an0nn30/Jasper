@@ -44,8 +44,8 @@ public final class TabRegistry {
      *     and a plugin's tab asked for then opens there once it is up
      * @param isMain whether a window is the main window
      * @param newWindow moves a tab into a new child window, or leaves it where it is
-     * @param movedOut a move took a tab out of this window, and has reported itself: the window manager closes a child
-     *     window the move left empty now, never in the middle of the move
+     * @param movedOut a move of a tab out of this window has ended, whether or not the tab left: the window manager closes
+     *     a child window the move left empty now, never in the middle of the move
      */
     public record Windows(Supplier<UUID> main, Predicate<UUID> isMain, Consumer<Tab> newWindow, Consumer<UUID> movedOut) {
         /** Requires every function. */
@@ -295,21 +295,24 @@ public final class TabRegistry {
      * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. When {@code next} fails, the tab
      * goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When {@code old}
      * fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that failure
-     * propagates afterwards. The window the tab left hears of the move last (workspace plan 4a).
+     * propagates afterwards. The window the tab left hears of the move last (workspace plan 4a); a failure there is kept
+     * behind the move's own.
      */
     private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {
         // Change ownership before removal: an emptied old window may unregister itself synchronously.
         tab.active(false);
         tab.window(next.id());
         tab.movingFrom = old.id();
-        Throwable leaving = null;
+        // The first failure is the move's own: the source's, else the destination's; later ones are kept behind it.
+        Throwable failure = null;
+        boolean arrived = false;
         try {
             try { old.detach().accept(tab); }
-            catch (RuntimeException | Error failure) { leaving = failure; }
-            try { next.attach().accept(tab); }
-            catch (RuntimeException | Error failure) {
-                Throwable kept = Tab.keep(leaving, failure);
-                rollbackAttach(next, tab, failure);
+            catch (RuntimeException | Error leaving) { failure = leaving; }
+            try { next.attach().accept(tab); arrived = true; }
+            catch (RuntimeException | Error attaching) {
+                failure = Tab.keep(failure, attaching);
+                rollbackAttach(next, tab, attaching);
                 if (tabs.contains(tab) && !tab.closed()) {
                     var recovery = new ArrayList<WorkspaceHost>();
                     if (hosts.get(old.id()) == old) recovery.add(old);
@@ -321,21 +324,26 @@ public final class TabRegistry {
                         try { host.attach().accept(tab); restored = true; break; }
                         catch (RuntimeException | Error recoveryFailure) {
                             rollbackAttach(host, tab, recoveryFailure);
-                            kept = Tab.keep(kept, recoveryFailure);
+                            failure = Tab.keep(failure, recoveryFailure);
                         }
                     }
                     if (!restored) tab.window(null);
                 }
-                Tab.rethrow(kept);
             }
         } finally {
             tab.movingFrom = null;
-            // The window the tab left hears of it only now: a child window the move emptied closes after the move has
-            // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
-            if (windows != null) windows.movedOut().accept(old.id());
         }
-        select(tab);
-        Tab.rethrow(leaving);
+        // The window the tab left hears of it only now: a child window the move emptied closes after the move has
+        // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
+        if (windows != null) {
+            try { windows.movedOut().accept(old.id()); }
+            catch (RuntimeException | Error closing) { failure = Tab.keep(failure, closing); }
+        }
+        if (arrived) {
+            try { select(tab); }
+            catch (RuntimeException | Error selecting) { failure = Tab.keep(failure, selecting); }
+        }
+        Tab.rethrow(failure);
     }
 
     /**

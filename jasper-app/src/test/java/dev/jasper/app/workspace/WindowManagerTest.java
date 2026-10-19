@@ -19,7 +19,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -64,7 +66,13 @@ class WindowManagerTest {
     private WindowContent compose(WindowManager.Opening opening) {
         if (quitting) return null;
         // A plugin opening its view while the main window is still being composed (a panel factory, say).
-        if (reenter) { reenter = false; early = model.tabs().open("dev.example.editor", "early", "early.txt", null, new JPanel()); }
+        if (reenter) {
+            reenter = false;
+            early = model.tabs().open("dev.example.editor", "early", "early.txt", null, new JPanel());
+            // Workspace plan 4a Rulings 24: the tab waits for the main window, and a nested request for it is still refused.
+            assertThatThrownBy(() -> manager.ensureMain("plugin", null)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("The main window is still opening");
+        }
         var launcher = new ShellLauncher(pending::add, directory -> { started.add(directory); return IdleTerminalSession.start(); },
             "idle-test-session");
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
@@ -382,22 +390,25 @@ class WindowManagerTest {
         edt(() -> {
             terminals[0].windowActivated(child[0].id());
             var mainId = manager.main().orElseThrow().id();
+            Tab tab = child[0].content().selectedTab();
+            Function<UUID, String> window = id -> id.equals(mainId) ? "main" : id.equals(child[0].id()) ? "child" : "another window";
+            Function<UUID, String> which = id -> id.equals(tab.id().value()) ? "it" : "another tab";
             List<String> heard = new ArrayList<>();
+            // Every event on the topics FakeTerminalsTest records, as it records them.
             terminals[0].onEvent(event -> {
                 switch (event) {
                     case dev.jasper.app.terminals.TerminalEvent.ActivePaneChanged changed ->
                         heard.add(changed.paneId().isPresent() ? "active pane" : "no active pane");
-                    case dev.jasper.app.terminals.TerminalEvent.TabMoved moved -> heard.add("tab moved");
-                    case dev.jasper.app.terminals.TerminalEvent.TabSelected selected when selected.windowId().equals(mainId) ->
-                        heard.add("main selects it");
-                    case dev.jasper.app.terminals.TerminalEvent.WindowClosed closed when closed.windowId().equals(child[0].id()) ->
-                        heard.add("child closed");
+                    case dev.jasper.app.terminals.TerminalEvent.TabMoved moved -> heard.add(which.apply(moved.tabId()) + " moved from "
+                        + window.apply(moved.fromWindowId()) + " to " + window.apply(moved.toWindowId()));
+                    case dev.jasper.app.terminals.TerminalEvent.TabSelected selected ->
+                        heard.add(window.apply(selected.windowId()) + " selects " + which.apply(selected.tabId()));
+                    case dev.jasper.app.terminals.TerminalEvent.WindowClosed closed -> heard.add(window.apply(closed.windowId()) + " closed");
                     default -> { }
                 }
             });
-            Tab tab = child[0].content().selectedTab();
             manager.moveToMainWindow(tab);
-            assertThat(heard).containsExactly("no active pane", "tab moved", "main selects it", "child closed");
+            assertThat(heard).containsExactly("no active pane", "it moved from child to main", "main selects it", "child closed");
             assertThat(child[0].closed()).isTrue();
             assertThat(tab.window()).isEqualTo(manager.main().orElseThrow().id());
         });

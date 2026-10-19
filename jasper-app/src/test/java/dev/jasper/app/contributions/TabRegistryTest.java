@@ -72,15 +72,71 @@ class TabRegistryTest {
         var target = UUID.randomUUID();
         registry.addHost(new WorkspaceHost(source, tab -> heard.add("attach source"),
             tab -> { heard.add("detach source"); throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
-        registry.addHost(new WorkspaceHost(target, tab -> heard.add("attach target"), tab -> heard.add("detach target"), tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(target, tab -> heard.add("attach target"), tab -> heard.add("detach target"),
+            tab -> heard.add("select target"), () -> {}));
         registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {},
             window -> heard.add("moved out of " + (window.equals(source) ? "source" : "target"))));
         var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
         heard.clear();
-        assertThatThrownBy(() -> registry.move(tab, target)).isInstanceOf(IllegalStateException.class).hasMessage("detach failed");
+        assertThatThrownBy(() -> registry.move(tab, target)).isInstanceOf(IllegalStateException.class).hasMessage("detach failed")
+            .satisfies(failure -> assertThat(failure.getSuppressed()).as("nothing else failed").isEmpty());
         assertThat(tab.window()).as("shown where it is said to be").isEqualTo(target);
-        assertThat(heard).containsExactly("detach source", "attach target", "moved out of source");
+        assertThat(heard).as("and selected there").containsExactly("detach source", "attach target", "moved out of source", "select target");
         assertThat(tab.moving()).as("the move is over").isFalse();
+    }
+
+    /**
+     * Workspace plan 4a: a failure as the window a move left hears of it is kept behind the move's own, and never keeps the
+     * tab that arrived from being selected.
+     */
+    @Test void aFailureAsTheWindowAMoveLeftHearsOfItIsKeptBehindTheMovesOwn() {
+        var heard = new ArrayList<String>();
+        var source = UUID.randomUUID();
+        var target = UUID.randomUUID();
+        boolean[] failDetach = {false}, failAttach = {false}, failClose = {true};
+        registry.addHost(new WorkspaceHost(source, tab -> heard.add("attach source"), tab -> {
+            heard.add("detach source");
+            if (failDetach[0]) throw new IllegalStateException("detach failed");
+        }, tab -> heard.add("select source"), () -> {}));
+        registry.addHost(new WorkspaceHost(target, tab -> {
+            heard.add("attach target");
+            if (failAttach[0]) throw new IllegalStateException("destination failed");
+        }, tab -> heard.add("detach target"), tab -> heard.add("select target"), () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {}, window -> {
+            if (failClose[0]) throw new IllegalStateException("close failed");
+        }));
+        var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
+        Runnable back = () -> { failClose[0] = false; registry.move(tab, source); failClose[0] = true; };
+
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).isInstanceOf(IllegalStateException.class).hasMessage("close failed");
+        assertThat(tab.window()).as("a clean move arrives").isEqualTo(target);
+        assertThat(heard).as("and is selected there").containsExactly("detach source", "attach target", "select target");
+        assertThat(tab.moving()).as("the move is over").isFalse();
+
+        back.run();
+        failDetach[0] = true;
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).hasMessage("detach failed").satisfies(failure ->
+            assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("close failed"));
+        assertThat(tab.window()).isEqualTo(target);
+        assertThat(heard).as("a source that failed to let go still loses the tab").containsExactly("detach source", "attach target", "select target");
+        failDetach[0] = false;
+
+        back.run();
+        failAttach[0] = true;
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).hasMessage("destination failed").satisfies(failure ->
+            assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("close failed"));
+        assertThat(tab.window()).as("back in the source").isEqualTo(source);
+        assertThat(heard).as("and not selected again").containsExactly("detach source", "attach target", "detach target", "attach source");
+
+        failClose[0] = false;
+        failDetach[0] = true;
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).hasMessage("detach failed").satisfies(failure ->
+            assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("destination failed"));
+        assertThat(tab.window()).isEqualTo(source);
     }
 
     /**

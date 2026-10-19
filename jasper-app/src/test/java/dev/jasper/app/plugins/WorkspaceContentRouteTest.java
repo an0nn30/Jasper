@@ -102,7 +102,7 @@ class WorkspaceContentRouteTest {
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
             var main = java.util.UUID.randomUUID(); var holder = new JPanel();
-            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, 
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main,
                 e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
             model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> { }));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,

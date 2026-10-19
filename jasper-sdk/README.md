@@ -54,9 +54,9 @@ group's selected tab; `TabHandle.kind()` says which kind a tab is and `terminal(
 `Terminals.split` opens a terminal tab beside the pane's group. `TAB_OPENED`, `TAB_CLOSED` and `TAB_SELECTED` cover
 every tab, and `TAB_MOVED` reports a tab moving to another window: a moved terminal tab reports no `PANE_OPENED` or
 `PANE_CLOSED`, and its pane keeps its id; a window opened for the move reports `WINDOW_OPENED` before the `TAB_MOVED`,
-and a window the move empties `WINDOW_CLOSED` after it. The Tab menu (`StandardMenu.TAB`) holds the split, group-focus and prompt
-items; `ExitPolicy.CLOSE` closes a session's tab when it ends. The testkit adds `FakePluginHost.addContentTab` and
-`moveTab`, and `addTerminalPane` gives a terminal tab its one pane.
+and a window the move empties `WINDOW_CLOSED` after it. The Tab menu (`StandardMenu.TAB`) holds the split, group-focus
+and prompt items; `ExitPolicy.CLOSE` closes a session's tab when it ends. The testkit adds
+`FakePluginHost.addContentTab` and `moveTab`, and `addTerminalPane` gives a terminal tab its one pane.
 
 ## Shell variables, the file editor and program tabs (SDK 0.17.1)
 
