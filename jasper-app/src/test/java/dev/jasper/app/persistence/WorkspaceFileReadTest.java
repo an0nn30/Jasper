@@ -249,6 +249,31 @@ class WorkspaceFileReadTest {
         assertThat(read(text.replace(id(tab(5)), id(tab(1))))).as("a tab the main window holds").isEqualTo(mainOnly);
     }
 
+    /** {@code text}, a main window then a child window, with the child window listed first. */
+    static String childFirst(String text) {
+        String head = "version = 1\n";
+        int child = text.indexOf("\n[[windows]]\nrole = \"child\"");
+        assertThat(child).as("the child window's entry").isGreaterThan(head.length());
+        return head + text.substring(child) + text.substring(head.length(), child);
+    }
+
+    @Test void aChildListedBeforeTheMainWindowIsTheOneDroppedWhenTheirIdsClash() throws Exception {
+        String text = WorkspaceFile.encode(new Snapshot(List.of(window(Role.MAIN, 1, 2), window(Role.CHILD, 3, 4))));
+        var mainOnly = new Loaded.Restore(new Snapshot(List.of(window(Role.MAIN, 1, 2))));
+        assertThat(read(childFirst(text))).as("no clash: both windows, the main window first")
+            .isEqualTo(new Loaded.Restore(new Snapshot(List.of(window(Role.MAIN, 1, 2), window(Role.CHILD, 3, 4)))));
+        assertThat(read(childFirst(text.replace(id(tab(3)), id(tab(1)))))).as("a tab the main window holds").isEqualTo(mainOnly);
+        assertThat(read(childFirst(text.replace(groupId(3).value().toString(), groupId(1).value().toString()))))
+            .as("a group the main window holds").isEqualTo(mainOnly);
+    }
+
+    @Test void aChildSharingAGroupIdWithTheMainWindowIsDroppedAlone() throws Exception {
+        String text = WorkspaceFile.encode(new Snapshot(List.of(window(Role.MAIN, 1, 2), window(Role.CHILD, 3, 4))));
+        var mainOnly = new Loaded.Restore(new Snapshot(List.of(window(Role.MAIN, 1, 2))));
+        assertThat(read(text.replace(groupId(3).value().toString(), groupId(1).value().toString())))
+            .as("the groups clash and no tab does").isEqualTo(mainOnly);
+    }
+
     @Test void anAbsentFileStartsFreshAndCreatesNothing() throws Exception {
         assertThat(WorkspaceFile.read(file())).isEqualTo(new Loaded.Fresh(Optional.empty()));
         try (var listing = Files.list(dir)) {

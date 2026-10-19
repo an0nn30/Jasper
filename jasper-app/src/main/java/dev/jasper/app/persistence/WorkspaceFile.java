@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -233,25 +234,26 @@ public final class WorkspaceFile {
         if (toml.hasErrors()) throw new IOException("Invalid workspace state: " + toml.errors().getFirst());
         Object version = toml.get(List.of("version"));
         if (!Long.valueOf(1).equals(version)) throw new IOException("Unknown workspace state version: " + version);
+        var read = new ArrayList<WindowRecord>();
+        if (toml.get(List.of("windows")) instanceof TomlArray entries)
+            for (int i = 0; i < entries.size(); i++) window(entries.get(i)).ifPresent(read::add);
+        // Main windows first, so that a child whose ids clash with the main window's is the one dropped.
+        read.sort(Comparator.comparing(window -> window.role() != Role.MAIN));
         var windows = new ArrayList<WindowRecord>();
         var groups = new HashSet<GroupId>();
         var tabs = new HashSet<TabId>();
-        if (toml.get(List.of("windows")) instanceof TomlArray entries)
-            for (int i = 0; i < entries.size(); i++) {
-                Optional<WindowRecord> read = window(entries.get(i));
-                if (read.isEmpty()) continue;
-                WindowRecord window = read.get();
-                List<GroupId> ids = window.layout().groups().stream().map(Group::id).toList();
-                if (window.role() == Role.MAIN && windows.stream().anyMatch(kept -> kept.role() == Role.MAIN)) {
-                    LOG.log(System.Logger.Level.WARNING, "Dropping a second main window from the workspace state");
-                } else if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)) {
-                    LOG.log(System.Logger.Level.WARNING, "Dropping a window whose groups or tabs an earlier window holds");
-                } else {
-                    groups.addAll(ids);
-                    tabs.addAll(window.layout().tabs());
-                    windows.add(window);
-                }
+        for (WindowRecord window : read) {
+            List<GroupId> ids = window.layout().groups().stream().map(Group::id).toList();
+            if (window.role() == Role.MAIN && windows.stream().anyMatch(kept -> kept.role() == Role.MAIN)) {
+                LOG.log(System.Logger.Level.WARNING, "Dropping a second main window from the workspace state");
+            } else if (ids.stream().anyMatch(groups::contains) || window.layout().tabs().stream().anyMatch(tabs::contains)) {
+                LOG.log(System.Logger.Level.WARNING, "Dropping a window whose groups or tabs an earlier window holds");
+            } else {
+                groups.addAll(ids);
+                tabs.addAll(window.layout().tabs());
+                windows.add(window);
             }
+        }
         if (windows.stream().noneMatch(kept -> kept.role() == Role.MAIN)) throw new IOException("The workspace state keeps no main window");
         return new Snapshot(windows);
     }
