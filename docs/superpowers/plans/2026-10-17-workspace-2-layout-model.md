@@ -22,11 +22,12 @@ and tests. Nothing in the app calls either here.
 (sections 1, 3, 4, 7, 8, 13, 15, 17 and 18; section 12, whose drops plan 5 resolves in pixels, not here). Plan 2 of 6
 (spec 18).
 
-**Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`.
-Run every command from the worktree root. Line numbers are from `941599fc2`; plan 1 of this series may execute first and
-touches none of the anchors used here except `docs/STATUS.md`'s top (see "Before you start"). Every edit to an existing
-file quotes the text it replaces; if the quoted text is not found exactly once, re-find it, adjust the anchor and record
-it in the banner; never edit around a missing anchor.
+**Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`
+(on `main` at `4ed94fb78`). Run every command from the worktree root. Line numbers are from `39c8ec44b`, plan 1's last
+commit: plan 1 has executed and changed none of the text quoted here, but it moved `docs/app-architecture.md`'s `dock`
+row to `:167`, appended a row to `migration.csv` and put its entry at the top of `docs/STATUS.md` (see "Before you
+start"). Every edit to an existing file quotes the text it replaces; if the quoted text is not found exactly once,
+re-find it, adjust the anchor and record it in the banner; never edit around a missing anchor.
 
 ## Before you start
 
@@ -43,8 +44,8 @@ grep -c 'void buddyStateLivesBesideCommandHistory()' jasper-app/src/test/java/de
 grep -c "Allowed outgoing Jasper dependencies: dev.jasper.app.dock (slots and the dock's size limits)." jasper-app/src/main/java/dev/jasper/app/persistence/package-info.java  # 1
 ```
 
-Every command prints the stated result. If plan 1 has executed, its STATUS entry is the top one; this plan's entry goes
-above it.
+Every command prints the stated result. Plan 1's STATUS entry ("Workspace tabs, plan 1: the single instance") is the
+top one; this plan's entry goes above it.
 
 ## Global Constraints
 
@@ -90,7 +91,7 @@ above it.
 
 ## Verified facts
 
-At `941599fc2`.
+At `39c8ec44b`.
 
 1. `gradle/application-architecture.gradle.kts`: `dockAwt` is `java.awt.Rectangle` and `java.awt.Point` (`:26-27`); the
    dock rule is `:63-66` (`packageOf(from) == "dev.jasper.app.dock"`, allowed: its own package, `java.*` outside
@@ -130,7 +131,7 @@ At `941599fc2`.
     Today's tab deck is a `JTabbedPane` (`WindowContent.closeTab`, `:1114-1126`).
 11. `dock/Side.java:4` is `enum Side { LEFT, RIGHT, BOTTOM }`; the new `layout.Side` is a different type with the same
     simple name (no file in this plan imports both).
-12. `docs/app-architecture.md:162` is the `dock` row of the package ownership table; `AGENTS.md:25` states the dock
+12. `docs/app-architecture.md:167` is the `dock` row of the package ownership table; `AGENTS.md:25` states the dock
     package's JDK-only rule.
 13. `UUID.nameUUIDFromBytes` is MD5 with version 3 and the IETF variant; `"jasper.split:"` gives
     `e8b5eccb-037b-3d65-a6c6-5e4889602b31` and `"jasper.split:1"` gives `59943c66-5e92-39d1-a8ea-1f88b440a667` (computed
@@ -3457,7 +3458,7 @@ EOF
 ### Task 6: Documentation, STATUS and the whole build
 
 **Files:**
-- Modify: `docs/app-architecture.md:162`, `AGENTS.md:25`, `docs/STATUS.md` (top), this plan's status banner (line 3)
+- Modify: `docs/app-architecture.md:167`, `AGENTS.md:25`, `docs/STATUS.md` (top), this plan's status banner (line 3)
 
 - [ ] **Step 1: The documents**
 
@@ -3517,7 +3518,7 @@ Record the line in the STATUS entry.
 - [ ] **Step 4: STATUS, the banner, and commit**
 
 Add a new entry at the top of `docs/STATUS.md` (below the `# Jasper — Status and Handoff` title, above the current first
-entry), in the style of the earlier entries:
+entry, plan 1's "Workspace tabs, plan 1: the single instance"), in the style of the earlier entries:
 
 ```markdown
 **Workspace tabs, plan 2: the layout model and its encoding — <date>** (`claude/workspace-tabs`, worktree
