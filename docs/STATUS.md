@@ -1,7 +1,7 @@
 # Jasper — Status and Handoff
 
 **The boot splash no longer flashes on Windows and Linux — 2026-10-19** (`claude/splash-no-flash`, worktree
-`.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; not merged, not pushed). Each start-up step repainted the
+`.claude/worktrees/splash-flash`, from `main` at `2c065f8cd`; merged to local `main`, not pushed). Each start-up step repainted the
 whole branded splash straight onto its window, the gradient first, and Windows and X11 show a window's pixels as they
 are drawn, so between steps the art, icon, name, version and bar vanished to the bare gradient; macOS presents a paint at
 once. Under Xvfb in the Linux container, 408 of 789 screen captures taken during 599 steps showed the area above the
