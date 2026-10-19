@@ -422,7 +422,7 @@ UI variant's `surface.terminal` and `surface.tabstrip`.
 
 - **Matching and extra schemes.** `ui.dark`'s matching scheme is `terminal.dark` and `ui.light`'s is `terminal.light`;
   `terminal.scheme = "match"` uses it. Any other key is an extra scheme that users can pick with any theme in either
-  appearance, as Slate Cobalt's `high-contrast` (`slate-cobalt/high-contrast`) and Enterprise's `dark-terminal` are.
+  appearance, as Slate Cobalt's `high-contrast` (`slate-cobalt/high-contrast`) is.
 - **The editor reads the matching scheme.** `terminal.*` references in `editor.dark` resolve in `terminal.dark`, and
   in `editor.light` in `terminal.light`.
 - **Light schemes.** Programs print ANSI white and bright white as text and use black as a background, so in a light

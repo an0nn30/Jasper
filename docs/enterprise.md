@@ -60,8 +60,12 @@ Enterprise as skipped: "did not finish starting with this look last time".
   (when a plugin fills it), Window and Help. **Window** holds what the standard look's Pane and Tab menus hold, then
   the tool window toggles, which the standard look keeps under View.
 - **Toolbar row** under the title bar: **New Session**, **Split** (Split Right, Split Down), **Maximize**, the plugins'
-  toolbar items (such as Remote's **Session:** dropdown), **Search everywhere** with the palette's shortcut, which
-  opens the Run window, and **Settings…** at the trailing edge. Its height, `window.toolbar_height`, defaults to 34 px.
+  toolbar items (such as Remote's session combo and Run button), **Search everywhere** with the palette's shortcut,
+  which opens the Run window, and **Settings…** at the trailing edge. By default each button is a 22 px icon named by
+  its tooltip, the built-in ones IntelliJ's classic icons, and Split marks its menu with a small ▼ in its corner.
+  **Toolbar: Icons and Labels** (`window.toolbar = "icons_and_labels"`) shows each button's icon, then its label, Split
+  ending in ▼. **Toolbar: Hidden** removes the row, Search everywhere and the plugins' items with it. Its height,
+  `window.toolbar_height`, defaults to 34 px.
 - **Tabs** are classic: always shown, as wide as their labels, each with a × (a terminal tab also with a status dot), a
   **+** after the last, the active one underlined.
 - **Tool windows** ([tool windows and the dock](workspace.md#tool-windows-and-the-dock)) sit on labelled stripes: left
@@ -70,12 +74,16 @@ Enterprise as skipped: "did not finish starting with this look last time".
   and Windows), its label starts with the digit, such as "3: Transfers". A click toggles the window and a right-click
   opens its menu. Frames are flush, under header strips 24 px high. Settings hides `window.rail_width`, which does not
   apply.
+- **The active tool window.** A click anywhere in a tool window, or opening it from its stripe, makes it the active
+  one: its header strip takes the focused colour and the keyboard moves into it, to its first control that takes keys,
+  buttons last. A click in a terminal pane ends that; dragging a divider does not. Remote's and File Server's own
+  toggle actions, such as **Toggle SFTP**, and their shortcuts open their windows without activating them.
 - **Event Log** is the Notifications panel's name, and it starts in the bottom strip, on its left
   ([Notifications](notifications.md#the-notifications-panel)).
 - **Status bar** in ruled cells: **▶ Run…** first, which opens the Run window, then the session with its dot and the
   folder, the plugins' items, the grid size, "UTF-8" and, while `config.toml` has a problem, its indicator.
-- **The Run window** replaces the command palette card. It opens at the bottom-left of the tool window area, stays open
-  while you work and shows 8 rows by default ([Run window](command-palette.md#the-run-window)).
+- **The Run window** replaces the command palette card. It opens centred across the workspace, in its upper part, stays
+  open while you work and shows 8 rows by default ([Run window](command-palette.md#the-run-window)).
 
 ### Dialogs and controls
 
@@ -126,7 +134,7 @@ shows the name.
 
 ### Defaults
 
-The look gives four settings other defaults. A value you saved in `config.toml` or Settings wins.
+The look gives five settings other defaults. A value you saved in `config.toml` or Settings wins.
 
 | Setting | Under Enterprise | Standard look |
 |---|---|---|
@@ -134,6 +142,7 @@ The look gives four settings other defaults. A value you saved in `config.toml` 
 | `ui.theme.dark` | `enterprise` | `slate-cobalt` |
 | `palette.visible_rows` | `8` | `5` |
 | `window.toolbar_height` | `34` | `30` |
+| `window.toolbar` | `"icons"` | `"icons_and_labels"` |
 
 ### The Enterprise theme
 
@@ -142,21 +151,23 @@ While the plugin is on, theme dropdowns list **Enterprise** (`enterprise`), capt
 
 | Part | Contents |
 |---|---|
-| UI | Enterprise Light and Enterprise Dark |
-| Terminal schemes | **Enterprise Light** (`enterprise/light`) and **Enterprise Dark** (`enterprise/dark`), which `terminal.scheme = "match"` uses with Light and Dark, and **Enterprise Dark Terminal** (`enterprise/dark-terminal`), with a darker background |
-| Editor | light and dark colours for the Editor plugin |
+| UI | Enterprise Light and Enterprise Dark, ports of IntelliJ's IntelliJ Light and New UI Dark themes |
+| Terminal schemes | **Enterprise Light** (`enterprise/light`) and **Enterprise Dark** (`enterprise/dark`), from the console colours of those themes' editor schemes, which `terminal.scheme = "match"` uses with Light and Dark |
+| Editor | light and dark colours for the Editor plugin, from the same editor schemes |
 
-The theme comes and goes with the plugin; the look works with any theme.
+The theme comes and goes with the plugin; the look works with any theme. About Jasper › Licenses… lists IntelliJ's
+themes as "IntelliJ Platform themes (the Enterprise theme)" and its icons, the classic ones included, as "IntelliJ
+Platform icons (New UI and Classic)".
 
 ## Classic layouts in Remote, File Server and Credential Vault
 
 Each of these plugins declares Enterprise as an optional requirement and, when it starts, looks for the `Workstation`
 service. Finding it, the plugin composes its classic layout for that run:
 
-- **Remote**: the Sessions and Tunnels panels start on the right and SFTP on the left; the toolbar shows **Session:**
-  with a dropdown and **Connect**; Sessions is a Name/Host/Port tree over the host's Properties, Tunnels a
-  Type/Local/Remote/Via table; Transfers is a bottom panel (Cmd+Option+3, or Alt+3 on Linux and Windows)
-  ([Remote](remote.md)).
+- **Remote**: the Sessions and Tunnels panels start on the right and SFTP on the left; the toolbar shows IntelliJ's
+  run-configuration combo for the session and a Run button, tooltip **Connect**; Sessions is a Name/Host/Port tree over
+  the host's Properties, Tunnels a Type/Local/Remote/Via table; Transfers is a bottom panel (Cmd+Option+3, or Alt+3 on
+  Linux and Windows) ([Remote](remote.md)).
 - **File Server**: the File Servers panel starts on the left beneath SFTP, as a Folder/Address/Status table over the
   server's Properties ([File Server](file-server.md)).
 - **Credential Vault**: the manager has a toolbar row, a Categories tree, a sortable table, a Details pane with Fields

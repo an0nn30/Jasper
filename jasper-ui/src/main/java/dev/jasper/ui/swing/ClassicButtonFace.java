@@ -7,6 +7,7 @@ import dev.jasper.ui.model.Nodes;
 import dev.jasper.ui.theme.*;
 import java.awt.*;
 import java.awt.geom.Area;
+import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.util.List;
@@ -17,13 +18,14 @@ import javax.swing.SwingUtilities;
  * The classic buttons (spec 6.4, DESIGN_LANGUAGE §6): a top-to-bottom gradient from {@code button.secondary.bg} to
  * {@code button.end} inside a {@code button.secondary.border} edge that darkens to {@code border.hover} on hover; the
  * primary filled with the accent inside {@code accent.edge}, its label medium, with no inset line or drop; a disabled
- * face flat; ghosts flat until hovered where a toolbar holds them. Dropdowns and picker faces follow, ending with a ▼.
+ * face flat; ghosts flat until hovered where a toolbar holds them. Dropdowns and picker faces follow, ending with a ▼;
+ * a rich dropdown in a toolbar strip is IntelliJ's run-configuration combo (plan 12 Rulings 10).
  */
 final class ClassicButtonFace implements ButtonFace {
     private static final float DISABLED = .42f;
     /** A document bar's disabled verb: {@code text.secondary} at half (the 07 toolbar mock's #A2A7AF on its bar). */
     private static final float BAR_DISABLED = .5f;
-    private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel;
+    private final PaintPair primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel, comboEdge, comboArrow, comboText;
 
     /** A face whose buttons stand on {@code surface}, the kit's dialog surface. */
     ClassicButtonFace(SemanticColor surface) {
@@ -34,9 +36,14 @@ final class ClassicButtonFace implements ButtonFace {
         hoverEdge = new PaintPair(DerivedColor.BORDER_HOVER, surface, SurfaceContrast.Guard.CONTROL);
         arrow = new PaintPair(SemanticColor.TEXT_SECONDARY, SemanticColor.BUTTON_SECONDARY_BG, SurfaceContrast.Guard.INDICATOR);
         primaryHoverLabel = new PaintPair(SemanticColor.TEXT_ONACCENT, SemanticColor.ACCENT_HOVER, SurfaceContrast.Guard.TEXT);
+        comboEdge = new PaintPair(SemanticColor.BORDER_CONTROL, surface, SurfaceContrast.Guard.CONTROL);
+        comboArrow = new PaintPair(SemanticColor.TEXT_SECONDARY, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.INDICATOR);
+        comboText = new PaintPair(SemanticColor.TEXT_PRIMARY, SemanticColor.SURFACE_INPUT, SurfaceContrast.Guard.TEXT);
     }
 
-    @Override public List<PaintPair> pairs() { return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel); }
+    @Override public List<PaintPair> pairs() {
+        return List.of(primaryLabel, label, edge, primaryEdge, hoverEdge, arrow, primaryHoverLabel, comboEdge, comboArrow, comboText);
+    }
 
     /**
      * Plan 4b Rulings 7: flat until hovered in toolbars, rows, panel headers and contextual slots, and as a composite control's
@@ -198,6 +205,7 @@ final class ClassicButtonFace implements ButtonFace {
 
     @Override public void paintPicker(JComponent owner, Graphics graphics, KitContext c, Nodes.PickerFace face, boolean empty, boolean focus,
                                       boolean hover, boolean expanded) {
+        if (owner instanceof Choices.ChoiceCombo combo && combo.toolbar) { toolbarCombo(combo, graphics, c, face, empty, focus || expanded); return; }
         var g = (Graphics2D) graphics.create();
         try {
             ThemePainting.antialias(g);
@@ -216,6 +224,64 @@ final class ClassicButtonFace implements ButtonFace {
             PickerMenus.line(g, c, empty ? "Choose…" : face.primary(), empty ? "" : face.caption(), pad, 0, Math.max(0, right - 2 * pad),
                 owner.getHeight(), false, empty, face.density() == Nodes.PickerDensity.COMPACT, false, face.technicalCaption());
         } finally { g.dispose(); }
+    }
+
+    /**
+     * Plan 12 Rulings 10, IntelliJ's {@code ComboBoxButton}: the input surface inset one pixel in its control edge, the
+     * focus edge while focused or open, the divider edge while disabled; then the face's icon, its name (or "Choose…")
+     * capped at {@code TOOLBAR_COMBO_TEXT_MAX}, and IntelliJ's 9 by 5 triangle in its arrow box, all faded while disabled.
+     * Hover changes nothing, as in IntelliJ.
+     */
+    private void toolbarCombo(Choices.ChoiceCombo combo, Graphics graphics, KitContext c, Nodes.PickerFace face, boolean empty, boolean ring) {
+        var g = (Graphics2D) graphics.create();
+        try {
+            ThemePainting.antialias(g);
+            boolean enabled = combo.isEnabled();
+            Color border = ring ? ThemePainting.color(c, SemanticColor.BORDER_FOCUS)
+                : !enabled ? ThemePainting.role(c, DerivedColor.BORDER_DIVIDER) : ThemePainting.painted(c, comboEdge);
+            ThemePainting.rounded(g, combo, c, ThemePainting.color(c, SemanticColor.SURFACE_INPUT), border, ring, false,
+                ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_RADIUS), UIScale.scale(1), 0);
+            if (!enabled) g.setComposite(AlphaComposite.SrcOver.derive(DISABLED));
+            int width = combo.getWidth(), height = combo.getHeight(), x = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_LEADING);
+            int gap = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ICON_GAP), box = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ARROW);
+            int arrowX = width - ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TRAILING) - box;
+            if (!face.icon().isBlank()) {
+                int rail = ThemePainting.metric(c, DesignMetrics.Role.ICON_RAIL);
+                var icon = c.icons().icon(face.icon(), c.theme(), SemanticColor.TEXT_SECONDARY, rail);
+                icon.paintIcon(combo, g, x, (height - icon.getIconHeight()) / 2);
+                x += rail + gap;
+            }
+            g.setFont(ThemePainting.font(c, Typography.Role.BODY));
+            var metrics = g.getFontMetrics();
+            int room = Math.min(ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TEXT_MAX), arrowX - gap - x);
+            g.setColor(ThemePainting.painted(c, comboText));
+            g.drawString(PickerMenus.clipped(metrics, empty ? "Choose…" : face.primary(), Math.max(0, room)), x,
+                (height - metrics.getHeight()) / 2 + metrics.getAscent());
+            double unit = UIScale.scale(1f), top = (height - box) / 2.0;
+            var triangle = new Path2D.Double();
+            triangle.moveTo(arrowX + 3.5 * unit, top + 6 * unit);
+            triangle.lineTo(arrowX + 12.5 * unit, top + 6 * unit);
+            triangle.lineTo(arrowX + 8 * unit, top + 11 * unit);
+            triangle.closePath();
+            g.setColor(ThemePainting.painted(c, comboArrow));
+            g.fill(triangle);
+        } finally { g.dispose(); }
+    }
+
+    /**
+     * Plan 12 Rulings 10: the leading inset, the icon and its gap, the name up to {@code TOOLBAR_COMBO_TEXT_MAX}, the gap,
+     * the arrow box and the trailing inset, {@code TOOLBAR_COMBO_HEIGHT} tall.
+     */
+    @Override public Dimension toolbarCombo(Choices.ChoiceCombo combo) {
+        var c = combo.context;
+        var face = combo.face;
+        int gap = ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ICON_GAP);
+        int icon = face.icon().isBlank() ? 0 : ThemePainting.metric(c, DesignMetrics.Role.ICON_RAIL) + gap;
+        int text = Math.min(ThemePainting.measureText(ThemePainting.font(c, Typography.Role.BODY), face.primary().isEmpty() ? "Choose…" : face.primary()),
+            ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TEXT_MAX));
+        return new Dimension(ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_LEADING) + icon + text + gap
+            + ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_ARROW) + ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_TRAILING),
+            ThemePainting.metric(c, DesignMetrics.Role.TOOLBAR_COMBO_HEIGHT));
     }
 
     @Override public boolean tiles() { return false; }

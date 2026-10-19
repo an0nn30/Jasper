@@ -228,7 +228,8 @@ no toggle of its own gets **Toggle** *title* (`<panel id>.toggle`).
 Tool windows dock in six slots. Each side, left and right, has a top slot (its upper half) and a bottom slot (its lower
 half); the bottom area has a left half (**Bottom Left**) and a right half (**Bottom Right**). A slot alone on its side
 fills it. Each slot shows one tool window at a time: showing another one in the same slot hides the first. Hiding a
-tool window by any route returns the focus to the selected tab: its focused pane, or the plugin tab.
+tool window by any route returns the focus to the selected tab: its focused pane, or the plugin tab. Under the
+Enterprise look, a tool window opened from its stripe in the hidden one's place takes the keyboard instead.
 
 A tool window is built the first time it shows in a window; a hidden one keeps its state. A tool window that fails to
 build shows "This panel could not be loaded."
@@ -406,6 +407,7 @@ on its own and never hands over to, or becomes, a background Jasper (see [Comman
 ## Under the Enterprise look
 
 The bundled Enterprise look changes the chrome: a system title bar with the menus in the window and a Window menu
-that gathers the Pane, Tab and tool window items, a toolbar row, tabs that always show, a status bar of ruled cells
-starting with **▶ Run…**, labelled stripes with a bottom strip, the Run window instead of the palette card, and
-different starting slots for the tool windows. See [Enterprise](enterprise.md).
+that gathers the Pane, Tab and tool window items, a toolbar row of IntelliJ's classic icons (Icons Only by default),
+tabs that always show, a status bar of ruled cells starting with **▶ Run…**, labelled stripes with a bottom strip, tool
+windows that take the keyboard when you click in them or open them from their stripe, the Run window instead of the
+palette card, and different starting slots for the tool windows. See [Enterprise](enterprise.md).

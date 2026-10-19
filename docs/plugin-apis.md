@@ -11,9 +11,9 @@ the SDK.
 | --- | --- | --- | --- | --- | --- |
 | [`dev.jasper.vault.api`](sdk-reference.html#package-dev.jasper.vault.api) | Credential Vault, `dev.jasper.vault` | 0.6.0 | [`VaultApi`](sdk-reference.html#dev.jasper.vault.api.VaultApi) | `publishPerConsumer`: each consumer gets its own instance | Remote, File Server |
 | [`dev.jasper.editor.api`](sdk-reference.html#package-dev.jasper.editor.api) | Editor, `dev.jasper.editor` | 0.10.0 | [`Editor`](sdk-reference.html#dev.jasper.editor.api.Editor) | `publish` | Remote, Project Index |
-| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.13.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
+| [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api) | Remote, `dev.jasper.remote` | 0.14.0 | [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) | `publish` | Project Index |
 | [`dev.jasper.snippets.api`](sdk-reference.html#package-dev.jasper.snippets.api) | Snippets, `dev.jasper.snippets` | 0.3.0 | [`SnippetService`](sdk-reference.html#dev.jasper.snippets.api.SnippetService) | `publish` | Shell History |
-| [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api) | Enterprise, `dev.jasper.enterprise` | 0.1.0 | [`Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation) | `publish`, while the Enterprise look is active | Credential Vault, Remote, File Server |
+| [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api) | Enterprise, `dev.jasper.enterprise` | 0.2.0 | [`Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation) | `publish`, while the Enterprise look is active | Credential Vault, Remote, File Server |
 
 Every bundled consumer declares its provider as an optional requirement and runs without it, except Shell History,
 which fails to start when Snippets is not loaded ([Snippets API](#snippets-api)).
@@ -411,7 +411,7 @@ reopener = editor.get().reopener("dev.example.tool:", key -> Optional.of(
 ## Remote API
 
 Package [`dev.jasper.remote.api`](sdk-reference.html#package-dev.jasper.remote.api), from Remote (`dev.jasper.remote`,
-0.13.0). The user's side is in [Remote](remote.md).
+0.14.0). The user's side is in [Remote](remote.md).
 
 Remote publishes one [`RemoteProjects`](sdk-reference.html#dev.jasper.remote.api.RemoteProjects) for every consumer
 with `publish`. Call every method on the UI thread. A stage completes on a worker thread once its remote work has
@@ -517,7 +517,7 @@ private void save(WindowHandle window, String name, String command) {
 ## Enterprise API
 
 Package [`dev.jasper.enterprise.api`](sdk-reference.html#package-dev.jasper.enterprise.api), from Enterprise
-(`dev.jasper.enterprise`, 0.1.0). The user's side is in [the Enterprise look](enterprise.md).
+(`dev.jasper.enterprise`, 0.2.0). The user's side is in [the Enterprise look](enterprise.md).
 
 [`Workstation`](sdk-reference.html#dev.jasper.enterprise.api.Workstation) is an empty interface: its presence is the
 message. Enterprise is off by default and starts only as the active look, and its `start` does nothing but publish

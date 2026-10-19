@@ -176,15 +176,16 @@ The base gives every key its starting value (the columns below) and also decides
 
 | Key | Values | `default` base | `classic` base | What it changes |
 |---|---|---|---|---|
-| `title_bar` | `unified`, `native` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, the toolbar in a classic row beneath it, and on macOS a title bar that follows the theme's darkness; Settings draws no title row of its own and hides `window.native_decorations` (always hidden on macOS). |
+| `title_bar` | `unified`, `native` | `unified` | `native` | `unified`: on macOS the title row holds the toolbar; on Linux and Windows Jasper draws the title bar, or the system draws it with `window.native_decorations`. `native`: the system title bar on every platform, the toolbar in a classic row beneath it (22-pixel icon buttons named by their tooltips under `window.toolbar = "icons"`, each button's icon and then its label under `"icons_and_labels"`), and on macOS a title bar that follows the theme's darkness; Settings draws no title row of its own and hides `window.native_decorations` (always hidden on macOS). |
 | `menu_bar` | `system`, `window` | `system` | `window` | `system`: the standard menus, in the screen menu bar on macOS. `window`: a menu row in each workspace window on every platform (the macOS screen menu bar is off; plugin windows, such as the Credential Vault manager, have none): File, Edit, View, then Session and Transfer, the plugins' menus and Tools, each when filled, then Window and Help. Window holds the Pane and Tab items and the tool window toggles, which leave View. Needs `title_bar = "native"`. |
 | `window_title` | 1 to 120 characters | `"{context}"` | `"{context}"` | The window's title, from the [tokens](#window-title-tokens) below. |
-| `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, tool windows framed flush under header strips; Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
+| `tool_windows` | `rails`, `stripes` | `rails` | `stripes` | `rails`: icon stripes as wide as `window.rail_width`. `stripes`: labelled stripes on the sides and a strip along the bottom, tool windows framed flush under header strips, a tool window becoming the active one, with the keyboard, when you click in it or open it from its stripe; Settings hides `window.rail_width`, and the Notifications panel is called **Event Log** and starts in Bottom Left instead of Right Top ([tool windows](workspace.md#tool-windows-and-the-dock)). |
 | `editor_tabs` | `equal`, `classic` | `equal` | `classic` | Equal-width tabs, shown once a window has two tabs, or classic tabs, always shown and as wide as their labels, each with a × (a terminal tab also with a status dot), and a + after the last. |
 | `status_bar` | `segments`, `cells` | `segments` | `cells` | Slash-separated segments, or ruled cells. |
-| `palette` | `anchored`, `run_window` | `anchored` | `run_window` | The command palette card under the title field, or the Run window, which opens at the bottom left of the tool window area until it has a saved place, with **▶ Run…** leading the status bar ([the Run window](command-palette.md#the-run-window)). |
+| `palette` | `anchored`, `run_window` | `anchored` | `run_window` | The command palette card under the title field, or the Run window, which opens centred across the upper part of the workspace until it has a saved place, with **▶ Run…** leading the status bar ([the Run window](command-palette.md#the-run-window)). |
 | `dialogs` | `as_requested`, `classic` | `as_requested` | `classic` | Dialogs as each one asks ([`DialogSpec.Presentation`](sdk-reference.html#dev.jasper.sdk.ui.DialogSpec.Presentation)), or overlay and attached-sheet dialogs drawn inside their window as classic dialogs. |
 | `motion` | `standard`, `none` | `standard` | `none` | Motion as `ui.animations.enabled` says, or none; `none` hides that setting. |
+| `icons` | `new_ui`, `classic` | `new_ui` | `classic` | The icons in each window's header and status bar: the New UI artwork, or IntelliJ's classic icons for add, split, zoom, settings, new window and search (the New UI artwork for the rest). |
 
 #### Window title tokens
 
@@ -288,7 +289,7 @@ Two theme roles a look chooses between; the colours themselves are the theme's
 
 ### defaults
 
-Defaults for four core settings. Keys are quoted because they hold dots. A value the user saved in `config.toml` or
+Defaults for five core settings. Keys are quoted because they hold dots. A value the user saved in `config.toml` or
 Settings wins; otherwise the look's default applies, and without one the core default
 ([look-dependent defaults](configuration.md#look-dependent-defaults)).
 
@@ -298,6 +299,7 @@ Settings wins; otherwise the look's default applies, and without one the core de
 | `"ui.theme.dark"` | a theme id with a Dark variant | `slate-cobalt` |
 | `"palette.visible_rows"` | integer, 1–20 | `5` |
 | `"window.toolbar_height"` | integer, 28–64 | `30` |
+| `"window.toolbar"` | `"icons_and_labels"`, `"icons"` or `"hidden"` | `"icons_and_labels"` |
 
 - A value the setting would not accept, an out-of-range number included, refuses the kit file.
 - A theme id must be a built-in theme ([themes](themes.md#built-in-themes)) or one of this plugin's `themes`, and must
@@ -345,7 +347,7 @@ Each message names the key it is about. A sample:
 | `[type].base: 18 is not a body size from 10 to 16` | The body size |
 | `[type.ui].regular: fonts/plex.woff is not a .ttf or .otf file`, `… is not in the plugin's jars`, `… is larger than 2 MiB` | A font file |
 | `[colors].dialog_surface: "surface.card" is not one of surface.dialog, surface.app` | A colour slot |
-| `[defaults]."ui.font.size": not a setting a look may default; use "ui.theme.light", "ui.theme.dark", "palette.visible_rows" or "window.toolbar_height"` | A setting a look cannot default |
+| `[defaults]."ui.font.size": not a setting a look may default; use "ui.theme.light", "ui.theme.dark", "palette.visible_rows", "window.toolbar_height" or "window.toolbar"` | A setting a look cannot default |
 | `[defaults]."ui.theme.light": "ocean" is neither a built-in theme nor one of this plugin's themes`, `… has no Light variant` | A theme default |
 | `[branding].icons: icons/icon-32.png is 64 × 64 pixels, not 32 × 32` | A branding icon |
 | `[branding].splash_art: splash/art.svg is not an SVG Jasper can draw: Active SVG denied` | The splash art |
@@ -388,6 +390,7 @@ status_bar = "cells"
 palette = "run_window"
 dialogs = "classic"
 motion = "none"
+icons = "classic"
 
 [controls]
 toggle = "checkbox"
@@ -446,14 +449,15 @@ splash_art = "splash/art.svg"
 "ui.theme.dark" = "enterprise"
 "palette.visible_rows" = 8
 "window.toolbar_height" = 34
+"window.toolbar" = "icons"
 ```
 
 - `base = "classic"`, and `[chrome]`, `[controls]`, `[metrics]`, `[colors]` and `[type] base` restate the classic
   base's values, except `window_title`.
 - The fonts sit in `presentation/fonts/`, the icons in `presentation/icons/` and the art in
   `presentation/splash/art.svg`, all inside the kit file's folder.
-- `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows and
-  makes the toolbar 34 pixels high.
+- `[defaults]` makes the plugin's own `enterprise` theme the default for both appearances, shows 8 Run window rows,
+  makes the toolbar 34 pixels high and shows its buttons as icons only.
 
 [The Enterprise look](enterprise.md) describes the result.
 

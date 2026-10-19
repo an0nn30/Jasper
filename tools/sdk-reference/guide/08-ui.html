@@ -148,21 +148,24 @@ ACTIONS stack, first, last or beside another separator;</li>
 <p>Each record's own rules, such as which presentations a field kind takes, are in its entry in the API reference.</p>
 
 <h3>Icons</h3>
-<p>Icons are names. Jasper's built-in names are {@code add}, {@code appearance}, {@code arrow.right}, {@code back},
-{@code bell}, {@code bookmark}, {@code brightness}, {@code check}, {@code chevron.down}, {@code chevron.left},
-{@code chevron.right}, {@code chevron.up}, {@code clock}, {@code close}, {@code collapse}, {@code collapse.all},
-{@code command-palette}, {@code copy}, {@code cursor}, {@code delete}, {@code desktop}, {@code download}, {@code edit},
-{@code error}, {@code expand.all}, {@code file}, {@code folder}, {@code folder.add}, {@code folder.filled}, {@code font},
-{@code forward}, {@code help}, {@code hidden}, {@code history}, {@code home}, {@code import}, {@code info}, {@code key},
-{@code keyboard}, {@code laptop}, {@code link}, {@code lock}, {@code lock.keyhole}, {@code login}, {@code logout},
-{@code match.case}, {@code match.word}, {@code menu}, {@code more}, {@code more.vertical}, {@code network}, {@code none},
-{@code note}, {@code notification.card}, {@code notification.history}, {@code notification.off},
-{@code notification.sticky}, {@code paste}, {@code pause}, {@code play}, {@code play.filled}, {@code plugin},
-{@code preview}, {@code question}, {@code refresh}, {@code regex}, {@code remove}, {@code reset}, {@code reveal},
-{@code save}, {@code search}, {@code server}, {@code settings}, {@code shield}, {@code sparkle}, {@code split},
-{@code star}, {@code star.filled}, {@code target}, {@code terminal}, {@code triangle.down}, {@code tunnel},
-{@code unlock}, {@code upload}, {@code user}, {@code warning}, {@code window}, {@code window.add} and {@code zoom}.
-They follow the theme and the look.</p>
+<p>Icons are names. Jasper's built-in names are {@code add}, {@code appearance}, {@code application},
+{@code arrow.right}, {@code back}, {@code bell}, {@code bookmark}, {@code brightness}, {@code check},
+{@code chevron.down}, {@code chevron.left}, {@code chevron.right}, {@code chevron.up}, {@code clock}, {@code close},
+{@code collapse}, {@code collapse.all}, {@code command-palette}, {@code copy}, {@code cursor}, {@code delete},
+{@code desktop}, {@code download}, {@code edit}, {@code error}, {@code expand.all}, {@code file}, {@code folder},
+{@code folder.add}, {@code folder.filled}, {@code font}, {@code forward}, {@code help}, {@code hidden}, {@code history},
+{@code home}, {@code import}, {@code info}, {@code key}, {@code keyboard}, {@code laptop}, {@code link}, {@code lock},
+{@code lock.keyhole}, {@code login}, {@code logout}, {@code match.case}, {@code match.word}, {@code menu}, {@code more},
+{@code more.vertical}, {@code network}, {@code none}, {@code note}, {@code notification.card},
+{@code notification.history}, {@code notification.off}, {@code notification.sticky}, {@code paste}, {@code pause},
+{@code play}, {@code play.filled}, {@code plugin}, {@code preview}, {@code question}, {@code refresh}, {@code regex},
+{@code remove}, {@code reset}, {@code reveal}, {@code run}, {@code save}, {@code search}, {@code server},
+{@code settings}, {@code shield}, {@code sparkle}, {@code split}, {@code star}, {@code star.filled}, {@code target},
+{@code terminal}, {@code triangle.down}, {@code tunnel}, {@code unlock}, {@code upload}, {@code user}, {@code warning},
+{@code window}, {@code window.add} and {@code zoom}.
+They follow the theme and the look. {@code run}, IntelliJ's classic Run triangle, and {@code application}, its
+run-configuration icon, are authored artwork: controls draw them in their own colours, and panels, prompts and tiles
+draw a monochrome glyph of the same name. These two names need SDK 0.18.1.</p>
 <p>A plugin adds its own with {@link UiKit#registerIcon(IconAsset)}. An {@link IconAsset}'s name is
 {@code <plugin id>:<name>}, the name a lowercase letter followed by lowercase letters, digits, dots and dashes; its artwork is SVG path data on a 16-unit grid, starting
 with a move and using only the M, L, H, V, C, S, Q, T, A and Z commands, at most 8,192 characters and 2,048 commands, with

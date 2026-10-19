@@ -614,10 +614,13 @@ Remote reads `~/.ssh/config` and the files it includes only when you import, and
 While the [Enterprise look](enterprise.md) is on, Remote's tool windows take their classic layout. Remote chooses its
 layout when it starts, so it follows a change of look at the next start of Jasper.
 
-- **Toolbar**: **Session:** with a dropdown of your hosts ("prod-web (web1.example.com)"), then the WSL distributions
-  ("No saved sessions" when there are neither), then **Manage Sessions…**, and **Connect**, which goes to the chosen
-  host's most recently used running pane or opens one, or opens the distribution. The dropdown and the window's
-  Sessions tree share the chosen row; until you choose, it is the current SSH pane's host, else the first.
+- **Toolbar**: the session combo, drawn as IntelliJ's run-configuration combo: the application icon and the chosen
+  row's name (a long one cut with an ellipsis), over a list of your hosts ("prod-web (web1.example.com)"), then the WSL
+  distributions ("No saved sessions" when there are neither), then **Manage Sessions…**, which shows the Sessions
+  panel. Beside it the Run button, a green triangle with the tooltip **Connect**, goes to the chosen host's most
+  recently used running pane or opens one, or opens the distribution; it is disabled while there is nothing to run.
+  The combo and the window's Sessions tree share the chosen row; until you choose, it is the current SSH pane's host,
+  else the first.
 - **Sessions** starts on the right, with its count beside the title: **Filter sessions** over a Name, Host and Port tree
   (favourites marked ★, groups opened and closed with their disclosure triangle, Enter or a double click), and below
   it the selected host's **Properties** (Host, User, Port, Credentials) with **Edit…** and **Connect** (**Open Shell**

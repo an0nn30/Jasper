@@ -86,8 +86,9 @@ rebuild it at any time with {@link PluginMenu#clear()}.</p>
 <p>{@link ToolbarItem#action(String)} is a button for one action, {@link ToolbarItem#menu(String,String,List)} a button
 that opens a menu of actions, and {@link ToolbarItem#view(ToolbarViewFactory)} a small group of the plugin's own
 controls, one view per window. A toolbar view's root is an INLINE {@link Nodes.Stack} of LABEL texts, DROPDOWN,
-SEARCHABLE or PICKER choices, at most one PRIMARY button, menu buttons and separators; any other tree is refused, and that
-window shows no view. When the toolbar is too narrow, buttons move into its "More actions" menu and a view hides.</p>
+SEARCHABLE or PICKER choices, at most one PRIMARY button, icon-only GHOST buttons (a blank label with an icon and a
+tooltip, which need SDK 0.18.1), menu buttons and separators; any other tree is refused, and that window shows no view.
+When the toolbar is too narrow, buttons move into its "More actions" menu and a view hides.</p>
 
 <h3>Status bar</h3>
 <pre><code class="language-java">StatusItem status = context.statusBar().add(new StatusItemSpec("dev.example.tool.status", Side.RIGHT, 100));

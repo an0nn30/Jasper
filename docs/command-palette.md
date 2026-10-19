@@ -98,10 +98,11 @@ room for the field, it opens centred across the window with its top one fifth of
 
 ## The Run window
 
-Under the Enterprise look the palette is the **Run window**, which opens at the bottom-left of the tool window area,
-above the bottom strip and the status bar. Its title row reads **Run** with the palette shortcut and × (Close). The help
-row under it describes the chosen scope, or reads "Type the name of a session, command, file or snippet, and Jasper
-will open it for you." with no chip. The **Open:** field holds the chip and the query, with no placeholder, and ends in
+Under the Enterprise look the palette is the **Run window**, which opens centred across the workspace with its top a
+seventh of the way down; when that would take it past the middle, it moves up to end there, as far as the tool window
+area allows. Its title row reads **Run** with the palette shortcut and × (Close). The help row under it describes the
+chosen scope, or reads "Type the name of a session, command, file or snippet, and Jasper will open it for you." with
+no chip. The **Open:** field holds the chip and the query, with no placeholder, and ends in
 a ▼ menu, "Choose what to open", which lists All and every scope with its shortcut.
 
 - The palette shortcut, **▶ Run…** at the start of the status bar and the toolbar's "Search everywhere" field open it.
@@ -121,9 +122,10 @@ a ▼ menu, "Choose what to open", which lists All and every scope with its shor
   Enter and the primary button run that verb. Each opening clears it.
 - The primary button reads the selected row's first verb ("Open" with no row selected) and is disabled during a step.
   **Browse…** runs File › Open File… and leaves the Run window open.
-- Drag it by its title row or an empty area. Released at or below its home, near it across, it goes back there; a
-  double click forgets the place. The place is saved for every window (`[palette.run_window]` `left` and `bottom` in
-  `ui-state.toml`). The Run window has no opening animation and no snap lines.
+- Drag it by its title row or an empty area. Released near its home, across and down, it goes back there; a double
+  click on its title row forgets the place and sends it home. The place is saved for every window
+  (`[palette.run_window]` `left` and `bottom` in `ui-state.toml`). The Run window has no opening animation and no snap
+  lines.
 
 ## Bundled scopes
 

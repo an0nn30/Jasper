@@ -164,7 +164,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 |---|---|---|---|---|---|
 | `window.tab_height` | integer | `30` | 20–72 logical pixels | Live | Window › Tab height |
 | `window.rail_width` | integer | `28` | 28–64 logical pixels: the width of the tool-window rails | Live | Window › Panel rail width; hidden under a look with labelled stripes, such as Enterprise |
-| `window.toolbar` | string | `"icons_and_labels"` | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live | Window › Toolbar (Icons & Labels, Icons Only, Hidden); also View › Show/Hide › Toolbar |
+| `window.toolbar` | string | `"icons_and_labels"`, or the [look's](#look-dependent-defaults) | `"icons_and_labels"`, `"icons"`, `"hidden"` | Live | Window › Toolbar (Icons & Labels, Icons Only, Hidden); also View › Show/Hide › Toolbar |
 | `window.toolbar_height` | integer | `30`, or the [look's](#look-dependent-defaults) | 28–64 logical pixels; also the height of the title bar when the toolbar sits in it | Live | Window › Toolbar height |
 | `window.status_bar` | boolean | `true` | | Live | Window › Show status bar; also View › Show/Hide › Status Bar |
 | `window.status_bar_height` | integer | `24` | 20–48 logical pixels; the bar is never shorter than its text | Live | Window › Height |
@@ -215,10 +215,10 @@ size (Increase, Decrease and Reset Font Size) and **Show Jasper**/**Hide Jasper*
 
 ### Look-dependent defaults
 
-The active look can give four settings defaults of its own (the [`defaults` table](looks.md#defaults) of its kit
-file): `ui.theme.dark`, `ui.theme.light`, `palette.visible_rows` and `window.toolbar_height`. A value you set wins; a
+The active look can give five settings defaults of its own (the [`defaults` table](looks.md#defaults) of its kit
+file): `ui.theme.dark`, `ui.theme.light`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A value you set wins; a
 value that is invalid falls back to the look's default. The Enterprise look ([Enterprise](enterprise.md#defaults)) uses
-the `enterprise` theme for both appearances, 8 palette rows and a 34-pixel toolbar. A look can also hide Settings rows
+the `enterprise` theme for both appearances, 8 palette rows and a 34-pixel toolbar of icons only (`"icons"`). A look can also hide Settings rows
 it makes meaningless: `window.native_decorations`, `ui.animations.enabled` and `window.rail_width`, as the table says.
 
 ### Theme

@@ -27,7 +27,8 @@ Themes (id, file, parentTheme). A plugin's `parentTheme` names the id; jasper_th
   islands/ManyIslandsDarcula.theme.json (ExperimentalDark); `JetBrainsHighContrastTheme`
   islands/HighContrast.theme.json (Islands Dark).
 
-None is offered as a Jasper theme: they are the parents and editor schemes that theme plugins build on.
+None is offered as a Jasper theme: they are the parents and editor schemes that theme plugins build on, and the
+Enterprise theme ports two of them (`../enterprise/SOURCE.md`).
 
 Editor schemes (name, file, parent_scheme). A theme's `editorScheme` and a scheme's `parent_scheme` name them;
 jasper_theme.py reads the colours a scheme leaves out from its parents.

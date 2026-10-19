@@ -247,7 +247,7 @@ settings live in each plugin's own `<home>/plugins/<id>/<id>.toml`, read with th
 | `root` | `Main` only; delegates to bootstrap. No owned resources. |
 | `bootstrap` | Pre-AWT argument and handoff flow, the pre-pass and EDT composition. `StartupResources` owns rollback until explicit transfer. |
 | `application` | EDT application composition and feature lifetimes (notifications, incidents, VM options, memory warnings, About, the Errors window, Settings appearance wiring); the launch coordinator synchronizes admission and shutdown waits off the EDT. `JasperApplication` closes its children. |
-| `workspace` | EDT terminal windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action and configuration adapters, activity events, each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes; each pane closes its session. |
+| `workspace` | EDT terminal windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action and configuration adapters, activity events, each window's presence in the terminal registry, the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `UpperHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). `WindowContent` closes subscriptions and panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only; each window owns its state on the EDT. |
 | `commands` | EDT action registry, `ActionId` and `KeyContext`, pure command ranking and metadata, and the palette's command recents (`command-history.toml`). The registry owns listeners until registration or registry close; the application flushes the recents at shutdown. |
 | `palette` | EDT scope, query and step state, keyboard routing, the palette's two views behind `PaletteView` (the card, `CardView`, and the Run window, `RunWindowView`, built by `PaletteViews.of` from the look's `PaletteLook`) and the built-in Commands scope. The controller owns scope listeners and invalidates asynchronous completions on close. |
@@ -296,8 +296,8 @@ Every window has a header row above the workspace. `WindowHeader` (workspace) ce
 and packs `WindowChrome`'s toolbar (tab and window, pane, plugin, then Find and Settings groups; tooltips carry live
 shortcuts) against the trailing edge. As the window narrows, the sides give way first (toolbar labels, then controls
 into the ⋮ menu; on Windows and Linux the menus fold into "…" and then ☰), and only then does the field shrink and
-collapse to its magnifier. `window.toolbar = "hidden"` hides only the buttons; Compact (`window.view_mode`) removes the
-header.
+collapse to its magnifier. `window.toolbar = "hidden"` hides only the buttons under `UnifiedHeader` and the whole row
+under `ClassicHeader`; Compact (`window.view_mode`) removes the header.
 
 `TitleBarStyle` (platform) is chosen at start-up. On macOS `MacTitleBar` hosts the header in the native title row and
 keeps it clear of the traffic lights; on Windows and Linux FlatLaf's title pane embeds `CollapsingMenuBar`, which
@@ -312,10 +312,10 @@ appearance follows the theme.
 | Strategy | Default look | Classic (Enterprise) |
 | --- | --- | --- |
 | `MenuBarLayout` | `StandardMenuBar` | `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help) |
-| `HeaderComposition` | `UnifiedHeader` | `ClassicHeader`: left-packed toolbar buttons, the search field and Settings… trailing |
+| `HeaderComposition` | `UnifiedHeader` | `ClassicHeader`: left-packed `ClassicToolbarButton`s (22 px icon buttons named by their tooltips under `window.toolbar = "icons"`, the icon then the label under `"icons_and_labels"`), the search field and Settings… trailing |
 | `TabStrip` | `WindowTabs`: equal-width tabs with centred titles, hidden while one tab is open, hover close | `ClassicTabs`: always shown, content-sized, a persistent × and a "+" after the last tab |
 | `StatusCells` | `SlashSegments` | `RuledCells` |
-| `PaletteHome` | `TitleFieldHome`: the card opens at the title search field | `CornerHome`: the Run window |
+| `PaletteHome` | `TitleFieldHome`: the card opens at the title search field | `UpperHome`: the Run window, centred across the workspace in its upper part |
 | `StripeSet` | `IconRails`: two `ToolStripe` rails | `LabelledStripes`: two `LabelledStripe`s and a `BottomStrip` |
 
 With `palette = "run_window"`, `RunItem` ("▶ Run…") leads the status bar. `WindowTitle` fills the look's title
@@ -327,12 +327,17 @@ Plugins name icons; Jasper draws the artwork for the place in the theme's colour
 header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
 named glyphs painted inside them use the kit's chrome artwork (`IconRegistry.chromeIcon`) without changing icon values
 or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
+Under `[chrome] icons = "classic"` each window's header and status bar are marked `ChromeArtwork.CLASSIC`, so the
+meanings the classic set has draw IntelliJ's classic icons (`assets-classic.tsv`).
 
 Under a look whose kit asks for stripes (`tool_windows = "stripes"`), `WorkspaceChrome.of` gives each window a
 `DockChrome` with labelled stripes and flush frames: the labels read "N: Title" when the toggle's shortcut is a digit
 with a modifier, and `ToolWindowArea` divides the frames by painted 1 px rules with 6 px drag areas and gives every
-frame a header strip, focused while it holds the focus owner. `UiState` keeps such a look's dock under
-`[look."<provider id>"]`, and the application's Notifications panel becomes Event Log in the bottom strip
+frame a header strip, focused while it holds the focus owner. A mouse press inside a frame (heard by an AWT event
+listener while the area shows), a stripe click and a `PanelRequest.Op.ACTIVATING_TOGGLE` (the host's own toggle
+actions, not a plugin's) activate that frame and move the keyboard to its first keyed control other than a button, else
+its first button, else the frame; a press in the terminal column clears the tint. `UiState` keeps such a look's dock
+under `[look."<provider id>"]`, and the application's Notifications panel becomes Event Log in the bottom strip
 (`AppPanels`).
 
 ## Themes

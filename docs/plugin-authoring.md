@@ -2,7 +2,7 @@
 
 Most of Jasper is plugins. Remote (SSH, SFTP and tunnels), Credential Vault, the Editor, File Server, Project Index,
 Shell History, Snippets and the Enterprise look are bundled plugins built only against the public plugin SDK this guide
-describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.0, task by task.
+describes; a plugin of yours uses the same SDK and reaches the same places. This guide covers SDK 0.18.1, task by task.
 
 - The [SDK reference](sdk-reference.html) documents every type of the SDK, the testkit and the bundled plugins'
   exported APIs.
@@ -116,7 +116,7 @@ notifications, naming the folder and the problem, for example `Unknown key: colo
 folder, a plugin's folder must be named after its id ("directory *x* holds plugin *y*; rename it to the plugin id").
 
 A plugin whose `sdk` range excludes this Jasper's SDK is skipped and reported as "*name* was not started": "needs SDK
-*range*; this is SDK 0.18.0".
+*range*; this is SDK 0.18.1".
 
 ### requires
 
@@ -340,7 +340,8 @@ Help, with the Pane and Tab items and the tool window toggles in Window.
 
 ### The toolbar
 
-- `toolbar().add(ToolbarItem.action(id))` is a button with the action's title and icon;
+- `toolbar().add(ToolbarItem.action(id))` is a button with the action's title and icon (only its icon, with the title
+  as its tooltip, when `window.toolbar` is `"icons"`, the Enterprise look's default);
   `ToolbarItem.menu(icon, title, actionIds)` is a button that opens a menu of the plugin's actions. In the default look
   plugin items sit after Jasper's Split and Zoom buttons and before Find and Settings, in the order they were added.
   When the toolbar is too narrow, buttons move into its **More actions** menu.
@@ -348,10 +349,12 @@ Help, with the Pane and Tab items and the tool window toggles in Window.
   the toolbar, one per window: the factory runs when a window opens, and for every window already open from inside
   `toolbar().add(...)`, so finish setting up what it reads before adding the view. The view closes with its window or
   the registration; a factory that throws is not asked again for that window. Its root is an INLINE `Stack` of LABEL
-  `Text`s, DROPDOWN, SEARCHABLE or PICKER `Choice`s, `MenuButton`s, `Separator`s and at most one `Button`, which is
-  PRIMARY. When a window mounts the view, Jasper refuses any other tree by logging it, naming the node, and closing the
-  view, and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view never moves into
-  the More actions menu: it hides while the toolbar is too narrow for it.
+  `Text`s, DROPDOWN, SEARCHABLE or PICKER `Choice`s, `MenuButton`s, `Separator`s, at most one PRIMARY `Button` and
+  any number of icon-only GHOST `Button`s: a blank label with an icon and a tooltip. A labelled GHOST `Button` is
+  refused. Icon-only GHOST buttons need SDK 0.18.1, so a plugin that uses them declares `sdk = ">=0.18.1, <0.19"`.
+  When a window mounts the view, Jasper refuses any other tree by logging it, naming the node, and closing the view,
+  and that window shows none; `update` throws `IllegalArgumentException` naming the node. A view never moves into the
+  More actions menu: it hides while the toolbar is too narrow for it.
 
 ### The status bar
 
@@ -403,6 +406,12 @@ sides, has a left and a right half. [`Anchor`](sdk-reference.html#dev.jasper.sdk
 `PanelSpec.withSplit()` its second half: Remote's SFTP starts under Sessions. One tool window shows per place. The user
 can drag a tool window by its stripe icon or header to another place, or use Move to; Jasper remembers its place, its
 order on the stripe and the side's size, per look ([workspace](workspace.md)).
+
+Under the Enterprise look a press anywhere in a tool window, or opening it from its stripe or with `<panel id>.toggle`,
+makes it the active tool window: its header strip shows the focus, and the keyboard moves to its first enabled control
+that takes keys, a button only when there is no other, else to the tool window itself. A toggle action of your own
+that calls `context.panels().toggle` opens the tool window without activating it, so the keyboard does not move
+into it.
 
 <!-- example:pluginpanels -->
 ```java

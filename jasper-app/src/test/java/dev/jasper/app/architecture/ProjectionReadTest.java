@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 class ProjectionReadTest {
     /** A variant pattern over internal names, and the classes that may read it. */
     static final Map<Pattern, Predicate<String>> PROJECTION_READERS = Map.of(
-        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle)(?=[;$.]|$)"),
+        Pattern.compile("dev/jasper/app/presentation/WorkspaceLook\\$(?:Menus|Header|Stripes|Tabs|Status|FrameStyle|Icons)(?=[;$.]|$)"),
             type -> type.startsWith("dev/jasper/app/presentation/") || type.equals("dev/jasper/app/workspace/WorkspaceChrome")
                 || type.startsWith("dev/jasper/app/workspace/WorkspaceChrome$"),
         Pattern.compile("dev/jasper/app/presentation/Motion(?=[;$.]|$)"),
@@ -99,13 +99,18 @@ class ProjectionReadTest {
             .withField("motion", ClassDesc.of("dev.jasper.app.presentation.Motion"), ClassFile.ACC_PRIVATE)
             .withField("dialogs", ClassDesc.of("dev.jasper.app.presentation.DialogMapping$Kind"), ClassFile.ACC_PRIVATE)
             .withField("view", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$View"), ClassFile.ACC_PRIVATE)
-            .withField("home", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$Home"), ClassFile.ACC_PRIVATE));
+            .withField("home", ClassDesc.of("dev.jasper.app.presentation.PaletteLook$Home"), ClassFile.ACC_PRIVATE)
+            .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE));
         assertThat(projectionReaders(List.of(probe))).hasSize(5);
+        // Plan 12: the icon set shares the WorkspaceLook pattern, so a class naming only it is reported on its own.
+        byte[] icons = ClassFile.of().build(ClassDesc.of("dev.jasper.app.workspace.WindowIconsProbe"), builder -> builder
+            .withField("icons", ClassDesc.of("dev.jasper.app.presentation.WorkspaceLook$Icons"), ClassFile.ACC_PRIVATE));
+        assertThat(projectionReaders(List.of(icons))).hasSize(1);
     }
 
     /** Plan 8b (spec 16.1.8): the palette's strategies, its two views and two homes. */
     static final List<String> PALETTE_STRATEGIES = List.of("dev/jasper/app/palette/CardView", "dev/jasper/app/palette/RunWindowView",
-        "dev/jasper/app/workspace/TitleFieldHome", "dev/jasper/app/workspace/CornerHome");
+        "dev/jasper/app/workspace/TitleFieldHome", "dev/jasper/app/workspace/UpperHome");
 
     /** Plan 8b (spec 3.3): the palette's strategies never name the kit, its variants or ChromeSpec. */
     @Test void thePalettesStrategiesNeverNameTheKit() throws Exception {

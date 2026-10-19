@@ -65,7 +65,8 @@ class ChromeRenderTest {
                 rows.add(new ChromeSpec(ChromeSpec.TitleBar.valueOf(v[0].toUpperCase()), ChromeSpec.MenuBar.valueOf(v[1].toUpperCase()), v[2],
                     ChromeSpec.ToolWindows.valueOf(v[3].toUpperCase()), ChromeSpec.EditorTabs.valueOf(v[4].toUpperCase()),
                     ChromeSpec.StatusBar.valueOf(v[5].toUpperCase()), ChromeSpec.PaletteKind.valueOf(v[6].toUpperCase()),
-                    ChromeSpec.DialogKind.valueOf(v[7].toUpperCase()), ChromeSpec.MotionKind.valueOf(v[8].toUpperCase())));
+                    ChromeSpec.DialogKind.valueOf(v[7].toUpperCase()), ChromeSpec.MotionKind.valueOf(v[8].toUpperCase()),
+                    ChromeSpec.Icons.CLASSIC));
             }
             return rows;
         } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
@@ -197,7 +198,9 @@ class ChromeRenderTest {
     @Test void theCoveringArrayHasStrengthTwoOverTheChromePoints() {
         var rows = covering();
         assertThat(rows).hasSize(8);
-        assertThat(rows.getFirst()).as("row 0 is the default look").isEqualTo(ChromeSpec.DEFAULT);
+        // Plan 12 E5: every row renders the classic icon set, so row 0 is the default look in its nine table points.
+        assertThat(rows.getFirst()).as("row 0 is the default look").usingRecursiveComparison().ignoringFields("icons")
+            .isEqualTo(ChromeSpec.DEFAULT);
         var seen = new HashSet<String>();
         for (var row : rows) {
             boolean[] values = flags(row);

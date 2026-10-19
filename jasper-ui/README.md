@@ -14,7 +14,7 @@ The module depends on FlatLaf 3.7, FlatLaf Extras 3.7 and JSVG 2.0.0, and on no 
 | `dev.jasper.ui.model` | Immutable view descriptors (`Nodes`, `ViewSpec`) and the events views report (`UiEvent`) |
 | `dev.jasper.ui.metrics` | Geometry catalogs (`DesignMetrics`), the public metric tokens (`MetricTokens`), type scales, faces, typography and the motion policy |
 | `dev.jasper.ui.kit` | The look: `Kit`, its control variants (`ControlVariants`) and colour slots (`ColorSlots`) |
-| `dev.jasper.ui.icons` | Named artwork: the built-in glyphs, the bundled IntelliJ Platform icons and scoped registrations |
+| `dev.jasper.ui.icons` | Named artwork: the built-in glyphs, the bundled IntelliJ Platform icons (New UI and classic) and scoped registrations |
 | `dev.jasper.ui.swing` | Views (`KitView`), contexts, FlatLaf installation, dialogs, the Settings shell and the native chrome's painters |
 
 `theme`, `model` and `kit` are JDK-only. Each package-info names the packages it may use, and views and bindings are

@@ -38,6 +38,7 @@ class KitParserTest {
         palette = "run_window"
         dialogs = "classic"
         motion = "none"
+        icons = "classic"
 
         [controls]
         toggle = "checkbox"
@@ -155,7 +156,8 @@ class KitParserTest {
         var parsed = parse(FULL);
         assertThat(parsed.chrome()).isEqualTo(new ChromeSpec(ChromeSpec.TitleBar.NATIVE, ChromeSpec.MenuBar.WINDOW,
             "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
-            ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE));
+            ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
+            ChromeSpec.Icons.CLASSIC));
         assertThat(parsed.kit().controls()).isEqualTo(new ControlVariants(ControlVariants.Toggle.CHECKBOX, ControlVariants.Exclusive.RADIOS,
             ControlVariants.Tabs.FOLDER, ControlVariants.Group.TITLED_BOX, ControlVariants.FormLabel.COLON, ControlVariants.Empty.TEXT,
             ControlVariants.Table.CLASSIC, ControlVariants.Tree.CLASSIC, ControlVariants.Stepper.SPINNER, ControlVariants.OrderedList.SIDE_COLUMN,
@@ -236,6 +238,13 @@ class KitParserTest {
         assertThat(dropped.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(3);
     }
 
+    @Test void aLookMayDefaultTheToolbarMode() throws Exception {
+        var parsed = parse("kit = 1\nbase = \"default\"\n[defaults]\n\"window.toolbar\" = \"icons\"\n");
+        assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
+        assertThat(problem("kit = 1\nbase = \"default\"\n[defaults]\n\"window.toolbar\" = \"tiny\"\n"))
+            .startsWith("[defaults].\"window.toolbar\": ");
+    }
+
     @Test void everyInvalidKitGivesOneMessageNamingTheKey() {
         String head = "kit = 1\nbase = \"default\"\n";
         String ui = "[type.ui]\nfamily = \"F\"\nmedium = \"fonts/ibm-plex-sans-medium.ttf\"\nsemibold = \"fonts/ibm-plex-sans-semibold.ttf\"\n";
@@ -258,7 +267,7 @@ class KitParserTest {
         cases.put(head + "[type]\nbase = 12.5\n", "[type].base: expected an integer");
         cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
-            + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\" or \"window.toolbar_height\"");
+            + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\", \"window.toolbar_height\" or \"window.toolbar\"");
         cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");
         cases.put(head + "[defaults]\n\"window.toolbar_height\" = 70\n", "[defaults].\"window.toolbar_height\": Use an integer from 28–64.");
         cases.put(head + "[defaults]\n\"ui.theme.dark\" = \"nope\"\n",
@@ -319,5 +328,15 @@ class KitParserTest {
             try { KitParser.parse(input, context(fonts(), Map.of("look", Optional.of(look())))); }
             catch (KitParser.Invalid expected) { assertThat(expected.getMessage()).isNotBlank(); }
         }
+    }
+
+    /** Plan 12: [chrome] icons, by base and both values. */
+    @Test void theIconsPointDefaultsByBaseAndTakesBothValues() throws Exception {
+        assertThat(parse("kit = 1\nbase = \"default\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.NEW_UI);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
+        assertThat(parse("kit = 1\nbase = \"default\"\n[chrome]\nicons = \"classic\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\nicons = \"new_ui\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.NEW_UI);
+        assertThat(problem("kit = 1\nbase = \"default\"\n[chrome]\nicons = \"retro\"\n"))
+            .isEqualTo("[chrome].icons: \"retro\" is not one of new_ui, classic");
     }
 }

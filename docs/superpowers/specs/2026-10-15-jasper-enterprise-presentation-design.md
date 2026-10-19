@@ -17,6 +17,7 @@ Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no m
 Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
+Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -59,7 +60,7 @@ The user's decisions (2026-10-14 and 2026-10-15):
 2. **Bundled and off by default.** The user turns Enterprise on in Settings › Plugins; a restart applies it.
 3. **Colours come from the active theme**, and every existing theme must keep working under the Enterprise kit,
    enforced by tests.
-4. **Remote adds the toolbar "Session: [combo] [Connect]" only when Enterprise is enabled**, discovering Enterprise
+4. **Remote adds the toolbar's session combo and Run button only when Enterprise is enabled**, discovering Enterprise
    through its exported API (a presence-only `Workstation` service and an optional requirement).
 5. The overall shape and principles (section 3) are approved as presented.
 6. The presentation provider (section 4) is approved as presented.
@@ -77,9 +78,9 @@ The user's decisions (2026-10-14 and 2026-10-15):
     `ButtonPresentation.CIRCULAR` → `HELP`, and the hero family → prompt. A clean break: plugins built on 0.17 that use
     a removed member are refused at load by the existing `KitCompatibility` gate, and THD Sourcing Crypto rebuilds for
     0.18. `Toggle`, `GHOST`, `MONO*` and `Card` keep their names, which stay accurate.
-14. **Enterprise's own theme is "Enterprise"** (id `enterprise`) with a Light and a Dark variant in this series. Light
-    comes from DESIGN_LANGUAGE §2; it ships a light terminal scheme and a `dark-terminal` scheme. Dark comes from the Dark
-    Mode mock (7.6). The kit's defaults select `enterprise` for both `ui.theme.light` and `ui.theme.dark`.
+14. **Enterprise's own theme is "Enterprise"** (id `enterprise`) with a Light and a Dark variant in this series. Since
+    2026-10-18 (the user) Light is a port of IntelliJ's IntelliJ Light and Dark of its New UI Dark, each with its terminal
+    scheme (7.6). The kit's defaults select `enterprise` for both `ui.theme.light` and `ui.theme.dark`.
 15. **Visible changes to the default look**, applied in both looks (section 13): the Session and Transfer standard
     menus replace Remote's "SSH" menu; a new File › Open File… action; "Vault: Locked"/"Vault: Unlocked"; the Snippets
     verb "Insert"; titled leading groups on Settings pages; the FTP warning as a Notice; read-only TFTP login and File
@@ -278,7 +279,7 @@ The Enterprise plugin's `plugin.toml`:
 ```toml
 id = "dev.jasper.enterprise"
 name = "Enterprise"
-version = "0.1.0"
+version = "0.2.0"
 entry = "dev.jasper.enterprise.EnterprisePlugin"
 sdk = ">=0.18.0, <0.19"
 description = "The Enterprise look: native title bars, menus in the window, labelled tool window stripes, a Run window and classic controls, in the Enterprise theme or any other."
@@ -519,6 +520,7 @@ status_bar = "cells"
 palette = "run_window"
 dialogs = "classic"
 motion = "none"
+icons = "classic"
 
 [controls]
 toggle = "checkbox"
@@ -577,6 +579,7 @@ splash_art = "splash/art.svg"
 "ui.theme.dark" = "enterprise"
 "palette.visible_rows" = 8
 "window.toolbar_height" = 34
+"window.toolbar" = "icons"
 ```
 
 Top-level keys: `kit` (required, the integer 1), `base` (required, `"default"` or `"classic"`, the host catalog that
@@ -589,7 +592,7 @@ key so the file can be reviewed; `PresentationConformanceTest` pins the list.
 
 ### 5.2 Variant points
 
-Twenty-three points: 9 chrome points and 14 control points, all two-valued except the `window_title` template. There
+Twenty-four points: 10 chrome points and 14 control points, all two-valued except the `window_title` template. There
 is no `toolbar` point: the classic
 header honours the existing `window.toolbar` setting (10.3).
 
@@ -604,6 +607,7 @@ header honours the existing `window.toolbar` setting (10.3).
 | `palette` | `anchored` | `run_window` | The Run window and the leading "▶ Run…" status item (section 11) |
 | `dialogs` | `as_requested` | `classic` | OVERLAY and ATTACHED_SHEET dialogs are drawn in their window as classic dialogs (10.8) |
 | `motion` | `standard` | `none` | No motion, whatever `ui.animations.enabled` says (10.9) |
+| `icons` | `new_ui` | `classic` | The workspace chrome's icons: IntelliJ's classic icons in the header and status bar (10.3) |
 
 | `[controls]` key | Default | Enterprise | What the Enterprise value does |
 |---|---|---|---|
@@ -717,8 +721,8 @@ data.
 
 ### 5.8 Defaults for settings
 
-The precedence is **user-saved, then kit default, then core default**, for an allowlist of four keys:
-`ui.theme.light`, `ui.theme.dark`, `palette.visible_rows` and `window.toolbar_height`. A kit default must pass the
+The precedence is **user-saved, then kit default, then core default**, for an allowlist of five keys: `ui.theme.light`,
+`ui.theme.dark`, `palette.visible_rows`, `window.toolbar_height` and `window.toolbar`. A kit default must pass the
 setting's own kind check (`palette.visible_rows` 1-20, `window.toolbar_height` 28-64), and a theme must be a built-in or
 one of the providing plugin's own themes with the variant its key needs (5.9). A declared theme file that fails to load
 is dropped from the `DefaultSource` (the core default applies) and named in the plugin's problem notice.
@@ -745,7 +749,7 @@ Every comparison with a core default is audited:
 | `Editors.java:523` (`OptionalNumber`), `WorkspaceEditors.java:37,54`, `NotificationGroupsEditor.java:132` | Compare with `draft.defaultValue(setting)`, the effective default (equal to the core default for a key outside the allowlist); a test pins that no allowlisted key reaches a core-default comparison |
 
 Reset stages `Optional.empty()`, which now means the effective default, and Reset shows while the value differs from
-it. `config.example.toml` and `docs/configuration.md` say for the four keys: "The default depends on the active look."
+it. `config.example.toml` and `docs/configuration.md` say for the five keys: "The default depends on the active look."
 A test starts a fresh home under Enterprise and checks that the first window opens with the kit's defaults.
 
 ### 5.9 Validation and limits
@@ -845,6 +849,10 @@ Classic button and field details, owned by the classic `ButtonFace` and the clas
 - Combo, dropdown and picker faces draw no icon tile on the closed face (the primary text, then the caption, in the
   data face when `technicalCaption`, then ▼) and their popup rows draw no tiles; captions are muted, and UTILITY rows
   sit below a `border.row` divider.
+- In a toolbar strip, a rich DROPDOWN (a `PickerFace`) is IntelliJ's run-configuration combo (`ComboBoxButton`): 24 px
+  tall, a `surface.input` box with a `border.control` ring of radius 3, the icon 10 from the edge, the name capped at
+  240 with an ellipsis, a 16 px arrow box with IntelliJ's triangle in `text.secondary`, and no hover change; an
+  icon-only GHOST button there draws its glyph at `ICON_RAIL` in a `BUTTON_HEIGHT` square.
 - SEARCH and PATH fields and the picker's search field draw no leading glyph.
 - GHOST and DESTRUCTIVE_GHOST buttons in ACTIONS stacks and side columns draw as standard buttons; in toolbars, panel
   headers and navigation rows they are flat until hovered, then show a 1 px `border.hover` border on
@@ -965,57 +973,39 @@ provider back on restores it. An unknown id keeps today's warning.
 
 ### 7.6 The Enterprise theme
 
-`themes/enterprise.json`, named "Enterprise", id `enterprise`, with `ui.light`, `ui.dark` and the terminal schemes
-`light`, `dark` and `dark-terminal`.
+`themes/enterprise.json`, named "Enterprise", id `enterprise`, with `ui.light`, `ui.dark` and the terminal schemes `light`
+and `dark`. At the user's direction (2026-10-18) both variants are ports of IntelliJ's own themes: `convert_port` in
+`tools/themes/jasper_theme.py` builds the file from `tools/themes/enterprise/port.json` and IntelliJ's theme files in
+`tools/themes/intellij/` (JetBrains/intellij-community, Apache-2.0; the port is identical at tag idea/2026.2.3, commit
+`8062c061ff33`), and `test_jasper_theme.py` holds the file to it.
 
-**Light** takes DESIGN_LANGUAGE §2. A neutral role the table does not name keeps the ΔL* it has from `surface.card`
-in Slate Cobalt Light (both cards are white), with the chroma of the Enterprise neutrals; any other unnamed role takes
-Slate Cobalt Light's value.
+- **Light** is "IntelliJ Light": `Light.theme.json` over `intellijlaf.theme.json` and `darcula.theme.json`, with the editor
+  scheme `Light.xml`.
+- **Dark** is the New UI "Dark": `expUI/expUI_dark.theme.json` over `darcula.theme.json`, with the editor scheme
+  `expUI/expUI_darkScheme.xml`.
 
-| Role | Value | Role | Value |
-|---|---|---|---|
-| `surface.app`, `surface.dialog` | #ECEDEF | `border.window` | #C4C7CC |
-| `surface.titlebar` | #E1E3E6 | `border.control`, `border.input`, `button.secondary.border` | #B4B8BF |
-| `surface.panel`, `surface.sidebar` | #F7F7F8 | `text.primary` | #1E1F22 |
-| `surface.card`, `surface.input`, `surface.terminal` | #FFFFFF | `text.strong.secondary` | #3A3D42 |
-| `accent`, `selection.bg`, `hue.blue` | #2F65CA | `text.secondary`, `text.tertiary` | #5C6370 |
-| `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #7A808A |
-| `text.onAccent.secondary`, `text.onSelection.secondary` | #DCE5F7 | `status.success`, `hue.green` | #2E9E4F |
-| `status.warning` | #8A5A00 | `status.danger` | #D03A3A |
-| `hue.amber` | #B5651D | `hue.purple` | #8A4FBF |
-| `surface.tabstrip` | #E8E9EB | `tab.indicator` | #2F65CA |
-| `surface.scrim` | #00000036 | | |
+Each variant is the converter's output for its theme, its terminal scheme the scheme's console colours. An override key is
+filled when IntelliJ's own theme sets its key exactly (not through a `*.` wildcard); port.json chooses three roles and one
+override. Key values:
 
-Overrides: `surface.header` #E1E3E6, `surface.header.active` #D9DFEA, `surface.stripe` #E4E6E9,
-`surface.tableHeader` #F0F1F3, `surface.zebra` #F7F8FA, `surface.rowHover` #EEF2FA, `warning.ground` #FBF1DA,
-`warning.border` #E6CF95, `border.divider` #D3D6DA.
-The `light` scheme follows Slate Cobalt Light's; `dark-terminal` has background #1F2125 and foreground #D5D8DD, with
-the ANSI colours of Slate Cobalt Dark's scheme.
+| Role | Light | Dark |
+|---|---|---|
+| `surface.app`, `surface.dialog` | #F2F2F2 | #2B2D30 |
+| `surface.panel`, `surface.card` | #FFFFFF | #2B2D30 |
+| `surface.terminal` | #FFFFFF | #1E1F22 |
+| `text.primary` | #000000 | #DFE1E5 |
+| `accent` | #2675BF | #366ACE |
+| `selection.bg` | #2675BF | #2E436E |
+| `border.window` | #D1D1D1 | #1E1F22 |
+| `border.control` | #C4C4C4 | #4E5157 |
+| `surface.header` | #F2F2F2 | #2B2D30 |
+| `surface.header.active` | #DFE2E9 | #2C3340 (its recipe) |
 
-**Dark** takes the Dark Mode mock (`08 Dark Mode`, sampled at its 2× pixels). A neutral role the table does not name
-keeps the ΔL* it has from `surface.card` in Light, on the lighter side; a hue or status the mock does not show
-(`status.danger`, `hue.purple`, the `*.secondary` text on the accent) keeps its Light hue, lightened until it meets
-4.5:1 on `surface.card`.
-
-| Role | Value | Role | Value |
-|---|---|---|---|
-| `surface.app`, `surface.dialog` | #3C3F44 | `border.window` | #2A2C30 |
-| `surface.titlebar` | #36393E | `border.control`, `border.input`, `button.secondary.border` | #5A5E65 |
-| `surface.panel`, `surface.sidebar` | #35383D | `text.primary` | #DFE1E5 |
-| `surface.card`, `surface.input`, `surface.terminal` | #2E3135 | `text.strong.secondary` | #C4C8CE |
-| `accent`, `selection.bg`, `hue.blue` | #3C74D6 | `text.secondary`, `text.tertiary` | #A0A5AD |
-| `text.onAccent`, `text.onSelection` | #FFFFFF | `text.placeholder` | #8E939B |
-| `button.secondary.bg` | #45484D | `status.success`, `hue.green` | #4CB86A |
-| `surface.control.selected` | #50545B | `status.warning` | #E3C27A |
-| `hue.amber` | #D08A4A | `surface.scrim` | #00000036 |
-| `surface.tabstrip` | #3A3D42 | `tab.indicator` | #3C74D6 |
-
-Overrides: `surface.header` #36393E, `surface.header.active` #3D4658, `surface.stripe` #383B40,
-`surface.tableHeader` #393C41, `surface.zebra` #313439, `warning.ground` #4A4128, `warning.border` #6B5A30,
-`border.divider` #4A4D53;
-`surface.rowHover` keeps its recipe. Its `dark` scheme has background #2E3135 and foreground #DFE1E5, with the ANSI
-colours of Slate Cobalt Dark's scheme. The mock's unfocused stripe labels and HTTP chip are targets
-for the chrome renders (16.1.4), which plans 6 and 7 compare in both variants.
+port.json's choices: Light's `accent` is IntelliJ Light's `List.selectionBackground` and its `surface.card` IntelliJ's
+`contentBackground`; Dark's `accent` is the palette's `Blue5`. IntelliJ's default-button blues (#528CC7, #3574F0) give
+white text 3.54:1 and 4.28:1, which the TEXT guard would paint black; these give 4.80:1 and 5.11:1. Light's
+`surface.header.active` is the user's #DFE2E9 (IntelliJ Light's own is #E2E6EC). New UI Dark sets no exact
+`ToolWindow.Header.background`, so Dark's follows its recipe. `derived-roles-enterprise.tsv` freezes every derived role.
 
 ### 7.7 Converter
 
@@ -1034,7 +1024,8 @@ IntelliJ theme has the key:
 | `Banner.warningBackground` | `warning.ground` |
 | `Banner.warningBorderColor` | `warning.border` |
 
-Goldens are regenerated. The Islands chrome mapping stays the only one: the guards absorb the difference.
+Goldens are regenerated. The Islands chrome mapping stays the only one: the guards absorb the difference. `convert_port`
+(7.6) converts IntelliJ's own themes for the Enterprise theme and also fills the override keys they set exactly.
 
 ## 8. SDK 0.18.0
 
@@ -1082,7 +1073,7 @@ additions `hue`, `itemNoun` and `role` are drawn only by the Run window (11.2), 
 | `DialogSpec.swatch` | `Nodes.Hue swatch` | A SWATCH square of the hue before the dialog's title wherever the presentation draws the title (a native title bar, or FlatLaf's on Windows and Linux, draws none); NONE draws none | "■ Add Login", "■ Add SSH Key" |
 | `IconSize.SWATCH` | enum constant | A solid square of the icon's hue at caption size; the hue must not be NONE; the name stays a valid icon name | Run window hue squares; radio swatches |
 | `StandardMenu.SESSION`, `TRANSFER` | enum constants | Built-in menus with no items of their own, shown only while a plugin has entries in them, as TOOLS is | Session and Transfer menus |
-| `ToolbarItem.View` | `record View(ToolbarViewFactory factory)`; `@FunctionalInterface interface ToolbarViewFactory { UiView create(WindowHandle window); }` | Admission and lifetime in 10.3 | "Session: [combo] [Connect]" |
+| `ToolbarItem.View` | `record View(ToolbarViewFactory factory)`; `@FunctionalInterface interface ToolbarViewFactory { UiView create(WindowHandle window); }` | Admission and lifetime in 10.3 | the session combo and Run |
 | `ScopeSpec.hue` | `Nodes.Hue hue` | NONE falls back to the owner's icon hue, then NEUTRAL; adds an SDK `palette` → `ui` package edge, which stays acyclic | Run window rows |
 | `ScopeSpec.itemNoun` | `String itemNoun` | A lowercase singular noun ("session"); blank falls back to the scope label; the host capitalises it for the detail label | "Session: dustin@192.168.1.119:22" |
 | `PaletteVerb.role` | `Role role`, `enum Role { STANDARD, SPLIT }` | At most one SPLIT verb per scope, never verb 0: it is the split variant of verb 0 | "Open in a split pane" |
@@ -1122,6 +1113,13 @@ plugins, `docs/examples/external-plugin`, and Enterprise. The example's `jasperS
 and `docs/sdk-icons.md` move with it (`VersionRangeTest.java:17-40`), and `VersionRangeTest` lists 0.17 among the
 incompatible minors. THD Sourcing Crypto rebuilds for 0.18. `sdkRelease` publishes the 0.18.0 jars.
 
+### 8.6 SDK 0.18.1
+
+An additive release (the user, 2026-10-18): `ToolbarItem.View` admits, besides at most one PRIMARY Button, any number of
+icon-only GHOST Buttons (a blank label with an icon and a tooltip), drawn flat until hovered with their glyph at rail
+size; and two authored built-in icon names, `run` (IntelliJ's classic Run triangle) and `application` (its
+run-configuration icon), host artwork in both looks. Only Remote's manifest moves to `sdk = ">=0.18.1, <0.19"`.
+
 ## 9. The app: projections and consumers
 
 ### 9.1 `dev.jasper.app.presentation`
@@ -1133,9 +1131,9 @@ in `KitFaces`. Each consumer receives its own projection, computed once:
 | Projection | Fields | Consumer |
 |---|---|---|
 | `DesktopFlags` | `screenMenuBar`, `nativeTitle` | bootstrap: desktop properties, `TitleBarStyle` |
-| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle` | workspace: `WorkspaceChrome.of` |
+| `WorkspaceLook` | menus (STANDARD, CLASSIC), header (UNIFIED, CLASSIC), stripes (RAILS, LABELLED), tabs (EQUAL, CLASSIC), status (SLASH, RULED), `runItem`, `FrameStyle`, icons (NEW_UI, CLASSIC) | workspace: `WorkspaceChrome.of` |
 | `ShellLook` | `unifiedTitle`, `windowMenus`, `followThemeAppearance` | windows: `ShellChrome.of`, `NativeShells` |
-| `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, CORNER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
+| `PaletteLook` | view (CARD, RUN_WINDOW), home (TITLE_FIELD, UPPER) | palette: `PaletteViews.of` (view); workspace: `WorkspaceChrome.of` (home, 11.5) |
 | `SettingsChrome` | `integratedTitle`, `collapsibleNav`, `inlineReset`, `hiddenKeys`, `kitFontSize` (from which `fontRowCopy` follows) | settingsui |
 | `Composition` | ROWS, CLASSIC | composition roots: `CorePages`, `AppearanceSelection`, `NotificationGroupsEditor`, the environment-variables editor (`Editors`), `KeymapPage`, `PluginsPage` |
 | `DialogMapping` | AS_REQUESTED, CLASSIC; `windowTitled` | windows (`AuxiliaryWindows`, which also hosts plugin dialogs) |
@@ -1161,7 +1159,8 @@ values follow from `ChromeSpec.DEFAULT` and `Kit.DEFAULT` by the same rules (12.
 | `WorkspaceLook.stripes`, `FrameStyle` | LABELLED and flush frames when `tool_windows = "stripes"` | RAILS and today's frames |
 | `WorkspaceLook.tabs` | CLASSIC when `editor_tabs = "classic"` | EQUAL |
 | `WorkspaceLook.status` | RULED when `status_bar = "cells"` | SLASH |
-| `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and CORNER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
+| `WorkspaceLook.icons` | CLASSIC when `icons = "classic"` | NEW_UI |
+| `WorkspaceLook.runItem`, `PaletteLook.view`, `PaletteLook.home` | true, RUN_WINDOW and UPPER when `palette = "run_window"` | false, CARD, TITLE_FIELD |
 | `ShellLook.unifiedTitle` | true only when `title_bar = "unified"` and `MacTitleBar.isSupported()` | false |
 | `ShellLook.windowMenus` | true when `menu_bar = "window"` | as committed |
 | `ShellLook.followThemeAppearance` | true when `title_bar = "native"` | true |
@@ -1225,22 +1224,23 @@ Each built-in menu that has no items of its own shows only while it has entries,
 ### 10.3 Header, toolbar and toolbar views
 
 `HeaderComposition` has `UnifiedHeader` (today's centred title field) and `ClassicHeader`: a toolbar row of left-packed
-buttons in separated groups, "+ New Session" (NEW_TAB), "Split ▾" (today's Split dropdown), "Maximize" (ZOOM_PANE); then
+buttons in separated groups, New Session (NEW_TAB), Split (today's Split dropdown), Maximize (ZOOM_PANE); then
 contributed items and views; then, trailing, the title search field reading "Search everywhere" with the
 COMMAND_PALETTE keycap, and "Settings…". New Window and Find stay in the File and Edit menus. Built-in labels are host
 strings owned by the strategy. `WindowToolbar.doLayout` learns to place any component and to pack leading.
 
-The classic header honours `window.toolbar`: `icons_and_labels` gives label-first text buttons with glyphs only where
-the mock has them ("+", "▾"); `icons` gives today's icon buttons; `hidden` gives no row, so the Session view and Search
-everywhere go with it, and the Run window stays reachable by ⇧⌘P and "▶ Run…". `window.toolbar_height` is the classic
-toolbar row's height.
+The classic header honours `window.toolbar`. `icons` (Enterprise's default, 5.8) gives 22 px icon buttons whose tooltips
+are their labels, Split marking its menu with a small ▼ in its corner. `icons_and_labels` gives each button's icon, then
+its label (Split ending in ▾). `hidden` gives no row, so the Session view and Search everywhere go with it, and the Run
+window stays reachable by ⇧⌘P and "▶ Run…". The icons are the look's `[chrome] icons` set (5.2), IntelliJ's classic
+icons under Enterprise. `window.toolbar_height` is the classic toolbar row's height.
 
 **`ToolbarItem.View` admission and lifetime:**
 
 - the root is an INLINE Stack of LABEL Text, Choice (DROPDOWN, SEARCHABLE or PICKER), at most one PRIMARY Button,
-  MenuButton and Separator; anything else is refused with a message naming the node, when a window mounts the view
-  (contained and logged against the plugin; the view closes and that window shows none) and on every update (an
-  `IllegalArgumentException` to the caller), since `Toolbar.add` receives only the factory;
+  icon-only GHOST Buttons (8.6), MenuButton and Separator; anything else is refused with a message naming the node, when
+  a window mounts the view (contained and logged against the plugin; the view closes and that window shows none) and on
+  every update (an `IllegalArgumentException` to the caller), since `Toolbar.add` receives only the factory;
 - the factory runs when a window's open event fires, once per window, never for the rehearsal or a pre-built window
   until it is shown; the view closes with its window or its registration;
 - a view never goes into the overflow menu: it hides while the toolbar is too narrow for it;
@@ -1288,10 +1288,14 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
   pills for badges that carry a number. It is 24 px plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop
   resolution gain horizontal group rectangles, as `Rectangle` math; the six slots are unchanged.
 - **Frames.** `FrameStyle`: arc 0, gutter 0, a painted `DOCK_RULE` with a `DOCK_RULE_HIT` drag area, a header strip of
-  `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A header
-  detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive it as a host
-  flag. Its arc and gutter are the window's kit metrics `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0 in the
-  classic catalog), which replace the static finals at `ToolWindowArea.java:53,55` (6.6).
+  `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A frame
+  is also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that
+  takes no focus) and when the user opens it from its stripe or its View toggle action; both move the keyboard into it
+  (its first control that takes keys, else the frame), as IntelliJ activates a tool window. A press in the terminal
+  column hands the tint back; dragging a divider keeps it, and a plugin's own toggle opens a frame without activating
+  it. A header detail is muted, and a digits-only detail is parenthesised ("Sessions (2)"). Kit `PanelHeaders` receive
+  it as a host flag. Its arc and gutter are the window's kit metrics `WORKSPACE_SURFACE_ARC` and `WORKSPACE_GUTTER` (0
+  in the classic catalog), which replace the static finals at `ToolWindowArea.java:53,55` (6.6).
 - **Layout per look.** The default look keeps today's ui-state keys unchanged. A non-default look saves its dock under
   its provider id, so a first Enterprise start gets Enterprise's default anchors and a return to the default look finds
   the old layout:
@@ -1318,7 +1322,7 @@ visible = true
 the 07 Credential Vault mocks show them:
 
 - a card with the catalog's dialog radius on `surface.dialog`, a 1 px `border.hover` frame and the catalog's popup
-  shadow, over a still scrim (black at 21 %: white content reads #C9CACC) covering the window below its title bar;
+  shadow, over a still `surface.scrim` covering the window below its title bar;
 - a 26 px header strip on `surface.header.active` above a `border.window` rule, holding the `DialogSpec.swatch` and the
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
@@ -1430,13 +1434,15 @@ implementations live in `dev.jasper.app.workspace`, beside the workspace geometr
 picks them from `PaletteLook.home`; `PaletteViews.of` picks only the view (`palette` cannot depend on `workspace`).
 
 - `TitleFieldHome` is today's: dropped from the title field, centred in Compact.
-- `CornerHome` is the bottom-left of the dock work area: to the right of the left stripe, above the bottom strip and the
-  status bar, inset by the mocks' 6 px across and 5 px up (`RUN_WINDOW_HOME_SIDE`, `RUN_WINDOW_HOME_BOTTOM`),
-  `RUN_WINDOW_WIDTH` wide. It attaches at or below its home:
-  `|left − home.left| ≤ reach && bottom ≥ home.bottom − reach`. It has no centre or top-fifth guides; home is its only
-  snap target. Double-clicking the title row forgets the saved place and returns home.
+- `UpperHome` is centred across the window's workspace with its top a seventh of the workspace's height down, moved up
+  to end at the workspace's middle while that keeps it in the dock work area, and clamped into the work area by
+  `PALETTE_WINDOW_MARGIN` (the user, 2026-10-18), `RUN_WINDOW_WIDTH` wide. It attaches within reach of its home across
+  and down: `|left − home.left| ≤ reach && |top − home.top| ≤ reach`. It has no centre or top-fifth guides; home is its
+  only snap target. Double-clicking the title row forgets the saved place and returns home. The Run window is about
+  364 px tall with 5 visible rows and 427 px with Enterprise's 8, so with 8 rows it is entirely in the upper half only in
+  windows about 1000 px tall or more; in shorter ones it sits just under the toolbar row and crosses the middle.
 
-The saved place is keyed by home kind: `TitleFieldHome` keeps `[palette] center_x/top`; `CornerHome` saves
+The saved place is keyed by home kind: `TitleFieldHome` keeps `[palette] center_x/top`; `UpperHome` saves
 `[palette.run_window] left/bottom`, fractions of the workspace, shared by every window:
 
 ```toml
@@ -1577,10 +1583,11 @@ Remote, File Server and Vault:
 
 Under CLASSIC:
 
-- **Toolbar view.** `SessionsToolbar` contributes a View in place of its Sessions dropdown: LABEL "Session:", a
-  DROPDOWN listing saved hosts as "name (address)", WSL distributions as "name (detail)", a separator and "Manage
-  Sessions…", and a PRIMARY "Connect" that runs `activateHost` for a host (`RemotePlugin.java:368-375`: focus a running
-  pane for it, else open one) or `openDistro` for a distribution. Choosing "Manage Sessions…" shows the Sessions panel.
+- **Toolbar view.** `SessionsToolbar` contributes a View in place of its Sessions dropdown: a DROPDOWN drawn as
+  IntelliJ's run-configuration combo (its face the chosen row's label and the `application` icon) listing saved hosts as
+  "name (address)", WSL distributions as "name (detail)", a separator and "Manage Sessions…", and an icon-only GHOST
+  `run` button, tooltip "Connect", that runs `activateHost` for a host (`RemotePlugin.java:368-375`: focus a running pane
+  for it, else open one) or `openDistro` for a distribution. Choosing "Manage Sessions…" shows the Sessions panel.
   The selection is shared per window with the Sessions tree and Properties, and falls back to the active SSH pane's host
   when nothing is selected. Under ROWS the Sessions dropdown stays as today.
 - **Sessions.** A Tree with Name, Host and Port columns, group heading rows, status dots, "★" after favourites (toggled
@@ -1721,7 +1728,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 4. **Chrome renders, as JUnit.** Test forms of `mockUiPreview`, `titleBarPreview`, `commandPalettePreview` and
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
    combination (native title, window menus, default kit), and over a checked-in strength-2 array of `ChromeSpec` values
-   across the 9 chrome points (`window_title` as its two shipped templates) honouring the `menu_bar`/`title_bar`
+   across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons` is held at `classic` in every
+   row and covered by `ChromeArtworkTest` and `ZoneIconsTest`) honouring the `menu_bar`/`title_bar`
    constraint, asserting painted pairs and structure (a flush header, no gutter, the stripe labels) and writing images
    under `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json` stay opt-in tools. Each of
    plans 5 to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the preserved mocks; the
@@ -1807,7 +1815,7 @@ Smallest edits:
   faces, derived roles and guards.
 - `docs/app-architecture.md`: the `presentation` package, projections and chrome strategies.
 - `docs/themes.md`: plugin themes, the override keys, reserved ids.
-- `docs/configuration.md` and `config.example.toml`: "The default depends on the active look." for the four keys; the
+- `docs/configuration.md` and `config.example.toml`: "The default depends on the active look." for the five keys; the
   meaning of `"system"` and of an unset `ui.font.size`.
 - `docs/command-palette.md`: the Run window.
 - `docs/remote.md`, `docs/file-server.md`, `docs/credential-vault.md`: the menus and status text.
@@ -1829,9 +1837,9 @@ the product name anywhere but the splash; a new packaged application icon.
 
 ### 19.1 Plans
 
-Eleven plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
+Twelve plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
 and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 11 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+`migration.csv` rows. Order: 1 to 12 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
 
 Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
 `KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
@@ -1855,6 +1863,7 @@ its additions in the default look and adds them to the testkit fake and the cont
 | 9 | `settings` | `SettingsChrome`, the collapsible navigation, Reset in the context menu, hidden rows, the Appearance, Keymap, Notifications, Plugins and Shell compositions, ⋯ menus, the font row copy; the chrome renders extended |
 | 10 | `plugin-compositions` | `Workstation` consumption; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
 | 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
+| 12 | `intellij-classic` | The user's 2026-10-18 direction: IntelliJ's classic icons (vendored, attributed) under `[chrome] icons`, the classic header's icon buttons and `window.toolbar` as a look default, SDK 0.18.1's icon-only GHOST toolbar buttons with `run` and `application`, Remote's run-configuration combo and Run, the Enterprise theme as ports of IntelliJ Light and New UI Dark, a pressed tool window activated, the Run window's upper home |
 
 ### 19.2 Amendments
 

@@ -53,14 +53,18 @@ Jasper and the testkit implement the other service interfaces; `FileLocation`, `
 
 ## Versioning
 
-[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.18.0`. A plugin's
+[`JasperSdk.VERSION`](../docs/sdk-reference.html#dev.jasper.sdk.JasperSdk.VERSION) is `0.18.1`. A plugin's
 `plugin.toml` names the SDK versions it runs on as comma-separated comparators (`>=`, `>`, `<=`, `<`, `=`), all of
 which must hold. 0.x carries no compatibility promise, so a plugin admits the one minor version it was built against,
-as every bundled plugin does:
+as the bundled plugins do:
 
 ```toml
 sdk = ">=0.18.0, <0.19"
 ```
+
+A plugin that uses something only a later 0.18 version has starts its range there: Remote uses icon-only GHOST buttons
+in its toolbar view and the `run` and `application` icons, which need SDK 0.18.1, and declares
+`sdk = ">=0.18.1, <0.19"`.
 
 Jasper checks the range at launch: a plugin whose range does not contain the running SDK is skipped, and Settings ›
 Plugins shows it as Skipped with the reason "needs SDK *range*; this is SDK *version*". Install from Zip… refuses such a

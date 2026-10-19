@@ -18,9 +18,9 @@ values. Run the tools with `python3 -I`; they need Pillow and NumPy. None of the
   prints one summary line per pair (and its `note`, which names a deliberate difference), and reports a missing render
   as `MISSING`.
 - `check_pairs.py OUT_DIR [FILTER]` runs every pair that has a `min_agreement` and prints PASS or FAIL: the edge
-  agreement must reach the floor, and each colour in the pair's `colours` must fill a 2×2 block within ΔE76 6 in the
-  mock and appear within ΔE76 1.5 in the render, as a 2×2 block or a three-pixel line. A missing render fails. It exits
-  with status 1 when any pair fails.
+  agreement must reach the floor, and each colour in the pair's `colours` must appear within ΔE76 1.5 in the render, as
+  a 2×2 block or a three-pixel line (the mock is not searched: the colours are the theme's). A missing render fails. It
+  exits with status 1 when any pair fails.
 
 `pairs.json` lists each pair as `name`, `mock` and `render` (paths from the repository root), `crop`, and optionally
 `render_crop`, `note`, `min_agreement` and `colours`. Regenerate the renders before comparing:

@@ -34,11 +34,10 @@ or off takes effect after a restart. While the plugin does not load, a setting t
 Slate Cobalt (and one that names one of its schemes uses Same as UI theme) without a warning, and keeps the name, so
 turning the plugin on again restores it.
 
-The bundled Enterprise plugin, off by default, ships **Enterprise** (`enterprise`), in Light and Dark with Editor
-colours for each, and the schemes Enterprise Light (`enterprise/light`), Enterprise Dark (`enterprise/dark`) and
-Enterprise Dark Terminal (`enterprise/dark-terminal`), darker than Enterprise Dark. While the Enterprise look is
-active, `enterprise` is the default theme of both appearances
-([the Enterprise theme](enterprise.md#the-enterprise-theme)).
+The bundled Enterprise plugin, off by default, ships **Enterprise** (`enterprise`), in Light and Dark (ports of
+IntelliJ's IntelliJ Light and New UI Dark) with Editor colours for each, and the schemes Enterprise Light
+(`enterprise/light`) and Enterprise Dark (`enterprise/dark`). While the Enterprise look is active, `enterprise` is the
+default theme of both appearances ([the Enterprise theme](enterprise.md#the-enterprise-theme)).
 
 ## Choosing the appearance, the themes and the terminal scheme
 

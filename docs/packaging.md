@@ -397,7 +397,7 @@ skipping the launcher's native suites (`testLauncherCore`, `testLauncherWatch`, 
 workflow does not run `check`. The publish job refuses to continue if the tag moved during the build, requires exactly
 the nine packages and the five SDK jars (`jasper-sdk-<v>.jar`, `jasper-sdk-<v>-sources.jar`,
 `jasper-sdk-<v>-javadoc.jar`, `jasper-sdk-testkit-<v>.jar` and `jasper-sdk-testkit-<v>-sources.jar`, where `<v>` is
-`JasperSdk.VERSION`, now 0.18.0), and writes `SHA256SUMS`. It creates a draft prerelease titled
+`JasperSdk.VERSION`, now 0.18.1), and writes `SHA256SUMS`. It creates a draft prerelease titled
 `Jasper X.Y.Z` with generated notes, uploads the files, checks that the release holds exactly those files, and
 publishes it as a prerelease that is not marked latest. A failed upload leaves the draft, which a rerun finishes; a
 published release for the tag is never overwritten.

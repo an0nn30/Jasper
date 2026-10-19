@@ -44,7 +44,8 @@ that window is focused. Waiting cards show in the order they arrived.
 
 The Notifications [tool window](workspace.md) starts in the upper half of the window's right side. Under the
 [Enterprise look](enterprise.md) it is titled **Event Log** and starts on the left of the bottom strip. Its button,
-or **Notifications: Show History** in the command palette, opens and closes it.
+or **Notifications: Show History** in the command palette, opens and closes it; under the Enterprise look either one
+opening it makes it the [active tool window](enterprise.md#windows-and-menus), with the keyboard.
 
 While anything is unread, the panel's button carries a badge: a dot on its icon under the default look, a count after
 its label under the Enterprise look. The badge turns to the error colour while an error is unread, and the tooltip adds

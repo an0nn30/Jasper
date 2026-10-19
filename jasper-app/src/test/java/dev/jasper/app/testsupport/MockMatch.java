@@ -112,12 +112,22 @@ public final class MockMatch {
     }
 
     /** Parses bands as the plan's measurement tables write them: {@code "0+36 #F7F7F8, 7+20 #FFFFFF~#F1F2F4"}. */
-    public static List<Band> parse(String text) {
+    public static List<Band> parse(String text) { return parse(text, Color::decode); }
+
+    /**
+     * {@link #parse(String)} where each colour cell is {@code #RRGGBB} or a role key resolved on {@code theme}
+     * ({@link dev.jasper.ui.testsupport.KitFixtures#colour}): {@code "0+6 surface.app, 7+20 button.secondary.bg~button.end"}.
+     */
+    public static List<Band> parse(String text, dev.jasper.ui.theme.GeneratedTheme theme) {
+        return parse(text, colour -> colour.startsWith("#") ? Color.decode(colour) : dev.jasper.ui.testsupport.KitFixtures.colour(theme, colour));
+    }
+
+    private static List<Band> parse(String text, java.util.function.Function<String, Color> colour) {
         var bands = new ArrayList<Band>();
         for (String part : text.split(",")) {
             String[] cells = part.strip().split("[+ ]");
             String[] colours = cells[2].split("~");
-            Color first = Color.decode(colours[0]), last = colours.length > 1 ? Color.decode(colours[1]) : first;
+            Color first = colour.apply(colours[0]), last = colours.length > 1 ? colour.apply(colours[1]) : first;
             bands.add(new Band(Integer.parseInt(cells[0]), Integer.parseInt(cells[1]), first, last));
         }
         return List.copyOf(bands);

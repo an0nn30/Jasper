@@ -60,7 +60,7 @@ Fixtures live in jasper-ui's `testFixtures` source set, which jasper-app's tests
 | `StateFixtures` | Every vocabulary variant, with headless interaction and presentation states |
 | `TableFixtures` | The table vocabulary: a column tree, a grouped table with cell dropdowns, cell stacks, and empty tables and ordered lists |
 | `EnterpriseFixtures` | The seven `classic-*` compositions |
-| `KitFixtures` | Themes and kits for tests: `dark()`/`light()` (Slate Cobalt), `enterpriseDark()`/`enterpriseLight()`, `enterprise()` (the classic catalog with the shipped kit file's tokens, the 12-point classic type, classic controls, slots and keys, platform faces), `complement()`, `withControls()`, `custom()` (every role 20% plum), `marked()` (every role its own colour), `themes()` (every built-in variant, the converter goldens `ocean`, `ocean-dawn` and `stray`, and Enterprise Dark and Light), `degenerate()` (eight palettes no theme should have), `context(...)` and `render(...)` |
+| `KitFixtures` | Themes and kits for tests: `dark()`/`light()` (Slate Cobalt), `enterpriseDark()`/`enterpriseLight()`, `enterprise()` (the classic catalog with the shipped kit file's tokens, the 12-point classic type, classic controls, slots and keys, platform faces), `complement()`, `withControls()`, `custom()` (every role 20% plum), `marked()` (every role its own colour), `themes()` (every built-in variant, the converter goldens `ocean`, `ocean-dawn` and `stray`, and Enterprise Dark and Light), `degenerate()` (eight palettes no theme should have), `colour(theme, key)` (a semantic or derived role's colour on a theme, which Enterprise tests read instead of colour literals), `painted(theme, pair)` (what a face paints for a pair), `context(...)` and `render(...)` |
 | `Edt` | Runs test code on the EDT |
 
 `GalleryCoverageTest` requires a real mounted fixture for every node kind and enum variant, all nine original
@@ -161,8 +161,11 @@ including the counts there (and the point count in the [rendering matrix](#rende
 - A derived role's recipe lives in `DerivedPalette`. Changing one updates `DerivedColorTest.INPUTS` when the roles it
   reads change, and updates `derived-roles.tsv` and `derived-roles-enterprise.tsv`. Changing a built-in theme updates
   `derived-roles.tsv`; changing the Enterprise theme updates `derived-roles-enterprise.tsv`. Make these edits in the
-  same commit. A change to the classic FlatLaf overlay edits `ui-color-keys-classic.tsv`. Slate Cobalt's file stays
-  identical to the block in [`slate-cobalt.md`](design/theme-engine/slate-cobalt.md).
+  same commit. The Enterprise theme is the converter's port of IntelliJ's own themes: change
+  `tools/themes/enterprise/port.json` or the converter, never `enterprise.json` by hand, and regenerate the file as
+  `tools/themes/enterprise/SOURCE.md` says (`test_jasper_theme.py` compares the two byte for byte). A change to the
+  classic FlatLaf overlay edits `ui-color-keys-classic.tsv`. Slate Cobalt's file stays identical to the block in
+  [`slate-cobalt.md`](design/theme-engine/slate-cobalt.md).
 - A new built-in theme is `<id>.json` under `jasper-ui/src/main/resources/dev/jasper/ui/theme/`, loaded in
   `JasperTheme.BuiltIns.read()` (its place there is its place in Settings). Add its rows to `derived-roles.tsv` and its
   id to the theme converter's `BUILT_IN` (`tools/themes/jasper_theme.py`), and add it to the tests that list the
@@ -184,9 +187,12 @@ scroll bars, never a Metal fallback.
   `FILLED_BUILT_INS` only when the artwork is a filled silhouette, and named in the
   [glyph list](ui-architecture.md#icons).
 - A bundled SVG meaning takes a light SVG and its `_dark` sibling under `src/main/resources/dev/jasper/ui/icons/`, a
-  row for each (resource path, upstream path, SHA-256) in `assets-selected.tsv` (the catalog) or `assets-chrome.tsv`
-  (the chrome set), the file count in `BuiltInArtwork`'s manifest check (14 and 20) and the meaning in its map. The
-  files are byte-identical upstream artwork under the Apache-2.0 `LICENSE.txt` and `NOTICE.txt` beside them.
+  row for each (resource path, upstream path, SHA-256) in `assets-selected.tsv` (the catalog), `assets-chrome.tsv`
+  (the chrome set) or `assets-classic.tsv` (IntelliJ's classic icons, under `classic/`; a file without a `_dark`
+  sibling serves both variants), the file count in `BuiltInArtwork`'s manifest check (14, 20 and 14) and the meaning
+  in its map. The files are byte-identical upstream artwork under the Apache-2.0 `LICENSE.txt` beside them, with the
+  upstream `NOTICE.txt` and the `ATTRIBUTION.txt` the Licenses window shows; `tools/icons/fetch-classic-icons.py`
+  reproduces the classic files.
 - The host accepts a plugin icon name that `IconRegistry.names()` holds, and that includes every built-in name. A new
   name (a path glyph or a catalog meaning) is therefore also added to the testkit's `FakeKit.BUILT_INS`, to the
   built-in names in [plugin icons](sdk-icons.md) and in `tools/sdk-reference/guide/08-ui.html` (then run

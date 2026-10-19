@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  * Keeps the Sessions dropdown in sync with the WSL distributions and the saved hosts. Distributions come first, titled
  * with their WSL version because toolbar menus have no separators; hosts follow alphabetically. Every host and
  * distribution is an action in both looks (the palette lists them and Keymap binds them). Under {@link Layout#CLASSIC}
- * the toolbar holds one "Session: [combo] [Connect]" view per window in place of the dropdown (Enterprise presentation
+ * the toolbar holds one view per window, the session combo and Run, in place of the dropdown (Enterprise presentation
  * spec 14.4). Owned by RemotePlugin on the UI thread.
  */
 final class SessionsToolbar implements AutoCloseable {
@@ -62,7 +62,7 @@ final class SessionsToolbar implements AutoCloseable {
     private final Consumer<WindowHandle> showHosts;
     private final Function<WindowHandle, Optional<UUID>> activeHost;
     private final Map<UUID, UiView> views = new HashMap<>();
-    static final String VIEW = "session", LABEL = "session.label", CHOICE = "session.choice", CONNECT = "session.connect",
+    static final String VIEW = "session", CHOICE = "session.choice", CONNECT = "session.connect",
         MANAGE_OPTION = "manage", NONE_OPTION = "none";
 
     SessionsToolbar(PluginContext context, HostStore store, String icon, BiConsumer<WindowHandle, RemoteHost> activate,
@@ -180,12 +180,20 @@ final class SessionsToolbar implements AutoCloseable {
         return pane.isPresent() ? pane : listed.stream().findFirst();
     }
 
+    /**
+     * IntelliJ's run-configuration combo and Run (plan 12 Rulings 12): the combo's face names the window's row (else the
+     * first option, "No saved sessions" when nothing is saved) beside the application icon, and Run is disabled while
+     * there is nothing to run.
+     */
     private Nodes.Stack classic(WindowHandle window) {
+        var options = options();
         var current = current(window);
+        String primary = current.flatMap(id -> options.stream().filter(option -> option.id().equals(id)).findFirst())
+            .orElse(options.getFirst()).label();
         return new Nodes.Stack(VIEW, ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
-            new Nodes.Text(LABEL, ControlState.READY, "Session:", Nodes.TextRole.LABEL),
-            new Nodes.Choice(CHOICE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options(), current.orElse(NONE_OPTION), "Session", ""),
-            new Nodes.Button(CONNECT, new ControlState(true, current.isPresent(), false, ""), "Connect", "", Nodes.ButtonKind.PRIMARY, CONNECT, "")));
+            new Nodes.Choice(CHOICE, ControlState.READY, Nodes.ChoiceKind.DROPDOWN, options, current.orElse(NONE_OPTION), "Session", "", "",
+                Optional.empty(), Optional.of(new Nodes.PickerFace(primary, "", "application", Nodes.Hue.NONE, Nodes.PickerDensity.COMPACT))),
+            new Nodes.Button(CONNECT, new ControlState(true, current.isPresent(), false, ""), "", "run", Nodes.ButtonKind.GHOST, CONNECT, "Connect")));
     }
 
     private void classicEvent(WindowHandle window, UiEvent event) {

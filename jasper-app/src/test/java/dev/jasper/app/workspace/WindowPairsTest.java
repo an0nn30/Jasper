@@ -48,7 +48,8 @@ import org.junit.jupiter.api.Test;
  */
 class WindowPairsTest {
     static final WorkspaceChrome CLASSIC = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"));
+        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD,
+        WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 
@@ -88,7 +89,7 @@ class WindowPairsTest {
         final ClassicTabs.Entry first, second;
         final JMenuBar menus = new JMenuBar();
         final ClassicToolbarButton button = new ClassicToolbarButton(new AbstractAction("Go") {
-            @Override public void actionPerformed(ActionEvent event) { } }, "Go", ClassicToolbarButton.Glyph.PLUS, true, null);
+            @Override public void actionPerformed(ActionEvent event) { } }, "Go", true, null);
         final ClassicHeader header = new ClassicHeader();
         final TitleSearchField field;
         final RunItem run, activeRun, slashRun, slashActiveRun;

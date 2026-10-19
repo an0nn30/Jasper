@@ -163,8 +163,8 @@ their plugin sections when the model changes. Workspace code never sees an SDK t
 
 A toolbar view (`ToolbarItem.View`) is built once per window, when the window opens, by the plugin's factory, inside
 containment. `ToolbarViewAdmission` admits only an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER
-`Choice`, at most one PRIMARY `Button`, `MenuButton`s and `Separator`s, when the view is built and on every update; a
-refused or throwing factory leaves that window without the view.
+`Choice`, at most one PRIMARY `Button`, icon-only GHOST `Button`s (a blank label), `MenuButton`s and `Separator`s, when
+the view is built and on every update; a refused or throwing factory leaves that window without the view.
 
 `KeyBindings` is keyed by action id. The user's `[keybindings]` entry for a contributed action wins; otherwise the
 plugin's default for the platform applies unless it is invalid or a binding in a conflicting context already holds the
@@ -195,7 +195,13 @@ Requests to show, hide or toggle a panel travel through the model tagged with a 
 `PanelHost` reaches exactly one window. Every panel's toggle action is listed under View › Tool Windows (in the
 Enterprise look, the Window menu): the application-registered `<panel id>.toggle`, or the plugin's own action named by
 `PanelSpec.toggleActionId`, which must already be registered, so a plugin action that toggles a panel appears once in
-the menu and the palette. A `PanelHeader` set through `PanelHost.setHeader` becomes application-owned
+the menu and the palette. The application-registered toggle requests an activating toggle
+(`PanelRequest.Op.ACTIVATING_TOGGLE`), and a stripe press toggles the same way: under flush frames
+(`tool_windows = "stripes"`) a panel it shows becomes the active tool window, as a press anywhere inside its frame makes
+it, and `ToolWindowArea` moves the keyboard to the frame's first enabled control bound to keys, a button only when
+there is no other, else to the frame itself. A plugin's own toggle action, through `Panels.toggle`, shows the panel
+without activating it. A `PanelHeader` set
+through `PanelHost.setHeader` becomes application-owned
 `PanelHeaderState`; `PanelSite` guards its callbacks' lifetime, `ToolWindowArea` keeps the metadata while the panel is
 hidden and updates a live header without rebuilding the content, and closing the site clears it. A panel whose content
 is a kit `Panel` view shows the same metadata in its own header row, which the tool window borrows

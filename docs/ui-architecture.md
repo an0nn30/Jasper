@@ -135,7 +135,7 @@ and `surface.card`.
 
 ## Metrics and density
 
-`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 698 roles covering heights, paddings, gaps,
+`DesignMetrics` holds one logical integer per `DesignMetrics.Role`: 705 roles covering heights, paddings, gaps,
 radii, widths, icon sizes, shadow and tint percentages and motion durations. `DesignMetrics.DEFAULT` is each role's
 declared value and is Jasper's compact geometry (frozen by `compact-roles.tsv`). `DesignMetrics.CLASSIC` is the default
 catalog with the classic look's delta, measured on the Enterprise references (frozen by `classic-roles.tsv`). Density
@@ -364,7 +364,7 @@ These `KitView` methods serve the app's native hosts; none is part of the plugin
 | `paintsSurface(true)` | Paints the route's `surface.panel` opaque behind the view (workspace content tabs) |
 | `panelSurface(false)` | Leaves a body panel's rounded surface to a native host that already paints it |
 | `managerColumn(RAIL \| LIST)` | Presents the whole view as a manager column: RAIL rows (a tree's branches become flat `SECTION_LABEL` headings) or LIST rows (rounded selection, a table's header on the row inset) |
-| `titleStrip(true)`, `toolbarStrip(true)` | A window title action strip or a main-toolbar view: icon-only menu buttons show their indicator on the borderless control surface; a toolbar strip keeps the kit's control height |
+| `titleStrip(true)`, `toolbarStrip(true)` | A window title action strip or a main-toolbar view: icon-only menu buttons show their indicator on the borderless control surface; a toolbar strip keeps the kit's control height, draws an icon-only button's glyph at `ICON_RAIL`, and under the classic buttons face draws a DROPDOWN with a `PickerFace` as IntelliJ's run-configuration combo (`TOOLBAR_COMBO_*`: 24 px, the face's icon, the name cut with an ellipsis at 240 px, an arrow box) |
 | `hostTitled(true)` | The host shows the form title, so the form draws neither its title label nor a hero that only repeats it |
 | `dialogBand(true)` | The form footer is a band on `surface.footer` under a `border.window` rule, footnote leading, actions trailing |
 | `dialogCard(true)` | A classic dialog's card paints the form's fill and frame |
@@ -577,22 +577,23 @@ A kit binding whose action is blank never hides the look and feel's own binding 
 owns a registry; `register(...)` returns an `IconRegistration` whose idempotent close
 removes only its own registration. `IconRegistry.prepareBuiltIns()` decodes the built-ins ahead of time.
 
-The built-in path glyphs are original Jasper vectors on a 16-unit grid (87 names; `folder.filled`, `play.filled` and
-`triangle.down` are filled, the rest outlines):
+The built-in path glyphs are original Jasper vectors on a 16-unit grid (89 names; `folder.filled`, `play.filled`,
+`run` and `triangle.down` are filled, the rest outlines):
 
-`add`, `appearance`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`, `chevron.left`,
-`chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`, `cursor`,
-`delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`, `folder.filled`, `font`,
-`forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`, `link`, `lock`,
-`lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `none`, `note`, `notification.card`,
-`notification.history`, `notification.off`, `notification.sticky`, `paste`, `pause`, `play`, `play.filled`, `plugin`,
-`preview`, `question`, `refresh`, `regex`, `remove`, `reset`, `reveal`, `save`, `search`, `server`, `settings`, `shield`,
-`sparkle`, `split`, `star`, `star.filled`, `target`, `terminal`, `triangle.down`, `tunnel`, `unlock`, `upload`, `user`,
-`warning`, `window`, `window.add`, `zoom`.
+`add`, `appearance`, `application`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`,
+`chevron.left`, `chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`,
+`cursor`, `delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`,
+`folder.filled`, `font`, `forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`,
+`link`, `lock`, `lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `none`, `note`,
+`notification.card`, `notification.history`, `notification.off`, `notification.sticky`, `paste`, `pause`, `play`,
+`play.filled`, `plugin`, `preview`, `question`, `refresh`, `regex`, `remove`, `reset`, `reveal`, `run`, `save`,
+`search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`, `terminal`,
+`triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
 
-Two sets of byte-identical IntelliJ Platform New UI icons (Apache-2.0; `icons/LICENSE.txt`, `NOTICE.txt` and
-`SOURCE.md` beside them, listed in the app's third-party notices as "IntelliJ Platform icons") ship as light SVGs with
-`_dark` siblings, each file checked against its SHA-256 in a manifest:
+Three sets of byte-identical IntelliJ Platform icons (Apache-2.0; `icons/LICENSE.txt`, `NOTICE.txt`, `ATTRIBUTION.txt`
+and `SOURCE.md` beside them, listed in the app's third-party notices as "IntelliJ Platform icons (New UI and Classic)")
+ship as light SVGs with `_dark` siblings (two classic files serve both variants), each file checked against its
+SHA-256 in a manifest:
 
 - **The catalog** (`assets-selected.tsv`, 14 files): `settings`, `network`, `tunnel`, `more.vertical`,
   `chevron.right`, `search`, `file`. Ordinary contexts given a theme draw these meanings with this artwork, picking
@@ -601,9 +602,13 @@ Two sets of byte-identical IntelliJ Platform New UI icons (Apache-2.0; `icons/LI
   Compact contexts (panel, prompt, tile and palette-only icons) draw only `network`, `tunnel` and `more.vertical` from
   it and the path glyphs otherwise.
 - **The chrome set** (`assets-chrome.tsv`, 20 files): `add`, `window.add`, `split`, `zoom`, `chevron.down`, `folder`,
-  `server`, `bell`, `lock`, `terminal`. Only `chromeIcon(name, size)`, the native workspace chrome's context (title
-  bar, toolbar, tool window stripes and status bar), draws them; descriptor, panel, tile and plugin contexts keep the
-  path glyphs for these names.
+  `server`, `bell`, `lock`, `terminal`. Only `chromeIcon(name, size[, artwork])`, the native workspace chrome's
+  context (title bar, toolbar, tool window stripes and status bar), draws them; descriptor, panel, tile and plugin
+  contexts keep the path glyphs for these names.
+- **The classic set** (`assets-classic.tsv`, 14 files, IntelliJ's classic icons): a chrome receiver marked
+  `ChromeArtwork.CLASSIC` (a look's `[chrome] icons = "classic"`) draws them for add, split, zoom, settings, new window
+  and search, and the chrome set's New UI originals for the rest. The `run` and `application` names are authored host
+  artwork from this set (`BuiltInArtwork`) wherever a control draws them.
 
 Receiving contexts:
 
@@ -615,7 +620,7 @@ Receiving contexts:
 | `prompt(...)` | Prompt glyphs, with a 1.75 px optical stroke at 24 px |
 | `tile(...)` | A category tile at the kit's tile opacity; selected tiles on the accent |
 | `identityHeader(...)` | An identity header tile outlined in `border.identity` |
-| `themedIcon(name, size)`, `chromeIcon(name, size)` | A `PreparedIcon` for native Swing, resolved against the live theme |
+| `themedIcon(name, size)`, `chromeIcon(name, size)`, `chromeIcon(name, size, ChromeArtwork)` | A `PreparedIcon` for native Swing, resolved against the live theme; the chrome forms draw the chrome or classic set |
 
 `size(metrics, IconSize)` maps the model's sizes to roles: CAPTION `ICON_CAPTION` (12), CONTROL `ICON_CONTROL` (14),
 RAIL `ICON_RAIL` (16), EMPTY `ICON_EMPTY` (20), PROMPT `ICON_PROMPT` (24; 16 in the classic catalog) and SWATCH

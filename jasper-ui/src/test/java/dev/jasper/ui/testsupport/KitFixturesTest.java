@@ -1,6 +1,7 @@
 package dev.jasper.ui.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import dev.jasper.ui.theme.GeneratedTheme;
 import dev.jasper.ui.theme.JasperTheme;
@@ -10,6 +11,13 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class KitFixturesTest {
+    @Test void colourResolvesSemanticAndDerivedKeysOnTheTheme() {
+        var light = KitFixtures.enterpriseLight();
+        assertThat(KitFixtures.colour(light, "surface.app")).isEqualTo(light.semantic().color(SemanticColor.SURFACE_APP));
+        assertThat(KitFixtures.colour(light, "surface.header.active")).isEqualTo(dev.jasper.ui.theme.DerivedColor.SURFACE_HEADER_ACTIVE.color(light));
+        assertThatIllegalArgumentException().isThrownBy(() -> KitFixtures.colour(light, "surface.nowhere")).withMessageContaining("surface.nowhere");
+    }
+
     @Test void theFixturesAreSlateCobaltAndCustomDiffersInEveryOpaqueRole() {
         assertThat(KitFixtures.dark()).isSameAs(JasperTheme.bundled().generated(true));
         assertThat(KitFixtures.light()).isSameAs(JasperTheme.bundled().generated(false));

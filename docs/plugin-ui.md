@@ -79,6 +79,7 @@ Pick the composition from what the surface is, not from how it should look:
 | Sidebar, list and detail (a manager) | `Split` with `SplitKind.THREE_COLUMN`, or `SIDEBAR_DETAIL` without the sidebar |
 | Document in a content tab | `Split` with `SplitKind.DOCUMENT` around a `Custom` |
 | Settings page of your own | `Stack` with `LayoutRole.SETTINGS_PAGE` |
+| Controls in the main toolbar | An INLINE `Stack` from a `ToolbarItem.view` factory: LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER choices, `MenuButton`s, `Separator`s, at most one PRIMARY `Button` and icon-only GHOST `Button`s, which draw a 16-pixel glyph and need SDK 0.18.1; see [the toolbar](plugin-authoring.md#the-toolbar) |
 | Nothing to show yet, or a disconnected state | `Empty` with an icon, title, description and actions |
 
 Inside cards:
@@ -102,8 +103,9 @@ an EXCLUSIVE choice draws radios, TABS draws folder tabs, a STEPPER or SLIDER dr
 checkbox, a Section with its Card draws a titled box, a Table draws a header band, zebra rows and banded headings, a
 Tree draws ▶ and ▼, a PROMPT form puts its title in the dialog's header strip and its tile beside the message, an Empty
 state shows its text and one button (its visible PRIMARY action, or else its first visible one) without a tile, a Chip
-is boxed in upper case, a ROUTE stack draws edged cells, and an ORDERED list's commands move to a side column that acts
-on the selection.
+is boxed in upper case, a ROUTE stack draws edged cells, an ORDERED list's commands move to a side column that acts
+on the selection, and in a toolbar view a DROPDOWN with a `PickerFace` draws as IntelliJ's run-configuration combo (its
+icon, the name cut with an ellipsis at 240 pixels, an arrow box).
 
 ### A grouped dialog
 

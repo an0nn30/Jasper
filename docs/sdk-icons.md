@@ -32,15 +32,19 @@ way. `ScopeSpec.withIcon` is checked like any other name, but neither palette dr
 
 ## Built-in names
 
-`add`, `appearance`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`, `chevron.left`,
-`chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`, `cursor`,
-`delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`, `folder.filled`,
-`font`, `forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`, `link`, `lock`,
-`lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `more.vertical`, `network`, `none`,
-`note`, `notification.card`, `notification.history`, `notification.off`, `notification.sticky`, `paste`, `pause`,
-`play`, `play.filled`, `plugin`, `preview`, `question`, `refresh`, `regex`, `remove`, `reset`, `reveal`, `save`,
-`search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`, `terminal`,
-`triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
+`add`, `appearance`, `application`, `arrow.right`, `back`, `bell`, `bookmark`, `brightness`, `check`, `chevron.down`,
+`chevron.left`, `chevron.right`, `chevron.up`, `clock`, `close`, `collapse`, `collapse.all`, `command-palette`, `copy`,
+`cursor`, `delete`, `desktop`, `download`, `edit`, `error`, `expand.all`, `file`, `folder`, `folder.add`,
+`folder.filled`, `font`, `forward`, `help`, `hidden`, `history`, `home`, `import`, `info`, `key`, `keyboard`, `laptop`,
+`link`, `lock`, `lock.keyhole`, `login`, `logout`, `match.case`, `match.word`, `menu`, `more`, `more.vertical`,
+`network`, `none`, `note`, `notification.card`, `notification.history`, `notification.off`, `notification.sticky`,
+`paste`, `pause`, `play`, `play.filled`, `plugin`, `preview`, `question`, `refresh`, `regex`, `remove`, `reset`,
+`reveal`, `run`, `save`, `search`, `server`, `settings`, `shield`, `sparkle`, `split`, `star`, `star.filled`, `target`,
+`terminal`, `triangle.down`, `tunnel`, `unlock`, `upload`, `user`, `warning`, `window`, `window.add`, `zoom`.
+
+`run` and `application` are authored host artwork: `run` is IntelliJ's classic Run triangle and `application` its
+run-configuration icon. Controls draw them in their own colours under every look; panels, prompts and tiles draw a
+monochrome glyph of the same name. The two names need SDK 0.18.1.
 
 ## Registering artwork
 

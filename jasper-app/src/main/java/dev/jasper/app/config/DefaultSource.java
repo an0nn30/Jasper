@@ -12,9 +12,9 @@ import java.util.Set;
  * @param overrides each overridden setting's default
  */
 public record DefaultSource(Map<Setting<?>, Object> overrides) {
-    /** The settings a look may default: both theme picks, the palette's rows and the toolbar's height. */
+    /** The settings a look may default: both theme picks, the palette's rows, and the toolbar's height and mode. */
     public static final Set<Setting<?>> ALLOWED = Set.of(CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DARK,
-        CoreSettings.PALETTE_VISIBLE_ROWS, CoreSettings.WINDOW_TOOLBAR_HEIGHT);
+        CoreSettings.PALETTE_VISIBLE_ROWS, CoreSettings.WINDOW_TOOLBAR_HEIGHT, CoreSettings.WINDOW_TOOLBAR);
     /** No overrides: the core defaults, as the default look has them. */
     public static final DefaultSource CORE = new DefaultSource(Map.of());
 

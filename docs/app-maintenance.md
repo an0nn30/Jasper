@@ -136,11 +136,12 @@ file (`<home>/plugins/<id>/<id>.toml`), not a core setting. A core setting needs
    take, `LaunchSettings` capture and `SessionLaunchOptions` construction.
 
 The loader, the generated template, Settings rows, Settings search and saving need no per-field code. A look may give
-a default only to the settings in `DefaultSource.ALLOWED` (both theme picks, `palette.visible_rows` and
-`window.toolbar_height`). Settings' ? button opens `docs/configuration.md#<anchor>` on GitHub (`SettingsDialog.HELP_URL`),
-with the anchor from the page (`SchemaPage.anchor`, `SettingsPage.helpAnchor`). No test checks those anchors: keep the
-headings that make `supported-settings`, `theme`, `finished-command-notifications`, `palette`, `desk-buddy`,
-`terminal-colors`, `shell-environment-and-history`, `background-residency`, `plugins` and `shortcuts`.
+a default only to the settings in `DefaultSource.ALLOWED` (both theme picks, `palette.visible_rows`,
+`window.toolbar_height` and `window.toolbar`). Settings' ? button opens `docs/configuration.md#<anchor>` on GitHub
+(`SettingsDialog.HELP_URL`), with the anchor from the page (`SchemaPage.anchor`, `SettingsPage.helpAnchor`). No test
+checks those anchors: keep the headings that make `supported-settings`, `theme`, `finished-command-notifications`,
+`palette`, `desk-buddy`, `terminal-colors`, `shell-environment-and-history`, `background-residency`, `plugins` and
+`shortcuts`.
 
 A View menu choice for a saved field saves it (`WindowContent.choose`); only per-pane font sizes and Show/Hide Jasper
 stay session-only, and an unchanged saved font size must preserve a pane's size. Check `WindowContent.configurePane`
@@ -605,7 +606,10 @@ notice, as `jbr-api.NOTICE.txt` does. The Licenses window reads the same file.
 `JasperTheme.builtIns()` lists the built-in theme files ([architecture](app-architecture.md#themes),
 [themes](themes.md)), Slate Cobalt first. The Catppuccin files are the theme converter's output for the plugin jar
 vendored in `tools/themes/catppuccin/`, with the hand-picked roles in its `roles.json` (its `SOURCE.md` says how to
-regenerate them); a converter test fails when they differ. Slate Cobalt's colours live only in jasper-ui's
+regenerate them); a converter test fails when they differ. The Enterprise plugin's `enterprise.json` is likewise the
+converter's port (`convert_port`) of IntelliJ's own IntelliJ Light and New UI Dark files in `tools/themes/intellij/`
+with the choices in `tools/themes/enterprise/port.json` (its `SOURCE.md` says how to regenerate it), and the Licenses
+window credits it as "IntelliJ Platform themes (the Enterprise theme)". Slate Cobalt's colours live only in jasper-ui's
 `slate-cobalt.json`, the machine-readable block of [the Slate Cobalt record](design/theme-engine/slate-cobalt.md)
 (`SlateCobaltFileTest` keeps the two identical); Ubuntu Yaru's sources and mapping are in [its
 record](design/theme-engine/ubuntu-yaru.md). `JasperTheme` reads a file once: the semantic palettes, the terminal
@@ -656,6 +660,10 @@ The SDK takes icon names, never Swing icons; a plugin registers its own monochro
 ([`IconAsset`](sdk-reference.html#dev.jasper.sdk.ui.IconAsset)) under `<plugin id>:<name>` ([plugin icons](sdk-icons.md)).
 jasper-ui's `IconRegistry` owns the glyph paths and the chrome artwork. `platform.NamedIcons` maps the application's
 own icon names to kit glyphs, and `AppIcons` resolves them against the receiving component at paint time.
+`AppIcons.chromeReceiver(component, artwork)` marks a chrome receiver with the look's `ChromeArtwork` (`WindowChrome`
+marks each window's header and `WorkspaceChrome.statusBar` its status bar, both with `WorkspaceChrome.chromeArtwork()`);
+a classic icon is prepared the first time it paints inside a `ChromeArtwork.CLASSIC` receiver, so a default-look start
+never prepares the classic chrome icons (`ChromeArtworkTest`, `ZoneIconsTest`).
 `PresentationIcon` and `PresentationIcons` carry immutable icon values into native models and into receiving views'
 own registries, so no plugin class loader, resource loader or callback crosses into the kit registry; keep their
 failure and lifetime tests.
@@ -702,7 +710,10 @@ their original placements; do not keep a second plugin registry for overflow. A 
 (`ToolbarEntry.View`) is built once per window, when `WindowContent.connectTerminals` reports the window open (never
 for the warm-up rehearsal), and closed with its window or its entry; it lays out at its preferred size and hides,
 never overflows, when the row is too narrow. Theme changes must keep the selected tab readable when the terminal's
-colours differ from the chrome's.
+colours differ from the chrome's. The classic header's buttons are `ClassicToolbarButton`s: with labels hidden
+(`window.toolbar = "icons"`) a button is `CHROME_ICON_BUTTON` square, named by its tooltip (its label unless the
+caller sets one, as Split does), and a dropdown draws a `CHROME_ICON_CARET` ▼ in its corner; with labels it draws its
+icon, then its label (`ClassicHeaderTest`).
 
 ### Tool window area, stripes and the dock
 
@@ -767,9 +778,14 @@ renders the stripes again.
 Under the default look the workspace boundaries are continuous chrome instead of painted rules: rail, toolbar, title
 bar and status bar have no edge strokes, and dock dividers paint nothing, so no UI update can give them a border or
 grip; terminal-internal splits keep their visible indicators. Under flush frames (a stripes look) each divider is a
-painted 1 px rule, and the classic header and status bar draw their own rules. `ToolWindowSurface` paints only the
-app-owned root, with `surface.panel`; it does not observe or restyle plugin descendants. Shared kit views consume their
-routed palette and own their control and selection geometry, and app-native stripe selection keeps its semantic icon.
+painted 1 px rule, and the classic header and status bar draw their own rules. There `ToolWindowArea` activates a frame
+on any mouse press inside it, through an AWT event listener added in `addNotify` and removed in `removeNotify`, and
+`WindowContributions.toggleAndActivate` does so for a stripe click and an `ACTIVATING_TOGGLE` request, without first
+handing focus back to the terminal when the window replaces another in its slot. `focusTarget` picks where the keyboard
+goes; a frame's host is focusable only while it holds the keyboard itself, so it is never a Tab stop
+(`PressedFrameTest`, `WindowPanelsTest`). `ToolWindowSurface` paints only the app-owned root, with `surface.panel`; it
+does not observe or restyle plugin descendants. Shared kit views consume their routed palette and own their control and
+selection geometry, and app-native stripe selection keeps its semantic icon.
 Native FlatLaf controls keep their delegate behaviour and receive the kit's colours; `SelectionRenderingTest` covers
 light and dark selected fills and readable text, while the kit's control tests cover their own rounded selections.
 
