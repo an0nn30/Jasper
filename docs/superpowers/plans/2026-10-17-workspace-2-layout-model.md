@@ -1,5 +1,14 @@
 # Workspace tabs 2: the layout model and its encoding Implementation Plan
 
+**Status: executed on 2026-10-18** (`255264a42..a2dbb4472`, then the documentation commit); see `docs/STATUS.md`.
+Deviations from the plan's text: Task 1 added tests for the tolerance rule (weights 0.7, 0.2 and 0.1 kept bit for bit)
+and the strict UUID guard (two non-canonical 36-character ids rejected); Task 2 added two assertions for the maximize
+when a three-group layout's maximized group closes its last tab; Task 5 added a test for two windows whose root splits
+share an id (`WorkspaceFileReadTest` has 17 tests, not 16) and proved that tomlj 1.1.1 overflows the stack under the 256
+KiB cap, so `aNestingThatOverflowsTheParserIsSetAside` exercises the `StackOverflowError` branch; Task 6 added one-line
+Javadoc comments to the enum constants of `Orientation`, `Side` and `WorkspaceFile.Role` and reworded Spec issues 1 as
+resolved by the spec amendment (`39162f79d`). No anchor needed re-finding.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A pure, immutable layout model for VS Code-style workspaces (n-ary weighted splits whose leaves are tab groups)
@@ -243,10 +252,9 @@ Record them in `docs/STATUS.md` (Task 6).
 
 ## Spec issues
 
-1. **The maximize on closing a tab.** Spec 7.3 says "any structural change clears it" and spec 15 that a maximized
-   group that "loses a tab or gains one by a move" clears. Following VS Code (a review decision), closing a tab keeps
-   the maximize while the maximized group survives and two groups remain, also when the closing removes another group;
-   spec 15's row is read as "loses a tab by a move or gains one by a move", which still clears (Rulings 5).
+1. **The maximize on closing a tab. Resolved (`39162f79d`):** that commit amended spec 7.3 and 15 to match Rulings 5.
+   Following VS Code, closing a tab keeps the maximize while the maximized group survives and two groups remain, also
+   when the closing removes another group; a move that loses or gains a tab still clears it.
 
 (Spec 7.3 also lists `neighbour` among operations that "return a new `Layout`"; it returns a group, Rulings 10.)
 

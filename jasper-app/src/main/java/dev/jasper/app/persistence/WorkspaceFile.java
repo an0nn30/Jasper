@@ -38,7 +38,12 @@ import org.tomlj.TomlTable;
  */
 public final class WorkspaceFile {
     /** Whether a window is the main window or a child window. */
-    public enum Role { MAIN, CHILD }
+    public enum Role {
+        /** The main window. */
+        MAIN,
+        /** Any other window. */
+        CHILD
+    }
 
     /** What a tab needs to come back (spec 13): a terminal's title, directory and profile, or a plugin's restore state. */
     public sealed interface TabRecord permits TabRecord.Terminal, TabRecord.Content {

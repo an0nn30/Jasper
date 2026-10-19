@@ -1,5 +1,56 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 2: the layout model and its encoding — 2026-10-18** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `255264a42..a2dbb4472` (Tasks 1 to 5 and their fix rounds), then this documentation
+commit; [plan](superpowers/plans/2026-10-17-workspace-2-layout-model.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Pure and unwired: no visible change. New
+JDK-only package `dev.jasper.app.layout` (nothing from `java.awt`, enforced by `verifyApplicationArchitecture`):
+`TabId` and `GroupId` (UUID records), and `Layout` over a tree of n-ary weighted `Split`s (same-orientation nesting
+flattened, weights normalized) and tab `Group`s, with `open`, `select`, `activate`, `split`, `move`, `moveToNewGroup`,
+`remove`, `resize`, `toggleMaximize`, `neighbour` (today's `SplitTree.navigate` rule) and `bounds()` over the unit
+square (for `neighbour`), `unmaximize`, and orders of use that pick the focused group and the selected tab after a
+removal. `persistence.WorkspaceFile` writes spec 8's `workspace.toml` atomically (`AppDirs.workspaceState()`) and reads
+it back without throwing: bad tab and window entries dropped alone, keys falling back alone, an unreadable file (or one
+over 256 KiB) set aside as `workspace.toml.bad` (`Loaded.Fresh`). Rulings (plan, "Rulings"): (1) `Group.selected` is an
+`Optional`, empty only for the empty workspace's group; (2) `Layout` is a final class with spec 7.1's public
+constructor and keeps the groups' order of use outside `equals` and the file; (3) `resize` addresses a split by its
+path, and a split's id in the file is the name-based UUID of `"jasper.split:"` plus that path; (4) weights within 1e-9
+of summing to 1 are kept bit for bit, others divided by their sum, no minimum weight; (5) a maximized group is the
+active group, closing a tab keeps the maximize while the group survives and two groups remain, a split or a move
+between groups clears it; (6) `select` also activates the tab's group; (7) closing a group's selected tab selects its
+most recently shown tab, the orders of use private and seeded in `JTabbedPane`'s order; (8) a removed group's weight
+goes to the sibling before it, so Cmd+D then closing the new tab restores the sizes exactly; (9) `move` counts the
+target without the moved tab, and `split` and `moveToNewGroup` need a target group with tabs; (10) `neighbour` is a
+query returning `Optional<GroupId>` over the whole tree's geometry, maximize ignored; (11) `TabId` and `GroupId` parse
+only the canonical 36-character form; (12) the codec is the stateless `persistence.WorkspaceFile` with nested values,
+reusing `UiState.Bounds` (`UiState.bounds` and `number` became package-private); (13) `read` never throws, not even on
+a `StackOverflowError` from tomlj's parser, and `write` throws `IOException`; (14) bad tab entries are dropped through
+`Layout.remove`, bad window entries drop that window, a tree deeper than 64 is a bad window, and other keys fall back
+alone; (15) the cap is `ui-state.toml`'s 256 KiB; (16) restore-state keys are bare when they match `[A-Za-z0-9_-]+`,
+quoted otherwise, every string through `UiState.quote`; (17) `WindowRecord.bounds` is an `Optional`; (18) `Snapshot`
+puts the main window first and refuses a group or tab in two windows; (19) a group's place in the unit square is
+`Region`, not `Bounds`; (20) for plan 6: `WindowRecord` needs a record for every tab of its layout, so before saving it
+takes out, with `Layout.remove`, every tab it cannot restore and leaves out a child window holding only such tabs. The
+plan's one spec issue (the maximize when a tab closes) is resolved: the spec was amended with the plan (`39162f79d`) to
+match Rulings 5. Deviations from the plan text made while executing it: Task 1 added tests that can fail for two
+rulings (`LayoutValuesTest`: weights 0.7, 0.2 and 0.1, whose sum is 0.9999999999999999, are kept bit for bit and a
+`Split` rebuilt from its own children equals it; two non-canonical 36-character ids, `+0000001-0000-4000-8000-00000000000a`
+and `00000001-0-0-0-000000000000000000001`, which `UUID.fromString` accepts, are rejected by `TabId.parse` and
+`GroupId.parse`); Task 2 added two assertions to
+`LayoutOperationsTest.theMaximizeFollowsTheActiveGroupClearsOnMovesAndSurvivesClosedTabs` (in the three-group layout,
+closing the maximized group's last tab clears the maximize and activates the first group of the order of use); Task 5
+added `WorkspaceFileReadTest.windowsWhoseRootSplitsShareAnIdAreReadApart` (a main and a child window whose root splits
+share one id are read back as written; the reader keys nodes per window), so `WorkspaceFileReadTest` has 17 tests, not
+16; the probe for the plan's open question (fact 15) showed that tomlj 1.1.1 does overflow its stack on 250,000 nested
+`[` under the 256 KiB cap, so `aNestingThatOverflowsTheParserIsSetAside` does exercise the `StackOverflowError` branch
+(it failed with that error when the branch was removed); this commit adds one-line Javadoc comments to the enum
+constants of `layout.Orientation`, `layout.Side` and `WorkspaceFile.Role` (doclint's "no comment" warnings). The plan's
+other code and test text was applied as written, no anchor needed re-finding in Tasks 1 to 6. `SplitTree` stays until
+plan 3 and `UiState`'s `[main_window]` until plan 6. `./gradlew check --continue`: BUILD SUCCESSFUL, **11,548 tests,
+0 failures, 0 errors, 25 skipped** (from the XML in `*/build/test-results/test/`; `LayoutValuesTest` 6,
+`LayoutTest` 6, `LayoutOperationsTest` 15, `LayoutGeometryTest` 16, `WorkspaceFileTest` 4, `WorkspaceFileReadTest` 17,
+`AppDirsTest` 11). No GUI checks (nothing visible changed). Not merged, not pushed.
+
 **Workspace tabs, plan 1: the single instance — 2026-10-18** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, every commit after `91f3cd66a` (the anchor refresh before Task 1) up to the branch
 tip: Tasks 1 to 11, the documentation commit, the spec amendment `4f9f8d629` and the final-review fixes;
