@@ -135,6 +135,19 @@ class SingleInstanceTest {
         assertThat(reply.get(10, TimeUnit.SECONDS)).isEqualTo(CommandProtocol.out("ran [editor]\n") + CommandProtocol.exit(7));
     }
 
+    @Test void aCallWhoseDispatcherThrowsAnErrorIsAnsweredWithAFailureAndLaterCallsStillRun() throws Exception {
+        Instance instance = owner();
+        String token = Files.readString(CommandListener.tokenFile(dirs().commandSocket())).strip();
+        instance.serve((request, updated) -> { }, () -> true, Runnable::run, invocation -> {
+            if (invocation.arguments().contains("boom")) throw new AssertionError("a broken command");
+            return CompletableFuture.completedFuture(3);
+        });
+        until(() -> !instance.holding());
+        assertThat(call(token, List.of("boom"))).isEqualTo(CommandProtocol.err("jasper: a broken command\n") + CommandProtocol.exit(1));
+        assertThat(call(token, List.of("fine"))).isEqualTo(CommandProtocol.exit(3));
+        assertThat(instance.commands().busy()).as("no call is left running").isFalse();
+    }
+
     @Test void aLoginOrWindowlessLaunchExitsWhileAnOwnerRuns() throws Exception {
         var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         ready(seen, true, Runnable::run);

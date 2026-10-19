@@ -688,18 +688,8 @@ public final class JasperApplication {
             PluginRuntime runtime = plugins;
             java.util.function.Predicate<String> subcommand = name -> runtime != null && runtime.declaresSubcommand(name);
             Optional<List<Path>> paths = commandPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
-            if (paths.isPresent()) {
-                var opened = new CompletableFuture<Integer>();
-                SwingUtilities.invokeLater(() -> {
-                    try {
-                        open(paths.get(), HANDOFF);
-                        opened.complete(0);
-                    } catch (RuntimeException failure) {
-                        opened.completeExceptionally(failure);
-                    }
-                });
-                return opened;
-            }
+            if (paths.isPresent())
+                return onEventThread(SwingUtilities::invokeLater, this::acceptsRequests, () -> open(paths.get(), HANDOFF));
             List<String> missing = missingPaths(invocation.workingDirectory(), invocation.arguments(), subcommand);
             if (!missing.isEmpty()) {
                 invocation.err("jasper: no such file or folder: " + String.join(", ", missing) + "\n");
@@ -711,6 +701,37 @@ public final class JasperApplication {
             }
             return runtime.commands().dispatch(invocation);
         };
+    }
+
+    /**
+     * Runs {@code open} on the event thread once {@code accepting} says this process still takes requests, and answers 0
+     * when it has run. A process that is quitting opens nothing and fails the call with the message
+     * {@code Instance.dispatch} gives a call that arrives after quit; a failure of {@code open}, an {@link Error}
+     * included, fails it too, so a call is never left waiting (the Error also goes on to the event thread's handler).
+     *
+     * @param edt runs a task on the event thread
+     * @param accepting whether the application takes requests; called on the event thread
+     * @param open what the call asks for
+     * @return the call's answer
+     */
+    static CompletionStage<Integer> onEventThread(Executor edt, BooleanSupplier accepting, Runnable open) {
+        var opened = new CompletableFuture<Integer>();
+        edt.execute(() -> {
+            if (!accepting.getAsBoolean()) {
+                opened.completeExceptionally(new IllegalStateException("Jasper is quitting; run the command again"));
+                return;
+            }
+            try {
+                open.run();
+                opened.complete(0);
+            } catch (RuntimeException failure) {
+                opened.completeExceptionally(failure);
+            } catch (Error failure) {
+                opened.completeExceptionally(failure);
+                throw failure;
+            }
+        });
+        return opened;
     }
 
     /**

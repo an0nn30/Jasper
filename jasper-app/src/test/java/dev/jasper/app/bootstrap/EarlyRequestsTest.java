@@ -2,6 +2,7 @@ package dev.jasper.app.bootstrap;
 
 import static dev.jasper.app.workspace.DesktopTestSupport.until;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -51,6 +52,26 @@ class EarlyRequestsTest {
         requests.open();
         until(() -> !requests.holding());
         assertThat(ran).containsExactly("after the failure");
+    }
+
+    @Test void aHeldRequestThatThrowsAnErrorDoesNotStopTheDrainOrLaterRequests() throws Exception {
+        var requests = new EarlyRequests();
+        requests.submit(() -> { throw new AssertionError("a broken request"); });
+        requests.submit(() -> ran.add("after the error"));
+        requests.open();
+        until(() -> !requests.holding());
+        assertThat(ran).as("the drain went on past the error").containsExactly("after the error");
+        assertThat(requests.submit(() -> ran.add("later"))).as("the queue is open for later requests").isEqualTo(EarlyRequests.Outcome.RAN);
+        assertThat(ran).containsExactly("after the error", "later");
+    }
+
+    @Test void aRequestThatThrowsAnErrorOnTheSubmittingThreadIsLoggedAndTheNextOneRuns() throws Exception {
+        var requests = new EarlyRequests();
+        requests.open();
+        until(() -> !requests.holding());
+        assertThatCode(() -> requests.submit(() -> { throw new AssertionError("a broken request"); })).doesNotThrowAnyException();
+        assertThat(requests.submit(() -> ran.add("next"))).isEqualTo(EarlyRequests.Outcome.RAN);
+        assertThat(ran).containsExactly("next");
     }
 
     @Test void eachRequestSaysWhatBecameOfItAndOnlyAnIdleQueueCanBeDeclined() throws Exception {

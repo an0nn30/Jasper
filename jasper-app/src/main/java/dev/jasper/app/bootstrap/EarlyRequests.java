@@ -6,7 +6,7 @@ import java.util.Objects;
 /**
  * Requests that reach the home's owner before its application can take them (workspace-tabs spec 5.3): held in arrival
  * order and run in that order once {@link #open} is called, on a virtual thread; from then on each runs at once on the
- * thread that submits it. A request that throws is logged and the next runs. Any thread.
+ * thread that submits it. A request that throws, an {@link Error} included, is logged and the next runs. Any thread.
  */
 final class EarlyRequests {
     private static final System.Logger LOG = System.getLogger(EarlyRequests.class.getName());
@@ -104,7 +104,7 @@ final class EarlyRequests {
     private static void run(Runnable request) {
         try {
             request.run();
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | Error failure) {
             LOG.log(System.Logger.Level.WARNING, "A launch request failed", failure);
         }
     }

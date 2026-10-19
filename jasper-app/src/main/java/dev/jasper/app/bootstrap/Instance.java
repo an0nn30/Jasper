@@ -106,7 +106,7 @@ final class Instance implements AutoCloseable {
             CompletionStage<Integer> stage;
             try {
                 stage = dispatcher.dispatch(invocation);
-            } catch (RuntimeException failure) {
+            } catch (RuntimeException | Error failure) {
                 result.completeExceptionally(failure);
                 return;
             }
