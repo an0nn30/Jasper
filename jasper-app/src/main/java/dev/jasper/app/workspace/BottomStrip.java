@@ -14,6 +14,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -30,8 +31,9 @@ import javax.swing.Action;
  * thickness less their rule, where the mocks start them), each followed by a 1 px {@code border.divider}, and the Bottom
  * Right windows' labels ending that far from the right, each preceded by one; a 1 px rule along its top; 24 px above its
  * rule, as the mocks draw it, whatever {@code window.rail_width}. Labels read across, an open window's on its tile, a badge
- * as a count pill. Its two groups meet midway between them and lie across, for the drag. It shows no rail actions. EDT
- * only.
+ * as a count pill. Each label starts with its window's 13 px icon, centred down, then a 4 px gap (the user's direction of
+ * 2026-10-19, as IntelliJ's classic StripeButton). Its two groups meet midway between them and lie across, for the drag. It
+ * shows no rail actions. EDT only.
  */
 final class BottomStrip extends DockStripe {
     /** Where the last layout put everything: the labels, the dividers, each group's drop bounds and the gap. */
@@ -77,7 +79,7 @@ final class BottomStrip extends DockStripe {
         for (Slot slot : SLOTS) groups.put(slot, new ArrayList<>());
         for (ToolStripe.Button window : toolWindows) {
             if (window.slot().side() != Side.BOTTOM) continue;
-            var label = new StripeLabels.Label(window, null, this::paintLabel);
+            var label = new StripeLabels.Label(window, labels.icon(window.icon()), this::paintLabel);
             label.setSelected(window.selected());
             label.addActionListener(event -> onToggle.accept(window.id()));
             label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
@@ -235,7 +237,7 @@ final class BottomStrip extends DockStripe {
         for (int x : dividers) graphics.fillRect(x, rule, rule, Math.max(0, getHeight() - rule));
     }
 
-    /** A label's tile, then its text and pill, reading across. */
+    /** A label's tile, its icon, then its text and pill, reading across. */
     private void paintLabel(StripeLabels.Label label, Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
@@ -247,7 +249,11 @@ final class BottomStrip extends DockStripe {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
-            labels.paint(g, label.text(), label.badge(), false, label.getHeight(), false, theme, open, hover);
+            if (label.icon != null) {
+                Point at = labels.iconAt(Side.BOTTOM, label.getWidth(), label.getHeight());
+                label.icon.paintIcon(label, g, at.x, at.y);
+            }
+            labels.paint(g, label.text(), label.badge(), label.icon != null, label.getHeight(), false, theme, open, hover);
         } finally { g.dispose(); }
     }
 }

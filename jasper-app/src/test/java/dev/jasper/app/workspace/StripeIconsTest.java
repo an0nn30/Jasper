@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.commands.Command;
+import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.platform.PresentationIcon;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
@@ -17,6 +19,7 @@ import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.swing.ChromePainter;
+import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
 import java.awt.Color;
@@ -380,6 +383,106 @@ class StripeIconsTest {
             assertThat(second.icon).as("the command glyph").isNotNull();
             assertThat(painted(image, iconBox(Side.LEFT, first), 2)).as("the classic server file")
                 .isEqualTo(reference(classic("server"), first, painter.stripeSurface(theme), 2));
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** The bottom strip's three windows, closed: Event Log and "3: Transfers" in Bottom Left, Terminal in Bottom Right. */
+    private static List<ToolStripe.Button> bottomWindows(Icon log, Icon transfers) {
+        return List.of(new ToolStripe.Button("log", "Event Log", log, Slot.BOTTOM_LEFT, false),
+            new ToolStripe.Button("transfers", "Transfers", transfers, Slot.BOTTOM_LEFT, false, Optional.empty(), OptionalInt.of(3)),
+            new ToolStripe.Button("terminal", "Terminal", null, Slot.BOTTOM_RIGHT, false));
+    }
+
+    /** The bottom strip's labels lead with their icon, past the padding, centred down (IntelliJ's classic StripeButton). */
+    @Test void theBottomStripLeadsEachLabelWithItsIconCentredDown() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var theme = EnterpriseLook.theme(false);
+            var painter = new ChromePainter(EnterpriseLook.kit());
+            var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            int size = metric(DesignMetrics.Role.STRIPE_ICON), padding = metric(DesignMetrics.Role.STRIPE_LABEL_PADDING);
+            var strip = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            strip.render(bottomWindows(AppIcons.semantic("bell"), new PresentationIcon("download", null)), List.of());
+            int height = strip.getPreferredSize().height;
+            assertThat(height).as("the strip stays 25 tall").isEqualTo(25);
+            var image = MockCrops.render(strip, 900, height, 2);
+            Color tile = painter.stripeTile(theme, false, false);
+            Color ground = tile != null ? tile : painter.stripeSurface(theme);
+            var log = (StripeLabels.Label) strip.buttons().get(0);
+            var transfers = (StripeLabels.Label) strip.buttons().get(1);
+            var terminal = (StripeLabels.Label) strip.buttons().get(2);
+            for (var entry : List.of(java.util.Map.entry(log, "bell"), java.util.Map.entry(transfers, "download"))) {
+                var label = entry.getKey();
+                Rectangle bounds = label.getBounds();
+                assertThat(label.icon).as(label.text() + ": its icon").isNotNull();
+                Rectangle box = iconBox(Side.BOTTOM, label);
+                assertThat(box.x).as(label.text() + ": past the padding").isEqualTo(bounds.x + padding);
+                assertThat(box.y).as(label.text() + ": centred down").isEqualTo(bounds.y + (bounds.height - size) / 2).isEqualTo(6);
+                assertThat(painted(image, box, 2)).as(label.text() + ": its classic tool-window file, upright")
+                    .isEqualTo(reference(classic(entry.getValue()), label, ground, 2));
+                assertThat(bounds.width).as(label.text() + ": the text-only length and the slice")
+                    .isEqualTo(labels.length(label.text(), Optional.empty(), null) + slice());
+                assertThat(new Color(image.getRGB(2 * (bounds.x + bounds.width), 2 * (height / 2))))
+                    .as(label.text() + ": a divider follows it").isEqualTo(painter.stripDivider(theme));
+            }
+            assertThat(terminal.icon).as("Terminal has no icon").isNull();
+            assertThat(terminal.getWidth()).as("Terminal's length is text-only").isEqualTo(labels.length("Terminal", Optional.empty(), null));
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Rulings 17's premise on the bottom strip: cutting each label's icon columns out leaves the text-only strip exactly. */
+    @Test void cuttingTheBottomStripsIconSlicesLeavesTheTextOnlyStrip() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var iconed = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            iconed.render(bottomWindows(AppIcons.semantic("bell"), new PresentationIcon("download", null)), List.of());
+            var textOnly = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            textOnly.render(bottomWindows(null, null), List.of());
+            int height = iconed.getPreferredSize().height;
+            assertThat(textOnly.getPreferredSize().height).as("one height").isEqualTo(height);
+            var cut = withoutIcons(MockCrops.render(iconed, 900 + 2 * slice(), height, 2), iconed, 2);
+            var plain = MockCrops.render(textOnly, 900, height, 2);
+            assertThat(cut.getWidth()).as("the slices' columns").isEqualTo(plain.getWidth());
+            assertThat(cut.getRGB(0, 0, cut.getWidth(), cut.getHeight(), null, 0, cut.getWidth()))
+                .as("the cut is the text-only strip").isEqualTo(plain.getRGB(0, 0, plain.getWidth(), plain.getHeight(), null, 0, plain.getWidth()));
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Review Focus 3: a badge on an iconed label keeps its icon, and the pill follows the text, a slice further along. */
+    @Test void aBadgeKeepsTheIconAndThePillFollowsTheText() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var theme = EnterpriseLook.theme(false);
+            var painter = new ChromePainter(EnterpriseLook.kit());
+            var badge = Optional.of(new PanelBadge(3, PanelBadge.Tone.ACCENT, "3 unread"));
+            int pillGround = DerivedColor.INFO_GROUND.color(theme).getRGB();
+            var firstPill = new ArrayList<Integer>();
+            for (Icon icon : java.util.Arrays.asList(AppIcons.semantic("bell"), null)) {
+                var strip = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+                strip.render(bottomWindows(icon, null), List.of());
+                int height = strip.getPreferredSize().height;
+                MockCrops.render(strip, 900, height, 1);
+                var label = (StripeLabels.Label) strip.buttons().getFirst();
+                Icon before = label.icon;
+                int length = label.getWidth();
+                strip.updateBadge("log", badge);
+                var image = MockCrops.render(strip, 900, height, 1);
+                assertThat(strip.buttons().getFirst()).as("the same label").isSameAs(label);
+                if (icon != null) {
+                    assertThat(before).isNotNull();
+                    assertThat(label.icon).as("the badge keeps the icon").isSameAs(before);
+                }
+                assertThat(label.getWidth()).as("the label grows by the pill")
+                    .isEqualTo(length + metric(DesignMetrics.Role.STRIPE_PILL_GAP) + painter.countPill("3").width);
+                Rectangle bounds = label.getBounds();
+                int first = -1;
+                for (int x = bounds.x; x < bounds.x + bounds.width && first < 0; x++)
+                    for (int y = bounds.y; y < bounds.y + bounds.height; y++)
+                        if (image.getRGB(x, y) == pillGround) { first = x; break; }
+                assertThat(first).as("the pill is painted").isNotNegative();
+                firstPill.add(first);
+            }
+            assertThat(firstPill.get(0)).as("the pill, a slice further along than on a text-only label").isEqualTo(firstPill.get(1) + slice());
         } finally { EnterpriseLook.restoreDefault(); }
     }
 }
