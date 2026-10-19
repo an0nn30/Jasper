@@ -541,21 +541,29 @@ class PaintedContrastTest {
         } finally { context.icons().close(); context.binding().close(); }
     }
 
-    /** The preview tiles' selected caption: its most opaque ink below the tile, painted over nothing. */
+    /** The selected caption's opaque glyph interiors below the tile, sampled at 4x like the header text. */
     private static boolean selectedPreview(GeneratedTheme theme, Color expected) {
         var context = KitFixtures.context(theme);
         var choice = new Nodes.Choice("theme", ControlState.READY, Nodes.ChoiceKind.PREVIEWS,
             List.of(new Option("a", "Alpha", Optional.empty()), new Option("b", "Beta", Optional.empty())), "a", "Theme", "choose");
         try (var view = new KitView(context, new ViewSpec(choice), event -> { })) {
             KitFixtures.render(view, 400, 200, 1);
-            var image = paint(KitTestSupport.require(view, "theme.option.a", JButton.class));
-            int strongest = 0, ink = 0;
-            for (int y = Math.min(scaled(DesignMetrics.Role.THEME_PREVIEW_HEIGHT), image.getHeight()); y < image.getHeight(); y++)
+            var button = KitTestSupport.require(view, "theme.option.a", JButton.class);
+            var image = new BufferedImage(4 * button.getWidth(), 4 * button.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try { graphics.scale(4, 4); button.paint(graphics); } finally { graphics.dispose(); }
+            // Small antialiased glyphs can have no fully covered pixel at 1x. Partial alpha also rounds
+            // unpremultiplied RGB; inspect opaque interiors, without a colour tolerance or platform branch.
+            int opaque = 0;
+            for (int y = Math.min(4 * scaled(DesignMetrics.Role.THEME_PREVIEW_HEIGHT), image.getHeight()); y < image.getHeight(); y++)
                 for (int x = 0; x < image.getWidth(); x++) {
                     int argb = image.getRGB(x, y);
-                    if (argb >>> 24 > strongest) { strongest = argb >>> 24; ink = argb & 0xFFFFFF; }
+                    if (argb >>> 24 == 255) {
+                        if (argb != expected.getRGB()) return false;
+                        opaque++;
+                    }
                 }
-            return strongest > 0 && ink == (expected.getRGB() & 0xFFFFFF);
+            return opaque >= 4;
         } finally { context.icons().close(); context.binding().close(); }
     }
 

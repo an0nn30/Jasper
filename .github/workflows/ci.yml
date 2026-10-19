@@ -43,6 +43,11 @@ jobs:
         with:
           python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v6
+      - name: Install Linux font coverage
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
       - name: Check
         shell: bash
         run: ./gradlew check --continue --stacktrace

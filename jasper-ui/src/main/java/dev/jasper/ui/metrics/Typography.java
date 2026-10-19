@@ -74,7 +74,8 @@ public final class Typography {
     /**
      * {@code role}'s font for {@code text}: {@link #font(Role)}, unless that is a kit's own face with no glyph for a
      * character of {@code text} (IBM Plex has no macOS modifier symbols and no CJK); the whole text then switches to the
-     * role's platform face, {@link Font#MONOSPACED} for a data role, which the platform fills in glyph by glyph.
+     * role's platform face, then a logical family if needed ({@link Font#MONOSPACED} for a data role),
+     * which uses the platform's installed fallback fonts glyph by glyph.
      */
     public Font font(Role role, String text) { return font(role, false, Objects.requireNonNull(text, "text")); }
 
@@ -95,6 +96,10 @@ public final class Typography {
         // The native macOS text face best matches regular desktop roles. Explicit user families bypass this policy.
         if (platformDefault && role != Role.BODY && weight < 600 && resolved.equals("Helvetica Neue") && AppleText.AVAILABLE)
             resolved = ".AppleSystemUIFont";
+        // A physical platform family (for example Liberation Sans on Linux) can itself lack the glyph.
+        // Logical families use Java's installed fallback fonts for symbols and CJK.
+        if (text != null && new Font(resolved, Font.PLAIN, 1).canDisplayUpTo(text) >= 0)
+            resolved = data ? Font.MONOSPACED : Font.SANS_SERIF;
         float size = scale.size(role) * bodySize / scale.base();
         // JBR maps Helvetica Neue's numeric semibold to regular. Use its installed medium face;
         // the small family-wide tracking adjustment is calibrated from original desktop title ink.

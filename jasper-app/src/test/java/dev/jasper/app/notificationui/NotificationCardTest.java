@@ -88,17 +88,20 @@ class NotificationCardTest {
                         .as(name + " count/card").isGreaterThanOrEqualTo(4.5);
                     assertThat(theme.semantic().color(SemanticColor.TEXT_SECONDARY)).isEqualTo(raw);
                     count.setSize(count.getPreferredSize());
-                    var image = new BufferedImage(count.getWidth(), count.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                    var graphics = image.createGraphics(); try { count.paint(graphics); } finally { graphics.dispose(); }
-                    // The most opaque ink is the foreground at full strength. Fractional glyph positions may cover no pixel
-                    // fully off macOS (Liberation Sans at 11 px peaks at alpha 251), so there it may fall a little short.
-                    int strongest = 0; boolean foreground = false;
+                    var image = new BufferedImage(4 * count.getWidth(), 4 * count.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics();
+                    try { graphics.scale(4, 4); count.paint(graphics); } finally { graphics.dispose(); }
+                    // At 1x a small glyph may never cover a whole pixel, and partial alpha rounds RGB.
+                    // At 4x require several opaque interiors, all in the exact guarded foreground.
+                    int opaque = 0;
                     for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
                         int argb = image.getRGB(x, y);
-                        if (argb >>> 24 > strongest) { strongest = argb >>> 24; foreground = (argb & 0xFFFFFF) == (count.getForeground().getRGB() & 0xFFFFFF); }
+                        if (argb >>> 24 == 255) {
+                            assertThat(argb).as(name + " actual count text").isEqualTo(count.getForeground().getRGB());
+                            opaque++;
+                        }
                     }
-                    assertThat(foreground).as(name + " actual count text").isTrue();
-                    assertThat(strongest).as(name + " actual count text opacity").isGreaterThanOrEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS ? 255 : 224);
+                    assertThat(opaque).as(name + " opaque count glyph interiors").isGreaterThanOrEqualTo(4);
                 }
             }
         }

@@ -1,5 +1,15 @@
 # Jasper — Status and Handoff
 
+**Ubuntu CI fixes — 2026-10-18** (`codex/ubuntu-rendering-tests`): Reproduced the 12 rendering
+failures on Ubuntu 24.04 ARM64/JBR 25. Font fallback now reaches logical families when physical
+fonts lack symbols/CJK; CI installs DejaVu and Noto CJK. Settings mock fixtures explicitly select
+their depicted capabilities; exact paint checks sample opaque glyph interiors and menu sizing uses
+the actual shortcut font. Full Linux validation also exposed an SSH shutdown race: host-key
+rejection reasons now survive MINA session cleanup, with deterministic regressions. Full `check`
+passed on Ubuntu and macOS: 11,430 tests each, zero failures/errors (53/25 existing platform skips).
+The Ubuntu external SDK plugin check/ZIP build also passed (one additional test). No skips or
+layout tolerances added; actionlint, source hygiene and independent review passed.
+
 **CI and prerelease workflows — 2026-10-18** (`codex/release-workflows-main`): Tests run on PRs and
 pushes to `main`, retaining documentation/path filters and cancelling superseded PR runs.
 The manual [Release workflow](../.github/workflows/release.yml) accepts an existing `vX.Y.Z`

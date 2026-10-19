@@ -265,6 +265,37 @@ class SettingsPagesMockTest {
         return failures;
     }
 
+    @Test void pageFactoryKeepsWorkspaceControlsSpecificToTheHost() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            var system = new CorePages.SystemActions(() -> java.nio.file.Path.of("config.toml"),
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> false, java.util.Optional.empty());
+            var supplied = CorePages.Pages.of(context -> new GroupPage("keymap", "Keymap", java.util.Optional.empty(),
+                false, List::of, context), context -> new GroupPage("plugins", "Plugins", java.util.Optional.empty(),
+                false, List::of, context));
+            var draft = new SettingsDraft(dev.jasper.app.config.ConfigLoader.parse(java.nio.file.Path.of("config.toml"), "", true).values());
+            var context = PageKit.context(draft, ignored -> { }, () -> { });
+            for (boolean glass : new boolean[] {false, true}) {
+                assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
+                    NotificationGroupChoices.NONE, supplied, glass).apply(context), glass);
+            }
+            assertWorkspace(CorePages.pages(AppearanceFixtures.CHOICES, system, ShellChoices.NONE,
+                NotificationGroupChoices.NONE, supplied).apply(context), com.formdev.flatlaf.util.SystemInfo.isMacOS);
+            assertThat(draft.value(dev.jasper.app.config.CoreSettings.SYSTEM_RUN_IN_BACKGROUND))
+                .isEqualTo(com.formdev.flatlaf.util.SystemInfo.isMacOS || com.formdev.flatlaf.util.SystemInfo.isWindows);
+        });
+    }
+
+    private static void assertWorkspace(List<SettingsPage> pages, boolean glass) {
+        try {
+            var appearance = (SchemaPage) pages.stream().filter(page -> page.id().equals("appearance")).findFirst().orElseThrow();
+            appearance.component();
+            var names = appearance.rows().stream().map(row -> row.setting().name()).toList();
+            assertThat(names.contains("ui.workspace.opacity")).isEqualTo(glass);
+            assertThat(names.contains("ui.workspace.blur")).isEqualTo(glass);
+            assertThat(names).contains("ui.font.family", "ui.font.size");
+        } finally { pages.forEach(SettingsPage::dispose); }
+    }
+
     @Test void appearanceAndWindowMatchTheirMocks() throws Exception {
         try (var settings = EnterpriseSettings.open(false)) {
             assertThat(compare(settings, List.of("appearance", "window"))).as("see jasper-app/build/enterprise-settings/compare").isEmpty();
