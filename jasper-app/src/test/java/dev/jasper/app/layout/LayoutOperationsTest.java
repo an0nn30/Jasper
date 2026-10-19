@@ -168,5 +168,7 @@ class LayoutOperationsTest {
         Layout three = new Layout(h(child(group(1), 0.25), child(group(2), 0.25), child(group(3), 0.5)), groupId(2), Optional.of(groupId(2)));
         assertThat(three.remove(tab(3)).maximized()).as("another group goes and two remain").contains(groupId(2));
         assertThat(three.remove(tab(3)).activeGroup()).isEqualTo(groupId(2));
+        assertThat(three.remove(tab(2)).maximized()).as("its last tab closes and two others remain").isEmpty();
+        assertThat(three.remove(tab(2)).activeGroup()).as("the most recently used remaining group").isEqualTo(groupId(1));
     }
 }
