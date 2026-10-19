@@ -42,7 +42,7 @@ public final class WorkspaceChrome {
         this.palette = Objects.requireNonNull(palette, "palette");
         this.paletteHome = switch (palette.home()) {
             case TITLE_FIELD -> new TitleFieldHome();
-            case CORNER -> new CornerHome();
+            case UPPER -> new UpperHome();
         };
         this.menus = Objects.requireNonNull(menus);
         this.title = Objects.requireNonNull(title);

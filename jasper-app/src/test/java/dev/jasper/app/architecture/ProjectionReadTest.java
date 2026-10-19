@@ -110,7 +110,7 @@ class ProjectionReadTest {
 
     /** Plan 8b (spec 16.1.8): the palette's strategies, its two views and two homes. */
     static final List<String> PALETTE_STRATEGIES = List.of("dev/jasper/app/palette/CardView", "dev/jasper/app/palette/RunWindowView",
-        "dev/jasper/app/workspace/TitleFieldHome", "dev/jasper/app/workspace/CornerHome");
+        "dev/jasper/app/workspace/TitleFieldHome", "dev/jasper/app/workspace/UpperHome");
 
     /** Plan 8b (spec 3.3): the palette's strategies never name the kit, its variants or ChromeSpec. */
     @Test void thePalettesStrategiesNeverNameTheKit() throws Exception {

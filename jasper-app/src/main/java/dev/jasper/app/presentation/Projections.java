@@ -63,7 +63,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI);
         var shell = new ShellLook(chrome.titleBar() == ChromeSpec.TitleBar.UNIFIED && host.unifiedTitleSupported(), windowMenus, nativeTitle);
         var palette = new PaletteLook(runWindow ? PaletteLook.View.RUN_WINDOW : PaletteLook.View.CARD,
-            runWindow ? PaletteLook.Home.CORNER : PaletteLook.Home.TITLE_FIELD);
+            runWindow ? PaletteLook.Home.UPPER : PaletteLook.Home.TITLE_FIELD);
         var hidden = new LinkedHashSet<String>();
         if (chrome.titleBar() == ChromeSpec.TitleBar.NATIVE || host.mac()) hidden.add("window.native_decorations");
         if (chrome.motion() == ChromeSpec.MotionKind.NONE) hidden.add("ui.animations.enabled");

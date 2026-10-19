@@ -150,9 +150,6 @@ public final class DesignMetrics {
         RUN_WINDOW_RADIUS(4), RUN_WINDOW_TITLE_HEIGHT(24), RUN_WINDOW_TITLE_SIDE(10), RUN_WINDOW_CLOSE(16), RUN_WINDOW_CLOSE_SIDE(5), RUN_WINDOW_SHORTCUT_GAP(10), RUN_WINDOW_SIDE(12), RUN_WINDOW_HELP_TOP(10), RUN_WINDOW_TILE(32), RUN_WINDOW_TILE_GLYPH(13), RUN_WINDOW_TILE_GAP(10), RUN_WINDOW_HELP_LINE(18), RUN_WINDOW_FIELD_TOP(11), RUN_WINDOW_LABEL_COLUMN(48), RUN_WINDOW_FIELD_SIDE(6), RUN_WINDOW_MENU_WIDTH(20), RUN_WINDOW_LIST_TOP(10), RUN_WINDOW_ROW_HEIGHT(21), RUN_WINDOW_HEADING_HEIGHT(18), RUN_WINDOW_ROW_SIDE(8), RUN_WINDOW_SWATCH(7), RUN_WINDOW_ROW_GAP(7), RUN_WINDOW_DETAIL_GAP(7), RUN_WINDOW_DETAIL_TOP(10), RUN_WINDOW_DETAIL_LABEL_GAP(6), RUN_WINDOW_CHECK_TOP(10), RUN_WINDOW_BOTTOM(10), RUN_WINDOW_FOOTER_HEIGHT(40), RUN_WINDOW_BUTTON_WIDTH(70), RUN_WINDOW_BUTTON_GAP(6),
         // Plan 5b: the help text's block under the help row's top, where the mocks set its first line (16 under the body's top).
         RUN_WINDOW_HELP_TEXT_TOP(1),
-        // Plan 8b: the Run window's home inset from the dock work area's left and bottom edges (06 Run Dialog mocks: 6 px
-        // right of the left stripe's rule, 5 px above the bottom strip's rule); read only by the Run window's home.
-        RUN_WINDOW_HOME_SIDE(6), RUN_WINDOW_HOME_BOTTOM(5),
         // Plan 8b: the Run window's button label padding, so every footer label the mocks show fits their 70 px buttons
         // (RUN_WINDOW_BUTTON_WIDTH); a longer label grows its button. Read only by the Run window's kit views.
         RUN_WINDOW_BUTTON_PADDING(8),

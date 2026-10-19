@@ -19,7 +19,7 @@ class ProjectionsTest {
             WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH,
             WorkspaceLook.Icons.CLASSIC));
         assertThat(classic.shell()).isEqualTo(new ShellLook(false, true, true));
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(classic.settings()).isEqualTo(new SettingsChrome(false, true, false,
             Set.of("window.native_decorations", "ui.animations.enabled", "window.rail_width"), true));
         assertThat(classic.composition()).isEqualTo(Composition.CLASSIC);
@@ -155,7 +155,7 @@ class ProjectionsTest {
     /** Plan 8b: the kit's run_window palette reaches the projection. */
     @Test void theRunWindowPaletteReachesTheProjection() {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
-        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
+        assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.UPPER));
         assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC).palette()).isEqualTo(PaletteLook.DEFAULT);
     }
 

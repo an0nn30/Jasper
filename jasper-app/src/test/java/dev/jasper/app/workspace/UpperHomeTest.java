@@ -23,8 +23,8 @@ import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 
-/** Spec 11.5: the Run window's corner home, its attach rule, its saved place and its fit. */
-class CornerHomeTest {
+/** Spec 11.5: the Run window's upper home, its attach rule, its saved place and its fit. */
+class UpperHomeTest {
     /** The default look's workspace chrome (5a's default WorkspaceLook) carrying {@code look}'s palette. */
     static WorkspaceChrome chrome(PaletteLook look) {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS,
@@ -39,9 +39,6 @@ class CornerHomeTest {
     }
 
     static int margin() { return UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.PALETTE_WINDOW_MARGIN)); }
-    /** The home's inset across from the work area's left edge and up from its bottom edge (the mocks' 6 and 5). */
-    static int side() { return UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE)); }
-    static int bottom() { return UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM)); }
 
     static void mouse(JComponent window, int type, Point overlayPoint, int clicks) {
         var at = SwingUtilities.convertPoint(window.getParent(), overlayPoint, window);
@@ -68,36 +65,85 @@ class CornerHomeTest {
         return new Opened(owner, root, window, (JComponent) window.getParent(), state);
     }
 
-    @Test void theRunWindowSitsAtTheBottomLeftOfTheDockWorkArea() throws Exception {
+    /** Rulings 19's rule as one expression, from the window's own height: the seventh down, or ending at the middle, clamped. */
+    static int expectedTop(Opened o) {
+        Rectangle ws = o.workspace(), work = o.work();
+        int h = o.window().getHeight(), inset = Math.min(margin(), work.height / 2);
+        int top = Math.min(ws.y + ws.height / UpperHome.TOP_FRACTION, ws.y + ws.height / 2 - h);
+        return Math.max(work.y + inset, Math.min(top, work.y + work.height - inset - h));
+    }
+
+    /** The user's request (5): centred across the window, a seventh down, entirely in the upper half, in a window tall enough. */
+    @Test void theRunWindowOpensCentredInTheUpperPartOfTheWindow() throws Exception {
         DesktopTestSupport.edt(() -> {
-            try (var o = open(1400, 900)) {
+            try (var o = open(1400, 1300)) {
                 assertThat(o.owner().commandPalette().view()).isInstanceOf(dev.jasper.app.palette.RunWindowView.class);
-                var work = o.work();
-                assertThat(o.window().getX()).as("right of the left stripe, the mocks' 6").isEqualTo(work.x + side());
-                assertThat(o.window().getY() + o.window().getHeight()).as("above the bottom strip and the status bar, the mocks' 5")
-                    .isEqualTo(work.y + work.height - bottom());
-                assertThat(o.window().getWidth()).isEqualTo(UIScale.scale(DesignMetrics.DEFAULT.value(DesignMetrics.Role.RUN_WINDOW_WIDTH)) + 2 * UIScale.scale(1));
                 var area = SwingUtilities.convertRectangle(o.owner().area().getParent(), o.owner().area().getBounds(), o.overlay());
-                assertThat(work).as("the tool window area between the stripes, above the status bar").isEqualTo(area);
-                // Plan 7 mounts the bottom strip under the area, so the area already ends above it.
-                o.owner().bottomStrip().ifPresent(strip -> assertThat(work.y + work.height)
-                    .isLessThanOrEqualTo(SwingUtilities.convertRectangle(strip.getParent(), strip.getBounds(), o.overlay()).y));
+                assertThat(o.work()).as("the tool window area between the stripes, above the status bar").isEqualTo(area);
+                var ws = o.workspace();
+                int seventh = ws.y + ws.height / UpperHome.TOP_FRACTION, middle = ws.y + ws.height / 2;
+                assertThat(seventh + o.window().getHeight()).as("precondition: a seventh down fits above the middle").isLessThanOrEqualTo(middle);
+                assertThat(o.window().getX() + o.window().getWidth() / 2.0).isCloseTo(ws.x + ws.width / 2.0, within(1.0));
+                assertThat(o.window().getY()).isEqualTo(seventh);
+                assertThat(o.window().getY() + o.window().getHeight()).isLessThanOrEqualTo(middle);
+                assertThat(o.window().getY()).isGreaterThanOrEqualTo(o.work().y + margin());
             }
         });
     }
 
-    @Test void aDragAttachesAtOrBelowItsHomeAndElsewhereSavesItsCornerPlace() throws Exception {
+    @Test void aWindowTooTallForASeventhDownEndsAtTheMiddle() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            try (var o = open(1400, 950)) {
+                var ws = o.workspace();
+                int middle = ws.y + ws.height / 2, h = o.window().getHeight();
+                assertThat(ws.y + ws.height / UpperHome.TOP_FRACTION + h).as("precondition: a seventh down would cross the middle").isGreaterThan(middle);
+                assertThat(middle - h).as("precondition: ending at the middle stays in the work area").isGreaterThanOrEqualTo(o.work().y + margin());
+                assertThat(o.window().getX() + o.window().getWidth() / 2.0).isCloseTo(ws.x + ws.width / 2.0, within(1.0));
+                assertThat(o.window().getY() + h).isEqualTo(middle);
+            }
+        });
+    }
+
+    /** Rulings 19: in an ordinary window the rule holds, even where the window must sit just under the toolbar and cross the middle. */
+    @Test void anOrdinaryWindowFollowsTheRule() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (int height : new int[] {700, 800, 900, 1000, 1100, 1200})
+                try (var o = open(1400, height)) {
+                    var ws = o.workspace();
+                    assertThat(o.window().getX() + o.window().getWidth() / 2.0).as(height + " centred").isCloseTo(ws.x + ws.width / 2.0, within(1.0));
+                    assertThat(o.window().getY()).as(height + " top").isEqualTo(expectedTop(o));
+                }
+        });
+    }
+
+    /** Review Focus 2. */
+    @Test void aShortWindowKeepsTheRunWindowInsideTheWorkArea() throws Exception {
+        DesktopTestSupport.edt(() -> {
+            for (var size : new java.awt.Dimension[] {new java.awt.Dimension(1400, 380), new java.awt.Dimension(560, 900)})
+                try (var o = open(size.width, size.height)) {
+                    var work = o.work();
+                    var bounds = o.window().getBounds();
+                    assertThat(bounds.y).as(size + " never above the work area").isGreaterThanOrEqualTo(work.y + Math.min(margin(), work.height / 2));
+                    assertThat(bounds.y).as(size + " the rule").isEqualTo(expectedTop(o));
+                    assertThat(bounds.x).isGreaterThanOrEqualTo(work.x);
+                    assertThat(bounds.x + bounds.width).isLessThanOrEqualTo(work.x + work.width);
+                    assertThat(bounds.y + bounds.height).isLessThanOrEqualTo(work.y + work.height);
+                }
+        });
+    }
+
+    @Test void aDragAttachesNearItsHomeAndElsewhereSavesItsPlace() throws Exception {
         DesktopTestSupport.edt(() -> {
             try (var o = open(1400, 900)) {
                 var palette = o.owner().commandPalette();
                 Rectangle home = o.window().getBounds();
                 Point press = grab(o.window());
                 mouse(o.window(), MouseEvent.MOUSE_PRESSED, press, 1);
-                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + 300, press.y - 250), 1);
+                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + 300, press.y + 250), 1);
                 assertThat(palette.dragging()).isTrue();
                 assertThat(palette.snappedToCenter() || palette.snappedToTop()).as("no guides").isFalse();
-                assertThat(o.window().getLocation()).isEqualTo(new Point(home.x + 300, home.y - 250));
-                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + 300, press.y - 250), 1);
+                assertThat(o.window().getLocation()).isEqualTo(new Point(home.x + 300, home.y + 250));
+                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + 300, press.y + 250), 1);
                 var saved = o.state().runWindowPosition().orElseThrow();
                 var ws = o.workspace();
                 assertThat(saved.left()).isCloseTo((o.window().getX() - ws.x) / (double) ws.width, within(0.002));
@@ -110,18 +156,18 @@ class CornerHomeTest {
                 press = grab(o.window());
                 int dx = home.x - o.window().getX(), dy = home.y - o.window().getY();
                 mouse(o.window(), MouseEvent.MOUSE_PRESSED, press, 1);
-                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx, press.y + dy - 80), 1);
-                assertThat(palette.snappedHome()).as("well above its home it stays where it is dropped").isFalse();
-                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 12, press.y + dy + 40), 1);
-                assertThat(palette.snappedHome()).as("near it across and below it").isTrue();
+                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx, press.y + dy + 80), 1);
+                assertThat(palette.snappedHome()).as("well below its home it stays where it is dropped").isFalse();
+                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + dx + 12, press.y + dy + 12), 1);
+                assertThat(palette.snappedHome()).as("near it across and down").isTrue();
                 assertThat(o.window().getBounds()).isEqualTo(home);
-                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + dx + 12, press.y + dy + 40), 1);
+                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + dx + 12, press.y + dy + 12), 1);
                 assertThat(o.state().runWindowPosition()).as("re-attached: forgotten").isEmpty();
 
                 press = grab(o.window());
                 mouse(o.window(), MouseEvent.MOUSE_PRESSED, press, 1);
-                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + 200, press.y - 200), 1);
-                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + 200, press.y - 200), 1);
+                mouse(o.window(), MouseEvent.MOUSE_DRAGGED, new Point(press.x + 200, press.y + 200), 1);
+                mouse(o.window(), MouseEvent.MOUSE_RELEASED, new Point(press.x + 200, press.y + 200), 1);
                 assertThat(o.state().runWindowPosition()).isPresent();
                 press = grab(o.window());
                 mouse(o.window(), MouseEvent.MOUSE_PRESSED, press, 1);
@@ -178,10 +224,10 @@ class CornerHomeTest {
                 Rectangle home = o.window().getBounds();
                 int x = title.getWidth() / 2, y = title.getHeight() / 2;
                 title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, x, y, 1, false, MouseEvent.BUTTON1));
-                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_DRAGGED, 0, InputEvent.BUTTON1_DOWN_MASK, x + 200, y - 150, 1, false, MouseEvent.BUTTON1));
+                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_DRAGGED, 0, InputEvent.BUTTON1_DOWN_MASK, x + 200, y + 150, 1, false, MouseEvent.BUTTON1));
                 assertThat(palette.dragging()).as("the title text drags").isTrue();
-                assertThat(o.window().getLocation()).isEqualTo(new Point(home.x + 200, home.y - 150));
-                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_RELEASED, 0, 0, x + 200, y - 150, 1, false, MouseEvent.BUTTON1));
+                assertThat(o.window().getLocation()).isEqualTo(new Point(home.x + 200, home.y + 150));
+                title.dispatchEvent(new MouseEvent(title, MouseEvent.MOUSE_RELEASED, 0, 0, x + 200, y + 150, 1, false, MouseEvent.BUTTON1));
                 assertThat(o.state().runWindowPosition()).as("and the drop saves its place").isPresent();
             }
         });
