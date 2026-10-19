@@ -12,10 +12,10 @@ public final class LookFixtures {
 
     private LookFixtures() { }
 
-    /** The required descriptor keys of a plugin on SDK 0.19. */
+    /** The required descriptor keys of a plugin on SDK 0.20. */
     public static String descriptor(String id, String name) {
         return "id = \"" + id + "\"\nname = \"" + name + "\"\nversion = \"0.1.0\"\nentry = \"" + id + ".Main\"\n"
-            + "sdk = \">=0.19.0, <0.20\"\n";
+            + "sdk = \">=0.20.0, <0.21\"\n";
     }
 
     /** The lines that make a descriptor a presentation provider with its kit at {@code kitPath}. */

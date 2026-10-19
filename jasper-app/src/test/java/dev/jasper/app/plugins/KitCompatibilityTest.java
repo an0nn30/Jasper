@@ -76,12 +76,12 @@ class KitCompatibilityTest {
         var own=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("test.kit.Mode","HERO")),false);
         try(var loader=PluginLoader.load(own,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the plugin's own constant").isNotNull();}
     }
-    /** Workspace tabs plan 3b: a manifest of the previous minor, 0.18, is skipped by its range before any class is read. */
-    @Test void aZeroEighteenRangeIsSkippedBeforeItLoads() throws Exception {
-        var candidate=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
+    /** Workspace tabs plan 4b: a manifest of the previous minor, 0.19, is skipped by its range before any class is read. */
+    @Test void aZeroNineteenRangeIsSkippedBeforeItLoads() throws Exception {
+        var candidate=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$ChoiceKind","SEGMENTED")),false);
         var result=PluginResolver.resolve(List.of(candidate),Map.of(),Version.parse(JasperSdk.VERSION),false);
         assertThat(result.load()).isEmpty();
-        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.18.0, <0.19.0; this is SDK 0.19.0"));
+        assertThat(result.rejected()).singleElement().satisfies(value -> assertThat(value.reason()).isEqualTo("needs SDK >=0.19.0, <0.20.0; this is SDK 0.20.0"));
     }
     @Test void truthfulOldRangeIsRejectedByPureResolver() throws Exception {
         var candidate=candidate(">=0.14, <0.15",Map.of(),false);
