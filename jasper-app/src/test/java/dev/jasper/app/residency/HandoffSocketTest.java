@@ -19,10 +19,9 @@ class HandoffSocketTest {
 
     private Path socket() { return dir.resolve("socket"); }
     private Path token() { return dir.resolve("token"); }
-    private Path lock() { return dir.resolve("lock"); }
 
     private HandoffSocket bind(Function<LaunchRequest, LaunchRequest.Response> handler) {
-        HandoffSocket endpoint = HandoffSocket.bind(socket(), token(), lock(), handler);
+        HandoffSocket endpoint = HandoffSocket.bind(socket(), token(), handler);
         assertThat(endpoint).as("bound the endpoint").isNotNull();
         return endpoint;
     }
@@ -51,6 +50,14 @@ class HandoffSocketTest {
         assertThat(token()).doesNotExist();
     }
 
+    @Test void anOwnerLeavesOnlyItsSocketAndItsTokenInTheFolder() throws Exception {
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK);
+             var listing = Files.list(dir)) {
+            assertThat(listing.map(entry -> entry.getFileName().toString()))
+                .as("no lock file and no process-id file beside them").containsExactlyInAnyOrder("socket", "token");
+        }
+    }
+
     @Test void aPathsRequestArrivesWhole() throws Exception {
         var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir.resolve("notes ü.txt"), dir), List.of("--safe-mode"));
@@ -58,19 +65,6 @@ class HandoffSocketTest {
             assertThat(handOff(request)).isEqualTo(LaunchRequest.Response.OK);
             assertThat(seen).containsExactly(request.withToken(Files.readString(token()).strip()));
         }
-    }
-
-    @Test void theOwnerRecordsItsProcessIdBesideTheTokenUntilItCloses() throws Exception {
-        assertThat(HandoffSocket.ownerPid(token())).as("nothing bound yet").isEqualTo(-1);
-        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-            assertThat(HandoffSocket.ownerPid(token())).isEqualTo(ProcessHandle.current().pid());
-            assertThat(Files.readString(token()).strip()).doesNotContain("\n").hasSizeGreaterThan(20);
-            assertThat(handOff(launch(7L))).isEqualTo(LaunchRequest.Response.OK);
-        }
-        assertThat(HandoffSocket.ownerPid(token())).as("released with the endpoint").isEqualTo(-1);
-        assertThat(dir.resolve("token.pid")).doesNotExist();
-        Files.writeString(dir.resolve("token.pid"), "not a number\n");
-        assertThat(HandoffSocket.ownerPid(token())).isEqualTo(-1);
     }
 
     @Test void aWrongTokenIsRefusedWithoutReachingTheHandler() throws Exception {
@@ -145,21 +139,19 @@ class HandoffSocketTest {
 
     @Test void aTokenThatCannotBeWrittenDeclinesAndLeavesNoSocketBehind() {
         // The token gates every request, so an endpoint without one must not exist at all.
-        assertThat(HandoffSocket.bind(socket(), dir.resolve("absent/directory/token"), lock(),
-            request -> LaunchRequest.Response.OK)).isNull();
+        assertThat(HandoffSocket.bind(socket(), dir.resolve("absent/directory/token"), request -> LaunchRequest.Response.OK)).isNull();
         assertThat(socket()).as("a half-built endpoint is cleaned up, not left to confuse the next bind").doesNotExist();
     }
 
-    @Test void aSocketFileLeftByACrashIsReplacedButALiveOwnerIsNot() throws Exception {
+    @Test void aSocketFileLeftByACrashIsReplaced() throws Exception {
         Files.createFile(socket());
         Files.writeString(token(), "left-over\n");
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
             assertThat(handOff(launch(1L))).as("the stale file was replaced by a working endpoint").isEqualTo(LaunchRequest.Response.OK);
-            assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK)).isNull();
         }
     }
 
-    @Test void aLivenessProbeLogsQuietlyRatherThanAlarmingly() throws Exception {
+    @Test void aPeerThatHangsUpBeforeTheReplyLogsQuietlyRatherThanAlarmingly() throws Exception {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(HandoffSocket.class.getName());
         java.util.logging.Level previousLevel = logger.getLevel();
         boolean previousUseParentHandlers = logger.getUseParentHandlers();
@@ -174,8 +166,8 @@ class HandoffSocketTest {
         logger.addHandler(handler);
         try {
             try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-                assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK)).isNull();
-                // One acceptor serves in order: a real reply proves the probe was served.
+                SocketChannel.open(UnixDomainSocketAddress.of(socket())).close();
+                // One acceptor serves in order: a real reply proves the peer that hung up was served.
                 assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
             }
         } finally {
@@ -183,7 +175,7 @@ class HandoffSocketTest {
             logger.setLevel(previousLevel);
             logger.setUseParentHandlers(previousUseParentHandlers);
         }
-        assertThat(records).as("a normal liveness probe must not log an alarming, stack-trace-bearing WARNING")
+        assertThat(records).as("a peer that hung up must not log an alarming, stack-trace-bearing WARNING")
             .allSatisfy(record -> {
                 assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.FINE);
                 assertThat(record.getThrown()).as("no stack trace for ordinary traffic").isNull();
@@ -212,8 +204,7 @@ class HandoffSocketTest {
         for (int i = 0; i < 12; i++) deep = deep.resolve("a-directory-with-a-long-name");
         Files.createDirectories(deep);
         assertThat(deep.toString().length()).isGreaterThan(104);
-        assertThat(HandoffSocket.bind(deep.resolve("socket"), deep.resolve("token"), deep.resolve("lock"),
-            request -> LaunchRequest.Response.OK)).isNull();
+        assertThat(HandoffSocket.bind(deep.resolve("socket"), deep.resolve("token"), request -> LaunchRequest.Response.OK)).isNull();
         assertThat(HandoffSocket.pathFits(deep.resolve("socket"))).isFalse();
         assertThat(HandoffSocket.pathFits(socket())).isTrue();
         assertThat(HandoffSocket.tooLong(deep.resolve("socket")))
@@ -260,13 +251,5 @@ class HandoffSocketTest {
             proof.bind(UnixDomainSocketAddress.of(socket()));  // The path was released.
         }
         Files.deleteIfExists(socket());
-    }
-
-    @Test void livenessFollowsTheEndpoint() throws Exception {
-        assertThat(HandoffSocket.live(socket())).as("nothing bound yet").isFalse();
-        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-            assertThat(HandoffSocket.live(socket())).isTrue();
-        }
-        assertThat(HandoffSocket.live(socket())).isFalse();
     }
 }

@@ -6,7 +6,6 @@ import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.residency.HandoffSocket;
 import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.workspace.DesktopTestSupport;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.concurrent.CountDownLatch;
@@ -42,16 +41,14 @@ class ApplicationBootstrapRollbackTest {
             owned -> new JasperApplication(service, DesktopTestSupport.launcher(new ArrayDeque<>()), owned, null,
                 () -> { calls.incrementAndGet(); terminated.countDown(); }),
             app -> {
-                endpoint[0] = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
-                    request -> LaunchRequest.Response.OK);
+                endpoint[0] = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), request -> LaunchRequest.Response.OK);
                 app.onShutdown(endpoint[0]::close);
             },
             app -> { assertThat(endpoint[0]).isNotNull(); throw original; })).isSameAs(original));
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(calls).hasValue(1);
         assertThat(history.closedFuture()).isCompleted();
-        try (var replacement = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
-                request -> LaunchRequest.Response.OK)) {
+        try (var replacement = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), request -> LaunchRequest.Response.OK)) {
             assertThat(replacement).isNotNull();
         }
     }
@@ -67,53 +64,5 @@ class ApplicationBootstrapRollbackTest {
             app -> { throw new AssertionError("Unreachable presentation"); })).isSameAs(original));
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(history.closedFuture()).isCompleted();
-    }
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
-    void contendedEndpointCannotBlockEdtOrBoundedTermination(boolean presentationFails) throws Exception {
-        warmUpComposition();
-        var service = new ConfigService(dir.resolve("config.toml"), true);
-        var history = new CommandHistory();
-        var terminated = new CountDownLatch(1);
-        var marker = new CountDownLatch(1);
-        var endpoint = HandoffSocket.bind(dir.resolve("socket"), dir.resolve("token"), dir.resolve("lock"),
-            request -> LaunchRequest.Response.OK);
-        assertThat(endpoint).isNotNull();
-        var original = new IllegalStateException("presentation");
-        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
-        try (var child = new dev.jasper.app.testsupport.EndpointLockChild(dir.resolve("lock"))) {
-            javax.swing.SwingUtilities.invokeLater(() -> {
-                try {
-                    var application = ApplicationBootstrap.compose(service, () -> history,
-                        owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
-                        app -> app.onShutdown(endpoint::close), app -> { if (presentationFails) throw original; });
-                    application.quit();
-                } catch (Throwable caught) { failure.set(caught); }
-                finally { javax.swing.SwingUtilities.invokeLater(marker::countDown); }
-            });
-            assertThat(marker.await(1, TimeUnit.SECONDS)).as("EDT responsive with endpoint lock held").isTrue();
-            assertThat(failure.get()).isSameAs(presentationFails ? original : null);
-            assertThat(terminated.await(4, TimeUnit.SECONDS)).as("bounded exit with endpoint lock held").isTrue();
-        } finally {
-            // The child releases the lock before we wait for EDT cleanup, including on RED.
-            assertThat(marker.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();
-            endpoint.close();
-        }
-    }
-
-    /**
-     * The first application in a JVM spends well over the EDT budget on first-use class loading and
-     * built-in theme parsing (measured 1.6 s cold, under 10 ms warm, with or without the lock held).
-     * One uncontended composition before the lock child starts keeps that out of the measured window.
-     */
-    private void warmUpComposition() throws Exception {
-        var service = new ConfigService(Files.createDirectory(dir.resolve("warm-up")).resolve("config.toml"), true);
-        var terminated = new CountDownLatch(1);
-        DesktopTestSupport.edt(() -> ApplicationBootstrap.compose(service, CommandHistory::new,
-            owned -> new JasperApplication(service, null, owned, null, terminated::countDown),
-            app -> { }, app -> { }).quit());
-        assertThat(terminated.await(5, TimeUnit.SECONDS)).as("warm-up application terminated").isTrue();
     }
 }

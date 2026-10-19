@@ -69,7 +69,6 @@ class AppDirsTest {
         assertThat(dirs.daemonSocket()).isEqualTo(daemon.resolve("socket"));
         assertThat(dirs.daemonToken()).isEqualTo(daemon.resolve("token"));
         assertThat(dirs.instanceLock()).isEqualTo(daemon.resolve("instance.lock"));
-        assertThat(dirs.daemonLock()).isEqualTo(daemon.resolve("lock"));
         assertThat(daemon).doesNotExist();
     }
 
@@ -78,7 +77,6 @@ class AppDirsTest {
         AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
         Path daemon = dirs.daemonSocket().getParent();
         assertThat(dirs.commandSocket()).isEqualTo(daemon.resolve("commands"));
-        assertThat(dirs.commandSocket(42)).isEqualTo(daemon.resolve("commands-42"));
         assertThat(dirs.subcommandList()).isEqualTo(daemon.resolve("subcommands"));
     }
 

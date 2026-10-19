@@ -7,14 +7,11 @@ import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Objects;
@@ -27,7 +24,7 @@ import java.util.function.Function;
 
 /**
  * The handoff endpoint (workspace-tabs spec 5.3). The home's owner serves it; every other launch hands its request to it
- * and exits.
+ * and exits. Only the owner binds, under its instance lock, so nothing else ever competes for the path.
  *
  * <p>The accept loop runs on a <strong>non-daemon</strong> platform thread, and that is deliberate:
  * AWT shuts its event dispatch thread down once nothing is displayable, so this thread is what keeps
@@ -54,29 +51,31 @@ public final class HandoffSocket implements AutoCloseable {
     private final ServerSocketChannel channel;
     private final Path socketPath;
     private final Path tokenPath;
-    private final Path lockPath;
     private final String token;
     private final Function<LaunchRequest, LaunchRequest.Response> handler;
     private final Thread acceptor;
     private volatile boolean closed;
 
-    private HandoffSocket(ServerSocketChannel channel, Path socketPath, Path tokenPath, Path lockPath,
-                          String token, Function<LaunchRequest, LaunchRequest.Response> handler) {
+    private HandoffSocket(ServerSocketChannel channel, Path socketPath, Path tokenPath, String token,
+                          Function<LaunchRequest, LaunchRequest.Response> handler) {
         this.channel = channel;
         this.socketPath = socketPath;
         this.tokenPath = tokenPath;
-        this.lockPath = lockPath;
         this.token = token;
         this.handler = handler;
         this.acceptor = Thread.ofPlatform().name("jasper-handoff-accept").unstarted(this::acceptLoop);
     }
 
     /**
-     * Becomes the owner, or returns null. Null means another process already owns the endpoint, or
-     * it is unavailable here; residency is an optimization, so failing to get it is never fatal.
+     * Binds the owner's endpoint, replacing whatever a process that has gone left at the path, or returns null when it is
+     * unavailable here. An owner without one runs, unreachable: a second launch reports it as not responding.
+     *
+     * @param socketPath the endpoint
+     * @param tokenPath the token every request must present
+     * @param handler answers each request with a valid token
+     * @return the endpoint, or null
      */
-    public static HandoffSocket bind(Path socketPath, Path tokenPath, Path lockPath,
-                              Function<LaunchRequest, LaunchRequest.Response> handler) {
+    public static HandoffSocket bind(Path socketPath, Path tokenPath, Function<LaunchRequest, LaunchRequest.Response> handler) {
         if (!pathFits(socketPath)) {
             LOG.log(System.Logger.Level.WARNING, tooLong(socketPath));
             return null;
@@ -85,30 +84,20 @@ public final class HandoffSocket implements AutoCloseable {
         try {
             Files.createDirectories(socketPath.getParent());
             OwnerOnlyFiles.restrict(socketPath.getParent(), "rwx------");
-            try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE,
-                    StandardOpenOption.READ, StandardOpenOption.WRITE);
-                 FileLock ignored = lockChannel.lock()) {
-                if (Files.exists(socketPath)) {
-                    if (owned(socketPath)) return null;
-                    Files.deleteIfExists(socketPath);
-                }
-                opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
-                opened.bind(UnixDomainSocketAddress.of(socketPath));
-                String token = OwnerOnlyFiles.writeToken(tokenPath);
-                OwnerOnlyFiles.writeProcessId(ownerPath(tokenPath));
-                var endpoint = new HandoffSocket(opened, socketPath, tokenPath, lockPath, token, handler);
-                endpoint.acceptor.start();
-                return endpoint;
-            }
+            Files.deleteIfExists(socketPath);
+            opened = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+            opened.bind(UnixDomainSocketAddress.of(socketPath));
+            String token = OwnerOnlyFiles.writeToken(tokenPath);
+            var endpoint = new HandoffSocket(opened, socketPath, tokenPath, token, handler);
+            endpoint.acceptor.start();
+            return endpoint;
         } catch (IOException | RuntimeException failure) {
-            // A bind that got as far as the socket file but no further must not leave it: the next
-            // start would find a path nothing is listening on and have to recover from it.
+            // A bind that got as far as the socket file but no further must not leave it behind.
             if (opened != null) {
                 try { opened.close(); } catch (IOException ignored) { }
                 try { Files.deleteIfExists(socketPath); } catch (IOException ignored) { }
             }
-            LOG.log(System.Logger.Level.WARNING,
-                "Background residency is unavailable; running as an ordinary application", failure);
+            LOG.log(System.Logger.Level.WARNING, "The handoff endpoint is unavailable", failure);
             return null;
         }
     }
@@ -191,29 +180,6 @@ public final class HandoffSocket implements AutoCloseable {
         return "Jasper's home folder path is too long for its socket: " + socketPath;
     }
 
-    /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
-    public static boolean live(Path socketPath) { return owned(socketPath); }
-
-    /**
-     * The process id the current owner recorded beside its token, or -1 when there is none or it cannot be read. A
-     * hint, not proof: an owner that died without closing leaves its id behind, so only a successful
-     * {@link #handOff} shows the owner was live. Windows needs it before the handoff, to pass on the foreground right,
-     * and the not-responding error names it.
-     */
-    public static long ownerPid(Path tokenPath) {
-        try {
-            long pid = Long.parseLong(Files.readString(ownerPath(tokenPath), StandardCharsets.UTF_8).strip());
-            return pid > 0 ? pid : -1;
-        } catch (IOException | RuntimeException unavailable) {
-            return -1;
-        }
-    }
-
-    /** Beside the token rather than in it, so a launcher from another build still reads the token it expects. */
-    static Path ownerPath(Path tokenPath) {
-        return tokenPath.resolveSibling(tokenPath.getFileName() + ".pid");
-    }
-
     /** The jar or classes directory this build was loaded from; null when it cannot be determined. */
     public static Path codeLocation() {
         return CodeLocation.of(HandoffSocket.class);
@@ -233,24 +199,18 @@ public final class HandoffSocket implements AutoCloseable {
         if (closed) return;
         closed = true;
         try { channel.close(); } catch (IOException ignored) { }
-        // On Linux a thread blocked in accept() keeps the listening socket alive until it wakes, so our
-        // own dying listener could answer the probe below and pass for a successor. Serving is bounded
-        // by READ_TIMEOUT_MILLIS, so the acceptor is always gone well within this.
+        // Serving is bounded (a silent peer by READ_TIMEOUT_MILLIS, the answer by its taker); an acceptor still serving
+        // after this finishes its reply on its own.
         if (Thread.currentThread() != acceptor) {
             try { acceptor.join(Duration.ofMillis(2 * READ_TIMEOUT_MILLIS)); }
             catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
         }
-        // Under the same lock bind uses: if anything answers on our path now, a successor owns it
-        // and these files are its, not ours.
-        try (FileChannel lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE,
-                StandardOpenOption.READ, StandardOpenOption.WRITE);
-             FileLock ignored = lockChannel.lock()) {
-            if (owned(socketPath)) return;
+        // The owner holds the instance lock until it exits, so these files are still its own.
+        try {
             Files.deleteIfExists(socketPath);
             Files.deleteIfExists(tokenPath);
-            Files.deleteIfExists(ownerPath(tokenPath));
         } catch (IOException | RuntimeException unavailable) {
-            // Including OverlappingFileLockException: leave the files rather than risk a successor's.
+            // Left behind; the next owner replaces them.
         }
     }
 
@@ -289,20 +249,10 @@ public final class HandoffSocket implements AutoCloseable {
         try {
             write(client, response.line());
         } catch (IOException peerGone) {
-            // A launch that gave up waiting, or a liveness probe that connects and disconnects without writing: from
-            // here both look like a peer that hung up before the reply arrived. Ordinary traffic, not a
-            // stack-trace-worthy failure; a genuine failure earlier in this method (reading the request) still
-            // propagates and is logged as one by acceptLoop.
+            // A launch that gave up waiting looks, from here, like a peer that hung up before the reply arrived:
+            // ordinary traffic, not a stack-trace-worthy failure. A genuine failure earlier in this method (reading the
+            // request) still propagates and is logged as one by acceptLoop.
             LOG.log(System.Logger.Level.DEBUG, "Could not reply to a handoff request; the peer had already gone");
-        }
-    }
-
-    /** True when something is listening: a connect that succeeds proves a live owner. */
-    private static boolean owned(Path socketPath) {
-        try (SocketChannel probe = SocketChannel.open(UnixDomainSocketAddress.of(socketPath))) {
-            return true;
-        } catch (IOException | RuntimeException gone) {
-            return false;
         }
     }
 

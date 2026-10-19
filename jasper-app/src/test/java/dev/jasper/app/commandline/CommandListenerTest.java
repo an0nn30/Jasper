@@ -120,31 +120,21 @@ class CommandListenerTest {
         assertThat(exchange("x".repeat(CommandProtocol.MAX_REQUEST_BYTES))).as("no newline within the limit").isEmpty();
     }
 
-    @Test void onlyOneProcessServesTheSocketAndClosingRemovesIt() throws Exception {
+    @Test void closingRemovesTheSocketAndItsFilesAndLeavesNothingInTheFolder() throws Exception {
         CommandListener first = bind(invocation -> CompletableFuture.completedFuture(0));
-        assertThat(CommandListener.live(socket())).isTrue();
-        assertThat(CommandListener.bind(socket(), invocation -> CompletableFuture.completedFuture(0))).isNull();
         first.close();
-        assertThat(CommandListener.live(socket())).isFalse();
         assertThat(socket()).doesNotExist();
         assertThat(CommandListener.tokenFile(socket())).doesNotExist();
         assertThat(CommandListener.ownerFile(socket())).doesNotExist();
+        try (var listing = Files.list(socket().getParent())) { assertThat(listing).as("no lock file either").isEmpty(); }
         bind(invocation -> CompletableFuture.completedFuture(0));
     }
 
-    @Test void aSocketFileNobodyServesIsReplaced() throws Exception {
+    @Test void aSocketFileLeftByACrashIsReplaced() throws Exception {
         Files.createDirectories(socket().getParent());
         Files.writeString(socket(), "left behind by a crash");
         bind(invocation -> CompletableFuture.completedFuture(0));
-        assertThat(CommandListener.live(socket())).isTrue();
-    }
-
-    @Test void aPrivateSocketTakesItsLockFileAlongWhenItCloses() throws Exception {
-        Path socket = dir.resolve("daemon").resolve("commands-42");
-        CommandListener listener = CommandListener.bind(socket, invocation -> CompletableFuture.completedFuture(0));
-        assertThat(listener).isNotNull();
-        listener.close();
-        try (var listing = Files.list(socket.getParent())) { assertThat(listing).isEmpty(); }
+        assertThat(exchange(request(token(), List.of()))).as("served").isEqualTo(CommandProtocol.exit(0));
     }
 
     @Test void aCallerThatGoesAwayCancelsItsCall() throws Exception {
@@ -211,7 +201,7 @@ class CommandListenerTest {
             until(listener::busy);
         }
         until(() -> !listener.busy());
-        assertThat(idle).as("another launch's liveness probe, before the first call").hasValue(0);
+        assertThat(idle).as("a connection that ends before its first call").hasValue(0);
         assertThat(exchange(request(token(), List.of("one")))).isEqualTo(CommandProtocol.exit(0));
         until(() -> idle.get() == 1);
     }

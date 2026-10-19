@@ -44,7 +44,7 @@ final class Instance implements AutoCloseable {
     private Instance(InstanceLock lock, AppDirs dirs, Path source, long modified) {
         this.lock = Objects.requireNonNull(lock, "lock");
         // Either may be null (logged by its bind): an owner whose endpoint cannot bind runs unreachable (plan Ruling 15).
-        this.handoff = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
+        this.handoff = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(),
             HandoffSocket.answering(this::take, source, modified));
         this.commands = CommandListener.bind(dirs.commandSocket(), this::dispatch);
     }
