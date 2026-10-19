@@ -555,12 +555,24 @@ public final class JasperApplication {
         }
     }
 
-    /** A window's native frame under this process's look: the main window's at its saved bounds. EDT. */
+    /**
+     * A window's native frame under this process's look: the main window's at its saved bounds. A failure after the
+     * frame is built disposes it, since its window never gets its shell to dispose it through, and propagates. EDT.
+     */
     private WindowShell frameOnScreen(JasperWindow window) {
         var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
-        if (window.isMain()) frame.restoreLayout(uiState);
-        startupSteps.workstation();
-        return frame.shell();
+        try {
+            if (window.isMain()) frame.restoreLayout(uiState);
+            startupSteps.workstation();
+            return frame.shell();
+        } catch (RuntimeException | Error failure) {
+            try {
+                frame.discard();
+            } catch (RuntimeException | Error disposing) {
+                failure.addSuppressed(disposing);
+            }
+            throw failure;
+        }
     }
 
     /** A window shows: its timing ends, and the start-up steps with the first. EDT. */
@@ -921,7 +933,8 @@ public final class JasperApplication {
      */
     public void open(List<Path> paths, String trigger) {
         if (quitting || stopped) return;
-        Optional<MainWindow> current = windows.main();
+        // A closing main window is not open, and none is restored while it closes (Rulings 25): nothing goes into it.
+        Optional<MainWindow> current = windows.main().filter(window -> !window.closed());
         OpenPlan plan = OpenPlan.of(paths, current.isPresent(), java.nio.file.Files::isDirectory, java.nio.file.Files::isRegularFile);
         Optional<MainWindow> target = current.isPresent() ? current : windows.ensureMain(trigger, plan.windowDirectory());
         if (target.isEmpty()) return;
@@ -1070,16 +1083,28 @@ public final class JasperApplication {
 
     /**
      * The rehearsal's window around {@code feed}: wired to the contributions but registered nowhere else, and silent,
-     * so a problem is logged rather than shown. Its frame is always disposed, even when closing the window fails. If the
-     * window's own constructor fails there is no window to reach its frame through; nothing was shown. EDT.
+     * so a problem is logged rather than shown. Its frame is always disposed, even when closing the window fails. If its
+     * configuration or its frame fails, its content closes and the failure propagates; nothing was shown. EDT.
      */
     private Rehearsal.Stage rehearsalWindow(Rehearsal.Feed feed, ConfigSnapshot snapshot) {
         // A main window's content and frame, made here and nowhere else: the window manager never hears of it.
         boolean macOs = com.formdev.flatlaf.util.SystemInfo.isMacOS;
         var content = new WindowContent(WindowRole.MAIN, Rehearsal.launcher(feed), null, false, directory -> { }, () -> { },
             () -> { }, themes, KeyBindings.defaults(macOs), new CommandHistory(), macOs, windowLook().chrome());
-        content.applyConfiguration(snapshot, macOs);
-        var window = new WindowFrame(content, windowLook(), snapshot, JasperWindow.Events.NONE);
+        WindowFrame window;
+        try {
+            content.applyConfiguration(snapshot, macOs);
+            window = new WindowFrame(content, windowLook(), snapshot, JasperWindow.Events.NONE);
+        } catch (RuntimeException | Error failure) {
+            // Half-built: there is no frame to reach, but the content's shell and subscriptions go (Rehearsal.run's contract).
+            try {
+                content.forgetLayout();
+                content.close();
+            } catch (RuntimeException | Error closing) {
+                failure.addSuppressed(closing);
+            }
+            throw failure;
+        }
         // The pane's launch completion is queued, so this is in place before a failed launch could ask for a dialog.
         Rehearsal.silence(content);
         // Discarded, not closed: never shown and at the default size, it must not become the last window closed.
@@ -2031,14 +2056,25 @@ public final class JasperApplication {
     public void toBackground() {
         if (quitting || stopped) return;
         if (!windowsMayClose()) return;
+        Throwable failure = null;
         try {
             // Every child window, then the main window (workspace tabs spec 6.4).
             windows.closeAll();
-        } finally {
-            // Every window closed whatever one threw; the plugin windows follow, and the failure still reaches the caller.
-            if (auxiliary != null) auxiliary.close();
-            updateDock();
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
         }
+        // Every window closed whatever one threw; the plugin windows follow, and the first failure still reaches the caller.
+        if (auxiliary != null) {
+            try {
+                auxiliary.close();
+            } catch (RuntimeException | Error thrown) {
+                if (failure == null) failure = thrown;
+                else failure.addSuppressed(thrown);
+            }
+        }
+        updateDock();
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw (RuntimeException) failure;
     }
 
     /** Whether any Jasper window, terminal or plugin, is open. EDT. */
@@ -2070,7 +2106,10 @@ public final class JasperApplication {
         if (dockFollowsWindows()) dock.windows(true);
     }
 
-    /** Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. EDT. */
+    /**
+     * Quits without asking plugin windows: start-up rollback and programmatic exits, which no user asked for. Every window
+     * closes; when one fails to, the shutdown is still requested and then the failure propagates. EDT.
+     */
     public void quitNow() {
         presentationAttempt().orderlyQuit();
         quitting = true;

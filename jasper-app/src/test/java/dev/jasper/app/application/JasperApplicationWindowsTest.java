@@ -106,6 +106,59 @@ class JasperApplicationWindowsTest {
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(rehearsalWindow|lambda\\$rehearsalWindow\\$\\d+)"));
     }
 
+    /** Rulings 20: an outside request raises the main window and opens there, though a child window was used last. */
+    @Test void aRequestTargetsTheMainWindowThoughAChildWindowWasUsedLast() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                var child = application.windows().openTerminalWindow(null).orElseThrow();
+                child.events().activated().accept(true);
+                assertThat(application.windows().lastActive()).as("the child window was used last").contains(child);
+                frames.clear();
+                application.open(List.of(HOME), JasperApplication.HANDOFF);
+                assertThat(frames).as("the main window comes forward, not the child window").containsExactly("front main");
+                assertThat(application.windows().main().orElseThrow().content().terminalTabs()).as("the folder opens there").hasSize(2);
+                assertThat(child.content().terminalTabs()).as("and not in the child window").hasSize(1);
+            });
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
+    /**
+     * Rulings 25: a request made while the main window closes (here a panel's close listener, as the window lets its
+     * panels go) adds nothing to the closing window and opens no second one.
+     */
+    @Test void aRequestWhileTheMainWindowClosesAddsNothingToItAndOpensNoSecondOne() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                List<Integer> tabsDuringClose = new ArrayList<>();
+                application.contributions().addPanel("dev.example.notes", "Notes", new javax.swing.ImageIcon(),
+                    dev.jasper.app.dock.Slot.RIGHT_TOP, site -> {
+                        site.onClosed(() -> {
+                            application.open(List.of(HOME), JasperApplication.HANDOFF);
+                            application.windows().main().ifPresent(main -> tabsDuringClose.add(main.content().terminalTabs().size()));
+                        });
+                        return new javax.swing.JLabel("notes");
+                    });
+                application.open(List.of(), JasperApplication.HANDOFF);
+                // A panel's instance is built the first time it shows in a window.
+                application.contributions().requestPanel(new dev.jasper.app.contributions.Contributions.PanelRequest(
+                    application.windows().main().orElseThrow().id(), "dev.example.notes",
+                    dev.jasper.app.contributions.Contributions.PanelRequest.Op.SHOW));
+                application.windows().closeAll();
+                assertThat(tabsDuringClose).as("the panel went while the main window closed, and the request added no tab to it")
+                    .containsExactly(1);
+                assertThat(application.windows().isEmpty()).as("and opened no second main window").isTrue();
+            });
+        } finally {
+            edt(application::quitNow);
+        }
+    }
+
     @Test void closingTheMainWindowClosesItsChildWindowsAndThenTheProcess() throws Exception {
         CountDownLatch terminated = new CountDownLatch(1);
         JasperApplication application = application(terminated::countDown);
