@@ -88,29 +88,29 @@ At `faeec76f3` unless marked.
 
    `toolbarMode` (`:145-152`) sets `labels = mode == ICONS_AND_LABELS` on both bars. `contributed` (`:165-170`) builds a `ClassicToolbarButton` with `AppIcons.icon("command")` when the action has no icon.
 2. `ClassicToolbarButton` (`ClassicToolbarButton.java:26-106`):
-   - `Glyph { NONE, PLUS }` (`:28`); every button gets `setToolTipText(label)` (`:41`).
+   - `Glyph { NONE, PLUS }` (`:29`); every button gets `setToolTipText(label)` (`:42`).
    - `getPreferredSize` (`:54-61`) returns a `side × side` square when the text is null, `side()` being the bar's `buttonSide()` (`BUTTON_HEIGHT`, 24 under classic, from `WindowToolbar.Leading.classic`, `WindowToolbar.java:66-69`).
-   - The labelled paint draws text only, with a drawn "+" for PLUS and a ▼ for a caret. The icon-only paint draws the icon centred and no caret (`:85-90`).
+   - The labelled paint draws text only, with a drawn "+" for PLUS and a ▼ for a caret. The icon-only paint draws the icon centred and no caret (`:81-85`).
    - `WindowChrome.classicButton` and `classicSplit` are at `WindowChrome.java:135-152`.
 3. `WindowToolbar.doLayout` gives every placed button `height = side` and a view `min(height, preferred)` (`WindowToolbar.java:170`).
-4. `AppIcons` marks chrome receivers with `CHROME_RECEIVER = Boolean.TRUE` (`AppIcons.java:116-128`). `NativePreparation.prepare` keeps `NAMED.themedIcon` and `NAMED.chromeIcon` (`:139`), and `paint` picks the chrome icon when `inChrome(c)` (`:141-143`). The receivers are `WindowHeader.java:40`, `WindowStatusBar.java:63` and `ToolStripe.java:96` (the default look's icon rails). `WindowChrome` builds the header at `WindowChrome.java:73`, and `WorkspaceChrome.statusBar` builds the status bar (`WorkspaceChrome.java:104-109`).
+4. `AppIcons` marks chrome receivers with `CHROME_RECEIVER = Boolean.TRUE` (`AppIcons.java:116-128`). `NativePreparation.prepare` keeps `NAMED.themedIcon` and `NAMED.chromeIcon` (`:139`), and `paint` picks the chrome icon when `inChrome(c)` (`:141-143`). The receivers are `WindowHeader.java:40`, `WindowStatusBar.java:63` and `ToolStripe.java:96` (the default look's icon rails). `WindowChrome` builds the header at `WindowChrome.java:73`, and `WorkspaceChrome.statusBar` builds the status bar (`WorkspaceChrome.java:103-109`). `WindowChrome.status()` (`WindowChrome.java:601`) returns it; `header()` is at `:598` and `windowToolbar()` at `:174`.
 5. `IconRegistry`:
    - `chromeIcon(name, size)` (`IconRegistry.java:92`) uses `BuiltInArtwork.chrome()`, else the catalog (`:93-105`).
    - Authored catalog artwork is selected only by the ordinary theme overloads (`select(..., ordinary=true)` with a theme, `:73-79`); other contexts paint the vector path of the same name, so every catalog name needs a vector path in `builtIns()` (`play` at `:415`).
    - `FILLED_BUILT_INS` is at `:21`.
    - Buttons paint their glyph with `icons().icon(name, theme, role, extent)` (`Buttons.java:85-89`). `extent` is `IconSize.RAIL` only for embedded or panel icon-only buttons, else `CONTROL`.
-6. `BuiltInArtwork` (`BuiltInArtwork.java`) has seven catalog names (`:14-18`) and ten chrome names (`:28-32`). Both read hash manifests with a fixed count (`assets-selected.tsv` 14, `assets-chrome.tsv` 20; `:39-40`). Every `Pair` reads a `_dark` sibling (`:35-37`). `BuiltInArtworkTest:19` pins the catalog at 7. Resources live under `dev/jasper/ui/icons/<expui path>`, so classic files that share an expui path (for example `actions/moveToWindow.svg`) need their own folder.
+6. `BuiltInArtwork` (`BuiltInArtwork.java`) has seven catalog names (`:14-18`) and ten chrome names (`:27-31`). Both read hash manifests with a fixed count (`assets-selected.tsv` 14, `assets-chrome.tsv` 20; `:39-40`). Every `Pair` reads a `_dark` sibling (`:35-37`). `BuiltInArtworkTest:19` pins the catalog at 7. Resources live under `dev/jasper/ui/icons/<expui path>`, so classic files that share an expui path (for example `actions/moveToWindow.svg`) need their own folder.
 7. `ChromeSpec` has nine points (`ChromeSpec.java:19-20`; `DEFAULT` and `CLASSIC` at `:39-43`). `KitParser` lists `CHROME` (`KitParser.java:57-58`), parses each point with `point(...)`, which matches the lower-cased constant name (`:287-293`, `:295-309`), and allowlists four `[defaults]` keys (`:514-519`). `DefaultSource.ALLOWED` holds the same four (`DefaultSource.java:16-17`). `ConfigSnapshot.defaults(DefaultSource)` and `from(values, defaults, …)` apply them (`ConfigSnapshot.java:87-100`).
-8. `WorkspaceLook` has seven components (`WorkspaceLook.java:17`). `Projections.of` builds it at `Projections.java:56-62` and `fallback` at `:101-104`. `WorkspaceChrome.of` reads its variants (`WorkspaceChrome.java:68-77`). `ProjectionReadTest` holds `WorkspaceLook$(Menus|Header|Stripes|Tabs|Status|FrameStyle)` to `WorkspaceChrome` (`ProjectionReadTest.java:24-27`) and lists the palette strategies at `:114-115`. `new ChromeSpec(` and `new WorkspaceLook(` appear in:
+8. `WorkspaceLook` has seven components (`WorkspaceLook.java:17`). `Projections.of` builds it at `Projections.java:56-62` and `fallback` at `:101-104`. `WorkspaceChrome.of` reads its variants (`WorkspaceChrome.java:68-77`). `ProjectionReadTest` (`jasper-app/src/test/java/dev/jasper/app/architecture/`) holds `WorkspaceLook$(Menus|Header|Stripes|Tabs|Status|FrameStyle)` to `WorkspaceChrome` (`ProjectionReadTest.java:24-26`) and lists the palette strategies at `:107-108`. `new ChromeSpec(` and `new WorkspaceLook(` appear in:
    - main: `ChromeSpec.java` (2), `KitParser.java` (1) and `Projections.java` (2);
    - tests: `KitParserTest`, `ProjectionsTest` (4), `testsupport/EnterpriseLook`, `ChromeRenderTest`, `ClassicHeaderTest`, `ClassicTabsTest`, `CornerHomeTest`, `DockChromeMatrixTest`, `DockChromeTest`, `WindowChromeMenusTest`, `WindowPairsTest` and `WindowTitleTest` (2).
-9. The Enterprise kit file (`plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml`) sets the nine `[chrome]` keys and four `[defaults]`. `PresentationConformanceTest.KEYS` pins every key (`:28-41`) and the plugin version 0.1.0 (`:55`).
+9. The Enterprise kit file (`plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml`) sets the nine `[chrome]` keys and four `[defaults]`. `PresentationConformanceTest.KEYS` pins every key (`:28-41`) and the plugin version 0.1.0 (`:54`).
 10. `ToolbarViewAdmission` admits a `Nodes.Button` only when it is PRIMARY, and at most one Button. The host copy is at `jasper-app/.../plugins/ToolbarViewAdmission.java:24` and `:30-31`; the testkit copy is identical apart from its class comment. The rule is documented in `ToolbarItem.View`'s Javadoc (`ToolbarItem.java:35-46`). `JasperSdk.VERSION = "0.18.0"` (`JasperSdk.java:6`). `FakeKit.BUILT_INS` (`FakeKit.java:21`) mirrors the host's built-in names. The shared contracts are `PluginContractTest.sessionBar` and the toolbar view tests (`:930-1030`). `ModelChecks.button` requires an icon and a tooltip when the label is blank (`ModelChecks.java:17-20`).
 11. `ClassicButtonFace.paintPicker` (`ClassicButtonFace.java:199-218`) draws the button gradient, a ▼ and `PickerMenus.line`, with no icon. `flat(b)` is true for a GHOST in an INLINE stack (`:44-50`). `recolours` is true only for joined halves (`:156`), so authored artwork keeps its colours. A DROPDOWN's face is assigned at `Choices.java:131`. `ChoiceCombo.getPreferredSize` gives a faced combo `PICKER_DEFAULT_HEIGHT` (`:433-437`). `labelShown()` already reads `view.toolbarStrip()` (`:35`).
 12. `SessionsToolbar.classic` (`SessionsToolbar.java:183-189`) is a LABEL "Session:", a DROPDOWN without a face and a PRIMARY "Connect". Remote is `version = "0.13.0"` with `sdk = ">=0.18.0, <0.19"`. `ClassicCompositionRenderTest:84-99` measures the session toolbar against the Workstation mocks (bands at x 130, floor 0.50).
 13. Flush frames mark the frame holding the permanent focus owner (`ToolWindowArea.java:431-449`; `Host.focused` at `:85-89`). Nothing reacts to a mouse press. The divider handles are children of the area itself, not of a host (`ToolWindowArea.java:309-313`), and the terminal column sits in the `center` host (`:303-308`). `WindowContributions.togglePanel` (`WindowContributions.java:192`) only toggles. It serves both the stripes' `onToggle` (`:80`) and every `PanelRequest` `TOGGLE` (`:188`). Those requests come from the generated View toggle action (`Contributions.java:156`), Notifications' toggle action (`NotificationsFeature.java:63-64`) and a plugin's `PanelRegistry.toggle` (`HostedUi.java:431`). `PanelRequest.Op` is `{ SHOW, HIDE, TOGGLE }` (`Contributions.java:56`), switched on only at `WindowContributions.java:185-189`. `FlushFramesTest.area(boolean)` and `DockTestSupport.show(area, slot, content, size)` (id `DockTestSupport.id(slot)`) are the fixtures. `MockCrops.render` only sizes, lays out and prints, so in these tests no component is ever `isShowing()`.
 14. `ChromePainter.FOCUSED_HEADER = PaintPair(SURFACE_HEADER_ACTIVE, SURFACE_HEADER, Guard.beyond(1))` (`ChromePainter.java:316`). #DFE2E9 against the port's Light `surface.header` #F2F2F2 is about 5.9 L* apart (contrast 1.158), so the guard holds and #DFE2E9 paints as authored. Six built-in variants author `surface.header.active` equal to their `surface.header` (0 L* apart): `catppuccin-latte`, `-frappe`, `-macchiato`, `-mocha` and both `ubuntu-yaru` variants (checked 2026-10-19). Today the guard is what gives them a focused tint.
-15. `CornerHome.home` (`CornerHome.java:16-25`) places the window at the bottom-left of the work area by `RUN_WINDOW_HOME_SIDE` and `_BOTTOM` (`DesignMetrics.java:155`). These two roles are read only there and in tests (`CornerHomeTest`, `RunWindowWorkspaceRenderTest`, `RunWindowRolesTest:38-41`, both role tables). `PaletteLook.Home { TITLE_FIELD, CORNER }` (`PaletteLook.java:15`, `RUN_WINDOW` at `:23`). `CornerHomeTest` is named three times in `migration.csv`: rows `:1402-1403` (CornerHome and its test) and the evidence column of `:1400` (PaletteHome). The Run window's height is `RunWindowView.WindowLayout.preferredLayoutSize` (`RunWindowView.java:487-494`): about 364 px with the default 5 visible rows and 427 px with Enterprise's `"palette.visible_rows" = 8` (the mock's just-opened render). `WindowCommandPalette.inside` clamps by `min(margin, work.height / 2)` on each side (`WindowCommandPalette.java:269-275`).
+15. `CornerHome.home` (`CornerHome.java:16-25`) places the window at the bottom-left of the work area by `RUN_WINDOW_HOME_SIDE` and `_BOTTOM` (`DesignMetrics.java:155`). These two roles are read only there and in tests (`CornerHomeTest`, `RunWindowWorkspaceRenderTest`, `RunWindowRolesTest:38-41`, both role tables). `PaletteLook.Home { TITLE_FIELD, CORNER }` (`PaletteLook.java:15`, `RUN_WINDOW` at `:23`). `CornerHomeTest` is named three times in `migration.csv`: rows `:1402-1403` (CornerHome and its test) and the evidence column of `:1400` (PaletteHome). The Run window's height is `RunWindowView.WindowLayout.preferredLayoutSize` (`RunWindowView.java:489-497`): about 364 px with the default 5 visible rows and 427 px with Enterprise's `"palette.visible_rows" = 8` (the mock's just-opened render). `WindowCommandPalette.inside` clamps by `min(margin, work.height / 2)` on each side (`WindowCommandPalette.java:269-275`).
 16. The converter `tools/themes/jasper_theme.py`:
     - `overrides()` (`:977-989`) fills an override key only from keys the theme or a parent in its plugin sets, never from IntelliJ's own themes or `*.` wildcards. `OVERRIDES` (`:966-974`) maps the seven IntelliJ keys.
     - `convert_intellij_theme(theme, siblings, name, scheme_file, loose_dir, roles)` (`:992`) takes chosen `roles` (hex or a palette colour name). `Lookup.key` (`:648-663`) resolves exact key, then the longest `*.` wildcard, level by level. `validate` checks the role and override order.
@@ -205,6 +205,28 @@ Decisions the user left open. Each reads "what — why — cost if wrong". Task 
   - `public PreparedIcon IconRegistry.chromeIcon(String name, int logicalSize, ChromeArtwork artwork)`, with `chromeIcon(name, size)` meaning `chromeIcon(name, size, ChromeArtwork.NEW_UI)`;
   - `static Map<String, Pair> BuiltInArtwork.classicChrome()`;
   - the built-in names `run` and `application` (authored catalog, with vector fallbacks).
+
+- [ ] **Step 0: Capture the default-look baseline** (Execution notes, Ruling E3; no commit)
+
+Before any source changes, while the worktree's code is still `faeec76f3`'s, render the default look into the scratchpad. Task 12 Step 3 compares against these files, so no second worktree is needed.
+
+```bash
+base=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan12-baseline
+git diff --quiet faeec76f3 HEAD -- . ':(exclude)docs' && echo "code is faeec76f3's"   # must print; otherwise stop
+test -z "$(git status --porcelain)" && echo clean                                       # must print
+rm -rf "$base" && mkdir -p "$base/app"
+for theme in dark light; do
+  ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R "jasper-ui/build/gallery/$theme-1x" "$base/gallery-$theme-1x"
+done
+./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest'
+for f in jasper-app/build/chrome-renders/chrome-default*.png jasper-app/build/chrome-renders/settings-default*.png \
+         jasper-app/build/chrome-renders/chrome-complement*.png jasper-app/build/chrome-renders/settings-complement*.png \
+         jasper-app/build/chrome-renders/chrome-fallback*.png jasper-app/build/chrome-renders/settings-fallback*.png \
+         jasper-app/build/dock-renders/default-dark.png jasper-app/build/dock-renders/default-light.png; do cp "$f" "$base/app/"; done
+ls "$base/gallery-dark-1x" | wc -l; ls "$base/gallery-light-1x" | wc -l; ls "$base/app" | wc -l
+```
+
+Expected: both prints, then the two gallery counts and `11`. Every `cp` must succeed; if one reports a missing file, read the names `ChromeRenderTest` and `DefaultDockPixelsTest` write and copy those, never dropping a default-look render.
 
 - [ ] **Step 1: Write the manifest**
 
@@ -413,7 +435,7 @@ https://www.jetbrains.com/idea/
 
 - [ ] **Step 7: Run the tests**
 
-Run: `./gradlew :jasper-ui:test --tests '*BuiltInArtworkTest' --tests '*IconRegistryTest' :jasper-app:test --tests '*ThirdPartyNoticesTest' --tests '*LicensesViewTest' :jasper-app:verifyThirdPartyNotices`
+Run: `./gradlew :jasper-ui:test --tests '*BuiltInArtworkTest' --tests '*IconRegistryTest' :jasper-app:test --tests '*ThirdPartyNoticesTest' --tests '*LicensesViewTest' :verifyThirdPartyNotices`
 Expected: PASS and BUILD SUCCESSFUL.
 
 - [ ] **Step 8: Commit**
@@ -493,7 +515,7 @@ class ChromeArtworkTest {
                 assertThat(chrome.chromeArtwork()).isEqualTo(expected);
                 var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), chrome);
                 assertThat(AppIcons.chromeArtwork(owner.chrome().header())).contains(expected);
-                assertThat(AppIcons.chromeArtwork(owner.chrome().statusBar())).contains(expected);
+                assertThat(AppIcons.chromeArtwork(owner.chrome().status())).contains(expected);
                 assertThat(AppIcons.chromeArtwork(owner.chrome().windowToolbar())).as("inside the header").contains(expected);
             }
             assertThat(WorkspaceChrome.of(look(WorkspaceLook.Icons.CLASSIC), new TitleFormat("{context}")))
@@ -503,7 +525,7 @@ class ChromeArtworkTest {
 }
 ```
 
-(Use the accessor `WindowChrome` already has for its status bar; if it has none, add a package-private `WindowStatusBar statusBar()`.)
+(`WindowChrome.status()` is the status bar's existing accessor, `WindowChrome.java:601`; add none.)
 
 `ZoneIconsTest`: `aClassicReceiverPaintsTheClassicSet`, modelled on `chromeReceiversAloneShowOriginalArtworkWithoutChangingIconValues`. It paints `AppIcons.icon("square-plus")` inside a panel marked `chromeReceiver(panel, CLASSIC)`, inside one marked plain, and outside any. It asserts the pixels equal `new IconRegistry().chromeIcon("add", 16, CLASSIC)`, then `chromeIcon("add", 16)`, then `themedIcon("add", 16)`, each drawn for the same theme and tint.
 
@@ -652,7 +674,7 @@ Expected: PASS with no assertion changed beyond its colour source.
 
 - [ ] **Step 1: Write the failing tests** in `ClassicHeaderTest`
 
-Replace `theToolbarSettingChoosesLabelsIconsOrNoRow`'s ICONS assertions with the new size: `first.getPreferredSize()` is `new Dimension(scale(22), scale(22))` and `first.getY()` is `(bar.getHeight() - scale(22)) / 2`. Add:
+Replace `theToolbarSettingChoosesLabelsIconsOrNoRow`'s ICONS assertions with the new size: `first.getPreferredSize()` is `new Dimension(scale(22), scale(22))` and `first.getY()` is `(bar.getHeight() - scale(22)) / 2`, with `bar` the test's `window.owner().chrome().windowToolbar()`. `classic(icons)` and a `window(themes, view, icons)` overload are added beside `classic()` and `window(themes, view)` (`ClassicHeaderTest.java:34-63`), which become `classic(WorkspaceLook.Icons.NEW_UI)` and `window(themes, view, WorkspaceLook.Icons.NEW_UI)`; `window` passes the same chrome to `DesktopTestSupport.content` and to `WindowLook`. Add:
 
 ```java
     static ClassicToolbarButton labelled(WindowToolbar bar, String label) {
@@ -1010,7 +1032,7 @@ In `ClassicCompositionRenderTest.theSessionToolbarViewMatchesTheWorkstationMocks
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `./gradlew :plugins:remote:test --tests '*SessionToolbarViewTest' :jasper-app:test --tests '*ClassicCompositionRenderTest'`
+Run: `./gradlew :jasper-plugin-remote:test --tests '*SessionToolbarViewTest' :jasper-app:test --tests '*ClassicCompositionRenderTest'`
 Expected: FAIL (the label node and the PRIMARY Connect).
 
 - [ ] **Step 3: Implement**
@@ -1027,7 +1049,7 @@ Then:
 
 - [ ] **Step 4: Run the tests**
 
-Run: the Step 2 command, then `./gradlew :plugins:remote:test :jasper-app:test --tests '*VersionRangeTest' --tests '*Remote*'`
+Run: the Step 2 command, then `./gradlew :jasper-plugin-remote:test :jasper-app:test --tests '*VersionRangeTest' --tests '*Remote*'`
 Expected: PASS.
 
 - [ ] **Step 5: Commit** — `Remote 0.14.0: the classic session view is IntelliJ's run-configuration combo and Run`, with the trailers.
@@ -1310,7 +1332,7 @@ Expected, after the hand edits: `check_pairs.py` passes every gated pair. Where 
 
 - [ ] **Step 9: Run the checks**
 
-Run: `python3 -I -m unittest discover -s tools/themes -p 'test_*.py' && ./gradlew :jasper-ui:test :jasper-app:test :jasper-app:verifyThirdPartyNotices --continue`
+Run: `python3 -I -m unittest discover -s tools/themes -p 'test_*.py' && ./gradlew :jasper-ui:test :jasper-app:test :verifyThirdPartyNotices --continue`
 Expected: OK, and BUILD SUCCESSFUL.
 
 - [ ] **Step 10: Commit** — `Enterprise theme: ports of IntelliJ Light and New UI Dark`, with a body naming port.json, the accents, #DFE2E9, the dropped `dark-terminal` and the attribution, and the trailers.
@@ -1439,7 +1461,7 @@ class PressedFrameTest {
 }
 ```
 
-In `aRealMousePressReachesTheArea`, `addNotify` needs no peer for the `AWTEventListener` registration; if it fails without a showing parent, mount the area in a `JRootPane` as `ChromeRenderTest` does. Keep the assertion: the press goes through `Component.dispatchEvent`, whose `Toolkit` listeners are the path the production code uses. `thePressMovesTheKeyboardToTheFramesFirstKeyedControlOrTheFrame` runs headless, where nothing is showing (fact 13); it passes only because `focusTarget` reads `isVisible()` up the parent chain, which is the point of that rule. In `WindowPanelsTest`, under flush frames (the Enterprise look's workspace chrome), add two assertions:
+In `aRealMousePressReachesTheArea`, `addNotify` needs no peer for the `AWTEventListener` registration; if it fails without a showing parent, mount the area in a `JRootPane` as `ChromeRenderTest` does. Keep the assertion: the press goes through `Component.dispatchEvent`, whose `Toolkit` listeners are the path the production code uses. `thePressMovesTheKeyboardToTheFramesFirstKeyedControlOrTheFrame` runs headless, where nothing is showing (fact 13); it passes only because `focusTarget` reads `isVisible()` up the parent chain, which is the point of that rule. In `WindowPanelsTest`, under flush frames, add two assertions. The test's `window()` is the default look (standard frames), so these use an owner from `DesktopTestSupport.content(launcher, themes, DockChromeTest.classicDock())`, the flush-frames chrome the dock tests already build (`DockChromeTest.java:14-18`):
 - invoking the panel's generated View toggle action (`Contributions` sends `ACTIVATING_TOGGLE`) shows it and `owner.area().focusedSlot()` is the panel's slot;
 - after hiding it again and putting the focus nowhere, `model.requestPanel(new Contributions.PanelRequest(window, id, Contributions.PanelRequest.Op.TOGGLE))`, a plugin's programmatic toggle, shows it and `focusedSlot()` stays empty.
 
@@ -1573,9 +1595,9 @@ Adapt the drag test (renamed `aDragAttachesNearItsHomeAndElsewhereSavesItsPlace`
 - the third drag goes 200 across and 200 down instead of up;
 - the double click returns home as before.
 
-Keep `aSavedPlaceFromALargerWindowStaysInside` and the list-fit test.
+Keep `aSavedPlaceFromALargerWindowStaysInside`, the list-fit test (`aShortWindowShrinksTheListToFitTheHome`) and `theDefaultLookKeepsTheTitleFieldsCard`. In `aPressOnTheTitleTextDragsTheWindow` (1400 × 900) the drag goes 200 across and 150 **down** (`y + 150` in the drag and the release, `home.y + 150` in the location assertion), for the same reason as the drag test: an upward drag from the upper home is clamped by the work area.
 
-In `RunWindowWorkspaceRenderTest`, replace the four placement assertions (6 and 5, the mock's x 60 and y 1696) with:
+In `RunWindowWorkspaceRenderTest` (`:70-90`), keep the bottom strip's visibility and `stripeAt.width` positive, and replace the six placement assertions that read the corner home (the two against the work area, `RUN_WINDOW_HOME_SIDE` across and `RUN_WINDOW_HOME_BOTTOM` up; the same 6 and 5 against the left stripe and the bottom strip; and the mock's x 60 and y 1696, with the comment above them) with:
 - the window's centre within 1 of the workspace's centre;
 - its top by Rulings 19's rule, written out in the test as `UpperHomeTest.expectedTop` writes it, from `owner.paletteWorkArea(overlay)`, the workspace and the window's height. Do not assert `workspace.y + workspace.height / UpperHome.TOP_FRACTION`: at 1442 × 902 with Enterprise's 8 rows the window is about 427 px tall, so the rule clamps it just under the toolbar row. Assert that too, as `window.getY() == work.y + Math.min(margin, work.height / 2)`, with a comment saying that this window is too short for the upper half (Rulings 19);
 - `2 * stripAt.y == 1706` kept;
@@ -1705,7 +1727,6 @@ host artwork in both looks. Only Remote's manifest moves to `sdk = ">=0.18.1, <0
   - The admission bullet's "at most one PRIMARY Button," becomes "at most one PRIMARY Button, icon-only GHOST Buttons (8.6),".
 - **10.7:** after the sentence defining the focused header strip (find it with `grep -n "focused" docs/superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md | sed -n '1,40p'` inside 10.7), add: "A frame is also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that takes no focus) and when the user opens it from its stripe or its View toggle action; both move the keyboard into it (its first control that takes keys, else the frame), as IntelliJ activates a tool window. A press in the terminal column hands the tint back; dragging a divider keeps it, and a plugin's own toggle opens a frame without activating it."
 - **11.5:**
-  - In the second sentence, `CornerHome` becomes `UpperHome`.
   - The `CornerHome` bullet becomes: "- `UpperHome` is centred across the window's workspace with its top a seventh of the workspace's height down, moved up to end at the workspace's middle while that keeps it in the dock work area, and clamped into the work area by `PALETTE_WINDOW_MARGIN` (the user, 2026-10-18), `RUN_WINDOW_WIDTH` wide. It attaches within reach of its home across and down: `|left − home.left| ≤ reach && |top − home.top| ≤ reach`. It has no centre or top-fifth guides; home is its only snap target. Double-clicking the title row forgets the saved place and returns home. The Run window is about 364 px tall with 5 visible rows and 427 px with Enterprise's 8, so with 8 rows it is entirely in the upper half only in windows about 1000 px tall or more; in shorter ones it sits just under the toolbar row and crosses the middle."
   - The saved-place paragraph's `CornerHome` becomes `UpperHome`.
 - **14.4:** the toolbar view bullet's text up to "Choosing" (spec lines 1580-1583 at `faeec76f3`, which include the PRIMARY "Connect" of line 1582) becomes: "`SessionsToolbar` contributes a View in place of its Sessions dropdown: a DROPDOWN drawn as IntelliJ's run-configuration combo (its face the chosen row's label and the `application` icon) listing saved hosts as "name (address)", WSL distributions as "name (detail)", a separator and "Manage Sessions…", and an icon-only GHOST `run` button, tooltip "Connect", that runs `activateHost` for a host (`RemotePlugin.java:368-375`: focus a running pane for it, else open one) or `openDistro` for a distribution."
@@ -1737,33 +1758,29 @@ For each hit:
 
 - [ ] **Step 3: Prove the default look unchanged**
 
-The gallery covers jasper-ui's kit views; jasper-app's default-look renders cover the paths this plan touches that the gallery never draws: `AppIcons`' receiver marks and paint routing, `WindowHeader` and `WindowStatusBar`'s marks, `WindowToolbar.java:170`, `ToolWindowArea`'s listener and focusable hosts, and the palette home's rename. Both are rendered on `faeec76f3` and on the branch, then compared.
+The gallery covers jasper-ui's kit views; jasper-app's default-look renders cover the paths this plan touches that the gallery never draws: `AppIcons`' receiver marks and paint routing, `WindowHeader` and `WindowStatusBar`'s marks, `WindowToolbar.java:170`, `ToolWindowArea`'s listener and focusable hosts, and the palette home's rename. Both were rendered on `faeec76f3` by Task 1 Step 0 into the scratchpad baseline; render them on the branch and compare (Execution notes, Ruling E3).
 
 ```bash
-base=$(mktemp -d)
-git worktree add --detach "$base/main" faeec76f3
-app_renders() {   # $1: the tree, $2: where to copy its default-look renders
-  (cd "$1" && ./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest') || return 1
-  mkdir -p "$2"
-  for f in "$1"/jasper-app/build/chrome-renders/chrome-default*.png "$1"/jasper-app/build/chrome-renders/settings-default*.png \
-           "$1"/jasper-app/build/chrome-renders/chrome-complement*.png "$1"/jasper-app/build/chrome-renders/settings-complement*.png \
-           "$1"/jasper-app/build/chrome-renders/chrome-fallback*.png "$1"/jasper-app/build/chrome-renders/settings-fallback*.png \
-           "$1"/jasper-app/build/dock-renders/default-dark.png "$1"/jasper-app/build/dock-renders/default-light.png; do
-    cp "$f" "$2/"
-  done
-}
+base=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan12-baseline
+out=$(mktemp -d)
+ls "$base/gallery-dark-1x" "$base/gallery-light-1x" "$base/app" > /dev/null || echo "NO BASELINE: see Ruling E3"
 for theme in dark light; do
-  ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && rm -rf "$base/branch-$theme" && cp -R jasper-ui/build/gallery "$base/branch-$theme"
-  (cd "$base/main" && ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme) && rm -rf "$base/main-$theme" && cp -R "$base/main/jasper-ui/build/gallery" "$base/main-$theme"
-  diff -r "$base/main-$theme" "$base/branch-$theme" && echo "$theme: identical"
+  ./gradlew :jasper-ui:gallery -Pjasper.galleryTheme=$theme && cp -R "jasper-ui/build/gallery/$theme-1x" "$out/gallery-$theme-1x"
+  diff -r "$base/gallery-$theme-1x" "$out/gallery-$theme-1x" && echo "$theme: identical ($(ls "$out/gallery-$theme-1x" | wc -l) files)"
 done
-app_renders "$PWD" "$base/branch-app" && app_renders "$base/main" "$base/main-app"
-ls "$base/main-app" | wc -l
-diff -r "$base/main-app" "$base/branch-app" && echo "jasper-app default look: identical"
-git worktree remove --force "$base/main"
+./gradlew :jasper-app:test --tests '*ChromeRenderTest' --tests '*DefaultDockPixelsTest'
+mkdir -p "$out/app"
+for f in jasper-app/build/chrome-renders/chrome-default*.png jasper-app/build/chrome-renders/settings-default*.png \
+         jasper-app/build/chrome-renders/chrome-complement*.png jasper-app/build/chrome-renders/settings-complement*.png \
+         jasper-app/build/chrome-renders/chrome-fallback*.png jasper-app/build/chrome-renders/settings-fallback*.png \
+         jasper-app/build/dock-renders/default-dark.png jasper-app/build/dock-renders/default-light.png; do cp "$f" "$out/app/"; done
+ls "$base/app" | wc -l
+diff -r "$base/app" "$out/app" && echo "jasper-app default look: identical"
 ```
 
-Expected: `dark: identical` and `light: identical` (322 files), then the jasper-app file count (11: the default, complement and fallback chrome, palette and settings images, and the two dock renders) and `jasper-app default look: identical`, with no `diff` output. If a `cp` reports a missing file, read the names `ChromeRenderTest` and `DefaultDockPixelsTest` write at `faeec76f3` and copy those; never drop a default-look render from the comparison. Record "identical" for the gallery and for each jasper-app render.
+Only the default look's own gallery folders (`dark-1x`, `light-1x`) are compared: the gallery writes every kit and theme into its own folder under `jasper-ui/build/gallery`, and Task 9's Enterprise folders are not part of the default look.
+
+Expected: `dark: identical` and `light: identical` (322 files), then the jasper-app file count (11: the default, complement and fallback chrome, palette and settings images, and the two dock renders) and `jasper-app default look: identical`, with no `diff` output. If the baseline is missing, follow Ruling E3's fallback; never compare against renders made after Task 1. Record "identical" for the gallery and for each jasper-app render.
 
 - [ ] **Step 4: Run the whole build and count**
 
@@ -1835,3 +1852,83 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 Expected: the hygiene script prints nothing, and the commit succeeds.
+
+## Execution notes (2026-10-19)
+
+**Refresh.** `HEAD` is `bcbb8236c`; `git diff faeec76f3 HEAD` touches only this plan, so the code is `faeec76f3`'s and nothing merged since. The refresh checks print `1`, `1`, `1` and `0`. Every anchor, quoted text, path and signature the tasks use was re-read against the worktree. These were corrected in place: fact 2 (`Glyph` at `:29`, the tooltip at `:42`, the icon-only paint at `:81-85`), fact 4 (`statusBar` at `:103-109`; `WindowChrome.status()` at `:601`), fact 6 (chrome names at `:27-31`), fact 8 (`ProjectionReadTest` lives in `architecture/`, pattern at `:24-26`, strategies at `:107-108`), fact 9 (the version at `:54`), fact 15 (`preferredLayoutSize` at `:489-497`), Task 2's `ChromeArtworkTest` accessor, the Gradle paths in Tasks 1, 8 and 9, Task 4's fixture overloads, Task 10's flush-frames owner, Task 11's two further test adaptations, Task 12 Step 3, and a missing 11.5 anchor in Task 12. Task 1 gains Step 0.
+
+**Tasks, in order:** 1 Classic artwork in jasper-ui; 2 The `[chrome] icons` point and the chrome receivers; 3 Enterprise tests read the shipped theme's roles; 4 Classic toolbar buttons show their icons; 5 `window.toolbar` as a look default; 6 SDK 0.18.1, icon-only GHOST buttons in toolbar views; 7 The toolbar combo face and toolbar-strip glyphs; 8 Remote's session view, the combo and Run; 9 The Enterprise theme, IntelliJ Light and New UI Dark; 10 A pressed tool window is the active one; 11 The Run window's upper home; 12 Documentation, STATUS and the whole build.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Agree? | Ruling |
+|---|---|---|---|
+| 1, 2 | `ChromeArtwork`, `IconRegistry.chromeIcon(name, size, artwork)` | Yes: 2 consumes what 1 produces | — |
+| 1, 6 | `run`, `application` → `FakeKit.BUILT_INS` | Yes | — |
+| 1, 7 | `run`, `application`; `icons().icon(name, theme, role, size)` (`IconRegistry.java:72`) | Yes | — |
+| 1, 8 | `run`, `application` in Remote's view | Yes | — |
+| 1, 9 | `notices.toml`: 1 renames the icons block (`:91-97`), 9 adds the themes block after it | Yes: separate blocks; 1's test filters `startsWith("IntelliJ Platform icons")` and still finds one | — |
+| 1, 12 | Step 0's baseline, read by 12 Step 3 | Yes, after this refresh | E3 |
+| 2, 3 | `testsupport/EnterpriseLook` (2 adds `CLASSIC` to `CHROME`; 3 reads `theme(dark)`) | Yes | — |
+| 2, 4 | `WindowChrome` (`:73` vs `:135-152`), `ClassicHeaderTest.classic()`, `WindowPairsTest` | Yes, once 4 builds on 2's argument | E6 |
+| 2, 5 | `KitParser` (`CHROME`/`chrome()` vs `defaultsByKey`), `KitParserTest`, `PresentationConformanceTest.KEYS`, `enterprise.kit.toml` (`[chrome]` vs `[defaults]`) | Yes: separate lines; 5 adds to the `KEYS` set 2 extended | — |
+| 2, 11 | `Projections` (`:56-62` vs `:65`), `WorkspaceChrome` (field, `equals`, `statusBar` vs `case CORNER` at `:40`), `ProjectionReadTest` (pattern and probe vs `PALETTE_STRATEGIES`), `ProjectionsTest` (`:18`/`:35` vs `:21`), `CornerHomeTest` (2's argument at `:30`, then 11's `git mv`), `migration.csv` | Yes: 11 renames files that already carry 2's edits | E5 |
+| 3, 4 | `EnterpriseWorkstationMockTest` | Yes: 3 changes colour sources, 4 changes the toolbar row's geometry | — |
+| 3, 8 | `ClassicCompositionRenderTest.check` (`:32-40`) and the session-toolbar bands | Only if 3 makes `check` read role keys | E7 |
+| 3, 9 | Every Enterprise test, `KitFixtures`/`KitFixturesTest`, `derived-roles-enterprise.tsv` | Yes: 3 reads the theme's roles, 9 changes the theme, 9 Step 7 fixes the rest | — |
+| 4, 5 | Enterprise's `window.toolbar = icons` default vs 4's `icons_and_labels` render expectations | Yes | E8 |
+| 4, 7 | `DesignMetrics` enum tail (after `LIST_TWO_LINE_ROW_HEIGHT(0)`, `:187`) and both role tables (`:698`) | Yes: 7 appends after 4's rows | — |
+| 4, 11 | `DesignMetrics` and the role tables (11 removes `RUN_WINDOW_HOME_*` at `:155` and rows `645-646`) | Yes: separate lines | — |
+| 4, 9 | `EnterpriseWorkstationMockTest`, the `enterprise` case in `ChromeRenderTest` | Yes: 9 Step 7 changes only colours and floors, never geometry | — |
+| 6, 8 | Both admissions, `JasperSdk.VERSION`, Remote's `sdk = ">=0.18.1, <0.19"` | Yes: 6 comes first | — |
+| 7, 8 | The toolbar combo face and the rail glyph | Yes: 7 comes first | — |
+| 8, 9 | `pairs.json`'s two session-toolbar entries (8 sets the floor and a note; 9 re-themes colours once) | Yes: 9's script maps the colour list and keeps 8's floor and note | — |
+| 9, 10 / 9, 11 | 9 Step 7 runs the whole suite before 10 and 11 exist | Yes: `PressedFrameTest` and 11's placement assertions do not depend on the theme | — |
+| 9, 12 | Dark's recorded `surface.header.active`; the 7.6 table | Yes: the prototype (E9) gives the table's values | — |
+| 10, 12 | Spec 10.7's new sentence | Yes | — |
+| 11, 12 | Spec 11.5, `docs/command-palette.md:43`, `docs/app-architecture.md:161` | Yes, once the missing anchor goes | E12 |
+| 1 | Task 1's own text | Yes (Step 0 added; verify task path fixed) | E2, E3, E14, E15 |
+| 2 | Task 2's own text | Yes, after the accessor fix | E4, E5 |
+| 3 | Task 3's own text | Yes | E7 |
+| 4 | Task 4's own text | Yes, after the `bar` and overload fix | E6 |
+| 5 | Task 5's own text | Yes: the not-allowlisted message ends `"window.toolbar_height" or "window.toolbar"` because the key goes last | E8 |
+| 6 | Task 6's own text | Yes | E16 |
+| 7 | Task 7's own text | Yes | E17 |
+| 8 | Task 8's own text | Yes, after the Gradle path fix; `options()` puts "No saved sessions" first and "Manage Sessions…" last (`SessionsToolbar.java:163-172`) | E2 |
+| 9 | Task 9's own text | Yes, after the verify task path fix | E2, E9, E10 |
+| 10 | Task 10's own text | Yes, after the `WindowPanelsTest` owner fix | E19 |
+| 11 | Task 11's own text | Yes, after the two test adaptations | E11 |
+| 12 | Task 12's own text | Yes, after the 11.5 and Step 3 fixes | E3, E12 |
+
+### Rulings
+
+- **E1.** Nothing merged since the base, so line numbers are `faeec76f3`'s apart from the corrections listed above — why: `git diff faeec76f3 HEAD` touches only this plan — cost if wrong: none.
+- **E2.** Two Gradle paths are corrected: `:verifyThirdPartyNotices` is a root-project task (`gradle/third-party-notices.gradle.kts`, applied at `build.gradle.kts:128`), and the Remote plugin is `:jasper-plugin-remote` (`settings.gradle.kts:3-7`) — why: `:jasper-app:verifyThirdPartyNotices` and `:plugins:remote:test` do not exist — cost if wrong: none; Gradle names the task when a path is wrong.
+- **E3.** Task 1 Step 0 captures the default look's baseline (both gallery folders and the 11 jasper-app renders) in the scratchpad before any code changes. Task 12 Step 3 compares against it instead of building a second worktree. It compares only `dark-1x` and `light-1x`, because the gallery writes each label to its own folder (`KitGallery.java:161-165`), so Task 9's `enterprise-*-2x` folders would make a whole-folder diff fail — why: the orchestrator's rule is to work only in this worktree with every command from its root, and the code at Step 0 is `faeec76f3`'s byte for byte — cost if wrong: if the baseline is lost, Task 12 makes one with `git worktree add --detach "$TMPDIR/plan12-main" faeec76f3`. It runs `./gradlew -p "$TMPDIR/plan12-main" …` from this worktree's root, compares the same folders and files, then runs `git worktree remove`.
+- **E4.** `ChromeArtworkTest` reads the status bar through the existing `WindowChrome.status()`, with no new accessor — why: that accessor is already there (`:601`) — cost if wrong: none.
+- **E5.** `ChromeRenderTest`'s constructor site is the covering-array row builder (`covering()`, `:59-72`). Every row takes `ChromeSpec.Icons.CLASSIC`, and `chrome-covering-array.tsv` stays at nine columns. `ProjectionsTest` takes `CLASSIC` at `:18` (Enterprise-shaped), `NEW_UI` at `:35` and in the loop at `:73`, and `d.icons()` at `:119` — why: every covering case runs under the Enterprise controller, and the `default` and `enterprise` cases already cover both values — cost if wrong: the covering renders show classic header icons, which nothing compares byte for byte.
+- **E6.** Task 2 gives `ClassicHeaderTest.classic()` `NEW_UI`. Task 4 adds `classic(icons)` and `window(themes, view, icons)`, and the old forms delegate with `NEW_UI` — why: `window` builds its chrome twice (`ClassicHeaderTest.java:51` and `:61`), and the classic-art test needs a `CLASSIC` window — cost if wrong: none.
+- **E7.** Task 3 makes `ClassicCompositionRenderTest.check` read role notation. It takes the theme from the case name's `light`/`dark`, parses bands with `MockMatch.parse(text, theme)` and resolves each colour through `MockProfile.role` unless the colour starts with `#`. Task 8 then writes its bands and colours as role keys. The combo ring may be written as `border.control`: under `Guard.CONTROL` (1.5) the ring against the kit's dialog surface is 1.70:1 (Light) and 1.62:1 (Dark) today, and 1.56:1 and 1.74:1 under the port, so the painted ring is the role itself — why: today `check` decodes hex only (`:37-38`) — cost if wrong: Task 8's bands fail to parse; the fix is in the one helper.
+- **E8.** Enterprise's new `window.toolbar = icons` default leaves Task 4's `icons_and_labels` expectations standing. The workstation renders use the window's own mode, and `EnterpriseSettings.CONFIG` saves `toolbar = "icons_and_labels"`. A saved value wins, and Reset to Default is a menu item (`SchemaPage.resetMenu`), so nothing painted changes. If a Task 4 render does read `ICONS` after Task 5, Task 5 sets `ToolbarMode.ICONS_AND_LABELS` in that fixture, with a comment, instead of changing Task 4's expectations — why: `ClassicHeaderTest` already covers the icons-only row — cost if wrong: one fixture line.
+- **E9.** Task 9's `exact_key` and `convert_port`, as written, were run against the vendored inputs in the scratchpad (`scratchpad/port-proto/proto.py`, using the converter's own `ThemeFile(id, path, data, files)`, `read_file`, `parse_json`, `resolve`, `Lookup`, `OVERRIDES` and `validate`). The output passes `validate` and matches the plan:
+  - Light: `surface.app` #F2F2F2, `surface.panel` and `surface.card` #FFFFFF, `text.primary` #000000, `accent` and `selection.bg` #2675BF, `border.window` #D1D1D1, `border.control` #C4C4C4, `surface.terminal` #FFFFFF.
+  - Light overrides: `surface.header` #F2F2F2, `surface.header.active` #DFE2E9, `surface.tableHeader` #FFFFFF, `surface.zebra` #F2F5F9, `surface.rowHover` #EDF5FC.
+  - Dark: `surface.app`, `surface.panel` and `surface.card` #2B2D30, `text.primary` #DFE1E5, `accent` #366ACE, `selection.bg` #2E436E, `border.window` #1E1F22, `border.control` #4E5157, `surface.terminal` #1E1F22.
+  - Dark overrides: `surface.header` #2B2D30 and `surface.zebra` #2B2D30 only.
+  - Terminal names: "Enterprise Light" and "Enterprise Dark".
+
+  The port drops today's `border.divider` and `surface.stripe` overrides, which are not in the converter's `OVERRIDE_KEYS` or exact keys, so those roles follow their recipes; Step 7 (d) absorbs this — why: these are the plan's own rules — cost if wrong: none; the golden test pins the file.
+- **E10.** Only `EnterpriseThemeTest` and `PluginThemesTest` name `dark-terminal` in Java (Task 9 rewrites the first, and Step 7 (d) updates the second) — why: a repository-wide search — cost if wrong: one more pin for Step 7 (d).
+- **E11.** Task 11 adapts two more tests:
+  - `aPressOnTheTitleTextDragsTheWindow` drags 150 down instead of up.
+  - `RunWindowWorkspaceRenderTest` has six placement assertions that read the corner home, not four (two against the work area, the same 6 and 5 against the stripe and the strip, x 60 and y 1696), and all six go.
+
+  why: at 1400 × 900 the upper home sits near the work area's top, so an upward drag is clamped — cost if wrong: none.
+- **E12.** Task 12's 11.5 edit "in the second sentence, `CornerHome` becomes `UpperHome`" is dropped, since that sentence names no home class. The bullet and the saved-place paragraph (spec `:1433`, `:1439`) are the edits. The other spec anchors were re-found at lines `19`, `62`, `81`, `281`, `395`, `592`, `720-721`, `748`, `966-993`, `1085`, `1228`, `1240`, `1580-1583` and `1832` — why: there is no anchor there — cost if wrong: none.
+- **E13.** The test-only `PluginInfo("dev.jasper.enterprise", "Enterprise", "0.1.0", …)` literals stay at 0.1.0 after Task 2's bump: `EnterprisePluginTest:19`, the three `FakeEnterprise` copies and `StagedEnterprise:12` — why: they describe a running plugin to fakes, and no test compares them with `plugin.toml` — cost if wrong: one test fails, and Task 2 bumps the literal it names.
+- **E14.** Task 1 Step 3 needs the network: curl to `raw.githubusercontent.com` at the pinned commit, with every hash checked before any write. If the network is unavailable, the task stops and reports. It never hand-writes, edits or substitutes an SVG — why: the artwork must be byte-identical upstream files — cost if wrong: the task waits for the user.
+- **E15.** Fact 5's "every catalog name needs a vector path" holds for names outside `BuiltInArtwork.IDENTITIES`. `network` and `more.vertical` have no vector path, because identities get catalog art in every context (`IconRegistry.java:81`). `run` and `application` are not identities, so they need the vector fallbacks Task 1 adds — why: that is how the code reads — cost if wrong: none.
+- **E16.** `PluginContractTest.aToolbarViewRefusesEveryOtherTreeOnUpdateAndKeepsItsTree` (`:1032-1083`) refuses GHOST and DESTRUCTIVE_GHOST buttons only with the label "Edit". It stays valid under 0.18.1 and is not changed — why: the new rule admits only blank-label GHOST buttons — cost if wrong: none.
+- **E17.** In `Buttons` (`:85`) the glyph extent has earlier branches (`stripInk`, ordered, `panelDetail`). `button.toolbarStrip` goes only into the final `(embedded || button.panel) && value.label().isEmpty()` condition — why: that keeps every other branch unchanged — cost if wrong: none.
+- **E18.** `python3 -I` (3.12.10) imports numpy and PIL here, so Task 9 Step 8's `import check_pairs` works in isolated mode — why: checked — cost if wrong: none.
+- **E19.** In `toggleAndActivate`, `dock.toggle(id)` reaches the area synchronously, because `WindowContributions.docked` calls `owner.area().sync()` on the same call (`:273-282`). So `owner.area().activate(id)` finds the new host — why: that is how the code reads — cost if wrong: the activation misses, and `WindowPanelsTest`'s new assertion catches it.
