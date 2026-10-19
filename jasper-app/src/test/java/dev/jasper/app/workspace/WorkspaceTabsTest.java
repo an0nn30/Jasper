@@ -1,5 +1,7 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.ShellExitBehavior;
 import dev.jasper.app.contributions.Contributions;
@@ -388,6 +390,29 @@ class WorkspaceTabsTest {
         } finally {
             edt(() -> KeyboardFocusManager.setCurrentKeyboardFocusManager(prior));
         }
+    }
+
+    /** Workspace plan 4a pre-flight F8: a window that failed to build leaves no listener on the theme controller. */
+    @Test void aWindowWhoseFirstTabFailsStopsHearingTheThemeController() throws Exception {
+        edt(() -> {
+            ThemeController themes = ThemeTestSupport.controller(true);
+            int before = themeListeners(themes);
+            // Without a launcher the first tab's pane cannot be made.
+            assertThatThrownBy(() -> content((ShellLauncher) null, themes)).isInstanceOf(NullPointerException.class);
+            assertThat(themeListeners(themes)).as("neither the window nor its View commands").isEqualTo(before);
+            var window = content(idleLauncher(pending), themes);
+            assertThat(themeListeners(themes)).isEqualTo(before + 2);
+            window.close();
+            assertThat(themeListeners(themes)).isEqualTo(before);
+        });
+    }
+
+    private static int themeListeners(ThemeController themes) {
+        try {
+            var field = ThemeController.class.getDeclaredField("listeners");
+            field.setAccessible(true);
+            return ((java.util.Collection<?>) field.get(themes)).size();
+        } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 
     @Test void aTerminalTabWhoseAttachFailsGoesWithItsPane() throws Exception {

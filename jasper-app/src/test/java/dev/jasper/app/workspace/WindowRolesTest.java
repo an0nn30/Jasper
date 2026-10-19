@@ -4,15 +4,20 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.commands.ActionId;
+import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.ToolbarEntry;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.app.palette.CommandsScope;
+import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.theme.SemanticColor;
 import java.awt.Color;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
+import java.util.Map;
 import java.util.Optional;
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
@@ -156,6 +161,48 @@ class WindowRolesTest {
             assertThat(main[0].workspace().emptyWorkspace()).as("a tab takes its place").isNull();
         });
         launch();
+    }
+
+    /** A theme change while a tab hides the empty state reaches it before it shows again. */
+    @Test void theEmptyWorkspaceTakesTheThemeThatChangedWhileItWasHidden() throws Exception {
+        WindowContent[] main = new WindowContent[1];
+        Color[] dark = new Color[1];
+        edt(() -> {
+            main[0] = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            dark[0] = main[0].workspace().emptyWorkspace().shortcut(ActionId.NEW_TAB).getForeground();
+            main[0].invoke(ActionId.NEW_TAB);
+            assertThat(main[0].workspace().emptyWorkspace()).as("a tab takes its place").isNull();
+        });
+        launch();
+        edt(() -> {
+            try {
+                main[0].selectVariant(false);
+                main[0].closeTab(main[0].selectedTab());
+                EmptyWorkspace empty = main[0].workspace().emptyWorkspace();
+                assertThat(empty).isNotNull();
+                JLabel caption = empty.shortcut(ActionId.NEW_TAB);
+                assertThat(caption.getForeground()).as("the light variant's placeholder text")
+                    .isEqualTo(ThemeZone.color(caption, SemanticColor.TEXT_PLACEHOLDER)).isNotEqualTo(dark[0]);
+            } finally { main[0].selectVariant(true); }
+        });
+    }
+
+    /** Workspace tabs spec 10: each caption shows its command's shortcut as the keymap binds it now. */
+    @Test void theEmptyWorkspacesCaptionsFollowTheKeymap() throws Exception {
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        edt(() -> {
+            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            JLabel caption = main.workspace().emptyWorkspace().shortcut(ActionId.NEW_TAB);
+            String before = caption.getText();
+            main.setBindings(KeyBindings.withOverrides(macOs, Map.of("new_tab", "alt+shift+y")));
+            KeyStroke rebound = KeyBindings.parse("alt+shift+y", macOs).orElseThrow();
+            assertThat(caption.getText()).as("the new shortcut").isEqualTo(CommandsScope.shortcutText(rebound, macOs))
+                .isNotEqualTo(before);
+            assertThat(caption.isVisible()).isTrue();
+            main.setBindings(KeyBindings.withOverrides(macOs, Map.of("new_tab", "none")));
+            assertThat(caption.getText()).isEmpty();
+            assertThat(caption.isVisible()).as("an unbound command shows no caption").isFalse();
+        });
     }
 
     @Test void aChildWindowIsNeverEmpty() throws Exception {

@@ -342,6 +342,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             catch (RuntimeException | Error failure) {
                 // The theme controller and the focus manager outlive a window that failed to build.
                 try { themeRegistration.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+                try { windowCommands.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
                 focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
                 throw failure;
             }
@@ -867,7 +868,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
-    /** @return whether this is the main window or a child window (workspace tabs spec 6) */
+    /** @return this window's role: the main window or a child window (workspace tabs spec 6) */
     public WindowRole role() { return role; }
 
     /** @return whether this is the main window, which has Jasper's chrome and dock and whose workspace may be empty */

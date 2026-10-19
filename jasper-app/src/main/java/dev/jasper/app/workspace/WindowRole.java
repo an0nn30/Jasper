@@ -5,7 +5,7 @@ package dev.jasper.app.workspace;
  * around its workspace, or a child window, which has a title bar and a workspace and nothing else.
  */
 public enum WindowRole {
-    /** The main window: header and toolbar, menus, the tool window dock and stripes, the status bar and the notification layer. */
+    /** The main window: header and toolbar, the menu row, the tool window dock and stripes, the status bar and the notification layer. */
     MAIN,
     /** A child window: a title bar and a workspace. */
     CHILD

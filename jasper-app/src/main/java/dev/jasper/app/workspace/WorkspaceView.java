@@ -243,7 +243,10 @@ final class WorkspaceView extends JPanel {
         if (empty != null) empty.refresh();
     }
 
-    /** Takes the theme: backgrounds, the strips' zone, and the delegates of a group the maximize keeps out of the tree. */
+    /**
+     * Takes the theme: backgrounds, the strips' zone, and the delegates of a group the maximize keeps out of the tree and
+     * of the empty state while a tab hides it.
+     */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         setBackground(theme.surface());
         for (SplitContainer split : splits.values()) split.setBackground(theme.surface());
@@ -252,6 +255,7 @@ final class WorkspaceView extends JPanel {
             WorkspaceTheme.apply(group.strip().component(), theme);
             group.refresh();
         }
+        if (updateDelegates && empty != null && !SwingUtilities.isDescendingFrom(empty, this)) SwingUtilities.updateComponentTreeUI(empty);
     }
 
     /** Below opacity 1 the workspace and its splits paint nothing behind the tabs; dividers stay solid. */
