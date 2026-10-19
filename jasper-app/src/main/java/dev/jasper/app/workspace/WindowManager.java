@@ -84,6 +84,8 @@ public final class WindowManager {
     private JasperWindow lastActive;
     private int openings;
     private boolean openingMain;
+    /** While {@link #closeAll()} runs: no child window opens, so none outlives the main window. */
+    private boolean closingAll;
 
     /**
      * The windows of the application whose contributions are {@code model}: its tab registry places a plugin's view
@@ -177,7 +179,7 @@ public final class WindowManager {
      * main window is open.
      *
      * @param directory where its terminal tab starts; null for where a new shell starts
-     * @return the child window; empty while Jasper quits
+     * @return the child window; empty while Jasper quits or every window closes
      */
     public Optional<ChildWindow> openTerminalWindow(Path directory) {
         requireEdt();
@@ -210,12 +212,21 @@ public final class WindowManager {
         Optional<ChildWindow> opened = openChild(true, null, bounds);
         if (opened.isEmpty()) return opened;
         ChildWindow child = opened.get();
+        Throwable failure = null;
         try {
             model.tabs().move(tab, child.id());
-        } finally {
-            // A move the registry refused, or one that failed, leaves the new window empty: it goes.
-            if (!child.closed() && child.content().tabCount() == 0) child.close();
+        } catch (RuntimeException | Error thrown) {
+            failure = thrown;
         }
+        // A move the registry refused, or one that failed, leaves the new window empty: it goes.
+        if (!child.closed() && child.content().tabCount() == 0) {
+            try {
+                child.close();
+            } catch (RuntimeException | Error thrown) {
+                failure = keep(failure, thrown);
+            }
+        }
+        rethrow(failure);
         return child.closed() ? Optional.empty() : opened;
     }
 
@@ -235,16 +246,37 @@ public final class WindowManager {
 
     /**
      * Closes every child window, then the main window, without asking any guard: Quit and going to the background ask
-     * first. The closing-all hook hears of it once before anything closes, while every window is whole.
+     * first. The closing-all hook hears of it once before anything closes, while every window is whole. Every window
+     * closes whatever closing another one throws, and no child window opens meanwhile; the first failure is rethrown once
+     * the main window has closed, the others suppressed under it.
      */
     public void closeAll() {
         requireEdt();
+        boolean nested = closingAll;
+        closingAll = true;
+        Throwable failure = null;
         try {
-            if (!isEmpty()) hooks.closingAll().run();
+            try {
+                if (!isEmpty()) hooks.closingAll().run();
+            } catch (RuntimeException | Error thrown) {
+                failure = thrown;
+            }
+            for (ChildWindow child : List.copyOf(children)) failure = close(child, failure);
+            if (main != null) failure = close(main, failure);
         } finally {
-            for (ChildWindow child : List.copyOf(children)) child.close();
-            if (main != null) main.close();
+            closingAll = nested;
         }
+        rethrow(failure);
+    }
+
+    /** Closes {@code window}, keeping its failure with those before it. */
+    private static Throwable close(JasperWindow window, Throwable failure) {
+        try {
+            window.close();
+        } catch (RuntimeException | Error thrown) {
+            failure = keep(failure, thrown);
+        }
+        return failure;
     }
 
     /**
@@ -268,6 +300,8 @@ public final class WindowManager {
     }
 
     private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds) {
+        // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
+        if (closingAll) return Optional.empty();
         ChildWindow[] made = new ChildWindow[1];
         return open(new Opening(WindowRole.CHILD, empty, directory, "menu", () -> { if (made[0] != null) made[0].emptied(); },
             Optional.ofNullable(bounds).map(Rectangle::new)), content -> {
@@ -336,7 +370,23 @@ public final class WindowManager {
         hooks.closed().accept(window);
     }
 
-    private static void requireEdt() {
+    static void requireEdt() {
         if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Windows belong to the EDT");
+    }
+
+    /**
+     * The failure to throw once a cleanup is done: the first one, each later one suppressed under it; the first thrown
+     * again is not suppressed under itself.
+     */
+    static Throwable keep(Throwable first, Throwable later) {
+        if (first == null) return later;
+        if (first != later) first.addSuppressed(later);
+        return first;
+    }
+
+    /** Throws {@code failure}, which {@link #keep} collected from runtime exceptions and errors only; null throws nothing. */
+    static void rethrow(Throwable failure) {
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw (RuntimeException) failure;
     }
 }

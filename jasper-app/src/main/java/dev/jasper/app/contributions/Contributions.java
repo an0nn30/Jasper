@@ -252,6 +252,7 @@ public final class Contributions {
      * @param route maps a request to the one the windows hear
      */
     public void panelRoute(java.util.function.UnaryOperator<PanelRequest> route) {
+        requireEdt();
         panelRoute = Objects.requireNonNull(route, "route");
     }
 

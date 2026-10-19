@@ -76,7 +76,10 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
      * Closes the window as its title bar's close button does (workspace tabs spec 6.4): a child window after its tabs'
      * guards; the main window after every window's tabs' guards, with every child window.
      */
-    public final void requestClose() { if (!closed) closeRequested(); }
+    public final void requestClose() {
+        WindowManager.requireEdt();
+        if (!closed) closeRequested();
+    }
 
     /** @return what this window's native frame tells it */
     public final Events events() { return new Events(this::requestClose, this::activated, this::stateChanged); }
@@ -92,6 +95,7 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
     final WindowShell shell() { return shell; }
 
     private void activated(boolean active) {
+        WindowManager.requireEdt();
         if (closed) return;
         content.setActive(active);
         if (active) manager.activated(this);
@@ -103,39 +107,37 @@ public abstract sealed class JasperWindow permits MainWindow, ChildWindow {
 
     /**
      * Closes the content, which closes the tabs it still holds, then the frame; the manager forgets the window. The
-     * manager's closing hook hears of it first, while its content is whole (plan 6 saves the layout there).
+     * manager's closing hook hears of it first, while its content is whole (plan 6 saves the layout there). Every step
+     * runs whatever an earlier one throws; the first failure is rethrown at the end, the others suppressed under it.
      */
     final void close() {
         if (closed) return;
         closed = true;
-        try {
-            try {
-                manager.closing(this);
-            } finally {
-                content.close();
-            }
-        } finally {
-            try {
-                if (shell != null) shell.dispose().run();
-            } finally {
-                manager.closed(this);
-            }
-        }
+        Throwable failure = step(() -> manager.closing(this), null);
+        failure = step(content::close, failure);
+        if (shell != null) failure = step(shell.dispose(), failure);
+        failure = step(() -> manager.closed(this), failure);
+        WindowManager.rethrow(failure);
     }
 
     /** As {@link #close()}, for a window that failed to open: neither its bounds nor its dock layout are remembered. */
     final void discard() {
         if (closed) return;
         closed = true;
+        content.forgetLayout();
+        Throwable failure = step(content::close, null);
+        if (shell != null) failure = step(shell.discard(), failure);
+        failure = step(() -> manager.closed(this), failure);
+        WindowManager.rethrow(failure);
+    }
+
+    /** Runs one step of a close, keeping its failure with those before it. */
+    private static Throwable step(Runnable run, Throwable failure) {
         try {
-            content.forgetLayout();
-            content.close();
-        } finally {
-            try {
-                if (shell != null) shell.discard().run();
-            } finally {
-                manager.closed(this);
-            }
+            run.run();
+        } catch (RuntimeException | Error thrown) {
+            failure = WindowManager.keep(failure, thrown);
         }
+        return failure;
     }
 }

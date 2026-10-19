@@ -108,7 +108,6 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                     for (section in verbose.split(Regex("(?m)^Classfile ")).drop(1)) {
                         if (!section.contains(makesMain)) continue
                         val type = Regex("this_class: #\\d+\\s+// (\\S+)").find(section)?.groupValues?.get(1)?.replace('/', '.') ?: continue
-                        if (topLevel(type) == "dev.jasper.app.workspace.MainWindow") continue
                         makers[type] = section.lines().count { (it.contains("invokespecial") || it.contains("REF_newInvokeSpecial")) && it.contains(makesMain) }
                     }
                 }

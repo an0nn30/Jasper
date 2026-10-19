@@ -38,7 +38,7 @@ class WindowManagerTest {
     private final List<String> events = new ArrayList<>();
     /** What the closing hooks heard, with whether the window's content was still whole. */
     private final List<String> closings = new ArrayList<>();
-    private boolean quitting, failFrames, reenter;
+    private boolean quitting, failFrames, reenter, failClosing;
     /** The tab a plugin asked for while the main window was being composed. */
     private Tab early;
     private WindowManager manager;
@@ -47,7 +47,10 @@ class WindowManagerTest {
         edt(() -> manager = new WindowManager(model, new WindowManager.Hooks(this::compose, this::frame,
             window -> events.add("opened " + name(window)), window -> events.add("activated " + name(window)),
             window -> events.add("closed " + name(window)), state -> { },
-            window -> closings.add("closing " + name(window) + (window.content().closed() ? " (closed)" : "")),
+            window -> {
+                closings.add("closing " + name(window) + (window.content().closed() ? " (closed)" : ""));
+                if (failClosing) throw new IllegalStateException("closing failed");
+            },
             () -> closings.add("closing all"))));
     }
 
@@ -338,6 +341,114 @@ class WindowManagerTest {
             assertThat(model.tabs().tabs()).isEmpty();
             assertThat(manager.ensureMain("cold", null)).as("the next request opens it").isPresent();
         });
+        launch();
+    }
+
+    @Test void aChildWindowWhoseFrameFailsIsDiscardedAndLeavesNoTabBehind() throws Exception {
+        edt(() -> {
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            events.clear();
+            failFrames = true;
+            assertThatThrownBy(() -> manager.openTerminalWindow(null)).isInstanceOf(IllegalStateException.class).hasMessage("no frame");
+            failFrames = false;
+            assertThat(manager.windows()).containsExactly(main);
+            assertThat(manager.opening()).isZero();
+            assertThat(events).containsExactly("closed child");
+            assertThat(model.tabs().tabs()).as("the main window's tab, and none left without a window").singleElement()
+                .satisfies(tab -> assertThat(tab.window()).isEqualTo(main.id()));
+        });
+        launch();
+    }
+
+    /** One window's failing close leaves none of the others open; the first failure propagates, the later ones under it. */
+    @Test void closingEveryWindowClosesThemAllWhateverOneOfThemThrows() throws Exception {
+        edt(() -> {
+            ChildWindow first = manager.openTerminalWindow(null).orElseThrow();
+            ChildWindow second = manager.openTerminalWindow(null).orElseThrow();
+            // Guard-less tabs whose disposing fails.
+            model.tabs().open("dev.example.editor", "notes", "notes.txt", first.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
+            model.tabs().open("dev.example.editor", "todo", "todo.txt", second.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("todo failed to close"); });
+            events.clear();
+            assertThatThrownBy(manager::closeAll).hasMessage("notes failed to close").satisfies(failure ->
+                assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("todo failed to close"));
+            assertThat(manager.isEmpty()).as("every window closed").isTrue();
+            assertThat(first.closed() && second.closed()).isTrue();
+            assertThat(events).containsExactly("dispose child", "closed child", "dispose child", "closed child", "dispose main",
+                "closed main");
+        });
+        launch();
+    }
+
+    /** A window's close keeps the closing hook's failure, with its content's under it, and still forgets the window. */
+    @Test void aWindowsCloseKeepsTheFirstFailure() throws Exception {
+        edt(() -> {
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            model.tabs().open("dev.example.editor", "notes", "notes.txt", child.id(), new JPanel())
+                .onClosed(() -> { throw new IllegalStateException("notes failed to close"); });
+            failClosing = true;
+            try {
+                assertThatThrownBy(child::requestClose).hasMessage("closing failed").satisfies(failure ->
+                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("notes failed to close"));
+            } finally {
+                failClosing = false;
+            }
+            assertThat(child.closed()).isTrue();
+            assertThat(manager.children()).isEmpty();
+        });
+        launch();
+    }
+
+    /** A failed move to a new window keeps its own failure when closing the window it left empty fails too. */
+    @Test void aFailedMoveToANewWindowKeepsTheMovesFailure() throws Exception {
+        edt(() -> {
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
+            boolean[] fail = {true};
+            notes.onActive(active -> { if (!active && fail[0]) throw new IllegalStateException("move failed"); });
+            failClosing = true;
+            try {
+                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("move failed").satisfies(failure ->
+                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("closing failed"));
+            } finally {
+                failClosing = false;
+                fail[0] = false;
+            }
+            assertThat(manager.children()).as("the window it left empty went").isEmpty();
+            assertThat(notes.window()).isEqualTo(main.id());
+        });
+        launch();
+    }
+
+    /** While every window closes, no child window opens: a closing tab's listener cannot leave one behind. */
+    @Test void noChildWindowOpensWhileEveryWindowCloses() throws Exception {
+        List<Optional<ChildWindow>> asked = new ArrayList<>();
+        edt(() -> {
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", child.id(), new JPanel());
+            Tab todo = model.tabs().open("dev.example.editor", "todo", "todo.txt", main.id(), new JPanel());
+            notes.onClosed(() -> asked.add(manager.openTerminalWindow(null)));
+            notes.onClosed(() -> asked.add(manager.moveToNewWindow(todo)));
+            manager.closeAll();
+            assertThat(asked).containsExactly(Optional.empty(), Optional.empty());
+            assertThat(manager.isEmpty()).as("no window outlives the main window").isTrue();
+            assertThat(events.stream().filter("opened child"::equals).count()).isEqualTo(1);
+        });
+        launch();
+    }
+
+    /** A window's requests and the panel route belong to the EDT. */
+    @Test void aWindowsRequestsAndThePanelRouteBelongToTheEdt() throws Exception {
+        ChildWindow[] child = new ChildWindow[1];
+        edt(() -> child[0] = manager.openTerminalWindow(null).orElseThrow());
+        assertThatThrownBy(() -> model.panelRoute(request -> request)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("Contributions belong to the EDT");
+        assertThatThrownBy(() -> child[0].events().activated().accept(true)).isInstanceOf(IllegalStateException.class)
+            .hasMessage("Windows belong to the EDT");
+        assertThatThrownBy(child[0]::requestClose).isInstanceOf(IllegalStateException.class).hasMessage("Windows belong to the EDT");
+        edt(() -> assertThat(child[0].closed()).isFalse());
         launch();
     }
 
