@@ -27,7 +27,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -157,7 +160,27 @@ class SingleInstanceTest {
         ready(seen, true, task -> { });
         assertThat(claim(QUICK)).as("spec 5.3: answered only once the event thread took it").isEqualTo(new SingleInstance.Claim.Done(1));
         assertThat(failures).containsExactly(SingleInstance.unresponsive(ProcessHandle.current().pid()));
-        assertThat(seen).as("withdrawn, never carried out").isEmpty();
+    }
+
+    @Test void aRequestTheEventThreadReachesAfterTheLaunchGaveUpIsWithdrawnAndNeverCarriedOut() throws Exception {
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
+        var reached = new AtomicInteger();
+        ScheduledExecutorService late = Executors.newSingleThreadScheduledExecutor();
+        try {
+            // An event thread that gets to each task 1.5 s after it was posted: beyond the 1 s the owner waits for it.
+            ready(seen, true, task -> late.schedule(() -> {
+                task.run();
+                reached.incrementAndGet();
+            }, 1500, TimeUnit.MILLISECONDS));
+            assertThat(claim(QUICK)).as("spec 5.3: not taken within a second").isEqualTo(new SingleInstance.Claim.Done(1));
+            assertThat(failures).containsExactly(SingleInstance.unresponsive(ProcessHandle.current().pid()));
+            // Runs after the late task: the executor runs by due time, and this one is due later than that one.
+            late.schedule(() -> { }, 1500, TimeUnit.MILLISECONDS).get(10, TimeUnit.SECONDS);
+            assertThat(reached.get()).as("the event thread did reach the request").isPositive();
+            assertThat(seen).as("withdrawn, never carried out").isEmpty();
+        } finally {
+            late.shutdownNow();
+        }
     }
 
     @Test void anOwnerThatTakesTheConnectionButNeverRepliesIsNotResponding() throws Exception {
@@ -195,10 +218,17 @@ class SingleInstanceTest {
         assertThat(failures).isEmpty();
     }
 
-    @Test void aReplacementWhosePredecessorNeverQuitsReportsIt() throws Exception {
+    @Test void aReplacementWhosePredecessorNeverQuitsWaitsForItAndNamesIt() throws Exception {
         heldElsewhere();
+        // The recorded owner is another process, so only the replacement's wait can name the live process it replaces.
+        Files.writeString(dirs().instanceLock().resolveSibling("instance.pid"), "4242\n");
         long alive = ProcessHandle.current().pid();
-        assertThat(claim(QUICK, "--replacing", Long.toString(alive))).isEqualTo(new SingleInstance.Claim.Done(1));
+        // A plain hand-off would give up after 100 ms; the wait is the 700 ms.
+        var timing = new SingleInstance.Timing(Duration.ofMillis(100), Duration.ofMillis(700), Duration.ofMillis(20));
+        long began = System.nanoTime();
+        assertThat(claim(timing, "--replacing", Long.toString(alive))).isEqualTo(new SingleInstance.Claim.Done(1));
+        assertThat(Duration.ofNanos(System.nanoTime() - began)).as("it waited out the replacement's time, not the hand-off's")
+            .isGreaterThanOrEqualTo(Duration.ofMillis(650));
         assertThat(failures).containsExactly(SingleInstance.unresponsive(alive));
     }
 

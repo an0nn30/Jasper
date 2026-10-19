@@ -77,8 +77,9 @@ class SingleInstanceProcessTest {
     @Test void theReplacementWaitsForTheLock() throws Exception {
         try (ChildJvm old = silentOwner()) {
             assertThat(old.line(90)).isEqualTo("owner");
-            try (ChildJvm replacement = launch("10000", "--replacing", Long.toString(old.pid()))) {
-                assertThat(replacement.line(3)).as("it waits while the old process lives").isNull();
+            // Its hand-off budget (1.5 s) is shorter than the silent window: a plain hand-off would have said "failed" by then.
+            try (ChildJvm replacement = launch("1500", "--replacing", Long.toString(old.pid()))) {
+                assertThat(replacement.line(5)).as("it waits while the old process lives").isNull();
                 old.finish();
                 assertThat(old.exit(30)).isZero();
                 assertThat(replacement.line(60)).isEqualTo("owner");
