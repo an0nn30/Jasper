@@ -41,14 +41,19 @@ public final class TabRegistry {
 
     /**
      * Registers a window's workspace. Closing the subscription removes, so disposes, the tabs that window still holds,
-     * then forgets it.
+     * then forgets it, whichever of those removals fail; the first failure is rethrown afterwards.
      */
     public Subscription addHost(WorkspaceHost host) {
         if (hosts.putIfAbsent(host.id(), host) != null) throw new IllegalArgumentException("Duplicate workspace");
         if (!host.detached()) lastMain = host.id();
         return new Subscription(() -> {
-            for (var tab : List.copyOf(tabs)) if (host.id().equals(tab.window())) remove(tab);
+            Throwable failure = null;
+            for (var tab : List.copyOf(tabs)) if (host.id().equals(tab.window())) {
+                try { remove(tab); }
+                catch (RuntimeException | Error thrown) { failure = Tab.keep(failure, thrown); }
+            }
             hosts.remove(host.id());
+            Tab.rethrow(failure);
         });
     }
 
@@ -224,13 +229,22 @@ public final class TabRegistry {
         select(tab);
     }
 
-    /** Disposes the tab at once, without asking a guard, and takes it out of its window. */
+    /**
+     * Disposes the tab at once, without asking a guard, and takes it out of its window. Whatever a listener or the content
+     * throws, the window still lets go of the tab; the first failure is rethrown afterwards.
+     */
     public void remove(Tab tab) {
         requireEdt();
         if (!tabs.remove(tab)) return;
         var host = hosts.get(tab.window());
-        tab.dispose();
-        if (host != null) host.detach().accept(tab);
+        Throwable failure = null;
+        try { tab.dispose(); }
+        catch (RuntimeException | Error thrown) { failure = thrown; }
+        if (host != null) {
+            try { host.detach().accept(tab); }
+            catch (RuntimeException | Error thrown) { failure = Tab.keep(failure, thrown); }
+        }
+        Tab.rethrow(failure);
     }
 
     public CompletableFuture<Boolean> approve(List<Tab> requested) { return approve(requested, true); }

@@ -267,4 +267,62 @@ class TabRegistryTest {
         assertThat(closed[0]).isEqualTo(1);
         assertThat(registry.tabs()).isEmpty();
     }
+
+    private Tab counted(int[] disposed, UUID window) {
+        var panel = new JPanel();
+        return registry.add(TabId.random(), Tab.Kind.TERMINAL, new TabContent() {
+            @Override public JComponent component() { return panel; }
+            @Override public void dispose() { disposed[0]++; }
+        }, window);
+    }
+
+    @Test void aFailingListenerNeverKeepsTheContentOrTheWindowFromLettingGoOfATab() {
+        hosts();
+        int[] disposed = {0};
+        var tab = counted(disposed, main);
+        mounted.add(tab);
+        var heard = new ArrayList<String>();
+        tab.onActive(active -> { if (!active) throw new IllegalStateException("activation failed"); });
+        tab.onActive(active -> { if (!active) heard.add("second activation"); });
+        tab.active(true);
+        tab.onClosed(() -> { throw new IllegalStateException("close failed"); });
+        tab.onClosed(() -> heard.add("second close"));
+        assertThatThrownBy(() -> registry.remove(tab)).isInstanceOf(IllegalStateException.class).hasMessage("activation failed")
+            .satisfies(failure -> assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("close failed"));
+        assertThat(heard).as("every other listener was still told").containsExactly("second activation", "second close");
+        assertThat(disposed[0]).as("the content was released").isEqualTo(1);
+        assertThat(mounted).as("the window let go of the tab").isEmpty();
+        assertThat(registry.tabs()).isEmpty();
+        assertThat(tab.closed()).isTrue();
+    }
+
+    @Test void aFailingDetachDoesNotHideTheFailureThatCameFirst() {
+        var window = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(window, false, tab -> {}, tab -> { throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
+        int[] disposed = {0};
+        var tab = counted(disposed, window);
+        tab.onClosed(() -> { throw new IllegalStateException("close failed"); });
+        assertThatThrownBy(() -> registry.remove(tab)).isInstanceOf(IllegalStateException.class).hasMessage("close failed")
+            .satisfies(failure -> assertThat(failure.getSuppressed()).extracting(Throwable::getMessage).containsExactly("detach failed"));
+        assertThat(disposed[0]).isEqualTo(1);
+        assertThat(registry.tabs()).isEmpty();
+    }
+
+    @Test void closingAHostRemovesEveryTabItHoldsAndForgetsItWhateverFails() {
+        var window = UUID.randomUUID();
+        var detachedTabs = new ArrayList<Tab>();
+        var registration = registry.addHost(new WorkspaceHost(window, true, tab -> {}, detachedTabs::add, tab -> {}, () -> {}));
+        int[] disposed = {0};
+        var first = counted(disposed, window);
+        var second = counted(disposed, window);
+        first.onClosed(() -> { throw new IllegalStateException("close failed"); });
+        assertThat(registry.detached(window)).as("registered").isTrue();
+        assertThatThrownBy(registration::close).isInstanceOf(IllegalStateException.class).hasMessage("close failed");
+        assertThat(disposed[0]).as("the other tab was removed too").isEqualTo(2);
+        assertThat(detachedTabs).containsExactly(first, second);
+        assertThat(registry.tabs()).isEmpty();
+        assertThat(registry.detached(window)).as("the host is forgotten").isFalse();
+        assertThatCode(() -> registry.addHost(new WorkspaceHost(window, true, tab -> {}, tab -> {}, tab -> {}, () -> {})))
+            .as("its id is free again").doesNotThrowAnyException();
+    }
 }

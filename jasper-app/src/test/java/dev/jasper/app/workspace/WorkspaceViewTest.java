@@ -1,10 +1,13 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.WorkspaceHost;
 import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.Orientation;
 import dev.jasper.app.layout.Side;
+import dev.jasper.app.launch.ShellLauncher;
 import dev.jasper.app.layout.Split;
+import dev.jasper.app.testsupport.IdleTerminalSession;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
@@ -16,6 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 /** Workspace tabs spec 10: a window's layout as groups in splits, each with its own strip (workspace plan 3a). */
@@ -29,6 +34,24 @@ class WorkspaceViewTest {
         owner.setSize(1208, 700);
         LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner);
         return owner;
+    }
+
+    /** A window whose {@code count} terminal tabs run real in-process sessions, which a launch delivers on the next EDT turn. */
+    private static WindowContent runningWindow(int count) throws Exception {
+        var launcher = new ShellLauncher(Runnable::run, directory -> IdleTerminalSession.start(), "idle-test-session");
+        var window = new WindowContent[1];
+        edt(() -> {
+            window[0] = content(launcher);
+            for (int i = 1; i < count; i++) window[0].newTab(HOME);
+            window[0].setSize(1208, 700);
+            layout(window[0]);
+        });
+        edt(() -> { });
+        return window[0];
+    }
+
+    private static dev.jasper.terminal.session.TerminalSession shellOf(Tab tab) {
+        return ((TerminalTab) tab.content()).focusedPane().session();
     }
 
     private static void layout(WindowContent owner) { LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner); }
@@ -183,6 +206,40 @@ class WorkspaceViewTest {
                 assertThat(strip.union(cards)).isEqualTo(whole);
             }
         });
+    }
+
+    @Test void aTerminalTabWhoseCloseListenerThrowsStillClosesItsShellAndLeavesTheWorkspace() throws Exception {
+        var owner = runningWindow(2);
+        var shells = new dev.jasper.terminal.session.TerminalSession[1];
+        edt(() -> {
+            var tab = owner.tabs().get(1);
+            shells[0] = shellOf(tab);
+            assertThat(shells[0]).as("its shell started").isNotNull();
+            assertThat(shells[0].exitFuture().isDone()).isFalse();
+            tab.onClosed(() -> { throw new IllegalStateException("listener failed"); });
+            assertThatThrownBy(() -> owner.closeTab(tab)).isInstanceOf(IllegalStateException.class).hasMessage("listener failed");
+            assertThat(owner.tabs()).doesNotContain(tab);
+            assertThat(owner.tabRegistry().tabs()).doesNotContain(tab);
+            assertThat(owner.workspace().activeGroupView().tabs()).as("the group's tabs").hasSize(1).doesNotContain(tab);
+            assertThat(owner.windowTabs().tabList().getComponentCount()).as("the strip lists the tab left").isEqualTo(1);
+        });
+        until(() -> shells[0].exitFuture().isDone());
+    }
+
+    @Test void closingAWindowWhoseTabListenerThrowsStillClosesTheOtherTabsAndForgetsTheWindow() throws Exception {
+        var owner = runningWindow(3);
+        var shells = new java.util.ArrayList<dev.jasper.terminal.session.TerminalSession>();
+        edt(() -> {
+            for (Tab tab : owner.tabs()) shells.add(shellOf(tab));
+            assertThat(shells).as("every shell started").doesNotContainNull().hasSize(3);
+            owner.tabs().get(0).onClosed(() -> { throw new IllegalStateException("listener failed"); });
+            assertThatThrownBy(owner::close).isInstanceOf(IllegalStateException.class).hasMessage("listener failed");
+            assertThat(owner.tabRegistry().tabs()).isEmpty();
+            assertThatCode(() -> owner.tabRegistry().addHost(new WorkspaceHost(owner.id(), false, tab -> { }, tab -> { }, tab -> { }, () -> { })))
+                .as("the window's host is unregistered").doesNotThrowAnyException();
+            assertThat(owner.windowTabs().isVisible()).as("the rest of the close ran: the strips are released").isFalse();
+        });
+        until(() -> shells.stream().allMatch(shell -> shell.exitFuture().isDone()));
     }
 
     @Test void stripsReorderWithinTheirGroupAndKeepTheSelection() throws Exception {

@@ -1582,7 +1582,9 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         themeRegistration.close();
         // Leaving the registry removes the tabs this window still holds: each closes, a terminal tab announced closed.
         java.util.List<Tab> held = registry.inWindow(id);
-        if (terminals != null) terminals.atomically(host::close); else host.close();
+        Throwable leaving = null;
+        try { if (terminals != null) terminals.atomically(host::close); else host.close(); }
+        catch (RuntimeException | Error failure) { leaving = failure; }
         for (Tab tab : held) WorkspaceTheme.clear(tab.component());
         workspace.close(); removeRootBindings();
         if (terminals != null) { terminals.close(); terminals = null; }
@@ -1594,5 +1596,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         onToggleBuddy = () -> {}; buddyEnabled = () -> false; onOpenFile = (file, line) -> {}; fileChooser = folder -> java.util.Optional.empty();
         activityListeners.clear();
         anyWindowActive = () -> false;
+        // A tab that failed to close does not leave the window half closed; its failure still reaches the caller.
+        if (leaving instanceof Error error) throw error;
+        if (leaving != null) throw (RuntimeException) leaving;
     }
 }

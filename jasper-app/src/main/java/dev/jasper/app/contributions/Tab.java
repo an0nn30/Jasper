@@ -147,14 +147,45 @@ public final class Tab implements AutoCloseable {
 
     private void fire() { for (var listener : List.copyOf(changed)) listener.run(); }
 
-    /** Marks the tab closed, tells its close listeners, then releases its content. */
+    /**
+     * Marks the tab closed, tells its activation and close listeners, then releases its content. A listener that throws
+     * keeps neither the other listeners nor the content from being told; the first failure is rethrown at the end, the
+     * others suppressed under it.
+     */
     void dispose() {
         if (closed) return;
-        active(false);
+        Throwable failure = null;
+        if (active) {
+            active = false;
+            failure = tell(activation, listener -> listener.accept(false), failure);
+        }
         closed = true;
-        for (var listener : List.copyOf(disposed)) listener.run();
+        failure = tell(disposed, Runnable::run, failure);
         changed.clear(); disposed.clear(); activation.clear();
-        content.dispose();
+        try { content.dispose(); }
+        catch (RuntimeException | Error thrown) { failure = keep(failure, thrown); }
+        rethrow(failure);
+    }
+
+    private static <T> Throwable tell(List<T> listeners, Consumer<T> call, Throwable failure) {
+        for (var listener : List.copyOf(listeners)) {
+            try { call.accept(listener); }
+            catch (RuntimeException | Error thrown) { failure = keep(failure, thrown); }
+        }
+        return failure;
+    }
+
+    /** The failure to throw once the cleanup is done: the first one, with each later one suppressed under it. */
+    static Throwable keep(Throwable first, Throwable later) {
+        if (first == null) return later;
+        first.addSuppressed(later);
+        return first;
+    }
+
+    /** Throws {@code failure}, which {@code keep} collected from runtime exceptions and errors only; null throws nothing. */
+    static void rethrow(Throwable failure) {
+        if (failure instanceof Error error) throw error;
+        if (failure != null) throw (RuntimeException) failure;
     }
 
     /** Removes the tab from its registry at once, without asking a guard. */
