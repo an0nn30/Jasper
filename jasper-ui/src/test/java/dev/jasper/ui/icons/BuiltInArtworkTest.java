@@ -110,13 +110,16 @@ class BuiltInArtworkTest {
         }
     }
 
-    /** Global Constraints: byte-identical upstream files, each with its JetBrains copyright comment. */
+    /** Upstream files that ship without a copyright comment; still intellij-community's Apache-2.0 platform/icons module (plan 13 Rulings 3). */
+    static final Set<String> NO_COMMENT = Set.of("classic/toolwindows/toolWindowServer.svg", "classic/toolwindows/toolWindowServer_dark.svg");
+
+    /** Global Constraints: byte-identical upstream files, each with its JetBrains copyright comment where upstream has one. */
     @Test void everyClassicFileIsTheRecordedUpstreamFileWithItsCopyright() throws Exception {
         List<String> lines;
         try (var in = getClass().getResourceAsStream("assets-classic.tsv")) {
             lines = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).lines().toList();
         }
-        assertThat(lines).hasSize(14);
+        assertThat(lines).hasSize(26);
         for (String line : lines) {
             String[] columns = line.split("\t");
             assertThat(columns[1]).startsWith("platform/icons/src/").endsWith(columns[0].substring("classic/".length()));
@@ -124,7 +127,28 @@ class BuiltInArtworkTest {
             try (var in = getClass().getResourceAsStream(columns[0])) { bytes = in.readAllBytes(); }
             assertThat(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes))).as(columns[0]).isEqualTo(columns[2]);
             String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            assertThat(text).as(columns[0]).startsWith("<!-- Copyright 2000-").contains("JetBrains s.r.o.").contains("Apache 2.0");
+            if (NO_COMMENT.contains(columns[0])) assertThat(text).as(columns[0] + ", shipped without a comment").startsWith("<svg").doesNotContain("Copyright");
+            else assertThat(text).as(columns[0]).startsWith("<!-- Copyright 2000-").contains("JetBrains s.r.o.").contains("Apache 2.0");
+        }
+    }
+
+    /** Plan 13 Rulings 4 and 5: the stripe table is Set A's six tool-window files, for labelled stripes only. */
+    @Test void theClassicStripeIconsAreTheToolWindowFilesForSixNames() throws Exception {
+        var files = Map.of("network", "classic/toolwindows/webToolWindow", "folder", "classic/toolwindows/toolWindowProject",
+            "tunnel", "classic/toolwindows/toolWindowModuleDependencies", "download", "classic/toolwindows/toolWindowAnalyzeDataflow",
+            "server", "classic/toolwindows/toolWindowServer", "bell", "classic/toolwindows/notifications");
+        assertThat(BuiltInArtwork.classicStripes()).containsOnlyKeys(files.keySet());
+        assertThat(BuiltInArtwork.classicChrome()).as("the header's classic set is unchanged").doesNotContainKeys(files.keySet().toArray(String[]::new));
+        try (var registry = new IconRegistry()) {
+            for (var entry : files.entrySet()) for (var theme : List.of(KitFixtures.light(), KitFixtures.dark())) {
+                String file = entry.getValue() + (theme.dark() ? "_dark.svg" : ".svg");
+                for (int scale : new int[] {1, 2}) {
+                    var stripe = registry.stripeIcon(entry.getKey(), 13).orElseThrow().icon(theme, SemanticColor.STATUS_DANGER);
+                    assertThat(pixels(stripe, scale)).as("%s at %s", file, scale).isEqualTo(direct(file, 13, scale));
+                }
+            }
+            for (String name : List.of("add", "history", "more.vertical", "dev.jasper.sample:flask", "no-such-icon"))
+                assertThat(registry.stripeIcon(name, 13)).as(name).isEmpty();
         }
     }
 
