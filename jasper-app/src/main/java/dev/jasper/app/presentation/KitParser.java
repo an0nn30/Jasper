@@ -36,7 +36,7 @@ import org.tomlj.TomlTable;
 /**
  * Reads a kit file (spec 5): TOML 1.0, strict and all or nothing, in the style of the plugin descriptor parser. A kit
  * names its format ({@code kit = 1}) and a host catalog ({@code base}), then optionally the chrome points, the control
- * points, the eleven public tokens, its type base and face files, two colour slots, four setting defaults and its branding. Every
+ * points, the eleven public tokens, its type base and face files, two colour slots, five setting defaults and its branding. Every
  * failure is one {@link Invalid} naming the key. Pure: files arrive through {@link Files}.
  */
 public final class KitParser {
@@ -515,7 +515,7 @@ public final class KitParser {
     private static Map<String, Setting<?>> defaultsByKey() {
         var byKey = new LinkedHashMap<String, Setting<?>>();
         for (Setting<?> setting : List.of(CoreSettings.UI_THEME_LIGHT, CoreSettings.UI_THEME_DARK, CoreSettings.PALETTE_VISIBLE_ROWS,
-                CoreSettings.WINDOW_TOOLBAR_HEIGHT)) byKey.put(String.join(".", setting.key()), setting);
+                CoreSettings.WINDOW_TOOLBAR_HEIGHT, CoreSettings.WINDOW_TOOLBAR)) byKey.put(String.join(".", setting.key()), setting);
         return java.util.Collections.unmodifiableMap(byKey);
     }
 }

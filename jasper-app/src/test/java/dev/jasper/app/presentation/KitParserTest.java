@@ -238,6 +238,13 @@ class KitParserTest {
         assertThat(dropped.defaults().value(CoreSettings.PALETTE_VISIBLE_ROWS)).isEqualTo(3);
     }
 
+    @Test void aLookMayDefaultTheToolbarMode() throws Exception {
+        var parsed = parse("kit = 1\nbase = \"default\"\n[defaults]\n\"window.toolbar\" = \"icons\"\n");
+        assertThat(parsed.defaults().value(CoreSettings.WINDOW_TOOLBAR)).isEqualTo(dev.jasper.app.config.ToolbarMode.ICONS);
+        assertThat(problem("kit = 1\nbase = \"default\"\n[defaults]\n\"window.toolbar\" = \"tiny\"\n"))
+            .startsWith("[defaults].\"window.toolbar\": ");
+    }
+
     @Test void everyInvalidKitGivesOneMessageNamingTheKey() {
         String head = "kit = 1\nbase = \"default\"\n";
         String ui = "[type.ui]\nfamily = \"F\"\nmedium = \"fonts/ibm-plex-sans-medium.ttf\"\nsemibold = \"fonts/ibm-plex-sans-semibold.ttf\"\n";
@@ -260,7 +267,7 @@ class KitParserTest {
         cases.put(head + "[type]\nbase = 12.5\n", "[type].base: expected an integer");
         cases.put(head + "[chrome]\nmenu_bar = \"window\"\n", "[chrome].menu_bar: \"window\" needs [chrome].title_bar = \"native\"");
         cases.put(head + "[defaults]\n\"ui.font.size\" = 12\n", "[defaults].\"ui.font.size\": not a setting a look may default; use "
-            + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\" or \"window.toolbar_height\"");
+            + "\"ui.theme.light\", \"ui.theme.dark\", \"palette.visible_rows\", \"window.toolbar_height\" or \"window.toolbar\"");
         cases.put(head + "[defaults]\n\"palette.visible_rows\" = 30\n", "[defaults].\"palette.visible_rows\": Use an integer from 1–20.");
         cases.put(head + "[defaults]\n\"window.toolbar_height\" = 70\n", "[defaults].\"window.toolbar_height\": Use an integer from 28–64.");
         cases.put(head + "[defaults]\n\"ui.theme.dark\" = \"nope\"\n",
