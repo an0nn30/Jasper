@@ -194,7 +194,11 @@ final class WorkspaceView extends JPanel {
     }
 
     private EmptyWorkspace emptyState() {
-        if (empty == null) empty = new EmptyWorkspace(owner);
+        if (empty == null) {
+            empty = new EmptyWorkspace(owner);
+            // It paints over the workspace surface, so its controls take the workspace theme.
+            WorkspaceTheme.apply(empty, owner.theme());
+        }
         empty.refresh();
         return empty;
     }
@@ -244,8 +248,8 @@ final class WorkspaceView extends JPanel {
     }
 
     /**
-     * Takes the theme: backgrounds, the strips' zone, and the delegates of a group the maximize keeps out of the tree and
-     * of the empty state while a tab hides it.
+     * Takes the theme: backgrounds, the strips' and the empty state's zones, and the delegates of a group the maximize
+     * keeps out of the tree and of the empty state while a tab hides it.
      */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         setBackground(theme.surface());
@@ -256,6 +260,7 @@ final class WorkspaceView extends JPanel {
             group.refresh();
         }
         if (updateDelegates && empty != null && !SwingUtilities.isDescendingFrom(empty, this)) SwingUtilities.updateComponentTreeUI(empty);
+        if (empty != null) WorkspaceTheme.apply(empty, theme);
     }
 
     /** Below opacity 1 the workspace and its splits paint nothing behind the tabs; dividers stay solid. */

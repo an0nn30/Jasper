@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import static dev.jasper.app.workspace.DesktopTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.commands.ActionId;
 import dev.jasper.app.config.KeyBindings;
 import dev.jasper.app.contributions.Contributions;
@@ -184,6 +185,23 @@ class WindowRolesTest {
                 assertThat(caption.getForeground()).as("the light variant's placeholder text")
                     .isEqualTo(ThemeZone.color(caption, SemanticColor.TEXT_PLACEHOLDER)).isNotEqualTo(dark[0]);
             } finally { main[0].selectVariant(true); }
+        });
+    }
+
+    /**
+     * The empty state paints over the workspace surface: it is a workspace zone, under a workspace theme unlike the
+     * chrome.
+     */
+    @Test void theEmptyWorkspaceIsAWorkspaceZone() throws Exception {
+        edt(() -> {
+            var main = content(idleLauncher(pending), WindowRole.MAIN, HOME, true, () -> { });
+            EmptyWorkspace empty = main.workspace().emptyWorkspace();
+            assertThat(empty.getClientProperty("Jasper.zone")).as("made as one").isEqualTo("workspace");
+            var chrome = ThemeTestSupport.generated(true);
+            var workspace = ThemeTestSupport.recolored(ThemeTestSupport.generated(false),
+                Map.of(SemanticColor.TEXT_PRIMARY, Color.MAGENTA));
+            main.applyTheme(ThemeTestSupport.mixed(chrome, workspace), false);
+            assertThat(ThemeZone.theme(empty.button(ActionId.NEW_TAB))).isSameAs(workspace);
         });
     }
 

@@ -1,6 +1,6 @@
 # Command palette
 
-Every window's header has a search field in the middle showing the focused pane's context, with the
+The main window's header has a search field in the middle showing the focused pane's context, with the
 palette shortcut on the right. Clicking it, Cmd+K on macOS or Ctrl+K on Windows and Linux, or View →
 Command Palette drops the palette from the field: the card covers the field, centred on it and at
 least 560 px wide, moving or narrowing to stay clear of the window controls. When the window is too

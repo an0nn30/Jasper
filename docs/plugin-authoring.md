@@ -161,14 +161,14 @@ private static void installUi(PluginContext context, long stepMillis) {
   `StandardMenu.SESSION` and `TRANSFER`. Like Tools, each shows only while some plugin has entries in it, after Tab in
   the default look.
 - **Toolbar views** (SDK 0.18): `ToolbarItem.view(window -> context.kit().create(spec, events))` places a small group
-  of your own controls in the main toolbar, one per window, built when the window opens and closed with it or your
-  registration. The factory also runs inside `toolbar().add(...)` for every window already open, so finish
+  of your own controls in the main window's toolbar, built when the main window opens and closed with it or your
+  registration. The factory also runs inside `toolbar().add(...)` while the main window is open, so finish
   initialising what it reads before you add the view; a factory that throws is not asked again for that window. Its
   root is an INLINE `Stack` of LABEL `Text`, DROPDOWN, SEARCHABLE or PICKER `Choice`s, at most one PRIMARY `Button`,
   `MenuButton`s and `Separator`s. When a window mounts the view the host refuses any other tree by logging it, naming
   the node, and closing the view, and that window shows none; `update` throws `IllegalArgumentException` naming the
   node. A view never moves into the overflow menu: it hides while the toolbar is too narrow.
-- **Status items** are global: one handle updates the item in every window.
+- **Status items** show in the main window's status bar: one handle updates the item there.
 - **Icons.** Pass semantic names such as `"lock"`, `"server"` and `"file"` to presentation records.
   Register a plugin-owned monochrome path with `context.kit().registerIcon(new IconAsset("your.plugin:icon", path))`.
   The host validates names and resolves the mounted theme on each paint. See [icons](sdk-icons.md).
@@ -923,8 +923,8 @@ Use SDK 0.8.5's `Windows.openTab` for document surfaces. Supply only specialized
 the app provides the tab strip, frame, window, status controls and menus. Update the returned
 `ContentTab` with `ContentPresentation`, `ContentCommand` and `ContentStatus` snapshots,
 and set a focus callback. Pass the handle as the owner of save pickers and dialogs so those
-follow moves to another window. `move(true)` opens a separate app-managed workspace;
-`move(false)` returns to the last main workspace. Preserve the component/session during moves. The tab is a
+follow moves to another window. `move(true)` opens a separate app-managed workspace, and
+leaves a child window's only tab where it is; `move(false)` moves the tab to the main window. Preserve the component/session during moves. The tab is a
 content tab of its window: `WindowHandle.tabs()` lists it and the `TAB_*` topics report it.
 
 Register one `onTabsClosing` guard per plugin. It receives the closing subset and a batch

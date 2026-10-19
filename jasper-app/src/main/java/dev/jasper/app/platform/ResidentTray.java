@@ -22,13 +22,13 @@ import javax.swing.SwingUtilities;
  * Jasper's icon outside its windows, the one owner of it. A resident Jasper shows it once start-up has settled: on
  * macOS the menu bar item with New Terminal Window, Settings… and Quit Jasper Completely; on Windows the
  * notification-area icon with Open Jasper and Quit Jasper (a windowless Windows process is otherwise invisible). On
- * Windows the same icon
- * carries the system notifications' balloons (spec section 9): a notification sent while Jasper is away shows its
- * balloon from the resident icon, or from an icon added for the purpose and removed when Jasper is focused again. A
- * click on a balloon or on the icon activates the most recent notification, if it is still unread, since
- * {@code TrayIcon} cannot tell balloons apart; once that one is read, a click on the resident icon is Open and a click
- * on the icon added for balloons does nothing, even if an older notification is unread. macOS banners come from its own
- * bridge, so the menu bar item carries no balloons; Linux gets no icon. EDT only; menu actions arrive on the EDT.
+ * Windows the same icon carries the system notifications' balloons (spec section 9): a notification sent while Jasper
+ * is away shows its balloon from the resident icon, or from an icon added for the purpose and removed when Jasper is
+ * focused again. A click on a balloon or on the icon activates the most recent notification, if it is still unread,
+ * since {@code TrayIcon} cannot tell balloons apart; once that one is read, a click on the resident icon is Open and a
+ * click on the icon added for balloons does nothing, even if an older notification is unread. macOS banners come from
+ * its own bridge, so the menu bar item carries no balloons; Linux gets no icon. EDT only; menu actions arrive on the
+ * EDT.
  */
 public final class ResidentTray {
     private static final System.Logger LOG = System.getLogger(ResidentTray.class.getName());

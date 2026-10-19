@@ -1,6 +1,7 @@
 # Workspace tabs 4a: the main window and child windows Implementation Plan
 
-**Status: executed on 2026-10-19** (`bd735c724..82a55495d`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-19** (`bd735c724..82a55495d`, then the documentation commit and the final review's
+fixes); see `docs/STATUS.md`.
 Deviations from the plan's text: (a) until plan 6, restoring opens a fresh main window and no child window (spec 6.4's
 last row; spec 18 puts restoring in plan 6); (b) before Task 1 the plan was replayed on 3b's final code `55e6de176` (41
 blocks, 7 failing before the refresh, 0 after) and refreshed in `bd735c724`: five anchors were re-found (Task 1 Step 3's
@@ -14,10 +15,11 @@ source lets the tab go, so the fake reports the application's order (no active p
 read, settling 3b's "one place off"); (f) F4: executors used the pre-flight's absolute counts, which Task 2's fix round
 moved to `WindowManagerTest` 23, 25 and 27 after Tasks 2, 4 and 5 (the plan's counts were off); (g) F5: `WindowFrame`
 clears the content's fixed 900 by 650 size for an empty child window, so it opens at the grid size (Rulings 18); (h) F6:
-a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and `JasperApplicationBackgroundTest`
-and `JasperApplicationResidencyTest` (41, 16) are unchanged; (i) F8: Task 1's failed-build catch closes
-`themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is package-private in `contributions`, and,
-from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when `old.detach` throws, still attaches to
+a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and for
+`JasperApplicationBackgroundTest` and `JasperApplicationResidencyTest` their counts (41, 16) are unchanged; (i) F8: Task
+1's failed-build catch closes `themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is
+package-private in `contributions`, and, from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when
+`old.detach` throws, still attaches to
 the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move whose every attach fails stays as 3b's
 F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
 `WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
@@ -49,7 +51,19 @@ from its version at execution (Editor 0.10.0, File Server 0.5.0, Remote 0.13.0, 
 ruling: four of Task 6's wording minors are folded in, so `NotificationsFeature.activated`'s and
 `JasperApplication.presence`'s comments say the main window holds the cards, `WindowContent.mount`'s Javadoc says "a
 window frame's root", and `docs/keyboard-shortcuts.md` says the Editor's keys are its tabs' commands, not registered
-actions.
+actions; (y) final review: tabs asked for while the main window is composed wait in the registry's list, in order, until
+`ensureMain` says the main window opened (`TabRegistry.mainOpened`: each attaches, the last is selected, one that fails
+is removed and logged) or failed (`mainFailed`: each is removed, its failure suppressed under the main window's), with
+nothing re-posted and no second composition, and a plugin's tab with no main window hears "The main window is closing
+or Jasper is quitting"; a panel toggle from a child window shows the panel; `WindowFrame`'s constructor closes its title
+bar and glass and disposes the frame when it fails (no test: a `JFrame` cannot be built headless); the empty workspace
+is a workspace zone; the architecture rule counts each explicit `new` of a pinned type, since javap prints a class's own
+constructor calls unqualified and the old rule, self-exemption or not, let a factory inside `MainWindow` pass; Move to
+Main Window has one path, `TabRegistry.moveToMainWindow` (`WindowManager.moveToMainWindow` is gone, its tests ported);
+a failed new-window move decides on `inWindow`, and a change listener that refuses a moving tab's new owner leaves the
+tab in its window; `ensureMain` opens nothing while every window closes; and the documentation and comment corrections
+(the plugin moves, a child window closing with its last tab, the main window's header, Zen, toolbar views and status
+items, the screen menu bar, `transfer`'s catch name and Javadoc, `ResidentTray`'s Javadoc).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

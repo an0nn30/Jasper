@@ -98,10 +98,12 @@ public final class WindowManager {
     public WindowManager(Contributions model, Hooks hooks) {
         this.model = Objects.requireNonNull(model, "model");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
-        // A plugin's view opened with no window goes to the main window, restored first when none is open (spec 6.4); while
-        // the main window is being composed it waits for it. A child window a move empties closes after the move.
+        // A plugin's view opened with no window goes to the main window, restored first when none is open (spec 6.4);
+        // while the main window is being composed it waits for it, until ensureMain says it opened or failed. A child
+        // window a move empties closes after the move.
         model.tabs().windows(new TabRegistry.Windows(() -> openingMain ? null : ensureMain("plugin", null).map(JasperWindow::id)
-            .orElseThrow(() -> new IllegalStateException("Jasper is quitting")), this::isMain, this::moveToNewWindow, this::movedOut));
+            .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting")), this::isMain,
+            this::moveToNewWindow, this::movedOut));
         model.panelRoute(this::routePanel);
     }
 
@@ -163,25 +165,37 @@ public final class WindowManager {
     }
 
     /**
-     * The main window, opened first when none is open (workspace tabs spec 6.4: every request restores it first).
+     * The main window, opened first when none is open (workspace tabs spec 6.4: every request restores it first). The
+     * tabs a plugin asked for while it was being composed open in it once it shows, or go with it when it fails to
+     * open, their failures under its own.
      *
      * @param trigger what asked, for the new window's start-up timing line
      * @param directory where a new main window's terminal tab starts; null for where a new shell starts
-     * @return the main window; empty while Jasper quits or the main window closes
+     * @return the main window; empty while Jasper quits, the main window closes or every window closes
      * @throws IllegalStateException when asked again while the main window is still opening
      */
     public Optional<MainWindow> ensureMain(String trigger, Path directory) {
         requireEdt();
         // A main window that is closing is not absent: no second one opens while it goes (workspace tabs spec 6.1).
         if (main != null) return main.closed() ? Optional.empty() : Optional.of(main);
+        // Nor does one open while every window closes, from a closed hook say.
+        if (closingAll) return Optional.empty();
         if (openingMain) throw new IllegalStateException("The main window is still opening");
         openingMain = true;
+        Optional<MainWindow> opened;
         try {
-            return open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty()),
+            opened = open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty()),
                 content -> main = new MainWindow(this, content));
+        } catch (RuntimeException | Error failure) {
+            // Still opening: a waiting tab's close listener cannot ask for another main window.
+            model.tabs().mainFailed(failure);
+            throw failure;
         } finally {
             openingMain = false;
         }
+        // A main window its own opening closed again leaves the waiting tabs to the next one.
+        opened.filter(window -> !window.closed()).ifPresent(window -> model.tabs().mainOpened(window.id()));
+        return opened;
     }
 
     /**
@@ -228,8 +242,8 @@ public final class WindowManager {
         } catch (RuntimeException | Error thrown) {
             failure = thrown;
         }
-        // A move the registry refused, or one that failed, leaves the new window empty: it goes.
-        if (!child.closed() && child.content().tabCount() == 0) {
+        // A move the registry refused, or one that failed, leaves no tab in the new window: it goes.
+        if (!child.closed() && model.tabs().inWindow(child.id()).isEmpty()) {
             try {
                 child.close();
             } catch (RuntimeException | Error thrown) {
@@ -238,20 +252,6 @@ public final class WindowManager {
         }
         rethrow(failure);
         return child.closed() ? Optional.empty() : opened;
-    }
-
-    /**
-     * Move Tab to Main Window (workspace tabs spec 6.5): {@code tab} goes to the main window's active group; its child
-     * window closes when that was its last tab.
-     *
-     * @param tab a tab of a child window
-     */
-    public void moveToMainWindow(Tab tab) {
-        requireEdt();
-        if (tab == null || tab.closed()) return;
-        Optional<JasperWindow> from = window(tab.window());
-        if (from.isEmpty() || from.get().isMain()) return;
-        ensureMain("menu", null).ifPresent(target -> model.tabs().move(tab, target.id()));
     }
 
     /**
@@ -350,11 +350,16 @@ public final class WindowManager {
         }
     }
 
-    /** A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. */
+    /**
+     * A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. A
+     * toggle there shows the panel, as a tool window's shortcut in IntelliJ's detached editor activates the tool
+     * window.
+     */
     private Contributions.PanelRequest routePanel(Contributions.PanelRequest request) {
         if (main == null || children.stream().noneMatch(child -> child.id().equals(request.windowId()))) return request;
-        if (request.op() != Contributions.PanelRequest.Op.HIDE) main.toFront();
-        return new Contributions.PanelRequest(main.id(), request.panelId(), request.op());
+        var op = request.op() == Contributions.PanelRequest.Op.TOGGLE ? Contributions.PanelRequest.Op.SHOW : request.op();
+        if (op != Contributions.PanelRequest.Op.HIDE) main.toFront();
+        return new Contributions.PanelRequest(main.id(), request.panelId(), op);
     }
 
     /**

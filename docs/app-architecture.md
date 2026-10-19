@@ -94,6 +94,7 @@ cleanup runs on daemon workers; both ordinary quit and startup rollback
 queue this cleanup without blocking EDT. The two-second bound covers the application
 wait, not a promise that every cleanup succeeds or the JVM exits within two seconds.
 The process shutdown hook backs up endpoint cleanup and drains logging separately.
+
 Windows are one main window and any number of child windows (workspace tabs spec 6), all made and closed by the
 application's `WindowManager` (workspace): the main window has every piece of chrome around its workspace and keeps an
 empty workspace when its last tab closes; a child window (`WindowRole.CHILD` content) shows a title bar over its
@@ -101,6 +102,7 @@ workspace and closes with its last tab. Every outside request, a plugin's tab wi
 restore the main window first; closing the main window, Quit and going to the background close the child windows, then
 the main window. `MainWindow`'s constructor has one call site, `WindowManager.ensureMain`, which
 `verifyApplicationArchitecture` checks.
+
 Residency retains indexes/config/history after the last window,
 and does not intentionally retain pane sessions; asynchronous child cleanup may
 briefly continue after the last window closes. On a packaged macOS Jasper that is
@@ -234,8 +236,8 @@ that keep clear of the traffic lights; on Windows and Linux FlatLaf's title pane
 the system title bar stays and the header is the top row of `WindowContent`. A look with a native title (the
 Enterprise presentation) gives every platform the system title bar; with `menu_bar = "window"` the bootstrap turns
 macOS's screen menu bar off, so the main window's menus are a row in the window (a child window shows none, and an
-auxiliary frame shows none and binds Close Window's shortcut itself). On macOS a focused child window's screen menu bar
-shows the main window's menus, built from the same model. A native-titled macOS frame's appearance follows the theme; Jasper gives the
+auxiliary frame shows none and binds Close Window's shortcut itself). Otherwise, on macOS a focused child window's screen
+menu bar shows its own copy of the main window's menus, built from the same model. A native-titled macOS frame's appearance follows the theme; Jasper gives the
 Windows and Linux system title bar no appearance hint (JBR has none). `WorkspaceChrome.of` (workspace) and
 `ShellChrome.of` (windows) read the look's projections and choose the strategies, among them `MenuBarLayout`:
 `StandardMenuBar`, or `ClassicMenuBar` (File, Edit, View, Session, Transfer, plugin menus, Tools, Window, Help).

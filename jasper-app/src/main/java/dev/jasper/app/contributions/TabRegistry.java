@@ -31,6 +31,8 @@ public final class TabRegistry {
     private static final System.Logger LOG = System.getLogger(TabRegistry.class.getName());
     private final Map<UUID, WorkspaceHost> hosts = new LinkedHashMap<>();
     private final List<Tab> tabs = new ArrayList<>();
+    /** The tabs asked for while the main window was being composed, in the order they were asked for. */
+    private final List<Tab> waiting = new ArrayList<>();
     private final Map<String, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>>> guards = new HashMap<>();
     private Windows windows;
     private List<Tab> pending = List.of();
@@ -166,8 +168,9 @@ public final class TabRegistry {
 
     /**
      * Opens a plugin's view as a tab in {@code owner}'s window, or the main window when {@code owner} is null or not
-     * registered, and selects it. A (plugin, key) already open is selected again, and attached to a window again when it
-     * lost its own.
+     * registered, and selects it. A (plugin, key) already open is selected again, and attached to a window again when
+     * it lost its own. While the main window is being composed, a tab for it waits ({@link #mainOpened},
+     * {@link #mainFailed}).
      */
     public Tab open(String plugin, String key, String title, UUID owner, JComponent component) {
         requireEdt();
@@ -175,7 +178,7 @@ public final class TabRegistry {
             if (tab.window() == null) {
                 WorkspaceHost retry = owner != null ? hosts.get(owner) : null;
                 if (retry == null) retry = main();
-                if (retry == null) { later(tab); return tab; }
+                if (retry == null) { waitForMain(tab); return tab; }
                 tab.window(retry.id());
                 try { retry.attach().accept(tab); }
                 catch (RuntimeException | Error failure) {
@@ -191,7 +194,7 @@ public final class TabRegistry {
         WorkspaceHost host = owner != null ? hosts.get(owner) : null;
         if (host == null) host = main();
         tabs.add(tab);
-        if (host == null) { later(tab); return tab; }
+        if (host == null) { waitForMain(tab); return tab; }
         tab.window(host.id());
         try { host.attach().accept(tab); }
         catch (RuntimeException | Error failure) {
@@ -221,24 +224,64 @@ public final class TabRegistry {
         return Objects.requireNonNull(hosts.get(id), "The main window registered no workspace");
     }
 
+    /** A tab asked for while the main window is being composed (a panel factory, say) waits for it (spec 6.4). */
+    private void waitForMain(Tab tab) { if (!waiting.contains(tab)) waiting.add(tab); }
+
     /**
-     * Attaches a tab asked for while the main window was being composed (a panel factory or a {@code WINDOW_OPENED}
-     * listener, say) once the main window is up, on a later EDT turn (workspace tabs spec 6.4).
+     * The main window has opened (workspace tabs spec 6.4): the tabs that waited for it open there, in the order they
+     * were asked for, and the last one that opened is selected. One that fails to open there is removed, so disposed;
+     * its failure, like a failing selection's, is logged as a warning, since its caller has already returned, and keeps
+     * no other tab out.
+     *
+     * @param main the main window's id
      */
-    private void later(Tab tab) {
-        SwingUtilities.invokeLater(() -> {
-            if (tab.closed() || !tabs.contains(tab) || tab.window() != null) return;
-            WorkspaceHost host = main();
-            if (host == null) { later(tab); return; }
-            tab.window(host.id());
-            try { host.attach().accept(tab); }
-            catch (RuntimeException | Error failure) {
+    public void mainOpened(UUID main) {
+        requireEdt();
+        Objects.requireNonNull(main, "main");
+        var batch = List.copyOf(waiting);
+        waiting.clear();
+        WorkspaceHost host = null;
+        Tab opened = null;
+        for (var tab : batch) {
+            // One closed, or given a window of its own meanwhile, no longer waits.
+            if (tab.closed() || !tabs.contains(tab) || tab.window() != null) continue;
+            if (host == null) host = Objects.requireNonNull(hosts.get(main), "The main window registered no workspace");
+            try {
+                tab.window(host.id());
+                host.attach().accept(tab);
+                opened = tab;
+            } catch (RuntimeException | Error failure) {
                 rollbackAttach(host, tab, failure);
-                tab.window(null);
-                throw failure;
+                tabs.remove(tab);
+                try { tab.dispose(); }
+                catch (RuntimeException | Error cleanup) { Tab.keep(failure, cleanup); }
+                LOG.log(System.Logger.Level.WARNING, "A tab that waited for the main window failed to open there",
+                    failure);
             }
-            select(tab);
-        });
+        }
+        if (opened == null) return;
+        try { select(opened); }
+        catch (RuntimeException | Error failure) {
+            LOG.log(System.Logger.Level.WARNING, "A tab that waited for the main window failed to be selected there",
+                failure);
+        }
+    }
+
+    /**
+     * The main window failed to open (workspace tabs spec 6.4): the tabs that waited for it are removed, so disposed,
+     * whatever removing another one throws, and nothing asks for the main window again for them.
+     *
+     * @param failure the main window's failure, which keeps theirs suppressed under it; the window manager rethrows it
+     */
+    public void mainFailed(Throwable failure) {
+        requireEdt();
+        Objects.requireNonNull(failure, "failure");
+        var batch = List.copyOf(waiting);
+        waiting.clear();
+        for (var tab : batch) {
+            try { remove(tab); }
+            catch (RuntimeException | Error thrown) { Tab.keep(failure, thrown); }
+        }
     }
 
     /** Shows the tab in its window and raises the window. */
@@ -292,16 +335,23 @@ public final class TabRegistry {
     }
 
     /**
-     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. When {@code next} fails, the tab
-     * goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When {@code old}
-     * fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that failure
-     * propagates afterwards. The window the tab left hears of the move last (workspace plan 4a); a failure there is kept
-     * behind the move's own.
+     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. A change listener that throws
+     * as the tab takes {@code next} leaves it in {@code old}, and its failure propagates. When {@code next} fails, the
+     * tab goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When
+     * {@code old} fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that
+     * failure propagates afterwards. The window the tab left hears of the move after it, then the tab is selected
+     * (workspace plan 4a); a failure of either is kept behind the move's own.
      */
     private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {
         // Change ownership before removal: an emptied old window may unregister itself synchronously.
         tab.active(false);
-        tab.window(next.id());
+        try { tab.window(next.id()); }
+        catch (RuntimeException | Error refused) {
+            // The tab never left: it names the window that holds it again (workspace plan 4a's final review).
+            try { tab.window(old.id()); }
+            catch (RuntimeException | Error again) { Tab.keep(refused, again); }
+            throw refused;
+        }
         tab.movingFrom = old.id();
         // The first failure is the move's own: the source's, else the destination's; later ones are kept behind it.
         Throwable failure = null;
@@ -337,7 +387,7 @@ public final class TabRegistry {
         // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
         if (windows != null) {
             try { windows.movedOut().accept(old.id()); }
-            catch (RuntimeException | Error closing) { failure = Tab.keep(failure, closing); }
+            catch (RuntimeException | Error closeFailure) { failure = Tab.keep(failure, closeFailure); }
         }
         if (arrived) {
             try { select(tab); }

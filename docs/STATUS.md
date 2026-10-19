@@ -2,7 +2,8 @@
 
 **Workspace tabs, plan 4a: the main window and child windows — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `bd735c724..82a55495d` (Tasks 1 to 6 and their fix rounds, after the plan refresh),
-then this documentation commit; [plan](superpowers/plans/2026-10-18-workspace-4a-windows.md),
+then the documentation commit and the final review's fixes;
+[plan](superpowers/plans/2026-10-18-workspace-4a-windows.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). Jasper has one main window and any number of
 child windows, all made, tracked and closed by the application's `workspace.WindowManager`: `MainWindow` is made only in
 `ensureMain`, and only when none is open (`verifyApplicationArchitecture` checks its constructor's one call site);
@@ -19,8 +20,8 @@ child window a move empties closes after the move has reported itself: `TAB_MOVE
 Javadoc, README, fakes and contract test follow, the reverse of plan 3b's order). For plan 5: `Opening.bounds`,
 `moveToNewWindow(Tab, Rectangle)` with `WindowShell.place`, `windowsByActivation()`; for plan 6: `Hooks.closing` and
 `closingAll`, and, since while `closeAll` runs the main window's closed hook runs after `manager.closed(main)` with
-`closingAll` still true, a hook there that calls `ensureMain` would open a fresh main window. The main window's last tab
-leaves `EmptyWorkspace` (New Terminal Tab, Open File). `WindowFrame` (formerly `TerminalWindow`) is the one `JFrame`;
+`closingAll` still true, `ensureMain` gives a hook there no main window. The main window's last tab leaves
+`EmptyWorkspace` (New Terminal Tab, Open File). `WindowFrame` (formerly `TerminalWindow`) is the one `JFrame`;
 `WindowShell` its functions, so `WindowManagerTest` and `JasperApplicationWindowsTest` run the lifecycle headlessly.
 `new_window` is gone everywhere; `new_terminal_window` (⌘N / Ctrl+Shift+N), `close_window` (⇧⌘W / none),
 `move_tab_to_new_window` and `move_tab_to_main_window` (no keys; the tab menu and the palette) are new; the menu bar
@@ -81,10 +82,11 @@ source lets the tab go, so the fake reports the application's order (no active p
 read, settling 3b's "one place off"); (f) F4: executors used the pre-flight's absolute counts, which Task 2's fix round
 moved to `WindowManagerTest` 23, 25 and 27 after Tasks 2, 4 and 5 (the plan's counts were off); (g) F5: `WindowFrame`
 clears the content's fixed 900 by 650 size for an empty child window, so it opens at the grid size (Rulings 18); (h) F6:
-a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and `JasperApplicationBackgroundTest`
-and `JasperApplicationResidencyTest` (41, 16) are unchanged; (i) F8: Task 1's failed-build catch closes
-`themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is package-private in `contributions`, and,
-from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when `old.detach` throws, still attaches to
+a frame that fails to build reaches `windowClosed` (`Hooks.closed`'s contract), and for
+`JasperApplicationBackgroundTest` and `JasperApplicationResidencyTest` their counts (41, 16) are unchanged; (i) F8: Task
+1's failed-build catch closes `themeRegistration` (3a's hand-off) with `addSuppressed`, since `Tab.keep` is
+package-private in `contributions`, and, from its review, `windowCommands` too; (j) F9: `transfer` keeps the error when
+`old.detach` throws, still attaches to
 the next window and rethrows, recovery keeps failures with `Tab.keep`, and a move whose every attach fails stays as 3b's
 F8 (one `TabRegistryTest` case); (k) F10: `aChildWindowClosesWhenItsLastTabCloses` ends with `TabClosed`,
 `WindowClosed`, `ActivePaneChanged(empty)` (3a's hand-off); (l) F11: `TabMoveTest` gains the routing case
@@ -116,18 +118,31 @@ from its version at execution (Editor 0.10.0, File Server 0.5.0, Remote 0.13.0, 
 ruling: four of Task 6's wording minors are folded in, so `NotificationsFeature.activated`'s and
 `JasperApplication.presence`'s comments say the main window holds the cards, `WindowContent.mount`'s Javadoc says "a
 window frame's root", and `docs/keyboard-shortcuts.md` says the Editor's keys are its tabs' commands, not registered
-actions. Left for plan 4b: plugin windows as tabs (`Windows.create`, `PluginWindow`, `WindowSpec`,
-`ShortcutContext.Kind.WINDOW`, `KeyContext.WINDOW`; the Vault manager and the sample About), the Errors window as a tab,
-`TabPlacement`, the `ContentTab` move API, panels in the main window only in the SDK, `WindowHandle.isMain()`, and
+actions; (y) final review: tabs asked for while the main window is composed wait in the registry's list, in order, until
+`ensureMain` says the main window opened (`TabRegistry.mainOpened`: each attaches, the last is selected, one that fails
+is removed and logged) or failed (`mainFailed`: each is removed, its failure suppressed under the main window's), with
+nothing re-posted and no second composition, and a plugin's tab with no main window hears "The main window is closing
+or Jasper is quitting"; a panel toggle from a child window shows the panel; `WindowFrame`'s constructor closes its title
+bar and glass and disposes the frame when it fails (no test: a `JFrame` cannot be built headless); the empty workspace
+is a workspace zone; the architecture rule counts each explicit `new` of a pinned type, since javap prints a class's own
+constructor calls unqualified and the old rule, self-exemption or not, let a factory inside `MainWindow` pass; Move to
+Main Window has one path, `TabRegistry.moveToMainWindow` (`WindowManager.moveToMainWindow` is gone, its tests ported);
+a failed new-window move decides on `inWindow`, and a change listener that refuses a moving tab's new owner leaves the
+tab in its window; `ensureMain` opens nothing while every window closes; and the documentation and comment corrections
+(the plugin moves, a child window closing with its last tab, the main window's header, Zen, toolbar views and status
+items, the screen menu bar, `transfer`'s catch name and Javadoc, `ResidentTray`'s Javadoc). Left for plan 4b: plugin
+windows as tabs (`Windows.create`, `PluginWindow`, `WindowSpec`, `ShortcutContext.Kind.WINDOW`, `KeyContext.WINDOW`; the
+Vault manager and the sample About), the Errors window as a tab, `TabPlacement`, the `ContentTab` move API, panels in
+the main window only in the SDK, `WindowHandle.isMain()`, and
 `WindowContent`'s comment on `KeyContext.WINDOW`'s case; from the pre-flight (F13), each needing the SDK's main window
 or `TabPlacement`: `KitCompatibility`'s 0.20 entries, `closeTab(UUID)` in `FakePluginHost` and `ContractHarness`,
 owner-less content placement pinned in the contract (`AppContractTest`'s main window is the last window added,
 `FakeUi`'s the first open one), exact event order in the contract with each event's topic and `TerminalFixture.moveTab`
 out of `registry.atomically`, the fakes' last-tab rule through `isMain()`, and a group model for `TabPlacement` in both
-fakes. `./gradlew check --continue`: **11,688 tests, 0 failures, 0 errors, 25 skipped** (from the XML in
-`*/build/test-results/test/`; `jasper-app` 3,738, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107 on
-each runtime, `WindowManagerTest` 27, `TabRegistryTest` 28, `TabMoveTest` 8, `JasperApplicationWindowsTest` 7,
-`WindowRolesTest` 9, `JasperApplicationBackgroundTest` 41, `JasperApplicationResidencyTest` 16; the build passed on its
+fakes. `./gradlew check --continue`: **11,695 tests, 0 failures, 0 errors, 25 skipped** (from the XML in
+`*/build/test-results/test/`; `jasper-app` 3,745, `jasper-sdk` 94, `jasper-sdk-testkit` 206, `PluginContractTest` 107 on
+each runtime, `WindowManagerTest` 32, `TabRegistryTest` 29, `TabMoveTest` 8, `JasperApplicationWindowsTest` 7,
+`WindowRolesTest` 10, `JasperApplicationBackgroundTest` 41, `JasperApplicationResidencyTest` 16; the build passed on its
 first run, `StagedTransferLifecycleTest` included). GUI checks for the user: Cmd+N opens a child window in the current
 terminal's folder with a title bar and no toolbar, status bar or tool windows; on macOS a child window's unified bar has
 a centred title and a focused child window shows the same menus as the main window in the screen menu bar (none at all
@@ -140,8 +155,9 @@ tab closes, so Cmd+T opens a tab; the main window's last tab leaves New Terminal
 and Move to Main Window from a tab's menu keep a running command running; a tool window shortcut in a child window opens
 the tool window in the main window and leaves focus in it; Cmd+Q while resident closes every window and keeps Jasper in
 the background; the menu bar item's New Terminal Window with no window open restores the main window first; a
-translucent workspace in a child window looks as the main window's; a notification card posted while a child window is
-in front shows in the main window when a window comes forward. Not merged, not pushed.
+translucent workspace in a child window looks as the main window's; the empty main workspace under a workspace theme
+that differs from the chrome; a notification card posted while a child window is in front shows in the main window when
+a window comes forward. Not merged, not pushed.
 
 **Workspace tabs, plan 3b: the SDK's tab and pane break — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `b6687d9df..5c27d93d8` (Tasks 1 to 4, after the plan refresh), then the

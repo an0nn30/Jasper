@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
@@ -41,15 +42,19 @@ class WindowManagerTest {
     private final List<String> events = new ArrayList<>();
     /** What the closing hooks heard, with whether the window's content was still whole. */
     private final List<String> closings = new ArrayList<>();
-    private boolean quitting, failFrames, reenter, failClosing;
+    private boolean quitting, failFrames, reenter, failClosing, reenterAlways, failEarly;
+    /** How many times the main window was composed. */
+    private int mainCompositions;
     /** The tab a plugin asked for while the main window was being composed. */
     private Tab early;
+    /** What the closed hook runs once it has recorded the window. */
+    private Consumer<JasperWindow> whenClosed = window -> { };
     private WindowManager manager;
 
     @BeforeEach void manager() throws Exception {
         edt(() -> manager = new WindowManager(model, new WindowManager.Hooks(this::compose, this::frame,
             window -> events.add("opened " + name(window)), window -> events.add("activated " + name(window)),
-            window -> events.add("closed " + name(window)), state -> { },
+            window -> { events.add("closed " + name(window)); whenClosed.accept(window); }, state -> { },
             window -> {
                 closings.add("closing " + name(window) + (window.content().closed() ? " (closed)" : ""));
                 if (failClosing) throw new IllegalStateException("closing failed");
@@ -66,10 +71,12 @@ class WindowManagerTest {
 
     private WindowContent compose(WindowManager.Opening opening) {
         if (quitting) return null;
+        if (opening.role() == WindowRole.MAIN) mainCompositions++;
         // A plugin opening its view while the main window is still being composed (a panel factory, say).
-        if (reenter) {
+        if (reenter || reenterAlways) {
             reenter = false;
             early = model.tabs().open("dev.example.editor", "early", "early.txt", null, new JPanel());
+            if (failEarly) early.onClosed(() -> { throw new IllegalStateException("early failed to close"); });
             // Workspace plan 4a Rulings 24: the tab waits for the main window, and a nested request for it is still refused.
             assertThatThrownBy(() -> manager.ensureMain("plugin", null)).isInstanceOf(IllegalStateException.class)
                 .hasMessage("The main window is still opening");
@@ -230,7 +237,7 @@ class WindowManagerTest {
             assertThat(main[0].content().tabCount()).as("the main window keeps its other tab").isEqualTo(1);
             assertThat(manager.moveToNewWindow(tab)).as("a child window's only tab stays where it is").isEmpty();
             assertThat(manager.children()).containsExactly(child);
-            manager.moveToMainWindow(tab);
+            model.tabs().moveToMainWindow(tab);
             assertThat(tab.window()).isEqualTo(main[0].id());
             assertThat(child.closed()).as("emptied, it closed").isTrue();
             assertThat(manager.children()).isEmpty();
@@ -327,6 +334,25 @@ class WindowManagerTest {
         launch();
     }
 
+    /**
+     * A tool window toggle from a child window shows the panel in the main window, as IntelliJ's does from a detached
+     * editor.
+     */
+    @Test void aPanelToggleFromAChildWindowShowsThePanel() throws Exception {
+        edt(() -> {
+            model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
+            ChildWindow child = manager.openTerminalWindow(null).orElseThrow();
+            MainWindow main = manager.main().orElseThrow();
+            model.requestPanel(new Contributions.PanelRequest(main.id(), "test.panel", Contributions.PanelRequest.Op.SHOW));
+            assertThat(main.content().dock().visible("test.panel")).isTrue();
+            events.clear();
+            model.requestPanel(new Contributions.PanelRequest(child.id(), "test.panel", Contributions.PanelRequest.Op.TOGGLE));
+            assertThat(main.content().dock().visible("test.panel")).as("still showing").isTrue();
+            assertThat(events).as("and the main window comes forward").containsExactly("front main");
+        });
+        launch();
+    }
+
     /** Workspace tabs spec 6.1: while the main window closes, a request for it opens no second one beside it. */
     @Test void aRequestWhileTheMainWindowClosesOpensNoSecondOne() throws Exception {
         List<Optional<MainWindow>> asked = new ArrayList<>();
@@ -334,8 +360,18 @@ class WindowManagerTest {
             MainWindow main = manager.ensureMain("cold", null).orElseThrow();
             Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
             notes.onClosed(() -> asked.add(manager.ensureMain("plugin", null)));
+            List<String> refused = new ArrayList<>();
+            notes.onClosed(() -> {
+                try {
+                    model.tabs().open("dev.example.editor", "late", "late.txt", null, new JPanel());
+                } catch (IllegalStateException failure) {
+                    refused.add(failure.getMessage());
+                }
+            });
             manager.closeAll();
             assertThat(asked).as("a closing main window is not absent").containsExactly(Optional.empty());
+            assertThat(refused).as("a plugin's tab with no window, while the main window closes")
+                .containsExactly("The main window is closing or Jasper is quitting");
             assertThat(manager.isEmpty()).isTrue();
             assertThat(events.stream().filter("opened main"::equals).count()).as("no second main window").isEqualTo(1);
         });
@@ -401,18 +437,73 @@ class WindowManagerTest {
         });
     }
 
-    /** Workspace tabs spec 6.4: a plugin's tab asked for while the main window is being composed opens there once it is up. */
+    /**
+     * Workspace tabs spec 6.4: a plugin's tab asked for while the main window is being composed waits for it and opens
+     * there as soon as it is up, with no later turn.
+     */
     @Test void aPluginsTabAskedForWhileTheMainWindowOpensOpensThereOnceItIsUp() throws Exception {
-        MainWindow[] main = new MainWindow[1];
         edt(() -> {
             reenter = true;
-            main[0] = manager.ensureMain("cold", null).orElseThrow();
-            assertThat(manager.windows()).as("no second main window").containsExactly(main[0]);
-            assertThat(early.window()).as("the tab waits for the main window").isNull();
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            assertThat(manager.windows()).as("no second main window").containsExactly(main);
+            assertThat(early.window()).as("the tab waited for the main window and opened there").isEqualTo(main.id());
+            assertThat(main.content().selectedTab()).isSameAs(early);
         });
+        launch();
+    }
+
+    /** A tab that waited for a main window that failed to open goes with it, its failure under the main window's. */
+    @Test void aTabThatWaitedForAMainWindowThatFailedToOpenGoesWithIt() throws Exception {
         edt(() -> {
-            assertThat(early.window()).as("and opens there on the next turn").isEqualTo(main[0].id());
-            assertThat(main[0].content().selectedTab()).isSameAs(early);
+            reenter = true;
+            failEarly = true;
+            failFrames = true;
+            try {
+                assertThatThrownBy(() -> manager.ensureMain("cold", null)).hasMessage("no frame").satisfies(failure ->
+                    assertThat(failure.getSuppressed()).extracting(Throwable::getMessage)
+                        .containsExactly("early failed to close"));
+            } finally {
+                failFrames = false;
+                failEarly = false;
+            }
+            assertThat(early.closed()).as("removed, so disposed").isTrue();
+            assertThat(model.tabs().tabs()).doesNotContain(early);
+        });
+        edt(() -> assertThat(manager.main()).as("nothing asks for the main window again").isEmpty());
+    }
+
+    /** Composition that asks for a tab with no window, against a main window that fails every time, is tried once. */
+    @Test void aMainWindowThatFailsEveryTimeIsComposedOnceForTheTabThatWaitsForIt() throws Exception {
+        edt(() -> {
+            reenterAlways = true;
+            failFrames = true;
+            assertThatThrownBy(() -> manager.ensureMain("cold", null)).hasMessage("no frame");
+        });
+        try {
+            edt(() -> { });
+            edt(() -> {
+                assertThat(mainCompositions).as("one composition, not a loop").isEqualTo(1);
+                assertThat(early.closed()).as("the waiting tab went with the main window").isTrue();
+            });
+        } finally {
+            edt(() -> { reenterAlways = false; failFrames = false; });
+        }
+    }
+
+    /** While every window closes, a closed hook that asks for the main window gets none: no fresh one opens. */
+    @Test void noMainWindowOpensWhileEveryWindowCloses() throws Exception {
+        List<Optional<MainWindow>> asked = new ArrayList<>();
+        edt(() -> {
+            manager.ensureMain("cold", null).orElseThrow();
+            whenClosed = window -> asked.add(manager.ensureMain("plugin", null));
+            try {
+                manager.closeAll();
+            } finally {
+                whenClosed = window -> { };
+            }
+            assertThat(asked).containsExactly(Optional.empty());
+            assertThat(manager.isEmpty()).isTrue();
+            assertThat(events.stream().filter("opened main"::equals).count()).as("no fresh main window").isEqualTo(1);
         });
         launch();
     }
@@ -451,7 +542,7 @@ class WindowManagerTest {
                     default -> { }
                 }
             });
-            manager.moveToMainWindow(tab);
+            model.tabs().moveToMainWindow(tab);
             assertThat(heard).containsExactly("no active pane", "it moved from child to main", "main selects it", "child closed");
             assertThat(child[0].closed()).isTrue();
             assertThat(tab.window()).isEqualTo(manager.main().orElseThrow().id());
@@ -532,6 +623,28 @@ class WindowManagerTest {
             }
             assertThat(manager.children()).as("the window it left empty went").isEmpty();
             assertThat(notes.window()).isEqualTo(main.id());
+        });
+        launch();
+    }
+
+    /** A change listener that throws as a tab moving to a new window changes owner leaves the tab where it was. */
+    @Test void aMoveToANewWindowThatAChangeListenerRefusesKeepsTheTab() throws Exception {
+        edt(() -> {
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", main.id(), new JPanel());
+            boolean[] fail = {true};
+            notes.onChanged(() -> {
+                if (fail[0] && !main.id().equals(notes.window())) throw new IllegalStateException("listener failed");
+            });
+            try {
+                assertThatThrownBy(() -> manager.moveToNewWindow(notes)).hasMessage("listener failed");
+            } finally {
+                fail[0] = false;
+            }
+            assertThat(notes.closed()).as("the tab is not disposed").isFalse();
+            assertThat(notes.window()).isEqualTo(main.id());
+            assertThat(main.content().selectedTab()).isSameAs(notes);
+            assertThat(manager.children()).as("the window it left empty went").isEmpty();
         });
         launch();
     }

@@ -65,6 +65,31 @@ class TabRegistryTest {
         assertThat(tab.window()).isEqualTo(main);
     }
 
+    /**
+     * Workspace plan 4a's final review: the tabs that waited for the main window open there in the order they were
+     * asked for once it is up, and the last one is selected; one that fails to open there goes and keeps no other out.
+     */
+    @Test void theTabsThatWaitedForTheMainWindowOpenThereInOrderAndAFailureKeepsNoneOut() {
+        var heard = new ArrayList<String>();
+        UUID[] up = {null};
+        registry.addHost(new WorkspaceHost(main, tab -> {
+            heard.add("attach " + tab.key());
+            if (tab.key().equals("bad")) throw new IllegalStateException("attach failed");
+        }, tab -> heard.add("detach " + tab.key()), tab -> heard.add("select " + tab.key()), () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> up[0], main::equals, tab -> {}));
+        var first = registry.open("plugin.file", "first", "First", null, new JPanel());
+        var bad = registry.open("plugin.file", "bad", "Bad", null, new JPanel());
+        var last = registry.open("plugin.file", "last", "Last", null, new JPanel());
+        assertThat(heard).as("they wait for it").isEmpty();
+        up[0] = main;
+        registry.mainOpened(main);
+        assertThat(heard).containsExactly("attach first", "attach bad", "detach bad", "attach last", "select last");
+        assertThat(first.window()).isEqualTo(main);
+        assertThat(last.window()).isEqualTo(main);
+        assertThat(bad.closed()).as("removed, so disposed").isTrue();
+        assertThat(registry.tabs()).containsExactly(first, last);
+    }
+
     /** Workspace plan 4a: a window that fails to let a moving tab go still loses it to the move, which then rethrows. */
     @Test void aMoveWhoseSourceFailsToLetGoStillArrivesAndRethrows() {
         var heard = new ArrayList<String>();

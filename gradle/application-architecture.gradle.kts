@@ -100,8 +100,10 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                     }
                 }
                 // Workspace tabs spec 6.1, one main window per process: MainWindow, its WindowManager and the native
-                // WindowFrame are each made only at the sites below, with an explicit `new`. The constant pool (javap -v)
-                // also shows a constructor reference (X::new), which javap -c alone would miss; it counts as a site.
+                // WindowFrame are each made only at the sites below, with an explicit `new`, the type's own code
+                // included: its `new` names the class, where javap prints its own constructor calls unqualified, and a
+                // this(...) or super(...) call is no `new`. The constant pool (javap -v) also shows a constructor
+                // reference (X::new), which javap -c alone would miss; it counts as a site.
                 val pinned = mapOf(
                     "dev/jasper/app/workspace/MainWindow" to listOf("dev.jasper.app.workspace.WindowManager.ensureMain"),
                     "dev/jasper/app/workspace/WindowManager" to listOf("dev.jasper.app.application.JasperApplication.<init>"),
@@ -109,6 +111,7 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                         "dev.jasper.app.application.JasperApplication.rehearsalWindow"))
                 val sites = pinned.keys.associateWith { mutableListOf<String>() }
                 val header = Regex("^  \\S.*?([\\w$.]+)\\(.*\\)( throws .*)?;$")
+                val created = Regex("^\\s+\\d+: new\\s+#\\d+\\s+// class (\\S+)\\s*$")
                 for (batch in types.chunked(100)) {
                     val verbose = tool("javap", listOf("-classpath", classes.absolutePath, "-v", "-p") + batch)
                     for (section in verbose.split(Regex("(?m)^Classfile ")).drop(1)) {
@@ -124,10 +127,11 @@ val verifyApplicationArchitecture = tasks.register("verifyApplicationArchitectur
                                     else -> name
                                 }
                             }
-                            for ((made, list) in sites) {
-                                if (!line.contains("$made.\"<init>\"") || topLevel(type) == made.replace('/', '.')) continue
-                                if (line.contains("invokespecial")) list.add("${topLevel(type)}.$method")
-                                else if (line.contains("REF_newInvokeSpecial")) list.add("${topLevel(type)}::new")
+                            val made = created.find(line)?.groupValues?.get(1)
+                            for ((pinnedType, list) in sites) {
+                                if (made == pinnedType) list.add("${topLevel(type)}.$method")
+                                else if (line.contains("REF_newInvokeSpecial") && line.contains("$pinnedType.\"<init>\""))
+                                    list.add("${topLevel(type)}::new")
                             }
                         }
                     }

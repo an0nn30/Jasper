@@ -45,7 +45,9 @@ public final class WindowFrame {
     };
 
     /**
-     * The frame around {@code content}, sized for {@code initial}'s grid when it is given, not yet shown.
+     * The frame around {@code content}, sized for {@code initial}'s grid when it is given, not yet shown. When building
+     * it fails, what was built goes (the title bar, the glass and the frame) and the failure propagates, the cleanup's
+     * under it.
      *
      * @param content the window's content; its role decides the frame's chrome
      * @param look the look's chrome and title facts
@@ -55,33 +57,58 @@ public final class WindowFrame {
     public WindowFrame(WindowContent content, WindowLook look, ConfigSnapshot initial, JasperWindow.Events events) {
         this.content = java.util.Objects.requireNonNull(content, "content");
         this.events = java.util.Objects.requireNonNull(events, "events");
-        frame.setIconImages(ApplicationIcon.images());
-        if (initial != null) {
-            // An empty window (a moved tab's) gives up its stand-in size, so its workspace takes the grid's (Rulings 18).
-            if (content.currentPane() == null) content.setPreferredSize(null);
-            JComponent sized = content.currentPane() != null ? content.currentPane() : content.workspace();
-            sized.setPreferredSize(InitialWindowSize.terminalArea(initial));
+        MacTitleBar bar = null;
+        WindowGlass made = null;
+        try {
+            frame.setIconImages(ApplicationIcon.images());
+            if (initial != null) {
+                // An empty window (a moved tab's) gives up its stand-in size, so its workspace takes
+                // the grid's (Rulings 18).
+                if (content.currentPane() == null) content.setPreferredSize(null);
+                JComponent sized = content.currentPane() != null ? content.currentPane() : content.workspace();
+                sized.setPreferredSize(InitialWindowSize.terminalArea(initial));
+            }
+            bar = content.isMain() ? WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle)
+                : WindowContent.mountChild(frame.getRootPane(), content, look, screenMenuBar(), frame::setTitle);
+            frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+            content.installRootBindings(frame.getRootPane());
+            // Native initial focus must not fall through to the first restored tool-panel control.
+            frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());
+            content.onMinimumSizeChanged = this::updateMinimumSize;
+            if (bar != null) bar.attach(frame);
+            // Workspace glass exists only on macOS: elsewhere WindowGlass is never loaded and its
+            // requests are never made.
+            if (SystemInfo.isMacOS && !GraphicsEnvironment.isHeadless()) {
+                made = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(),
+                    content::applyBackgroundOpacity);
+                WindowGlass requested = made;
+                content.setGlassRequests((levels, dark) -> requested.request(levels.opacity(), levels.blur(), dark));
+            }
+            frame.addWindowListener(listener); frame.pack();
+            if (initial != null) {
+                updateMinimumSize();
+                frame.setSize(InitialWindowSize.fit(frame.getSize(), frame.getMinimumSize(), usableBounds()));
+            }
+            frame.setLocationByPlatform(true);
+            content.update();
+        } catch (RuntimeException | Error failure) {
+            // No window gets this frame's shell to dispose it through: it goes now, with what it made.
+            if (made != null) {
+                try { made.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            }
+            if (bar != null) {
+                try { bar.close(); } catch (RuntimeException | Error closing) { failure.addSuppressed(closing); }
+            }
+            try {
+                frame.removeWindowListener(listener);
+                frame.dispose();
+            } catch (RuntimeException | Error disposing) {
+                failure.addSuppressed(disposing);
+            }
+            throw failure;
         }
-        titleBar = content.isMain() ? WindowContent.mount(frame.getRootPane(), content, look, frame::setTitle)
-            : WindowContent.mountChild(frame.getRootPane(), content, look, screenMenuBar(), frame::setTitle);
-        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        content.installRootBindings(frame.getRootPane());
-        // Native initial focus must not fall through to the first restored tool-panel control.
-        frame.setFocusTraversalPolicy(content.getFocusTraversalPolicy());
-        content.onMinimumSizeChanged = this::updateMinimumSize;
-        if (titleBar != null) titleBar.attach(frame);
-        // Workspace glass exists only on macOS: elsewhere WindowGlass is never loaded and its requests are never made.
-        if (SystemInfo.isMacOS && !GraphicsEnvironment.isHeadless()) {
-            glass = new WindowGlass(frame.getRootPane(), WindowGlass.Platform.current(), content::applyBackgroundOpacity);
-            content.setGlassRequests((levels, dark) -> glass.request(levels.opacity(), levels.blur(), dark));
-        } else glass = null;
-        frame.addWindowListener(listener); frame.pack();
-        if (initial != null) {
-            updateMinimumSize();
-            frame.setSize(InitialWindowSize.fit(frame.getSize(), frame.getMinimumSize(), usableBounds()));
-        }
-        frame.setLocationByPlatform(true);
-        content.update();
+        titleBar = bar;
+        glass = made;
     }
 
     /** Whether macOS shows this process's menus in the screen menu bar, as the look committed before AWT started. */
