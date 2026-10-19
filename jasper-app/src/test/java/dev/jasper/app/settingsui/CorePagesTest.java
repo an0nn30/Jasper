@@ -96,6 +96,25 @@ class CorePagesTest {
         page.dispose();
     }
 
+    @Test void theOptionKeyRowIsBuiltOnlyOnMacOsButStaysOnTheTerminalPage() {
+        for (boolean macOs : new boolean[]{true, false}) {
+            var spec = CorePages.specs(APPEARANCE, system(), ShellChoices.NONE, id -> { }, macOs).stream()
+                .filter(page -> page.id().equals("terminal")).findFirst().orElseThrow();
+            assertThat(spec.settings()).contains(CoreSettings.TERMINAL_OPTION_AS_META);
+            var page = spec.build(context);
+            page.component();
+            if (macOs) {
+                assertThat(builtSettings(page)).contains(CoreSettings.TERMINAL_OPTION_AS_META);
+                assertThat(page.searchTerms()).contains(CoreSettings.TERMINAL_OPTION_AS_META.label());
+            } else {
+                assertThat(builtSettings(page)).doesNotContain(CoreSettings.TERMINAL_OPTION_AS_META)
+                    .contains(CoreSettings.TERMINAL_COPY_ON_SELECT, CoreSettings.TERMINAL_DIM_INACTIVE_PANES);
+                assertThat(page.searchTerms()).doesNotContain(CoreSettings.TERMINAL_OPTION_AS_META.label());
+            }
+            page.dispose();
+        }
+    }
+
     @Test void theWorkspaceSectionFollowsTheThemeSectionOnlyOnMacOs() {
         assertThat(sectionTitles(appearance(true))).containsExactly("Theme", "Workspace", "Interface Font", "View mode", "Animations");
         assertThat(sectionTitles(appearance(false))).containsExactly("Theme", "Interface Font", "View mode", "Animations");
