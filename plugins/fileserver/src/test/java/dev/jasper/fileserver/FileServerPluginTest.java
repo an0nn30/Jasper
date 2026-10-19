@@ -469,7 +469,7 @@ class FileServerPluginTest {
             assertThat(served.definition().writable()).isFalse();
             assertThat(served.definition().login()).isEqualTo(Login.ANONYMOUS);
             assertThat(panel.selected()).contains(served.definition().id());
-            UUID elsewhere = host.addTerminalPane(tab, pane(Optional.empty()));
+            UUID elsewhere = host.addTerminalPane(host.addTerminalTab(window, "zsh"), pane(Optional.empty()));
             assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, window, elsewhere)).isTrue();
             await(host, () -> plugin.registry().servers().size() == 2
                 && plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the second start settles");
@@ -652,7 +652,7 @@ class FileServerPluginTest {
                 80, 24, true, location.equals("plugin") ? SessionKind.PLUGIN : SessionKind.LOCAL,
                 location.equals("plugin") ? Optional.of("dev.jasper.remote") : Optional.empty(), SessionState.RUNNING, OptionalInt.empty(), "zsh");
             UUID clicked = host.addTerminalPane(tab, info);
-            host.focusTerminalPane(host.addTerminalPane(tab, pane(Optional.of(home))));
+            host.focusTerminalPane(host.addTerminalPane(host.addTerminalTab(window, "zsh"), pane(Optional.of(home))));
             assertThat(host.invoke("dev.jasper.fileserver.share-http", window, location.equals("no-pane") ? null : clicked)).isTrue();
             settle(host);
             assertThat(plugin.registry().servers()).as("never substitute another folder").isEmpty();

@@ -12,9 +12,9 @@ import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 
 /**
- * The open terminal windows and what happens in them. Structure is always read through the entries, so
- * it cannot go stale; the one thing derived here is the active pane: the focused pane of the selected tab
- * of the window the user used last. EDT only.
+ * The open Jasper windows, their tabs and what happens in them. Structure is always read through the entries, so it
+ * cannot go stale; the one thing derived here is the active pane: the pane of the active tab of the window the user used
+ * last, when that tab is a terminal tab. EDT only.
  */
 public final class TerminalRegistry {
     private static final System.Logger LOG = System.getLogger(TerminalRegistry.class.getName());
@@ -93,7 +93,7 @@ public final class TerminalRegistry {
     public Optional<WindowEntry> activeWindow() { requireEdt(); return Optional.ofNullable(lastActive).map(windows::get); }
 
     public Optional<PaneEntry> activePane() {
-        return activeWindow().flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.focusedPane().get());
+        return activeWindow().flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.terminal().get());
     }
 
     public Optional<TabEntry> tab(UUID id) {
@@ -106,8 +106,10 @@ public final class TerminalRegistry {
     public Optional<PaneEntry> pane(UUID id) {
         requireEdt();
         for (WindowEntry window : windows.values())
-            for (TabEntry tab : window.tabs().get())
-                for (PaneEntry pane : tab.panes().get()) if (pane.id().equals(id)) return Optional.of(pane);
+            for (TabEntry tab : window.tabs().get()) {
+                Optional<PaneEntry> pane = tab.terminal().get();
+                if (pane.isPresent() && pane.get().id().equals(id)) return pane;
+            }
         return Optional.empty();
     }
 }

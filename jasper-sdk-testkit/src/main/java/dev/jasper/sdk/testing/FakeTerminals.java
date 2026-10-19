@@ -42,11 +42,11 @@ final class FakeTerminals implements Terminals {
         @Override public UUID id() { return id; }
         @Override public List<TabHandle> tabs() {
             context.requireOpen();
-            return workspace.window(id).map(window -> window.tabs.stream().<TabHandle>map(tab -> new Tab(tab.id, id)).toList()).orElse(List.of());
+            return workspace.window(id).map(window -> window.tabs.stream().<TabHandle>map(tab -> new Tab(tab.id, id, tab.kind)).toList()).orElse(List.of());
         }
         @Override public Optional<TabHandle> activeTab() {
             context.requireOpen();
-            return workspace.window(id).map(window -> window.selected).map(tab -> new Tab(tab.id, id));
+            return workspace.window(id).map(window -> window.selected).map(tab -> new Tab(tab.id, id, tab.kind));
         }
         @Override public boolean isActive() { context.requireOpen(); return workspace.lastActive != null && workspace.lastActive.open && workspace.lastActive.id.equals(id); }
         @Override public boolean isOpen() { context.requireOpen(); return workspace.window(id).isPresent(); }
@@ -57,9 +57,10 @@ final class FakeTerminals implements Terminals {
 
     private final class Tab implements TabHandle {
         private final UUID id;
+        private final TabHandle.Kind kind;
         private UUID windowId;
         private String title = "";
-        Tab(UUID id, UUID windowId) { this.id = id; this.windowId = windowId; }
+        Tab(UUID id, UUID windowId, TabHandle.Kind kind) { this.id = id; this.windowId = windowId; this.kind = kind; }
         private Optional<FakeWorkspace.Tab> model() {
             Optional<FakeWorkspace.Tab> found = workspace.tab(id);
             found.ifPresent(tab -> windowId = tab.window.id);
@@ -67,11 +68,11 @@ final class FakeTerminals implements Terminals {
         }
         @Override public UUID id() { return id; }
         @Override public WindowHandle window() { context.requireOpen(); model(); return new Window(windowId); }
-        @Override public List<PaneHandle> panes() {
+        @Override public TabHandle.Kind kind() { return kind; }
+        @Override public Optional<PaneHandle> terminal() {
             context.requireOpen();
-            return model().map(tab -> tab.panes.stream().<PaneHandle>map(pane -> new Pane(pane.id, id)).toList()).orElse(List.of());
+            return model().map(tab -> tab.pane).filter(pane -> pane.open).map(pane -> new Pane(pane.id, id));
         }
-        @Override public Optional<PaneHandle> activePane() { context.requireOpen(); return model().map(tab -> tab.focused).map(pane -> new Pane(pane.id, id)); }
         @Override public String title() {
             require(Capabilities.TERMINAL_OBSERVE);
             context.requireOpen();
@@ -98,7 +99,7 @@ final class FakeTerminals implements Terminals {
         @Override public TabHandle tab() {
             context.requireOpen();
             model();
-            return new Tab(tabId, workspace.tab(tabId).map(tab -> tab.window.id).orElse(new UUID(0, 0)));
+            return new Tab(tabId, workspace.tab(tabId).map(tab -> tab.window.id).orElse(new UUID(0, 0)), TabHandle.Kind.TERMINAL);
         }
         @Override public PaneInfo info() {
             require(Capabilities.TERMINAL_OBSERVE);
@@ -151,7 +152,7 @@ final class FakeTerminals implements Terminals {
     @Override public Optional<PaneHandle> activePane() { context.requireOpen(); return workspace.activePane().map(pane -> new Pane(pane.id, pane.tab.id)); }
     @Override public List<WindowHandle> windows() { context.requireOpen(); return workspace.windows.stream().<WindowHandle>map(window -> new Window(window.id)).toList(); }
     @Override public Optional<PaneHandle> pane(UUID id) { context.requireOpen(); return workspace.pane(id).map(pane -> new Pane(pane.id, pane.tab.id)); }
-    @Override public Optional<TabHandle> tab(UUID id) { context.requireOpen(); return workspace.tab(id).map(tab -> new Tab(tab.id, tab.window.id)); }
+    @Override public Optional<TabHandle> tab(UUID id) { context.requireOpen(); return workspace.tab(id).map(tab -> new Tab(tab.id, tab.window.id, tab.kind)); }
     @Override public Optional<WindowHandle> window(UUID id) { context.requireOpen(); return workspace.window(id).map(window -> new Window(window.id)); }
 
     @Override public Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request) {
@@ -183,21 +184,23 @@ final class FakeTerminals implements Terminals {
         context.requireOpen();
         if (!knownProfile(request)) return Optional.empty();
         return workspace.pane(target.id()).map(model -> {
+            // A split is a terminal tab of its own in the target's window, as in the application (spec 9.4).
+            FakeWorkspace.Window window = model.tab.window;
             FakeWorkspace.Pane pane = switch (request) {
                 case OpenRequest.Local local -> {
                     workspace.openRequests.add("split|" + model.id + "|" + direction + "|" + local.spec().workingDirectory().map(Path::toString).orElse("-")
                         + profile(local) + program(local));
-                    yield workspace.addPane(model.tab, openedInfo(local));
+                    yield workspace.addPane(workspace.addTab(window, "opened"), openedInfo(local));
                 }
                 case OpenRequest.Session session -> {
                     workspace.openRequests.add("session-split|" + model.id + "|" + direction + "|" + session.spec().title());
-                    FakeWorkspace.Pane created = workspace.addPane(model.tab, sessionInfo(session));
+                    FakeWorkspace.Pane created = workspace.addPane(workspace.addTab(window, session.spec().title()), sessionInfo(session));
                     workspace.sessions.connect(context, created, session.spec());
                     yield created;
                 }
             };
             workspace.focus(pane);
-            return new Pane(pane.id, model.tab.id);
+            return new Pane(pane.id, pane.tab.id);
         });
     }
 

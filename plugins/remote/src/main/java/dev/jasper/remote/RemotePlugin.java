@@ -27,6 +27,7 @@ import dev.jasper.sdk.terminal.PendingSession;
 import dev.jasper.sdk.terminal.SessionKind;
 import dev.jasper.sdk.terminal.SessionSpec;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
+import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import dev.jasper.sdk.terminal.WindowHandle;
 import dev.jasper.sdk.ui.ActionSpec;
@@ -270,7 +271,7 @@ public class RemotePlugin implements Plugin {
         });
         if (vault.isPresent()) context.events().subscribe(VaultApi.LOCK_STATE_CHANGED, state -> refreshPanels());
         context.events().subscribe(TerminalEvents.CWD_CHANGED,event->event.remoteDirectory().ifPresent(directory->{follower.reported(event.paneId());sftpUi.directory(event.paneId(),directory.path());}));
-        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->{context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(tab->tab.activePane()).ifPresent(pane->sftpFocused(pane.id())); syncSessions();});
+        context.events().subscribe(TerminalEvents.TAB_SELECTED,event->{context.terminals().window(event.windowId()).flatMap(window->window.activeTab()).flatMap(TabHandle::terminal).ifPresent(pane->sftpFocused(pane.id())); syncSessions();});
     }
 
     /** Remote's navigation actions with their default bindings; Keymap rebinds them. */
@@ -301,7 +302,7 @@ public class RemotePlugin implements Plugin {
         if (connections != null) connections.close();
     }
 
-    private Optional<dev.jasper.remote.ui.sftp.SftpUi.PaneTarget> sftpPane(WindowHandle window) { return window.activeTab().flatMap(tab->tab.activePane()).flatMap(this::sftpPane); }
+    private Optional<dev.jasper.remote.ui.sftp.SftpUi.PaneTarget> sftpPane(WindowHandle window) { return window.activeTab().flatMap(TabHandle::terminal).flatMap(this::sftpPane); }
     private Optional<dev.jasper.remote.ui.sftp.SftpUi.PaneTarget> sftpPane(PaneHandle pane) {
         var identity=paneIdentities.get(pane.id());if(identity==null)return Optional.empty();
         return Optional.of(new dev.jasper.remote.ui.sftp.SftpUi.PaneTarget(pane.id(),identity,pane.info().remoteDirectory().map(dev.jasper.sdk.terminal.RemoteDirectory::path).orElse("")));
@@ -514,7 +515,7 @@ public class RemotePlugin implements Plugin {
                 close();
                 return;
             }
-            var dimensions = window.activeTab().flatMap(tab -> tab.activePane()).map(PaneHandle::info);
+            var dimensions = window.activeTab().flatMap(TabHandle::terminal).map(PaneHandle::info);
             int cols = dimensions.map(info -> Math.max(1, info.columns())).orElse(80);
             int rows = dimensions.map(info -> Math.max(1, info.rows())).orElse(24);
             // Followed panes get their own connection so the probe can tell their shell apart (see the directory probe spec).
@@ -635,7 +636,7 @@ public class RemotePlugin implements Plugin {
 
     private dev.jasper.sdk.ui.UiView createPanel(PanelHost host) {
         WindowHandle window = host.window();
-        var panel = new HostsPanel(context.kit(), new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitHost(pane, h)),
+        var panel = new HostsPanel(context.kit(), new HostsPanel.Actions(h -> openHost(window, h), h -> window.activeTab().flatMap(TabHandle::terminal).ifPresent(pane -> splitHost(pane, h)),
             editing -> editHost(window, editing), h -> reportMutation("Could not duplicate the host", store.put(duplicate(h))), h -> deleteHost(window, h),
             (h, favorite) -> reportMutation("Could not update favorites", store.put(h.withFavorite(favorite))), () -> importConfig(window)), layout);
         panel.onHeaderChanged(host::setHeader);
@@ -647,7 +648,7 @@ public class RemotePlugin implements Plugin {
         panel.onBrowseFiles(h->sftpUi.browse(window,h));
         panel.setHostDetails(this::hostDetails, this::sessionCount);
         panel.onDistros(profile -> openDistro(window, profile),
-            profile -> window.activeTab().flatMap(tab -> tab.activePane()).ifPresent(pane -> splitDistro(pane, profile)));
+            profile -> window.activeTab().flatMap(TabHandle::terminal).ifPresent(pane -> splitDistro(pane, profile)));
         panel.setDistros(distros, this::distroSessions);
         panel.setCollapsed(panelState.collapsed());
         panel.setWslCollapsed(panelState.wslCollapsed());
@@ -724,7 +725,7 @@ public class RemotePlugin implements Plugin {
 
     /** The host of the window's active pane, when Remote opened that pane. */
     private Optional<UUID> activeHostId(WindowHandle window) {
-        return window.activeTab().flatMap(tab -> tab.activePane()).flatMap(pane -> Optional.ofNullable(panes.get(pane.id())));
+        return window.activeTab().flatMap(TabHandle::terminal).flatMap(pane -> Optional.ofNullable(panes.get(pane.id())));
     }
 
     private int sessionCount(RemoteHost host) { return (int) panes.values().stream().filter(host.id()::equals).count(); }

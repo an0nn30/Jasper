@@ -1,11 +1,26 @@
 package dev.jasper.sdk.terminal;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** One tab. Handles keep an id and no Swing object; two handles for the same tab are equal. EDT only. */
+/**
+ * One tab of a Jasper window: a terminal tab, whose {@link #terminal()} is its one pane, or a content tab, such as an
+ * editor, a tool view or a plugin's view. Handles keep an id and no Swing object; two handles for the same tab are equal.
+ * EDT only, except {@link #id()} and {@link #kind()}.
+ */
 public interface TabHandle {
+    /**
+     * What a tab holds. A tab keeps its kind for its whole life.
+     *
+     * @since 0.19.0
+     */
+    enum Kind {
+        /** A terminal: one pane, so one session. */
+        TERMINAL,
+        /** Anything else: an editor, a tool view or a plugin's view. */
+        CONTENT
+    }
+
     /**
      * The tab's stable id.
      *
@@ -21,18 +36,20 @@ public interface TabHandle {
     WindowHandle window();
 
     /**
-     * The tab's panes, in creation order; empty once the tab is closed.
+     * What the tab holds. Needs no capability.
      *
-     * @return the panes
+     * @return its kind
+     * @since 0.19.0
      */
-    List<PaneHandle> panes();
+    Kind kind();
 
     /**
-     * The pane that has, or would get, keyboard focus in this tab.
+     * A terminal tab's pane. Needs no capability.
      *
-     * @return the pane, or empty once the tab is closed
+     * @return the pane, or empty for a content tab and once the tab is closed
+     * @since 0.19.0
      */
-    Optional<PaneHandle> activePane();
+    Optional<PaneHandle> terminal();
 
     /**
      * The tab's title as its header shows it. Needs {@code terminal.observe}.

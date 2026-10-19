@@ -55,10 +55,11 @@ class WindowTerminalsTest {
         edt(() -> {
             WindowEntry window = registry.windows().get(0);
             TabEntry tab = window.tabs().get().get(0);
-            PaneEntry pane = tab.panes().get().get(0);
+            PaneEntry pane = tab.terminal().get().orElseThrow();
             assertThat(window.id()).isEqualTo(owner.id());
             assertThat(window.selectedTab().get()).contains(tab);
-            assertThat(tab.focusedPane().get()).contains(pane);
+            assertThat(tab.terminal().get()).contains(pane);
+            assertThat(tab.kind()).isEqualTo(TabEntry.Kind.TERMINAL);
             assertThat(tab.windowId()).isEqualTo(window.id());
             assertThat(pane.tabId()).isEqualTo(tab.id());
             assertThat(events).containsExactly(new TerminalEvent.WindowOpened(window.id()), new TerminalEvent.TabOpened(window.id(), tab.id()),
@@ -82,7 +83,7 @@ class WindowTerminalsTest {
     @Test void tabsSplitsInjectionAndExitAreReported() throws Exception {
         open();
         UUID windowId = owner.id();
-        PaneEntry first = onEdt(() -> registry.windows().get(0).tabs().get().get(0).panes().get().get(0));
+        PaneEntry first = onEdt(() -> registry.windows().get(0).tabs().get().get(0).terminal().get().orElseThrow());
         pending.remove().run();
         until(() -> first.snapshot().get().state() == PaneSnapshot.State.RUNNING);
         edt(() -> {
@@ -96,8 +97,8 @@ class WindowTerminalsTest {
             UUID splitTab = split.get().tabId();
             assertThat(splitTab).as("a split is a terminal tab of its own").isNotEqualTo(first.tabId());
             assertThat(events).contains(new TerminalEvent.TabOpened(windowId, splitTab), new TerminalEvent.PaneOpened(splitTab, split.get().id()));
-            assertThat(registry.tab(splitTab).orElseThrow().panes().get()).containsExactly(split.get());
-            assertThat(registry.tab(first.tabId()).orElseThrow().panes().get()).containsExactly(first);
+            assertThat(registry.tab(splitTab).orElseThrow().terminal().get()).contains(split.get());
+            assertThat(registry.tab(first.tabId()).orElseThrow().terminal().get()).contains(first);
             assertThat(owner.workspace().model().groups()).as("in a new group below").hasSize(2);
         });
 

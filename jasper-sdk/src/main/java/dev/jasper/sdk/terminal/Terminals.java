@@ -17,9 +17,9 @@ public interface Terminals {
     Optional<WindowHandle> activeWindow();
 
     /**
-     * The focused pane of the active window's selected tab.
+     * The pane of the active window's active tab (the selected tab of its active group), when that tab is a terminal tab.
      *
-     * @return the pane, or empty
+     * @return the pane, or empty while a content tab is active or there is no active window ({@link #activeWindow()})
      */
     Optional<PaneHandle> activePane();
 
@@ -55,7 +55,7 @@ public interface Terminals {
     Optional<WindowHandle> window(UUID id);
 
     /**
-     * Opens and selects a new tab. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal tab in the window's active group and selects it. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
@@ -66,14 +66,16 @@ public interface Terminals {
     Optional<PaneHandle> openTab(WindowHandle window, OpenRequest request);
 
     /**
-     * Splits a pane. A local request needs {@code terminal.open}; one naming a profile the host does not list opens nothing.
+     * Opens a terminal tab in a new tab group beside the target pane's group and selects it: Jasper splits a window's
+     * workspace, never a tab. A local request needs {@code terminal.open}; one naming a profile the host does not list
+     * opens nothing.
      * A request with a command ({@link LocalSpec#command()}) runs that program instead of the shell, with the shell's
      * environment, and its pane closes when the program exits with status 0.
      *
-     * @param target the pane to split
-     * @param direction where the new pane goes
+     * @param target the pane whose group the new group goes beside
+     * @param direction which side of the target's group the new group takes
      * @param request what to run
-     * @return the new pane, or empty when the target is gone, its session has ended or the profile is unknown
+     * @return the new tab's pane, or empty when the target is gone, its session has ended or the profile is unknown
      */
     Optional<PaneHandle> split(PaneHandle target, Direction direction, OpenRequest request);
 

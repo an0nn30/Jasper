@@ -97,21 +97,24 @@ class HostedTerminalsTest {
         assertThat(terminals.windows()).isEmpty();
         assertThat(terminals.activeWindow()).isEmpty();
         UUID window = fixture.addWindow(), tab = fixture.addTab(window, "build"), left = fixture.addPane(tab, "make", Path.of("/src"));
-        UUID right = fixture.addPane(tab, "top", null);
+        UUID top = fixture.addTab(window, "top"), right = fixture.addPane(top, "top", null);
+        fixture.focusPane(left);
         fixture.activateWindow(window);
         WindowHandle handle = terminals.windows().get(0);
         assertThat(handle).isEqualTo(terminals.activeWindow().orElseThrow()).isEqualTo(terminals.windowHandle(window)).hasSameHashCodeAs(terminals.windowHandle(window));
         assertThat(handle.isOpen()).isTrue();
         assertThat(handle.isActive()).isTrue();
         TabHandle tabHandle = handle.activeTab().orElseThrow();
-        assertThat(handle.tabs()).containsExactly(tabHandle);
+        assertThat(handle.tabs()).extracting(TabHandle::id).containsExactly(tab, top);
+        assertThat(handle.tabs()).first().isEqualTo(tabHandle);
         assertThat(tabHandle.id()).isEqualTo(tab);
+        assertThat(tabHandle.kind()).isEqualTo(TabHandle.Kind.TERMINAL);
         assertThat(tabHandle.window()).isEqualTo(handle);
         assertThat(tabHandle.title()).isEqualTo("build");
-        assertThat(tabHandle.panes()).extracting(PaneHandle::id).containsExactly(left, right);
+        assertThat(tabHandle.terminal().map(PaneHandle::id)).contains(left);
         PaneHandle pane = terminals.activePane().orElseThrow();
         assertThat(pane.id()).isEqualTo(left);
-        assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow()).isEqualTo(tabHandle.activePane().orElseThrow());
+        assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow()).isEqualTo(tabHandle.terminal().orElseThrow());
         assertThat(pane.tab()).isEqualTo(tabHandle);
         assertThat(pane.info()).isEqualTo(new PaneInfo("make", Optional.of(Path.of("/src")), Optional.empty(), 80, 24, true, SessionKind.LOCAL,
             Optional.empty(), SessionState.RUNNING, java.util.OptionalInt.empty(), "zsh"));
@@ -122,6 +125,7 @@ class HostedTerminalsTest {
 
         terminals.pane(right).orElseThrow().focus();
         assertThat(terminals.activePane().map(PaneHandle::id)).contains(right);
+        assertThat(handle.activeTab().map(TabHandle::id)).as("focusing a pane selects its tab").contains(top);
         handle.toFront();
         assertThat(fixture.opened()).containsExactly("front|" + window);
         fixture.reportDirectory(left, "build-host", "/srv/app");
@@ -147,7 +151,8 @@ class HostedTerminalsTest {
         assertThat(windowHandle.isOpen()).as("the last tab took the window with it").isFalse();
         assertThat(pane.info().title()).as("the last known value").isEqualTo("make");
         assertThat(tabHandle.title()).isEqualTo("build");
-        assertThat(tabHandle.panes()).isEmpty();
+        assertThat(tabHandle.terminal()).isEmpty();
+        assertThat(tabHandle.kind()).as("a closed tab keeps its kind").isEqualTo(TabHandle.Kind.TERMINAL);
         assertThat(windowHandle.tabs()).isEmpty();
         assertThat(pane.selection()).isEmpty();
         assertThat(pane.foregroundJob()).isCompletedWithValue(Optional.empty());
@@ -162,7 +167,7 @@ class HostedTerminalsTest {
         HostedTerminals bare = terminals();
         PaneHandle pane = bare.pane(only).orElseThrow();
         assertThat(pane.isOpen()).as("identity and structure need nothing").isTrue();
-        assertThat(pane.tab().panes()).hasSize(1);
+        assertThat(pane.tab().terminal()).contains(pane);
         for (var gated : List.<java.util.Map.Entry<String, Runnable>>of(
                 java.util.Map.entry(Capabilities.TERMINAL_OBSERVE, pane::info), java.util.Map.entry(Capabilities.TERMINAL_OBSERVE, pane::foregroundJob),
                 java.util.Map.entry(Capabilities.TERMINAL_OBSERVE, () -> pane.tab().title()),
@@ -216,7 +221,8 @@ class HostedTerminalsTest {
         assertThat(opened.isOpen()).isTrue();
         assertThat(opened.tab().id()).isNotEqualTo(tab);
         PaneHandle split = terminals.split(terminals.paneHandle(only), Direction.DOWN, OpenRequest.local()).orElseThrow();
-        assertThat(split.tab().id()).isEqualTo(tab);
+        assertThat(split.tab().id()).as("a split is a terminal tab of its own").isNotEqualTo(tab).isNotEqualTo(opened.tab().id());
+        assertThat(split.tab().window().id()).isEqualTo(window);
         assertThat(fixture.opened()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
         assertThat(terminals.split(terminals.paneHandle(UUID.randomUUID()), Direction.RIGHT, OpenRequest.local())).isEmpty();
     }

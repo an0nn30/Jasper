@@ -64,6 +64,7 @@ import dev.jasper.sdk.terminal.Direction;
 import dev.jasper.sdk.terminal.OpenRequest;
 import dev.jasper.sdk.terminal.PaneHandle;
 import dev.jasper.sdk.terminal.SessionState;
+import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.nio.file.Path;
 import dev.jasper.sdk.terminal.ExitPolicy;
@@ -1311,8 +1312,9 @@ public abstract class PluginContractTest {
     private static PluginInfo info(String id, String... capabilities) { return new PluginInfo(id, id, "1.0.0", Set.of(capabilities)); }
 
     @Test void terminalsAreFoundThroughTheContextAndHandlesAreEqualById() {
-        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
-        UUID left = h.addTerminalPane(tab, "make", Path.of("/src")), right = h.addTerminalPane(tab, "top", Path.of("/"));
+        UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build"), left = h.addTerminalPane(tab, "make", Path.of("/src"));
+        UUID other = h.addTerminalTab(window, "top"), right = h.addTerminalPane(other, "top", Path.of("/"));
+        h.focusTerminalPane(left);
         h.activateTerminalWindow(window);
         var alpha = new AtomicReference<PluginContext>();
         h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), alpha::set);
@@ -1320,11 +1322,13 @@ public abstract class PluginContractTest {
             var terminals = alpha.get().terminals();
             assertThat(terminals.windows()).extracting(handle -> handle.id()).containsExactly(window);
             assertThat(terminals.activeWindow()).contains(terminals.windows().get(0));
+            assertThat(terminals.windows().get(0).tabs()).extracting(TabHandle::id).containsExactly(tab, other);
             var tabHandle = terminals.windows().get(0).activeTab().orElseThrow();
+            assertThat(tabHandle.id()).isEqualTo(tab);
+            assertThat(tabHandle.kind()).isEqualTo(TabHandle.Kind.TERMINAL);
             assertThat(tabHandle.title()).isEqualTo("build");
-            assertThat(tabHandle.panes()).extracting(PaneHandle::id).containsExactly(left, right);
             PaneHandle pane = terminals.activePane().orElseThrow();
-            assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow());
+            assertThat(pane).isEqualTo(terminals.pane(left).orElseThrow()).isEqualTo(tabHandle.terminal().orElseThrow());
             assertThat(pane.tab()).isEqualTo(tabHandle);
             assertThat(pane.tab().window().isActive()).isTrue();
             assertThat(pane.info().title()).isEqualTo("make");
@@ -1332,9 +1336,13 @@ public abstract class PluginContractTest {
             assertThat(pane.info().state()).isEqualTo(SessionState.RUNNING);
             terminals.pane(right).orElseThrow().focus();
             assertThat(terminals.activePane().map(PaneHandle::id)).contains(right);
+            assertThat(terminals.windows().get(0).activeTab().map(TabHandle::id)).as("focusing a pane selects its tab").contains(other);
         });
         h.closeTerminalPane(right);
-        h.ui(() -> assertThat(alpha.get().terminals().activePane().map(PaneHandle::id)).contains(left));
+        h.ui(() -> {
+            assertThat(alpha.get().terminals().activePane().map(PaneHandle::id)).contains(left);
+            assertThat(alpha.get().terminals().tab(other)).as("a pane closes with its tab").isEmpty();
+        });
     }
 
     @Test void gatedTerminalCallsNameTheMissingCapability() {
@@ -1364,7 +1372,7 @@ public abstract class PluginContractTest {
 
     @Test void injectionArrivesInOrderFromAnyThreadAndAClosedPaneIgnoresIt() throws Exception {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
-        UUID only = h.addTerminalPane(tab, "make", Path.of("/src")), other = h.addTerminalPane(tab, "top", Path.of("/"));
+        UUID only = h.addTerminalPane(tab, "make", Path.of("/src")), other = h.addTerminalPane(h.addTerminalTab(window, "top"), "top", Path.of("/"));
         var alpha = new AtomicReference<PluginContext>();
         h.start(info("test.alpha", Capabilities.TERMINAL_INJECT, Capabilities.TERMINAL_SELECTION), Set.of(), Set.of(), alpha::set);
         var pane = new AtomicReference<PaneHandle>();
@@ -1392,7 +1400,9 @@ public abstract class PluginContractTest {
 
     @Test void terminalEventsNameIdsAndFollowTheActivePane() {
         UUID window = h.addTerminalWindow(), tab = h.addTerminalTab(window, "build");
-        UUID left = h.addTerminalPane(tab, "make", Path.of("/src")), right = h.addTerminalPane(tab, "top", Path.of("/"));
+        UUID left = h.addTerminalPane(tab, "make", Path.of("/src"));
+        UUID other = h.addTerminalTab(window, "top"), right = h.addTerminalPane(other, "top", Path.of("/"));
+        h.focusTerminalPane(left);
         List<Object> heard = Collections.synchronizedList(new ArrayList<>());
         h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
             context.events().subscribe(TerminalEvents.ACTIVE_PANE_CHANGED, heard::add);
@@ -1415,7 +1425,7 @@ public abstract class PluginContractTest {
             assertThat(finished.exitStatus()).hasValue(2);
             assertThat(finished.workingDirectory()).contains(Path.of("/src"));
         });
-        assertThat(heard.subList(3, 5)).containsExactlyInAnyOrder(new TerminalEvents.PaneEvent(tab, right),
+        assertThat(heard.subList(3, 5)).containsExactlyInAnyOrder(new TerminalEvents.PaneEvent(other, right),
             new TerminalEvents.ActivePaneChanged(Optional.of(left)));
     }
 
@@ -1429,7 +1439,11 @@ public abstract class PluginContractTest {
             assertThat(opened.isOpen()).isTrue();
             assertThat(opened.tab().id()).isNotEqualTo(tab);
             PaneHandle split = terminals.split(terminals.pane(only).orElseThrow(), Direction.DOWN, OpenRequest.local()).orElseThrow();
-            assertThat(split.tab().id()).isEqualTo(tab);
+            assertThat(split.tab().id()).as("a split is a terminal tab of its own").isNotEqualTo(tab).isNotEqualTo(opened.tab().id());
+            assertThat(split.tab().kind()).isEqualTo(TabHandle.Kind.TERMINAL);
+            assertThat(split.tab().terminal()).contains(split);
+            assertThat(split.tab().window().id()).isEqualTo(window);
+            assertThat(terminals.window(window).orElseThrow().activeTab()).as("and it is selected").contains(split.tab());
         });
         assertThat(h.openRequests()).containsExactly("tab|" + window + "|" + Path.of("/tmp").toAbsolutePath(), "split|" + only + "|DOWN|-");
     }

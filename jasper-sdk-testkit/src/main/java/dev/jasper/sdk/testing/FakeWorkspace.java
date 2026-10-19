@@ -2,6 +2,7 @@ package dev.jasper.sdk.testing;
 
 import dev.jasper.sdk.terminal.PaneInfo;
 import dev.jasper.sdk.terminal.ShellProfileInfo;
+import dev.jasper.sdk.terminal.TabHandle;
 import dev.jasper.sdk.terminal.TerminalEvents;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,9 +11,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The windows, tabs and panes a test scripts, with the application's rules: the active pane is the focused
- * pane of the selected tab of the window activated last, the last pane takes its tab with it and the last
- * tab its window, and every change is announced on the terminal topics.
+ * The windows, tabs and panes a test scripts, with the application's rules (workspace tabs spec 9.4): a terminal tab
+ * holds one pane, a split opens a terminal tab of its own, the active pane is the pane of the active tab of the window
+ * activated last when that tab is a terminal tab, focusing a pane selects its tab, a pane closes with its tab and the last
+ * tab takes its window with it, and every change is announced on the terminal topics.
  */
 final class FakeWorkspace {
     static final class Pane {
@@ -22,8 +24,8 @@ final class FakeWorkspace {
         Pane(Tab tab, PaneInfo info) { this.tab = tab; this.info = info; }
     }
     static final class Tab {
-        final UUID id = UUID.randomUUID(); final Window window; final String title; final List<Pane> panes = new ArrayList<>(); Pane focused; boolean open = true;
-        Tab(Window window, String title) { this.window = window; this.title = title; }
+        final UUID id = UUID.randomUUID(); final TabHandle.Kind kind; Window window; String title; Pane pane; boolean open = true;
+        Tab(Window window, TabHandle.Kind kind, String title) { this.window = window; this.kind = kind; this.title = title; }
     }
     static final class Window {
         final UUID id = UUID.randomUUID(); final List<Tab> tabs = new ArrayList<>(); Tab selected; boolean open = true; boolean detached;
@@ -53,7 +55,7 @@ final class FakeWorkspace {
     Optional<Pane> pane(UUID id) { return everyPane.stream().filter(pane -> pane.open && pane.id.equals(id)).findFirst(); }
     Optional<Pane> anyPane(UUID id) { return everyPane.stream().filter(pane -> pane.id.equals(id)).findFirst(); }
     Optional<Pane> activePane() {
-        return Optional.ofNullable(lastActive).filter(window -> window.open).map(window -> window.selected).map(tab -> tab.focused);
+        return Optional.ofNullable(lastActive).filter(window -> window.open).map(window -> window.selected).map(tab -> tab.pane);
     }
 
     private void refreshActive() {
@@ -70,8 +72,12 @@ final class FakeWorkspace {
         return window;
     }
 
-    Tab addTab(Window window, String title) {
-        var tab = new Tab(window, title);
+    /** A terminal tab, selected; {@link #addPane} gives it its one pane. */
+    Tab addTab(Window window, String title) { return addTab(window, TabHandle.Kind.TERMINAL, title); }
+
+    /** A tab of {@code kind}, selected. */
+    Tab addTab(Window window, TabHandle.Kind kind, String title) {
+        var tab = new Tab(window, kind, title);
         everyTab.add(tab);
         window.tabs.add(tab);
         host.publishApp(TerminalEvents.TAB_OPENED, new TerminalEvents.TabEvent(window.id, tab.id));
@@ -86,11 +92,13 @@ final class FakeWorkspace {
         refreshActive();
     }
 
+    /** A terminal tab's one pane; a second, or one in a content tab, is refused. */
     Pane addPane(Tab tab, PaneInfo info) {
+        if (tab.kind != TabHandle.Kind.TERMINAL) throw new IllegalArgumentException("A content tab holds no pane");
+        if (tab.pane != null) throw new IllegalStateException("A terminal tab holds one pane");
         var pane = new Pane(tab, info);
         everyPane.add(pane);
-        tab.panes.add(pane);
-        if (tab.focused == null) tab.focused = pane;
+        tab.pane = pane;
         host.publishApp(TerminalEvents.PANE_OPENED, new TerminalEvents.PaneEvent(tab.id, pane.id));
         refreshActive();
         return pane;
@@ -106,32 +114,36 @@ final class FakeWorkspace {
     void focus(Pane pane) {
         if (!pane.open) return;
         select(pane.tab);
-        pane.tab.focused = pane;
         host.publishApp(TerminalEvents.PANE_FOCUSED, new TerminalEvents.PaneEvent(pane.tab.id, pane.id));
         refreshActive();
     }
 
-    void close(Pane pane) {
-        if (!pane.open) return;
-        sessions.closing(pane);
-        pane.open = false;
-        Tab tab = pane.tab; Window window = tab.window;
-        tab.panes.remove(pane);
-        if (tab.focused == pane) tab.focused = tab.panes.isEmpty() ? null : tab.panes.get(0);
-        host.publishApp(TerminalEvents.PANE_CLOSED, new TerminalEvents.PaneEvent(tab.id, pane.id));
-        if (tab.panes.isEmpty()) {
-            tab.open = false;
-            window.tabs.remove(tab);
-            host.publishApp(TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(window.id, tab.id));
-            if (window.selected == tab) { window.selected = null; if (!window.tabs.isEmpty()) select(window.tabs.get(0)); }
-            if (window.tabs.isEmpty()) {
-                window.open = false;
-                windows.remove(window);
-                if (lastActive == window) lastActive = null;
-                host.closeToolbarViews(window.id);
-                host.publishApp(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(window.id));
-            }
+    /** A pane closes with its tab. */
+    void close(Pane pane) { if (pane.open) close(pane.tab); }
+
+    /** Closes a tab, its pane with it; the last tab takes its window with it. */
+    void close(Tab tab) {
+        if (!tab.open) return;
+        Window window = tab.window;
+        Pane pane = tab.pane;
+        if (pane != null && pane.open) {
+            sessions.closing(pane);
+            pane.open = false;
+            host.publishApp(TerminalEvents.PANE_CLOSED, new TerminalEvents.PaneEvent(tab.id, pane.id));
         }
+        tab.open = false;
+        window.tabs.remove(tab);
+        host.publishApp(TerminalEvents.TAB_CLOSED, new TerminalEvents.TabEvent(window.id, tab.id));
+        if (window.selected == tab) { window.selected = null; if (!window.tabs.isEmpty()) select(window.tabs.get(0)); }
+        if (window.tabs.isEmpty()) closeWindow(window);
         refreshActive();
+    }
+
+    private void closeWindow(Window window) {
+        window.open = false;
+        windows.remove(window);
+        if (lastActive == window) lastActive = null;
+        host.closeToolbarViews(window.id);
+        host.publishApp(TerminalEvents.WINDOW_CLOSED, new TerminalEvents.WindowEvent(window.id));
     }
 }

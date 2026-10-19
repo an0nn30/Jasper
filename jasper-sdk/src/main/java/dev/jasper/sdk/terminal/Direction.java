@@ -1,9 +1,9 @@
 package dev.jasper.sdk.terminal;
 
-/** Where a split places the new pane. */
+/** Which side of the target pane's tab group a split puts the new terminal tab's group. */
 public enum Direction {
-    /** Beside the target, to its right. */
+    /** To the right of the target's group. */
     RIGHT,
-    /** Below the target. */
+    /** Below the target's group. */
     DOWN
 }

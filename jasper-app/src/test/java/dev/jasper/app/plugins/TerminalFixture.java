@@ -18,16 +18,21 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import dev.jasper.app.terminals.OpenSpec;
 import dev.jasper.app.terminals.SessionAttempt;
 import dev.jasper.app.terminals.SessionRequest;
 import dev.jasper.terminal.session.AttachedConnection;
 
-/** A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. EDT only. */
+/**
+ * A scripted workspace behind a real {@link TerminalRegistry}: what windows do, without windows. A terminal tab holds one
+ * pane, a split opens a terminal tab of its own in the pane's window, focusing a pane selects its tab, a pane closes with
+ * its tab and the last tab takes its window with it (workspace tabs spec 9.4). EDT only.
+ */
 final class TerminalFixture {
     private static final class Pane { UUID id = UUID.randomUUID(); Tab tab; String title; Path directory; String selection; List<String> sent = new ArrayList<>(); dev.jasper.app.terminals.RemoteLocation remote;
         SessionRequest request; SessionAttempt attempt; AttachedConnection connection; boolean everAttached; String status = ""; String state = ""; String shell = "zsh"; }
-    private static final class Tab { UUID id = UUID.randomUUID(); Window window; String title; List<Pane> panes = new ArrayList<>(); Pane focused; }
+    private static final class Tab { UUID id = UUID.randomUUID(); Window window; TabEntry.Kind kind = TabEntry.Kind.TERMINAL; Supplier<String> title; Pane pane; }
     private static final class Window { UUID id = UUID.randomUUID(); List<Tab> tabs = new ArrayList<>(); Tab selected; Subscription registration; }
 
     final TerminalRegistry registry = new TerminalRegistry();
@@ -46,17 +51,19 @@ final class TerminalFixture {
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             bytes -> pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)), text -> pane.sent.add("paste:" + text),
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
-            (axis, spec) -> {
+            (side, spec) -> {
+                // A split is a terminal tab of its own, in a new group beside the pane's group (spec 9.4).
+                UUID window = pane.tab.window.id;
                 UUID created = switch (spec) {
                     case OpenSpec.Local local -> {
-                        opened.add("split|" + pane.id + "|" + axis + "|" + local.directory().map(Path::toString).orElse("-")
+                        opened.add("split|" + pane.id + "|" + side + "|" + local.directory().map(Path::toString).orElse("-")
                             + local.profile().map(profile -> "|" + profile).orElse("")
                             + local.program().map(program -> "|run:" + String.join(" ", program)).orElse(""));
-                        yield addPane(pane.tab.id, "split", local.directory().orElse(pane.directory));
+                        yield addPane(addTab(window, "split"), "split", local.directory().orElse(pane.directory));
                     }
                     case OpenSpec.Session session -> {
-                        opened.add("session-split|" + pane.id + "|" + axis + "|" + session.request().title());
-                        yield addSessionPane(pane.tab.id, session.request());
+                        opened.add("session-split|" + pane.id + "|" + side + "|" + session.request().title());
+                        yield addSessionPane(addTab(window, session.request().title()), session.request());
                     }
                 };
                 focusPane(created);
@@ -65,8 +72,7 @@ final class TerminalFixture {
     }
 
     private TabEntry entry(Tab tab) {
-        return new TabEntry(tab.id, tab.window.id, () -> tab.panes.stream().map(this::entry).toList(),
-            () -> Optional.ofNullable(tab.focused).map(this::entry), () -> tab.title, () -> selectTab(tab));
+        return new TabEntry(tab.id, tab.window.id, tab.kind, () -> Optional.ofNullable(tab.pane).map(this::entry), tab.title, () -> select(tab));
     }
 
     UUID addWindow() {
@@ -89,58 +95,70 @@ final class TerminalFixture {
         return window.id;
     }
 
+    /** A terminal tab, selected; {@link #addPane} gives it its one pane. */
     UUID addTab(UUID windowId, String title) {
         Window window = windows.get(windowId);
-        var tab = new Tab(); tab.window = window; tab.title = title;
+        var tab = new Tab(); tab.window = window; tab.title = () -> title;
         tabs.put(tab.id, tab);
         window.tabs.add(tab);
-        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); selectTab(tab); });
+        registry.atomically(() -> { registry.publish(new TerminalEvent.TabOpened(window.id, tab.id)); select(tab); });
         return tab.id;
     }
 
-    private void selectTab(Tab tab) {
+    private void select(Tab tab) {
         if (tab.window.selected == tab) return;
         tab.window.selected = tab;
         registry.publish(new TerminalEvent.TabSelected(tab.window.id, tab.id));
     }
 
+    /** A terminal tab's one pane; a second, or a pane in a content tab, is refused. */
     UUID addPane(UUID tabId, String title, Path directory) {
         Tab tab = tabs.get(tabId);
+        if (tab.kind != TabEntry.Kind.TERMINAL || tab.pane != null) throw new IllegalStateException("A terminal tab holds one pane");
         var pane = new Pane(); pane.tab = tab; pane.title = title; pane.directory = directory;
         panes.put(pane.id, pane);
-        tab.panes.add(pane);
-        if (tab.focused == null) tab.focused = pane;
+        tab.pane = pane;
         registry.publish(new TerminalEvent.PaneOpened(tab.id, pane.id));
         return pane.id;
     }
 
     void activateWindow(UUID windowId) { registry.windowActivated(windowId); }
 
+    /** Focusing a pane selects its tab, as in the application. */
     void focusPane(UUID paneId) {
         Pane pane = panes.get(paneId);
         if (pane == null) return;
-        pane.tab.focused = pane;
-        registry.publish(new TerminalEvent.PaneFocused(pane.tab.id, pane.id));
+        registry.atomically(() -> { select(pane.tab); registry.publish(new TerminalEvent.PaneFocused(pane.tab.id, pane.id)); });
     }
 
-    /** The last pane takes its tab with it, and the last tab its window, as in the application. */
+    /** A pane closes with its tab, as in the application. */
     void closePane(UUID paneId) {
-        Pane pane = panes.remove(paneId);
-        if (pane == null) return;
-        closedPanes.put(paneId, pane);
-        if (pane.attempt != null) pane.attempt.cancel();
-        if (pane.connection != null) { pane.connection.close().run(); pane.connection = null; }
-        Tab tab = pane.tab; Window window = tab.window;
+        Pane pane = panes.get(paneId);
+        if (pane != null) close(pane.tab);
+    }
+
+    /** Closes a tab, its pane with it; the last tab takes its window with it. */
+    private void close(Tab tab) {
+        if (tabs.remove(tab.id) == null) return;
+        Window window = tab.window;
+        Pane pane = tab.pane;
+        if (pane != null && panes.remove(pane.id) != null) {
+            closedPanes.put(pane.id, pane);
+            if (pane.attempt != null) pane.attempt.cancel();
+            if (pane.connection != null) { pane.connection.close().run(); pane.connection = null; }
+        }
         registry.atomically(() -> {
-            tab.panes.remove(pane);
-            if (tab.focused == pane) tab.focused = tab.panes.isEmpty() ? null : tab.panes.get(0);
-            registry.publish(new TerminalEvent.PaneClosed(tab.id, pane.id));
-            if (!tab.panes.isEmpty()) return;
-            tabs.remove(tab.id); window.tabs.remove(tab);
+            if (pane != null) registry.publish(new TerminalEvent.PaneClosed(tab.id, pane.id));
+            window.tabs.remove(tab);
             registry.publish(new TerminalEvent.TabClosed(window.id, tab.id));
-            if (window.selected == tab) { window.selected = null; if (!window.tabs.isEmpty()) selectTab(window.tabs.get(0)); }
-            if (window.tabs.isEmpty()) { windows.remove(window.id); window.registration.close(); }
+            if (window.selected == tab) { window.selected = null; if (!window.tabs.isEmpty()) select(window.tabs.get(0)); }
+            if (window.tabs.isEmpty()) closeWindow(window);
         });
+    }
+
+    private void closeWindow(Window window) {
+        windows.remove(window.id);
+        window.registration.close();
     }
 
     void select(UUID paneId, String text) { panes.get(paneId).selection = text; }

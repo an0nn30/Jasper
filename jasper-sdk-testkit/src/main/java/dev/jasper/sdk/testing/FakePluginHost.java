@@ -1193,7 +1193,7 @@ public final class FakePluginHost implements AutoCloseable {
     public UUID addTerminalWindow() { return workspace.addWindow().id; }
 
     /**
-     * Adds and selects a tab.
+     * Adds and selects a terminal tab; {@link #addTerminalPane} gives it its one pane.
      *
      * @param windowId an open window
      * @param title the tab's title
@@ -1204,7 +1204,7 @@ public final class FakePluginHost implements AutoCloseable {
     }
 
     /**
-     * Adds a pane; a tab's first pane is its focused pane.
+     * Adds a terminal tab's pane. A terminal tab holds one pane, so a second throws {@code IllegalStateException}.
      *
      * @param tabId an open tab
      * @param info what the pane reports
@@ -1222,13 +1222,13 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void activateTerminalWindow(UUID windowId) { workspace.window(windowId).ifPresent(workspace::activate); }
     /**
-     * The user focused a pane, which also selects its tab.
+     * The user focused a pane, which selects its tab.
      *
      * @param paneId the pane
      */
     public void focusTerminalPane(UUID paneId) { workspace.pane(paneId).ifPresent(workspace::focus); }
     /**
-     * Closes a pane; the last pane takes its tab with it, and the last tab its window.
+     * Closes a pane with its tab; the last tab takes its window with it.
      *
      * @param paneId the pane
      */

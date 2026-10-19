@@ -5,9 +5,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * One pane. Handles keep an id and no Swing object; two handles for the same pane are equal. A pane can
- * close at any moment: commands to a closed pane are ignored, queries return the last known value, and
- * {@link #isOpen()} tells. A missing capability always throws. EDT only, except the three sending methods.
+ * One pane: the terminal of a terminal tab, so one session. Handles keep an id and no Swing object; two handles for the
+ * same pane are equal. A pane closes with its tab, at any moment: commands to a closed pane are ignored, queries return
+ * the last known value, and {@link #isOpen()} tells. A missing capability always throws. EDT only, except the three
+ * sending methods.
  */
 public interface PaneHandle {
     /**
@@ -18,7 +19,7 @@ public interface PaneHandle {
     UUID id();
 
     /**
-     * The tab the pane was last seen in.
+     * The terminal tab whose pane this is; a pane belongs to one tab for its whole life.
      *
      * @return its handle
      */

@@ -64,7 +64,11 @@ final class KitCompatibility {
         "dev/jasper/sdk/ui/Nodes$FormKind#HERO_COMPACTLdev/jasper/sdk/ui/Nodes$FormKind;",
         "dev/jasper/sdk/ui/Nodes$LayoutRole#HEROLdev/jasper/sdk/ui/Nodes$LayoutRole;",
         "dev/jasper/sdk/ui/Nodes$TextRole#HERO_TITLELdev/jasper/sdk/ui/Nodes$TextRole;",
-        "dev/jasper/sdk/ui/Nodes$IconSize#HEROLdev/jasper/sdk/ui/Nodes$IconSize;")));
+        "dev/jasper/sdk/ui/Nodes$IconSize#HEROLdev/jasper/sdk/ui/Nodes$IconSize;"),
+        // The members SDK 0.19 removed with workspace tabs.
+        "0.19", List.of(
+        "dev/jasper/sdk/terminal/TabHandle#activePane()Ljava/util/Optional;",
+        "dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;")));
 
     private static Map<String, String> removed(Map<String, List<String>> byVersion) {
         var removed = new HashMap<String, String>();

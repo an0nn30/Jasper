@@ -122,19 +122,19 @@ public interface ContractHarness extends AutoCloseable {
     /** UI thread: adds a Jasper window, which announces itself on the terminal topics. */
     java.util.UUID addTerminalWindow();
 
-    /** UI thread: adds and selects a tab in an open window. */
+    /** UI thread: adds and selects a terminal tab in an open window; {@link #addTerminalPane} gives it its one pane. */
     java.util.UUID addTerminalTab(java.util.UUID windowId, String title);
 
-    /** UI thread: adds a running local pane, 80 by 24, with shell integration; a tab's first pane is its focused pane. */
+    /** UI thread: adds a terminal tab's one pane: running, local, 80 by 24, with shell integration. */
     java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory);
 
     /** UI thread: the user turned to this window. */
     void activateTerminalWindow(java.util.UUID windowId);
 
-    /** UI thread: the user focused this pane. */
+    /** UI thread: the user focused this pane, which selects its tab. */
     void focusTerminalPane(java.util.UUID paneId);
 
-    /** UI thread: closes a pane; the last pane takes its tab with it, and the last tab its window. */
+    /** UI thread: closes a pane with its tab; the last tab takes its window with it. */
     void closeTerminalPane(java.util.UUID paneId);
 
     /** UI thread: sets the text selected in a pane. */

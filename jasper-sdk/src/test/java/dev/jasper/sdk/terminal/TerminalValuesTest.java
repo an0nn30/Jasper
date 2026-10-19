@@ -81,6 +81,17 @@ class TerminalValuesTest {
         assertThat(TerminalEvents.owns(Topic.of("jasper.activity", String.class))).isFalse();
     }
 
+    /** Workspace tabs spec 14: a tab is a terminal tab, holding one pane, or a content tab, holding none. */
+    @Test void aTabHasAKindAndATerminalTabItsOnePane() throws Exception {
+        assertThat(TabHandle.Kind.values()).containsExactly(TabHandle.Kind.TERMINAL, TabHandle.Kind.CONTENT);
+        assertThat(TabHandle.class.getMethod("kind").getReturnType()).isEqualTo(TabHandle.Kind.class);
+        assertThat(TabHandle.class.getMethod("terminal").getGenericReturnType().getTypeName())
+            .isEqualTo("java.util.Optional<dev.jasper.sdk.terminal.PaneHandle>");
+        assertThat(java.util.Arrays.stream(TabHandle.class.getMethods()).map(java.lang.reflect.Method::getName))
+            .as("a tab has no pane list").doesNotContain("panes", "activePane");
+        assertThat(Direction.values()).containsExactly(Direction.RIGHT, Direction.DOWN);
+    }
+
     @Test void aMissingCapabilityNamesThePluginAndTheCapability() {
         var failure = new MissingCapabilityException("dev.example.tool", Capabilities.TERMINAL_INJECT);
         assertThat(failure.pluginId()).isEqualTo("dev.example.tool");

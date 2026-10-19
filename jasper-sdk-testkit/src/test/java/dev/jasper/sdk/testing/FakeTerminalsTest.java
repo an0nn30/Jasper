@@ -86,6 +86,31 @@ class FakeTerminalsTest {
         }
     }
 
+    /** Workspace tabs spec 9.4: a terminal tab holds one pane, and a split is a terminal tab of its own. */
+    @Test void aTerminalTabHoldsOnePaneAndASplitOpensATabOfItsOwn() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "build"), pane = host.addTerminalPane(tab, info("make"));
+            assertThatIllegalStateException().isThrownBy(() -> host.addTerminalPane(tab, info("top"))).withMessageContaining("one pane");
+            var context = host.start(new PluginInfo("dev.x.tool", "Tool", "1.0.0", Set.of(Capabilities.TERMINAL_OPEN)), Set.of(), Set.of(), plugin -> { });
+            var terminals = context.terminals();
+            var tabHandle = terminals.tab(tab).orElseThrow();
+            assertThat(tabHandle.kind()).isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL);
+            assertThat(tabHandle.terminal().map(PaneHandle::id)).contains(pane);
+            PaneHandle split = terminals.split(terminals.pane(pane).orElseThrow(), dev.jasper.sdk.terminal.Direction.RIGHT,
+                OpenRequest.local()).orElseThrow();
+            assertThat(split.tab().id()).as("a split is a terminal tab of its own").isNotEqualTo(tab);
+            assertThat(split.tab().window().id()).isEqualTo(window);
+            assertThat(terminals.window(window).orElseThrow().tabs()).extracting(dev.jasper.sdk.terminal.TabHandle::id)
+                .containsExactly(tab, split.tab().id());
+            assertThat(terminals.window(window).orElseThrow().activeTab()).as("and it is selected").contains(split.tab());
+            assertThat(host.openRequests()).containsExactly("split|" + pane + "|RIGHT|-");
+            host.closeTerminalPane(pane);
+            assertThat(tabHandle.isOpen()).as("a pane closes with its tab").isFalse();
+            assertThat(tabHandle.terminal()).isEmpty();
+            assertThat(tabHandle.kind()).as("a closed tab keeps its kind").isEqualTo(dev.jasper.sdk.terminal.TabHandle.Kind.TERMINAL);
+        }
+    }
+
     @Test void profilesAreScriptedAndOnlyListedOnesOpen() {
         try (var host = new FakePluginHost()) {
             var ubuntu = new ShellProfileInfo("wsl:Ubuntu", "Ubuntu", ShellProfileInfo.Kind.WSL, Optional.of("WSL 2"));

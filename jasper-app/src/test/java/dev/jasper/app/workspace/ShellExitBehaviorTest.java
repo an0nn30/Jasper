@@ -358,7 +358,7 @@ class ShellExitBehaviorTest {
             .apply(new dev.jasper.app.terminals.OpenSpec.Local(Optional.of(directory), Optional.empty(), Optional.of(PROGRAM)))).isPresent());
         deliver();
         edt(() -> {
-            var pane = registry.get().window(owner.id()).orElseThrow().selectedTab().get().orElseThrow().focusedPane().get().orElseThrow();
+            var pane = registry.get().window(owner.id()).orElseThrow().selectedTab().get().orElseThrow().terminal().get().orElseThrow();
             assertThat(pane.split().apply(dev.jasper.app.layout.Side.RIGHT,
                 new dev.jasper.app.terminals.OpenSpec.Local(Optional.empty(), Optional.empty(), Optional.of(split)))).isPresent();
         });

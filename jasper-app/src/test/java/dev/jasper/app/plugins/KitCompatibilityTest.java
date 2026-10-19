@@ -54,6 +54,13 @@ class KitCompatibilityTest {
         assertThatThrownBy(() -> PluginLoader.load(candidate,Map.of(),Plugin.class.getClassLoader())).hasMessage("plugin.jar!test/kit/Probe.class references removed SDK member "
             +"dev/jasper/sdk/ui/Nodes$ChoiceKind#SEGMENTEDLdev/jasper/sdk/ui/Nodes$ChoiceKind;; rebuild it for SDK 0.18");
     }
+    /** Workspace tabs plan 3b: a plugin built on 0.18 that claims 0.19 and still reads a tab's pane list is refused at load. */
+    @Test void theTabMembersSdkZeroNineteenRemovedAreRefused() throws Exception {
+        rejects(reference("dev.jasper.sdk.terminal.TabHandle","panes","()Ljava/util/List;"),"dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;","0.19");
+        rejects(reference("dev.jasper.sdk.terminal.TabHandle","activePane","()Ljava/util/Optional;"),"dev/jasper/sdk/terminal/TabHandle#activePane()Ljava/util/Optional;","0.19");
+        var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.terminal.TabHandle","terminal","()Ljava/util/Optional;")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took their place").isNotNull();}
+    }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {
         for(var renamed:RENAMED_TO) {
             var candidate=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$"+renamed.get(0),renamed.get(1))),false);

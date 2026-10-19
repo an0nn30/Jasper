@@ -94,6 +94,11 @@ final class HostedTerminals implements Terminals {
             snapshot.exitStatus(), snapshot.shell());
     }
 
+    /** The application's tab kind as plugins see it (workspace plan 3b Rulings 13). */
+    private static TabHandle.Kind kindOf(TabEntry.Kind kind) {
+        return switch (kind) { case TERMINAL -> TabHandle.Kind.TERMINAL; case CONTENT -> TabHandle.Kind.CONTENT; };
+    }
+
     private final class Window implements WindowHandle {
         private final UUID id;
         TerminalRegistry hostRegistry() { return registry; }
@@ -117,10 +122,11 @@ final class HostedTerminals implements Terminals {
 
     private final class Tab implements TabHandle {
         private final UUID id;
+        private final TabHandle.Kind kind;
         private UUID windowId;
         private String title = "";
-        Tab(TabEntry entry) { this(entry.id(), entry.windowId()); }
-        Tab(UUID id, UUID windowId) { this.id = id; this.windowId = windowId; }
+        Tab(TabEntry entry) { this(entry.id(), entry.windowId(), kindOf(entry.kind())); }
+        Tab(UUID id, UUID windowId, TabHandle.Kind kind) { this.id = id; this.windowId = windowId; this.kind = kind; }
         private Optional<TabEntry> entry() {
             Optional<TabEntry> found = registry.tab(id);
             found.ifPresent(entry -> windowId = entry.windowId());
@@ -128,11 +134,11 @@ final class HostedTerminals implements Terminals {
         }
         @Override public UUID id() { return id; }
         @Override public WindowHandle window() { requireUi("window"); entry(); return new Window(windowId); }
-        @Override public List<PaneHandle> panes() {
-            requireUi("panes");
-            return entry().map(entry -> entry.panes().get().stream().<PaneHandle>map(Pane::new).toList()).orElse(List.of());
+        @Override public TabHandle.Kind kind() { return kind; }
+        @Override public Optional<PaneHandle> terminal() {
+            requireUi("terminal");
+            return entry().flatMap(entry -> entry.terminal().get()).map(Pane::new);
         }
-        @Override public Optional<PaneHandle> activePane() { requireUi("activePane"); return entry().flatMap(entry -> entry.focusedPane().get()).map(Pane::new); }
         @Override public String title() {
             gate.require(Capabilities.TERMINAL_OBSERVE);
             requireUi("title");
@@ -161,7 +167,7 @@ final class HostedTerminals implements Terminals {
         @Override public TabHandle tab() {
             requireUi("tab");
             entry();
-            return registry.tab(tabId).<TabHandle>map(Tab::new).orElseGet(() -> new Tab(tabId, NOWHERE));
+            return registry.tab(tabId).<TabHandle>map(Tab::new).orElseGet(() -> new Tab(tabId, NOWHERE, TabHandle.Kind.TERMINAL));
         }
         @Override public PaneInfo info() {
             gate.require(Capabilities.TERMINAL_OBSERVE);
@@ -232,10 +238,10 @@ final class HostedTerminals implements Terminals {
             .flatMap(tab -> registry.window(tab.windowId())).<WindowHandle>map(window -> new Window(window.id()));
     }
 
-    /** The focused pane in {@code windowId}'s selected tab, else the active pane. */
+    /** The pane of {@code windowId}'s active tab when that is a terminal tab, else the active pane. */
     Optional<UUID> focusedPane(UUID windowId) {
         Optional<PaneEntry> pane = windowId == null ? Optional.empty()
-            : registry.window(windowId).flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.focusedPane().get());
+            : registry.window(windowId).flatMap(window -> window.selectedTab().get()).flatMap(tab -> tab.terminal().get());
         return pane.or(registry::activePane).map(PaneEntry::id);
     }
 

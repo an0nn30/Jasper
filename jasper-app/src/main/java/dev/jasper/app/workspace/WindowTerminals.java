@@ -8,7 +8,6 @@ import dev.jasper.app.terminals.TerminalEvent;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.terminals.WindowEntry;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,8 +39,7 @@ final class WindowTerminals implements AutoCloseable {
     }
 
     TabEntry entry(TerminalContent terminal) {
-        return new TabEntry(terminal.id().value(), owner.id(),
-            () -> terminal.closed() ? List.of() : List.of(entry(terminal, terminal.pane())),
+        return new TabEntry(terminal.id().value(), owner.id(), TabEntry.Kind.TERMINAL,
             () -> terminal.closed() ? Optional.empty() : Optional.of(entry(terminal, terminal.pane())),
             terminal::title, () -> owner.selectTab(terminal));
     }
