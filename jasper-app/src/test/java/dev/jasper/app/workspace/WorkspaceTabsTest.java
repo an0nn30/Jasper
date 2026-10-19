@@ -314,23 +314,30 @@ class WorkspaceTabsTest {
                 window.closeTab(background.get(0));
                 assertThat(window.workspace().model().groups()).as("the background group collapsed").hasSize(4);
                 assertThat(focused[0]).as("focus stays outside the workspace").isZero();
+                window.focusGroup(Side.RIGHT);
+                window.focusGroup(Side.LEFT);
+                assertThat(window.selectedTab()).isSameAs(view);
+                assertThat(focused[0]).as("Focus Group takes focus from wherever it is").isEqualTo(1);
                 // Focus left in a component nobody sees, such as the palette that just closed to run a command.
                 focus.own(new JTextField());
                 window.closeTab(background.get(1));
-                assertThat(focused[0]).as("focus nowhere follows the change").isEqualTo(1);
+                assertThat(focused[0]).as("focus nowhere follows the change").isEqualTo(2);
+                window.addNotify();
+                assertThat(inside.isShowing()).as("a field the person sees, in the workspace").isTrue();
                 focus.own(inside);
                 assertThat(window.selectedTab()).isSameAs(view);
                 window.closeTab(background.get(2));
-                assertThat(focused[0]).as("focus in the workspace follows the change").isEqualTo(2);
+                assertThat(focused[0]).as("focus in the workspace follows the change").isEqualTo(3);
                 WindowCommandPaletteTest.install(window);
                 window.commandPalette().toggle();
                 assertThat(window.commandPalette().blocksActions()).isTrue();
                 window.closeTab(background.get(3));
                 assertThat(window.workspace().model().groups()).hasSize(1);
                 assertThat(window.commandPalette().isOpen()).isTrue();
-                assertThat(focused[0]).as("never while the palette holds the window's input").isEqualTo(2);
+                assertThat(focused[0]).as("never while the palette holds the window's input").isEqualTo(3);
                 window.commandPalette().dismiss();
                 focus.own(null);
+                window.removeNotify();
             });
         } finally {
             edt(() -> { outside.removeNotify(); KeyboardFocusManager.setCurrentKeyboardFocusManager(prior); });

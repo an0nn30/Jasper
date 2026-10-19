@@ -15,8 +15,8 @@ import java.util.function.Function;
  * @param id the window's id
  * @param detached whether it is a separate window for plugin views
  * @param attach shows a tab the registry placed in this window, at the end of its active group
- * @param detach takes a tab out of this window's layout, once the tab has closed (the registry disposes it first) or as
- *     it moves to another window
+ * @param detach takes a tab out of this window's layout, once the tab has closed (the registry disposes it first), as
+ *     it moves to another window, or when the registry takes back an attach that failed
  * @param select shows a tab of this window and activates its group
  * @param toFront raises the window
  * @param groupOf the group that holds a tab of this window

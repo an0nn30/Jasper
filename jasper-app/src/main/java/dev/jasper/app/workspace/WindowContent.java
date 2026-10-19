@@ -1167,7 +1167,12 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     void toggleMaximize() { workspace.toggleMaximize(); }
 
     /** Focus Group: the neighbouring group that way takes focus with its selected tab; nothing past the edge. */
-    void focusGroup(Side side) { workspace.neighbour(side).ifPresent(workspace::activate); }
+    void focusGroup(Side side) {
+        workspace.neighbour(side).ifPresent(group -> {
+            workspace.activate(group);
+            focusSelected();
+        });
+    }
 
     /** The terminal tab holding {@code pane}; null when none of this window's does. */
     TerminalContent terminalOf(TerminalPane pane) {

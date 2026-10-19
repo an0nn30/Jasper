@@ -307,7 +307,10 @@ public final class TabRegistry {
                             if (error != null || !Boolean.TRUE.equals(allowed)) finish(false);
                             else run();
                         }));
-                } catch (RuntimeException failure) { finish(false); }
+                } catch (RuntimeException | Error failure) {
+                    LOG.log(System.Logger.Level.WARNING, "A close guard failed", failure);
+                    finish(false);
+                }
             }
             void finish(boolean allowed) {
                 pending = List.of();
@@ -325,6 +328,7 @@ public final class TabRegistry {
      * after this method has returned.
      */
     public CompletableFuture<Boolean> requestClose(List<Tab> requested) {
+        requireEdt();
         if (decision != null && closing == null) return CompletableFuture.completedFuture(false);
         if (closing != null) return pending.equals(requested) ? closing : CompletableFuture.completedFuture(false);
         var result = new CompletableFuture<Boolean>();

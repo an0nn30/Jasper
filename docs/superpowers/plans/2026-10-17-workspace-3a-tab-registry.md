@@ -44,6 +44,8 @@ since a rethrow would end in a future nobody reads; `Tab.keep`, and with it `ope
 failure under itself; a layout change gives the active tab focus only while the palette's card does not hold the
 window's input and the permanent focus owner was in the workspace, nowhere, or not showing (a closed terminal, or the
 palette that just closed to run a command), so focus in the open palette, the Run window or a tool window stays there;
+Focus Group takes focus from wherever it is; a close guard that throws, even an `Error`, refuses its close, and
+`requestClose` runs on the Event Dispatch Thread only;
 Close Others and Close Group of terminal tabs alone close at once, without the registry's approval; every tab's
 `Tab.active()` follows its window's active tab, terminal tabs included; a group outside the active one shows no Select
 Tab shortcut; a window stops hearing the focus manager first when it closes, and when its first tab fails in its
