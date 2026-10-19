@@ -16,6 +16,8 @@ import dev.jasper.app.presentation.WorkspaceLook;
 import dev.jasper.app.terminals.TerminalRegistry;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.swing.FlatLafInstaller;
@@ -234,19 +236,38 @@ class ClassicHeaderTest {
         });
     }
 
-    /** Review Focus 5. */
+    /** Review Focus 5: the squares, Split's corner ▼ while it is placed, and the order things give way in. */
     @Test void asTheRowNarrowsIconButtonsKeepTheirSquaresAndSplitItsCornerArrow() throws Exception {
         edt(() -> {
             var themes = ThemeTestSupport.controller(true);
             var window = window(themes, true);
             window.owner().setToolbarMode(ToolbarMode.ICONS);
             var bar = window.owner().chrome().windowToolbar();
-            for (int width = 1440; width >= 420; width -= 40) {
+            var header = window.owner().chrome().header();
+            var split = labelled(bar, "Split");
+            var corner = new Rectangle(scale(22) - scale(7), scale(22) - scale(5), scale(5), scale(3));
+            int splitGone = 0, maximize = 0, view = 0, shrunk = 0, collapsed = 0;
+            for (int width = 1440; width >= 200; width -= 10) {
                 window.width(width);
                 for (Component child : bar.getComponents())
                     if (child instanceof ClassicToolbarButton button && button.isVisible() && button.getWidth() > 0)
                         assertThat(button.getSize()).as(width + " " + button.getClientProperty("label")).isEqualTo(new Dimension(scale(22), scale(22)));
+                boolean placed = split.isVisible() && split.getWidth() > 0;
+                if (placed) assertThat(alphaIn(split, corner)).as("Split's corner ▼ at " + width).isPositive();
+                Component sessionView = WindowTabsTest.named(bar, "sessionView");
+                if (splitGone == 0 && !placed) splitGone = width;
+                if (maximize == 0 && !bar.getComponent(3).isVisible()) maximize = width;
+                if (view == 0 && sessionView != null && !sessionView.isVisible()) view = width;
+                if (shrunk == 0 && header.field().getWidth() < 300) shrunk = width;
+                if (collapsed == 0 && header.field().getWidth() == 0) collapsed = width;
             }
+            assertThat(List.of(splitGone, maximize, view, shrunk, collapsed)).as("each gave way").doesNotContain(0);
+            // Today's order, as aNarrowWindowGivesWayInOrder's: the view hides, Maximize then Split go into the overflow
+            // menu, then the field shrinks and collapses.
+            assertThat(view).as("the view hides first").isGreaterThanOrEqualTo(maximize);
+            assertThat(maximize).as("Maximize no later than Split").isGreaterThanOrEqualTo(splitGone);
+            assertThat(splitGone).as("then the field shrinks").isGreaterThanOrEqualTo(shrunk);
+            assertThat(shrunk).as("then collapses").isGreaterThan(collapsed);
         });
     }
 
@@ -257,27 +278,58 @@ class ClassicHeaderTest {
             var window = window(themes, false, WorkspaceLook.Icons.CLASSIC);
             window.owner().setToolbarMode(ToolbarMode.ICONS);
             window.width(1440);
-            var session = labelled(window.owner().chrome().windowToolbar(), "New Session");
-            session.setSize(session.getPreferredSize());
-            int size = scale(16), x = (session.getWidth() - size) / 2, y = (session.getHeight() - size) / 2;
-            var actual = painted(session).getSubimage(x, y, size, size);
-            var expected = new BufferedImage(session.getWidth(), session.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            var g = expected.createGraphics();
-            try {
-                FlatUIUtils.setRenderingHints(g);
-                new IconRegistry().chromeIcon("add", size, ChromeArtwork.CLASSIC).icon(ThemeZone.theme(session), SemanticColor.TEXT_PRIMARY)
-                    .paintIcon(session, g, x, y);
-            } finally { g.dispose(); }
-            var centre = expected.getSubimage(x, y, size, size);
-            int differing = 0, inked = 0;
-            for (int row = 0; row < size; row++)
-                for (int column = 0; column < size; column++) {
-                    if (actual.getRGB(column, row) != centre.getRGB(column, row)) differing++;
-                    if (centre.getRGB(column, row) >>> 24 != 0) inked++;
-                }
-            assertThat(inked).as("the classic add icon has ink").isPositive();
-            assertThat(differing).as("New Session paints the classic add icon").isZero();
+            assertPaintsClassicAdd(labelled(window.owner().chrome().windowToolbar(), "New Session"));
         });
+    }
+
+    /** {@code session}, at its preferred size, paints exactly IntelliJ's classic add icon at its centre. */
+    static void assertPaintsClassicAdd(ClassicToolbarButton session) {
+        session.setSize(session.getPreferredSize());
+        int size = scale(16), x = (session.getWidth() - size) / 2, y = (session.getHeight() - size) / 2;
+        var actual = painted(session).getSubimage(x, y, size, size);
+        var expected = new BufferedImage(session.getWidth(), session.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        var g = expected.createGraphics();
+        try {
+            FlatUIUtils.setRenderingHints(g);
+            new IconRegistry().chromeIcon("add", size, ChromeArtwork.CLASSIC).icon(ThemeZone.theme(session), SemanticColor.TEXT_PRIMARY)
+                .paintIcon(session, g, x, y);
+        } finally { g.dispose(); }
+        var centre = expected.getSubimage(x, y, size, size);
+        int differing = 0, inked = 0;
+        for (int row = 0; row < size; row++)
+            for (int column = 0; column < size; column++) {
+                if (actual.getRGB(column, row) != centre.getRGB(column, row)) differing++;
+                if (centre.getRGB(column, row) >>> 24 != 0) inked++;
+            }
+        assertThat(inked).as("the classic add icon has ink").isPositive();
+        assertThat(differing).as("New Session paints the classic add icon").isZero();
+    }
+
+    /**
+     * Final review: Enterprise's own default toolbar (icons, the classic set, the Enterprise kit and theme, with a toolbar view),
+     * in Light and Dark; the renders are written under build/ for inspection.
+     */
+    @Test void enterprisesDefaultToolbarIsClassicIconSquares() throws Exception {
+        for (boolean dark : new boolean[] {false, true})
+            edt(() -> {
+                var themes = EnterpriseLook.controller(dark);
+                try {
+                    var window = window(themes, true, WorkspaceLook.Icons.CLASSIC);
+                    window.owner().setToolbarMode(ToolbarMode.ICONS);
+                    window.width(1440);
+                    var bar = window.owner().chrome().windowToolbar();
+                    assertThat(labels(bar)).containsExactly("New Session", "Split", "Maximize");
+                    for (Component child : bar.getComponents())
+                        if (child instanceof ClassicToolbarButton button) {
+                            assertThat(button.getText()).as("icons only").isNull();
+                            assertThat(button.getSize()).as(String.valueOf(button.getClientProperty("label"))).isEqualTo(new Dimension(scale(22), scale(22)));
+                        }
+                    assertThat(WindowTabsTest.named(bar, "sessionView").isVisible()).isTrue();
+                    assertPaintsClassicAdd(labelled(bar, "New Session"));
+                    var header = window.owner().chrome().header();
+                    MockProfile.write(MockCrops.render(header, header.getWidth(), header.getHeight(), 2), "enterprise-default-toolbar-" + (dark ? "dark" : "light"));
+                } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+            });
     }
 
     @Test void theDefaultHeaderIsTodays() throws Exception {

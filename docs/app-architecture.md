@@ -238,6 +238,8 @@ foreground (see [SDK architecture](sdk-architecture.md)).
 The header, both stripes and the status bar are the native chrome's receiving contexts (`AppIcons.chromeReceiver`):
 named glyphs painted inside them use the kit's original chrome artwork (`IconRegistry.chromeIcon`) without changing
 icon values or identities, and their painting and text sizes come from `ChromePainter.installed()` and named kit roles.
+Under `[chrome] icons = "classic"` each window's header and status bar are marked `ChromeArtwork.CLASSIC`, so the
+meanings the classic set has draw IntelliJ's classic icons (`assets-classic.tsv`).
 
 ## Themes
 

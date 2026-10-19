@@ -93,22 +93,27 @@ class KitViewToolbarStripTest {
     }
 
     /** An INLINE strip holding the GHOST Run button in {@code state}, rendered in Enterprise Light: the image and the button's bounds in it. */
-    record Run(java.awt.image.BufferedImage image, java.awt.Rectangle bounds, int iconWidth, java.awt.Dimension preferred, int buttonHeight) {
+    record Run(java.awt.image.BufferedImage image, java.awt.Rectangle bounds, int iconWidth, java.awt.Dimension preferred, int buttonHeight,
+               java.awt.Color hoverFill) {
         int centre() { return image.getRGB(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2); }
     }
 
-    static Run run(ControlState state) {
+    static Run run(ControlState state) { return run(state, false); }
+
+    static Run run(ControlState state, boolean hovered) {
         var spec = new ViewSpec(new Nodes.Stack("bar", ControlState.READY, Nodes.LayoutRole.INLINE, List.of(
             new Nodes.Button("bar.run", state, "", "run", Nodes.ButtonKind.GHOST, "run", "Connect"))));
         var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
         try (var view = new KitView(context, spec, event -> { })) {
             view.toolbarStrip(true);
+            var button = KitViewTest.find(view, "bar.run", Buttons.KitButton.class);
+            button.getModel().setRollover(hovered);
             var size = view.getPreferredSize();
             var image = KitFixtures.render(view, size.width, size.height, 1);
-            var button = KitViewTest.find(view, "bar.run", Buttons.KitButton.class);
             var bounds = javax.swing.SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), view);
             return new Run(image, bounds, button.getIcon().getIconWidth(), button.getPreferredSize(),
-                ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT));
+                ThemePainting.metric(context, dev.jasper.ui.metrics.DesignMetrics.Role.BUTTON_HEIGHT),
+                ThemePainting.color(context, dev.jasper.ui.theme.SemanticColor.SURFACE_CONTROL_HOVER));
         } finally { context.binding().close(); context.icons().close(); }
     }
 
@@ -122,6 +127,20 @@ class KitViewToolbarStripTest {
             var centre = new java.awt.Color(run.centre(), true);
             assertThat(centre.getGreen()).as("the authored green triangle, %s", centre)
                 .isGreaterThan(centre.getRed() + 40).isGreaterThan(centre.getBlue() + 40);
+        });
+    }
+
+    /** Final review, Review Focus 4: hovered, the icon-only button draws the classic hover frame on surface.control.hover. */
+    @Test void aHoveredIconOnlyGhostButtonInAToolbarStripShowsTheClassicHoverFrame() {
+        Edt.run(() -> {
+            var run = run(ControlState.READY, true);
+            var bounds = run.bounds();
+            // Inside the face, clear of the 16 px glyph centred in the square and of the 1 px ring.
+            var fill = new java.awt.Color(run.image().getRGB(bounds.x + 2, bounds.y + bounds.height / 2), true);
+            assertThat(fill.getAlpha()).as("no longer flat").isPositive();
+            assertThat(fill.getRGB() & 0xFFFFFF).as("surface.control.hover").isEqualTo(run.hoverFill().getRGB() & 0xFFFFFF);
+            var ring = new java.awt.Color(run.image().getRGB(bounds.x, bounds.y + bounds.height / 2), true);
+            assertThat(ring.getRGB()).as("a ring around the fill").isNotEqualTo(fill.getRGB());
         });
     }
 

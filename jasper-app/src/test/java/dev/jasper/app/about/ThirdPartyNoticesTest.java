@@ -51,6 +51,19 @@ class ThirdPartyNoticesTest {
         });
     }
 
+    /** Plan 12: the Enterprise theme's port is listed with the Apache text, its pinned commits and upstream's NOTICE. */
+    @Test void theIntelliJThemesComponentNamesThePortAndKeepsTheUpstreamNotice() {
+        var themes = ThirdPartyNotices.thirdParty().stream().filter(c -> c.name().startsWith("IntelliJ Platform themes")).toList();
+        assertThat(themes).singleElement().satisfies(c -> {
+            assertThat(c.name()).isEqualTo("IntelliJ Platform themes (the Enterprise theme)");
+            assertThat(c.license()).isEqualTo("Apache-2.0");
+            assertThat(ThirdPartyNotices.read(c.text())).contains("Apache License").contains("Version 2.0, January 2004");
+            assertThat(ThirdPartyNotices.read(c.notice().orElseThrow()))
+                .contains("f7377708b654b73b206da40bb382ecb4d44e8f12", "8062c061ff33e22041d9f1844db5b8b8a6b5e4d7")
+                .contains("This software includes code from IntelliJ IDEA\nCopyright (C) JetBrains s.r.o.\nhttps://www.jetbrains.com/idea/");
+        });
+    }
+
     @Test void jaspersTextIsTheRootLicense() throws Exception {
         String root = Files.readString(ROOT.resolve("LICENSE.md"));
         assertThat(ThirdPartyNotices.read(ThirdPartyNotices.jasper("").text())).isEqualTo(root);

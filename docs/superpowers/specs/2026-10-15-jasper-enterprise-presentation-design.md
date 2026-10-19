@@ -17,7 +17,7 @@ Amended on 2026-10-17 with plan 10b's ruling: 10.1 (auxiliary windows carry no m
 Amended on 2026-10-18 by the series' final alignment pass, recording rulings approved during execution: 4.1, 6.4, 7.1,
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
-Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 11.5, 14.4, 17 and 19.1.
+Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -849,6 +849,10 @@ Classic button and field details, owned by the classic `ButtonFace` and the clas
 - Combo, dropdown and picker faces draw no icon tile on the closed face (the primary text, then the caption, in the
   data face when `technicalCaption`, then ▼) and their popup rows draw no tiles; captions are muted, and UTILITY rows
   sit below a `border.row` divider.
+- In a toolbar strip, a rich DROPDOWN (a `PickerFace`) is IntelliJ's run-configuration combo (`ComboBoxButton`): 24 px
+  tall, a `surface.input` box with a `border.control` ring of radius 3, the icon 10 from the edge, the name capped at
+  240 with an ellipsis, a 16 px arrow box with IntelliJ's triangle in `text.secondary`, and no hover change; an
+  icon-only GHOST button there draws its glyph at `ICON_RAIL` in a `BUTTON_HEIGHT` square.
 - SEARCH and PATH fields and the picker's search field draw no leading glyph.
 - GHOST and DESTRUCTIVE_GHOST buttons in ACTIONS stacks and side columns draw as standard buttons; in toolbars, panel
   headers and navigation rows they are flat until hovered, then show a 1 px `border.hover` border on
@@ -1318,7 +1322,7 @@ visible = true
 the 07 Credential Vault mocks show them:
 
 - a card with the catalog's dialog radius on `surface.dialog`, a 1 px `border.hover` frame and the catalog's popup
-  shadow, over a still scrim (black at 21 %: white content reads #C9CACC) covering the window below its title bar;
+  shadow, over a still `surface.scrim` covering the window below its title bar;
 - a 26 px header strip on `surface.header.active` above a `border.window` rule, holding the `DialogSpec.swatch` and the
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
@@ -1724,7 +1728,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
 4. **Chrome renders, as JUnit.** Test forms of `mockUiPreview`, `titleBarPreview`, `commandPalettePreview` and
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
    combination (native title, window menus, default kit), and over a checked-in strength-2 array of `ChromeSpec` values
-   across the 9 chrome points (`window_title` as its two shipped templates) honouring the `menu_bar`/`title_bar`
+   across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons` is held at `classic` in every
+   row and covered by `ChromeArtworkTest` and `ZoneIconsTest`) honouring the `menu_bar`/`title_bar`
    constraint, asserting painted pairs and structure (a flush header, no gutter, the stripe labels) and writing images
    under `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json` stay opt-in tools. Each of
    plans 5 to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the preserved mocks; the

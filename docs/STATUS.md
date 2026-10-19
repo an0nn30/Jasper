@@ -4,8 +4,8 @@
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),
 [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)). Commits `ef5a90cc9..e96129c86`, then
-this documentation commit; spec 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 7.6, 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 11.5,
-14.4, 17 and 19.1 amended. After trying Enterprise the user asked for IntelliJ's classic look in five places. (1)
+the documentation commits `01f6611c3` and `ae2356289`, then the final review's fixes; spec 1 (decisions 4 and 14), 4.1,
+5.1, 5.2, 5.8, 6.4, 7.6, 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1 amended. After trying Enterprise the user asked for IntelliJ's classic look in five places. (1)
 **Classic icons.** jasper-ui vendors 14 unmodified SVGs from JetBrains/intellij-community at tag idea/2026.2.3
 (`8062c061ff33`), checked against `assets-classic.tsv`; a new `[chrome] icons = "new_ui" | "classic"` point (Enterprise:
 `classic`) marks each window's header and status bar, and the About page's entry is now "IntelliJ Platform icons (New UI
@@ -16,9 +16,12 @@ run-configuration combo (the classic buttons face draws a rich DROPDOWN in a too
 the `application` icon, the name capped at 240 with an ellipsis, IntelliJ's arrow) and an icon-only GHOST `run` button,
 tooltip "Connect", in place of "Session:" and Connect; SDK 0.18.1 admits icon-only GHOST buttons in toolbar views and
 adds the authored `run` and `application` icons (Remote 0.14.0 requires it; Enterprise 0.2.0). (3) **The focused
-header.** Under flush frames any mouse press inside a tool window, and opening it from its stripe or its View toggle
-(`PanelRequest.Op.ACTIVATING_TOGGLE`), activates it and moves the keyboard into it; a press in the terminal hands the
-tint back and dragging a divider keeps it. Light's focused header paints exactly #DFE2E9. (4) **The theme.**
+header.** Under flush frames any mouse press inside a tool window, and opening it from its stripe or a View toggle the
+host declares (`PanelRequest.Op.ACTIVATING_TOGGLE`), activates it and moves the keyboard into it, to its first keyed
+control other than a button, else its first button, else the frame; a press in the terminal hands the tint back and
+dragging a divider keeps it. Every bundled tool window except Event Log declares its own toggle action, which calls
+`PanelRegistry.toggle`, so for those only the stripe and a press activate: View › Sessions, SFTP, Tunnels, Transfers
+and File Servers and the stripe-number shortcuts open them without the tint. Light's focused header paints exactly #DFE2E9. (4) **The theme.**
 `enterprise.json` is now `convert_port`'s output from `tools/themes/enterprise/port.json` and IntelliJ's "IntelliJ
 Light" and New UI "Dark" theme files and editor schemes, pinned by a golden test, with an About entry "IntelliJ Platform
 themes (the Enterprise theme)"; accents #2675BF and `Blue5` #366ACE, Light's `surface.header.active` the user's #DFE2E9,
@@ -44,7 +47,9 @@ kept for every value; (18) activation follows IntelliJ, a plugin's own `PanelReg
 **Awaiting the user's ruling:** Rulings 17 keeps `FOCUSED_HEADER`'s `Guard.beyond(1)` for every value, a deviation from
 approved design D (an authored `surface.header.active` override painting unguarded), because design D would remove the
 focused tint from the six Catppuccin and Ubuntu Yaru variants whose authored active header equals their header; #DFE2E9
-is 5.9 L* from Light's header and paints exactly either way. **A question for the user:** with Enterprise's 8 visible
+is 5.9 L* from Light's header and paints exactly either way. **A question for the user:** should ⌘1 to ⌘3 and the View items
+activate the bundled windows, as IntelliJ's ⌘1 does (the host would treat a panel's own declared toggle action as
+activating)? **A question for the user:** with Enterprise's 8 visible
 rows the Run window is about 427 px tall, so it is entirely in the upper half only in windows about 1000 px tall or
 more, and in shorter ones it sits just under the toolbar and crosses the middle (Rulings 19); should Enterprise show
 fewer rows? Task 9's changes that follow the theme (Step 7, file and one line each): `RunWindowPresentationTest`,
@@ -72,22 +77,29 @@ and the four `dock-dark-kit-*-header` pairs); #2E3135 (Dark `surface.card` and i
 #FFFFFF (Light `surface.card` and its kin) to #C4C4C4 (`chrome-tabs-light`); #2E9E4F (`status.success`, `hue.green`) to
 #34B171 (`classic-new-tunnel`); #C4C7CC (Light `border.window`) to #D1D1D1 (`chrome-dialog-add-login-footer`); and three
 mock literals no theme role held: #2D984D (`classic-new-file-server-ftp`), #E8EEFA (`classic-file-servers`) and #8E949C
-(`chrome-dialog-unlock-strip`). Task 8 records the session toolbar pairs' agreement under IntelliJ's combo (0.962 to
+(`chrome-dialog-unlock-strip`). Step 8 also re-maps the mock literal #E6E7EA to the new `surface.footer` #EBEBEB
+by a ΔE 1.5 near match in 29 entries, which the plan's exact-role script does not do. Task 8 records the session toolbar pairs' agreement under IntelliJ's combo (0.962 to
 0.666 Light, 0.826 to 0.653 Dark, floor 0.50). Deviations from the plan's text: the spec's amendment line also names
 5.1, which Task 12 amends, and 9.1 and 17, which the review found stale (9.1's projection tables gain
 `WorkspaceLook.icons` and give `PaletteLook.home` as `UPPER`; 17 says five keys), and 19.1's order runs 1 to 12; Task 12
 fences the STATUS template in the plan's Step 6, whose inline links failed `AppDocumentationTest`;
 `docs/command-palette.md` also drops "or below it" from the Run window's re-attach rule, which `UpperHome` no longer
 has; `docs/sdk-icons.md` also says that panels, prompts and tiles draw a monochrome glyph of the same name, since
-`IconRegistry.select` gives the authored artwork to ordinary themed contexts only; otherwise none beyond the plan's
-Rulings. `./gradlew check --continue`: **11,469 tests, 0 failures, 0 errors, 25 skipped**; `check_pairs.py` passes 101
+`IconRegistry.select` gives the authored artwork to ordinary themed contexts only; Task 4's
+`EnterpriseWorkstationMockTest.theToolbarRowIsTheMocks` also moves ink 0's top expectation up 4 px (`rise`, the add
+icon's ink tops out above the "+") and reads the render's Settings… crop from ΔE 12 instead of 25 (its disabled icon);
+Task 9 Step 8's #E6E7EA near match above; the final review's fixes: an activating toggle that replaces a window no
+longer hands focus back to the terminal first, an activated frame's keyboard skips a toolbar row of buttons, a frame
+is focusable only while it holds the keyboard (never a Tab stop), and spec 6.4, 10.8 and 16.1 are amended; otherwise
+none beyond the plan's Rulings. `./gradlew check --continue`: **11,469 tests, 0 failures, 0 errors, 25 skipped** before the final review's fixes, which add six tests; `check_pairs.py` passes 101
 of 101 gated pairs; the headless gallery is byte-identical to `faeec76f3`'s (Slate Cobalt Dark and Light, 322 files) and
 so are the 11 default-look jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and
 settings images, `DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under
 Enterprise, the toolbar's classic icons in Light and Dark, with their tooltips and Split's menu; View › Toolbar's Icons
 & Labels; the session combo against IntelliJ's, with a long host name and with no saved sessions; Run's hover and
 disabled states, and connecting by Run; clicking blank space, a header strip and a stripe label in each tool window (the
-tint, and typing goes there), dragging a divider (the tint stays), then clicking the terminal; the Light focused header
+tint, and typing goes there), dragging a divider (the tint stays), then clicking the terminal; switching between Event
+Log and Transfers from their stripe labels after clicking into one (the tint stays and typing goes to the new one); the Light focused header
 against the user's screenshot (#DFE2E9); Enterprise Light and Dark as a whole against IntelliJ Light and New UI Dark;
 the Run window opening centred in the upper part in a tall window (about 1200 px or more), ending at the middle in a
 window about 1000 to 1200 px tall and just under the toolbar, crossing the middle, in a shorter one, then dragged away

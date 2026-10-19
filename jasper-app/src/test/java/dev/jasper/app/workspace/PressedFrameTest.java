@@ -11,14 +11,18 @@ import dev.jasper.app.testsupport.MockCrops;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Toolkit;
+import java.awt.event.FocusEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
+import javax.swing.LayoutFocusTraversalPolicy;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +80,57 @@ class PressedFrameTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
+    /** Final review: as IntelliJ focuses a tool window's list or tree, the keyboard skips a toolbar row above it. */
+    @Test void thePressPrefersTheBodyToAButtonRowAndTakesAButtonOnlyWhenNothingElseIsKeyed() throws Exception {
+        try {
+            var content = new JPanel(new BorderLayout());
+            var toolbar = new JPanel();
+            var back = new JButton("Back");
+            toolbar.add(back); toolbar.add(new JButton("Refresh"));
+            var list = new JList<>(new String[] {"etc"});
+            content.add(toolbar, BorderLayout.NORTH); content.add(list, BorderLayout.CENTER);
+            var area = area(true, content);
+            assertThat(back.getInputMap(JComponent.WHEN_FOCUSED).allKeys()).as("the button is keyed").isNotEmpty();
+            area.pressed(content);
+            flushEdt();
+            assertThat(focused).containsExactly(list);
+            focused.clear();
+            content.remove(list);
+            area.pressed(content);
+            flushEdt();
+            assertThat(focused).containsExactly(back);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Final review: a frame is never a Tab stop; it is focusable only while it holds the keyboard as the fallback. */
+    @Test void framesAreNoTabStopsAndAreFocusableOnlyWhileTheyHoldTheKeyboard() throws Exception {
+        try {
+            var left = new JTextField("left");
+            var area = area(true, left);
+            var right = area.content(Slot.RIGHT_TOP);
+            var leftHost = area.content(Slot.LEFT_TOP).getParent();
+            var rightHost = right.getParent();
+            area.addNotify();
+            try {
+                var policy = new LayoutFocusTraversalPolicy() {
+                    boolean accepts(Component component) { return accept(component); }
+                };
+                assertThat(policy.accepts(left)).isTrue();
+                assertThat(policy.accepts(leftHost)).isFalse();
+                assertThat(policy.accepts(rightHost)).isFalse();
+                area.activate(DockTestSupport.id(Slot.RIGHT_TOP));
+                flushEdt();
+                assertThat(focused).containsExactly(rightHost);
+                assertThat(rightHost.isFocusable()).as("the fallback can take the keyboard").isTrue();
+                // The focus manager drops a synthetic focus event for a component that never held focus; tell the listeners.
+                for (var listener : rightHost.getFocusListeners()) listener.focusLost(new FocusEvent(rightHost, FocusEvent.FOCUS_LOST, true));
+                assertThat(rightHost.isFocusable()).as("a temporary loss keeps it").isTrue();
+                for (var listener : rightHost.getFocusListeners()) listener.focusLost(new FocusEvent(rightHost, FocusEvent.FOCUS_LOST, false));
+                assertThat(rightHost.isFocusable()).as("and stops being a stop once it lets go").isFalse();
+            } finally { area.removeNotify(); }
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
     /** Review Focus 1. */
     @Test void aPressInTheTerminalHandsTheTintBack() throws Exception {
         try {
@@ -105,10 +160,11 @@ class PressedFrameTest {
             var area = area(true, new JLabel("top"));
             var label = area.content(Slot.LEFT_TOP);
             area.addNotify();
-            // Screen coordinates given: the area has a lightweight peer but no window, so none can be read from it.
-            label.dispatchEvent(new MouseEvent(label, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 2, 2, 2, 2, 1, false, MouseEvent.BUTTON1));
-            assertThat(area.focusedSlot()).hasValue(Slot.LEFT_TOP);
-            area.removeNotify();
+            try {
+                // Screen coordinates given: the area has a lightweight peer but no window, so none can be read from it.
+                label.dispatchEvent(new MouseEvent(label, MouseEvent.MOUSE_PRESSED, 0, InputEvent.BUTTON1_DOWN_MASK, 2, 2, 2, 2, 1, false, MouseEvent.BUTTON1));
+                assertThat(area.focusedSlot()).hasValue(Slot.LEFT_TOP);
+            } finally { area.removeNotify(); }
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

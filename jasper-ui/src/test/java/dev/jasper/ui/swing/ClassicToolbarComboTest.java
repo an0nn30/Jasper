@@ -74,9 +74,23 @@ class ClassicToolbarComboTest {
             var context = KitFixtures.context(KitFixtures.enterpriseLight(), KitFixtures.enterprise());
             try (var view = new KitView(context, bar("x".repeat(400)), event -> { })) {
                 view.toolbarStrip(true);
-                var size = KitViewTest.find(view, "bar.host.input", Choices.ChoiceCombo.class).getPreferredSize();
+                var combo = KitViewTest.find(view, "bar.host.input", Choices.ChoiceCombo.class);
+                var size = combo.getPreferredSize();
                 assertThat(size.height).isEqualTo(s(24));
                 assertThat(size.width).isCloseTo(s(57) + s(240), within(1));
+                // Final review: the painted name is cut before its 4 px gap, leaving the arrow box to the triangle alone.
+                combo.setSize(size);
+                var image = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+                var g = image.createGraphics(); try { combo.paint(g); } finally { g.dispose(); }
+                int input = context.theme().semantic().color(SemanticColor.SURFACE_INPUT).getRGB();
+                int textEnd = size.width - s(7) - s(16) - s(4), triangleStart = size.width - s(7) - s(16) + (s(16) - s(9)) / 2;
+                for (int x = textEnd; x < triangleStart; x++)
+                    for (int y = s(3); y < size.height - s(3); y++)
+                        assertThat(image.getRGB(x, y)).as("no text ink at (%d, %d), right of the elided name", x, y).isEqualTo(input);
+                int inked = 0;
+                for (int x = textEnd - s(12); x < textEnd; x++)
+                    for (int y = s(3); y < size.height - s(3); y++) if (image.getRGB(x, y) != input) inked++;
+                assertThat(inked).as("the ellipsis ends the name").isPositive();
             } finally { context.binding().close(); context.icons().close(); }
         });
     }

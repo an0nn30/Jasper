@@ -93,8 +93,14 @@ final class ToolWindowArea extends JPanel {
         Host(boolean toolWindow) {
             super(new BorderLayout());
             if (toolWindow) putClientProperty("Jasper.zone", "chrome");
-            // A press on a frame with no keyed control moves the keyboard to the frame itself (plan 12 Rulings 18).
-            if (toolWindow && flush) setFocusable(true);
+            // A frame with no keyed control takes the keyboard itself when activated (plan 12 Rulings 18). It is
+            // focusable only while it holds the keyboard, so it is never a Tab stop or an automatic focus target.
+            if (toolWindow && flush) {
+                setFocusable(false);
+                addFocusListener(new java.awt.event.FocusAdapter() {
+                    @Override public void focusLost(java.awt.event.FocusEvent event) { if (!event.isTemporary()) setFocusable(false); }
+                });
+            }
             int gutter = gutter();
             gutters(gutter, gutter, gutter, gutter);
         }
@@ -493,32 +499,37 @@ final class ToolWindowArea extends JPanel {
         Host host = hosts.get(slot);
         SwingUtilities.invokeLater(() -> {
             Component owner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
-            if (focused == slot && hosts.get(slot) == host && (owner == null || !SwingUtilities.isDescendingFrom(owner, host)))
-                focuser.accept(focusTarget(slot));
+            if (focused != slot || hosts.get(slot) != host || owner != null && SwingUtilities.isDescendingFrom(owner, host)) return;
+            Component target = focusTarget(slot);
+            if (target == host) host.setFocusable(true);
+            focuser.accept(target);
         });
     }
 
     /**
      * Where an activated frame's keyboard goes: the first component of its content, depth first, that is enabled,
-     * focusable, visible with every ancestor up to the frame and bound to keys while focused; else the frame itself.
+     * focusable, visible with every ancestor up to the frame and bound to keys while focused, a button only when no
+     * other component is, as IntelliJ focuses a tool window's list or tree before its toolbar; else the frame itself.
      * Visibility is read through {@code isVisible()}, never {@code isShowing()}, so it holds before the window shows.
      */
     Component focusTarget(Slot slot) {
         Host host = hosts.get(slot);
         if (host == null) return null;
-        Component found = host.content == null ? null : keyed(host.content);
+        Component found = host.content == null ? null : keyed(host.content, false);
+        if (found == null && host.content != null) found = keyed(host.content, true);
         return found != null ? found : host;
     }
 
-    private static Component keyed(Component component) {
+    private static Component keyed(Component component, boolean buttons) {
         if (!component.isVisible()) return null;
-        if (component instanceof JComponent candidate && candidate.isEnabled() && candidate.isFocusable()) {
+        if (component instanceof JComponent candidate && candidate.isEnabled() && candidate.isFocusable()
+                && (buttons || !(candidate instanceof javax.swing.AbstractButton))) {
             var keys = candidate.getInputMap(JComponent.WHEN_FOCUSED).allKeys();
             if (keys != null && keys.length > 0) return candidate;
         }
         if (component instanceof Container container)
             for (Component child : container.getComponents()) {
-                Component found = keyed(child);
+                Component found = keyed(child, buttons);
                 if (found != null) return found;
             }
         return null;

@@ -195,6 +195,8 @@ confirms (set `pending` while a start or stop is in flight).
   `Button`, icon-only GHOST `Button`s (a blank label with an icon and a tooltip; SDK 0.18.1), `MenuButton`s and
   `Separator`s, placed in the main toolbar with `ToolbarItem.view` (see
   [actions](plugin-authoring.md#actions-and-where-they-appear)). A choice's label is its accessible name, not a caption.
+  Under the Enterprise look a DROPDOWN with a `PickerFace` there draws as IntelliJ's run-configuration combo (its icon,
+  the name cut with an ellipsis at 240 px, an arrow box) and an icon-only GHOST `Button` as a 16 px glyph.
 - **Dialog swatch.** `DialogSpec.swatch` puts a small square of a hue before the dialog's title where Jasper draws the
   title (the macOS window title row, or the header strip of a dialog the Enterprise look draws in its window); `Hue.NONE`,
   the default, draws none.
