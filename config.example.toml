@@ -56,7 +56,7 @@ system = true
 # On by default on macOS and Windows and off on Linux, so it is commented out here: uncomment it to choose.
 # On macOS, Quit (Cmd+Q) closes every window and keeps Jasper in the menu bar; its Quit Jasper Completely ends it.
 # Restart required for residency; the login item updates on reload. Autostart requires an installed Jasper: a
-# ./gradlew run development session stays resident but never registers a login item.
+# ./gradlew run development session uses its own home, is never resident and never registers a login item.
 # run_in_background = true
 
 [palette]

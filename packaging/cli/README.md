@@ -1,7 +1,7 @@
 # The `jasper` command
 
 A small native program that hands each call to the running Jasper and relays its reply. It never starts a JVM: a
-call reaches the JVM that is already running (the resident one on macOS and Windows), so it returns quickly. The
+call reaches the Jasper that owns the home, so it returns quickly. The
 design is the spec `docs/superpowers/specs/2026-10-13-jasper-command-line-and-default-editor-design.md`, section 3.
 
 ## Where it is
@@ -37,6 +37,10 @@ line installs it on `PATH`.
 `jasper --help` prints the usage and the subcommands Jasper last wrote to `<home>/daemon/subcommands`, without
 contacting Jasper. Any other first argument starting with `--` runs the app image's launcher, detached, with those
 arguments in the caller's working directory and environment, and exits.
+
+Other arguments go to Jasper as given, with the caller's working directory, and Jasper decides: a subcommand a plugin
+declares runs; otherwise, when every argument names an existing file or folder, each file opens in the editor and each
+folder as a terminal tab. No arguments bring Jasper forward.
 
 ## Sources and tests
 

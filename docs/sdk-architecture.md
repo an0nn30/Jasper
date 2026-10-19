@@ -15,7 +15,7 @@ plugin writer's view.
 | `dev.jasper.app.dock` | The tool window dock model: the six slots, each window's `DockState` and the pure `DockGeometry`; JDK-only | none |
 | `dev.jasper.app.windows` | Application-built auxiliary windows: headless `AuxiliarySurface`, native `NativeShells` | `appearance`, `lifecycle`, `persistence`, `platform` |
 | `dev.jasper.app.pluginmanager` | The Settings dialog's Plugins page: passive Swing view, consent view and controller over app-native rows | `plugins`, `restart`, `settingsui`, `windows` |
-| `dev.jasper.app.restart` | Restart planning from the process's own command line, `ResidentControl`, and the Restart normally conversation | none |
+| `dev.jasper.app.restart` | Restart planning from the process's own command line and the Plugins page's restart banner state | none |
 | `plugins/sample` | Bundled end-to-end fixture and documentation example | SDK (`compileOnly`) |
 
 `verifySdkArchitecture`, `verifyPluginArchitecture` and `verifyApplicationArchitecture`
@@ -68,7 +68,7 @@ Every outcome is a `PluginStatus` line in the log.
 - **Services.** Staged during `start`, committed on success. Per-consumer factories run on
   the EDT just before each consumer starts; lookups are cache reads.
 - **State.** `PluginStateStore` changes `plugins.toml` only inside a `FileLock` transaction
-  and never at shutdown, because standalone launches mean several processes may edit it.
+  and never at shutdown.
 
 ## Chrome contributions
 
@@ -264,14 +264,10 @@ banner, and because the comparison starts from the files it also notices changes
 Jasper process. `PluginRuntime` exposes the result as `Row` and `Snapshot` records; the manager
 package never sees a runtime type.
 
-Restart now replays the process's own command line (`ProcessHandle.info()`) without `--background`.
-The replacement is spawned from the exit thread, after process cleanup has released the handoff
-endpoint; if that cleanup did not finish, the replacement gets `--standalone`. Restart normally,
-from safe mode, drops `--safe-mode`, and therefore first asks `ResidentControl` whether a resident
-process holds the endpoint: if so it sends the authenticated `retire` request (protocol 1 with a
-sixth field, so an ordinary open request is unchanged), waits up to 30 seconds for the socket to go
-quiet, and otherwise offers only a `--standalone` launch. A handoff-capable replacement is never
-started while the old resident holds the endpoint.
+Restart now replays the process's own command line (`ProcessHandle.info()`) without `--background`,
+`--no-window` or the launch's paths, adding `--replacing <pid>`. The replacement is spawned from the exit thread, after
+process cleanup, and waits up to 30 seconds for this process's instance lock. Restart normally, from safe mode, also
+drops `--safe-mode`.
 
 ## Shutdown
 
@@ -388,14 +384,13 @@ Quit and restart ask plugin windows first: `JasperApplication.quit()` and `resta
 `AuxiliaryWindows.mayQuit()`, which asks every open plugin window's guards in creation order (not
 dialogs or overlays) without closing anything, before `quitting` is set and before
 `ApplicationShutdown` arms the exit deadline. A refusal leaves Jasper running; a refused restart
-records no relaunch. Start-up rollback, a `--background` launch that cannot stay resident and the
-benchmark exit through `quitNow()`, which does not ask; a resident asked to retire by another
-launch goes through `quit()` and does. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
+records no relaunch. Start-up rollback and the
+benchmark exit through `quitNow()`, which does not ask. Since SDK 0.11.0 the same check then asks `Windows.onQuitting` guards, kept in
 `Contributions.quitGuards()` (`QuitGuards`), one at a time, pumping UI events while a decision is pending; a refusal
 cancels, and a guard that throws or fails allows the quit. A resident macOS Jasper's Cmd+Q does not go through `quit()`:
 `quitRequested()` calls `toBackground()`, which asks only `windowsMayClose()` (content tabs and plugin windows), so
 `Windows.onQuitting` guards are not asked and plugin background work keeps running until `quit()` (Quit Jasper
-Completely, a log-out or a retire request).
+Completely or a log-out).
 
 `Windows.chooseSaveFile` is the save-target twin of `chooseFiles`: `PathChoice.Mode.SAVE` makes
 `NativeShells` open an AWT `FileDialog` in `SAVE` mode, filling in a suggested file's folder and

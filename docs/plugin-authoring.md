@@ -772,7 +772,8 @@ jasper --plugin-dir /path/to/build/plugin/dev.example.tool
 ```
 
 `--plugin-dir` loads one plugin directory with consent pre-granted. Like `--safe-mode`
-(no user plugins) and `--standalone`, it never hands off to or becomes a resident process.
+(no user plugins), it applies only when Jasper starts: a launch while Jasper runs hands off and ignores it, so quit
+Jasper first. Such a Jasper is never resident.
 Installed plugins live in `~/.config/jasper/plugins/<id>/jars/` and stay inert until the user reviews
 them in File → Manage Plugins…, which records the consent in `~/.config/jasper/plugins.toml`. Every
 plugin, a `--plugin-dir` one included, gets `plugins/<id>/` with its settings file and `data/`.

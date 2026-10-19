@@ -48,7 +48,7 @@ sequenceDiagram
   participant Launches as SessionLaunchCoordinator
   participant Workspace
   participant Buddy as BuddyIntegration
-  Bootstrap->>Bootstrap: Parse arguments / attempt resident handoff before AWT
+  Bootstrap->>Bootstrap: Parse arguments / take the instance lock or hand off before AWT
   Bootstrap->>Resources: Own acquired configuration, logging, hooks
   Bootstrap->>App: Compose on EDT; transfer owners after wiring
   App->>Buddy: Configure one companion model; native show remains lazy
@@ -66,10 +66,16 @@ sequenceDiagram
 
 `StartupResources` rolls back reverse acquisition order once and suppresses cleanup
 failures onto the original error. Pre-EDT and EDT composition use separate scopes.
-A successful resident handoff creates no window. Endpoint bind failure cannot silently
-leave a background process. A `--background` (login) launch exits before reading the
-configuration when another process already owns the endpoint. On Windows the owner
-records its process id beside the token (`token.pid`), and a handing-off launcher lends
+One process owns each home: `bootstrap.SingleInstance` takes `residency.InstanceLock` (`daemon/instance.lock`) before
+AWT and follows spec 5.2's table (`LaunchAction`). The owner binds the handoff endpoint and the command socket at once
+(`bootstrap.Instance`) and holds requests in `EarlyRequests` until `compose` hands it the application; from then on it
+answers a handoff only once the EDT has taken it (within a second), and none while it quits. Any other launch hands its
+request (protocol 2: RAISE or OPEN_PATHS, its working directory, paths and ignored start-up flags) to the owner and
+exits without creating a window; a `--background` or `--no-window` launch exits at once; restart's replacement
+(`--replacing <pid>`) waits up to 30 s for the lock; an owner that does not answer within 10 s is reported
+(`bootstrap.LaunchFailure`) and no second instance starts. A start that fails after taking the lock closes its
+endpoints and exits, so the lock goes with the process. The owner records its process id in `daemon/instance.pid`
+when it takes the lock, and on Windows a handing-off launcher lends
 it Windows' foreground right (`platform.WindowsForeground`) before sending the request, so an existing window can be raised immediately. A settled resident Windows
 process opts out of execution-speed throttling and keeps a soft working-set floor
 (`platform.WindowsProcess`); each window's timing line reports how long Jasper had no
@@ -84,7 +90,7 @@ A pane owns its admitted session. The launch coordinator stops admission and clo
 late arrivals; it does not force-close a session before its pane has completed cleanup.
 Shutdown waits for accepted launch workers, their late child exits, tracked process exits,
 command-history flush and endpoint cleanup with the existing two-second bound. Endpoint
-lock/probe cleanup runs on daemon workers; both ordinary quit and startup rollback
+cleanup runs on daemon workers; both ordinary quit and startup rollback
 queue this cleanup without blocking EDT. The two-second bound covers the application
 wait, not a promise that every cleanup succeeds or the JVM exits within two seconds.
 The process shutdown hook backs up endpoint cleanup and drains logging separately.
@@ -99,14 +105,13 @@ plugin quit guards and then closes all owners. It is reached by Quit Jasper Comp
 the menu bar item and Quit Jasper in the Windows notification-area icon
 (`platform.ResidentTray`, whose Windows icon also carries the system notifications'
 balloons), the Plugin Manager's Quit Jasper button (shown when a restart
-cannot be planned), a plugin window's File › Quit, a retire request from another
-launch, and macOS logging out, restarting or shutting down; a restart asks the same
+cannot be planned), a plugin window's File › Quit, and macOS logging out, restarting or shutting down; a restart asks the same
 guards and then quits through `quitNow()`. Any Quit before start-up has settled, and any
 Quit by a process that is not resident or has no Dock presence, quits the same way. The
 indicator and the macOS bridge arrive once start-up has settled (the
 first output painted, a finished `--background` warm-up, or 2 s after the first paint).
-A reopen with no window open relaunches the process when its application jar changed on
-disk. A `--background` launch rehearses one window (`application.Rehearsal`): composed
+A reopen, or a launch of another build, with no window open relaunches the process when its
+application jar changed on disk; the replacement waits for the lock. A `--background` launch rehearses one window (`application.Rehearsal`): composed
 with a canned terminal and no shell, painted once into an image, disposed unseen; one explicit collection follows it.
 
 ## Threading and cancellation
@@ -156,7 +161,7 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | Package | Owner and thread/lifetime contract |
 | --- | --- |
 | `root` | Stable launcher only; delegates to bootstrap. No owned resources. |
-| `bootstrap` | Pre-AWT argument/handoff flow and EDT composition. StartupResources owns rollback until explicit transfer. |
+| `bootstrap` | Pre-AWT arguments, the home's instance lock and the handoff, and EDT composition. StartupResources owns rollback until explicit transfer; the owner's Instance keeps its lock for the life of the process. |
 | `application` | EDT application composition and feature lifetimes; launch coordinator synchronizes admission and shutdown waits off EDT. JasperApplication closes children. |
 | `workspace` | EDT windows, tabs, splits, panes, the tool window area, stripes, headers and dock drag, action/config adapters, activity events, each window's presence in the terminal registry, and the pending and disconnected states of provided sessions, and the palette's homes (`PaletteHome`: `TitleFieldHome`, `CornerHome`, chosen by `WorkspaceChrome.of` from the look's `PaletteLook`). WindowContent closes subscriptions/panes; each pane closes its session. |
 | `dock` | Pure tool window dock model: the six slots, each window's `DockState`, `DockGeometry` and the drag's `DockDropResolver`. JDK-only (no Swing; `java.awt.Rectangle` and `Point` only, enforced by `verifyApplicationArchitecture`); each window owns its state on the EDT. |
@@ -175,15 +180,15 @@ are wired by JasperApplication. Residency is decided at startup, not changed by 
 | `notificationui` | EDT Swing views of the center: each window's CardLayer, the history panel, the Errors window's ErrorsView, and their text, style and focus helpers. Application mounts each layer through WindowContent and closes it with its window; the Errors window closes its view when it closes. |
 | `about` | The About and Licenses windows' views and the third-party notices index read from resources. Application's AboutWindows owns both windows and closes each view with its window. |
 | `splash` | The boot splash of a branded look: `SplashPainter` draws it from the look's files, the same in every theme, and `Splash` is its undecorated window. The bootstrap decodes the files off the EDT, opens the window on it and closes it through `StartupSteps` when the first window shows or start-up fails. |
-| `residency` | Bounded interprocess protocol and endpoint workers. Bootstrap transfers endpoint close to application shutdown and process-hook backup. |
-| `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. Bootstrap binds the listener after plugins start; the application closes it at shutdown. |
+| `residency` | The instance lock, the bounded handoff protocol and its endpoint worker. The lock lives as long as the process; bootstrap transfers endpoint close to application shutdown and process-hook backup. |
+| `commandline` | The `jasper` command's side: the command socket's wire format and listener (a reader and a writer virtual thread per call; output is only queued), the calls it dispatches, the subcommand list `jasper --help` reads, and putting the command on `PATH`. The home's owner binds the listener before AWT and holds its calls until the application is composed; the application closes it at shutdown. |
 | `platform` | OS adapters, icons, fonts, title-bar paint, logging and system notifications. Callers own registrations and native handles; Swing operations run on EDT, and logging and system notifications each have their own worker. |
 | `persistence` | Bounded TOML reads and atomic writes; synchronous helpers own short-lived file handles. Caller chooses thread and lifecycle. |
 | `presentation` | The presentation a process runs with, chosen once before Swing: the kit file parser (`KitParser`, `ChromeSpec`, `FontFile`), each provider's `PresentationFacts`, the attempt record (`AttemptStore`, `PresentationAttempt`), the projections of spec 9.1 and `Presentation`. The window chrome's projections are read by the bootstrap (`DesktopFlags`), `WorkspaceChrome.of`, `ShellChrome.of`, `WindowLook`, `WindowTitle` (`TitleFormat`) and the application's `LookMotion`, and the dialog mapping by `AuxiliaryWindows`. Values and bounded file stores; `PluginSelection` builds it and the application hands each consumer its kit or projection. `Branding` holds a look's product name, icons and splash art as bytes; the bootstrap and `ApplicationIcon` decode them. |
 | `plugins` | The plugin runtime: descriptors, locked consent state, resolution, per-plugin classloaders, the queued EDT event bus, activities, the service registry and plugin lifetimes. Application owns and stops PluginRuntime; it is the only package that may reference the SDK. Declared plugin settings (DeclaredSettings) are read with the plugin's own schema and saved through PluginSettingsFiles. PluginRuntime.settingsPages gives Settings a page per plugin under Tools. |
 | `shortcuthelp` | The Settings dialog's Keymap page: effective shortcut catalog, expandable searchable sections, staged binding edits saved on Apply and a window-scoped key recorder; `KeymapPage` maps the look's composition to a `KeymapShape` (columns, text tools, the recording band). SettingsDialog owns each KeymapPage; disposing it closes its subscription and capture. |
 | `pluginmanager` | The Settings dialog's Plugins page: passive view, consent view and an EDT controller over PluginRuntime's public records; `PluginsPage` maps the look's composition to a `PluginShape` (checkbox rows, ⋯ actions). Application owns the PluginManager; SettingsDialog owns each PluginsPage, whose consent and confirm dialogs open over Settings. |
-| `restart` | Pure restart planning, the ResidentControl seam and the RestartFlow state machine. No owner; worker threads are daemons. |
+| `restart` | Pure restart planning (the replacement waits for the lock with `--replacing`) and the Plugins page's restart banner state (`RestartFlow`). No owner. |
 | `vmoptions` | Custom VM options: the launcher's reading of `jasper.vmoptions` mirrored for the app, editing it, the launch's properties, the bundled `Jasper.cfg`, the check that runs the bundled `java`, the record of a start-up cache that failed at launch, the heap readings and the low-memory watch with its heap threshold. JDK-only (`com.sun.management` allowed; `verifyApplicationArchitecture` enforces it); values and pure functions, with file I/O and the check on the caller's thread, and `HeapThreshold`, a resource its creator closes whose callback runs on the JMX notification thread. |
 | `lifecycle` | Owner-thread-confined once-only cancellation. The subscriber closes the handle; no background worker or global state. |
 | `startup` | Start-up timing (`StartupTrace`, `WindowTrace`, `StartupTraceFile`) and the steps a branded look's splash shows (`StartupSteps`); JDK-only, depended on by bootstrap, application, plugins, splash and benchmark. Safe from any thread except `StartupSteps` (EDT only); `mark` and `phase` are non-blocking and run on the caller's thread; settling, logging and file writes run on virtual threads, never on the EDT. |

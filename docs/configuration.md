@@ -12,16 +12,18 @@ For a copyable starting point, use the root [config.example.toml](../config.exam
 | Linux | `$XDG_CONFIG_HOME/jasper/config.toml`, or `~/.config/jasper/config.toml` when unset or relative |
 | Windows | `%APPDATA%/jasper/config.toml`, or `~/AppData/Roaming/jasper/config.toml` when unavailable |
 
-The directory holding that file is Jasper's home: it also holds installed plugins, plugin consent and data, command history, snippets, layout state, logs and the resident process's socket. The `jasper.home` system property, or else the `JASPER_HOME` environment variable, moves the whole home somewhere else; a launch with either is standalone, exactly like `--config`, so it never hands off to or becomes the installed app's resident process. `./gradlew :jasper-app:run` and the committed IntelliJ configuration "Jasper (dev home)" both point it at `jasper-app/build/dev-home`, so a development launch never touches the installed app's files; pass `-Pjasper.home=<dir>` to Gradle to use another.
+The directory holding that file is Jasper's home: it also holds installed plugins, plugin consent and data, command history, snippets, layout state, logs and the running Jasper's sockets and instance lock. The `jasper.home` system property, or else the `JASPER_HOME` environment variable, moves the whole home somewhere else, and with it the lock: a Jasper in another home runs beside the installed app's and is never resident. `./gradlew :jasper-app:run` and the committed IntelliJ configuration "Jasper (dev home)" both point it at `jasper-app/build/dev-home`, so a development launch never touches the installed app's files; pass `-Pjasper.home=<dir>` to Gradle to use another.
 
-Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes the configuration file location and makes the launch standalone (no residency or login-item changes; see [background residency](#background-residency)). Other data, including logs, snippets, command-usage history and Buddy position, still uses the default Jasper application directory. Settings creates only the selected config file's parent directories when needed.
+Use `--config <path>` to select a different file. Relative paths resolve from the process's working directory. The override changes the configuration file location; such a launch is never resident and never changes the login item (see [background residency](#background-residency)). Other data, including logs, snippets, command-usage history and Buddy position, still uses the default Jasper application directory. Settings creates only the selected config file's parent directories when needed.
 
 ```bash
 ./gradlew :jasper-app:run --args='--config /absolute/path/to/config.toml'
 ./gradlew :jasper-app:run --args='--help'
 ```
 
-`--safe-mode` starts without user-installed plugins, `--plugin-dir <path>` additionally loads one development plugin directory, and `--standalone` changes nothing else. All three, like `--config`, make the launch standalone: it never hands off to a resident Jasper and never becomes resident. In safe mode, File → Manage Plugins… shows that safe mode is on and offers Restart Normally. If another Jasper is resident, it is asked to quit first, because a plain launch would otherwise be handed to it.
+`--safe-mode` starts without user-installed plugins and `--plugin-dir <path>` additionally loads one development plugin directory; like `--config`, they make a launch that is never resident. In safe mode, File → Manage Plugins… shows that safe mode is on and offers Restart Normally.
+
+One Jasper runs per home. A launch while Jasper runs hands its request to that Jasper and exits: it brings Jasper forward, or opens the files and folders named on its command line (`Jasper notes.txt src`), each file in the editor and each folder as a terminal tab. `--config`, `--safe-mode` and `--plugin-dir` apply only to a Jasper that starts: on a second launch they are ignored, and the running Jasper says to quit it first. A running Jasper that does not answer within 10 seconds is reported with its process id, and the launch exits without starting another.
 
 The first command launches the desktop and a shell. `--help` prints usage without opening a window or reading configuration. Missing, duplicate and unknown arguments fail before desktop startup.
 
@@ -35,14 +37,15 @@ password when that folder needs it; on Linux `~/.local/bin/jasper`; on Windows i
 user `Path`. A development run cannot install it.
 
 - `jasper` opens a window, or brings one forward.
-- `jasper --safe-mode`, `--config <path>`, `--plugin-dir <path>` and `--standalone` start Jasper with those options.
+- `jasper PATH...` opens each file in the [Editor](editor.md#opening-files) and each folder as a terminal tab; a command
+  of the same name wins, so `jasper ./editor` opens a file named `editor`.
+- `jasper --safe-mode`, `--config <path>` and `--plugin-dir <path>` start Jasper with those options when it is not running.
 - `jasper editor [--wait] FILE[:LINE[:COLUMN]]...` opens files in the [Editor](editor.md#opening-files);
   `git config --global core.editor "jasper editor --wait"` edits commit messages there.
 - `jasper --help` lists the commands plugins add, as Jasper last recorded them.
 
 The command looks for Jasper's socket in `JASPER_COMMAND_SOCKET`, else in `daemon/commands` under `JASPER_HOME`, else
-under the default home. A launch with `--config`, `--safe-mode`, `--plugin-dir` or `--standalone` serves a socket of its
-own, which only its own shells reach, and so does a Jasper started while another serves its home.
+under the default home.
 
 ### Custom VM options
 
@@ -276,8 +279,8 @@ carries on after Cmd+Q, and a plugin's quit confirmation is not asked. Only **Qu
 and stops that work. Until start-up has settled, Quit
 still exits completely, as it does when residency is off. Logging out, restarting or shutting down quits Jasper by
 itself. Clicking the Dock icon, Spotlight or `open -a Jasper` opens a window in the running process; no new process
-starts. At login Jasper starts with no window and no Dock icon. A development run (`./gradlew run`) stays resident but
-never hides from the Dock, and Quit there still exits.
+starts. At login Jasper starts with no window and no Dock icon. A development run (`./gradlew run`) uses its own home,
+so it is never resident and Quit there exits.
 
 **Windows.** Once start-up has settled, the resident process shows a Jasper icon in the notification area (it may sit
 in the taskbar's hidden-icons overflow until you pin it). **Open Jasper**, or double-clicking the icon, opens a window
@@ -291,29 +294,26 @@ Residency also registers Jasper to start in the background at login:
 - **Windows** adds a `Jasper` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
 Both are removed as soon as you set `run_in_background = false` and save. Autostart needs an installed Jasper: a
-`./gradlew run` development session stays resident but never registers a login item.
+`./gradlew run` development session is never resident and never registers a login item.
 
 The two halves of the key have different timing. The login item is reconciled every time the configuration is read,
-so turning it on or off applies at once. **Residency itself applies from the next start**: whether a process owns the
-handoff endpoint, shows the menu bar item and quits into the background is settled when it starts. With the key off
+so turning it on or off applies at once. **Residency itself applies from the next start**: whether a process outlives its
+windows, shows the menu bar item and quits into the background is settled when it starts. With the key off
 Jasper behaves as before: no login item, no menu bar item, Quit exits, and closing the last window ends the process.
 
-Jasper keeps a socket, a token and a lock in a `daemon` directory beside `config.toml`, owner-only. A second launch
-hands its request to the resident process over that socket and exits; on macOS a Dock click never creates a process.
+Jasper keeps its instance lock, its two sockets and their tokens in a `daemon` directory beside `config.toml`,
+owner-only. The running Jasper holds the lock whether or not it is resident; a second launch hands its request over the
+socket and exits, and on macOS a Dock click never creates a process.
 
 **Updates.** Finder will not replace a running app, so choose **Quit Jasper Completely** before installing a new
-version from the disk image. If the app is replaced some other way while Jasper runs, the next Dock click with no
-window open relaunches Jasper as the new build; with windows open it raises them, and the relaunch waits until they are
-closed. A plain launch of the new build likewise retires the old resident process, which exits if it has no windows
-open or otherwise keeps running, no longer resident, until those windows are closed.
+version from the disk image. If the app is replaced some other way while Jasper runs, the next Dock click or launch with no
+window open relaunches Jasper as the new build, opening what the launch named; with windows open it raises them, a
+launch of the new build also says that Jasper was updated, with a Restart action, and the relaunch waits for the next
+Dock click or launch with no window open.
 
-**A launch with `--config` is fully standalone.** It never hands off to a resident process, never
-binds the shared endpoint itself, is never itself resident, and never touches the login item. Any
-resident process was itself started without `--config`, so it is always holding the default
-configuration, never the one named on the command line; and the login item always points at the
-installed app with no `--config`, so an override's `system.run_in_background` could never arm autostart
-for the default configuration. `system.run_in_background` inside a `--config` file is therefore never
-acted on.
+**A launch with `--config` is never resident** and never touches the login item. The login item always points at
+the installed app with no `--config`, so an override's `system.run_in_background` could never arm autostart for the
+default configuration; `system.run_in_background` inside a `--config` file is therefore never acted on.
 
 ### Palette
 

@@ -3,8 +3,8 @@ package dev.jasper.app.application;
 import java.util.Objects;
 
 /**
- * Whether a resident macOS Jasper shows in the Dock and Cmd+Tab: Foreground while any window is open, Background
- * (hidden) with none. EDT, except {@link #prepared} and {@link #poweringOff}. It switches only on a change, so a launch
+ * Whether a macOS Jasper that follows its windows (a resident one, or a hidden launch that carries out a request)
+ * shows in the Dock and Cmd+Tab: Foreground while any window is open, Background (hidden) with none. EDT, except {@link #prepared} and {@link #poweringOff}. It switches only on a change, so a launch
  * already in its first state never calls the bridge.
  */
 final class DockPresence {

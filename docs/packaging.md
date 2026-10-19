@@ -302,6 +302,12 @@ sealed into the bundle), `bin\jasper.exe` on Windows and `lib/bin/jasper` on Lin
 rest of the image. `verifyPackage` checks that it is there, executable and, on macOS, signed, and that `jasper --help`
 runs; the Linux install check runs it from the installed package.
 
+## macOS Open With
+
+`packageApp` declares `CFBundleDocumentTypes` for text, source code and folders at `LSHandlerRank` Alternate, so Jasper
+appears in Finder's Open With and takes drops on its Dock icon without becoming any type's default application.
+`verifyPackage` checks the key.
+
 ## Native acceptance checklist
 
 Perform each checklist outside the repository so source-tree classes or an external
@@ -338,7 +344,12 @@ acceptance remain unexecuted on macOS.
 - [ ] Replace the installed app with a newer build while Jasper is in the background (for example `ditto` over it), then click the Dock icon: the old process exits and a window opens from the new build (the new log's start-up line). With a window open, the same click only raises it.
 - [ ] Record the warm reopen time and idle memory with the start-up benchmark's warm mode ([benchmarks](benchmarks.md#start-up-benchmark)); confirm Jasper survives sleep/wake and a monitor change in the background.
 - [ ] Set `run_in_background = false`, save, and confirm the plist is removed without restarting Jasper; after the next start Cmd+Q exits and no menu bar item appears.
-- [ ] Confirm a handoff request or a Dock click arriving while Jasper is quitting does not raise a window that is being disposed (the guard lives in `openOrRaise`; it needs a live window in flight and cannot be exercised headlessly).
+- [ ] Confirm a handoff request or a Dock click arriving while Jasper is quitting does not raise a window that is being disposed (the guard lives in `open`; it needs a live window in flight and cannot be exercised headlessly).
+- [ ] With Jasper running, launch it again from Finder, Spotlight and `open -n -a Jasper`: `pgrep -fl Jasper.app` lists one process and its window comes forward. Run `jasper --safe-mode`: the running Jasper says to quit it first.
+- [ ] Open a text file and a folder with Jasper from Finder's Open With, and drop each on the Dock icon, once with Jasper running and once with it quit: the file opens in the editor and the folder as a terminal tab, in one process.
+- [ ] Stop the running Jasper with `kill -STOP <pid>` and launch it again: after about 10 s a dialog says Jasper is not responding and names the pid, and no second process starts; then `kill -CONT <pid>`.
+- [ ] Quit Jasper with a window open and launch it again at once: the new launch opens a window once the old process has exited, and only one process remains.
+- [ ] Restart from the Plugins page (Restart Now) and from Custom VM options: the old process exits and the new one opens a window.
 
 ### Windows
 
@@ -360,10 +371,11 @@ acceptance remain unexecuted on macOS.
 - [ ] Confirm links, working-directory status, and broken-config reporting.
 - [ ] Confirm the packaged app runs without a separately installed Java runtime.
 - [ ] Confirm `AF_UNIX` sockets work: with the default configuration, confirm a second `Jasper.exe` launch reveals a window and the second process exits rather than opening its own window.
+- [ ] With Jasper running, run `Jasper.exe notes.txt` from a command prompt: the file opens in the running Jasper, whose window comes to the front, and the second process exits.
 - [ ] With a resident Jasper and no window, click Jasper in the Start menu while another application is in front: the new window opens **in front, focused**. With a Jasper window open behind another application, click it again: that window comes forward (at worst about 300 ms later, the raise's retry) rather than only flashing on the taskbar.
 - [ ] On Windows on Arm, confirm Task Manager's Architecture column (Details tab) shows `ARM64` for `Jasper.exe`, not `x64`.
 - [ ] Leave a resident Jasper with no window for a few hours, then open one: the log's `Window (handoff)` line ends with `no window for … before, … page faults until shown, working set … to … MB`, and the log has `Resident Jasper keeps a soft working-set floor of … MB` from start-up. Many thousands of page faults with a much smaller starting working set mean Windows trimmed the resident despite the floor.
-- [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident. Also start Jasper by hand during sign-in: the `--background` launch then finds it resident and exits at once (`Started with --background while a resident Jasper is running; exiting`), instead of starting its plugins first.
+- [ ] Confirm the `Jasper` value appears under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, sign out and back in, and confirm Jasper is resident. Also start Jasper by hand during sign-in: the `--background` launch then finds it resident and exits at once (`Started with --background while a Jasper owns this home; exiting`), instead of starting its plugins first.
 - [ ] Confirm Quit exits completely, that the notification-area icon appears only once start-up has settled (the first output painted, a finished `--background` warm-up, or 2 s after the first paint) rather than at launch, and that setting `run_in_background = false` removes the Run value.
 
 ### Linux

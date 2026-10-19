@@ -1,5 +1,85 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs, plan 1: the single instance — 2026-10-18** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, `88ae278c8..9530494e9` and the documentation commit after it;
+[plan](superpowers/plans/2026-10-17-workspace-1-single-instance.md),
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One Jasper process per home: a launch takes
+`<home>/daemon/instance.lock` (`residency.InstanceLock`, `FileChannel.tryLock`, held for the life of the process; the
+owner's process id is in `daemon/instance.pid`) before AWT, or hands its request to the owner and exits
+(`bootstrap.SingleInstance`; spec 5.2's table is `LaunchAction`). The owner binds the handoff endpoint and the command
+socket at once (`bootstrap.Instance`) and holds early requests (`EarlyRequests`) until `compose` hands it the
+application; until then a handoff is answered on receipt, afterwards only once the EDT has taken it (within 1 s), and a
+quitting owner takes none; a `jasper` call is answered when it has run. Handoff protocol 2 (`LaunchRequest`): RAISE or
+OPEN_PATHS, the launch's working directory, its paths and the start-up flags it ignored; replies OK, TOKEN, UPDATED,
+PROTOCOL. A launch retries an owner that does not answer for 10 s (taking the lock if the owner has gone), then says
+"Jasper is already running but not responding. Quit it (process N) and try again." and exits 1 (`LaunchFailure`), never
+starting a second instance. An owner answering UPDATED whose own jar changed restarts into the new build when no window
+is open (the replacement opens the launch's paths), otherwise posts "Jasper was updated" with Restart; ignored start-up
+flags get "Jasper is already running: quit it first to start with …". Restart (Plugins page, VM options, updates, the
+look's Try Again) spawns the replacement with `--replacing <pid>`, which waits up to 30 s for the lock, or hands off once
+that process has gone. A start that fails after the claim closes its endpoints and exits. `JasperApplication.open(List<Path>,
+String)` routes RAISE, OPEN_PATHS, `jasper <path>…`, the macOS open-file event (`Desktop.setOpenFileHandler`) and the
+reopen event through today's windows (`OpenPlan`); a file from outside opens in a plugin's editor or is revealed, never
+edited by the desktop; a cold start's first window takes its first directory (`openFirstWindow`); plan 4 retargets
+these to the main window. Command-line paths are positional `AppArguments`; the macOS plist gains
+`CFBundleDocumentTypes` (text, source code and folders at Alternate), which `verifyPackage` checks. Removed:
+`--standalone`, the private `commands-<pid>` sockets, `daemon/lock` and `<socket>.lock`, the handoff endpoint's
+`token.pid`, the liveness probes, RETIRE and the STALE release, `RestartFlow`'s probe/retire/standalone states,
+`RestartMode.STANDALONE`, `ResidentControl`, `endpointReleased`, the Plugins page's notice line (it was hidden in every
+state the 8b and 9b comparisons render; `SettingsPagesMockTest.pluginsMatchesItsMock` and the `settings-plugins` pair
+are unchanged: the 9b comparison printed `settings-plugins: best_offset_render_px dx=10 dy=13 edge_agreement=0.287`
+before and after). Rulings (plan, "Rulings"): (1) the lock lives in `residency`; (2) an I/O failure taking it ends
+the launch with an error; (3) the 10 s retry retries the lock too; (4) early requests run once the application is
+composed; (5) the not-responding error goes to stderr, the log and a system-look dialog and names the pid in
+`instance.pid`; (6) UPDATED acts only when the owner's own jar changed; (7) both notices are INFO in `jasper.general`;
+(8) restart keeps its order and always adds `--replacing`; (9) `RestartFlow` keeps two states and the Plugins page's
+notice line goes; (10) a non-option argument is a path; (11) Jasper, not the client, tells a path from a subcommand, a
+declared subcommand winning, and a call that starts with a path lists the missing ones; (12) OPEN_PATHS opens in the
+last active window or a new one; (13) a cold start's first window takes the first directory and is still timed cold;
+(14) the owner binds over whatever is at the socket path; (15) a home whose socket path is too long runs unreachable and
+says so; (16) child JVMs run `java.home/bin/java` on two code sources; (17) a request over 1 MiB ends the launch with
+exit 2; (18) the document types are Text (Editor) and Folder (Viewer); (19) `start` takes the home, so no test takes
+the real lock; (20) a non-resident `--background` launch exits from `startDesktop` unless it already holds a request,
+which it then carries out as an ordinary start; (21) raise and path calls answer once they have run; (22) a ready owner
+answers a handoff once its EDT took it, within 1 s; (23) a quitting owner takes no handoff; (24) a failed start keeps
+the lock until its process exits; (25) the lock is never opened twice in one process; (26) a file from outside is
+revealed, never desktop-edited, without a plugin's editor; (27) a replacement whose predecessor has gone hands off. The
+spec was amended while the plan was written (`c6d11f711`: no `LSMultipleInstancesProhibited`; `a92166bb2`: the EDT
+take and the quitting owner); the plan follows the amended text; three rulings refine it for safety: 26 reveals where
+spec 5.4 says "as Cmd-click does" (edit-or-reveal), 6 restarts on UPDATED only when the owner's own jar changed where
+spec 5.3 restarts for any differing build, and 27 lets a replacement whose predecessor has gone hand off where spec
+5.2's row only waits and then errors. Deviations from the plan text made while executing it: `InstanceLock.close()`
+is synchronized on the class like `tryAcquire` (Task 1; its 300-round close/ask stress test is bounded, `InstanceLockTest`
+has 8 tests, not 6); `JasperApplication` gained the private helpers `activeWindow()` (shared by `open` and
+`raiseTerminal`) and `newWindowTrigger()` (shared by `newWindow` and `openFirstWindow`) (Task 4); three imports
+`ResidentIndicatorTest` no longer used were removed (Task 5); `SingleInstanceTest.ready(...)` declares `throws Exception`
+and `Instance`'s Javadoc does not claim production never closes the lock (Task 6), whose replacement-wait test
+(`aReplacementWhosePredecessorNeverQuitsWaitsForItAndNamesIt`, a different pid planted so only the wait can name the live
+process) and `SingleInstanceProcessTest.theReplacementWaitsForTheLock` (a 1.5 s hand-off budget) are stronger than the
+plan's, and a new test proves a request the event thread reaches too late is withdrawn
+(`aRequestTheEventThreadReachesAfterTheLaunchGaveUpIsWithdrawnAndNeverCarriedOut`, `SingleInstanceTest` 16 tests, not 15);
+`ApplicationBootstrapTest`'s rollback test throws from the `Consumer<Startup>` form and asserts the home's lock is free
+afterwards, with a new `aFailedPrePassReleasesTheHome`, and a `--background` launch that is not resident but carries out
+a request now shows its Dock presence before its first window (`JasperApplication.dockFollowsWindows()` also holds for a
+process whose `DockPresence` began hidden; two tests in `JasperApplicationBackgroundTest`) (Task 7); a hand-off socket
+test pins that an owner leaves only its socket and token in the folder (`anOwnerLeavesOnlyItsSocketAndItsTokenInTheFolder`,
+`HandoffSocketTest` 19 tests, not 18) (Task 8); `verifyPackage` runs against `jasper-app/build/packaging/image`, not the
+plan's `build/jpackage/image` (Task 10). The stale "private launch" Javadoc (`JasperApplication`, `PluginRuntime`) and the
+`updateDock` and `DockPresence` Javadoc that still said only a resident process follows its windows were corrected in the
+documentation commit. `./gradlew check --continue`: **11475 tests, 0 failures,
+0 errors, 25 skipped** (jasper-app 3538 (19 skipped), jasper-ui 920, jasper-terminal 459 (5 skipped), jasper-buddy 151, jasper-sdk 90, jasper-sdk-testkit 197, plugins 6120 (1 skipped)). Before the first launch of this build, quit any older resident Jasper
+completely (its menu bar item's Quit Jasper Completely): it holds no instance lock and is unreachable from the new
+build, so it would keep running beside it (a one-time transition, Ruling 14). A home on a filesystem without working
+file locks (some NFS or SMB mounts) cannot start: the launch reports that it could not lock its home folder (Ruling 2).
+GUI checks for the user: a second launch from Finder, Spotlight, `open -n -a Jasper` and `Jasper.exe notes.txt` (one
+process, the window comes forward); `open -n -a Jasper FILE` while Jasper runs (macOS delivers the open-file event to
+the second process, which hands off: the file may be dropped and only the raise arrive); `jasper --safe-mode` while
+Jasper runs (the notice); Open With and Dock drops of a text file and a folder, with Jasper running and quit;
+`jasper notes.txt src` from a shell; a stopped owner (`kill -STOP`) gives the not-responding dialog after 10 s; Quit and
+an immediate relaunch end with one process; Restart Now and the VM options restart; a packaged `--background` launch
+that holds a request (a second launch handed it one while it started hidden, with residency off) shows its Dock icon
+with its window. Not merged, not pushed.
+
 **Enterprise presentation: the series — 2026-10-18** (`claude/enterprise-final`, worktree
 `.claude/worktrees/enterprise-final`, rebased from `5d5e5fcf3`, where plans 1 to 11 are merged, onto `main`'s `11e40192c`
 (plan 10b on the Ubuntu Yaru commits);

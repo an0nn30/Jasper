@@ -218,6 +218,20 @@ Verify the example with `./gradlew :jasper-app:test --tests "*AppExamplesTest"`,
 ./gradlew :jasper-app:test --tests "*StartupResourcesTest" --tests "*ApplicationBootstrapRollbackTest" --tests "*MacTitleBarTest"
 ```
 
+### Single instance
+
+One Jasper process owns each home (workspace-tabs spec section 5). `bootstrap.SingleInstance` takes
+`residency.InstanceLock` before AWT and decides with `LaunchAction`; the owner's `bootstrap.Instance` binds both sockets
+at once and holds requests in `EarlyRequests` until `compose` hands it the application. Change the handoff's wire format
+in `residency.LaunchRequest` (with its protocol number), the owner's answer in `HandoffSocket.answering`, when the owner
+takes a request in `bootstrap.Instance`, and what a request opens in `JasperApplication.open`. The process-level tests
+start child JVMs through `testsupport.ChildJvm` with only the test classes and jasper-app's classes, so those classes
+must not reach the toolkit or the other modules.
+
+```sh
+./gradlew :jasper-app:test --tests "*InstanceLockTest" --tests "*SingleInstance*" --tests "*EarlyRequestsTest" --tests "*LaunchRequestTest" --tests "*HandoffSocketTest"
+```
+
 ### Workspace glass
 
 A translucent, blurred terminal workspace on macOS. Slate Cobalt's glass (opaque, no blur) and

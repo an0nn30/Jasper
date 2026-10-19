@@ -558,7 +558,7 @@ public final class PluginRuntime {
 
     private java.nio.file.Path subcommandList;
 
-    /** Where {@code jasper --help} reads the subcommands; before {@link #start}, and never for a private launch. */
+    /** Where {@code jasper --help} reads the subcommands; before {@link #start}. */
     public void subcommandList(java.nio.file.Path file) {
         if (host != null) throw new IllegalStateException("Plugins have already started");
         subcommandList = file;

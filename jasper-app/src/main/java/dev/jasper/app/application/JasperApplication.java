@@ -144,7 +144,7 @@ public final class JasperApplication {
     private volatile PluginRuntime plugins;
     /** The command socket this Jasper serves; new local shells name it in JASPER_COMMAND_SOCKET. */
     private volatile Path commandSocket;
-    /** Where {@code jasper --help} reads the subcommands, or null for a private launch. */
+    /** Where {@code jasper --help} reads the subcommands, or null when none is kept. */
     private Path subcommandList;
     private ActionEntry migrateAction;
     private CommandInstall commandInstall;
@@ -601,7 +601,7 @@ public final class JasperApplication {
 
     public boolean resident() { return resident; }
 
-    /** Where {@code jasper --help} reads the subcommands; before {@link #startPlugins}. Never set for a private launch. */
+    /** Where {@code jasper --help} reads the subcommands; before {@link #startPlugins}. */
     public void subcommandList(Path file) { subcommandList = file; }
 
     /** The command socket this Jasper serves, named in each new local shell's {@code JASPER_COMMAND_SOCKET}. */
@@ -2030,8 +2030,9 @@ public final class JasperApplication {
     }
 
     /**
-     * Foreground with a window open, Background with none; only a resident process with Dock presence switches. Not to
-     * be confused with {@link #presence()}, which is where Jasper stands for notifications. EDT.
+     * Foreground with a window open, Background with none; only a process with Dock presence for which
+     * {@link #dockFollowsWindows} holds switches. Not to be confused with {@link #presence()}, which is where Jasper
+     * stands for notifications. EDT.
      */
     private void updateDock() {
         if (dockFollowsWindows()) dock.windows(windowsOpen());
