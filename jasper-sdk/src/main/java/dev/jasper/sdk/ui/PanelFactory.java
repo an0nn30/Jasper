@@ -1,12 +1,13 @@
 package dev.jasper.sdk.ui;
 
 
-/** Builds a panel's content for one window. */
+/** Builds a panel's content, in the main window. */
 @FunctionalInterface
 public interface PanelFactory {
 
     /**
-     * Called on the UI thread once per window, the first time the panel is shown there. Build an owned kit view; share your own model between the instances. A factory that throws yields an
+     * Called on the UI thread the first time the panel is shown in the main window, and again after the main window
+     * closed and opened anew. Build an owned kit view; keep your own model outside it. A factory that throws yields an
      * error placeholder instead of breaking the window.
      *
      * @param host this instance's window and visibility

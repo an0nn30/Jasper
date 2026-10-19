@@ -959,55 +959,60 @@ public final class FakePluginHost implements AutoCloseable {
         return lines;
     }
 
-    /** Returns the currently published header of an open panel instance.
+    /**
+     * Returns the header the open panel last published.
+     *
      * @param panelId panel identifier
-     * @param windowId owning window
-     * @return header metadata, or an empty header if no instance exists
+     * @return header metadata, or an empty header if the panel is not open
      */
-    public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId, UUID windowId) {
+    public dev.jasper.sdk.ui.PanelHeader panelHeader(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.get(windowId);
-            if (instance != null) return instance.header;
+            if (panel.instance != null) return panel.instance.header;
         }
         return dev.jasper.sdk.ui.PanelHeader.EMPTY;
     }
 
     /**
-     * Discards an open panel instance as its window would when the window closes: its header clears, retained header
-     * callbacks become inert and its close handlers run. Nothing happens when no such instance is open.
+     * Discards the open panel as the main window would when it closes: its header clears, retained header callbacks
+     * become inert and its close handlers run. Nothing happens when the panel is not open.
      *
      * @param panelId panel identifier
-     * @param windowId owning window
      */
-    public void closePanel(String panelId, UUID windowId) {
+    public void closePanel(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.remove(windowId);
+            var instance = panel.instance;
+            panel.instance = null;
             if (instance != null) instance.close();
         }
     }
 
     /**
-     * Invokes a panel's factory as a window showing it would. A factory failure is recorded.
+     * Invokes a panel's factory as the main window showing it would, or shows the panel built there: panels live in the
+     * main window (workspace tabs spec 14). A factory failure is recorded.
      *
      * @param panelId the panel to build
-     * @param windowId the window the panel host reports
-     * @return the component, or null when there is no such panel or its factory failed
+     * @return the component, or null when no main window is open, there is no such panel or its factory failed
      */
-    public javax.swing.JComponent openPanel(String panelId, UUID windowId) {
+    public javax.swing.JComponent openPanel(String panelId) {
         for (FakePluginContext context : contexts.values()) {
-            javax.swing.JComponent built = context.ui.openPanel(panelId, windowId);
+            javax.swing.JComponent built = context.ui.openPanel(panelId);
             if (built != null) return built;
         }
         return null;
     }
 
-    /** The mounted owned view of an opened panel, when its content is a kit view. */
-    public java.util.Optional<FakeKitView> panelView(String panelId, UUID windowId) {
+    /**
+     * The mounted owned view of the open panel, when its content is a kit view.
+     *
+     * @param panelId panel identifier
+     * @return the view, or empty when the panel is not open
+     */
+    public java.util.Optional<FakeKitView> panelView(String panelId) {
         for (var context : contexts.values()) for (var panel : context.ui.panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var instance = panel.instances.get(windowId);
+            var instance = panel.instance;
             if (instance == null || instance.done) return java.util.Optional.empty();
             return context.kit().views().stream().filter(view -> view.component == instance.content).findFirst();
         }

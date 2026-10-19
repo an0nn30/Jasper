@@ -6,18 +6,16 @@ import dev.jasper.sdk.ui.Anchor;
 import dev.jasper.sdk.ui.PanelHost;
 import dev.jasper.sdk.ui.PanelSpec;
 import dev.jasper.sdk.ui.UiView;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Registers the classic Transfers BOTTOM panel (spec 14.4), toggled by {@link TransferUi#SHOW} so its stripe reads
- * "3: Transfers", and shows it on that action. Each window's panel shows that window's transfer rows. UI thread only.
+ * "3: Transfers", and shows it on that action. The panel, in the main window, shows its transfer rows. UI thread only.
  */
 public final class TransfersPanels {
     private final PluginContext context;
     private final TransferUi transfers;
-    private final Map<UUID, PanelHost> hosts = new HashMap<>();
+    /** The panel's host while it is open: panels live in the main window (workspace tabs spec 14). */
+    private PanelHost host;
 
     /** Registers the panel with {@code context}; its rows come from {@code transfers}. */
     public TransfersPanels(PluginContext context, TransferUi transfers) {
@@ -29,14 +27,13 @@ public final class TransfersPanels {
         WindowHandle window = host.window();
         var strip = transfers.strip(window);
         var panel = new TransfersPanel(context.kit(), strip);
-        hosts.put(window.id(), host);
-        host.onClosed(() -> { panel.close(); transfers.release(window, strip); if (hosts.get(window.id()) == host) hosts.remove(window.id()); });
+        this.host = host;
+        host.onClosed(() -> { panel.close(); transfers.release(window, strip); if (this.host == host) this.host = null; });
         return panel.view();
     }
 
-    /** Shows the window's Transfers panel, opening it there when it is not open. */
+    /** Shows the Transfers panel, opening it in the main window when it is not open; {@code window} asked for it. */
     public void show(WindowHandle window) {
-        PanelHost host = hosts.get(window.id());
         if (host == null) context.panels().toggle(TransfersPanel.PANEL, window); else host.show();
     }
 }

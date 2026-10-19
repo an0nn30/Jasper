@@ -23,8 +23,8 @@ public final class TunnelsTestAccess {
     public static void listenPort(TunnelEditor editor, String text) { Kits.type(editor.view(), TunnelEditor.LISTEN_PORT, text); }
     public static void forwardPort(TunnelEditor editor, String text) { Kits.type(editor.view(), TunnelEditor.FORWARD_PORT, text); }
 
-    /** The window's Tunnels panel, once it was opened there. */
-    public static TunnelsPanel panel(TunnelsUi tunnels, UUID windowId) { return tunnels.panel(windowId); }
+    /** The Tunnels panel, once it was opened in the main window. */
+    public static TunnelsPanel panel(TunnelsUi tunnels) { return tunnels.panel(); }
 
     /** The panel's double click on a tunnel's row: edit a saved tunnel, Save as Tunnel for a quick forward. */
     public static void activate(TunnelsPanel panel, UUID id) { select(panel, id); Kits.press(panel.view(), TunnelsPanel.ACTIVATE); }

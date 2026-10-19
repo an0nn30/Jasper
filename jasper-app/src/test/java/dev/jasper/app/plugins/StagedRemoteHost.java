@@ -138,9 +138,9 @@ final class StagedRemoteHost implements AutoCloseable {
      */
     void sessionsState(java.util.function.ToIntFunction<Object> sessions, String credential) {
         try {
-            // The plugin's per-window panel map: its method table names optional Vault types, which are absent here.
-            var panels = plugin.getClass().getDeclaredField("panels"); panels.setAccessible(true);
-            Object panel = ((Map<?, ?>) panels.get(plugin)).get(window.id());
+            // The plugin's Sessions panel: its method table names optional Vault types, which are absent here.
+            var sessionsField = plugin.getClass().getDeclaredField("sessionsPanel"); sessionsField.setAccessible(true);
+            Object panel = sessionsField.get(plugin);
             panel.getClass().getMethod("setCredentialLabels", Function.class).invoke(panel, (Function<Object, String>) host -> credential);
             panel.getClass().getMethod("setHostDetails", Function.class, java.util.function.ToIntFunction.class)
                 .invoke(panel, (Function<Object, String>) host -> "Ubuntu 24.04", sessions);
@@ -166,7 +166,7 @@ final class StagedRemoteHost implements AutoCloseable {
     void tunnelStates(String stage) {
         try {
             Object tunnelsUi = field(plugin, "tunnelsUi");
-            Object panel = ((Map<?, ?>) field(tunnelsUi, "panels")).get(window.id());
+            Object panel = field(tunnelsUi, "panel");
             Object store = field(tunnelsUi, "store");
             var tunnels = (List<?>) store.getClass().getMethod("tunnels").invoke(store);
             Object starting = loader.loadClass("dev.jasper.remote.tunnels.TunnelState$Starting").getConstructor(String.class).newInstance(stage);
@@ -237,8 +237,8 @@ final class StagedRemoteHost implements AutoCloseable {
     Object sftpPanel() {
         try {
             Object sftpUi = field(plugin, "sftpUi");
-            var panel = sftpUi.getClass().getDeclaredMethod("panel", java.util.UUID.class); panel.setAccessible(true);
-            return panel.invoke(sftpUi, window.id());
+            var panel = sftpUi.getClass().getDeclaredMethod("panel"); panel.setAccessible(true);
+            return panel.invoke(sftpUi);
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
 

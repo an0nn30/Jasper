@@ -56,18 +56,18 @@ class FakeContractTest extends PluginContractTest {
             @Override public List<String> menu(String target) { return host.menu(target); }
             @Override public List<String> status() { return host.status(); }
             @Override public List<String> panels() { return host.panels(); }
-            @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) { return host.openPanel(panelId, windowId); }
-            @Override public String panelHeader(String panelId, java.util.UUID windowId) {
-                var header = host.panelHeader(panelId, windowId);
+            @Override public javax.swing.JComponent openPanel(String panelId) { return host.openPanel(panelId); }
+            @Override public String panelHeader(String panelId) {
+                var header = host.panelHeader(panelId);
                 var labels = header.actions().stream().map(dev.jasper.sdk.ui.PanelHeader.Action::label).toList();
                 return header.detail() + "|" + header.active() + "|" + (labels.isEmpty() ? "-" : String.join(";", labels));
             }
-            @Override public boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label) {
-                var action = host.panelHeader(panelId, windowId).actions().stream().filter(a -> a.label().equals(label)).findFirst();
+            @Override public boolean runPanelHeaderAction(String panelId, String label) {
+                var action = host.panelHeader(panelId).actions().stream().filter(a -> a.label().equals(label)).findFirst();
                 action.ifPresent(a -> a.invoke().run());
                 return action.isPresent();
             }
-            @Override public void closePanel(String panelId, java.util.UUID windowId) { host.closePanel(panelId, windowId); }
+            @Override public void closePanel(String panelId) { host.closePanel(panelId); }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((FakeKitView) view).route; }
             @Override public List<String> rail() { return host.rail(); }
             @Override public List<String> windows() { return host.windows(); }

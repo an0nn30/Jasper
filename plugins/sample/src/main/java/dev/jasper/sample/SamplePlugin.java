@@ -107,7 +107,7 @@ public final class SamplePlugin implements Plugin {
 
     // example:pluginpanels:start
     private static void installPanelAndAboutTab(PluginContext context, long stepMillis) {
-        // One instance per window, built the first time the panel is shown there. Its body is the kit's empty state:
+        // Built the first time the panel shows in the main window, the only window with tool windows. Its body is the kit's empty state:
         // a tile, a title, one sentence and one secondary action, centered in the panel.
         context.panels().register(new PanelSpec("dev.jasper.sample.panel", "Sample", FLASK, Anchor.LEFT), host ->
             context.kit().create(new ViewSpec(new Nodes.Panel("sample.panel", ControlState.READY,

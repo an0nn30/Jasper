@@ -295,7 +295,7 @@ class CompositionParityTest {
             assertThat(value(() -> host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, window, null))).as(layout + ": Transfers runs").isTrue();
             settle(host);
             String shown = layout == Layout.ROWS ? dev.jasper.remote.ui.sftp.SftpUi.PANEL : dev.jasper.remote.ui.transfers.TransfersPanel.PANEL;
-            assertThat(value(() -> host.panelView(shown, window))).as(layout + ": Transfers shows its panel").isPresent();
+            assertThat(value(() -> host.panelView(shown))).as(layout + ": Transfers shows its panel").isPresent();
         }
     }
 }

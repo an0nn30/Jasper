@@ -92,8 +92,8 @@ class RemoteEditingPluginTest {
         new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
         UUID window = host.addTerminalWindow();
         host.activateTerminalWindow(window);
-        dev.jasper.remote.testsupport.Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
-        var panel = SftpTestAccess.panel(plugin.sftp(), window);
+        dev.jasper.remote.testsupport.Kits.edt(() -> host.openPanel(SftpUi.PANEL));
+        var panel = SftpTestAccess.panel(plugin.sftp());
         dev.jasper.remote.testsupport.Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); RemotePluginTest.settle(host);
         UUID pane = host.terminalPanes().getFirst();
         dev.jasper.remote.testsupport.Kits.edt(() -> { host.focusTerminalPane(pane); host.flush(); });

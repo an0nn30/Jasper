@@ -168,9 +168,9 @@ class KitCompatibilityTest {
                 var host=new dev.jasper.sdk.testing.FakePluginHost();
                 host.start(new dev.jasper.sdk.PluginInfo("test.kit","Kit","1.0.0",Set.of()),Set.of(),Set.of(),plugin);
                 assertThat(host.panels()).contains("test.kit.panel|Panel|LEFT");
-                var window=host.addTerminalWindow();
-                host.openPanel("test.kit.panel",window);
-                assertThat(host.panelView("test.kit.panel",window)).isPresent();
+                host.addTerminalWindow();
+                host.openPanel("test.kit.panel");
+                assertThat(host.panelView("test.kit.panel")).isPresent();
                 host.close();
             });
         }

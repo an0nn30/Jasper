@@ -248,7 +248,7 @@ class FakeKitMountingTest {
             }
         });
     }
-    @Test void panelRegistrationOwnsEachViewAndContainsFactoryFailure() throws Exception {
+    @Test void panelRegistrationOwnsItsViewAndContainsFactoryFailure() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             try(var host=new FakePluginHost()){
                 var context=host.start(new PluginInfo("test.panel","Panel","1.0.0",Set.of()),Set.of(),Set.of(),c -> {});
@@ -257,10 +257,10 @@ class FakeKitMountingTest {
                     var view=context.kit().create(new ViewSpec(new Nodes.Custom("node",ControlState.READY,"document",Nodes.CustomKind.EDITOR,"Document")),e -> {});
                     view.registerContent(new CustomContent("document",Nodes.CustomKind.EDITOR,new JTextArea(),disposed::incrementAndGet));views.add(view);return view;
                 });
-                UUID one=UUID.randomUUID();host.openPanel("test.panel.files",one);host.openPanel("test.panel.files",one);host.openPanel("test.panel.files",UUID.randomUUID());
-                assertThat(views).hasSize(2);registration.close();registration.close();assertThat(disposed.get()).isEqualTo(2);
+                host.addTerminalWindow();host.openPanel("test.panel.files");host.openPanel("test.panel.files");
+                assertThat(views).as("one view, in the main window").hasSize(1);registration.close();registration.close();assertThat(disposed.get()).isEqualTo(1);
                 context.panels().register(new PanelSpec("test.panel.broken","Broken","folder",Anchor.LEFT),h -> {throw new IllegalStateException("failure");});
-                assertThat(host.openPanel("test.panel.broken",one)).isNull();assertThat(host.failures()).hasSize(1);
+                assertThat(host.openPanel("test.panel.broken")).isNull();assertThat(host.failures()).hasSize(1);
             }
         });
     }

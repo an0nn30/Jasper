@@ -114,8 +114,9 @@ public class RemotePlugin implements Plugin {
     private String serverIcon;
     private boolean stopped;
     private final Set<CompletableFuture<HostKeyVerifier.Decision>> questions = new java.util.HashSet<>();
-    private final Map<UUID, HostsPanel> panels = new HashMap<>();
-    private final Map<UUID, PanelHost> panelHosts = new HashMap<>();
+    /** The Sessions panel while it is open: panels live in the main window (workspace tabs spec 14). */
+    private HostsPanel sessionsPanel;
+    private PanelHost sessionsHost;
     private final Map<UUID, UUID> panes = new HashMap<>();
     private final Map<UUID, dev.jasper.remote.client.ConnectionIdentity> paneIdentities = new HashMap<>();
     private HostKeyPanel currentHostKeyPanel;
@@ -244,10 +245,12 @@ public class RemotePlugin implements Plugin {
         context.panels().register(new PanelSpec(PANEL, "Sessions", icon, layout == dev.jasper.remote.workstation.Layout.CLASSIC ? Anchor.RIGHT : Anchor.LEFT)
             .withToggleActionId(HOSTS), this::createPanel);
         sessionsToolbar = new SessionsToolbar(context, store, icon, this::activateHost, window -> {
-            PanelHost panel = panelHosts.get(window.id());
-            if (panel == null) showPanel(window); else panel.show();
+            if (sessionsHost == null) showPanel(window); else sessionsHost.show();
         }, () -> distros, this::openDistro, layout, sessionSelection, this::activeHostId);
-        sessionSelection.onChanged((windowId, row) -> { var shown = panels.get(windowId); if (shown != null) row.ifPresent(shown::selectRow); });
+        // The Sessions panel is the main window's: only that window's row moves it.
+        sessionSelection.onChanged((windowId, row) -> {
+            if (sessionsPanel != null && windowId.equals(sessionsHost.window().id())) row.ifPresent(sessionsPanel::selectRow);
+        });
 
         store.onChanged(() -> { if (stopped) return; scope.changed(); refreshPanels(); sessionsToolbar.refresh(); tunnelsUi.hostsChanged(); sftpUi.hostsChanged(); store.warnings().forEach(warning -> context.log().log(System.Logger.Level.WARNING, "hosts.toml: {0}", warning)); });
         store.load();
@@ -654,14 +657,14 @@ public class RemotePlugin implements Plugin {
         panel.setWslCollapsed(panelState.wslCollapsed());
         panel.onCollapsedChanged(() -> { try { panelState.save(panel.collapsed(), panel.wslCollapsed()); } catch (IOException failure) { context.log().log(System.Logger.Level.WARNING, "panel state: {0}", failure.getMessage()); } });
         panel.setHosts(store.hosts(), store.error());
-        panels.put(window.id(), panel); panelHosts.put(window.id(), host);
+        sessionsPanel = panel; sessionsHost = host;
         seedSessions(window.id(), panel);
         // Shown again, the first host is selected as when the old list was shown (under CLASSIC the window's row, which the
         // toolbar view shares); focus follows an explicit opening only (a restored panel's window is not showing yet, so
         // the kit's focus request does nothing).
         host.onVisibility(visible -> { if (visible) { panel.shown(); seedSessions(window.id(), panel); panel.focusWhenOpened(); } });
         // The host disposed the view; the panel goes inert so no later refresh touches it.
-        host.onClosed(() -> { panel.close(); if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); } });
+        host.onClosed(() -> { panel.close(); if (sessionsPanel == panel) { sessionsPanel = null; sessionsHost = null; } });
         return panel.view();
     }
 
@@ -686,14 +689,14 @@ public class RemotePlugin implements Plugin {
     }
 
     private void refreshPanels() {
-        for (HostsPanel panel : panels.values()) {
-            panel.setCredentialLabels(this::credentialLabel);
-            panel.setDefaultGroup(panelState.defaultGroup());
-            panel.setHostDetails(this::hostDetails, this::sessionCount);
-            panel.setDistros(distros, this::distroSessions);
-            panel.setHosts(store.hosts(), store.error());
-        }
-        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+        var panel = sessionsPanel;
+        if (panel == null) return;
+        panel.setCredentialLabels(this::credentialLabel);
+        panel.setDefaultGroup(panelState.defaultGroup());
+        panel.setHostDetails(this::hostDetails, this::sessionCount);
+        panel.setDistros(distros, this::distroSessions);
+        panel.setHosts(store.hosts(), store.error());
+        seedSessions(sessionsHost.window().id(), panel);
     }
 
     /**
@@ -703,7 +706,7 @@ public class RemotePlugin implements Plugin {
     private void syncSessions() {
         if (stopped || layout != dev.jasper.remote.workstation.Layout.CLASSIC || sessionsToolbar == null) return;
         sessionsToolbar.renderViews();
-        for (var entry : List.copyOf(panels.entrySet())) seedSessions(entry.getKey(), entry.getValue());
+        if (sessionsPanel != null) seedSessions(sessionsHost.window().id(), sessionsPanel);
     }
 
     /**
@@ -744,7 +747,7 @@ public class RemotePlugin implements Plugin {
                 if (store.hosts().stream().anyMatch(host -> !host.group().isEmpty() && host.group().equalsIgnoreCase(value)))
                     throw new IllegalArgumentException("A group with that name already exists");
                 panelState.renameDefaultGroup(value);
-                for (var panel : panels.values()) panel.setCollapsed(panelState.collapsed());
+                if (sessionsPanel != null) sessionsPanel.setCollapsed(panelState.collapsed());
                 refreshPanels(); dialog.close();
             } catch (IOException | IllegalArgumentException failure) { editor[0].showError(message(failure)); }
         }, dialog::close);
@@ -785,8 +788,8 @@ public class RemotePlugin implements Plugin {
     GroupNamePanel currentGroupEditor() { return currentGroupEditor; }
     ConnectionPanel currentConnectionPanel() { return currentConnectionPanel; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
-    /** The Sessions panel open in a window, for tests. */
-    HostsPanel hostsPanel(UUID windowId) { return panels.get(windowId); }
+    /** The Sessions panel while it is open, for tests. */
+    HostsPanel hostsPanel() { return sessionsPanel; }
     dev.jasper.remote.ui.tunnels.TunnelsUi tunnels() { return tunnelsUi; }
     /** The SFTP explorers, for tests. */
     dev.jasper.remote.ui.sftp.SftpUi sftp() { return sftpUi; }

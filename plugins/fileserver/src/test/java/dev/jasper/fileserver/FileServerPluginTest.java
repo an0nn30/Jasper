@@ -82,9 +82,9 @@ class FileServerPluginTest {
         return result.get();
     }
 
-    static FileServersPanel openPanel(FakePluginHost host, FileServerPlugin plugin, UUID window) {
-        UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL, window));
-        return plugin.panel(window);
+    static FileServersPanel openPanel(FakePluginHost host, FileServerPlugin plugin) {
+        UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL));
+        return plugin.panel();
     }
 
     static PaneInfo pane(Optional<Path> directory) {
@@ -124,7 +124,7 @@ class FileServerPluginTest {
             assertThat(host.actions()).contains("dev.jasper.fileserver.serve-sftp|Serve Current Folder over SFTP|true");
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
             UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
-            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL, window));
+            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL));
             assertThat(host.invoke(FileServerPlugin.SERVE_SFTP, window, local)).isTrue();
             await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
             var served = plugin.registry().servers().getFirst();
@@ -149,7 +149,7 @@ class FileServerPluginTest {
             assertThat(host.actions()).contains("dev.jasper.fileserver.serve-tftp|Serve Current Folder over TFTP|true");
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
             UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
-            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL, window));
+            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL));
             assertThat(host.invoke(FileServerPlugin.SERVE_TFTP, window, local)).isTrue();
             await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
             var served = plugin.registry().servers().getFirst();
@@ -179,8 +179,8 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            UUID window = host.addTerminalWindow();
-            var panel = openPanel(host, plugin, window);
+            host.addTerminalWindow();
+            var panel = openPanel(host, plugin);
             var base = ServerDefinition.create("keys", Protocol.SFTP, home);
             var sftp = new ServerDefinition(base.id(), "keys", Protocol.SFTP, home, Bind.LOOPBACK, Ports.free(), Optional.empty(), false,
                 Login.SESSION, List.of(), false, false, false);
@@ -217,9 +217,9 @@ class FileServerPluginTest {
                 .anySatisfy(line -> assertThat(line).startsWith("confirm_quit"))
                 .anySatisfy(line -> assertThat(line).startsWith("activity_entries"))
                 .anySatisfy(line -> assertThat(line).startsWith("passive_ports"));
-            UUID window = host.addTerminalWindow();
-            openPanel(host, plugin, window);
-            var header = host.panelHeader(FileServerPlugin.PANEL, window);
+            host.addTerminalWindow();
+            openPanel(host, plugin);
+            var header = host.panelHeader(FileServerPlugin.PANEL);
             assertThat(header.detail()).isEmpty();
             assertThat(header.actions()).singleElement().satisfies(action -> assertThat(action.label()).isEqualTo("New File Server…"));
             UiTestAccess.edt(() -> header.actions().getFirst().invoke().run());
@@ -265,8 +265,8 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            UUID window = host.addTerminalWindow();
-            UiTestAccess.add(openPanel(host, plugin, window)).doClick();
+            host.addTerminalWindow();
+            UiTestAccess.add(openPanel(host, plugin)).doClick();
             var view = UiTestAccess.fake(plugin.currentEditor().view());
             UiTestAccess.edt(() -> view.emit(new UiEvent.Selected(ServerEditor.PROTOCOL, Set.of("SFTP"))));
             assertThat(UiTestAccess.node(view, ServerEditor.PASTE_KEY)).as("SFTP shows the key controls").isNotNull();
@@ -290,7 +290,7 @@ class FileServerPluginTest {
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
             UUID window = host.addTerminalWindow();
-            var panel = openPanel(host, plugin, window);
+            var panel = openPanel(host, plugin);
             UiTestAccess.add(panel).doClick();
             assertThat(host.windows()).containsExactly("dialog|New File Server|true");
             Path shared = Files.createDirectories(home.resolve("shared"));
@@ -361,7 +361,7 @@ class FileServerPluginTest {
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
             UUID window = host.addTerminalWindow();
-            var panel = openPanel(host, plugin, window);
+            var panel = openPanel(host, plugin);
             var docs = http("docs", home, Ports.free(), Login.ANONYMOUS, false);
             plugin.store().put(docs);
             settle(host);
@@ -390,8 +390,8 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            UUID window = host.addTerminalWindow();
-            var panel = openPanel(host, plugin, window);
+            host.addTerminalWindow();
+            var panel = openPanel(host, plugin);
             var definition = http("busy", home, blocker.getLocalPort(), Login.ANONYMOUS, false);
             plugin.store().put(definition);
             settle(host);
@@ -457,7 +457,7 @@ class FileServerPluginTest {
             settle(host);
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
             UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
-            var panel = openPanel(host, plugin, window);
+            var panel = openPanel(host, plugin);
             assertThat(host.invoke(FileServerPlugin.SERVE_HTTP, window, local)).isTrue();
             await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
             var served = plugin.registry().servers().getFirst();
@@ -559,7 +559,7 @@ class FileServerPluginTest {
             assertThat(host.actions()).contains("dev.jasper.fileserver.serve-ftp|Serve Current Folder over FTP|true");
             UUID window = host.addTerminalWindow(), tab = host.addTerminalTab(window, "zsh");
             UUID local = host.addTerminalPane(tab, pane(Optional.of(project)));
-            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL, window));
+            UiTestAccess.edt(() -> host.openPanel(FileServerPlugin.PANEL));
             assertThat(host.invoke(FileServerPlugin.SERVE_FTP, window, local)).isTrue();
             await(host, () -> plugin.registry().servers().stream().noneMatch(v -> v.state().phase() == Phase.STARTING), "the start settles");
             var served = plugin.registry().servers().getFirst();
@@ -626,7 +626,7 @@ class FileServerPluginTest {
             if (protocol == Protocol.FTP || protocol == Protocol.SFTP) assertThat(plugin.registry().password(definition.id())).hasValueSatisfying(password -> assertThat(password).isNotBlank());
             assertThat(plugin.store().definitions()).isEmpty();
             assertThat(host.windows()).as("no setup or login dialog").isEmpty();
-            var panel = openPanel(host, plugin, window);
+            var panel = openPanel(host, plugin);
             assertThat(panel.selected()).contains(definition.id());
             assertThat(host.failures()).isEmpty();
             plugin.registry().stopAll();
@@ -679,7 +679,7 @@ class FileServerPluginTest {
             assertThat(host.invoke(FileServerPlugin.HOST_KEY_FINGERPRINT, window, null)).isTrue();
             await(host, () -> plugin.currentConfirm() != null, "the host key dialog opens");
             assertThat(UiTestAccess.message(plugin.currentConfirm()).getText()).startsWith("No SSH host key yet");
-            assertThat(plugin.panel(window)).as("the File Servers panel stays closed").isNull();
+            assertThat(plugin.panel()).as("the File Servers panel stays closed").isNull();
             assertThat(host.failures()).isEmpty();
         }
     }
@@ -689,8 +689,8 @@ class FileServerPluginTest {
             var plugin = plugin();
             host.start(INFO, Set.of(), Set.of(), plugin);
             settle(host);
-            UUID window = host.addTerminalWindow();
-            var panel = openPanel(host, plugin, window);
+            host.addTerminalWindow();
+            var panel = openPanel(host, plugin);
             var base = http("secure", home, Ports.free(), Login.ANONYMOUS, false);
             var secure = new ServerDefinition(base.id(), base.name(), Protocol.HTTP, home, Bind.LOOPBACK, base.port(), Optional.empty(), false,
                 Login.ANONYMOUS, List.of(), true, false, false);

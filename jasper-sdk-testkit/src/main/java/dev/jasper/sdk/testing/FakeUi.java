@@ -158,7 +158,7 @@ final class FakeUi {
         for (var built : toolbarBuilt.values()) for (var view : built.values()) view.ifPresent(FakeKitView::close);
         toolbarBuilt.clear();
         actions.clear(); toolbar.clear(); sections.clear(); topLevelIds.clear(); status.clear();
-        for (Panel panel : List.copyOf(panels)) panel.instances.values().forEach(PanelInstance::close);
+        for (Panel panel : List.copyOf(panels)) if (panel.instance != null) panel.instance.close();
         panels.clear(); railActions.clear();
         for(var popup:List.copyOf(popovers))popup.close();
         for (FakeWindow window : List.copyOf(windows)) window.close();
@@ -299,7 +299,8 @@ final class FakeUi {
         return item;
     }
 
-    static final class Panel { final PanelSpec spec; final PanelFactory factory; final Map<UUID, PanelInstance> instances = new LinkedHashMap<>(); Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
+    /** A registered panel and its instance in the main window, while one is built. */
+    static final class Panel { final PanelSpec spec; final PanelFactory factory; PanelInstance instance; Panel(PanelSpec spec, PanelFactory factory) { this.spec = spec; this.factory = factory; } }
 
     record SurfaceMount(FakeWindow surface) { }
 
@@ -425,7 +426,7 @@ final class FakeUi {
             for (Panel existing : panels) if (existing.spec.id().equals(spec.id())) throw new IllegalArgumentException("Panel already registered: " + spec.id());
             var panel = new Panel(spec, factory);
             panels.add(panel);
-            return () -> { if (panels.remove(panel)) { panel.instances.values().forEach(PanelInstance::close); panel.instances.clear(); } };
+            return () -> { if (panels.remove(panel) && panel.instance != null) { panel.instance.close(); panel.instance = null; } };
           }
           @Override public void toggle(String panelId, WindowHandle window) {
             context.requireOpen();
@@ -433,22 +434,27 @@ final class FakeUi {
             Panel panel = panels.stream().filter(p -> p.spec.id().equals(panelId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Panel not registered: " + panelId));
             if (!window.isOpen()) return;
-            var instance = panel.instances.get(window.id());
-            if (instance == null) openPanel(panelId, window.id());
-            else instance.setVisible(!instance.visible());
+            // Panels live in the main window (workspace tabs spec 14): a child window's toggle shows the panel there, as
+            // the application's does (workspace plan 4a's final review); the main window's toggles it.
+            if (panel.instance == null) openPanel(panelId);
+            else if (!window.isMain()) panel.instance.show();
+            else panel.instance.setVisible(!panel.instance.visible());
           }
         };
     }
 
-    JComponent openPanel(String panelId, UUID windowId) {
+    /** Builds the panel in the main window, or shows it there; null without a main window or when the factory fails. */
+    JComponent openPanel(String panelId) {
+        var main = host.workspace.main().orElse(null);
+        if (main == null) return null;
         for (Panel panel : panels) {
             if (!panel.spec.id().equals(panelId)) continue;
-            var existing = panel.instances.get(windowId);
+            var existing = panel.instance;
             if (existing != null) { existing.show(); return existing.content; }
             try {
-                var instance = new PanelInstance(windowId);
+                var instance = new PanelInstance(main.id);
                 var view=context.kit().requireOwned(panel.factory.create(instance));view.mount(instance);instance.onClosed(view::close);instance.content = view.component;
-                if (instance.content != null) panel.instances.put(windowId, instance);
+                if (instance.content != null) panel.instance = instance;
                 return instance.content;
             } catch (RuntimeException | LinkageError failure) {
                 host.recordFailure(pluginId() + " panel " + panelId + ": " + failure);

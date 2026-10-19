@@ -112,8 +112,8 @@ class SamplePluginTest {
             host.setSetting("dev.jasper.sample", "demo_step_millis", 0L);
             start(host,INFO, Set.of(), Set.of(), new SamplePlugin());
             javax.swing.SwingUtilities.invokeAndWait(() -> {
-                host.openPanel("dev.jasper.sample.panel", window);
-                var panel = host.panelView("dev.jasper.sample.panel", window).orElseThrow();
+                host.openPanel("dev.jasper.sample.panel");
+                var panel = host.panelView("dev.jasper.sample.panel").orElseThrow();
                 var body = (dev.jasper.sdk.ui.Nodes.Empty) ((dev.jasper.sdk.ui.Nodes.Panel) panel.spec().root()).body();
                 assertThat(body.title()).isEqualTo("Sample Activity");
                 var run = (dev.jasper.sdk.ui.Nodes.Button) body.actions().getLast();
@@ -192,7 +192,8 @@ class SamplePluginTest {
             assertThat(host.failures()).isEmpty();
             assertThat(host.panels()).containsExactly("dev.jasper.sample.panel|Sample|LEFT");
             assertThat(host.rail()).containsExactly("dev.jasper.sample.about");
-            assertThat(host.openPanel("dev.jasper.sample.panel", java.util.UUID.randomUUID())).isNotNull();
+            host.addTerminalWindow();
+            assertThat(host.openPanel("dev.jasper.sample.panel")).as("in the main window").isNotNull();
             assertThat(host.windows()).isEmpty();
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();
             assertThat(host.invoke("dev.jasper.sample.about", java.util.UUID.randomUUID(), null)).isTrue();

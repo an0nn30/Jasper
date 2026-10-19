@@ -33,8 +33,9 @@ public sealed interface ToolbarItem permits ToolbarItem.Button, ToolbarItem.Drop
     }
 
     /**
-     * A small group of the plugin's own controls, one per window, such as a session choice with a Connect button. The
-     * factory runs when a window opens, and for each window already open from inside {@code add}, never for a window
+     * A small group of the plugin's own controls, one per window with a toolbar (the main window), such as a session
+     * choice with a Connect button. The factory runs when such a window opens, and for each one already open from
+     * inside {@code add}, never for a window
      * nobody sees, and the view closes with its window or with this registration. Its root is an INLINE
      * {@link Nodes.Stack} of LABEL {@link Nodes.Text}s, DROPDOWN, SEARCHABLE or PICKER {@link Nodes.Choice}s, at most one
      * PRIMARY {@link Nodes.Button}, {@link Nodes.MenuButton}s and {@link Nodes.Separator}s. When it mounts the view the

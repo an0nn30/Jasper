@@ -55,10 +55,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -126,8 +124,9 @@ public final class FileServerPlugin implements Plugin {
     private PluginAction stopAll;
     private Subscription quitGuard;
     private Runnable addressTimer;
-    private final Map<UUID, FileServersPanel> panels = new LinkedHashMap<>();
-    private final Map<UUID, PanelHost> panelHosts = new LinkedHashMap<>();
+    /** The File Servers panel while it is open: panels live in the main window (workspace tabs spec 14). */
+    private FileServersPanel panel;
+    private PanelHost panelHost;
     private List<String> reportedWarnings = List.of();
     private String reportedError;
     private boolean stopped;
@@ -218,7 +217,7 @@ public final class FileServerPlugin implements Plugin {
             refreshPanels();
         });
         addressTimer = environment.every().apply(Duration.ofSeconds(10), () -> {
-            if (!stopped && panelHosts.values().stream().anyMatch(PanelHost::visible)) registry.refreshAddresses();
+            if (!stopped && panelHost != null && panelHost.visible()) registry.refreshAddresses();
         });
         store.load().whenComplete((ignored, failure) -> { if (!stopped) registry.autostart(); });
         context.background().execute(() -> {
@@ -240,7 +239,7 @@ public final class FileServerPlugin implements Plugin {
     ServerRegistry registry() { return registry; }
     ServerEditor currentEditor() { return currentEditor; }
     ConfirmPanel currentConfirm() { return currentConfirm; }
-    FileServersPanel panel(UUID window) { return panels.get(window); }
+    FileServersPanel panel() { return panel; }
     WindowHandle windowHandle(UUID id) { return context.terminals().window(id).orElseThrow(); }
 
     /** Engine events reach the transfer activities only while the plugin runs: a late one must not open an activity on a closed context. */
@@ -270,10 +269,10 @@ public final class FileServerPlugin implements Plugin {
         panel.setTlsFingerprint(tls.cachedFingerprint());
         panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
         panel.setServers(registry.servers(), store.error());
-        panels.put(window.id(), panel);
-        panelHosts.put(window.id(), host);
+        this.panel = panel;
+        panelHost = host;
         host.onVisibility(visible -> { if (visible) registry.refreshAddresses(); });
-        host.onClosed(() -> { panel.close(); panels.remove(window.id()); panelHosts.remove(window.id()); });
+        host.onClosed(() -> { panel.close(); if (this.panel == panel) { this.panel = null; panelHost = null; } });
         return panel.view();
     }
 
@@ -389,10 +388,9 @@ public final class FileServerPlugin implements Plugin {
     }
 
     private void showPanel(WindowHandle window, UUID id) {
-        PanelHost host = panelHosts.get(window.id());
-        if (host == null) context.panels().toggle(PANEL, window);
-        else if (!host.visible()) host.show();
-        FileServersPanel panel = panels.get(window.id());
+        // Asked from any window, the panel shows in the main window.
+        if (panelHost == null) context.panels().toggle(PANEL, window);
+        else if (!panelHost.visible()) panelHost.show();
         if (panel != null) panel.select(id);
     }
 
@@ -502,7 +500,7 @@ public final class FileServerPlugin implements Plugin {
         activityRefreshPending = true;
         environment.ui().execute(() -> {
             activityRefreshPending = false;
-            if (!stopped) panels.values().forEach(FileServersPanel::refreshActivity);
+            if (!stopped && panel != null) panel.refreshActivity();
         });
     }
 
@@ -511,12 +509,11 @@ public final class FileServerPlugin implements Plugin {
             environment.ui().execute(this::refreshPanels);
             return;
         }
-        for (FileServersPanel panel : panels.values()) {
-            panel.setTlsFingerprint(tls.cachedFingerprint());
-            panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
-            panel.setServers(registry.servers(), store.error());
-            panel.refreshActivity();
-        }
+        if (panel == null) return;
+        panel.setTlsFingerprint(tls.cachedFingerprint());
+        panel.setHostKeyFingerprint(hostKey.cachedFingerprint());
+        panel.setServers(registry.servers(), store.error());
+        panel.refreshActivity();
     }
 
     /** Shows the fingerprint the server presents: the shared SSH host key's for SFTP, else the shared certificate's. */

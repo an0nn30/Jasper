@@ -32,8 +32,8 @@ class SftpPluginTest {
             UUID window=host.addTerminalWindow(),second=host.addTerminalWindow();dev.jasper.remote.testsupport.Kits.edt(()-> { host.invoke("dev.jasper.remote.transfers",window,null);host.invoke("dev.jasper.remote.transfers",second,null); });
             assertThat(host.openRequests()).isEmpty();assertThat(host.failures()).isEmpty();
             assertThat(host.windows()).as("showing transfers never opens the host chooser").isEmpty();
-            dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window));
-            var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp(),window);
+            dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL));
+            var sidebar=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
             dev.jasper.remote.testsupport.Kits.await(host,()->dev.jasper.remote.testsupport.Kits.find(sidebar.view(),dev.jasper.remote.ui.transfers.TransferStrip.ROWS).isPresent(),
                 "the restored transfer shows");
             assertThat(dev.jasper.remote.ui.sftp.SftpTestAccess.texts(sidebar)).as("the strip lives in the SFTP sidebar").contains("Transfers","Paused");
@@ -41,14 +41,14 @@ class SftpPluginTest {
     }
 
     /** Task 6d acceptance carried into Task 8: the SFTP header keeps its connection name and connected dot through setHeader. */
-    @Test void theSftpHeaderCarriesTheConnectionAndItsDotAndTheShortcutsActOnTheWindowsPanel() throws Exception {
+    @Test void theSftpHeaderCarriesTheConnectionAndItsDotAndTheShortcutsActOnTheOneExplorer() throws Exception {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(dev.jasper.remote.testsupport.Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
             UUID window=host.addTerminalWindow();
-            dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window));
-            var panel=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp(),window);
-            var header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window);
+            dev.jasper.remote.testsupport.Kits.edt(()->host.openPanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL));
+            var panel=dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp());
+            var header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL);
             assertThat(header.detail()).isEmpty();assertThat(header.active()).isFalse();assertThat(header.actions()).isEmpty();
             var moves=new ArrayList<String>();
             dev.jasper.remote.testsupport.Kits.edt(()-> {
@@ -56,7 +56,7 @@ class SftpPluginTest {
                 panel.showPage("prod","/srv",List.of(new dev.jasper.remote.sftp.FileEntry("a",dev.jasper.remote.sftp.FileEntry.Kind.FILE,1,0,0644,"")),0,1,false);
                 panel.navigationAvailable(true,true);
             });
-            header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window);
+            header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL);
             assertThat(header.detail()).as("the connection name").isEqualTo("prod");
             assertThat(header.active()).as("the connected dot").isTrue();
             assertThat(header.actions()).isEmpty();
@@ -67,14 +67,14 @@ class SftpPluginTest {
             assertThat(moves).containsExactly("back","forward");
             UUID other=host.addTerminalWindow();
             dev.jasper.remote.testsupport.Kits.edt(()->host.invoke(dev.jasper.remote.ui.sftp.SftpUi.BACK,other,null));
-            assertThat(moves).as("a window without the panel has nothing to go back in").hasSize(2);
+            assertThat(moves).as("one explorer, in the main window: Back from a child window acts on it").containsExactly("back","forward","back");
             dev.jasper.remote.testsupport.Kits.edt(()->panel.clear("SSH session closed"));
-            header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window);
+            header=host.panelHeader(dev.jasper.remote.ui.sftp.SftpUi.PANEL);
             assertThat(header.detail()).isEmpty();assertThat(header.active()).isFalse();
-            host.closePanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL,window);
-            assertThat(dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp(),window)).as("a closed panel leaves the map").isNull();
+            host.closePanel(dev.jasper.remote.ui.sftp.SftpUi.PANEL);
+            assertThat(dev.jasper.remote.ui.sftp.SftpTestAccess.panel(plugin.sftp())).as("a closed panel leaves no explorer").isNull();
             dev.jasper.remote.testsupport.Kits.edt(()->host.invoke(dev.jasper.remote.ui.sftp.SftpUi.BACK,window,null));
-            assertThat(moves).hasSize(2);
+            assertThat(moves).as("a closed panel has nothing to go back in").hasSize(3);
             host.stopAll();
             assertThat(host.failures()).isEmpty();
         }

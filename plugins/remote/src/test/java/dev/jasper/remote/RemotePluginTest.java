@@ -85,10 +85,10 @@ class RemotePluginTest {
             UUID window = host.addTerminalWindow();
             assertThat(Kits.value(() -> host.invoke(dev.jasper.remote.ui.transfers.TransferUi.SHOW, window, null))).isTrue();
             settle(host);
-            assertThat(Kits.value(() -> host.panelView(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL, window))).as("Transfers shows its panel").isPresent();
-            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
+            assertThat(Kits.value(() -> host.panelView(dev.jasper.remote.ui.transfers.TransfersPanel.PANEL))).as("Transfers shows its panel").isPresent();
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL));
             settle(host);
-            assertThat(Kits.value(() -> dev.jasper.remote.testsupport.Kits.find(host.panelView(SftpUi.PANEL, window).orElseThrow(),
+            assertThat(Kits.value(() -> dev.jasper.remote.testsupport.Kits.find(host.panelView(SftpUi.PANEL).orElseThrow(),
                 dev.jasper.remote.ui.transfers.TransferStrip.ROOT))).as("the SFTP footer holds no transfers under CLASSIC").isEmpty();
         }
     }
@@ -146,7 +146,7 @@ class RemotePluginTest {
                 assertThat(host.invoke(RemotePlugin.NEW_HOST, window, null)).isTrue();
                 assertThat(host.failures()).isEmpty();
                 assertThat(host.windows()).containsExactly("dialog|Add Host|true");
-                assertThat(plugin.hostsPanel(window)).as("the Sessions panel stays closed").isNull();
+                assertThat(plugin.hostsPanel()).as("the Sessions panel stays closed").isNull();
                 name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "new.invalid"); agentAuth(plugin.currentEditor());
                 username(plugin.currentEditor(), "root");
                 saveAndConnect(plugin.currentEditor());
@@ -186,8 +186,8 @@ class RemotePluginTest {
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
             var handle = context.terminals().window(window).orElseThrow();
-            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
-            var panel = SftpTestAccess.panel(plugin.sftp(), window);
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL));
+            var panel = SftpTestAccess.panel(plugin.sftp());
             Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
             Kits.edt(() -> plugin.openHost(handle, prod)); settle(host);
             UUID first = host.terminalPanes().getFirst(), second = host.terminalPanes().getLast();
@@ -246,8 +246,8 @@ class RemotePluginTest {
             new KnownHosts(context.dataDirectory().resolve("known_hosts"), Optional.empty()).trust("127.0.0.1", server.port(), server.hostPublicKey());
             UUID window = host.addTerminalWindow();
             host.activateTerminalWindow(window);
-            Kits.edt(() -> host.openPanel(SftpUi.PANEL, window));
-            var panel = SftpTestAccess.panel(plugin.sftp(), window);
+            Kits.edt(() -> host.openPanel(SftpUi.PANEL));
+            var panel = SftpTestAccess.panel(plugin.sftp());
             Kits.edt(() -> plugin.openHost(context.terminals().window(window).orElseThrow(), prod)); settle(host);
             Kits.edt(() -> { host.focusTerminalPane(host.terminalPanes().getFirst()); host.flush(); });
             awaitRowCount(host, panel, 1);
@@ -491,8 +491,8 @@ class RemotePluginTest {
                 assertThat(host.actions()).contains(manage + "|Manage Sessions...|true");
                 UUID window = host.addTerminalWindow();
                 assertThat(host.invoke(manage, window, null)).isTrue();
-                assertThat(host.openPanel(RemotePlugin.PANEL, window)).as("a kit view, no raw component").isNotNull();
-                assertThat(plugin.hostsPanel(window)).isNotNull();
+                assertThat(host.openPanel(RemotePlugin.PANEL)).as("a kit view, no raw component").isNotNull();
+                assertThat(plugin.hostsPanel()).isNotNull();
 
                 var zebra = RemoteHost.create("Zebra", "z.example", 22, "me", new Auth.Agent(), "", Optional.empty());
                 var alpha = RemoteHost.create("alpha", "a.example", 2222, "root", new Auth.Agent(), "", Optional.empty());
@@ -552,10 +552,10 @@ class RemotePluginTest {
                 var context = host.start(INFO, Set.of(), Set.of("dev.jasper.vault"), plugin);
                 UUID window = host.addTerminalWindow();
                 host.activateTerminalWindow(window);
-                host.openPanel(RemotePlugin.PANEL, window);
-                var panel = plugin.hostsPanel(window);
+                host.openPanel(RemotePlugin.PANEL);
+                var panel = plugin.hostsPanel();
                 assertThat(panel).isNotNull();
-                headerAction(host, window, "New session");
+                headerAction(host, "New session");
                 assertThat(host.windows()).containsExactly("dialog|Add Host|true");
                 name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "new.example"); agentAuth(plugin.currentEditor());
                 username(plugin.currentEditor(), "root");
@@ -564,7 +564,7 @@ class RemotePluginTest {
                 assertThat(host.windows()).isEmpty();
                 assertThat(plugin.store().hosts()).extracting(RemoteHost::name).containsExactly("new");
                 assertThat(rows(panel)).as("ungrouped host without a redundant header").hasSize(1);
-                assertThat(host.panelHeader(RemotePlugin.PANEL, window).detail()).isEmpty();
+                assertThat(host.panelHeader(RemotePlugin.PANEL).detail()).isEmpty();
                 assertThat(((dev.jasper.sdk.ui.Nodes.Panel)panel.view().spec().root()).header().count()).hasValue(1);
                 panel.select(plugin.store().hosts().getFirst().id());
                 assertThat(cardCredential(panel)).isEqualTo("SSH agent");
@@ -595,8 +595,8 @@ class RemotePluginTest {
     }
 
     /** Runs a Sessions header action through the testkit's published header, as the window's header button would. */
-    static void headerAction(FakePluginHost host, UUID window, String label) {
-        host.panelHeader(RemotePlugin.PANEL, window).actions().stream().filter(action -> action.label().equals(label)).findFirst()
+    static void headerAction(FakePluginHost host, String label) {
+        host.panelHeader(RemotePlugin.PANEL).actions().stream().filter(action -> action.label().equals(label)).findFirst()
             .orElseThrow(() -> new AssertionError("No header action " + label)).invoke().run();
     }
 
@@ -626,7 +626,7 @@ class RemotePluginTest {
                 UUID window = host.addTerminalWindow();
                 host.invoke(RemotePlugin.HOSTS, window, null);
                 assertThat(host.paletteOpens()).isEmpty();
-                assertThat(host.openPanel(RemotePlugin.PANEL, window)).isNotNull();
+                assertThat(host.openPanel(RemotePlugin.PANEL)).isNotNull();
             }
         });
     }
@@ -636,16 +636,16 @@ class RemotePluginTest {
             try (var host = new FakePluginHost()) {
                 var plugin = plugin(dir);
                 var context = host.start(INFO, Set.of(), Set.of(), plugin);
-                UUID window = host.addTerminalWindow();
-                host.openPanel(RemotePlugin.PANEL, window);
-                var panel = plugin.hostsPanel(window);
+                host.addTerminalWindow();
+                host.openPanel(RemotePlugin.PANEL);
+                var panel = plugin.hostsPanel();
                 var saved = RemoteHost.create("saved", "example", 22, "me", Auth.AGENT, "", Optional.empty());
                 plugin.store().put(saved); settle(host);
                 Files.writeString(context.dataDirectory().resolve("hosts.toml"), "broken = [");
                 int row = indexOf(panel, saved);
                 menu(panel, row, "Duplicate");
                 menu(panel, row, "Add to favorites");
-                headerAction(host, window, "New session");
+                headerAction(host, "New session");
                 name(plugin.currentEditor(), "new"); hostname(plugin.currentEditor(), "example");
                 agentAuth(plugin.currentEditor()); username(plugin.currentEditor(), "me");
                 save(plugin.currentEditor());
@@ -705,11 +705,11 @@ class RemotePluginTest {
             try (var host = new FakePluginHost()) {
                 var plugin = plugin(dir);
                 var context = host.start(INFO, Set.of(), Set.of(), plugin);
-                UUID window = host.addTerminalWindow();
+                host.addTerminalWindow();
                 var saved = RemoteHost.create("home", "example", 22, "me", Auth.AGENT, "", Optional.empty());
                 plugin.store().put(saved); settle(host);
-                host.openPanel(RemotePlugin.PANEL, window);
-                var panel = plugin.hostsPanel(window);
+                host.openPanel(RemotePlugin.PANEL);
+                var panel = plugin.hostsPanel();
                 menu(panel, 0, "Rename group\u2026");
                 groupName(plugin.currentGroupEditor(), "My machines");
                 saveGroup(plugin.currentGroupEditor()); settle(host);
@@ -732,8 +732,8 @@ class RemotePluginTest {
                 var context = host.start(INFO, Set.of(), Set.of(), plugin);
                 UUID window = host.addTerminalWindow();
                 host.activateTerminalWindow(window);
-                host.openPanel(RemotePlugin.PANEL, window);
-                var panel = plugin.hostsPanel(window);
+                host.openPanel(RemotePlugin.PANEL);
+                var panel = plugin.hostsPanel();
                 assertThat(rows(panel)).as("no WSL group without distributions").isEmpty();
 
                 host.setShellProfiles(List.of(UBUNTU));

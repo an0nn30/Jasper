@@ -29,7 +29,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +69,9 @@ public final class TunnelsUi implements AutoCloseable {
     private final String icon;
     private final NotificationGroup notifications;
     private String warningIcon;
-    private final Map<UUID, TunnelsPanel> panels = new HashMap<>();
-    private final Map<UUID, PanelHost> panelHosts = new HashMap<>();
+    /** The Tunnels panel while it is open: panels live in the main window (workspace tabs spec 14). */
+    private TunnelsPanel panel;
+    private PanelHost panelHost;
     private final Set<PluginDialog> dialogs = new HashSet<>();
     private final TunnelsScope scope;
     private final StatusItem status;
@@ -140,7 +140,7 @@ public final class TunnelsUi implements AutoCloseable {
         status.setIcon(icon);
         status.setAction(TOGGLE);
         status.setVisible(false);
-        ticker = new Timer(1000, event -> panels.values().forEach(TunnelsPanel::refresh));
+        ticker = new Timer(1000, event -> { if (panel != null) panel.refresh(); });
         storeSubscription = store.onChanged(this::storeChanged);
         managerSubscription = manager.onChanged(this::refresh);
     }
@@ -167,8 +167,8 @@ public final class TunnelsUi implements AutoCloseable {
     public TunnelEditor currentEditor() { return currentEditor; }
     public ForwardPanel currentForward() { return currentForward; }
     public ConfirmPanel currentConfirm() { return currentConfirm; }
-    /** The window's Tunnels panel, once it was opened there. */
-    TunnelsPanel panel(UUID windowId) { return panels.get(windowId); }
+    /** The Tunnels panel while it is open. */
+    TunnelsPanel panel() { return panel; }
 
     /** Plugin stop: every tunnel stops and the dialogs close. */
     @Override public void close() {
@@ -180,20 +180,20 @@ public final class TunnelsUi implements AutoCloseable {
         manager.close();
     }
 
-    private dev.jasper.sdk.ui.UiView create(PanelHost panelHost) {
-        WindowHandle window = panelHost.window();
+    private dev.jasper.sdk.ui.UiView create(PanelHost host) {
+        WindowHandle window = host.window();
         // The switch, Enter and the menu act through the manager, whose confirmed state alone redraws the row.
         var panel = new TunnelsPanel(context.kit(), new TunnelsPanel.Actions(tunnel -> manager.start(tunnel, window), tunnel -> manager.stop(tunnel.id()),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::duplicate, tunnel -> delete(window, tunnel),
             tunnel -> edit(window, Optional.of(tunnel), Optional.empty()), this::browse, this::copyAddress,
             () -> edit(window, Optional.empty(), Optional.empty())), layout);
-        panel.onHeaderChanged(panelHost::setHeader);
-        panels.put(window.id(), panel);
-        panelHosts.put(window.id(), panelHost);
+        panel.onHeaderChanged(host::setHeader);
+        this.panel = panel;
+        panelHost = host;
         // The host disposed the view; the panel goes inert, so no later state change or tick touches it.
-        panelHost.onClosed(() -> {
+        host.onClosed(() -> {
             panel.close();
-            if (panels.get(window.id()) == panel) { panels.remove(window.id()); panelHosts.remove(window.id()); }
+            if (this.panel == panel) { this.panel = null; panelHost = null; }
         });
         fill(panel);
         return panel.view();
@@ -217,7 +217,7 @@ public final class TunnelsUi implements AutoCloseable {
 
     private void refresh() {
         if (closed) return;
-        for (TunnelsPanel panel : panels.values()) fill(panel);
+        if (panel != null) fill(panel);
         scope.changed();
         int active = manager.active(), failing = manager.failed();
         status.setText(TunnelRows.status(active, failing));
@@ -273,8 +273,8 @@ public final class TunnelsUi implements AutoCloseable {
 
     private void reveal(WindowHandle window) {
         if (closed || !window.isOpen()) return;
-        PanelHost existing = panelHosts.get(window.id());
-        if (existing == null) context.panels().toggle(PANEL, window); else existing.show();
+        // Asked from any window, the panel shows in the main window.
+        if (panelHost == null) context.panels().toggle(PANEL, window); else panelHost.show();
     }
 
     private void edit(WindowHandle window, Optional<Tunnel> editing, Optional<UUID> preferredHost) {

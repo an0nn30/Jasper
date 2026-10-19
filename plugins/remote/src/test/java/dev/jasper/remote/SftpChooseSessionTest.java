@@ -25,9 +25,9 @@ class SftpChooseSessionTest {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
-            var window=host.addTerminalWindow();
-            Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
-            var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
+            host.addTerminalWindow();
+            Kits.edt(()->host.openPanel(SftpUi.PANEL));
+            var sidebar=SftpTestAccess.panel(plugin.sftp());
             assertThat(SftpTestAccess.sessions(sidebar)).containsExactly("No saved sessions");
             assertThatThrownBy(()->SftpTestAccess.chooseSession(sidebar,"No saved sessions")).hasMessageContaining("disabled");
             assertThat(host.windows()).as("no chooser dialog").isEmpty();
@@ -41,9 +41,9 @@ class SftpChooseSessionTest {
         try(var host=new FakePluginHost(root.resolve("home"))) {
             var plugin=new TestRemotePlugin(Kits.UI,context->Optional.empty(),(delay,work)->()->{},root.resolve("ssh"));
             host.start(RemotePluginTest.INFO,Set.of(),Set.of(),plugin);
-            var window=host.addTerminalWindow();
-            Kits.edt(()->host.openPanel(SftpUi.PANEL,window));
-            var sidebar=SftpTestAccess.panel(plugin.sftp(),window);
+            host.addTerminalWindow();
+            Kits.edt(()->host.openPanel(SftpUi.PANEL));
+            var sidebar=SftpTestAccess.panel(plugin.sftp());
             // Without an SSH agent or Vault here, each host's connection attempt fails its own way.
             var first=RemoteHost.create("<html>first","first.invalid",22,"user",new Auth.Vault(UUID.randomUUID()),"",Optional.empty());
             var second=RemoteHost.create("second","second.invalid",22,"user",Auth.AGENT,"",Optional.empty());

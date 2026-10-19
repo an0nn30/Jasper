@@ -232,7 +232,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     public void selectSession(UUID host) throws InterruptedException {
         onEdt(() -> {
             try {
-                if (((Map<?, ?>) field(plugin, "panels")).get(vault.window) == null) throw new AssertionError("no Sessions panel");
+                if (field(plugin, "sessionsPanel") == null) throw new AssertionError("no Sessions panel");
                 var dispatch = KitView.class.getDeclaredMethod("dispatch", dev.jasper.ui.model.UiEvent.class);
                 dispatch.setAccessible(true);
                 dispatch.invoke(view, new dev.jasper.ui.model.UiEvent.Selected("sessions.rows", Set.of("host:" + host)));
@@ -261,7 +261,7 @@ public final class PanelSurfaceFixture implements AutoCloseable {
         onEdt(() -> {
             try {
                 Object tunnelsUi = field(plugin, "tunnelsUi");
-                Object panel = ((Map<?, ?>) field(tunnelsUi, "panels")).get(vault.window);
+                Object panel = field(tunnelsUi, "panel");
                 Object store = field(tunnelsUi, "store");
                 var tunnels = (List<?>) store.getClass().getMethod("tunnels").invoke(store);
                 Object stopped = loader.loadClass("dev.jasper.remote.tunnels.TunnelState").getField("STOPPED").get(null);
@@ -291,8 +291,8 @@ public final class PanelSurfaceFixture implements AutoCloseable {
     /** The live SFTP explorer of the fixture window. */
     private Object sftpPanel() throws ReflectiveOperationException {
         Object sftpUi = field(plugin, "sftpUi");
-        var panel = sftpUi.getClass().getDeclaredMethod("panel", UUID.class); panel.setAccessible(true);
-        return panel.invoke(sftpUi, vault.window);
+        var panel = sftpUi.getClass().getDeclaredMethod("panel"); panel.setAccessible(true);
+        return panel.invoke(sftpUi);
     }
 
     /** Calls one public method of the window's live SFTP explorer, as its controller does. */

@@ -76,21 +76,24 @@ public interface ContractHarness extends AutoCloseable {
      */
     List<String> panels();
 
-    /** UI thread: invokes the panel's factory as a window showing it would; null when there is no such panel or the factory failed. */
-    javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId);
+    /**
+     * UI thread: invokes the panel's factory as the main window showing it would, or returns the panel built there;
+     * null when no main window is open, there is no such panel or the factory failed.
+     */
+    javax.swing.JComponent openPanel(String panelId);
 
     /**
-     * UI thread: the header metadata an open panel instance published through {@code PanelHost.setHeader}, as
-     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or no
-     * instance is open.
+     * UI thread: the header metadata the open panel published through {@code PanelHost.setHeader}, as
+     * {@code detail|active|label;label} with {@code -} for no actions; {@code |false|-} when it published none or the
+     * panel is not open.
      */
-    String panelHeader(String panelId, java.util.UUID windowId);
+    String panelHeader(String panelId);
 
-    /** UI thread: activates the labelled header action of an open panel instance as its header would; false when there is none. */
-    boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label);
+    /** UI thread: activates the labelled header action of the open panel as its header would; false when there is none. */
+    boolean runPanelHeaderAction(String panelId, String label);
 
-    /** UI thread: discards an open panel instance as its window would when the window or registration goes away. */
-    void closePanel(String panelId, java.util.UUID windowId);
+    /** UI thread: discards the open panel as the main window would when it closes or the registration goes away. */
+    void closePanel(String panelId);
     /**
      * UI thread: the theme slot the host paints a kit view of this runtime from, {@code CHROME} or {@code WORKSPACE}. A view
      * mounted as a workspace content tab ({@code Windows.openTab}) takes {@code WORKSPACE}, as terminals and editors do;

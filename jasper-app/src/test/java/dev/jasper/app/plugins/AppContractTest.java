@@ -303,38 +303,43 @@ class AppContractTest extends PluginContractTest {
                         + (panel.defaultSlot().split() ? "+split" : "")
                         + (panel.namedToggle() ? "|" + panel.toggleActionId() : "")).toList());
             }
-            /** Open instances' sites and the header metadata each last published, keyed by panel id and window, as a window keeps them. */
+            /** Open panels' sites, components and the header metadata each last published, keyed by panel id, as the main window keeps them. */
             final java.util.Map<String, dev.jasper.app.contributions.PanelSite> sites = new java.util.HashMap<>();
+            final java.util.Map<String, javax.swing.JComponent> components = new java.util.HashMap<>();
             final java.util.Map<String, dev.jasper.app.contributions.PanelHeaderState> headers = new java.util.HashMap<>();
-            @Override public javax.swing.JComponent openPanel(String panelId, java.util.UUID windowId) {
-                String key = panelId + "|" + windowId;
-                return onEdtValue(() -> contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
-                    .map(panel -> {
-                        var site = new dev.jasper.app.contributions.PanelSite(windowId, () -> { }, () -> { }, () -> true, header -> headers.put(key, header));
-                        var built = panel.factory().apply(site);
-                        if (built != null) sites.put(key, site);
-                        return built;
-                    })
-                    .orElse(null));
-            }
-            @Override public String panelHeader(String panelId, java.util.UUID windowId) {
+            @Override public javax.swing.JComponent openPanel(String panelId) {
                 return onEdtValue(() -> {
-                    var header = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
+                    UUID window = main[0];
+                    if (window == null) return null;
+                    if (components.containsKey(panelId)) return components.get(panelId);
+                    return contributions.panels().stream().filter(panel -> panel.id().equals(panelId)).findFirst()
+                        .map(panel -> {
+                            var site = new dev.jasper.app.contributions.PanelSite(window, () -> { }, () -> { }, () -> true, header -> headers.put(panelId, header));
+                            var built = panel.factory().apply(site);
+                            if (built != null) { sites.put(panelId, site); components.put(panelId, built); }
+                            return built;
+                        })
+                        .orElse(null);
+                });
+            }
+            @Override public String panelHeader(String panelId) {
+                return onEdtValue(() -> {
+                    var header = headers.getOrDefault(panelId, dev.jasper.app.contributions.PanelHeaderState.EMPTY);
                     var labels = header.actions().stream().map(dev.jasper.app.contributions.PanelHeaderState.Action::label).toList();
                     return header.detail() + "|" + header.active() + "|" + (labels.isEmpty() ? "-" : String.join(";", labels));
                 });
             }
-            @Override public boolean runPanelHeaderAction(String panelId, java.util.UUID windowId, String label) {
+            @Override public boolean runPanelHeaderAction(String panelId, String label) {
                 return onEdtValue(() -> {
-                    var action = headers.getOrDefault(panelId + "|" + windowId, dev.jasper.app.contributions.PanelHeaderState.EMPTY)
+                    var action = headers.getOrDefault(panelId, dev.jasper.app.contributions.PanelHeaderState.EMPTY)
                         .actions().stream().filter(a -> a.label().equals(label)).findFirst();
                     action.ifPresent(a -> a.invoke().run());
                     return action.isPresent();
                 });
             }
             @Override public String viewRoute(dev.jasper.sdk.ui.UiView view) { return ((HostedKitView) view).component().route().name(); }
-            @Override public void closePanel(String panelId, java.util.UUID windowId) {
-                onEdt(() -> { var site = sites.remove(panelId + "|" + windowId); if (site != null) site.notifyClosed(); });
+            @Override public void closePanel(String panelId) {
+                onEdt(() -> { components.remove(panelId); var site = sites.remove(panelId); if (site != null) site.notifyClosed(); });
             }
             /** Each toolbar view's instance per window, built once as a window builds it when it opens; empty when it failed. */
             final java.util.Map<dev.jasper.app.contributions.ToolbarEntry.View, java.util.Map<UUID, Optional<dev.jasper.app.contributions.ToolbarEntry.Mounted>>> toolbarViews =
