@@ -113,7 +113,8 @@ final class WorkspaceActions {
                 boolean enabled = !owner.closed() && (contentEnabled || switch (id) {
                     case OPEN_SETTINGS -> owner.configurationConnected();
                     case RELOAD_CONFIG -> owner.configurationConnected();
-                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, TOGGLE_ZEN_MODE, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    case COMMAND_PALETTE, NEW_TAB, NEW_WINDOW, OPEN_FILE, QUIT, SPLIT_RIGHT, SPLIT_DOWN -> true;
+                    case TOGGLE_ZEN_MODE -> owner.isMain();
                     case PASTE -> running;
                     case COPY -> ready && pane.view().hasSelection();
                     case CLEAR_TERMINAL -> ready && !pane.session().usingAlternateBuffer();

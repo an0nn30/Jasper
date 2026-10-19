@@ -70,7 +70,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
     private Subscription host;
     private Runnable bringToFront = () -> {};
+    /** Until workspace plan 4a Task 4: a child window, or one that starts empty, hosts detached content. */
     private final boolean detached;
+    /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
+    private final WindowRole role;
     /** The window's tabs as groups in splits, each group under the look's strip (workspace tabs spec 10). */
     private final WorkspaceView workspace;
     /** The configured tab motion, which strips made later take too. */
@@ -238,20 +241,45 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     }
 
     /**
-     * A {@code detached} window starts with no tab and holds detached content; any other starts one tab in
-     * {@code directory}, where null means where a new shell starts. {@code newWindow} receives null the same way.
+     * An {@code empty} window starts with no tab; any other starts one tab in {@code directory}, where null means where a
+     * new shell starts. {@code newWindow} receives null the same way.
      */
-    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs) {
-        this(launcher, directory, detached, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
+        this(launcher, directory, empty, newWindow, quit, onEmpty, themes, bindings, history, macOs, WorkspaceChrome.STANDARD);
     }
 
-    /** As above, under the look's workspace chrome (Enterprise presentation spec 9.1). */
-    WindowContent(ShellLauncher launcher, Path directory, boolean detached, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
+    /** As above, as the main window, under the look's workspace chrome (Enterprise presentation spec 9.1). */
+    WindowContent(ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newWindow, Runnable quit, Runnable onEmpty,
                   ThemeController themes, KeyBindings bindings, CommandHistory history, boolean macOs, WorkspaceChrome look) {
+        this(WindowRole.MAIN, launcher, directory, empty, newWindow, quit, onEmpty, themes, bindings, history, macOs, look);
+    }
+
+    /**
+     * A window's content in {@code role} (workspace tabs spec 6): the main window's shows Jasper's chrome around its
+     * workspace; a child window's shows its workspace alone, with the same actions, menus, keymap and palette, and docks
+     * no tool window.
+     *
+     * @param role the main window or a child window
+     * @param launcher starts the window's shells
+     * @param directory where the first tab starts, or null for where a new shell starts
+     * @param empty whether the window starts without a tab
+     * @param newWindow opens a window with a terminal tab in a directory, or where a new shell starts when it is null
+     * @param quit quits Jasper
+     * @param onEmpty runs when the window's last tab has closed or moved out
+     * @param themes the application's look
+     * @param bindings the keymap until a configuration arrives
+     * @param history the shared command history
+     * @param macOs whether the keymap and shortcut text are macOS's
+     * @param look the workspace's chrome under the look
+     */
+    public WindowContent(WindowRole role, ShellLauncher launcher, Path directory, boolean empty, Consumer<Path> newWindow,
+                         Runnable quit, Runnable onEmpty, ThemeController themes, KeyBindings bindings, CommandHistory history,
+                         boolean macOs, WorkspaceChrome look) {
         super(new BorderLayout());
+        this.role = Objects.requireNonNull(role, "role");
         this.look = Objects.requireNonNull(look, "look");
-        this.detached = detached;
+        this.detached = empty || role == WindowRole.CHILD;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
             @Override public Component getDefaultComponent(Container root) {
@@ -302,14 +330,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         area.releaseDragSource = dockDrag::uninstall;
         // A dock change moves the window's minimum size; read the hook when it fires, as the frame sets it later.
         area.onMinimumSizeChanged = () -> onMinimumSizeChanged.run();
-        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
+        // A child window shows its workspace alone, in the centre surface that paints the main window's glass, with no dock,
+        // stripes or chrome around it; its chrome serves its menus and actions and is never shown (spec 6.3).
+        if (role == WindowRole.MAIN) { add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH); }
+        else add(area, BorderLayout.CENTER);
         themeRegistration = themes.subscribe(this::applyTheme);
         focusManager.addPropertyChangeListener("permanentFocusOwner", focusOwners);
         host = registry.addHost(workspaceHost());
-        if (!detached) {
+        if (!empty) {
             try { newTab(directory); }
             catch (RuntimeException | Error failure) {
-                // The focus manager outlives a window that failed to build.
+                // The theme controller and the focus manager outlive a window that failed to build.
+                try { themeRegistration.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
                 focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
                 throw failure;
             }
@@ -751,6 +783,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     String paletteShortcut() {
         return CommandsScope.shortcutText(action(ActionId.COMMAND_PALETTE).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    /** {@code id}'s shortcut as this platform writes it, from the live keymap; "" while it has none. */
+    String shortcutText(ActionId id) {
+        return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
+    }
     String tabShortcut(int index) {
         if (index < 0 || index >= 9) return "";
         ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
@@ -831,13 +867,20 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** Stable identity of this window for extensions; never a Swing object. */
     public UUID id() { return id; }
 
+    /** @return whether this is the main window or a child window (workspace tabs spec 6) */
+    public WindowRole role() { return role; }
+
+    /** @return whether this is the main window, which has Jasper's chrome and dock and whose workspace may be empty */
+    public boolean isMain() { return role == WindowRole.MAIN; }
+
     /** Connects with layout state that lives only as long as this window. */
     /** Connects this window to the application-wide terminal registry, once. {@code toFront} raises the native window. */
     public void connectTerminals(TerminalRegistry registry, Runnable toFront) {
         if (closed || terminals != null) return;
         bringToFront = toFront;
         terminals = new WindowTerminals(this, Objects.requireNonNull(registry), Objects.requireNonNull(toFront));
-        chrome.windowOpened();
+        // A child window has no toolbar, so it builds no toolbar views (workspace tabs spec 6.3).
+        if (role == WindowRole.MAIN) chrome.windowOpened();
     }
 
     /** This window's terminal tabs in workspace order. */
@@ -872,7 +915,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         uiState = Objects.requireNonNull(state);
         railVisible = state.railVisible();
         // Restore before contributions can build or show saved panels.
-        setZenMode(state.zenMode());
+        if (role == WindowRole.MAIN) setZenMode(state.zenMode());
         contributed = new WindowContributions(this, Objects.requireNonNull(model), state);
         if (hostsContent) {
             // The window joins the application's registry, taking the tabs it already holds along (workspace plan 3a Rulings 3).
@@ -1055,8 +1098,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * predict this rule for the layout after the drop.
      */
     void syncRailVisibility() {
-        boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
-        boolean bottom = stripes.bottom().map(strip -> railsEnabled() && !strip.empty()).orElse(false);
+        // A child window has no stripes: its workspace fills the centre surface edge to edge (workspace tabs spec 6.3).
+        boolean rails = isMain() && railsEnabled();
+        boolean left = rails && !leftStripe.empty(), right = rails && !rightStripe.empty();
+        boolean bottom = stripes.bottom().map(strip -> rails && !strip.empty()).orElse(false);
         area.setStripesVisible(left, right);
         boolean bottomChanged = stripes.bottom().map(strip -> strip.isVisible() != bottom).orElse(false);
         if (leftStripe.isVisible() != left || rightStripe.isVisible() != right || bottomChanged) {

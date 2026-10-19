@@ -138,16 +138,19 @@ final class WindowCommands implements AutoCloseable {
             owner.workspace().model().maximized().isPresent() ? "Restore Group" : "Maximize Group");
         view("view.status_bar").putValue(Command.TITLE, owner.status().isVisible() ? "Hide Status Bar" : "Show Status Bar");
         view("view.status_bar").putValue(Action.SELECTED_KEY, owner.status().isVisible());
-        view("view.status_bar").setEnabled(!zen);
+        // A child window has no toolbar, status bar, rail or Zen of its own (workspace tabs spec 6.3).
+        boolean main = owner.isMain();
+        view("view.status_bar").setEnabled(main && !zen);
         view("view.rail").putValue(Command.TITLE, !zen && owner.railVisible() ? "Hide Rail" : "Show Rail");
         view("view.rail").putValue(Action.SELECTED_KEY, !zen && owner.railVisible());
-        view("view.rail").setEnabled(!zen);
+        view("view.rail").setEnabled(main && !zen);
         boolean buddy = owner.buddyEnabled.getAsBoolean();
         view("view.buddy").putValue(Command.TITLE, buddy ? "Hide Jasper" : "Show Jasper");
         view("view.buddy").putValue(Action.SELECTED_KEY, buddy);
         for (var mode : ToolbarMode.values()) {
             var action = view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT));
             action.putValue(Action.SELECTED_KEY, owner.toolbarMode() == mode);
+            action.setEnabled(main);
         }
         syncSchemes();
         for (var scheme : schemes) {

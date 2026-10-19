@@ -45,6 +45,10 @@ final class WorkspaceView extends JPanel {
     private final Set<TabId> moved = new HashSet<>();
     private Layout layout = Layout.empty();
     private Object shape;
+    /** The shape of the main window's empty workspace, which shows {@link #empty} (workspace tabs spec 10). */
+    private static final Object EMPTY = new Object();
+    /** The main window's empty state, made the first time its workspace is empty. */
+    private EmptyWorkspace empty;
     private boolean glass, closed;
 
     WorkspaceView(WindowContent owner) {
@@ -174,18 +178,29 @@ final class WorkspaceView extends JPanel {
         for (Group group : layout.groups())
             groups.get(group.id()).display(group.tabs().stream().map(tabs::get).toList(), group.selected().map(tabs::get).orElse(null));
         Node shown = layout.maximized().<Node>map(id -> layout.group(id).orElseThrow()).orElse(layout.root());
-        Object next = shape(shown);
+        // The main window's empty workspace shows New Terminal Tab and Open File in place of its empty group (spec 10).
+        boolean showEmpty = layout.isEmpty() && owner.isMain();
+        Object next = showEmpty ? EMPTY : shape(shown);
         if (!next.equals(shape)) {
             shape = next;
             splits.clear();
             removeAll();
-            add(build(shown, List.of()), BorderLayout.CENTER);
+            add(showEmpty ? emptyState() : build(shown, List.of()), BorderLayout.CENTER);
             revalidate();
         } else {
             for (var entry : splits.entrySet()) entry.getValue().setWeights(weightsAt(entry.getKey()));
         }
         repaint();
     }
+
+    private EmptyWorkspace emptyState() {
+        if (empty == null) empty = new EmptyWorkspace(owner);
+        empty.refresh();
+        return empty;
+    }
+
+    /** The main window's empty state while it shows; null otherwise. */
+    EmptyWorkspace emptyWorkspace() { return shape == EMPTY ? empty : null; }
 
     /** The tree's shape without its weights: what a rebuild depends on. */
     private static Object shape(Node node) {
@@ -222,7 +237,11 @@ final class WorkspaceView extends JPanel {
     }
 
     /** Refreshes every group's strip: its tabs, titles, selection and activity. */
-    void refresh() { if (!closed) for (GroupView group : groups.values()) group.refresh(); }
+    void refresh() {
+        if (closed) return;
+        for (GroupView group : groups.values()) group.refresh();
+        if (empty != null) empty.refresh();
+    }
 
     /** Takes the theme: backgrounds, the strips' zone, and the delegates of a group the maximize keeps out of the tree. */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {

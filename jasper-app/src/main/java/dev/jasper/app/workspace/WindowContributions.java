@@ -64,6 +64,8 @@ final class WindowContributions implements AutoCloseable {
     /** In Zen, the panels that showed before it, which show again when it ends and stay saved as showing; else null. */
     private Set<String> beforeZen;
     private Subscription panelRequests;
+    /** Whether this window docks panels and shows status entries: the main window does, a child window does not. */
+    private final boolean docks;
 
     WindowContributions(WindowContent owner, Contributions model, UiState state) {
         this.owner = owner;
@@ -72,26 +74,33 @@ final class WindowContributions implements AutoCloseable {
         this.dock = owner.dock();
         // A window restored in Zen remembers its saved panels for leaving it instead of showing them.
         if (owner.zenMode()) beforeZen = new LinkedHashSet<>();
+        // A child window takes the actions, the menus and the palette scopes; panels and status entries are the main
+        // window's (workspace tabs spec 6.3).
+        docks = owner.isMain();
         syncActions();
         owner.chrome().connect(this);
-        renderStatus();
-        restoreSizes();
-        for (DockStripe stripe : owner.stripes().all()) {
-            stripe.onToggle = this::togglePanel;
-            stripe.onMove = this::movePanel;
-            stripe.onHide = this::hidePanel;
+        if (docks) {
+            renderStatus();
+            restoreSizes();
+            for (DockStripe stripe : owner.stripes().all()) {
+                stripe.onToggle = this::togglePanel;
+                stripe.onMove = this::movePanel;
+                stripe.onHide = this::hidePanel;
+            }
+            owner.area().onMove = this::movePanel;
+            owner.area().onHide = this::hidePanel;
+            owner.dockDrag().onDrop = this::dropped;
+            owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
+            owner.dockDrag().labels = this::stripeLabel;
+            dock.addListener(docked);
+            panelRequests = model.onPanelRequest(this::requested);
         }
-        owner.area().onMove = this::movePanel;
-        owner.area().onHide = this::hidePanel;
-        owner.dockDrag().onDrop = this::dropped;
-        owner.dockDrag().icons = id -> panels.containsKey(id) ? panels.get(id).entry.icon() : null;
-        owner.dockDrag().labels = this::stripeLabel;
-        dock.addListener(docked);
-        panelRequests = model.onPanelRequest(this::requested);
         paletteRequests = model.onPaletteRequest(this::requestedPalette);
         syncScopes();
-        syncPanels();
-        renderStripes();
+        if (docks) {
+            syncPanels();
+            renderStripes();
+        }
         listening = model.onChanged(this::changed);
     }
 
@@ -395,6 +404,8 @@ final class WindowContributions implements AutoCloseable {
     }
 
     private void changed(Contributions.Kind kind) {
+        if (!docks && (kind == Contributions.Kind.PANELS || kind == Contributions.Kind.RAIL || kind == Contributions.Kind.BADGES
+            || kind == Contributions.Kind.STATUS)) return;
         switch (kind) {
             case ACTIONS -> {
                 boolean structural = syncActions();
@@ -402,6 +413,7 @@ final class WindowContributions implements AutoCloseable {
                 // Titles label toolbar buttons, and a vanished or disabled action changes every placement of it.
                 owner.chrome().renderContributedToolbar();
                 owner.chrome().renderContributedMenus();
+                if (!docks) return;
                 renderStatus();
                 // Which actions the stripe shows changes only when one is added or removed, which rebuilds it. A title or
                 // enabled change renames and repaints the buttons it has, so that it does not end a drag.
@@ -462,7 +474,7 @@ final class WindowContributions implements AutoCloseable {
      */
     void close(boolean remember) {
         if (listening == null) return;
-        if (remember) persist();
+        if (remember && docks) persist();
         listening.close();
         listening = null;
         // Snapshot before teardown: the last window closed wins; disposal must not save panels as hidden.

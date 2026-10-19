@@ -82,6 +82,17 @@ public final class DesktopTestSupport {
         OWNERS.add(owner);
         return owner;
     }
+    /**
+     * A window in {@code role} with this host's keymap: its first tab starts in {@code directory} (null: where a new shell
+     * starts) unless it is {@code empty}, and {@code emptied} runs when its last tab has closed or moved out.
+     */
+    public static WindowContent content(ShellLauncher launcher, WindowRole role, Path directory, boolean empty, Runnable emptied) {
+        boolean macOs = System.getProperty("os.name").startsWith("Mac");
+        WindowContent owner = new WindowContent(role, launcher, directory, empty, path -> {}, () -> {}, emptied, ThemeTestSupport.controller(true),
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD);
+        OWNERS.add(owner);
+        return owner;
+    }
     /** Closes the test windows now, on the EDT: before a test closes the theme controller its windows are bound to. */
     public static void closeOwnersNow() { OWNERS.forEach(WindowContent::close); OWNERS.clear(); }
     /** Closes {@code owner} with the other test windows. */
