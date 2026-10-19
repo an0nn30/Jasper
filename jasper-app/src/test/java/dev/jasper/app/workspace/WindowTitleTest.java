@@ -54,7 +54,7 @@ class WindowTitleTest {
             DesktopTestSupport.edt(() -> {
                 var chrome = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.UNIFIED,
                     WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false,
-                    WorkspaceLook.FrameStyle.STANDARD), WORKSTATION);
+                    WorkspaceLook.FrameStyle.STANDARD, WorkspaceLook.Icons.NEW_UI), WORKSTATION);
                 var owner = WindowShellTest.window(true, chrome);
                 var titles = new ArrayList<String>();
                 WindowContent.mount(new JRootPane(), owner, new WindowLook(chrome, false, true), titles::add);
@@ -73,7 +73,7 @@ class WindowTitleTest {
             DesktopTestSupport.edt(() -> {
                 var chrome = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.UNIFIED,
                     WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false,
-                    WorkspaceLook.FrameStyle.STANDARD), WORKSTATION);
+                    WorkspaceLook.FrameStyle.STANDARD, WorkspaceLook.Icons.NEW_UI), WORKSTATION);
                 var owner = WindowShellTest.window(true, chrome);
                 var titles = new ArrayList<String>();
                 WindowContent.mount(new JRootPane(), owner, new WindowLook(chrome, false, true), titles::add);

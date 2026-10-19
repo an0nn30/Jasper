@@ -38,6 +38,7 @@ class KitParserTest {
         palette = "run_window"
         dialogs = "classic"
         motion = "none"
+        icons = "classic"
 
         [controls]
         toggle = "checkbox"
@@ -155,7 +156,8 @@ class KitParserTest {
         var parsed = parse(FULL);
         assertThat(parsed.chrome()).isEqualTo(new ChromeSpec(ChromeSpec.TitleBar.NATIVE, ChromeSpec.MenuBar.WINDOW,
             "Workstation — {session} — {directory}", ChromeSpec.ToolWindows.STRIPES, ChromeSpec.EditorTabs.CLASSIC,
-            ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE));
+            ChromeSpec.StatusBar.CELLS, ChromeSpec.PaletteKind.RUN_WINDOW, ChromeSpec.DialogKind.CLASSIC, ChromeSpec.MotionKind.NONE,
+            ChromeSpec.Icons.CLASSIC));
         assertThat(parsed.kit().controls()).isEqualTo(new ControlVariants(ControlVariants.Toggle.CHECKBOX, ControlVariants.Exclusive.RADIOS,
             ControlVariants.Tabs.FOLDER, ControlVariants.Group.TITLED_BOX, ControlVariants.FormLabel.COLON, ControlVariants.Empty.TEXT,
             ControlVariants.Table.CLASSIC, ControlVariants.Tree.CLASSIC, ControlVariants.Stepper.SPINNER, ControlVariants.OrderedList.SIDE_COLUMN,
@@ -319,5 +321,15 @@ class KitParserTest {
             try { KitParser.parse(input, context(fonts(), Map.of("look", Optional.of(look())))); }
             catch (KitParser.Invalid expected) { assertThat(expected.getMessage()).isNotBlank(); }
         }
+    }
+
+    /** Plan 12: [chrome] icons, by base and both values. */
+    @Test void theIconsPointDefaultsByBaseAndTakesBothValues() throws Exception {
+        assertThat(parse("kit = 1\nbase = \"default\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.NEW_UI);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
+        assertThat(parse("kit = 1\nbase = \"default\"\n[chrome]\nicons = \"classic\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.CLASSIC);
+        assertThat(parse("kit = 1\nbase = \"classic\"\n[chrome]\nicons = \"new_ui\"\n").chrome().icons()).isEqualTo(ChromeSpec.Icons.NEW_UI);
+        assertThat(problem("kit = 1\nbase = \"default\"\n[chrome]\nicons = \"retro\"\n"))
+            .isEqualTo("[chrome].icons: \"retro\" is not one of new_ui, classic");
     }
 }

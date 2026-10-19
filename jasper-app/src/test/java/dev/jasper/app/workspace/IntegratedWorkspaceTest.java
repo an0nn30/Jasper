@@ -63,7 +63,7 @@ class IntegratedWorkspaceTest {
                 assertThat(owner[0].leftStripe().buttons()).extracting(AbstractButton::isSelected).containsExactly(true, true);
                 // The rail and status bar are visible chrome receivers around the docked panels.
                 assertThat(owner[0].leftStripe().isVisible()).isTrue();
-                assertThat(owner[0].status().getClientProperty("Jasper.chromeArtwork")).isEqualTo(Boolean.TRUE);
+                assertThat(owner[0].status().getClientProperty("Jasper.chromeArtwork")).isEqualTo(dev.jasper.ui.icons.ChromeArtwork.NEW_UI);
             });
             edt(() -> {
                 var hide = hostButton(owner[0].area(), "Hide", "SFTP");

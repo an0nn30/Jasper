@@ -16,7 +16,8 @@ class ProjectionsTest {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(classic.desktop()).isEqualTo(new DesktopFlags(false, true));
         assertThat(classic.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH));
+            WorkspaceLook.Stripes.LABELLED, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.FLUSH,
+            WorkspaceLook.Icons.CLASSIC));
         assertThat(classic.shell()).isEqualTo(new ShellLook(false, true, true));
         assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
         assertThat(classic.settings()).isEqualTo(new SettingsChrome(false, true, false,
@@ -33,7 +34,8 @@ class ProjectionsTest {
         var mac = Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC);
         assertThat(mac.desktop()).isEqualTo(DesktopFlags.STANDARD);
         assertThat(mac.workspace()).isEqualTo(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED,
-            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD));
+            WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI));
         assertThat(mac.shell()).isEqualTo(new ShellLook(true, false, false));
         assertThat(mac.settings()).isEqualTo(new SettingsChrome(true, false, true, Set.of("window.native_decorations"), false));
         assertThat(mac.dialogs()).isEqualTo(new DialogMapping(DialogMapping.Kind.AS_REQUESTED, false));
@@ -70,7 +72,7 @@ class ProjectionsTest {
         for (var dialogs : ChromeSpec.DialogKind.values()) for (var motion : ChromeSpec.MotionKind.values())
         for (String template : new String[] {"{context}", "Workstation — {session} — {directory}"}) {
             if (menu == ChromeSpec.MenuBar.WINDOW && title != ChromeSpec.TitleBar.NATIVE) continue;
-            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion);
+            var chrome = new ChromeSpec(title, menu, template, tools, tabs, status, palette, dialogs, motion, ChromeSpec.Icons.NEW_UI);
             for (var host : new Projections.Host[] {MAC, LINUX})
                 assertThatCode(() -> Projections.of(chrome, true, true, "p", host)).doesNotThrowAnyException();
             built++;
@@ -117,7 +119,7 @@ class ProjectionsTest {
     @Test void labelledStripesHideThePanelRailWidth() {
         var d = ChromeSpec.DEFAULT;
         var stripes = new ChromeSpec(d.titleBar(), d.menuBar(), d.windowTitle(), ChromeSpec.ToolWindows.STRIPES, d.editorTabs(),
-            d.statusBar(), d.palette(), d.dialogs(), d.motion());
+            d.statusBar(), d.palette(), d.dialogs(), d.motion(), d.icons());
         for (var host : new Projections.Host[] {MAC, LINUX}) {
             assertThat(Projections.of(stripes, false, false, "p", host).settings().hiddenKeys()).contains("window.rail_width");
             assertThat(Projections.of(d, false, false, "", host).settings().hiddenKeys()).doesNotContain("window.rail_width");
@@ -155,5 +157,13 @@ class ProjectionsTest {
         var classic = Projections.of(ChromeSpec.CLASSIC, true, true, "dev.jasper.enterprise", MAC);
         assertThat(classic.palette()).isEqualTo(new PaletteLook(PaletteLook.View.RUN_WINDOW, PaletteLook.Home.CORNER));
         assertThat(Projections.of(ChromeSpec.DEFAULT, false, false, "", MAC).palette()).isEqualTo(PaletteLook.DEFAULT);
+    }
+
+    /** Plan 12 Rulings 6: the kit's [chrome] icons is the workspace look's icons; the default look and the fallback keep New UI. */
+    @Test void theIconsPointIsTheWorkspaceLooksIcons() {
+        assertThat(Projections.of(ChromeSpec.CLASSIC, true, false, "p", MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.CLASSIC);
+        assertThat(Projections.standard(MAC).workspace().icons()).isEqualTo(WorkspaceLook.Icons.NEW_UI);
+        for (var committed : new DesktopFlags[] {DesktopFlags.STANDARD, new DesktopFlags(false, true)})
+            assertThat(Projections.fallback(committed, MAC).workspace().icons()).as("%s", committed).isEqualTo(WorkspaceLook.Icons.NEW_UI);
     }
 }

@@ -59,7 +59,8 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
             chrome.editorTabs() == ChromeSpec.EditorTabs.CLASSIC ? WorkspaceLook.Tabs.CLASSIC : WorkspaceLook.Tabs.EQUAL,
             chrome.statusBar() == ChromeSpec.StatusBar.CELLS ? WorkspaceLook.Status.RULED : WorkspaceLook.Status.SLASH,
             chrome.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
-            stripes ? WorkspaceLook.FrameStyle.FLUSH : WorkspaceLook.FrameStyle.STANDARD);
+            stripes ? WorkspaceLook.FrameStyle.FLUSH : WorkspaceLook.FrameStyle.STANDARD,
+            chrome.icons() == ChromeSpec.Icons.CLASSIC ? WorkspaceLook.Icons.CLASSIC : WorkspaceLook.Icons.NEW_UI);
         var shell = new ShellLook(chrome.titleBar() == ChromeSpec.TitleBar.UNIFIED && host.unifiedTitleSupported(), windowMenus, nativeTitle);
         var palette = new PaletteLook(runWindow ? PaletteLook.View.RUN_WINDOW : PaletteLook.View.CARD,
             runWindow ? PaletteLook.Home.CORNER : PaletteLook.Home.TITLE_FIELD);
@@ -100,7 +101,7 @@ public record Projections(DesktopFlags desktop, WorkspaceLook workspace, ShellLo
         Set<String> hidden = nativeTitle || host.mac() ? Set.of("window.native_decorations") : Set.of();
         return new Projections(committed,
             new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL,
-                WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD),
+                WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD, WorkspaceLook.Icons.NEW_UI),
             new ShellLook(!nativeTitle && host.unifiedTitleSupported(), !committed.screenMenuBar(), nativeTitle),
             new PaletteLook(PaletteLook.View.CARD, PaletteLook.Home.TITLE_FIELD),
             new SettingsChrome(!nativeTitle, false, true, hidden, false), Composition.ROWS,

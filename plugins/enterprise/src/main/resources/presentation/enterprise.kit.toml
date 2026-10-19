@@ -11,6 +11,7 @@ status_bar = "cells"
 palette = "run_window"
 dialogs = "classic"
 motion = "none"
+icons = "classic"
 
 [controls]
 toggle = "checkbox"

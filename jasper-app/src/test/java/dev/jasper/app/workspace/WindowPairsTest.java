@@ -48,7 +48,8 @@ import org.junit.jupiter.api.Test;
  */
 class WindowPairsTest {
     static final WorkspaceChrome CLASSIC = WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.CLASSIC, WorkspaceLook.Header.CLASSIC,
-        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"));
+        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.CLASSIC, WorkspaceLook.Status.RULED, true, WorkspaceLook.FrameStyle.STANDARD,
+        WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"));
 
     @AfterEach void closeWindows() throws Exception { DesktopTestSupport.closeOwners(); }
 

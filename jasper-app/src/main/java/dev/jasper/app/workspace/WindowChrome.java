@@ -71,6 +71,7 @@ final class WindowChrome {
             new ActionEvent(owner, ActionEvent.ACTION_PERFORMED, "titleSearch")),
             owner::paletteShortcut, composition);
         header = new WindowHeader(search, toolbar, composition);
+        dev.jasper.app.platform.AppIcons.chromeReceiver(header, owner.look().chromeArtwork());
         // With a native title the toolbar row is chrome, not a title-bar zone (spec 10.1).
         if (composition.titleBarZone()) dev.jasper.app.platform.ThemeZone.titleBar(header);
         header.setOpaque(true);

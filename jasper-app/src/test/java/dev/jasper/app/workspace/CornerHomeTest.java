@@ -28,7 +28,8 @@ class CornerHomeTest {
     /** The default look's workspace chrome (5a's default WorkspaceLook) carrying {@code look}'s palette. */
     static WorkspaceChrome chrome(PaletteLook look) {
         return WorkspaceChrome.of(new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED, WorkspaceLook.Stripes.RAILS,
-            WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD), new TitleFormat("{context}"), look);
+            WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+            WorkspaceLook.Icons.NEW_UI), new TitleFormat("{context}"), look);
     }
 
     /** A window under {@link #chrome(PaletteLook)}, through plan 6a's constructor. */
