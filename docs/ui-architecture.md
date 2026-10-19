@@ -252,6 +252,9 @@ depicts (add, new window, split, expand, chevron down, folder, server, bell, loc
 original desktop artwork (`assets-chrome.tsv`); descriptor, panel, tile and plugin-registered contexts never receive it.
 A receiver marked `ChromeArtwork.CLASSIC` (a look's `[chrome] icons = "classic"`) draws IntelliJ's classic icons
 (`assets-classic.tsv`) for add, split, zoom, settings, new window and search, and the New UI originals for the rest.
+`IconRegistry.stripeIcon` gives a labelled stripe IntelliJ's classic 13 px tool-window icons (the `toolwindows/` rows
+of `assets-classic.tsv`) for network, folder, tunnel, download, server and bell; it is a table of its own, so the
+classic chrome set is unchanged.
 
 Manager and notification capabilities (Plan 2 Task 6c): item-list rows can carry their own context menu (offered on
 any row, never selecting it; the menu key and Shift+F10 open the focused row's menu); Space on a row whose trailing slot

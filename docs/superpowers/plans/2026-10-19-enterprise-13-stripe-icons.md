@@ -1,5 +1,7 @@
 # Enterprise presentation 13: stripe icons Implementation Plan
 
+> **Status (2026-10-19): executed on `claude/enterprise-stripe-icons` (`eca2feca8..2606d5633`, then the documentation commit).** Deviations from this plan's text: Task 7 also re-wraps spec 16.1 item 4, whose line the added test names pushed past 120 columns; Task 7 Step 3's "322 files each" is 161 files per theme, 322 in all.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** On 2026-10-19, after trying plan 12, the user asked: "Now I want the sidebar strip to have icons like the classic intelliJ does for plugins and whatnot too you can use those classic IntelliJ icons we vendored in." This plan makes every Enterprise stripe button (both side stripes and the bottom strip) draw its tool window's or rail action's icon the way IntelliJ's classic `StripeButton` does. Under Enterprise those icons are IntelliJ's classic 13 px tool-window icons (the user's "Set A").

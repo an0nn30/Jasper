@@ -1,5 +1,59 @@
 # Jasper — Status and Handoff
 
+**Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
+Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying
+plan 12 the user asked: "Now I want the sidebar strip to have icons like the classic intelliJ does for plugins and
+whatnot too you can use those classic IntelliJ icons we vendored in." Every labelled stripe button (both side stripes
+and the bottom strip) now starts, in reading order, with its tool window's or rail action's icon, as IntelliJ's classic
+`StripeButton`: 13 px (`STRIPE_ICON`), upright, centred across, `STRIPE_LABEL_PADDING` from the label's start, then a
+4 px gap (`STRIPE_ICON_GAP`) and the text, the same in every state. Under `[chrome] icons = "classic"` (Enterprise) the
+icon is the user's Set A, the classic counterpart of the panel's declared icon: `network` draws `webToolWindow`,
+`folder` `toolWindowProject`, `tunnel` `toolWindowModuleDependencies`, `download` `toolWindowAnalyzeDataflow`, `server`
+`toolWindowServer` and `bell` `notifications`; any other name, a plugin's own path included (the Sample's flask), draws
+its monochrome glyph in the label's ink. Under `new_ui` the window's ordinary icon is drawn at 13 px, and a window
+without an icon reads text only. A dragged label keeps its icon and its length, and the drag's ghost is that stripe
+icon. jasper-ui vendors 12 more unmodified SVGs (those six, light and dark) from JetBrains/intellij-community at
+`8062c061ff33`, hash-checked rows under `classic/toolwindows/` in `assets-classic.tsv` (26 rows), behind a stripe-only
+lazy table (`IconRegistry.stripeIcon`); every file keeps its JetBrains copyright comment except `toolWindowServer.svg`
+and `toolWindowServer_dark.svg`, which upstream ships without one (stated in `BuiltInArtworkTest`, `icons/SOURCE.md`
+and `ATTRIBUTION.txt`). The stripe numbers and Event Log's count pill stay; no SDK, plugin or Enterprise version
+changes. Rulings (plan, "Rulings"): (1) one plan of seven tasks; (2) the 12 files are appended to `assets-classic.tsv`
+under `classic/toolwindows/` and fetched by the existing script; (3) `toolWindowServer` keeps no comment, the one stated
+exception; (4) a separate lazy stripe table reached only through `IconRegistry.stripeIcon`, empty for a name without a
+file, the classic chrome set unchanged; (5) keyed by icon name, so a third-party panel naming one of the six gets that
+file; (6) the resolver is `AppIcons.stripeIcon` in `dev.jasper.app.platform`; (7) the fallback glyph's ink is the
+label's own painted ink, with no new `PaintPair`; (8) an identity name without stripe art draws its authored catalog
+art; (9) any other sized `Icon` is drawn as given, centred and scaled down into the box; (10) labelled stripes under
+`new_ui` draw what the rails draw, at 13 px; (11) the metrics `STRIPE_ICON` 13 and `STRIPE_ICON_GAP` 4, equal in both
+catalogs, are read only by `StripeLabels`; (12) a side stripe is the larger of its line and `STRIPE_ICON`, plus its two
+edges and its rule, thick, icons or not (still 23 under IBM Plex); (13) the icon box starts `STRIPE_LABEL_PADDING` from
+the reading start and is centred with integer division (4 across a side stripe, 5 down the bottom strip), without
+IntelliJ's 1.1 stretch; (14) the same untinted icon in every state; (15) rail actions lead with their icon too
+(`Command.ICON`, else `command`); (16) `DockStripe.beginDrag` receives the panel's icon and the ghost is
+`StripeSet.ghost(icon)`, the rails' unchanged; (17) the mock checks compare the cut render, below; (18) spec 9.1, 12.1
+and 12.2 are unchanged; (19) the label ink, the stripe surface and the default look's rails, ghost and drag are
+unchanged. The execution rulings R1 to R17 are in the plan's "Execution notes". Deviations from the Enterprise mocks, at
+the user's 2026-10-19 direction: the stripes' labels carry icons, so each is 17 px longer than the mocks'; `DockMockTest`
+renders the shipped icons, asserts each label's icon slice (the icon and its gap, 17 px, 34 at 2x) as its icon, and
+compares the mocks with the slices cut out, which is pixel-identical to the text-only label, so every run expectation,
+tolerance and floor and the `FONTS` lines equal plan 12's. **For the user to confirm:** this cut is a change of method
+relative to the approved design ("update honestly to the iconed stripes"), beside the 17 px longer labels. The nine
+gated stripe pairs (`dock-{light,dark,vault}-{left-stripe,right-stripe,bottom-strip}`) read `-text-render.png`, with a
+note, and nine ungated `-iconed` pairs show the real iconed `-render.png` beside the mock crop widened by the slices,
+for `compare_all.py`; no other pair's crop or floor changed. Deviations from the plan's text: Task 7 also re-wraps spec 16.1 item 4,
+whose line the added test names pushed past 120 columns; the plan's "322 files each" for the gallery is 161 per theme,
+322 in all, as earlier entries count them. `./gradlew check --continue`: **11,502 tests, 0 failures, 0 errors, 25
+skipped**; `check_pairs.py` passes 101 of 101 gated pairs, the 25 dock pairs' output equal to plan 12's; the headless
+gallery is byte-identical to `2c065f8cd`'s (Slate Cobalt Dark and Light, 322 files) and so are the 11 default-look
+jasper-app renders (`ChromeRenderTest`'s default, complement and fallback chrome, palette and settings images,
+`DefaultDockPixelsTest`'s `default-dark` and `default-light`). GUI checks for the user: under Enterprise Light and Dark,
+each stripe label's icon against the user's screenshot of IntelliJ's Classic UI stripe: Sessions' globe, SFTP's folder,
+Tunnels' chain link, File Servers' server rack, Event Log's bell, Transfers' arrows, and the Sample panel's flask and
+"About Sample" in the label's colour; closed, hovered and open labels; switching Light and Dark with the stripes
+showing; dragging a label within a stripe, to the other stripe and between a side stripe and the bottom strip (the
+label keeps its icon, the gap fits it, the ghost is the icon); Event Log's count pill after its bell; a short window
+cutting off labels; the About page's IntelliJ icons entry; the default look's rails unchanged. Not merged, not pushed.
+
 **Enterprise presentation, plan 12: IntelliJ classic at the user's direction — 2026-10-18**
 (`claude/enterprise-intellij-classic`, worktree `.claude/worktrees/enterprise-12`, from `main` at `faeec76f3`;
 [plan](superpowers/plans/2026-10-18-enterprise-12-intellij-classic.md),

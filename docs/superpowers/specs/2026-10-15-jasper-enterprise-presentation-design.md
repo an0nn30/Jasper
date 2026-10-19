@@ -18,6 +18,7 @@ Amended on 2026-10-18 by the series' final alignment pass, recording rulings app
 7.6, 9.2, 10.6, 10.11, 11.1, 11.2, 11.5 and 14.8.
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
 Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
+Amended on 2026-10-19 at the user's direction after trying plan 12 (plan 13): 5.2, 10.7, 16.1 and 19.1 (every labelled stripe button starts with its tool window's icon, IntelliJ's classic tool-window icons under Enterprise, over the mocks' text-only labels).
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -607,7 +608,7 @@ header honours the existing `window.toolbar` setting (10.3).
 | `palette` | `anchored` | `run_window` | The Run window and the leading "▶ Run…" status item (section 11) |
 | `dialogs` | `as_requested` | `classic` | OVERLAY and ATTACHED_SHEET dialogs are drawn in their window as classic dialogs (10.8) |
 | `motion` | `standard` | `none` | No motion, whatever `ui.animations.enabled` says (10.9) |
-| `icons` | `new_ui` | `classic` | The workspace chrome's icons: IntelliJ's classic icons in the header and status bar (10.3) |
+| `icons` | `new_ui` | `classic` | The workspace chrome's icons: IntelliJ's classic icons in the header and status bar (10.3) and on the labelled stripes (10.7) |
 
 | `[controls]` key | Default | Enterprise | What the Enterprise value does |
 |---|---|---|---|
@@ -1276,17 +1277,27 @@ leading accent item "▶ Run…" bound to COMMAND_PALETTE; while the Run window 
 
 ### 10.7 Dock
 
-- **Stripes.** `StripeSet` has `IconRails` (today's `ToolStripe`) and `LabelledStripes`: rotated text labels on
+- **Stripes.** `StripeSet` has `IconRails` (today's `ToolStripe`) and `LabelledStripes`: rotated labels on
   `surface.stripe`, an open panel's label on `surface.control.selected`. A label starts with "N: " when the panel's
-  toggle action is bound to a single digit with modifiers (⌘⌥1 on macOS, Alt+1 elsewhere), read from the live keymap,
-  so today's bindings give "1: Sessions", "2: SFTP" and "3: Transfers". The stripe is as thick as its label's line and
-  the rail's two edges, with its 1 px rule (the mocks' 22 + 1 under IBM Plex), the label centred across it;
-  `window.rail_width` does not apply to it. Left-stripe labels read bottom to top, right-stripe labels top to bottom.
-  The top group stands at the stripe's top and the second group (LEFT_BOTTOM, RIGHT_BOTTOM) at its bottom end, as
-  IntelliJ's.
-- **Bottom strip.** `LabelledStripes` adds a horizontal strip for the BOTTOM_LEFT and BOTTOM_RIGHT slots, with count
-  pills for badges that carry a number. It is 24 px plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop
-  resolution gain horizontal group rectangles, as `Rectangle` math; the six slots are unchanged.
+  toggle action is bound to a single digit with modifiers (⌘⌥1 on macOS, Alt+1 elsewhere), read from the live keymap, so
+  today's bindings give "1: Sessions", "2: SFTP" and "3: Transfers". The stripe is as thick as its label's line (at
+  least `STRIPE_ICON`, 13) and the rail's two edges, with its 1 px rule (the mocks' 22 + 1 under IBM Plex), the label
+  centred across it; `window.rail_width` does not apply to it. Left-stripe labels read bottom to top, right-stripe
+  labels top to bottom. Each label starts, in reading order, with its window's or rail action's icon (the user,
+  2026-10-19, over the mocks' text-only labels), as IntelliJ's classic `StripeButton`: 13 px (`STRIPE_ICON`), upright,
+  centred across, `STRIPE_LABEL_PADDING` from the label's start, then a 4 px gap (`STRIPE_ICON_GAP`) and the text, so
+  the label grows by 17. It sits at the label's bottom end on the left stripe, its top end on the right and its left end
+  on the bottom strip, and is the same in every state. Under `[chrome] icons = "classic"` the names `network`, `folder`,
+  `tunnel`, `download`, `server` and `bell` draw IntelliJ's classic tool-window icons as authored (`webToolWindow`,
+  `toolWindowProject`, `toolWindowModuleDependencies`, `toolWindowAnalyzeDataflow`, `toolWindowServer`,
+  `notifications`), and any other name, a plugin's own path included, draws its monochrome glyph in the label's ink.
+  Under `new_ui` the window's ordinary icon is drawn at 13 px. A window without an icon reads text only. A dragged label
+  keeps its icon and length, and the drag's ghost is that icon. The top group stands at the stripe's top and the second
+  group (LEFT_BOTTOM, RIGHT_BOTTOM) at its bottom end, as IntelliJ's.
+- **Bottom strip.** `LabelledStripes` adds a horizontal strip for the BOTTOM_LEFT and BOTTOM_RIGHT slots,
+  its labels led by their icons (centred down the strip), with count pills for badges that carry a number. It is 24 px
+  plus its 1 px rule, as the mocks draw it. `DockDrag` and the drop resolution gain horizontal group rectangles, as
+  `Rectangle` math; the six slots are unchanged.
 - **Frames.** `FrameStyle`: arc 0, gutter 0, a painted `DOCK_RULE` with a `DOCK_RULE_HIT` drag area, a header strip of
   `tool_window_header` height on `surface.header` (`surface.header.active` while focused), the hide glyph "−". A frame
   is also the focused one after any mouse press inside it (its content, blank space, its header strip, a control that
@@ -1729,11 +1740,11 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
    combination (native title, window menus, default kit), and over a checked-in strength-2 array of `ChromeSpec` values
    across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons` is held at `classic` in every
-   row and covered by `ChromeArtworkTest` and `ZoneIconsTest`) honouring the `menu_bar`/`title_bar`
-   constraint, asserting painted pairs and structure (a flush header, no gutter, the stripe labels) and writing images
-   under `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json` stay opt-in tools. Each of
-   plans 5 to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the preserved mocks; the
-   comparison stays opt-in.
+   row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and `StripeIconsTest`) honouring the
+   `menu_bar`/`title_bar` constraint, asserting painted pairs and structure (a flush header, no gutter, the stripe
+   labels) and writing images under `build/` for inspection. The opt-in `JavaExec` tasks and `tools/visual/pairs.json`
+   stay opt-in tools. Each of plans 5 to 10 adds `tools/visual/pairs.json` crops pairing its Enterprise renders with the
+   preserved mocks; the comparison stays opt-in.
 5. **The shipped kit.** `EnterpriseKitRenderTest` (jasper-app tests) parses the real `enterprise.kit.toml` with the
    production `KitParser`, registers the real Plex fonts from `plugins/enterprise/src/main/resources`, and renders with
    the jasper-ui test fixtures. `EnterpriseFixtureTest` checks that the parsed kit's metrics, type scale, variants and
@@ -1837,9 +1848,9 @@ the product name anywhere but the splash; a new packaged application icon.
 
 ### 19.1 Plans
 
-Twelve plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
+Thirteen plans, each a runnable deliverable leaving `./gradlew check` green, written with `superpowers:writing-plans`
 and named `docs/superpowers/plans/YYYY-MM-DD-enterprise-N-<slug>.md` (the date each is written). Each adds its
-`migration.csv` rows. Order: 1 to 12 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
+`migration.csv` rows. Order: 1 to 13 in sequence; plan 10 needs 3, 4 and 5; plan 11 needs 5 and 6.
 
 Plan 3 is delivered as five plans (the user, 2026-10-15): 3a `sdk-0-18-renames` (8.1, 8.3, 8.5, the 4.2 constant and
 `KitCompatibility`); 3b `sdk-0-18-controls` (Notice, Properties, `ChoiceKind.TABS`, `Field.readOnly`,
@@ -1864,6 +1875,7 @@ its additions in the default look and adds them to the testkit fake and the cont
 | 10 | `plugin-compositions` | `Workstation` consumption; Remote's toolbar view, Sessions tree and Properties, Tunnels table, SFTP row, Transfers panel and anchors; File Server's table, Properties and keys table; Vault's classic manager, editors and Unlock form (14.8); the confinement check; `CompositionParityTest` |
 | 11 | `branding` | `[branding]` and its validation, the `Branding` projection, the Enterprise icons and splash art, the runtime application icon and `Splash` with its start-up steps (10.11); a render of the splash compared with the Boot Splash frames |
 | 12 | `intellij-classic` | The user's 2026-10-18 direction: IntelliJ's classic icons (vendored, attributed) under `[chrome] icons`, the classic header's icon buttons and `window.toolbar` as a look default, SDK 0.18.1's icon-only GHOST toolbar buttons with `run` and `application`, Remote's run-configuration combo and Run, the Enterprise theme as ports of IntelliJ Light and New UI Dark, a pressed tool window activated, the Run window's upper home |
+| 13 | `stripe-icons` | The user's 2026-10-19 direction: every labelled stripe button starts with its tool window's 13 px icon, upright at the reading start, IntelliJ's classic tool-window icons (vendored, attributed) under `[chrome] icons = "classic"`, the label's monochrome glyph for any other name, drag and the ghost keeping it |
 
 ### 19.2 Amendments
 
