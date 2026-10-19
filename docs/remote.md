@@ -2,7 +2,7 @@
 
 Remote is bundled with Jasper. Press **Cmd+Shift+H** (Ctrl+Shift+H elsewhere) or type `>ssh` in the
 command palette to pick a saved host; Enter connects in a new tab, Cmd/Ctrl+Enter connects in a
-split beside the current pane, Shift+Enter edits the host. The **Sessions** panel shows searchable
+new tab group beside the current one, Shift+Enter edits the host. The **Sessions** panel shows searchable
 compact tree-style rows grouped by folder, favorites first, with slightly larger text.
 Choose **Session › Toggle SSH hosts** or press **Cmd+Alt+1** (Alt+1 elsewhere) to show or hide
 the panel in the current window. Opening the sidebar highlights the first visible host and focuses

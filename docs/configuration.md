@@ -876,9 +876,8 @@ Settings → Appearance → Animations controls motion throughout the app, unles
 turning it off and clicking Apply finishes running transitions immediately in open windows. Future app animations
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
-Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): first reveal takes 490 ms,
-subsequent opening 475 ms and closing 425 ms. Selection and hiding the last remaining tab
-bar are immediate. A single workspace tab has no visible tab bar.
+Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): opening takes 475 ms and
+closing 425 ms. Selection is immediate. A tab group's strip shows even with a single tab.
 
 The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
 fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;
