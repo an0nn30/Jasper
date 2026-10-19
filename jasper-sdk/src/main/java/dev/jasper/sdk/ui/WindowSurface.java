@@ -18,7 +18,7 @@ public interface WindowSurface extends Subscription {
     /** Shows the surface; overlays return immediately. For a modal dialog this returns after the dialog has closed. */
     void show();
 
-    /** Brings the window to the front, restoring it if minimized; overlays focus their content. */
+    /** Brings the dialog to the front, restoring it if minimized; overlays focus their content. */
     void toFront();
 
     /**
@@ -29,7 +29,7 @@ public interface WindowSurface extends Subscription {
     void setTitle(String title);
 
     /**
-     * Opens a native chooser for one existing file, owned by this dialog.
+     * Opens a native chooser for one existing file, owned by this dialog, or by an overlay's window.
      * Blocks on the UI thread while the platform pumps events. If the owner closes during
      * selection, the result is discarded. This does not read the selected file.
      *
@@ -51,7 +51,7 @@ public interface WindowSurface extends Subscription {
     Subscription onClosing(BooleanSupplier guard);
 
     /**
-     * Runs the handler once, after the window has closed for any reason.
+     * Runs the handler once, after the dialog or overlay has closed for any reason.
      *
      * @param handler cleanup
      * @return the registration
