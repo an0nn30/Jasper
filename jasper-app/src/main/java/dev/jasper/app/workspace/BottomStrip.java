@@ -5,6 +5,7 @@ import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.theme.GeneratedTheme;
@@ -58,9 +59,10 @@ final class BottomStrip extends DockStripe {
     private Rectangle gap;
     private List<Integer> dividers = List.of();
 
-    BottomStrip(Kit kit) {
+    /** A strip over {@code kit}, its labels' icons in the look's {@code artwork}. */
+    BottomStrip(Kit kit, ChromeArtwork artwork) {
         super(null);
-        this.labels = new StripeLabels(kit);
+        this.labels = new StripeLabels(kit, artwork);
         setOpaque(true);
         getAccessibleContext().setAccessibleName("Bottom tool windows");
         render(List.of(), List.of());
@@ -75,7 +77,7 @@ final class BottomStrip extends DockStripe {
         for (Slot slot : SLOTS) groups.put(slot, new ArrayList<>());
         for (ToolStripe.Button window : toolWindows) {
             if (window.slot().side() != Side.BOTTOM) continue;
-            var label = new StripeLabels.Label(window, this::paintLabel);
+            var label = new StripeLabels.Label(window, null, this::paintLabel);
             label.setSelected(window.selected());
             label.addActionListener(event -> onToggle.accept(window.id()));
             label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
@@ -121,7 +123,7 @@ final class BottomStrip extends DockStripe {
         dragging = true;
         lifted = id;
         StripeLabels.Label own = byId.get(id);
-        liftedLength = own != null ? labels.length(own.text(), own.badge()) : labels.length(label, Optional.empty());
+        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), null);
         gapSlot = null;
         doLayout();
         repaint();
@@ -178,7 +180,7 @@ final class BottomStrip extends DockStripe {
         var items = new ArrayList<Item>();
         for (int i = 0; i <= shown.size(); i++) {
             if (gapHere && i == gapAt) items.add(new Item(null, liftedLength, true));
-            if (i < shown.size()) items.add(new Item(shown.get(i), labels.length(shown.get(i).text(), shown.get(i).badge()), false));
+            if (i < shown.size()) items.add(new Item(shown.get(i), labels.length(shown.get(i).text(), shown.get(i).badge(), shown.get(i).icon), false));
         }
         boolean liftedHere = dragging && groups.get(slot).stream().anyMatch(label -> label.id().equals(lifted));
         if (dragging && !gapHere && (shown.isEmpty() || liftedHere)) items.add(new Item(null, liftedLength, false));
@@ -245,7 +247,7 @@ final class BottomStrip extends DockStripe {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
-            labels.paint(g, label.text(), label.badge(), label.getHeight(), false, theme, open, hover);
+            labels.paint(g, label.text(), label.badge(), false, label.getHeight(), false, theme, open, hover);
         } finally { g.dispose(); }
     }
 }

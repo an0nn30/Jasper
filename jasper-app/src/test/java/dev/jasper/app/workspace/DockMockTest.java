@@ -8,6 +8,7 @@ import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
 import dev.jasper.app.testsupport.MockProfile;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.swing.ChromePainter;
 import dev.jasper.ui.theme.PaintPair;
 import dev.jasper.ui.theme.SurfaceContrast;
@@ -99,7 +100,7 @@ class DockMockTest {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit());
+                var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
                 stripe.render(List.of(LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 1),
                     LabelledStripeTest.window("servers", "File Servers", Slot.LEFT_BOTTOM, 2)), List.of());
                 int thickness = stripe.getPreferredSize().width;
@@ -116,7 +117,7 @@ class DockMockTest {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var stripe = new LabelledStripe(Side.RIGHT, EnterpriseLook.kit());
+                var stripe = new LabelledStripe(Side.RIGHT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
                 stripe.render(List.of(LabelledStripeTest.window("sessions", "Sessions", Slot.RIGHT_TOP, 0),
                     LabelledStripeTest.window("tunnels", "Tunnels", Slot.RIGHT_BOTTOM, 0)), List.of());
                 int thickness = stripe.getPreferredSize().width;
@@ -135,8 +136,8 @@ class DockMockTest {
      * this tall (166 and 138, the mocks' crops 332 and 276 tall at 2x) and the mocks' labels compare in place.
      */
     static int fitted(String top, String second) {
-        var labels = new StripeLabels(EnterpriseLook.kit());
-        return 2 * rail() + labels.length(top, java.util.Optional.empty()) + labels.length(second, java.util.Optional.empty());
+        var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+        return 2 * rail() + labels.length(top, java.util.Optional.empty(), null) + labels.length(second, java.util.Optional.empty(), null);
     }
 
     private static int rail() {
@@ -223,7 +224,7 @@ class DockMockTest {
         for (Variant variant : VARIANTS) {
             try {
                 EnterpriseLook.install(variant.dark());
-                var strip = new BottomStrip(EnterpriseLook.kit());
+                var strip = new BottomStrip(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
                 var problems = new ToolStripe.Button("problems", "Problems", null, Slot.BOTTOM_LEFT, false,
                     java.util.Optional.of(new dev.jasper.app.contributions.PanelBadge(1, dev.jasper.app.contributions.PanelBadge.Tone.ERROR, "1 problem")),
                     java.util.OptionalInt.empty());
@@ -231,7 +232,7 @@ class DockMockTest {
                     new ToolStripe.Button("transfers", "Transfers", null, Slot.BOTTOM_LEFT, false), problems), List.of());
                 int thickness = strip.getPreferredSize().height;
                 assertThat(thickness).as(where(variant) + ": the mocks' 24 and the rule").isEqualTo(25);
-                int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit()).getPreferredSize().width - 23);
+                int shift = 2 * (new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC).getPreferredSize().width - 23);
                 var render = variant.seen(MockCrops.render(strip, 330, thickness, 2));
                 // The whole strip, its 2 px rule at 2x and its fill, against the mock's (rule at 1706, fill from 1708).
                 MockCrops.write(variant.name() + "-bottom-strip", MockCrops.crop(render, shift, 0, 520, 50), variant.crop(2, 1706, 520, 50));

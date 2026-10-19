@@ -8,6 +8,7 @@ import dev.jasper.app.dock.DockState;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.metrics.DesignMetrics;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -65,7 +66,7 @@ class DockDragBottomStripTest {
     /** a and b on the left stripe's top group, c and e in Bottom Left (or c in Left Bottom, or none), d on the right stripe. */
     private final class Window {
         final DockState state = new DockState();
-        final StripeSet.LabelledStripes stripes = new StripeSet.LabelledStripes(EnterpriseLook.kit());
+        final StripeSet.LabelledStripes stripes = new StripeSet.LabelledStripes(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
         final ToolWindowArea area = new ToolWindowArea(new JPanel(), state, EnterpriseLook.kit(), true);
         final JPanel content = new JPanel(new BorderLayout());
         final JRootPane rootPane = new JRootPane();

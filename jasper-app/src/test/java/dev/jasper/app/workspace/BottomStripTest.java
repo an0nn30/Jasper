@@ -11,6 +11,7 @@ import dev.jasper.app.persistence.UiState;
 import dev.jasper.app.testsupport.EdtTestExtension;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.swing.ChromePainter;
 import java.awt.Color;
 import java.awt.Rectangle;
@@ -29,14 +30,14 @@ class BottomStripTest {
         try {
             EnterpriseLook.install(false);
             var kit = EnterpriseLook.kit();
-            var strip = new BottomStrip(kit);
+            var strip = new BottomStrip(kit, ChromeArtwork.CLASSIC);
             strip.render(List.of(LabelledStripeTest.window("log", "Event Log", Slot.BOTTOM_LEFT, 0),
                 LabelledStripeTest.window("transfers", "Transfers", Slot.BOTTOM_LEFT, 3),
                 LabelledStripeTest.window("terminal", "Terminal", Slot.BOTTOM_RIGHT, 0),
                 LabelledStripeTest.window("sftp", "SFTP", Slot.LEFT_TOP, 2)), List.of());
             int thickness = strip.getPreferredSize().height;
             assertThat(thickness).as("the mocks' 24 and the rule (Rulings 4 as ruled)").isEqualTo(25);
-            int fill = new LabelledStripe(Side.LEFT, kit).getPreferredSize().width - 1;
+            int fill = new LabelledStripe(Side.LEFT, kit, ChromeArtwork.CLASSIC).getPreferredSize().width - 1;
             var image = MockCrops.render(strip, 900, thickness, 1);
             assertThat(strip.buttons()).extracting(AbstractButton::getToolTipText).containsExactly("Event Log", "3: Transfers", "Terminal");
             Rectangle log = strip.buttons().get(0).getBounds(), transfers = strip.buttons().get(1).getBounds(), terminal = strip.buttons().get(2).getBounds();
@@ -67,14 +68,14 @@ class BottomStripTest {
     @Test void theLabelledSetShowsTheBottomSlotsOnTheStrip() throws Exception {
         try {
             EnterpriseLook.install(false);
-            var set = new StripeSet.LabelledStripes(EnterpriseLook.kit());
+            var set = new StripeSet.LabelledStripes(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
             assertThat(set.of(Slot.LEFT_BOTTOM)).isSameAs(set.left());
             assertThat(set.of(Slot.RIGHT_TOP)).isSameAs(set.right());
             assertThat(set.of(Slot.BOTTOM_LEFT)).isSameAs(set.bottomStrip());
             assertThat(set.of(Slot.BOTTOM_RIGHT)).isSameAs(set.bottomStrip());
             assertThat(set.all()).containsExactly(set.left(), set.right(), set.bottomStrip());
-            assertThat(new DockChrome(true, true).stripes(EnterpriseLook.kit())).isInstanceOf(StripeSet.LabelledStripes.class);
-            assertThat(DockChrome.STANDARD.stripes(EnterpriseLook.kit())).isInstanceOf(StripeSet.IconRails.class);
+            assertThat(new DockChrome(true, true).stripes(EnterpriseLook.kit(), ChromeArtwork.CLASSIC)).isInstanceOf(StripeSet.LabelledStripes.class);
+            assertThat(DockChrome.STANDARD.stripes(EnterpriseLook.kit(), ChromeArtwork.CLASSIC)).isInstanceOf(StripeSet.IconRails.class);
         } finally { EnterpriseLook.restoreDefault(); }
     }
 

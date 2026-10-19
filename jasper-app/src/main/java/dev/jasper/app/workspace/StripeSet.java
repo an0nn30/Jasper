@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
+import dev.jasper.ui.icons.ChromeArtwork;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -54,8 +55,10 @@ sealed interface StripeSet permits StripeSet.IconRails, StripeSet.LabelledStripe
      * @param bottomStrip the bottom strip
      */
     record LabelledStripes(LabelledStripe left, LabelledStripe right, BottomStrip bottomStrip) implements StripeSet {
-        /** Three new stripes over the window's kit. */
-        LabelledStripes(dev.jasper.ui.kit.Kit kit) { this(new LabelledStripe(Side.LEFT, kit), new LabelledStripe(Side.RIGHT, kit), new BottomStrip(kit)); }
+        /** Three new stripes over the window's kit, their labels' icons in the look's {@code artwork}. */
+        LabelledStripes(dev.jasper.ui.kit.Kit kit, ChromeArtwork artwork) {
+            this(new LabelledStripe(Side.LEFT, kit, artwork), new LabelledStripe(Side.RIGHT, kit, artwork), new BottomStrip(kit, artwork));
+        }
 
         @Override public Optional<DockStripe> bottom() { return Optional.of(bottomStrip); }
 

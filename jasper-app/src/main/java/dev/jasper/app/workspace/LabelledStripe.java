@@ -5,6 +5,7 @@ import dev.jasper.app.dock.DockDropResolver;
 import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.ThemeZone;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
 import dev.jasper.ui.theme.GeneratedTheme;
@@ -13,6 +14,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -31,9 +33,11 @@ import javax.swing.Action;
  * then on the left the plugins' rail actions, and the second group's at the stripe's bottom end, in order, its last label
  * {@code RAIL_GAP} above it, as IntelliJ's bottom group (the user's direction of 2026-10-18); a 1 px rule along the edge
  * toward the workspace.
- * The stripe is as thick as a label's line and its two rail edges, the text's capitals centred across it;
- * {@code window.rail_width} does not apply (the user's direction of 2026-10-18). A badge ends its label with a count
- * pill. A click toggles the window and a right-click opens its {@link ToolWindowMenu}.
+ * The stripe is as thick as a label's line (or its icon, where that is larger) and its two rail edges, the text's
+ * capitals centred across it; {@code window.rail_width} does not apply (the user's direction of 2026-10-18). Each label
+ * starts, in reading order, with its window's or action's 13 px icon, upright, then a 4 px gap (the user's direction of
+ * 2026-10-19, as IntelliJ's classic StripeButton). A badge ends its label with a count pill. A click toggles the window
+ * and a right-click opens its {@link ToolWindowMenu}.
  * During a dock drag both groups show (an empty group as the dragged label's drop space), the dragged label is lifted
  * out and its length stays at the end of its group, and a gap as long as it opens where it would drop. On a stripe too
  * short for everything the rail actions follow the second group, and labels past the stripe's end are cut off by it.
@@ -63,11 +67,12 @@ final class LabelledStripe extends DockStripe {
     private int gapIndex;
     private Rectangle gap;
 
-    LabelledStripe(Side side, Kit kit) {
+    /** A stripe on {@code side} over {@code kit}, its labels' icons in the look's {@code artwork}. */
+    LabelledStripe(Side side, Kit kit, ChromeArtwork artwork) {
         super(null);
         if (side == Side.BOTTOM) throw new IllegalArgumentException("A labelled stripe stands on the left or the right");
         this.side = side;
-        this.labels = new StripeLabels(kit);
+        this.labels = new StripeLabels(kit, artwork);
         setOpaque(true);
         getAccessibleContext().setAccessibleName(side == Side.LEFT ? "Left tool windows" : "Right tool windows");
         render(List.of(), List.of());
@@ -83,7 +88,7 @@ final class LabelledStripe extends DockStripe {
         for (Slot.Group group : GROUPS) groups.put(group, new ArrayList<>());
         for (ToolStripe.Button window : toolWindows) {
             if (window.slot().side() != side) continue;
-            var label = new StripeLabels.Label(window, this::paintLabel);
+            var label = new StripeLabels.Label(window, labels.icon(window.icon()), this::paintLabel);
             label.setSelected(window.selected());
             label.addActionListener(event -> onToggle.accept(window.id()));
             label.setComponentPopupMenu(ToolWindowMenu.create(window.slot(), window.selected(),
@@ -94,7 +99,7 @@ final class LabelledStripe extends DockStripe {
             dragSource.accept(label, window.id());
         }
         for (Action action : contributed) {
-            var label = new StripeLabels.Label(action, this::paintLabel);
+            var label = new StripeLabels.Label(action, labels.icon(ToolStripe.actionIcon(action)), this::paintLabel);
             describe(label);
             actions.add(label);
         }
@@ -151,7 +156,7 @@ final class LabelledStripe extends DockStripe {
         dragging = true;
         lifted = id;
         StripeLabels.Label own = byId.get(id);
-        liftedLength = own != null ? labels.length(own.text(), own.badge()) : labels.length(label, Optional.empty());
+        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), null);
         gapGroup = null;
         doLayout();
         repaint();
@@ -214,7 +219,7 @@ final class LabelledStripe extends DockStripe {
         int between = styles.metric(DesignMetrics.Role.STRIPE_LABEL_GAP);
         int y = column(Slot.Group.TOP, edge, x, across, between, withGap, placement);
         int actionsLength = actions.isEmpty() ? 0 : styles.metric(DesignMetrics.Role.RAIL_SECTION_GAP);
-        for (StripeLabels.Label action : actions) actionsLength += labels.length(action.text(), Optional.empty()) + between;
+        for (StripeLabels.Label action : actions) actionsLength += labels.length(action.text(), Optional.empty(), action.icon) + between;
         // The second group's extent, its gap or drop space included, from a dry run of its column.
         int extent = column(Slot.Group.SECOND, 0, x, across, between, withGap, new Placement());
         int start = Math.max(y, getHeight() - edge - Math.max(0, extent - between));
@@ -233,7 +238,7 @@ final class LabelledStripe extends DockStripe {
         if (actions.isEmpty()) return y;
         y += labels.styles().metric(DesignMetrics.Role.RAIL_SECTION_GAP);
         for (StripeLabels.Label action : actions) {
-            int length = labels.length(action.text(), Optional.empty());
+            int length = labels.length(action.text(), Optional.empty(), action.icon);
             placement.bounds.put(action, new Rectangle(x, y, across, length));
             y += length + between;
         }
@@ -263,7 +268,7 @@ final class LabelledStripe extends DockStripe {
             }
             if (i == shown.size()) break;
             var label = shown.get(i);
-            var at = new Rectangle(x, y, across, labels.length(label.text(), label.badge()));
+            var at = new Rectangle(x, y, across, labels.length(label.text(), label.badge(), label.icon));
             placement.bounds.put(label, at);
             rects.add(at);
             y += at.height + between;
@@ -285,7 +290,10 @@ final class LabelledStripe extends DockStripe {
         graphics.fillRect(side == Side.LEFT ? getWidth() - rule : 0, 0, rule, getHeight());
     }
 
-    /** A label's tile, then its text and pill turned to read bottom to top (left) or top to bottom (right). */
+    /**
+     * A label's tile, its icon upright at its reading start, then its text and pill turned to read bottom to top (left)
+     * or top to bottom (right).
+     */
     private void paintLabel(StripeLabels.Label label, Graphics graphics) {
         var g = (Graphics2D) graphics.create();
         try {
@@ -297,9 +305,13 @@ final class LabelledStripe extends DockStripe {
                 g.setColor(tile);
                 g.fillRect(0, 0, label.getWidth(), label.getHeight());
             }
+            if (label.icon != null) {
+                Point at = labels.iconAt(side, label.getWidth(), label.getHeight());
+                label.icon.paintIcon(label, g, at.x, at.y);
+            }
             if (side == Side.LEFT) { g.translate(0, label.getHeight()); g.rotate(-Math.PI / 2); }
             else { g.translate(label.getWidth(), 0); g.rotate(Math.PI / 2); }
-            labels.paint(g, label.text(), label.badge(), label.getWidth(), true, theme, open, hover);
+            labels.paint(g, label.text(), label.badge(), label.icon != null, label.getWidth(), true, theme, open, hover);
         } finally { g.dispose(); }
     }
 }

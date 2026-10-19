@@ -7,6 +7,7 @@ import dev.jasper.app.dock.Side;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.platform.AppIcons;
 import dev.jasper.app.testsupport.MockCrops;
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.icons.IconRegistry;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.model.ControlState;
@@ -82,7 +83,7 @@ final class DockFixture implements AutoCloseable {
         this.panels = panels(connected);
         this.binding = new ThemeBinding(new ThemePair(theme, theme), failure -> { throw new AssertionError(failure); });
         var context = KitContext.of(kit, binding, ThemeRoute.CHROME, icons, () -> false, action -> "");
-        stripes = new StripeSet.LabelledStripes(kit);
+        stripes = new StripeSet.LabelledStripes(kit, ChromeArtwork.CLASSIC);
         var terminal = new JPanel();
         terminal.setBackground(theme.semantic().color(SemanticColor.SURFACE_TERMINAL));
         area = new ToolWindowArea(terminal, state, kit, true);
