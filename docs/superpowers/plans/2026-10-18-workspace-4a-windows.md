@@ -29,13 +29,13 @@ tab, the SDK's window rows) follows it. Plans [1](2026-10-17-workspace-1-single-
 [3b](2026-10-18-workspace-3b-sdk-tabs.md) execute first, in that order.
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch `claude/workspace-tabs`,
-after plan 3b's last commit (the branch is `main` at `11e40192c` plus this series). Run every command from the worktree
-root. Every anchor below was taken from, and every edit script of Tasks 1-7 replayed on, a copy of `22b702456` with the
-edit scripts and created files of plans 1, 2, 3a and 3b applied in order (3b as committed in `17830fac6`); nothing was
-compiled or run. Every edit quotes the text it replaces, and the scripts stop with a message when that text is not found
-the stated number of times: re-find the quoted text (a plan before this one may have reworded it), adjust the anchor,
-re-run, and record it in this plan's banner; never edit around a missing anchor. Later tasks anchor on text earlier
-tasks of this plan wrote, and quote it as those tasks leave it.
+after plan 3b's last commit `55e6de176` (the branch is `main` at `4ed94fb78` plus this series). Run every command from
+the worktree root. Every anchor below was taken from, and every edit script of Tasks 1-7 replayed on, a `git archive`
+copy of `55e6de176`; line numbers are from it; nothing was compiled or run. Every edit quotes the text it replaces, and
+the scripts stop with a message when that text is not found the stated number of times: re-find the quoted text (a plan
+before this one may have reworded it), adjust the anchor, re-run, and record it in this plan's banner; never edit
+around a missing anchor. Later tasks anchor on text earlier tasks of this plan wrote, and quote it as those tasks leave
+it.
 
 ## Spec issues
 
@@ -58,7 +58,8 @@ child window has no menu bar) is Rulings 7. Section 6.6's Errors tab and section
   `move(boolean)`, and `WorkspaceHost`'s `detached` go outright with their tests' uses. Saved bindings for `new_window`
   become unknown keys (spec 11). No shim, no migration, no "was removed" text.
 - The SDK keeps its shape: no file under `jasper-sdk` or `jasper-sdk-testkit` changes except for the order a move reports
-  in (Task 4 Step 4: `TabMoved`'s Javadoc, the README, the fake and the contract test; Rulings 23), and under `plugins`
+  in (Task 4 Step 4: `TabMoved`'s Javadoc, the README, the fake, its `FakeTerminalsTest` case and the contract test;
+  Rulings 23), and under `plugins`
   only Task 6's wording does (plan 4b changes the rest).
   `ContentTab.move(boolean)` and `isSeparate()` keep their meaning through the new registry (Rulings 13).
 - Package edges (package-info "Allowed outgoing" lists; `verifyApplicationArchitecture` checks the graph is acyclic):
@@ -118,7 +119,7 @@ in triple-quoted strings, so `\n` and `…` in Java source stay as written.
 
 ## Verified facts
 
-From a replay of plans 1, 2, 3a and 3b on `22b702456` (see Workspace).
+Checked against `55e6de176` (see Workspace).
 
 1. `TerminalWindow` (`workspace/TerminalWindow.java:25-205`) is the only `JFrame` of a Jasper window: it builds its
    `WindowContent` (`:77-78`), applies the initial configuration before mounting (`:79-82`), mounts it with
@@ -321,7 +322,7 @@ Record them in `docs/STATUS.md` (Task 7). "What — why".
 ```bash
 git branch --show-current                                                                         # claude/workspace-tabs
 git status --short                                                                                # nothing
-git log --oneline -1 --grep "Workspace tabs: documentation and status for the SDK's tab break"   # 3b's last commit
+git log --oneline -1                                                                              # 55e6de176 Workspace tabs 3b: final review fixes
 grep -c 'VERSION = "0.19.0";' jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java                                       # 1
 grep -c 'public void move(Tab tab, UUID window)' jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java   # 1
 grep -c 'public void setFactory(Function<Boolean, UUID> factory)' jasper-app/src/main/java/dev/jasper/app/contributions/TabRegistry.java  # 1
@@ -682,6 +683,8 @@ edit(W + "WindowContent.java", [
     ("""    private Runnable bringToFront = () -> {};
     private final boolean detached;
 """, """    private Runnable bringToFront = () -> {};
+    /** Until workspace plan 4a Task 4: a child window, or one that starts empty, hosts detached content. */
+    private final boolean detached;
     /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
     private final WindowRole role;
 """, 1),
@@ -739,6 +742,7 @@ edit(W + "WindowContent.java", [
         super(new BorderLayout());
         this.role = Objects.requireNonNull(role, "role");
         this.look = Objects.requireNonNull(look, "look");
+        this.detached = empty || role == WindowRole.CHILD;
 """, 1),
     ("""        add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH);
 """, """        // A child window shows its workspace alone, in the centre surface that paints the main window's glass, with no dock,
@@ -746,8 +750,17 @@ edit(W + "WindowContent.java", [
         if (role == WindowRole.MAIN) { add(chrome.header(), BorderLayout.NORTH); add(body); add(chrome.status(), BorderLayout.SOUTH); }
         else add(area, BorderLayout.CENTER);
 """, 1),
-    ("""        if (!detached) newTab(directory);
-""", """        if (!empty) newTab(directory);
+    ("""        if (!detached) {
+            try { newTab(directory); }
+            catch (RuntimeException | Error failure) {
+                // The focus manager outlives a window that failed to build.
+                focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
+""", """        if (!empty) {
+            try { newTab(directory); }
+            catch (RuntimeException | Error failure) {
+                // The theme controller and the focus manager outlive a window that failed to build.
+                try { themeRegistration.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+                focusManager.removePropertyChangeListener("permanentFocusOwner", focusOwners);
 """, 1),
     ("""        boolean left = railsEnabled() && !leftStripe.empty(), right = railsEnabled() && !rightStripe.empty();
         boolean bottom = stripes.bottom().map(strip -> railsEnabled() && !strip.empty()).orElse(false);
@@ -772,7 +785,6 @@ edit(W + "WindowContent.java", [
     ("""        setZenMode(state.zenMode());
 """, """        if (role == WindowRole.MAIN) setZenMode(state.zenMode());
 """, 1),
-    ("new WorkspaceHost(id, detached,", "new WorkspaceHost(id, role == WindowRole.CHILD,", 1),
     ("""    String tabShortcut(int index) {
 """, """    /** {@code id}'s shortcut as this platform writes it, from the live keymap; "" while it has none. */
     String shortcutText(ActionId id) {
@@ -929,7 +941,9 @@ edit(W + "WorkspaceActions.java", [
 PY
 ```
 
-The `WorkspaceHost` keeps its `detached` flag for now, true for a child window (Task 4 removes the flag).
+The `WorkspaceHost` keeps its `detached` flag for now, true for a child window and, as in plan 3a, for a window that
+starts empty, so the tests of 3a's separate windows hold until Task 4 removes the flag (pre-flight F1). A first tab that
+fails in the constructor also closes the window's theme registration (pre-flight F8).
 
 - [ ] **Step 4: Ledger rows**
 
@@ -1136,11 +1150,23 @@ class WindowManagerTest {
         edt(() -> child[0] = manager.openTerminalWindow(null).orElseThrow());
         launch();
         edt(() -> {
+            var terminals = new dev.jasper.app.terminals.TerminalRegistry();
+            for (JasperWindow window : manager.windows()) window.content().connectTerminals(terminals, () -> { });
+            terminals.windowActivated(child[0].id());
+            var facts = new ArrayList<dev.jasper.app.terminals.TerminalEvent>();
+            terminals.onEvent(facts::add);
             events.clear();
-            child[0].content().closeTab(child[0].content().selectedTab());
+            Tab tab = child[0].content().selectedTab();
+            child[0].content().closeTab(tab);
             assertThat(child[0].closed()).isTrue();
             assertThat(manager.children()).isEmpty();
             assertThat(events).containsExactly("dispose child", "closed child");
+            // Plan 3a's accepted order (its final review, M3): the window closes inside the tab's close, and the active
+            // pane is reported once that change is complete.
+            assertThat(facts).as("the last tab's close, then its window's, then no active pane").endsWith(
+                new dev.jasper.app.terminals.TerminalEvent.TabClosed(child[0].id(), tab.id().value()),
+                new dev.jasper.app.terminals.TerminalEvent.WindowClosed(child[0].id()),
+                new dev.jasper.app.terminals.TerminalEvent.ActivePaneChanged(Optional.empty()));
         });
     }
 
@@ -2081,7 +2107,7 @@ system notification's click raises the window that holds its pane now (Rulings 4
   `benchmark/BenchmarkRun.java`
 - Test: `application/JasperApplicationWindowsTest.java` (new); `SystemNoticesTest`, `CommandNotifierTest`,
   `WindowShellTest`, `JasperApplicationBackgroundTest`, `WindowCommandPaletteTest`, `ApplicationTestSupport`,
-  `ChromeRenderTest`, `WindowDragTest` (comments)
+  `TerminalContentTest`, `ChromeRenderTest`, `WindowDragTest` (comments)
 - Ledger: one row moved, one added
 
 **Interfaces:**
@@ -2152,7 +2178,7 @@ class JasperApplicationWindowsTest {
                 MainWindow main = application.windows().main().orElseThrow();
                 assertThat(application.windows().windows()).as("a handoff with no window restores the main window").containsExactly(main);
                 application.open(List.of(HOME), JasperApplication.HANDOFF);
-                assertThat(main.content().tabCount()).as("a folder opens as a terminal tab in the main window").isEqualTo(2);
+                assertThat(main.content().terminalTabs()).as("a folder opens as a terminal tab in the main window").hasSize(2);
                 assertThat(frames).contains("front main");
                 application.windows().closeAll();
                 assertThat(application.windows().isEmpty()).isTrue();
@@ -2344,7 +2370,7 @@ edit(T + "workspace/ChromeRenderTest.java", [
      " * combination and a strength-2 covering array of the nine chrome points, mounted as WindowFrame mounts it and printed", 1)])
 edit(T + "workspace/WindowDragTest.java", [
     ("                // TerminalWindow on windowDeactivated:", "                // WindowFrame on windowDeactivated:", 1)])
-regex(T + "workspace/TerminalTabTest.java", r"\bTerminalWindow\.minimumSize\(", "WindowFrame.minimumSize(", 5)
+regex(T + "workspace/TerminalContentTest.java", r"\bTerminalWindow\.minimumSize\(", "WindowFrame.minimumSize(", 5)
 PY
 ```
 
@@ -2423,6 +2449,8 @@ public final class WindowFrame {
         this.events = java.util.Objects.requireNonNull(events, "events");
         frame.setIconImages(ApplicationIcon.images());
         if (initial != null) {
+            // An empty window (a moved tab's) gives up its stand-in size, so its workspace takes the grid's (Rulings 18).
+            if (content.currentPane() == null) content.setPreferredSize(null);
             JComponent sized = content.currentPane() != null ? content.currentPane() : content.workspace();
             sized.setPreferredSize(InitialWindowSize.terminalArea(initial));
         }
@@ -3197,6 +3225,8 @@ Expected: `none left`.
 Run: `./gradlew :jasper-app:test --tests 'dev.jasper.app.application.*' --tests 'dev.jasper.app.workspace.*' --tests 'dev.jasper.app.notifications.*' --tests 'dev.jasper.app.bootstrap.*' --tests 'dev.jasper.app.appearance.ThemeMigrationCoverageTest' --continue`
 Expected: PASS (`JasperApplicationWindowsTest` 4, `SystemNoticesTest` and `CommandNotifierTest` one more each,
 `WindowShellTest` one more; the background tests reach the frame as before and fail there headlessly, as they assert).
+Report `JasperApplicationBackgroundTest`'s and `JasperApplicationResidencyTest`'s counts and any failure from the XML:
+a window whose frame fails now reaches `windowClosed`, which shuts a non-resident process down (pre-flight F6).
 Then `./gradlew verifyApplicationArchitecture` (the one-place rule) and `./gradlew :jasper-app:check`: PASS. To see the
 rule bite, add a second `new WindowManager(contributions, …)` field to `JasperApplication`, run
 `./gradlew verifyApplicationArchitecture` (FAIL: "WindowManager is made only at …"), and remove it again.
@@ -3235,12 +3265,12 @@ SDK's `ContentTab.move(boolean)` and `isSeparate()` keep their meaning through t
 - Modify: `contributions/TabRegistry.java`, `contributions/Tab.java`, `contributions/WorkspaceHost.java`,
   `workspace/WindowContent.java`, `workspace/WindowManager.java`, `plugins/HostedUi.java`; the order a move reports
   (Step 4): `jasper-sdk/.../terminal/TerminalEvents.java` (Javadoc), `jasper-sdk/README.md`, the testkit's
-  `FakeWorkspace.java`, `FakePluginHost.java` (Javadoc) and `contract/PluginContractTest.java`, and the app's
-  `plugins/TerminalFixture.java`
+  `FakeWorkspace.java`, `FakePluginHost.java` (Javadoc), `contract/PluginContractTest.java` and `FakeTerminalsTest.java`,
+  and the app's `plugins/TerminalFixture.java`
 - Test: `contributions/TabRegistryTest.java`, `plugins/AppContractTest.java`, `KitMountingTest.java`,
   `StagedEditorHost.java`, `WorkspaceContentRouteTest.java`, `HostedChooserTest.java`, `workspace/HostedContentTest.java`,
-  `PluginPaneAppearanceTest.java`, `WorkspaceThemeTest.java`, `RuledCellsTest.java`, `WindowManagerTest.java`,
-  `application/JasperApplicationBackgroundTest.java`
+  `PluginPaneAppearanceTest.java`, `WorkspaceThemeTest.java`, `WorkspaceViewTest.java`, `TabMoveTest.java`,
+  `RuledCellsTest.java`, `WindowManagerTest.java`, `application/JasperApplicationBackgroundTest.java`
 
 **Interfaces:**
 - Consumes: Task 2's `WindowManager.ensureMain`, `moveToNewWindow(Tab)`.
@@ -3258,11 +3288,12 @@ python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan4a"); from edits import edit, regex
 T = "jasper-app/src/test/java/dev/jasper/app/"
 R = T + "contributions/TabRegistryTest.java"
-regex(R, r"new WorkspaceHost\((\w+), (?:false|true), ", r"new WorkspaceHost(\1, ", 19)
+regex(R, r"new WorkspaceHost\((\w+), (?:false|true), ", r"new WorkspaceHost(\1, ", 23)
 regex(R, r"registry\.setFactory\(separate -> separate \? (\w+) : (\w+)\);", r"registry.windows(windows(\2, \1));", 5)
 regex(R, r"registry\.move\((\w+), ?true\)", r"registry.moveToNewWindow(\1)", 7)
 regex(R, r"registry\.move\(tab, false\)", "registry.moveToMainWindow(tab)", 1)
 regex(R, r"tab\.move\(true\)", "tab.moveToNewWindow()", 2)
+regex(R, r"registry\.detached\(window\)", "registry.isMain(window)", 2)
 edit(R, [(
 """        registry.windows(windows(main, detached));
     }
@@ -3311,6 +3342,48 @@ edit(R, [(
         assertThat(tab.inMainWindow()).isFalse();
         tab.moveToMainWindow();
         assertThat(tab.window()).isEqualTo(main);
+    }
+
+    /** Workspace plan 4a: a window that fails to let a moving tab go still loses it to the move, which then rethrows. */
+    @Test void aMoveWhoseSourceFailsToLetGoStillArrivesAndRethrows() {
+        var heard = new ArrayList<String>();
+        var source = UUID.randomUUID();
+        var target = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(source, tab -> heard.add("attach source"),
+            tab -> { heard.add("detach source"); throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(target, tab -> heard.add("attach target"), tab -> heard.add("detach target"), tab -> {}, () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {},
+            window -> heard.add("moved out of " + (window.equals(source) ? "source" : "target"))));
+        var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).isInstanceOf(IllegalStateException.class).hasMessage("detach failed");
+        assertThat(tab.window()).as("shown where it is said to be").isEqualTo(target);
+        assertThat(heard).containsExactly("detach source", "attach target", "moved out of source");
+        assertThat(tab.moving()).as("the move is over").isFalse();
+    }
+
+    /**
+     * Workspace plan 4a: a tab being closed, or closed, reaches no window when moved (a pinned tab, one already there and an
+     * unknown window are {@code anyTabMovesToANamedWindowAndIsSelectedThere}'s).
+     */
+    @Test void aTabBeingClosedOrClosedReachesNoWindowWhenMoved() {
+        var heard = new ArrayList<String>();
+        var other = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(main, tab -> heard.add("attach main"), tab -> heard.add("detach main"), tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(other, tab -> heard.add("attach other"), tab -> heard.add("detach other"), tab -> {}, () -> {}));
+        var tab = registry.open("plugin.file", "one", "One", main, new JPanel());
+        var answer = new CompletableFuture<Boolean>();
+        registry.guard("plugin.file", (tabs, batch) -> answer);
+        registry.requestClose(List.of(tab));
+        heard.clear();
+        registry.move(tab, other);
+        assertThat(heard).as("being closed: it stays").isEmpty();
+        answer.complete(true);
+        assertThat(tab.closed()).isTrue();
+        heard.clear();
+        registry.move(tab, other);
+        assertThat(heard).as("closed: it goes nowhere").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> registry.move(tab, UUID.randomUUID())).withMessageStartingWith("No workspace");
     }
 """, 1)])
 for name, count in [("plugins/KitMountingTest.java", 2), ("plugins/StagedEditorHost.java", 2), ("plugins/WorkspaceContentRouteTest.java", 3)]:
@@ -3371,6 +3444,9 @@ edit(T + "application/JasperApplicationBackgroundTest.java", [(
 edit(T + "workspace/RuledCellsTest.java", [(
     "registry.addHost(new WorkspaceHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));",
     "registry.addHost(new WorkspaceHost(window, entry -> { }, entry -> { }, entry -> { }, () -> { }));", 1)])
+edit(T + "workspace/WorkspaceViewTest.java", [(
+    "addHost(new WorkspaceHost(owner.id(), false, tab -> { }, tab -> { }, tab -> { }, () -> { }))",
+    "addHost(new WorkspaceHost(owner.id(), tab -> { }, tab -> { }, tab -> { }, () -> { }))", 1)])
 H = T + "workspace/HostedContentTest.java"
 edit(H, [
     ("""            model.tabs().setFactory(separate -> {
@@ -3409,6 +3485,32 @@ edit(T + "workspace/WorkspaceThemeTest.java", [
      "                    tab -> model.tabs().move(tab, detached.id())));", 1),
     ("                model.tabs().move(entry, true);\n", "                model.tabs().moveToNewWindow(entry);\n", 1),
     ("                model.tabs().move(entry, false);\n", "                model.tabs().moveToMainWindow(entry);\n", 1)])
+edit(T + "workspace/TabMoveTest.java", [(
+"""    @Test void aTabThatArrivesByAMoveIsShownWithoutTheOpenMotion() throws Exception {
+""", """    /** Workspace plan 4a (plan 3a's final review): a moved terminal tab's pane asks the window it arrived in. */
+    @Test void aMovedTerminalTabsPaneAsksTheWindowItArrivedIn() throws Exception {
+        edt(() -> {
+            var failures = new ArrayList<String>();
+            source.onLaunchFailure = (details, cause) -> failures.add("source " + details);
+            target.onLaunchFailure = (details, cause) -> failures.add("target " + details);
+            Tab tab = source.selectedTab();
+            var terminal = (TerminalContent) tab.content();
+            int sourceTabs = source.tabCount();
+            model.tabs().move(tab, target.id());
+            assertThat(terminal.lastInWindow.getAsBoolean()).as("the target holds another tab").isFalse();
+            target.closeTab(target.tabs().getFirst());
+            assertThat(terminal.lastInWindow.getAsBoolean()).as("now it is the target's only tab").isTrue();
+            terminal.onError.accept("launch failed", null);
+            assertThat(failures).containsExactly("target launch failed");
+            terminal.onEmpty.run();
+            assertThat(tab.closed()).as("closed from the window it is in").isTrue();
+            assertThat(target.tabs()).doesNotContain(tab);
+            assertThat(source.tabCount()).as("the source is untouched").isEqualTo(sourceTabs - 1);
+        });
+    }
+
+    @Test void aTabThatArrivesByAMoveIsShownWithoutTheOpenMotion() throws Exception {
+""", 1)])
 edit(T + "workspace/WindowManagerTest.java", [(
 """    @Test void aRequestWhileTheMainWindowOpensIsRefusedRatherThanOpeningASecondOne() throws Exception {
         edt(() -> {
@@ -3438,7 +3540,11 @@ edit(T + "workspace/WindowManagerTest.java", [(
         launch();
     }
 
-    /** Workspace tabs spec 6.4: a child window a move empties closes once the move has reported itself. */
+    /**
+     * Workspace tabs spec 6.4: a child window a move empties closes once the move has reported itself. The active window
+     * reports no active pane as it lets the tab go, then the move, the main window's selection and the close: the order
+     * the testkit's FakeWorkspace follows (pre-flight F3).
+     */
     @Test void aChildWindowAMoveEmptiesClosesAfterTheMoveIsReported() throws Exception {
         ChildWindow[] child = new ChildWindow[1];
         dev.jasper.app.terminals.TerminalRegistry[] terminals = new dev.jasper.app.terminals.TerminalRegistry[1];
@@ -3449,15 +3555,24 @@ edit(T + "workspace/WindowManagerTest.java", [(
         });
         launch();
         edt(() -> {
+            terminals[0].windowActivated(child[0].id());
+            var mainId = manager.main().orElseThrow().id();
             List<String> heard = new ArrayList<>();
             terminals[0].onEvent(event -> {
-                if (event instanceof dev.jasper.app.terminals.TerminalEvent.TabMoved) heard.add("tab moved");
-                if (event instanceof dev.jasper.app.terminals.TerminalEvent.WindowClosed closed && closed.windowId().equals(child[0].id()))
-                    heard.add("child closed");
+                switch (event) {
+                    case dev.jasper.app.terminals.TerminalEvent.ActivePaneChanged changed ->
+                        heard.add(changed.paneId().isPresent() ? "active pane" : "no active pane");
+                    case dev.jasper.app.terminals.TerminalEvent.TabMoved moved -> heard.add("tab moved");
+                    case dev.jasper.app.terminals.TerminalEvent.TabSelected selected when selected.windowId().equals(mainId) ->
+                        heard.add("main selects it");
+                    case dev.jasper.app.terminals.TerminalEvent.WindowClosed closed when closed.windowId().equals(child[0].id()) ->
+                        heard.add("child closed");
+                    default -> { }
+                }
             });
             Tab tab = child[0].content().selectedTab();
             manager.moveToMainWindow(tab);
-            assertThat(heard).containsExactly("tab moved", "child closed");
+            assertThat(heard).containsExactly("no active pane", "tab moved", "main selects it", "child closed");
             assertThat(child[0].closed()).isTrue();
             assertThat(tab.window()).isEqualTo(manager.main().orElseThrow().id());
         });
@@ -3619,18 +3734,6 @@ edit(C + "TabRegistry.java", [
         if (host == null) { later(tab); return tab; }
         tab.window(host.id());
 """, 1),
-    ("""        } finally {
-            tab.movingFrom = null;
-        }
-        select(tab);
-""", """        } finally {
-            tab.movingFrom = null;
-            // The window the tab left hears of it only now: a child window the move emptied closes after the move has
-            // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
-            if (windows != null) windows.movedOut().accept(old.id());
-        }
-        select(tab);
-""", 1),
     ("""    /** Moves a tab to a separate window or back to the main one; a pinned tab or one being closed stays. */
     public void move(Tab tab, boolean separate) {
         requireEdt();
@@ -3665,12 +3768,58 @@ edit(C + "TabRegistry.java", [
         if (target != null) move(tab, target.id());
     }
 """, 1),
-    ("""                    for (var host : hosts.values())
-                        if (host != old && host != next && !host.detached()) recovery.add(host);
-""", """                    for (var host : hosts.values())
-                        if (host != old && host != next) recovery.add(host);
-""", 1),
 ])
+# Pre-flight F9: a source that fails to let the tab go still loses it to the move; recovery keeps failures with Tab.keep.
+span(C + "TabRegistry.java", """    /**
+     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it.""", """        select(tab);
+    }
+""", """    /**
+     * Detaches the tab from {@code old} and attaches it to {@code next}, then selects it. When {@code next} fails, the tab
+     * goes back to {@code old}, or another window, or stays in no window, and the failure propagates. When {@code old}
+     * fails to let the tab go, the move still goes on, so the tab is shown in the window it names, and that failure
+     * propagates afterwards. The window the tab left hears of the move last (workspace plan 4a).
+     */
+    private void transfer(Tab tab, WorkspaceHost old, WorkspaceHost next) {
+        // Change ownership before removal: an emptied old window may unregister itself synchronously.
+        tab.active(false);
+        tab.window(next.id());
+        tab.movingFrom = old.id();
+        Throwable leaving = null;
+        try {
+            try { old.detach().accept(tab); }
+            catch (RuntimeException | Error failure) { leaving = failure; }
+            try { next.attach().accept(tab); }
+            catch (RuntimeException | Error failure) {
+                Throwable kept = Tab.keep(leaving, failure);
+                rollbackAttach(next, tab, failure);
+                if (tabs.contains(tab) && !tab.closed()) {
+                    var recovery = new ArrayList<WorkspaceHost>();
+                    if (hosts.get(old.id()) == old) recovery.add(old);
+                    for (var host : hosts.values())
+                        if (host != old && host != next) recovery.add(host);
+                    boolean restored = false;
+                    for (var host : recovery) {
+                        tab.window(host.id());
+                        try { host.attach().accept(tab); restored = true; break; }
+                        catch (RuntimeException | Error recoveryFailure) {
+                            rollbackAttach(host, tab, recoveryFailure);
+                            kept = Tab.keep(kept, recoveryFailure);
+                        }
+                    }
+                    if (!restored) tab.window(null);
+                }
+                Tab.rethrow(kept);
+            }
+        } finally {
+            tab.movingFrom = null;
+            // The window the tab left hears of it only now: a child window the move emptied closes after the move has
+            // reported itself, never midway, so a failed attach could still go back to it (workspace plan 4a).
+            if (windows != null) windows.movedOut().accept(old.id());
+        }
+        select(tab);
+        Tab.rethrow(leaving);
+    }
+""")
 edit(C + "Tab.java", [
     ("""    /** @return whether a separate window for plugin views holds the tab */
     public boolean detached() { return registry.detached(window); }
@@ -3711,7 +3860,12 @@ edit(C + "WorkspaceHost.java", [
 """, 1)])
 W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
 edit(W + "WindowContent.java", [
-    ("new WorkspaceHost(id, role == WindowRole.CHILD, this::attach,", "new WorkspaceHost(id, this::attach,", 1),
+    ("new WorkspaceHost(id, detached, this::attach,", "new WorkspaceHost(id, this::attach,", 1),
+    ("""    /** Until workspace plan 4a Task 4: a child window, or one that starts empty, hosts detached content. */
+    private final boolean detached;
+""", "", 1),
+    ("""        this.detached = empty || role == WindowRole.CHILD;
+""", "", 1),
     ("""        if (workspace.isEmpty()) onEmpty.run();
 """, """        // A move empties a window only once it has reported itself: the window manager closes it then (TabRegistry.Windows).
         if (workspace.isEmpty() && !tab.moving()) onEmpty.run();
@@ -3772,8 +3926,10 @@ Expected: `none left`.
 - [ ] **Step 4: The order a move reports, in the SDK and its fakes**
 
 A child window a move empties now closes after the move (Rulings 23): plugins hear `TAB_MOVED`, then that window's
-`WINDOW_CLOSED`. Plan 3b documented the opposite order, so its Javadoc, the README, both fakes and the contract test
-follow; the SDK's shape does not change:
+`WINDOW_CLOSED`. Plan 3b documented the opposite order, so its Javadoc, the README, both fakes, the testkit's own test of
+that order and the contract test follow, and `FakeWorkspace` reports the active pane where the application's windows do,
+as soon as the source lets the tab go (`WindowManagerTest.aChildWindowAMoveEmptiesClosesAfterTheMoveIsReported` pins
+that order on real windows; pre-flight F3); the SDK's shape does not change:
 
 ```bash
 python3 -I - <<'PY'
@@ -3810,6 +3966,8 @@ edit(K + "FakeWorkspace.java", [(
         Window from = tab.window;
         from.tabs.remove(tab);
         if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
+        // As the application's window does: the active pane is reported as soon as the source lets the tab go.
+        refreshActive();
         tab.window = to;
         to.tabs.add(tab);
         host.publishApp(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(tab.id, from.id, to.id));
@@ -3842,6 +4000,24 @@ edit("jasper-app/src/test/java/dev/jasper/app/plugins/TerminalFixture.java", [
             registry.publish(new TerminalEvent.TabMoved(tab.id, from.id, to.id));
             select(tab);
             if (from.tabs.isEmpty()) closeWindow(from);
+""", 1)])
+edit("jasper-sdk-testkit/src/test/java/dev/jasper/sdk/testing/FakeTerminalsTest.java", [
+    ("""    /** As in the application: a move that empties the active window reports no active pane as that window closes. */
+    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneAsItCloses() {
+""", """    /**
+     * A move that empties the active window reports no active pane as that window lets the tab go, then the move, the
+     * arrival's selection and, last, the window's close: the order the application's WindowManagerTest pins on real windows.
+     */
+    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneThenClosesItAfterTheMove() {
+""", 1),
+    ("""            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first),
+                new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(moving, first, second),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving));
+""", """            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(moving, first, second),
+                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving),
+                new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first));
 """, 1)])
 PY
 ```
@@ -4089,6 +4265,11 @@ edit(M + "shortcuthelp/ShortcutCatalog.java", [(
     "            case NEW_TAB, CLOSE_TAB, NEXT_TAB, PREVIOUS_TAB, RENAME_TAB, MOVE_TAB_TO_NEW_WINDOW, MOVE_TAB_TO_MAIN_WINDOW,\n"
     "                SELECT_TAB_1, SELECT_TAB_2,\n", 1)])
 edit(M + "platform/ResidentTray.java", [
+    (" * macOS the menu bar item with New Window, Settings… and Quit Jasper Completely; on Windows the notification-area icon\n"
+     " * with Open Jasper and Quit Jasper (a windowless Windows process is otherwise invisible). On Windows the same icon\n",
+     " * macOS the menu bar item with New Terminal Window, Settings… and Quit Jasper Completely; on Windows the\n"
+     " * notification-area icon with Open Jasper and Quit Jasper (a windowless Windows process is otherwise invisible). On\n"
+     " * Windows the same icon\n", 1),
     ("     * @param newWindow macOS: always opens a new window\n",
      "     * @param newTerminalWindow macOS: opens a window with a terminal tab, after the main window is restored\n", 1),
     ("    public record Actions(Runnable open, Runnable newWindow, Runnable settings, Runnable quit) {\n",
@@ -4208,8 +4389,8 @@ main window has the thing (Rulings 22).
   `windows/AuxiliaryWindows.java`, `NativeShells.java`, `ShellChrome.java`, `workspace/MenuBarItems.java`, `WindowLook.java`; the Editor's `DefaultEditor` and `EditorWindow`,
   File Servers' `FileServerPlugin`, Remote's `RemoteHosts` and `RemoteEditing`, Vault's `VaultPlugin`
 - Modify (text): `shortcuthelp/ShortcutCatalog.java:59`, Remote's `chooser/RemoteHosts.java:105` and
-  `edit/EditChannels.java:99`; `docs/app-maintenance.md:636-638`, `docs/configuration.md:241-244`,
-  `docs/editor.md:9-11,143`, `docs/editor-verification.md:9,29`, `docs/keyboard-shortcuts.md:8-9,26-27,42,76-77,94-95`,
+  `edit/EditChannels.java:99`; `docs/app-maintenance.md:652-654`, `docs/configuration.md:244-247`,
+  `docs/editor.md:9-11,143`, `docs/editor-verification.md:9,29`, `docs/keyboard-shortcuts.md:9-10,26-27,42,76-77,94-95`,
   `docs/remote.md:233-234`
 - Test: Remote's `EditChannelsTest`, `RemoteEditingTest`; descriptions and comments in `JasperApplicationBackgroundTest`,
   `PresentationReachTest`, `StagedRemoteHost`, `ShortcutHelpTest`, `ShortcutSectionsTest`, `AuxiliaryWindowsTest`,
@@ -4247,7 +4428,6 @@ python3 -I - <<'PY'
 import sys; sys.path.insert(0, "build/plan4a"); from edits import edit, regex
 M, T = "jasper-app/src/main/java/dev/jasper/app/", "jasper-app/src/test/java/dev/jasper/app/"
 edit(M + "application/JasperApplication.java", [
-    ("    /** What every terminal window of this process is made of:", "    /** What every Jasper window of this process is made of:", 1),
     ("    /** What terminal windows and the rehearsal's are made of", "    /** What Jasper windows and the rehearsal's are made of", 1),
     ("no terminal window being opened)", "no Jasper window being opened)", 1),
     ("     * terminal windows: the next one still shows what waited. EDT.", "     * Jasper windows: the next one still shows what waited. EDT.", 1)])
@@ -4559,7 +4739,7 @@ EOF
   4b's (6.6's Errors tab, 14's SDK rows, the plugins), plan 5's tear-out, plan 6's saving and restoring.
 - Review findings (2026-10-18) folded in: the frames seam before the manager (JLS 8.3.3), Rulings 3's structural pins,
   4's deviation, 7's amended spec, 23-29.
-- Every quoted anchor was matched, at its stated count, in a replay of plans 1, 2, 3a and 3b and of Tasks 1-7 in order;
+- Every quoted anchor was matched, at its stated count, in a replay of Tasks 1-7 in order on a copy of `55e6de176`;
   nothing was compiled.
 - Type consistency: `WindowRole`, `JasperWindow.Events`, `WindowShell` (with `place`), `WindowManager.Opening` (with
   `bounds`)/`Hooks` (with `closing`, `closingAll`)/`State`, `ensureMain(String, Path)`, `openTerminalWindow(Path)`,
