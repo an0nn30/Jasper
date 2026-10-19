@@ -27,7 +27,8 @@ class LayoutValuesTest {
         assertThat(GroupId.parse("3F1E0000-0000-4000-8000-00000000000A")).as("either case")
             .isEqualTo(new GroupId(UUID.fromString("3f1e0000-0000-4000-8000-00000000000a")));
         for (String bad : List.of("", "1-2-3-4-5", "3f1e0000-0000-4000-8000-00000000000", "3f1e0000x0000-4000-8000-00000000000a",
-                "not a uuid at all, thirty-six chars!")) {
+                "not a uuid at all, thirty-six chars!", "+0000001-0000-4000-8000-00000000000a",
+                "00000001-0-0-0-000000000000000000001")) {
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> TabId.parse(bad));
             assertThatIllegalArgumentException().as(bad).isThrownBy(() -> GroupId.parse(bad));
         }
@@ -68,6 +69,10 @@ class LayoutValuesTest {
         double third = 1.0 / 3;
         assertThat(h(child(a, third), child(b, third), child(c, third)).children()).extracting(Child::weight)
             .as("already normalized: kept bit for bit").containsExactly(third, third, third);
+        Split tenths = h(child(a, 0.7), child(b, 0.2), child(c, 0.1));
+        assertThat(tenths.children()).extracting(Child::weight)
+            .as("summing to 1 within the tolerance but not exactly: kept bit for bit").containsExactly(0.7, 0.2, 0.1);
+        assertThat(new Split(Orientation.HORIZONTAL, tenths.children())).as("normalizing twice changes nothing").isEqualTo(tenths);
         assertThat(h(child(a, 0.5), child(h(child(b, 0.5), child(c, 0.5)), 0.5))).as("a child of the same orientation is flattened")
             .isEqualTo(h(child(a, 0.5), child(b, 0.25), child(c, 0.25)));
         assertThat(h(child(a, 2), child(h(child(b, 1), child(c, 3)), 2))).as("flattened, then normalized")
