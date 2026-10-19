@@ -60,6 +60,12 @@ class AppDirsTest {
             .isEqualTo(home.resolve(".config/jasper/buddy.toml"));
     }
 
+    @Test void theWorkspaceStateLivesInTheRootBesideTheUiState() {
+        AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
+        assertThat(dirs.workspaceState()).isEqualTo(home.resolve(".config/jasper/workspace.toml"));
+        assertThat(dirs.workspaceState().getParent()).isEqualTo(dirs.uiState().getParent());
+    }
+
     @Test void daemonFilesShareOwnTheirOwnSubdirectoryOfTheRoot() {
         AppDirs dirs = AppDirs.resolve("Mac OS X", Map.of(), home);
         Path daemon = home.resolve(".config/jasper/daemon");
