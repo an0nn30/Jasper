@@ -190,6 +190,28 @@ class TabMoveTest {
         });
     }
 
+    /** Workspace plan 4a (plan 3a's final review): a moved terminal tab's pane asks the window it arrived in. */
+    @Test void aMovedTerminalTabsPaneAsksTheWindowItArrivedIn() throws Exception {
+        edt(() -> {
+            var failures = new ArrayList<String>();
+            source.onLaunchFailure = (details, cause) -> failures.add("source " + details);
+            target.onLaunchFailure = (details, cause) -> failures.add("target " + details);
+            Tab tab = source.selectedTab();
+            var terminal = (TerminalContent) tab.content();
+            int sourceTabs = source.tabCount();
+            model.tabs().move(tab, target.id());
+            assertThat(terminal.lastInWindow.getAsBoolean()).as("the target holds another tab").isFalse();
+            target.closeTab(target.tabs().getFirst());
+            assertThat(terminal.lastInWindow.getAsBoolean()).as("now it is the target's only tab").isTrue();
+            terminal.onError.accept("launch failed", null);
+            assertThat(failures).containsExactly("target launch failed");
+            terminal.onEmpty.run();
+            assertThat(tab.closed()).as("closed from the window it is in").isTrue();
+            assertThat(target.tabs()).doesNotContain(tab);
+            assertThat(source.tabCount()).as("the source is untouched").isEqualTo(sourceTabs - 1);
+        });
+    }
+
     @Test void aTabThatArrivesByAMoveIsShownWithoutTheOpenMotion() throws Exception {
         edt(() -> {
             Tab tab = source.selectedTab();

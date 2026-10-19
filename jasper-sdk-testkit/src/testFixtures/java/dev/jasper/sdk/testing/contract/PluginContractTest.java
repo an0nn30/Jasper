@@ -1494,8 +1494,8 @@ public abstract class PluginContractTest {
         heard.clear();
         h.moveTab(stays, second);
         h.flush();
-        assertThat(heard).as("the window the move empties closes first").containsExactly(new TerminalEvents.WindowEvent(first),
-            new TerminalEvents.TabMoved(stays, first, second));
+        assertThat(heard).as("the window the move empties closes after the move").containsExactly(
+            new TerminalEvents.TabMoved(stays, first, second), new TerminalEvents.WindowEvent(first));
         h.ui(() -> assertThat(alpha.get().terminals().window(first)).isEmpty());
     }
 

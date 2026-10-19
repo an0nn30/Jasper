@@ -248,7 +248,7 @@ class WorkspaceViewTest {
             owner.tabs().get(0).onClosed(() -> { throw new IllegalStateException("listener failed"); });
             assertThatThrownBy(owner::close).isInstanceOf(IllegalStateException.class).hasMessage("listener failed");
             assertThat(owner.tabRegistry().tabs()).isEmpty();
-            assertThatCode(() -> owner.tabRegistry().addHost(new WorkspaceHost(owner.id(), false, tab -> { }, tab -> { }, tab -> { }, () -> { })))
+            assertThatCode(() -> owner.tabRegistry().addHost(new WorkspaceHost(owner.id(), tab -> { }, tab -> { }, tab -> { }, () -> { })))
                 .as("the window's host is unregistered").doesNotThrowAnyException();
             assertThat(owner.windowTabs().isVisible()).as("the rest of the close ran: the strips are released").isFalse();
         });

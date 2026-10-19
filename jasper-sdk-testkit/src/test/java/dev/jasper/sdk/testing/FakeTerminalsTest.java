@@ -137,8 +137,11 @@ class FakeTerminalsTest {
         }
     }
 
-    /** As in the application: a move that empties the active window reports no active pane as that window closes. */
-    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneAsItCloses() {
+    /**
+     * A move that empties the active window reports no active pane as that window lets the tab go, then the move, the
+     * arrival's selection and, last, the window's close: the order the application's WindowManagerTest pins on real windows.
+     */
+    @Test void aMoveThatEmptiesTheActiveWindowReportsNoActivePaneThenClosesItAfterTheMove() {
         try (var host = new FakePluginHost()) {
             UUID first = host.addTerminalWindow(), moving = host.addTerminalTab(first, "build");
             host.addTerminalPane(moving, info("make"));
@@ -155,10 +158,10 @@ class FakeTerminalsTest {
             heard.clear();
             host.moveTab(moving, second);
             host.flush();
-            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first),
-                new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
+            assertThat(heard).containsExactly(new dev.jasper.sdk.terminal.TerminalEvents.ActivePaneChanged(Optional.empty()),
                 new dev.jasper.sdk.terminal.TerminalEvents.TabMoved(moving, first, second),
-                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving));
+                new dev.jasper.sdk.terminal.TerminalEvents.TabEvent(second, moving),
+                new dev.jasper.sdk.terminal.TerminalEvents.WindowEvent(first));
         }
     }
 

@@ -44,9 +44,9 @@ class WorkspaceContentRouteTest {
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
             var main = java.util.UUID.randomUUID(); var separate = java.util.UUID.randomUUID();
             var mainHolder = new JPanel(); var separateHolder = new JPanel();
-            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, false, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
-            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, true, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
-            model.tabs().setFactory(detached -> detached ? separate : main);
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, e -> mainHolder.add(e.component()), e -> mainHolder.remove(e.component()), e -> {}, () -> {}));
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(separate, e -> separateHolder.add(e.component()), e -> separateHolder.remove(e.component()), e -> {}, () -> {}));
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> model.tabs().move(tab, separate)));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
                 h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}),
                 new GlassSource(c -> SwingUtilities.isDescendingFrom(c, separateHolder) ? .4 : 1, h -> new dev.jasper.app.lifecycle.Subscription(() -> {})));
@@ -102,9 +102,9 @@ class WorkspaceContentRouteTest {
             var mixed = ThemeTestSupport.mixed(chrome, workspace);
             var containment = new Containment(() -> true); var model = new dev.jasper.app.contributions.Contributions();
             var main = java.util.UUID.randomUUID(); var holder = new JPanel();
-            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, false,
+            model.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(main, 
                 e -> { holder.add(e.component()); holder.remove(e.component()); throw new IllegalStateException("mount failed"); }, e -> {}, e -> {}, () -> {}));
-            model.tabs().setFactory(detached -> main);
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> { }));
             var ui = new HostedUi("test.kit", model, containment, Runnable::run, () -> true, () -> true, getClass().getClassLoader(), () -> dev.jasper.sdk.Variant.LIGHT,
                 h -> () -> {}, AppContractTest.headlessWindows(), null, () -> mixed, h -> new dev.jasper.app.lifecycle.Subscription(() -> {}), GlassSource.NONE);
             var kit = new HostedKit("test.kit", () -> true, ui::kitThemes, ui.appearance(), containment); ui.kit(kit);

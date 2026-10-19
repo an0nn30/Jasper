@@ -325,8 +325,9 @@ class JasperApplicationBackgroundTest {
         try {
             edt(() -> {
                 var content = application.contributions().tabs();
-                content.addHost(new WorkspaceHost(UUID.randomUUID(), false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
-                content.open("dev.example.editor", "notes.txt", "notes.txt", null, new JLabel("unsaved"));
+                UUID window = UUID.randomUUID();
+                content.addHost(new WorkspaceHost(window, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                content.open("dev.example.editor", "notes.txt", "notes.txt", window, new JLabel("unsaved"));
                 content.guard("dev.example.editor", (entries, batch) -> {
                     asked.incrementAndGet();
                     return CompletableFuture.completedFuture(false);

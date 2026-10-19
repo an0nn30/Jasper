@@ -104,8 +104,8 @@ public final class Tab implements AutoCloseable {
     /** A modal owner keeps the tab where it is and open until the returned subscription closes. */
     public Subscription pin() { pins++; return new Subscription(() -> pins--); }
     public boolean pinned() { return pins > 0; }
-    /** @return whether a separate window for plugin views holds the tab */
-    public boolean detached() { return registry.detached(window); }
+    /** @return whether the main window holds the tab (workspace tabs spec 6) */
+    public boolean inMainWindow() { return registry.isMain(window); }
 
     /** Sets the presentation and tells the listeners; ignored once closed. */
     public void presentation(String title, String detail, Icon icon, boolean dirty, String location, String host) {
@@ -121,8 +121,10 @@ public final class Tab implements AutoCloseable {
     public void focus() { if (!closed) focus.run(); }
     /** Shows the tab in its window and raises the window, wherever the tab is now. */
     public void select() { registry.select(this); }
-    /** Moves a hosted tab to a separate window or back to the main one (workspace plan 4 replaces this). */
-    public void move(boolean separate) { registry.move(this, separate); }
+    /** Move Tab to New Window: a new child window takes the tab (workspace tabs spec 6.5). */
+    public void moveToNewWindow() { registry.moveToNewWindow(this); }
+    /** Move Tab to Main Window: the main window takes the tab (workspace tabs spec 6.5). */
+    public void moveToMainWindow() { registry.moveToMainWindow(this); }
     /** Closes the tab once its plugin's guard allows it. */
     public CompletableFuture<Boolean> requestClose() { return registry.requestClose(List.of(this)); }
 

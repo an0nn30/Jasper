@@ -564,8 +564,11 @@ final class HostedUi {
             new dev.jasper.app.contributions.ContentStatus(v.text(), v.tooltip(), v.run() == null ? null : () -> containment.run(pluginId, "content status", v.run()))).toList()); }
         public void setFocusTarget(Runnable focus) { requireUi("content focus"); entry.focusTarget(() -> containment.run(pluginId, "content focus", focus)); }
         public void select() { requireUi("select content"); entry.select(); }
-        public void move(boolean separate) { requireUi("move content"); entry.move(separate); }
-        public boolean isSeparate() { requireUi("content host"); return entry.detached(); }
+        public void move(boolean separate) {
+            requireUi("move content");
+            if (separate) entry.moveToNewWindow(); else entry.moveToMainWindow();
+        }
+        public boolean isSeparate() { requireUi("content host"); return !entry.inMainWindow(); }
         public boolean isActive() { requireUi("content active"); return entry.active(); }
         public boolean isClosed() { requireUi("content closed"); return entry.closed(); }
         public java.util.concurrent.CompletableFuture<Boolean> requestClose() { requireUi("close content"); return entry.requestClose(); }

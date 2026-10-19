@@ -16,13 +16,99 @@ class TabRegistryTest {
     private final List<Tab> mounted = new ArrayList<>();
     private final UUID main = UUID.randomUUID(), detached = UUID.randomUUID();
     private void hosts() {
-        registry.addHost(new WorkspaceHost(main, false, mounted::add, mounted::remove, tab -> {}, () -> {}));
-        registry.addHost(new WorkspaceHost(detached, true, mounted::add, mounted::remove, tab -> {}, () -> {}));
-        registry.setFactory(separate -> separate ? detached : main);
+        registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(detached, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.windows(windows(main, detached));
+    }
+
+    /** The window manager's part as a test plays it: {@code main} is the main window, and a new window is {@code separate}. */
+    private TabRegistry.Windows windows(UUID main, UUID separate) {
+        return new TabRegistry.Windows(() -> main, main::equals, tab -> registry.move(tab, separate));
+    }
+
+    /**
+     * Workspace plan 4a: the window a move leaves hears of it only after the move has reported itself, so a failed attach
+     * can still go back to it; the window manager then closes a child window the move left empty.
+     */
+    @Test void theWindowAMoveLeavesHearsOfItAfterTheMoveAndAFailedMoveGoesBackToIt() {
+        var heard = new ArrayList<String>();
+        var child = UUID.randomUUID();
+        var bad = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(main, tab -> heard.add("attach main"), tab -> heard.add("detach main"), tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(child, tab -> heard.add("attach child"), tab -> heard.add("detach child"), tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(bad, tab -> { throw new IllegalStateException("destination failed"); }, tab -> {}, tab -> {}, () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> main, main::equals, tab -> {},
+            window -> heard.add("moved out of " + (window.equals(child) ? "child" : "main"))));
+        var tab = registry.open("plugin.file", "one", "One", child, new JPanel());
+        heard.clear();
+        tab.moveToMainWindow();
+        assertThat(heard).containsExactly("detach child", "attach main", "moved out of child");
+        registry.move(tab, child);
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, bad)).isInstanceOf(IllegalStateException.class).hasMessage("destination failed");
+        assertThat(tab.window()).as("back in the window it left, which a move never closes midway").isEqualTo(child);
+        assertThat(heard).containsExactly("detach child", "attach child", "moved out of child");
+    }
+
+    @Test void withoutTheWindowManagerTheFirstWorkspaceIsTheMainWindowAndNothingMovesToANewWindow() {
+        var other = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(other, mounted::add, mounted::remove, tab -> {}, () -> {}));
+        var tab = registry.open("plugin.file", "one", "One", null, new JPanel());
+        assertThat(tab.window()).as("a view without a window goes to the main window").isEqualTo(main);
+        assertThat(tab.inMainWindow()).isTrue();
+        tab.moveToNewWindow();
+        assertThat(tab.window()).isEqualTo(main);
+        registry.move(tab, other);
+        assertThat(tab.inMainWindow()).isFalse();
+        tab.moveToMainWindow();
+        assertThat(tab.window()).isEqualTo(main);
+    }
+
+    /** Workspace plan 4a: a window that fails to let a moving tab go still loses it to the move, which then rethrows. */
+    @Test void aMoveWhoseSourceFailsToLetGoStillArrivesAndRethrows() {
+        var heard = new ArrayList<String>();
+        var source = UUID.randomUUID();
+        var target = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(source, tab -> heard.add("attach source"),
+            tab -> { heard.add("detach source"); throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(target, tab -> heard.add("attach target"), tab -> heard.add("detach target"), tab -> {}, () -> {}));
+        registry.windows(new TabRegistry.Windows(() -> source, source::equals, tab -> {},
+            window -> heard.add("moved out of " + (window.equals(source) ? "source" : "target"))));
+        var tab = registry.open("plugin.file", "one", "One", source, new JPanel());
+        heard.clear();
+        assertThatThrownBy(() -> registry.move(tab, target)).isInstanceOf(IllegalStateException.class).hasMessage("detach failed");
+        assertThat(tab.window()).as("shown where it is said to be").isEqualTo(target);
+        assertThat(heard).containsExactly("detach source", "attach target", "moved out of source");
+        assertThat(tab.moving()).as("the move is over").isFalse();
+    }
+
+    /**
+     * Workspace plan 4a: a tab being closed, or closed, reaches no window when moved (a pinned tab, one already there and an
+     * unknown window are {@code anyTabMovesToANamedWindowAndIsSelectedThere}'s).
+     */
+    @Test void aTabBeingClosedOrClosedReachesNoWindowWhenMoved() {
+        var heard = new ArrayList<String>();
+        var other = UUID.randomUUID();
+        registry.addHost(new WorkspaceHost(main, tab -> heard.add("attach main"), tab -> heard.add("detach main"), tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(other, tab -> heard.add("attach other"), tab -> heard.add("detach other"), tab -> {}, () -> {}));
+        var tab = registry.open("plugin.file", "one", "One", main, new JPanel());
+        var answer = new CompletableFuture<Boolean>();
+        registry.guard("plugin.file", (tabs, batch) -> answer);
+        registry.requestClose(List.of(tab));
+        heard.clear();
+        registry.move(tab, other);
+        assertThat(heard).as("being closed: it stays").isEmpty();
+        answer.complete(true);
+        assertThat(tab.closed()).isTrue();
+        heard.clear();
+        registry.move(tab, other);
+        assertThat(heard).as("closed: it goes nowhere").isEmpty();
+        assertThatIllegalArgumentException().isThrownBy(() -> registry.move(tab, UUID.randomUUID())).withMessageStartingWith("No workspace");
     }
     @Test void failedOpenLeavesNoEntryAndSameKeyCanMountAgain() {
         var fail = new boolean[] {true};
-        registry.addHost(new WorkspaceHost(main, false, tab -> {
+        registry.addHost(new WorkspaceHost(main, tab -> {
             if (fail[0]) { fail[0] = false; throw new IllegalStateException("mount failed"); }
             mounted.add(tab);
         }, mounted::remove, tab -> {}, () -> {}));
@@ -40,10 +126,10 @@ class TabRegistryTest {
         var tab = registry.open("plugin.file", "one", "One", main, panel);
         tab.presentation("One", "", null, true, "", "");
         var bad = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(bad, true, t -> { throw new IllegalStateException("destination failed"); },
+        registry.addHost(new WorkspaceHost(bad, t -> { throw new IllegalStateException("destination failed"); },
             t -> {}, t -> {}, () -> {}));
-        registry.setFactory(separate -> separate ? bad : main);
-        assertThatThrownBy(() -> registry.move(tab, true)).isInstanceOf(IllegalStateException.class)
+        registry.windows(windows(main, bad));
+        assertThatThrownBy(() -> registry.moveToNewWindow(tab)).isInstanceOf(IllegalStateException.class)
             .hasMessage("destination failed");
         assertThat(tab.window()).isEqualTo(main);
         assertThat(tab.closed()).isFalse();
@@ -54,26 +140,26 @@ class TabRegistryTest {
 
     @Test void failedDestinationAfterSourceUnregistersLeavesRecoverableUnmountedEntry() {
         var source = new dev.jasper.app.lifecycle.Subscription[1];
-        source[0] = registry.addHost(new WorkspaceHost(main, false, mounted::add, tab -> {
+        source[0] = registry.addHost(new WorkspaceHost(main, mounted::add, tab -> {
             mounted.remove(tab);
             source[0].close();
         }, tab -> {}, () -> {}));
         var bad = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(bad, true, tab -> { throw new IllegalStateException("destination failed"); },
+        registry.addHost(new WorkspaceHost(bad, tab -> { throw new IllegalStateException("destination failed"); },
             tab -> {}, tab -> {}, () -> {}));
-        registry.setFactory(separate -> separate ? bad : main);
+        registry.windows(windows(main, bad));
         var panel = new JTextArea("unsaved");
         var tab = registry.open("plugin.file", "one", "One", main, panel);
         tab.presentation("One", "", null, true, "", "");
         // Model the source window unregistering synchronously when its final tab leaves.
-        assertThatThrownBy(() -> registry.move(tab, true)).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> registry.moveToNewWindow(tab)).isInstanceOf(IllegalStateException.class)
             .hasMessage("destination failed");
         assertThat(tab.window()).isNull();
         assertThat(tab.closed()).isFalse();
         assertThat(tab.dirty()).isTrue();
         assertThat(registry.hosted()).containsExactly(tab);
         var replacement = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(replacement, false, mounted::add, mounted::remove, t -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(replacement, mounted::add, mounted::remove, t -> {}, () -> {}));
         assertThat(registry.open("plugin.file", "one", "One", replacement, new JPanel())).isSameAs(tab);
         assertThat(tab.component()).isSameAs(panel);
         assertThat(tab.window()).isEqualTo(replacement);
@@ -82,20 +168,20 @@ class TabRegistryTest {
 
     @Test void failedDestinationAfterSourceUnregistersUsesAnotherMainHost() {
         var source = new dev.jasper.app.lifecycle.Subscription[1];
-        source[0] = registry.addHost(new WorkspaceHost(main, false, mounted::add, tab -> {
+        source[0] = registry.addHost(new WorkspaceHost(main, mounted::add, tab -> {
             mounted.remove(tab);
             source[0].close();
         }, tab -> {}, () -> {}));
         var fallback = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(fallback, false, mounted::add, mounted::remove, t -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(fallback, mounted::add, mounted::remove, t -> {}, () -> {}));
         var bad = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(bad, true, tab -> { throw new IllegalStateException("destination failed"); },
+        registry.addHost(new WorkspaceHost(bad, tab -> { throw new IllegalStateException("destination failed"); },
             tab -> {}, tab -> {}, () -> {}));
-        registry.setFactory(separate -> separate ? bad : fallback);
+        registry.windows(windows(fallback, bad));
         var panel = new JTextArea("unsaved");
         var tab = registry.open("plugin.file", "one", "One", main, panel);
         tab.presentation("One", "", null, true, "", "");
-        assertThatThrownBy(() -> registry.move(tab, true)).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> registry.moveToNewWindow(tab)).isInstanceOf(IllegalStateException.class)
             .hasMessage("destination failed");
         assertThat(tab.window()).isEqualTo(fallback);
         assertThat(tab.closed()).isFalse();
@@ -109,11 +195,11 @@ class TabRegistryTest {
         var tab = registry.open("plugin.file", "one", "One", main, panel);
         int[] disposed = {0}; tab.onClosed(() -> disposed[0]++);
         assertThat(registry.open("plugin.file", "one", "Other", detached, new JPanel())).isSameAs(tab);
-        registry.move(tab, true);
+        registry.moveToNewWindow(tab);
         assertThat(tab.window()).isEqualTo(detached);
         assertThat(tab.component()).isSameAs(panel);
         assertThat(disposed[0]).isZero();
-        registry.move(tab, false);
+        registry.moveToMainWindow(tab);
         assertThat(tab.window()).isEqualTo(main);
         tab.close(); tab.close();
         assertThat(disposed[0]).isEqualTo(1);
@@ -127,7 +213,7 @@ class TabRegistryTest {
         registry.guard("plugin.file", (tabs,batch) -> { assertThat(tabs).containsExactly(a,b); return answer; });
         var first=registry.requestClose(List.of(a,b));
         assertThat(registry.requestClose(List.of(a,b))).isSameAs(first);
-        registry.move(a,true);
+        registry.moveToNewWindow(a);
         assertThat(a.window()).isEqualTo(main);
         answer.complete(false);
         assertThat(first.join()).isFalse();
@@ -142,7 +228,7 @@ class TabRegistryTest {
         registry.guard("plugin.file", (tabs,batch) -> answer);
         int[] disposed={0}; tab.onClosed(() -> disposed[0]++);
         var closing=registry.requestClose(List.of(tab));
-        tab.close(); answer.complete(true); registry.move(tab,true); tab.select();
+        tab.close(); answer.complete(true); registry.moveToNewWindow(tab); tab.select();
         assertThat(closing.join()).isTrue();
         assertThat(disposed[0]).isEqualTo(1);
         assertThat(mounted).isEmpty();
@@ -151,11 +237,11 @@ class TabRegistryTest {
         hosts();
         var tab = registry.open("plugin.file", "a", "A", main, new JPanel());
         var pin = tab.pin();
-        tab.move(true);
+        tab.moveToNewWindow();
         assertThat(tab.window()).isEqualTo(main);
         assertThat(tab.requestClose().join()).isFalse();
         pin.close();
-        tab.move(true);
+        tab.moveToNewWindow();
         assertThat(tab.window()).isEqualTo(detached);
         assertThat(tab.requestClose().join()).isTrue();
     }
@@ -202,13 +288,13 @@ class TabRegistryTest {
 
     @Test void aTabSaysItIsMovingWhileItsWindowsDetachAndAttachIt() {
         var seen = new ArrayList<String>();
-        registry.addHost(new WorkspaceHost(main, false, tab -> seen.add("attach main " + tab.moving()),
+        registry.addHost(new WorkspaceHost(main, tab -> seen.add("attach main " + tab.moving()),
             tab -> seen.add("detach main " + tab.moving()), tab -> {}, () -> {}));
-        registry.addHost(new WorkspaceHost(detached, true, tab -> seen.add("attach detached " + tab.moving()),
+        registry.addHost(new WorkspaceHost(detached, tab -> seen.add("attach detached " + tab.moving()),
             tab -> seen.add("detach detached " + tab.moving()), tab -> {}, () -> {}));
-        registry.setFactory(separate -> separate ? detached : main);
+        registry.windows(windows(main, detached));
         var tab = registry.open("plugin.file", "one", "One", main, new JPanel());
-        registry.move(tab, true);
+        registry.moveToNewWindow(tab);
         assertThat(tab.moving()).as("only during the move").isFalse();
         tab.close();
         assertThat(seen).containsExactly("attach main false", "detach main true", "attach detached true", "detach detached false");
@@ -216,7 +302,7 @@ class TabRegistryTest {
 
     @Test void theHostSaysWhichGroupHoldsATab() {
         var group = GroupId.random();
-        registry.addHost(new WorkspaceHost(main, false, mounted::add, mounted::remove, tab -> {}, () -> {},
+        registry.addHost(new WorkspaceHost(main, mounted::add, mounted::remove, tab -> {}, () -> {},
             id -> Optional.of(group)));
         var tab = registry.open("plugin.file", "one", "One", main, new JPanel());
         assertThat(tab.group()).contains(group);
@@ -252,7 +338,7 @@ class TabRegistryTest {
         var own = new TabRegistry();
         var window = UUID.randomUUID();
         var left = new ArrayList<Tab>();
-        var registration = own.addHost(new WorkspaceHost(window, false, tab -> {}, left::add, tab -> {}, () -> {}));
+        var registration = own.addHost(new WorkspaceHost(window, tab -> {}, left::add, tab -> {}, () -> {}));
         var tab = own.add(TabId.random(), Tab.Kind.TERMINAL, new HostedContent(new JPanel()), window);
         int[] closed = {0};
         tab.onClosed(() -> closed[0]++);
@@ -262,7 +348,7 @@ class TabRegistryTest {
         assertThat(closed[0]).isZero();
         assertThat(own.tabs()).isEmpty();
         assertThat(registry.tabs()).containsExactly(tab);
-        registry.addHost(new WorkspaceHost(window, false, mounted::add, mounted::remove, t -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(window, mounted::add, mounted::remove, t -> {}, () -> {}));
         tab.close();
         assertThat(closed[0]).isEqualTo(1);
         assertThat(registry.tabs()).isEmpty();
@@ -298,7 +384,7 @@ class TabRegistryTest {
 
     @Test void aFailingDetachDoesNotHideTheFailureThatCameFirst() {
         var window = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(window, false, tab -> {}, tab -> { throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(window, tab -> {}, tab -> { throw new IllegalStateException("detach failed"); }, tab -> {}, () -> {}));
         int[] disposed = {0};
         var tab = counted(disposed, window);
         tab.onClosed(() -> { throw new IllegalStateException("close failed"); });
@@ -311,18 +397,18 @@ class TabRegistryTest {
     @Test void closingAHostRemovesEveryTabItHoldsAndForgetsItWhateverFails() {
         var window = UUID.randomUUID();
         var detachedTabs = new ArrayList<Tab>();
-        var registration = registry.addHost(new WorkspaceHost(window, true, tab -> {}, detachedTabs::add, tab -> {}, () -> {}));
+        var registration = registry.addHost(new WorkspaceHost(window, tab -> {}, detachedTabs::add, tab -> {}, () -> {}));
         int[] disposed = {0};
         var first = counted(disposed, window);
         var second = counted(disposed, window);
         first.onClosed(() -> { throw new IllegalStateException("close failed"); });
-        assertThat(registry.detached(window)).as("registered").isTrue();
+        assertThat(registry.isMain(window)).as("registered").isTrue();
         assertThatThrownBy(registration::close).isInstanceOf(IllegalStateException.class).hasMessage("close failed");
         assertThat(disposed[0]).as("the other tab was removed too").isEqualTo(2);
         assertThat(detachedTabs).containsExactly(first, second);
         assertThat(registry.tabs()).isEmpty();
-        assertThat(registry.detached(window)).as("the host is forgotten").isFalse();
-        assertThatCode(() -> registry.addHost(new WorkspaceHost(window, true, tab -> {}, tab -> {}, tab -> {}, () -> {})))
+        assertThat(registry.isMain(window)).as("the host is forgotten").isFalse();
+        assertThatCode(() -> registry.addHost(new WorkspaceHost(window, tab -> {}, tab -> {}, tab -> {}, () -> {})))
             .as("its id is free again").doesNotThrowAnyException();
     }
 
@@ -334,7 +420,7 @@ class TabRegistryTest {
 
     @Test void aRollbackThatThrowsTheOpeningFailureAgainRethrowsIt() {
         var failure = new IllegalStateException("mount failed");
-        registry.addHost(new WorkspaceHost(main, false, tab -> { throw failure; }, tab -> { throw failure; }, tab -> {}, () -> {}));
+        registry.addHost(new WorkspaceHost(main, tab -> { throw failure; }, tab -> { throw failure; }, tab -> {}, () -> {}));
         assertThatThrownBy(() -> registry.open("plugin.file", "one", "One", main, new JPanel())).isSameAs(failure);
         assertThat(registry.hosted()).isEmpty();
     }
@@ -378,11 +464,11 @@ class TabRegistryTest {
     @Test void aMoveTellsBothWindowsWhereTheTabComesFromUntilItEnds() {
         var seen = new ArrayList<String>();
         var first = UUID.randomUUID(); var second = UUID.randomUUID(); var failing = UUID.randomUUID();
-        registry.addHost(new WorkspaceHost(first, false, tab -> seen.add("attach first " + tab.movingFrom().orElse(null)),
+        registry.addHost(new WorkspaceHost(first, tab -> seen.add("attach first " + tab.movingFrom().orElse(null)),
             tab -> seen.add("detach first " + tab.movingFrom().orElse(null)), tab -> { }, () -> { }));
-        registry.addHost(new WorkspaceHost(second, false, tab -> seen.add("attach second " + tab.movingFrom().orElse(null)),
+        registry.addHost(new WorkspaceHost(second, tab -> seen.add("attach second " + tab.movingFrom().orElse(null)),
             tab -> seen.add("detach second " + tab.movingFrom().orElse(null)), tab -> { }, () -> { }));
-        registry.addHost(new WorkspaceHost(failing, false, tab -> { throw new IllegalStateException("attach failed"); },
+        registry.addHost(new WorkspaceHost(failing, tab -> { throw new IllegalStateException("attach failed"); },
             tab -> { }, tab -> { }, () -> { }));
         var tab = registry.open("plugin.file", "one", "One", first, new JPanel());
         registry.move(tab, second);
@@ -402,7 +488,7 @@ class TabRegistryTest {
         var other = UUID.randomUUID();
         var arrived = new ArrayList<Tab>();
         var selected = new ArrayList<Tab>();
-        registry.addHost(new WorkspaceHost(other, false, arrived::add, arrived::remove, selected::add, () -> {}));
+        registry.addHost(new WorkspaceHost(other, arrived::add, arrived::remove, selected::add, () -> {}));
         var tab = registry.add(TabId.random(), Tab.Kind.TERMINAL, new HostedContent(new JPanel()), main);
         mounted.add(tab);
         registry.move(tab, other);

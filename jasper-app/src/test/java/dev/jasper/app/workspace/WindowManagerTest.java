@@ -244,6 +244,24 @@ class WindowManagerTest {
         launch();
     }
 
+    @Test void aPluginsTabMovesThroughTheRegistryToANewWindowAndBack() throws Exception {
+        edt(() -> {
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
+            MainWindow main = manager.main().orElseThrow();
+            assertThat(notes.inMainWindow()).isTrue();
+            notes.moveToNewWindow();
+            ChildWindow child = manager.children().getFirst();
+            assertThat(notes.window()).isEqualTo(child.id());
+            assertThat(notes.inMainWindow()).isFalse();
+            notes.moveToNewWindow();
+            assertThat(manager.children()).as("a child window's only tab stays").containsExactly(child);
+            notes.moveToMainWindow();
+            assertThat(notes.window()).isEqualTo(main.id());
+            assertThat(child.closed()).isTrue();
+        });
+        launch();
+    }
+
     @Test void aChildWindowsPanelRequestGoesToTheMainWindow() throws Exception {
         edt(() -> {
             model.addPanel("test.panel", "Panel", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel("panel"));
@@ -331,15 +349,57 @@ class WindowManagerTest {
         });
     }
 
-    @Test void aRequestWhileTheMainWindowOpensIsRefusedRatherThanOpeningASecondOne() throws Exception {
+    /** Workspace tabs spec 6.4: a plugin's tab asked for while the main window is being composed opens there once it is up. */
+    @Test void aPluginsTabAskedForWhileTheMainWindowOpensOpensThereOnceItIsUp() throws Exception {
+        MainWindow[] main = new MainWindow[1];
         edt(() -> {
             reenter = true;
-            assertThatThrownBy(() -> manager.ensureMain("cold", null)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("The main window is still opening");
-            assertThat(manager.main()).isEmpty();
-            assertThat(manager.opening()).isZero();
-            assertThat(model.tabs().tabs()).isEmpty();
-            assertThat(manager.ensureMain("cold", null)).as("the next request opens it").isPresent();
+            main[0] = manager.ensureMain("cold", null).orElseThrow();
+            assertThat(manager.windows()).as("no second main window").containsExactly(main[0]);
+            assertThat(early.window()).as("the tab waits for the main window").isNull();
+        });
+        edt(() -> {
+            assertThat(early.window()).as("and opens there on the next turn").isEqualTo(main[0].id());
+            assertThat(main[0].content().selectedTab()).isSameAs(early);
+        });
+        launch();
+    }
+
+    /**
+     * Workspace tabs spec 6.4: a child window a move empties closes once the move has reported itself. The active window
+     * reports no active pane as it lets the tab go, then the move, the main window's selection and the close: the order
+     * the testkit's FakeWorkspace follows (pre-flight F3).
+     */
+    @Test void aChildWindowAMoveEmptiesClosesAfterTheMoveIsReported() throws Exception {
+        ChildWindow[] child = new ChildWindow[1];
+        dev.jasper.app.terminals.TerminalRegistry[] terminals = new dev.jasper.app.terminals.TerminalRegistry[1];
+        edt(() -> {
+            child[0] = manager.openTerminalWindow(null).orElseThrow();
+            terminals[0] = new dev.jasper.app.terminals.TerminalRegistry();
+            for (JasperWindow window : manager.windows()) window.content().connectTerminals(terminals[0], () -> { });
+        });
+        launch();
+        edt(() -> {
+            terminals[0].windowActivated(child[0].id());
+            var mainId = manager.main().orElseThrow().id();
+            List<String> heard = new ArrayList<>();
+            terminals[0].onEvent(event -> {
+                switch (event) {
+                    case dev.jasper.app.terminals.TerminalEvent.ActivePaneChanged changed ->
+                        heard.add(changed.paneId().isPresent() ? "active pane" : "no active pane");
+                    case dev.jasper.app.terminals.TerminalEvent.TabMoved moved -> heard.add("tab moved");
+                    case dev.jasper.app.terminals.TerminalEvent.TabSelected selected when selected.windowId().equals(mainId) ->
+                        heard.add("main selects it");
+                    case dev.jasper.app.terminals.TerminalEvent.WindowClosed closed when closed.windowId().equals(child[0].id()) ->
+                        heard.add("child closed");
+                    default -> { }
+                }
+            });
+            Tab tab = child[0].content().selectedTab();
+            manager.moveToMainWindow(tab);
+            assertThat(heard).containsExactly("no active pane", "tab moved", "main selects it", "child closed");
+            assertThat(child[0].closed()).isTrue();
+            assertThat(tab.window()).isEqualTo(manager.main().orElseThrow().id());
         });
         launch();
     }

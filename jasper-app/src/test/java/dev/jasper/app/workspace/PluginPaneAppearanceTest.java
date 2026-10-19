@@ -104,14 +104,15 @@ class PluginPaneAppearanceTest {
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); owner.connectContributions(contributions);
             detached.connectContributions(contributions);
-            contributions.tabs().setFactory(separate -> detached.id());
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(owner::id, owner.id()::equals,
+                tab -> contributions.tabs().move(tab, detached.id())));
             var moved = new JPanel(); var movedList = new JList<>(new String[] {"move"}); moved.add(movedList);
             var entry = contributions.tabs().open("fixture", "move", "Move", owner.id(), moved);
             var retained = new JPanel(); var retainedList = new JList<>(new String[] {"keep"}); retained.add(retainedList);
             contributions.tabs().open("fixture", "keep", "Keep", owner.id(), retained);
             var armed = new boolean[] {true};
             moved.addPropertyChangeListener("Jasper.workspaceTheme", event -> {
-                if (armed[0]) { armed[0] = false; contributions.tabs().move(entry, true); }
+                if (armed[0]) { armed[0] = false; contributions.tabs().moveToNewWindow(entry); }
             });
             // A light workspace inside the dark chrome, as hosting code may receive any pair (Decision 5).
             var split = ThemeTestSupport.mixed(ThemeTestSupport.generated(true), ThemeTestSupport.generated(false));
@@ -136,18 +137,19 @@ class PluginPaneAppearanceTest {
                 // One installed look per process: the second window shows the same variant.
                 ThemeTestSupport.controller(true));
             var contributions = new Contributions(); first.connectContributions(contributions); second.connectContributions(contributions);
-            contributions.tabs().setFactory(separate -> second.id());
+            contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(first::id, first.id()::equals,
+                tab -> contributions.tabs().move(tab, second.id())));
             var text = new JTextArea("before"); var document = text.getDocument();
             var undo = new javax.swing.undo.UndoManager(); document.addUndoableEditListener(undo);
             text.append(" after"); text.select(1, 4);
             var entry = contributions.tabs().open("fixture", "pane", "Pane", first.id(), text);
             assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
-            contributions.tabs().move(entry, true);
+            contributions.tabs().moveToNewWindow(entry);
             assertThat(text.getClientProperty("Jasper.workspaceStyle")).isNull();
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();
             assertThat(text.getSelectedText()).isEqualTo("efo");
-            contributions.tabs().move(entry, false);
+            contributions.tabs().moveToMainWindow(entry);
             assertThat(dev.jasper.app.platform.ThemeZone.theme(text)).isSameAs(firstTheme.current().workspace());
             assertThat(text.getDocument()).isSameAs(document);
             assertThat(undo.canUndo()).isTrue();

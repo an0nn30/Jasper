@@ -53,8 +53,9 @@ public final class TerminalEvents {
 
     /**
      * A tab moved to another window, keeping its id, its content and a terminal tab's pane, whose id stays too: the move
-     * reports no {@code TAB_CLOSED} or {@code TAB_OPENED} and no {@code PANE_OPENED} or {@code PANE_CLOSED}. A window the
-     * move empties reports {@code WINDOW_CLOSED}, and a window opened for the move {@code WINDOW_OPENED}, before it.
+     * reports no {@code TAB_CLOSED} or {@code TAB_OPENED} and no {@code PANE_OPENED} or {@code PANE_CLOSED}. A window
+     * opened for the move reports {@code WINDOW_OPENED} before it, and a window the move empties {@code WINDOW_CLOSED}
+     * after it.
      *
      * @param tabId the tab
      * @param fromWindowId the window it left

@@ -75,18 +75,18 @@ class HostedContentTest {
             var rehearsal = content(launcher(new ArrayDeque<>()));
             rehearsal.connectContributions(model, UiState.inMemory(), false);
             var created = new WindowContent[1];
-            model.tabs().setFactory(separate -> {
+            model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> {
                 created[0] = content(launcher(new ArrayDeque<>()));
                 created[0].connectContributions(model, UiState.inMemory());
                 return created[0].id();
-            });
+            }, id -> created[0] != null && created[0].id().equals(id), tab -> { }));
             var entry = model.tabs().open("dev.editor", "a", "A", null, new JPanel());
             assertThat(created[0]).as("a real window was asked for").isNotNull();
             assertThat(entry.window()).isEqualTo(created[0].id());
             assertThat(rehearsal.selectedContent()).isNull();
         });
     }
-    @Test void detachedWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
+    @Test void anEmptyWorkspaceDoesNotScheduleATerminalLaunch() throws Exception {
         edt(() -> {
             var pending = new ArrayDeque<Runnable>();
             try (var owner = new WindowContent(launcher(pending), null, path -> {}, () -> {}, () -> {})) {
@@ -95,7 +95,7 @@ class HostedContentTest {
                 assertThat(owner.currentPane()).isNull();
                 var model = new Contributions(); owner.connectContributions(model);
                 var entry = model.tabs().open("dev.editor", "a", "A", owner.id(), new JPanel());
-                assertThat(entry.detached()).isTrue();
+                assertThat(entry.window()).isEqualTo(owner.id());
                 assertThat(owner.selectedContent()).isSameAs(entry);
             }
         });

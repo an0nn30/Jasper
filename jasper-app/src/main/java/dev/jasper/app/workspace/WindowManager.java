@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.contributions.TabRegistry;
 import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -97,9 +98,10 @@ public final class WindowManager {
     public WindowManager(Contributions model, Hooks hooks) {
         this.model = Objects.requireNonNull(model, "model");
         this.hooks = Objects.requireNonNull(hooks, "hooks");
-        // A plugin's view opened with no window goes to the main window, restored first when none is open (spec 6.4).
-        model.tabs().setFactory(separate -> (separate ? openChild(true, null, null).map(JasperWindow::id) : ensureMain("plugin", null)
-            .map(JasperWindow::id)).orElseThrow(() -> new IllegalStateException("Jasper is quitting")));
+        // A plugin's view opened with no window goes to the main window, restored first when none is open (spec 6.4); while
+        // the main window is being composed it waits for it. A child window a move empties closes after the move.
+        model.tabs().windows(new TabRegistry.Windows(() -> openingMain ? null : ensureMain("plugin", null).map(JasperWindow::id)
+            .orElseThrow(() -> new IllegalStateException("Jasper is quitting")), this::isMain, this::moveToNewWindow, this::movedOut));
         model.panelRoute(this::routePanel);
     }
 
@@ -116,6 +118,14 @@ public final class WindowManager {
         all.addAll(children);
         return List.copyOf(all);
     }
+
+    /**
+     * Whether {@code id} is the main window's.
+     *
+     * @param id a window's id, or null
+     * @return true for the main window while it is open
+     */
+    public boolean isMain(UUID id) { return main != null && main.id().equals(id); }
 
     /** @return whether no window is open */
     public boolean isEmpty() { return main == null && children.isEmpty(); }
@@ -345,6 +355,15 @@ public final class WindowManager {
         if (main == null || children.stream().noneMatch(child -> child.id().equals(request.windowId()))) return request;
         if (request.op() != Contributions.PanelRequest.Op.HIDE) main.toFront();
         return new Contributions.PanelRequest(main.id(), request.panelId(), request.op());
+    }
+
+    /**
+     * A move took a tab out of {@code window} and has reported itself: a child window it left empty closes now, so listeners
+     * hear {@code TAB_MOVED} before that window's {@code WINDOW_CLOSED} (workspace tabs spec 6.4).
+     */
+    private void movedOut(UUID window) {
+        for (ChildWindow child : List.copyOf(children))
+            if (child.id().equals(window) && child.content().tabCount() == 0) child.close();
     }
 
     void activated(JasperWindow window) {

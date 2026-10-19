@@ -137,17 +137,19 @@ final class FakeWorkspace {
         refreshActive();
     }
 
-    /** Moves a tab to another open window, where it is selected; a window left with no tab closes before the move is announced. */
+    /** Moves a tab to another open window, where it is selected; a window left with no tab closes after the move is announced. */
     void move(Tab tab, Window to) {
         if (!tab.open || !to.open || tab.window == to) return;
         Window from = tab.window;
         from.tabs.remove(tab);
         if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
-        if (from.tabs.isEmpty()) closeWindow(from);
+        // As the application's window does: the active pane is reported as soon as the source lets the tab go.
+        refreshActive();
         tab.window = to;
         to.tabs.add(tab);
         host.publishApp(TerminalEvents.TAB_MOVED, new TerminalEvents.TabMoved(tab.id, from.id, to.id));
         select(tab);
+        if (from.tabs.isEmpty()) closeWindow(from);
         refreshActive();
     }
 

@@ -157,8 +157,8 @@ final class TerminalFixture {
 
     /**
      * Moves a tab to another window, where it is selected: the move is reported once, its pane keeps its id with no
-     * PaneOpened or PaneClosed, and a window left with no tab closes before the move is reported (workspace plan 3b
-     * Rulings 5, 6).
+     * PaneOpened or PaneClosed, and a window left with no tab closes after the move is reported (workspace plan 3b
+     * Rulings 5, 6; plan 4a Rulings 23).
      */
     void moveTab(UUID tabId, UUID windowId) {
         Tab tab = tabs.get(tabId);
@@ -168,11 +168,11 @@ final class TerminalFixture {
         registry.atomically(() -> {
             from.tabs.remove(tab);
             if (from.selected == tab) { from.selected = null; if (!from.tabs.isEmpty()) select(from.tabs.get(0)); }
-            if (from.tabs.isEmpty()) closeWindow(from);
             tab.window = to;
             to.tabs.add(tab);
             registry.publish(new TerminalEvent.TabMoved(tab.id, from.id, to.id));
             select(tab);
+            if (from.tabs.isEmpty()) closeWindow(from);
         });
     }
 

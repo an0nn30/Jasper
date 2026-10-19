@@ -1251,7 +1251,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * Moves a tab the test added to another open window, where it is selected, as dragging it there does: a terminal
      * tab's pane keeps its id and session with no {@code PANE_OPENED} or {@code PANE_CLOSED}, the move is announced on
-     * {@code TAB_MOVED}, and a window left with no tab closes before it. A plugin moves its own content tab with
+     * {@code TAB_MOVED}, and a window left with no tab closes after it. A plugin moves its own content tab with
      * {@code ContentTab.move}.
      *
      * @param tabId an open tab the test added

@@ -140,10 +140,14 @@ class AppContractTest extends PluginContractTest {
         // Every window is a workspace, as every application window is (workspace plan 3b Rulings 15): a plugin's tab is a
         // content tab of the window that shows it, the window it moves to reports the move, and a window whose last tab
         // left closes, taking its workspace with it.
-        java.util.function.Function<Boolean, UUID> workspace = separate -> {
+        // The window manager's part: the window added last that no move made is the main window (workspace plan 4a).
+        UUID[] main = new UUID[1];
+        java.util.Set<UUID> separate = new java.util.HashSet<>();
+        java.util.function.Function<Boolean, UUID> workspace = forMove -> {
             UUID id = terminalFixture.addWindow();
+            if (forMove) separate.add(id); else main[0] = id;
             var tabs = contributions.tabs();
-            var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id, separate,
+            var registration = tabs.addHost(new dev.jasper.app.contributions.WorkspaceHost(id,
                 tab -> tab.movingFrom().ifPresentOrElse(from -> terminalFixture.moveTab(tab.id().value(), id),
                     () -> terminalFixture.addContentTab(id, tab.id().value(), tab::title)),
                 tab -> { if (!tab.moving()) terminalFixture.closeTab(tab.id().value()); },
@@ -151,10 +155,15 @@ class AppContractTest extends PluginContractTest {
                     for (var other : tabs.inWindow(id)) other.active(other == entry);
                     terminalFixture.selectTab(entry.id().value());
                 }, () -> {}));
-            terminalFixture.onWindowClosed(id, registration::close);
+            terminalFixture.onWindowClosed(id, () -> {
+                registration.close();
+                if (id.equals(main[0])) main[0] = null;
+            });
             return id;
         };
-        onEdt(() -> contributions.tabs().setFactory(workspace));
+        onEdt(() -> contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(
+            () -> main[0] != null ? main[0] : workspace.apply(false), id -> !separate.contains(id),
+            tab -> contributions.tabs().move(tab, workspace.apply(true)))));
         var notifications = new NotificationsFixture();
         List<Path> edited = new CopyOnWriteArrayList<>();
         TestShellProfiles shells = new TestShellProfiles();

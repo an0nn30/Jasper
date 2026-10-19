@@ -214,7 +214,7 @@ class RuledCellsTest {
             try {
                 var registry = new TabRegistry();
                 var window = UUID.randomUUID();
-                registry.addHost(new WorkspaceHost(window, false, entry -> { }, entry -> { }, entry -> { }, () -> { }));
+                registry.addHost(new WorkspaceHost(window, entry -> { }, entry -> { }, entry -> { }, () -> { }));
                 var entry = registry.open("dev.x.editor", "notes", "notes.txt", window, new JPanel());
                 entry.presentation("notes.txt", "", null, false, "/work/notes.txt", "");
                 entry.status(List.of(new ContentStatus("Ln 12, Col 4", null, null), new ContentStatus("Plain Text", null, null),

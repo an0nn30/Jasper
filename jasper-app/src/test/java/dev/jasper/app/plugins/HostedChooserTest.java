@@ -42,9 +42,11 @@ class HostedChooserTest {
     @Test void ownedDocumentPinsAcrossChooserAndOwnerClosureDiscardsResult() {
         var containment=new Containment(() -> true);
         var kit=new HostedKit("dev.x.tool",open::get,ui::kitThemes,ui.appearance(),containment);ui.kit(kit);
-        contributions.tabs().setFactory(separate -> {
-            UUID id=fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,separate,e -> {},e -> {},e -> {},() -> {}));return id;
-        });
+        java.util.function.Supplier<UUID> window = () -> {
+            UUID id=fixture.addWindow();contributions.tabs().addHost(new dev.jasper.app.contributions.WorkspaceHost(id,e -> {},e -> {},e -> {},() -> {}));return id;
+        };
+        UUID main=window.get();
+        contributions.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(() -> main, main::equals, tab -> contributions.tabs().move(tab, window.get())));
         var disposed=new java.util.concurrent.atomic.AtomicInteger();
         var view=kit.create(HostedKitTest.custom(dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,"doc"),e -> {});
         view.registerContent(new dev.jasper.sdk.ui.CustomContent("doc",dev.jasper.sdk.ui.Nodes.CustomKind.EDITOR,new javax.swing.JTextArea(),disposed::incrementAndGet));

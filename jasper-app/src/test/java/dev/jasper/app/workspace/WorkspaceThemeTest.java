@@ -72,16 +72,18 @@ class WorkspaceThemeTest {
             var model = new dev.jasper.app.contributions.Contributions(); owner.connectContributions(model);
             try (var detached = new WindowContent(launcher(new ArrayDeque<>()), null, path -> {}, () -> {}, () -> {},
                     ThemeTestSupport.controller(false))) {
-                detached.connectContributions(model); model.tabs().setFactory(separate -> detached.id());
+                detached.connectContributions(model);
+                model.tabs().windows(new dev.jasper.app.contributions.TabRegistry.Windows(owner::id, owner.id()::equals,
+                    tab -> model.tabs().move(tab, detached.id())));
                 var text = new JTextArea("retained document"); var document = text.getDocument();
                 var entry = model.tabs().open("test", "move", "Move", owner.id(), text);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
-                model.tabs().move(entry, true);
+                model.tabs().moveToNewWindow(entry);
                 assertThat(detached.selectedContent()).isSameAs(entry);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
                 assertThat(text.getClientProperty("Jasper.workspaceTheme")).isNull();
                 assertThat(text.getDocument()).isSameAs(document);
-                model.tabs().move(entry, false);
+                model.tabs().moveToMainWindow(entry);
                 assertThat(owner.selectedContent()).isSameAs(entry);
                 assertThat(text.getClientProperty("Jasper.zone")).isEqualTo("workspace");
             }

@@ -70,8 +70,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     /** This window's workspace in {@link #registry}; closing it removes the tabs the window still holds. */
     private Subscription host;
     private Runnable bringToFront = () -> {};
-    /** Until workspace plan 4a Task 4: a child window, or one that starts empty, hosts detached content. */
-    private final boolean detached;
     /** The main window, with Jasper's chrome, or a child window, a workspace alone (workspace tabs spec 6). */
     private final WindowRole role;
     /** The window's tabs as groups in splits, each group under the look's strip (workspace tabs spec 10). */
@@ -279,7 +277,6 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         super(new BorderLayout());
         this.role = Objects.requireNonNull(role, "role");
         this.look = Objects.requireNonNull(look, "look");
-        this.detached = empty || role == WindowRole.CHILD;
         setFocusTraversalPolicyProvider(true);
         setFocusTraversalPolicy(new LayoutFocusTraversalPolicy() {
             @Override public Component getDefaultComponent(Container root) {
@@ -974,7 +971,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
 
     /** The registry-facing side of this window's workspace (workspace tabs spec 9.1). */
     private WorkspaceHost workspaceHost() {
-        return new WorkspaceHost(id, detached, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
+        return new WorkspaceHost(id, this::attach, this::detach, this::selectTab, () -> bringToFront.run(),
             tab -> workspace.model().groupOf(tab));
     }
 
@@ -1035,7 +1032,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         WorkspaceTheme.clear(tab.component());
         update();
         if (backgroundOpacity < 1) glassListener.run();
-        if (workspace.isEmpty()) onEmpty.run();
+        // A move empties a window only once it has reported itself: the window manager closes it then (TabRegistry.Windows).
+        if (workspace.isEmpty() && !tab.moving()) onEmpty.run();
     }
 
     /**
@@ -1087,7 +1085,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         var menu = new JPopupMenu();
         if (tab.kind() == Tab.Kind.TERMINAL)
             menu.add(tabMenuItem("Rename Tab", ActionId.RENAME_TAB, () -> { selectTab(tab); invoke(ActionId.RENAME_TAB); }));
-        else menu.add(tabMenuItem(tab.detached() ? "Move to Main Window" : "Open in Separate Window", null, () -> tab.move(!tab.detached())));
+        else if (tab.inMainWindow()) menu.add(tabMenuItem("Open in Separate Window", null, tab::moveToNewWindow));
+        else menu.add(tabMenuItem("Move to Main Window", null, tab::moveToMainWindow));
         menu.addSeparator();
         menu.add(tabMenuItem("Close Tab", ActionId.CLOSE_TAB, () -> closeTab(tab)));
         var others = tabMenuItem("Close Others", null, () -> closeOthers(tab));
@@ -1712,7 +1711,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         if (!value && commandPalette != null) commandPalette.windowDeactivated();
         // A modal dialog opening takes the drag's release, and so does another application taking focus.
         if (!value) dockDrag.cancel();
-        active = value; if (value) registry.activated(id); update();
+        active = value; update();
     }
     void setToolbarMode(ToolbarMode mode) {
         toolbarMode = Objects.requireNonNull(mode); refreshChromeVisibility(); updateActions();
