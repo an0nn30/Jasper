@@ -183,7 +183,7 @@ final class FakeSessions {
             String message = status != null ? "exit " + status
                 : String.valueOf(connection.exited().handle((value, error) -> error == null ? "unknown" : String.valueOf(error.getMessage())).join());
             ended(pane, message, status == null ? OptionalInt.empty() : OptionalInt.of(status));
-            if (pane.session.spec.onExit() == ExitPolicy.CLOSE_PANE) workspace.close(pane);
+            if (pane.session.spec.onExit() == ExitPolicy.CLOSE) workspace.close(pane);
         }
     }
 }

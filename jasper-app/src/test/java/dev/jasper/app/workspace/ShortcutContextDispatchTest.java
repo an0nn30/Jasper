@@ -109,7 +109,7 @@ class ShortcutContextDispatchTest {
     }
 
     @Test void cmdWClosesTheActiveTabAndAGroupGoesWithItsLastTab() throws Exception {
-        // The launcher's queued work runs between the steps, so the split inherits from a running shell, as in TerminalTabTest.
+        // The launcher's queued work runs between the steps, so the split inherits from a running shell, as in TerminalContentTest.
         Queue<Runnable> pending = new ArrayDeque<>();
         WindowContent[] owner = new WindowContent[1];
         edt(() -> { owner[0] = content(idleLauncher(pending), true); owner[0].newTab(HOME); });

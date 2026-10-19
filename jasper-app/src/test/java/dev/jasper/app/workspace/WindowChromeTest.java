@@ -84,7 +84,7 @@ class WindowChromeTest {
                 assertThat(button.getAccessibleContext().getAccessibleName()).isNotBlank();
                 assertThat(button.getToolTipText()).isNotBlank();
             });
-            assertThat(buttons.get(2).getAccessibleContext().getAccessibleName()).isEqualTo("Split pane");
+            assertThat(buttons.get(2).getAccessibleContext().getAccessibleName()).isEqualTo("Split");
 
             List<Icon> icons = buttons.stream().map(AbstractButton::getIcon).toList();
 

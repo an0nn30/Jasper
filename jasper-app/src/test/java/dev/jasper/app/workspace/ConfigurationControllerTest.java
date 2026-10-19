@@ -299,7 +299,7 @@ class ConfigurationControllerTest {
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
-    void existingTerminalHandlerUsesReloadedBindingsAndPreservesSelectionAndZoomedHiddenPanes() throws Exception {
+    void existingTerminalHandlerUsesReloadedBindingsAndPreservesSelectionAndTheMaximizedGroup() throws Exception {
         start(""); edt(this::owner); launchAll();
         var owner = owners.getFirst(); var tab = owner.currentTerminal(); var retained = owner.currentPane();
         until(() -> {

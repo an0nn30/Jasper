@@ -61,6 +61,13 @@ class KitCompatibilityTest {
         var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",reference("dev.jasper.sdk.terminal.TabHandle","terminal","()Ljava/util/Optional;")),false);
         try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the member that took their place").isNotNull();}
     }
+    /** Workspace tabs plan 3b: a constant SDK 0.19 removed, the Pane menu or the pane exit policy, is refused at load. */
+    @Test void theConstantsSdkZeroNineteenRemovedAreRefused() throws Exception {
+        rejects(constant("dev.jasper.sdk.ui.StandardMenu","PANE"),"dev/jasper/sdk/ui/StandardMenu#PANELdev/jasper/sdk/ui/StandardMenu;","0.19");
+        rejects(constant("dev.jasper.sdk.terminal.ExitPolicy","CLOSE_PANE"),"dev/jasper/sdk/terminal/ExitPolicy#CLOSE_PANELdev/jasper/sdk/terminal/ExitPolicy;","0.19");
+        var current=candidate(">=0.19.0, <0.20",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.terminal.ExitPolicy","CLOSE")),false);
+        try(var loader=PluginLoader.load(current,Map.of(),Plugin.class.getClassLoader()).loader()){assertThat(loader).as("the constant that took its place").isNotNull();}
+    }
     @Test void theNamesSdkZeroEighteenGaveThemAreAdmitted() throws Exception {
         for(var renamed:RENAMED_TO) {
             var candidate=candidate(">=0.18.0, <0.19",Map.of("test/kit/Probe.class",constant("dev.jasper.sdk.ui.Nodes$"+renamed.get(0),renamed.get(1))),false);

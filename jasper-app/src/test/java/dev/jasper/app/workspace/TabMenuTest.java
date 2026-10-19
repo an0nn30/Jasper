@@ -235,13 +235,15 @@ class TabMenuTest {
         });
     }
 
-    @Test void theFileViewAndPaneMenusNameTabsAndGroups() throws Exception {
+    @Test void theFileViewAndTabMenusNameTabsAndGroups() throws Exception {
         var window = window(1);
         edt(() -> {
             assertThat(items(window, "File")).containsSubsequence("New Tab", "New Window", "Open File…", "Close Tab", "Close Group");
             assertThat(items(window, "View")).contains("Maximize Group");
-            assertThat(items(window, "Pane")).containsExactly("Split Right", "Split Down", "Focus Group Left", "Focus Group Right",
-                "Focus Group Up", "Focus Group Down", "Previous Prompt", "Next Prompt");
+            assertThat(items(window, "Tab")).containsExactly("Split Right", "Split Down", "Focus Group Left", "Focus Group Right",
+                "Focus Group Up", "Focus Group Down", "Previous Prompt", "Next Prompt", "Next Tab", "Previous Tab", "Rename Tab",
+                "Select Tab 1", "Select Tab 2", "Select Tab 3", "Select Tab 4", "Select Tab 5", "Select Tab 6", "Select Tab 7",
+                "Select Tab 8", "Select Tab 9");
         });
     }
 }

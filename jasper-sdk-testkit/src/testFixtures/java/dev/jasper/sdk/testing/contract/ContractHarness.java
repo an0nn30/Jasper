@@ -59,7 +59,7 @@ public interface ContractHarness extends AutoCloseable {
     void clickToolbarViewButton(java.util.UUID windowId, String buttonId);
 
     /**
-     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS},
+     * One menu target ({@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS},
      * {@code SESSION}, {@code TRANSFER}, {@code context},
      * {@code top:<menuId>}): {@code item:id}, {@code ---}, {@code submenu:title}, children indented two
      * spaces, sections separated by {@code ===}; items of closed actions omitted.

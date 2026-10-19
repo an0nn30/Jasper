@@ -68,7 +68,9 @@ final class KitCompatibility {
         // The members SDK 0.19 removed with workspace tabs.
         "0.19", List.of(
         "dev/jasper/sdk/terminal/TabHandle#activePane()Ljava/util/Optional;",
-        "dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;")));
+        "dev/jasper/sdk/terminal/TabHandle#panes()Ljava/util/List;",
+        "dev/jasper/sdk/terminal/ExitPolicy#CLOSE_PANELdev/jasper/sdk/terminal/ExitPolicy;",
+        "dev/jasper/sdk/ui/StandardMenu#PANELdev/jasper/sdk/ui/StandardMenu;")));
 
     private static Map<String, String> removed(Map<String, List<String>> byVersion) {
         var removed = new HashMap<String, String>();

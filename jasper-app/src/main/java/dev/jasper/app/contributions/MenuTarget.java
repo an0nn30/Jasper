@@ -17,7 +17,7 @@ public record MenuTarget(Type type, String key, String title) {
     public static final String HELP = "app.help";
 
     /** The built-in menus that accept a contributed section. */
-    public enum Slot { FILE, EDIT, VIEW, PANE, TAB, TOOLS, SESSION, TRANSFER }
+    public enum Slot { FILE, EDIT, VIEW, TAB, TOOLS, SESSION, TRANSFER }
 
     public MenuTarget {
         Objects.requireNonNull(type, "type");

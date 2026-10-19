@@ -93,14 +93,12 @@ final class WindowChrome {
         JMenu visibility = menu("Show/Hide");
         view.add(visibility);
         view.add(menu("Font Size", ActionId.FONT_BIGGER, ActionId.FONT_SMALLER, ActionId.FONT_RESET));
-        JMenu pane = paneMenu();
         JMenu tab = tabMenu();
         // The look's layout decides which built-in menus the bar shows from the start (spec 10.2).
-        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, pane, tab))) menuBar.add(fixed);
+        for (JMenu fixed : owner.look().menus().fixed(new MenuBarLayout.BuiltIn(file, edit, view, tab))) menuBar.add(fixed);
         owner.look().menus().style(menuBar);
         standardMenus.put(MenuTarget.Slot.FILE, file); standardMenus.put(MenuTarget.Slot.EDIT, edit);
-        standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.PANE, pane);
-        standardMenus.put(MenuTarget.Slot.TAB, tab);
+        standardMenus.put(MenuTarget.Slot.VIEW, view); standardMenus.put(MenuTarget.Slot.TAB, tab);
         JMenu modes = menu("Toolbar");
         for (ToolbarMode mode : ToolbarMode.values()) {
             JRadioButtonMenuItem item = new MenuBarItems.Radio(owner.windowCommands().view("view.toolbar." + mode.name().toLowerCase(java.util.Locale.ROOT)));
@@ -142,7 +140,7 @@ final class WindowChrome {
     /** The classic "Split ▾": a label and a caret opening Split Right and Split Down. */
     void classicSplit() {
         var split = new ClassicToolbarButton(null, "Split", ClassicToolbarButton.Glyph.NONE, true, AppIcons.icon("columns-2"));
-        split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        split.setToolTipText("Split right or down"); split.getAccessibleContext().setAccessibleName("Split");
         WindowToolbar.entry(split, 90, () -> {
             var menu = new JMenu("Split");
             menu.add(WindowToolbar.menuItem(owner.action(ActionId.SPLIT_RIGHT)));
@@ -197,7 +195,7 @@ final class WindowChrome {
     private void addSplitButton() {
         JButton split = addButton(ActionId.SPLIT_RIGHT, "columns-2");
         split.setAction(null); split.setText("Split"); split.setIcon(AppIcons.icon("columns-2"));
-        split.setToolTipText("Split pane right or down"); split.getAccessibleContext().setAccessibleName("Split pane");
+        split.setToolTipText("Split right or down"); split.getAccessibleContext().setAccessibleName("Split");
         split.putClientProperty("keepLabel", true);
         WindowToolbar.entry(split, 90, () -> {
             var menu = new JMenu("Split");
@@ -398,8 +396,8 @@ final class WindowChrome {
             standardMenus.put(MenuTarget.Slot.SESSION, menu("Session"));
             standardMenus.put(MenuTarget.Slot.TRANSFER, menu("Transfer"));
             standardMenus.put(MenuTarget.Slot.TOOLS, menu("Tools"));
-            // A layout that gathers Pane and Tab into another menu builds them fresh too.
-            layout.fresh(standardMenus, this::paneMenu, this::tabMenu);
+            // A layout that gathers Tab into another menu builds it fresh too.
+            layout.fresh(standardMenus, this::tabMenu);
             var toolWindows = contributions.model().toolWindowsSection();
             for (MenuSection section : sections) {
                 if (section.target().type() != MenuTarget.Type.STANDARD) continue;
@@ -434,13 +432,20 @@ final class WindowChrome {
         menuBar.revalidate(); menuBar.repaint();
     }
 
-    private static final ActionId[] PANE_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_GROUP_LEFT,
+    /** The Tab menu's group and prompt items, before its tab items (workspace plan 3b Rulings 7). */
+    private static final ActionId[] GROUP_ITEMS = {ActionId.SPLIT_RIGHT, ActionId.SPLIT_DOWN, ActionId.FOCUS_GROUP_LEFT,
         ActionId.FOCUS_GROUP_RIGHT, ActionId.FOCUS_GROUP_UP, ActionId.FOCUS_GROUP_DOWN, ActionId.PREVIOUS_PROMPT, ActionId.NEXT_PROMPT};
     private static final ActionId[] TAB_ITEMS = {ActionId.NEXT_TAB, ActionId.PREVIOUS_TAB, ActionId.RENAME_TAB,
         ActionId.SELECT_TAB_1, ActionId.SELECT_TAB_2, ActionId.SELECT_TAB_3, ActionId.SELECT_TAB_4,
         ActionId.SELECT_TAB_5, ActionId.SELECT_TAB_6, ActionId.SELECT_TAB_7, ActionId.SELECT_TAB_8, ActionId.SELECT_TAB_9};
-    private JMenu paneMenu() { return menu("Pane", PANE_ITEMS); }
-    private JMenu tabMenu() { return menu("Tab", TAB_ITEMS); }
+
+    /** Tab: splitting and focusing groups and moving between prompts, a rule, then the tab commands. */
+    private JMenu tabMenu() {
+        JMenu menu = menu("Tab", GROUP_ITEMS);
+        menu.addSeparator();
+        for (ActionId id : TAB_ITEMS) menu.add(new MenuBarItems.Item(owner.action(id)));
+        return menu;
+    }
 
     /** One item per tool window whose toggle action this window has, in registration order. */
     private List<JMenuItem> toolWindowItems() {

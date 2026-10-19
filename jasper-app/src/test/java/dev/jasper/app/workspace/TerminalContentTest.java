@@ -18,7 +18,7 @@ import static dev.jasper.app.workspace.DesktopTestSupport.*;
 
 /** Terminal tabs: one pane each, in groups (workspace tabs spec 9.2). */
 @DisabledOnOs(OS.WINDOWS)
-class TerminalTabTest {
+class TerminalContentTest {
     @org.junit.jupiter.api.AfterEach void cleanup() throws Exception { closeOwners(); }
 
     @Test void completionAfterOwnerCloseTerminatesReturnedProcess() throws Exception {

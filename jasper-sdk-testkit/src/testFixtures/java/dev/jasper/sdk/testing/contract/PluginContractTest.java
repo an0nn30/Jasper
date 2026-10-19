@@ -1760,6 +1760,29 @@ public abstract class PluginContractTest {
         assertThat(h.active("test.alpha")).as("a failing connector is contained").isTrue();
     }
 
+    @Test void aSessionThatClosesWhenItEndsTakesItsTabWithIt() {
+        UUID window = h.addTerminalWindow(), keep = h.addTerminalTab(window, "local");
+        h.addTerminalPane(keep, "zsh", Path.of("/"));
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.SESSION_PROVIDE), Set.of(), Set.of(), alpha::set);
+        List<PendingSession> pendings = Collections.synchronizedList(new ArrayList<>());
+        PaneHandle pane = openSession(alpha, window, new SessionSpec("build-host", Optional.empty(), ExitPolicy.CLOSE, pendings::add));
+        var tab = new AtomicReference<UUID>();
+        h.ui(() -> tab.set(pane.tab().id()));
+        var probe = new Probe();
+        pendings.get(0).attach(probe.connection("bye"));
+        h.flush();
+        probe.exited.complete(0);
+        h.flush();
+        assertThat(h.sessionState(pane.id())).isEqualTo("CLOSED|");
+        assertThat(probe.closes).hasValue(1);
+        h.ui(() -> {
+            assertThat(pane.isOpen()).isFalse();
+            assertThat(alpha.get().terminals().tab(tab.get())).as("its tab closed with it").isEmpty();
+            assertThat(alpha.get().terminals().window(window)).as("the window keeps its other tab").isPresent();
+        });
+    }
+
     @Test void stoppingAPluginCancelsWhatItIsStillConnecting() {
         UUID window = h.addTerminalWindow();
         var alpha = new AtomicReference<PluginContext>();

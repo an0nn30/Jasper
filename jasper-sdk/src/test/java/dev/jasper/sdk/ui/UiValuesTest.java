@@ -7,6 +7,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class UiValuesTest {
+    /** Workspace tabs spec 14: the Tab menu holds what the Pane menu held. */
+    @Test void theStandardMenusAreFileEditViewTabAndThePluginOnes() {
+        assertThat(StandardMenu.values()).containsExactly(StandardMenu.FILE, StandardMenu.EDIT, StandardMenu.VIEW, StandardMenu.TAB,
+            StandardMenu.TOOLS, StandardMenu.SESSION, StandardMenu.TRANSFER);
+    }
+
     @Test void actionSpecValidatesAndCopies() {
         var keywords = new ArrayList<>(List.of("connect"));
         ActionSpec spec = ActionSpec.of("dev.x.tool.run", "Run Tool").withKeywords(keywords).withDefaultBinding("cmd+alt+j");

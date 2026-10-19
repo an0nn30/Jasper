@@ -1,7 +1,7 @@
 package dev.jasper.sdk.ui;
 
 /** The application's built-in menus; a plugin's entries form a section at the end of one. A presentation may show the
- * PANE and TAB items in a Window menu. */
+ * TAB items in a Window menu. */
 public enum StandardMenu {
     /** The File menu. */
     FILE,
@@ -9,9 +9,7 @@ public enum StandardMenu {
     EDIT,
     /** The View menu. */
     VIEW,
-    /** The Pane menu. */
-    PANE,
-    /** The Tab menu. */
+    /** The Tab menu: splitting and focusing tab groups, moving between prompts, and the tab commands. */
     TAB,
     /**
      * The Tools menu, for utility commands. Jasper has none of its own, so it shows only while a plugin has entries in

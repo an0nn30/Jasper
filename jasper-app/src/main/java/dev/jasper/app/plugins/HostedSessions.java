@@ -38,7 +38,7 @@ final class HostedSessions {
     SessionRequest request(SessionSpec spec) {
         Objects.requireNonNull(spec, "spec");
         Executor contained = task -> cleanup.execute(() -> containment.run(pluginId, "session cleanup", task));
-        return new SessionRequest(pluginId, spec.title(), spec.onExit() == ExitPolicy.CLOSE_PANE, attempt -> {
+        return new SessionRequest(pluginId, spec.title(), spec.onExit() == ExitPolicy.CLOSE, attempt -> {
             track(attempt);
             Throwable failure = containment.attempt(pluginId, "session connector", () -> { spec.connector().accept(new Pending(attempt)); return null; });
             if (failure != null) attempt.fail(failure.getMessage() == null ? failure.toString() : failure.getMessage());

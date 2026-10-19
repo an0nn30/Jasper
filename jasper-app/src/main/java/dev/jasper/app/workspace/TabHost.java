@@ -64,7 +64,7 @@ final class TabHost {
     }
 
     /**
-     * A pane that has just opened: the terminal registry, whose listeners cannot fail it, then this window's activity
+     * A pane that has just opened: the terminal registry, which logs a listener's exception (an Error still propagates), then this window's activity
      * hear of it.
      */
     private void announce(Tab tab, TerminalPane pane) {

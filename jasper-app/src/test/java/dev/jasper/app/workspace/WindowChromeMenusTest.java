@@ -72,10 +72,10 @@ class WindowChromeMenusTest {
         edt(() -> {
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             owner.connectContributions(model(false));
-            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Pane", "Tab", "Session", "Transfer", "Tools", "Own", "Help");
+            assertThat(titles(owner)).containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Own", "Help");
             var first = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);
             first.connectContributions(model(true));
-            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Pane", "Tab", "Session", "Transfer", "Tools", "Help", "Own");
+            assertThat(titles(first)).as("registration order, as today").containsExactly("File", "Edit", "View", "Tab", "Session", "Transfer", "Tools", "Help", "Own");
             assertThat(owner.chrome().menuBar().getClientProperty("FlatLaf.style")).as("the standard bar is not restyled").isNull();
         });
     }
@@ -91,17 +91,17 @@ class WindowChromeMenusTest {
         });
     }
 
-    @Test void theClassicWindowMenuHoldsPaneThenTabThenTheToolWindows() throws Exception {
+    @Test void theClassicWindowMenuHoldsTheTabMenuThenTheToolWindows() throws Exception {
         edt(() -> {
             var model = model(false);
             model.addPanel("dev.x.hosts", "Hosts", new ImageIcon(), Slot.LEFT_TOP, site -> new JLabel());
-            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.PANE)).set(List.of(new MenuEntry.Item("dev.x.split")));
+            model.addMenuSection(MenuTarget.standard(MenuTarget.Slot.TAB)).set(List.of(new MenuEntry.Item("dev.x.split")));
             var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), classic());
             owner.connectContributions(model);
             var window = items(menu(owner, "Window"));
             assertThat(window.getFirst()).isEqualTo("Split Right");
-            assertThat(window).as("Pane's items and the plugin's Pane section, Tab's items, then the toggles")
-                .containsSubsequence("Split Right", "Next Prompt", "---", "split", "---", "Next Tab", "Previous Tab", "---", "Toggle Hosts");
+            assertThat(window).as("the Tab menu's group, prompt and tab items with the plugin's Tab section, then the toggles")
+                .containsSubsequence("Split Right", "Next Prompt", "---", "Next Tab", "Previous Tab", "---", "split", "---", "Toggle Hosts");
             assertThat(window.getLast()).as("the tool-window toggles close the menu").isEqualTo("Toggle Hosts");
             assertThat(items(menu(owner, "View"))).as("the toggles moved to Window").doesNotContain("submenu:Tool Windows");
             var standard = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), ThemeTestSupport.controller(true), WorkspaceChrome.STANDARD);

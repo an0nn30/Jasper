@@ -23,10 +23,9 @@ sealed interface MenuBarLayout permits StandardMenuBar, ClassicMenuBar {
      * @param file File
      * @param edit Edit
      * @param view View
-     * @param pane Pane
      * @param tab Tab
      */
-    record BuiltIn(JMenu file, JMenu edit, JMenu view, JMenu pane, JMenu tab) { }
+    record BuiltIn(JMenu file, JMenu edit, JMenu view, JMenu tab) { }
 
     /**
      * A contributed top-level menu of this pass.
@@ -60,7 +59,7 @@ sealed interface MenuBarLayout permits StandardMenuBar, ClassicMenuBar {
     List<JMenu> fixed(BuiltIn menus);
 
     /** Before a pass: puts fresh menus in the slots this layout rebuilds every pass. */
-    void fresh(Map<MenuTarget.Slot, JMenu> slots, Supplier<JMenu> pane, Supplier<JMenu> tab);
+    void fresh(Map<MenuTarget.Slot, JMenu> slots, Supplier<JMenu> tab);
 
     /** Whether View keeps the app's "Tool Windows" section. */
     boolean toolWindowsInView();

@@ -8,6 +8,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class SessionValuesTest {
+    /** Workspace tabs plan 3b: a session's tab stays, or closes as {@code terminal.on_exit = "close"} closes a shell's. */
+    @Test void aSessionKeepsItsTabOpenOrClosesIt() {
+        assertThat(ExitPolicy.values()).containsExactly(ExitPolicy.KEEP_OPEN, ExitPolicy.CLOSE);
+        assertThat(new SessionSpec("build-host", Optional.empty(), ExitPolicy.CLOSE, pending -> { }).onExit()).isEqualTo(ExitPolicy.CLOSE);
+    }
+
     @Test void aSessionSpecDefaultsToKeepingThePaneOpen() {
         SessionSpec spec = SessionSpec.of("build-host", pending -> { });
         assertThat(spec.onExit()).isEqualTo(ExitPolicy.KEEP_OPEN);

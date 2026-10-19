@@ -583,7 +583,7 @@ public final class FakePluginHost implements AutoCloseable {
     /**
      * One menu target's contributed entries.
      *
-     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code PANE}, {@code TAB}, {@code TOOLS}, {@code SESSION},
+     * @param target {@code FILE}, {@code EDIT}, {@code VIEW}, {@code TAB}, {@code TOOLS}, {@code SESSION},
      *     {@code TRANSFER}, {@code context} or {@code top:<menuId>}
      * @return {@code item:id}, {@code ---} and {@code submenu:title} lines, children indented, sections separated by {@code ===}
      */
