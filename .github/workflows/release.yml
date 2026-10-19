@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (vX.Y.Z, for example v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      commit: ${{ steps.tag.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate tag and resolve its commit
+        id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          tag = os.environ['RELEASE_TAG']
+          match = re.fullmatch(r'v([1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,4})', tag)
+          if not match or any(int(n) > limit for n, limit in zip(match.groups(), (255, 255, 65535))):
+              raise SystemExit('Expected vX.Y.Z: major 1..255, minor 0..255, patch 0..65535, no leading zeroes')
+          commit = subprocess.check_output(['git', 'rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}'], text=True).strip()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={tag[1:]}\ncommit={commit}\n')
+          PY
+
+  package:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2025
+            architecture: x64
+          - platform: windows-aarch64
+            runner: windows-11-arm
+            architecture: aarch64
+          # Ubuntu 22.04 keeps the pre-t64 dependencies required by Debian 12.
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            architecture: x64
+          - platform: linux-aarch64
+            runner: ubuntu-22.04-arm
+            architecture: aarch64
+          - platform: macos-aarch64
+            runner: macos-15
+            architecture: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      JASPER_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: jetbrains
+          java-version: '25'
+          architecture: ${{ matrix.architecture }}
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Select Xcode 26 SDK
+        if: runner.os == 'macOS'
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fakeroot rpm cpio binutils g++
+      - name: Install WiX 3.14.1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'wix.zip'
+          $wix = Join-Path $env:RUNNER_TEMP 'wix'
+          Invoke-WebRequest 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $wix
+          $wix | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # verifyPackage normally depends on these native suites; CI runs them.
+      - name: Build Windows ZIP and installer EXE
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\gradlew.bat :jasper-app:packageDist :jasper-app:packageInstaller "-PjasperVersion=$env:JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # macOS packageDist trains the AOT cache on this hosted runner.
+      - name: Build Linux packages or macOS DMG
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./gradlew :jasper-app:packageDist "-PjasperVersion=$JASPER_VERSION" -x :jasper-app:testLauncherCore -x :jasper-app:testLauncherWatch -x :jasper-app:testWatcher --stacktrace
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: jasper-app/build/packaging/dist/*
+          if-no-files-found: error
+          retention-days: 7
+      # GITHUB_TOKEN-created releases do not trigger sdk-release.yml, so include the SDK here.
+      - name: Build SDK release jars
+        if: matrix.platform == 'linux-x64'
+        run: ./gradlew sdkRelease verifySdkRelease --stacktrace
+      - uses: actions/upload-artifact@v7
+        if: matrix.platform == 'linux-x64'
+        with:
+          name: release-sdk
+          path: build/sdk-release/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [prepare, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      JASPER_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Check release assets and write checksums
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, pathlib, re, subprocess
+          tag = os.environ['RELEASE_TAG']
+          actual = subprocess.check_output(['git', 'rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}'], text=True).strip()
+          if actual != os.environ['RELEASE_COMMIT']:
+              raise SystemExit('The release tag moved during the build; refusing to publish')
+          version = os.environ['JASPER_VERSION']
+          expected = {f'Jasper-{version}-macos-aarch64.dmg'}
+          for arch in ('x64', 'aarch64'):
+              expected.update((f'Jasper-{version}-windows-{arch}.zip', f'Jasper-{version}-windows-{arch}-setup.exe'))
+          for arch in ('amd64', 'arm64'):
+              expected.add(f'Jasper-{version}-linux-{arch}.deb')
+          for arch in ('x86_64', 'aarch64'):
+              expected.add(f'Jasper-{version}-linux-{arch}.rpm')
+          sdk_source = pathlib.Path('jasper-sdk/src/main/java/dev/jasper/sdk/JasperSdk.java').read_text()
+          sdk_version = re.search(r'VERSION = "([^"]+)"', sdk_source).group(1)
+          expected.update(f'jasper-sdk-{sdk_version}{suffix}.jar' for suffix in ('', '-sources', '-javadoc'))
+          expected.update(f'jasper-sdk-testkit-{sdk_version}{suffix}.jar' for suffix in ('', '-sources'))
+          files = sorted(pathlib.Path('dist').iterdir())
+          if {p.name for p in files} != expected or any(not p.is_file() or p.stat().st_size == 0 for p in files):
+              raise SystemExit(f'Unexpected or missing release assets: expected {sorted(expected)}, got {[p.name for p in files]}')
+          with open('dist/SHA256SUMS', 'w') as output:
+              for path in files:
+                  with path.open('rb') as artifact:
+                      digest = hashlib.file_digest(artifact, 'sha256').hexdigest()
+                  output.write(f'{digest}  {path.name}\n')
+          PY
+      - name: Publish complete prerelease
+        run: |
+          # A failed upload leaves a draft that can be retried. Never overwrite a published release.
+          if gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/release-draft"; then
+            if [ "$(cat "$RUNNER_TEMP/release-draft")" != true ]; then
+              echo 'A published release already exists for this tag; refusing to overwrite it.' >&2
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false \
+              --title "Jasper $JASPER_VERSION" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --clobber
+          # A reused draft must not retain unrelated or obsolete assets.
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | LC_ALL=C sort > "$RUNNER_TEMP/remote-assets"
+          find dist -type f -printf '%f\n' | LC_ALL=C sort > "$RUNNER_TEMP/local-assets"
+          diff -u "$RUNNER_TEMP/local-assets" "$RUNNER_TEMP/remote-assets"
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false --title "Jasper $JASPER_VERSION"
