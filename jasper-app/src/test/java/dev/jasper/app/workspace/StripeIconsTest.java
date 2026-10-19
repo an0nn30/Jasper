@@ -386,6 +386,56 @@ class StripeIconsTest {
         } finally { EnterpriseLook.restoreDefault(); }
     }
 
+    /**
+     * Rulings 16: a dragged label's gap is as long as the label that will land, its icon included: an owned label keeps its
+     * own icon, a foreign one is resolved from the window's icon, and a window without one gets the text-only length.
+     */
+    @Test void aDraggedLabelKeepsItsIconAndLength() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var labels = new StripeLabels(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            var stripe = new LabelledStripe(Side.LEFT, EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            stripe.render(List.of(LabelledStripeTest.window("t", "Top", Slot.LEFT_TOP, 0, new PresentationIcon("folder", null)),
+                LabelledStripeTest.window("s", "Second", Slot.LEFT_BOTTOM, 0, new PresentationIcon("server", null))), List.of());
+            MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
+            int top = stripe.buttons().getFirst().getHeight();
+            assertThat(top).as("Top's iconed length").isEqualTo(labels.length("Top", Optional.empty(), null) + slice());
+
+            stripe.beginDrag("t", "Top", null);
+            stripe.showGap(Slot.LEFT_BOTTOM, 0);
+            assertThat(stripe.gapBounds().orElseThrow().height).as("an owned label keeps its own icon").isEqualTo(top);
+            stripe.endDrag();
+
+            stripe.beginDrag("x", "Foreign", new PresentationIcon("download", null));
+            stripe.showGap(Slot.LEFT_BOTTOM, 0);
+            assertThat(stripe.gapBounds().orElseThrow().height).as("a foreign label, its window's icon resolved")
+                .isEqualTo(labels.length("Foreign", Optional.empty(), null) + slice());
+            stripe.endDrag();
+
+            stripe.beginDrag("y", "Foreign", null);
+            stripe.showGap(Slot.LEFT_BOTTOM, 0);
+            assertThat(stripe.gapBounds().orElseThrow().height).as("a foreign window without an icon: text only")
+                .isEqualTo(labels.length("Foreign", Optional.empty(), null));
+            stripe.endDrag();
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
+    /** Rulings 16: the labelled stripes' ghost is the window's stripe icon, or none; the rails' is the window's icon itself. */
+    @Test void theGhostIsTheLabelsStripeIcon() throws Exception {
+        try {
+            EnterpriseLook.install(false);
+            var set = new StripeSet.LabelledStripes(EnterpriseLook.kit(), ChromeArtwork.CLASSIC);
+            Icon ghost = set.ghost(new PresentationIcon("folder", null));
+            assertThat(ghost).isNotNull();
+            assertThat(reference(ghost, set.left(), Color.WHITE, 2)).as("Project's folder at 13 px")
+                .isEqualTo(reference(classic("folder"), set.left(), Color.WHITE, 2));
+            assertThat(set.ghost(null)).as("no icon, no ghost").isNull();
+            assertThat(set.ghost(new ImageIcon())).as("an empty icon, no ghost").isNull();
+            Icon folder = new PresentationIcon("folder", null);
+            assertThat(new StripeSet.IconRails().ghost(folder)).as("the rails' ghost is the icon itself").isSameAs(folder);
+        } finally { EnterpriseLook.restoreDefault(); }
+    }
+
     /** The bottom strip's three windows, closed: Event Log and "3: Transfers" in Bottom Left, Terminal in Bottom Right. */
     private static List<ToolStripe.Button> bottomWindows(Icon log, Icon transfers) {
         return List.of(new ToolStripe.Button("log", "Event Log", log, Slot.BOTTOM_LEFT, false),

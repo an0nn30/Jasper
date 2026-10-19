@@ -6,6 +6,7 @@ import dev.jasper.ui.icons.ChromeArtwork;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import javax.swing.Icon;
 
 /**
  * A window's tool window stripes (spec 10.7): the default look's two icon rails, or the classic look's two labelled
@@ -23,6 +24,14 @@ sealed interface StripeSet permits StripeSet.IconRails, StripeSet.LabelledStripe
 
     /** The stripe that shows a window docked in {@code slot}. */
     DockStripe of(Slot slot);
+
+    /**
+     * The drag's ghost for a window whose own icon is {@code icon}, drawn at the cursor; null for none.
+     *
+     * @param icon the dragged window's own icon, or null
+     * @return the ghost, or null
+     */
+    Icon ghost(Icon icon);
 
     /** Every stripe: left, right, then the bottom strip. */
     default List<DockStripe> all() {
@@ -43,6 +52,9 @@ sealed interface StripeSet permits StripeSet.IconRails, StripeSet.LabelledStripe
 
         @Override public Optional<DockStripe> bottom() { return Optional.empty(); }
 
+        /** The rails' ghost is the window's icon itself. */
+        @Override public Icon ghost(Icon icon) { return icon; }
+
         @Override public DockStripe of(Slot slot) { return slot.stripe() == Side.LEFT ? left : right; }
     }
 
@@ -61,6 +73,9 @@ sealed interface StripeSet permits StripeSet.IconRails, StripeSet.LabelledStripe
         }
 
         @Override public Optional<DockStripe> bottom() { return Optional.of(bottomStrip); }
+
+        /** The labelled stripes' ghost is the window's stripe icon, as its label leads with it. */
+        @Override public Icon ghost(Icon icon) { return left.stripeIcon(icon); }
 
         @Override public DockStripe of(Slot slot) {
             return switch (slot.side()) {

@@ -42,7 +42,7 @@ final class DockDropOverlay extends JComponent {
      *
      * @param highlight where the window would land
      * @param placeholder the stripe's gap
-     * @param ghost the dragged window's icon
+     * @param ghost the dragged window's ghost, drawn at the cursor
      * @param cursor where to draw the ghost, centred
      */
     void show(Rectangle highlight, Rectangle placeholder, Icon ghost, Point cursor) {
@@ -74,6 +74,9 @@ final class DockDropOverlay extends JComponent {
     Rectangle highlight() { return highlight == null ? null : new Rectangle(highlight); }
 
     Rectangle placeholder() { return placeholder == null ? null : new Rectangle(placeholder); }
+
+    /** The ghost shown at the cursor, or null. */
+    Icon ghost() { return ghost; }
 
     /** Events pass through to whatever is underneath. */
     @Override public boolean contains(int x, int y) { return false; }

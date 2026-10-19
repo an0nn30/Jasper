@@ -248,8 +248,8 @@ final class ToolStripe extends DockStripe {
         doLayout(); repaint();
     }
 
-    /** A rail's gap is one button's step whatever the label. */
-    @Override void beginDrag(String id, String label) { beginDrag(id); }
+    /** A rail's gap is one button's step whatever the label and the icon. */
+    @Override void beginDrag(String id, String label, Icon icon) { beginDrag(id); }
 
     private JSeparator dragSeparator() {
         var separator = new JSeparator();

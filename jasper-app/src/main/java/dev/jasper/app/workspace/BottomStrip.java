@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
+import javax.swing.Icon;
 
 /**
  * The classic look's bottom strip (spec 10.7): the Bottom Left windows' labels rightward from the side stripes' fill (their
@@ -121,11 +122,11 @@ final class BottomStrip extends DockStripe {
     /** The strip and its labels' lead do not follow {@code window.rail_width}. */
     @Override void setRailWidth(int width) { }
 
-    @Override void beginDrag(String id, String label) {
+    @Override void beginDrag(String id, String label, Icon icon) {
         dragging = true;
         lifted = id;
         StripeLabels.Label own = byId.get(id);
-        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), null);
+        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), labels.icon(icon));
         gapSlot = null;
         doLayout();
         repaint();

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.swing.AbstractButton;
 import javax.swing.Action;
+import javax.swing.Icon;
 
 /**
  * One of the classic look's labelled tool window stripes (spec 10.7): each window as a label, "N: " first when its
@@ -152,11 +153,14 @@ final class LabelledStripe extends DockStripe {
     /** A labelled stripe fits its labels: {@code window.rail_width} does not apply. */
     @Override void setRailWidth(int width) { }
 
-    @Override void beginDrag(String id, String label) {
+    /** The 13 px stripe icon this stripe's labels lead with for a window or action whose icon is {@code source}; null for none. */
+    Icon stripeIcon(Icon source) { return labels.icon(source); }
+
+    @Override void beginDrag(String id, String label, Icon icon) {
         dragging = true;
         lifted = id;
         StripeLabels.Label own = byId.get(id);
-        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), null);
+        liftedLength = own != null ? labels.length(own.text(), own.badge(), own.icon) : labels.length(label, Optional.empty(), labels.icon(icon));
         gapGroup = null;
         doLayout();
         repaint();

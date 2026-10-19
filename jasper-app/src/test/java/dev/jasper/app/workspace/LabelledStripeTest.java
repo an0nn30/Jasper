@@ -263,7 +263,7 @@ class LabelledStripeTest {
             assertThat(s.y + s.height).as("the second group at the bottom end").isEqualTo(height - rail);
             assertThat(s.y).as("after the top group").isGreaterThanOrEqualTo(t.y + t.height + between);
             assertThat(about.y).as("the actions follow the second group").isGreaterThanOrEqualTo(s.y + s.height);
-            stripe.beginDrag("t", "A long top group title");
+            stripe.beginDrag("t", "A long top group title", null);
             var groups = stripe.dropGroups();
             assertThat(groups.get(1).bounds().height).as("the second group can take a drop").isPositive();
             assertThat(groups.get(1).bounds().contains(s.x + s.width / 2, s.y + s.height / 2)).isTrue();
@@ -286,7 +286,7 @@ class LabelledStripeTest {
                 MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
                 Rectangle under = stripe.buttons().get(1).getBounds(), servers = stripe.buttons().get(2).getBounds();
                 // A drag of a top window: the second group keeps its label at the bottom end.
-                stripe.beginDrag("u", "Under");
+                stripe.beginDrag("u", "Under", null);
                 var groups = stripe.dropGroups();
                 assertThat(groups).extracting(DockDropResolver.Group::slot).containsExactly(top, second);
                 Rectangle topBounds = groups.get(0).bounds(), secondBounds = groups.get(1).bounds();
@@ -318,7 +318,7 @@ class LabelledStripeTest {
                 stripe.endDrag();
 
                 // Dragging the second group's only label: its length stays at the bottom end as the group's drop space.
-                stripe.beginDrag("f", "2: File Servers");
+                stripe.beginDrag("f", "2: File Servers", null);
                 groups = stripe.dropGroups();
                 assertThat(groups.get(1).buttons()).as(side + ": lifted out").isEmpty();
                 assertThat(groups.get(1).bounds().contains(x, servers.y + servers.height / 2)).as(side + ": its place drops back").isTrue();
@@ -331,7 +331,7 @@ class LabelledStripeTest {
                 // An empty second group shows one label's drop space at the bottom end.
                 stripe.render(List.of(window("t", "Top", top, 0), window("u", "Under", top, 0)), List.of());
                 MockCrops.render(stripe, stripe.getPreferredSize().width, height, 1);
-                stripe.beginDrag("u", "Under");
+                stripe.beginDrag("u", "Under", null);
                 groups = stripe.dropGroups();
                 assertThat(groups.get(1).buttons()).isEmpty();
                 stripe.showGap(second, 0);
@@ -348,7 +348,7 @@ class LabelledStripeTest {
             var stripe = stripe(Side.LEFT);
             stripe.render(List.of(window("sftp", "SFTP", Slot.LEFT_TOP, 1), window("servers", "File Servers", Slot.LEFT_TOP, 2)), List.of());
             MockCrops.render(stripe, stripe.getPreferredSize().width, 400, 1);
-            stripe.beginDrag("servers", "2: File Servers");
+            stripe.beginDrag("servers", "2: File Servers", null);
             var groups = stripe.dropGroups();
             assertThat(groups).extracting(DockDropResolver.Group::slot).containsExactly(Slot.LEFT_TOP, Slot.LEFT_BOTTOM);
             assertThat(groups.get(0).buttons()).as("the lifted label is out").hasSize(1);
