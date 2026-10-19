@@ -6,7 +6,10 @@ session rather than one instance (plan 1's spec issue). Amended 2026-10-18: clos
 VS Code does (sections 7.3 and 15, plan 2 Ruling 5); a ready owner answers a handoff only once its EDT has taken it,
 and a quitting owner refuses handoffs (section 5.3, plan 1 review). Amended 2026-10-18: under a look with in-window
 menus a child window has no menu bar (section 6.3, plan 4a review); sessions carry restore state too (section 14, plan
-6b). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
+6b). Amended 2026-10-19 after plan 1's execution: outside files are revealed rather than desktop-opened, an UPDATED
+owner restarts only for its own new build, the replacement hands off once its predecessor has gone, and a second
+process's Apple-event files are not opened (sections 5.2 to 5.4). Branch: `claude/workspace-tabs`, from `main` at
+`2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -203,7 +206,7 @@ app.
 | `--safe-mode`, `--config`, `--plugin-dir` | Starts with the flag | Hands off RAISE with the ignored flags, exits 0; the owner shows "Jasper is already running: quit it first to start with --safe-mode" |
 | `--background` (login item) | Resident warm-up, as today | Exits 0 |
 | `--no-window` (the CLI's cold start) | Serves commands without a window, as today | Exits 0 (the owner serves the CLI) |
-| `--replacing <pid>` (restart's replacement, internal) | Starts | Waits for the lock up to 30 s, then shows the unresponsive-owner error |
+| `--replacing <pid>` (restart's replacement, internal) | Starts | Waits for the lock while the replaced process lives, up to 30 s, then shows the unresponsive-owner error; once the replaced process has gone and the lock is still held (another launch won the race), hands off with the restart's paths |
 
 `--standalone` is removed. Residency (`system.run_in_background`) now decides only whether the owner outlives its
 windows; it still applies only to the default home launched without start-up flags, so a dev run quits with its last
@@ -227,10 +230,11 @@ window as today.
 - **An owner that does not answer:** the launch retries the handoff for up to 10 s (the owner may be between taking the
   lock and binding), then shows "Jasper is already running but not responding. Quit it (process *pid*) and try again."
   and exits 1. It never starts as a second instance.
-- **A newer build:** an owner whose code location or modification time differs from the launch's answers UPDATED. With
-  no window open it restarts itself into the new build (the existing reopen-after-update path), passing the request's
-  paths to the replacement; with windows open it carries out the request itself and posts "Jasper was updated" with a
-  Restart action. The launch exits 0 either way.
+- **A newer build:** an owner whose code location or modification time differs from the launch's answers UPDATED. When
+  the owner's own build changed on disk, then with no window open it restarts itself into the new build (the existing
+  reopen-after-update path), passing the request's paths to the replacement, and with windows open it carries out the
+  request itself and posts "Jasper was updated" with a Restart action; when only the launch's build differs (another
+  copy of Jasper), the owner carries out the request as an ordinary one. The launch exits 0 either way.
 - **Restart** (Plugins manager, VM options, updates) spawns the replacement with `--replacing <pid>` and quits through
   the usual guards; the replacement takes the lock once the old process is gone. `RestartFlow`'s probe-retire-standalone
   path and `ResidentControl` are removed.
@@ -243,6 +247,12 @@ window as today.
   `Alternate`, so Jasper appears in Open With and accepts drops on its Dock icon without claiming any type as default.
   `open -n` starts a process that meets the instance lock and hands off like any other launch. The reopen event restores
   or raises the main window.
+- **Outside files never reach the desktop's open or edit actions.** A file from an open-file event, a handoff or the CLI
+  opens in the default editor; with no editor to take it, it is revealed in the Finder or file manager, never opened or
+  edited by the desktop, which could hand it straight back to Jasper (Cmd-click keeps edit-or-reveal).
+- **A second process that receives files by Apple event** (`open -n -a Jasper FILE`, or another copy of Jasper.app
+  chosen in Open With) claims the home before AWT and never sees the event, so it hands off a RAISE and its files are not
+  opened. Open With, Dock drops and `open -a` against the running Jasper deliver their files to it.
 - **Windows and Linux:** paths on the command line are positional arguments (`AppArguments` gains them); a second
   `Jasper.exe file.txt` hands off OPEN_PATHS. On Windows the launch still passes its foreground right
   (`WindowsForeground.allow`) before handing off.
