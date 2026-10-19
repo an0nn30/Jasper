@@ -3,30 +3,27 @@ package dev.jasper.app.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.testsupport.EnterpriseLook;
-import dev.jasper.ui.theme.ColorMath;
 import dev.jasper.ui.theme.DerivedColor;
 import dev.jasper.ui.theme.SemanticColor;
 import org.junit.jupiter.api.Test;
 
 /**
- * Plan 6b Rulings 2 and 3: the chrome roles the Workstation and Dark Mode mocks paint are the Enterprise theme's values;
- * Dark's tab indicator follows the accent, #3C74D6 (spec 7.6, amended with plan 5b's accent ruling).
+ * Plan 6b Rulings 2 and 3: the chrome roles the Workstation and Dark Mode mocks paint are the Enterprise theme's values.
+ * Since the user's 2026-10-18 direction the theme ports IntelliJ Light and New UI Dark, so the tab indicator is
+ * IntelliJ's tab underline and the scrim the converter's (black at 25 % in Light, 55 % in Dark).
  */
 class EnterpriseChromeTargetsTest {
     @Test void theChromeTargetsAreTheMocks() {
         var theme = EnterpriseLook.theme();
-        assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#E8E9EB");
-        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.SURFACE_TABSTRIP))).isEqualToIgnoringCase("#3A3D42");
-        assertThat(ColorMath.hex(theme.palette(false).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#2F65CA");
-        assertThat(ColorMath.hex(theme.palette(true).color(SemanticColor.TAB_INDICATOR))).isEqualToIgnoringCase("#3C74D6");
         for (boolean dark : new boolean[] {false, true}) {
-            var scrim = theme.palette(dark).color(SemanticColor.SURFACE_SCRIM);
+            var palette = theme.palette(dark);
+            // The port's values, pinned: reading them back through the shipped theme would compare the file with itself.
+            assertThat(palette.color(SemanticColor.SURFACE_TABSTRIP).getRGB() & 0xFFFFFF).as("surface.tabstrip").isEqualTo(dark ? 0x1E1F22 : 0xF2F2F2);
+            assertThat(palette.color(SemanticColor.TAB_INDICATOR).getRGB() & 0xFFFFFF).as("EditorTabs.underlineColor").isEqualTo(dark ? 0x3574F0 : 0x4083C9);
+            var scrim = palette.color(SemanticColor.SURFACE_SCRIM);
             assertThat(scrim.getRGB() & 0xFFFFFF).as("black").isZero();
-            assertThat(scrim.getAlpha()).as("spec 10.8's 21 %, so white reads #C9CACC").isEqualTo(0x36);
+            assertThat(scrim.getAlpha()).as("the converter's scrim").isEqualTo(dark ? 0x8C : 0x40);
+            assertThat(DerivedColor.BORDER_DIVIDER.color(theme.generated(dark)).getRGB() & 0xFFFFFF).as("border.divider").isEqualTo(dark ? 0x3E3F42 : 0xDDDDDD);
         }
-        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(false)))).as("the override, not the recipe")
-            .isEqualToIgnoringCase("#D3D6DA");
-        assertThat(ColorMath.hex(DerivedColor.BORDER_DIVIDER.color(theme.generated(true)))).as("lighter than the recipe's #3F4145")
-            .isEqualToIgnoringCase("#4A4D53");
     }
 }

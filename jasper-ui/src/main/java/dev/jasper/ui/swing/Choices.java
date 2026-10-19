@@ -128,6 +128,7 @@ final class Choices {
                         combo.setModel(new DefaultComboBoxModel<>(choice.options().toArray(Option[]::new))); options = choice.options();
                     }
                     ((ChoiceCombo)combo).refreshPopup();
+                    ((ChoiceCombo)combo).toolbar = view.toolbarStrip();
                     ((ChoiceCombo)combo).face = choice.kind() == Nodes.ChoiceKind.DROPDOWN ? choice.face().orElse(null) : null;
                     combo.setSelectedItem(choice.options().stream().filter(o -> o.id().equals(choice.selectedId())).findFirst().orElse(null));
                 } else if (input instanceof PickerButton picker) {
@@ -350,6 +351,8 @@ final class Choices {
         /** In a table cell (set by {@link ChoiceControl#inCell}); the ink of its selected row while it is bare, else null. */
         boolean cell;
         InteractiveRows.Ink cellInk;
+        /** In a toolbar strip (its owner sets this from {@link KitView#toolbarStrip()} on every refresh, before the face). */
+        boolean toolbar;
         /** A cell dropdown shows only its value and chevron until it is hovered, focused or open. */
         boolean bare() { return cell && !hover && !(focus != null && focus.visible()) && !isPopupVisible(); }
         /** The chevron's role: the selected row's supporting ink while this cell dropdown is bare (plan 3c), else text.secondary. */
@@ -431,6 +434,7 @@ final class Choices {
             popup.revalidate(); popup.repaint(); list.repaint();
         }
         @Override public Dimension getPreferredSize() {
+            if (toolbar && face != null) { var combo = context.faces().buttons.toolbarCombo(this); if (combo != null) return combo; }
             var size = super.getPreferredSize();
             int height = face != null ? ThemePainting.height(context, DesignMetrics.Role.PICKER_DEFAULT_HEIGHT, Typography.Role.BODY)
                 : ThemePainting.height(context, compactHeight ? DesignMetrics.Role.FULL_SETTING_CHOICE_HEIGHT : DesignMetrics.Role.FIELD_HEIGHT, Typography.Role.BODY);

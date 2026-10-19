@@ -1,5 +1,6 @@
 package dev.jasper.app.platform;
 
+import dev.jasper.ui.icons.ChromeArtwork;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.metrics.DesignMetrics;
 
@@ -112,34 +113,73 @@ public final class AppIcons {
         return icon;
     }
 
-    /** Client property marking a native chrome receiver: icons painted inside it use the chrome's original artwork. */
+    /**
+     * Client property marking a native chrome receiver with its {@link ChromeArtwork}: icons painted inside it use that
+     * chrome artwork.
+     */
     private static final String CHROME_RECEIVER = "Jasper.chromeArtwork";
 
     /**
      * Marks {@code component} as one of the workspace chrome's receiving contexts (title bar header, tool window
-     * stripes, status bar): named glyphs painted inside it use {@link dev.jasper.ui.icons.IconRegistry#chromeIcon}'s
-     * original desktop artwork. Icon values, sizes and identities are unchanged; everything outside keeps ordinary artwork.
+     * stripes, status bar) for the New UI originals: the same as {@code chromeReceiver(component, ChromeArtwork.NEW_UI)}.
      */
-    public static void chromeReceiver(javax.swing.JComponent component) { component.putClientProperty(CHROME_RECEIVER, Boolean.TRUE); }
+    public static void chromeReceiver(javax.swing.JComponent component) { chromeReceiver(component, ChromeArtwork.NEW_UI); }
 
-    static boolean inChrome(Component component) {
+    /**
+     * Marks {@code component} as one of the workspace chrome's receiving contexts, drawing {@code artwork}: named glyphs
+     * painted inside it use {@link dev.jasper.ui.icons.IconRegistry#chromeIcon(String, int, ChromeArtwork)}'s desktop
+     * artwork for that set. Icon values, sizes and identities are unchanged; everything outside keeps ordinary artwork.
+     * A later mark replaces an earlier one.
+     */
+    public static void chromeReceiver(javax.swing.JComponent component, ChromeArtwork artwork) {
+        component.putClientProperty(CHROME_RECEIVER, Objects.requireNonNull(artwork, "artwork"));
+    }
+
+    /**
+     * The chrome artwork of the nearest receiver holding {@code component} (itself included), or empty outside every
+     * receiver.
+     */
+    public static java.util.Optional<ChromeArtwork> chromeArtwork(Component component) {
         for (Component c = component; c != null; c = c.getParent())
-            if (c instanceof javax.swing.JComponent j && j.getClientProperty(CHROME_RECEIVER) == Boolean.TRUE) return true;
-        return false;
+            if (c instanceof javax.swing.JComponent j && j.getClientProperty(CHROME_RECEIVER) instanceof ChromeArtwork artwork)
+                return java.util.Optional.of(artwork);
+        return java.util.Optional.empty();
     }
 
     private record PreparationKey(String name, int size) { }
     private record NativeSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon artwork,
                                   dev.jasper.ui.icons.IconRegistry.PreparedIcon chrome) { }
-    /** One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. */
+    /** A classic chrome icon prepared for one snapshot's size. */
+    private record ClassicSnapshot(int size, dev.jasper.ui.icons.IconRegistry.PreparedIcon icon) { }
+    /**
+     * One process-lifetime preparation owner, shared with builtin PresentationIcons. No receiving theme is cached. The
+     * classic chrome icon is built only the first time it paints inside a {@link ChromeArtwork#CLASSIC} receiver, so a
+     * default-look start never prepares it.
+     */
     static final class NativePreparation {
         final String name; final int baseSize;
         volatile NativeSnapshot snapshot;
+        private volatile ClassicSnapshot classic;
         NativePreparation(String name,int size) { this.name=name;this.baseSize=size;prepare(); }
-        void prepare() { int size=UIScale.scale(baseSize);snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size),NAMED.chromeIcon(name,size)); }
+        void prepare() {
+            int size=UIScale.scale(baseSize);
+            snapshot=new NativeSnapshot(size,NAMED.themedIcon(name,size),NAMED.chromeIcon(name,size));
+            if(classic!=null && classic.size()!=size)classic=null;
+        }
         int size(){return snapshot.size();}
         void paint(Component c,Graphics g,int x,int y,SemanticColor tint) {
-            var current=snapshot;(inChrome(c)?current.chrome():current.artwork()).icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+            var current=snapshot;
+            var prepared=switch(chromeArtwork(c).orElse(null)) {
+                case null -> current.artwork();
+                case NEW_UI -> current.chrome();
+                case CLASSIC -> classic(current.size());
+            };
+            prepared.icon(ThemeZone.theme(c),tint).paintIcon(c,g,x,y);
+        }
+        private dev.jasper.ui.icons.IconRegistry.PreparedIcon classic(int size) {
+            var built=classic;
+            if(built==null || built.size()!=size)classic=built=new ClassicSnapshot(size,NAMED.chromeIcon(name,size,ChromeArtwork.CLASSIC));
+            return built.icon();
         }
     }
     private static final Map<PreparationKey,NativePreparation> PREPARED = new java.util.HashMap<>();

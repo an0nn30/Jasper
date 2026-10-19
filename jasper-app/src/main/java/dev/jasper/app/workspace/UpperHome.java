@@ -1,32 +1,32 @@
 package dev.jasper.app.workspace;
 
 import dev.jasper.app.persistence.UiState;
-import dev.jasper.ui.metrics.DesignMetrics;
-import dev.jasper.ui.swing.NativeStyles;
 import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.util.Optional;
 
 /**
- * The Run window's home (spec 11.5): the bottom-left of the dock work area, inset by the mocks' side and bottom insets
- * ({@code RUN_WINDOW_HOME_SIDE}, {@code RUN_WINDOW_HOME_BOTTOM}), at the window's own size. A drag that ends at or below it, within reach across, re-attaches; there are no guides; the place is saved as
- * {@code [palette.run_window] left/bottom}, fractions of the workspace (plan 8b Rulings 2).
+ * The Run window's home (spec 11.5, the user's 2026-10-18 direction): centred across the workspace with its top a seventh of
+ * the workspace's height down, moved up to end at the workspace's middle while that keeps it in the dock work area, and
+ * clamped into the work area by the margin, at the window's own size. A drag that ends within reach of it in both directions
+ * re-attaches; there are no guides; the place is saved as {@code [palette.run_window] left/bottom}, fractions of the workspace.
  */
-final class CornerHome implements PaletteHome {
+final class UpperHome implements PaletteHome {
+    /** The home's top is the workspace's height over this, down from the workspace's top. */
+    static final int TOP_FRACTION = 7;
+
     @Override public Rectangle home(Geometry g, Dimension preferred) {
-        Rectangle work = g.workArea();
+        Rectangle work = g.workArea(), ws = g.workspace();
         if (work == null || work.width <= 0 || work.height <= 0) return null;
         Dimension size = WindowCommandPalette.fitted(work, preferred, g.margin());
-        // The two insets are read here only, so the card's home never reads a Run window role.
-        var styles = NativeStyles.installed();
-        int side = styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_SIDE), bottom = styles.metric(DesignMetrics.Role.RUN_WINDOW_HOME_BOTTOM);
-        int insetX = Math.min(side, Math.max(0, work.width / 2)), insetY = Math.min(bottom, Math.max(0, work.height / 2));
-        return new Rectangle(work.x + insetX, work.y + work.height - insetY - size.height, size.width, size.height);
+        int top = ws.y + ws.height / TOP_FRACTION, middle = ws.y + ws.height / 2;
+        if (top + size.height > middle) top = middle - size.height;
+        return WindowCommandPalette.inside(new Rectangle(ws.x + (ws.width - size.width) / 2, top, size.width, size.height), work, g.margin());
     }
 
-    /** At or below its home, across within {@code reach}: {@code |left − home.left| ≤ reach} and its bottom no higher than the home's less the reach. */
+    /** Within {@code reach} of its home across and down. */
     @Override public boolean attaches(Rectangle home, Rectangle bounds, int reach) {
-        return Math.abs(bounds.x - home.x) <= reach && bounds.y + bounds.height >= home.y + home.height - reach;
+        return Math.abs(bounds.x - home.x) <= reach && Math.abs(bounds.y - home.y) <= reach;
     }
 
     @Override public boolean guides() { return false; }

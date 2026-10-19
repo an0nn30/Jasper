@@ -34,4 +34,13 @@ class MockMatchTest {
         assertThat(MockMatch.deltaE(Color.WHITE, Color.WHITE)).isZero();
         assertThat(MockMatch.deltaE(Color.WHITE, Color.BLACK)).isGreaterThan(99);
     }
+
+    @Test void bandsMayNameThemeRoles() {
+        var theme = dev.jasper.ui.testsupport.KitFixtures.enterpriseLight();
+        var bands = MockMatch.parse("0+6 surface.app, 6+1 border.control, 7+20 button.secondary.bg~button.end, 27+1 #B4B8BF", theme);
+        assertThat(bands).hasSize(4);
+        assertThat(bands.get(0).first()).isEqualTo(dev.jasper.ui.testsupport.KitFixtures.colour(theme, "surface.app"));
+        assertThat(bands.get(2).last()).isEqualTo(dev.jasper.ui.testsupport.KitFixtures.colour(theme, "button.end"));
+        assertThat(bands.get(3).first()).isEqualTo(new java.awt.Color(0xB4B8BF));
+    }
 }

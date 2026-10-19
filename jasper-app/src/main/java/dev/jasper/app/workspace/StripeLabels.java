@@ -1,6 +1,5 @@
 package dev.jasper.app.workspace;
 
-import com.formdev.flatlaf.util.UIScale;
 import dev.jasper.app.contributions.PanelBadge;
 import dev.jasper.ui.kit.Kit;
 import dev.jasper.ui.metrics.DesignMetrics;
@@ -61,14 +60,19 @@ final class StripeLabels {
         return length;
     }
 
+    /** A side label's line across its stripe: the face's ascent and descent at fractional metrics, rounded. */
+    int line() {
+        LineMetrics line = font().getLineMetrics("Mg", TEXT_CONTEXT);
+        return Math.round(line.getAscent() + line.getDescent());
+    }
+
     /**
-     * How deep a side stripe stands, its 1 px rule included (Rulings 4): {@code window.rail_width}, or the label's line and
-     * the rail's two edges when a large interface font needs more.
+     * How deep a side stripe stands, its 1 px rule included (the user's direction of 2026-10-18): the label's line and
+     * the rail's two edges, so the stripe fits its labels and a larger interface font thickens it; {@code window.rail_width}
+     * does not apply.
      */
-    int thickness(int railWidth, Component reference) {
-        int line = reference.getFontMetrics(font()).getHeight();
-        return Math.max(UIScale.scale(railWidth),
-            line + 2 * styles.metric(DesignMetrics.Role.RAIL_EDGE) + styles.metric(DesignMetrics.Role.DOCK_RULE));
+    int thickness() {
+        return line() + 2 * styles.metric(DesignMetrics.Role.RAIL_EDGE) + styles.metric(DesignMetrics.Role.DOCK_RULE);
     }
 
     /**
@@ -84,25 +88,22 @@ final class StripeLabels {
 
     /**
      * Paints a label in text space, from its start, on a whole-pixel baseline: its text, held on the stripe, a hovered tile
-     * or an open tile, then its badge's pill on the text's line. Text space's {@code y} runs across from a side stripe's
-     * outer edge, where the mocks set a side label's line ({@code outerEdge}: the baseline the face's ascent from that
-     * edge, the extra thickness of the stripe on its inner side); otherwise the line is centred across {@code across} (the
-     * mocks' bottom strip sets its 24 px line's baseline at 17).
+     * or an open tile, then its badge's pill, both centred across {@code across}. A side label centres its face's capitals
+     * ({@code sideLabel}, the user's direction of 2026-10-18); the bottom strip centres its face's whole-pixel ascent and
+     * descent (the mocks' bottom strip sets its 24 px line's baseline at 17).
      */
-    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, boolean outerEdge, GeneratedTheme theme,
+    void paint(Graphics2D g, String text, Optional<PanelBadge> badge, int across, boolean sideLabel, GeneratedTheme theme,
                boolean open, boolean hover) {
         painter.prepareText(g);
         Font font = font();
         g.setFont(font);
-        FontMetrics metrics = g.getFontMetrics(font);
-        int baseline, lineHeight;
-        if (outerEdge) {
-            LineMetrics line = font.getLineMetrics(text, TEXT_CONTEXT);
-            baseline = Math.round(line.getAscent());
-            lineHeight = Math.round(line.getAscent() + line.getDescent());
+        int baseline;
+        if (sideLabel) {
+            float capHeight = (float) -font.createGlyphVector(TEXT_CONTEXT, "H").getVisualBounds().getY();
+            baseline = Math.round((across + capHeight) / 2f);
         } else {
+            FontMetrics metrics = g.getFontMetrics(font);
             baseline = Math.round((across - metrics.getAscent() - metrics.getDescent()) / 2f + metrics.getAscent());
-            lineHeight = across;
         }
         int x = styles.metric(DesignMetrics.Role.STRIPE_LABEL_PADDING);
         g.setColor(painter.stripeLabel(theme, open, hover));
@@ -111,7 +112,7 @@ final class StripeLabels {
         String count = Integer.toString(badge.get().count());
         Dimension pill = painter.countPill(count);
         painter.countPill(g, x + painter.measureText(font, text) + styles.metric(DesignMetrics.Role.STRIPE_PILL_GAP),
-            (lineHeight - pill.height) / 2, count, theme, badge.get().tone() == PanelBadge.Tone.ERROR);
+            (across - pill.height) / 2, count, theme, badge.get().tone() == PanelBadge.Tone.ERROR);
     }
 
     /** The fractional antialiased context a side label's line is measured in. */

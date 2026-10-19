@@ -24,7 +24,7 @@ import javax.swing.Icon;
 import javax.swing.JButton;
 
 /**
- * The classic toolbar row (spec 10.3; the Workstation mocks): left-packed "+ New Session", "Split ▾" and "Maximize" in
+ * The classic toolbar row (spec 10.3; the Workstation mocks): left-packed "New Session", "Split ▾" and "Maximize" in
  * separated groups, the plugin group, then "Search everywhere" with the palette's keycap and "Settings…" at the trailing
  * edge, over a 1 px {@code border.window} rule. The row is window chrome under a native title, not a title-bar zone.
  */
@@ -40,17 +40,17 @@ final class ClassicHeader implements HeaderComposition {
         var spacing = WindowToolbar.Leading.classic(FlatLafInstaller.installedKit().metrics());
         var toolbar = chrome.windowToolbar();
         toolbar.packLeading(spacing);
-        chrome.classicButton(toolbar, ActionId.NEW_TAB, "New Session", ClassicToolbarButton.Glyph.PLUS, "square-plus", 90);
+        chrome.classicButton(toolbar, ActionId.NEW_TAB, "New Session", "square-plus", 90);
         toolbar.add(chrome.separator(true));
         chrome.classicSplit();
-        chrome.classicButton(toolbar, ActionId.ZOOM_PANE, "Maximize", ClassicToolbarButton.Glyph.NONE, "maximize", 10);
+        chrome.classicButton(toolbar, ActionId.ZOOM_PANE, "Maximize", "maximize", 10);
         chrome.addPluginGroup(true);
         toolbar.finish();
         trailing.setFloatable(false);
         trailing.setBorder(BorderFactory.createEmptyBorder());
         trailing.setOpaque(false);
         trailing.packLeading(new WindowToolbar.Leading(0, spacing.gap(), spacing.separatorGap(), spacing.separatorInset(), spacing.side()));
-        chrome.classicButton(trailing, ActionId.OPEN_SETTINGS, "Settings…", ClassicToolbarButton.Glyph.NONE, "settings", 100);
+        chrome.classicButton(trailing, ActionId.OPEN_SETTINGS, "Settings…", "settings", 100);
         trailing.finish();
         chrome.header().add(trailing);
         refreshTheme(chrome.header());
@@ -161,9 +161,9 @@ final class ClassicHeader implements HeaderComposition {
         header.revalidate(); header.repaint();
     }
 
-    /** Spec 10.3: a contributed button is a label-first classic button; a dropdown ends in the caret, as "Split ▾" does. */
+    /** Spec 10.3: a contributed button is a classic icon-and-label button; a dropdown ends in the caret, as "Split ▾" does. */
     @Override public JButton contributed(WindowChrome chrome, Action action, String label, Icon icon, boolean dropdown) {
-        var button = new ClassicToolbarButton(action, label, ClassicToolbarButton.Glyph.NONE, dropdown, icon != null ? icon : AppIcons.icon("command"));
+        var button = new ClassicToolbarButton(action, label, dropdown, icon != null ? icon : AppIcons.icon("command"));
         if (dropdown) button.putClientProperty("keepLabel", true);
         if (action != null) WindowToolbar.entry(button, 30, () -> WindowToolbar.menuItem(action));
         return button;

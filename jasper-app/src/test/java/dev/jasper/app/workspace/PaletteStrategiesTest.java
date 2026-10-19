@@ -13,7 +13,7 @@ class PaletteStrategiesTest {
     @Test void everyViewAndHomeBuildsForEveryValue() throws Exception {
         DesktopTestSupport.edt(() -> {
             for (var view : PaletteLook.View.values()) for (var home : PaletteLook.Home.values()) {
-                try (var owner = CornerHomeTest.owner(new PaletteLook(view, home))) {
+                try (var owner = UpperHomeTest.owner(new PaletteLook(view, home))) {
                     var root = WindowCommandPaletteTest.install(owner); root.setSize(1200, 800); LayoutTestSupport.layoutTree(root);
                     owner.commandPalette().toggle(); LayoutTestSupport.layoutTree(root);
                     assertThat(owner.commandPalette().view()).as(view + "/" + home)

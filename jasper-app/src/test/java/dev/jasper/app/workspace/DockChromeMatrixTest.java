@@ -34,7 +34,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(EdtTestExtension.class)
 class DockChromeMatrixTest {
     static final WorkspaceLook RAILS = new WorkspaceLook(WorkspaceLook.Menus.STANDARD, WorkspaceLook.Header.UNIFIED,
-        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD);
+        WorkspaceLook.Stripes.RAILS, WorkspaceLook.Tabs.EQUAL, WorkspaceLook.Status.SLASH, false, WorkspaceLook.FrameStyle.STANDARD,
+        WorkspaceLook.Icons.NEW_UI);
 
     @Test void everyKitDocksUnderBothDockStyles() throws Exception {
         try {
