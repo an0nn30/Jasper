@@ -1,12 +1,14 @@
-subprojects {
-    apply(plugin = "java")
-
+allprojects {
     repositories {
         mavenCentral()
         maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies") {
             content { includeGroup("org.jetbrains.jediterm") }
         }
     }
+}
+
+subprojects {
+    apply(plugin = "java")
 
     extensions.configure<JavaPluginExtension> {
         toolchain {
@@ -41,11 +43,28 @@ subprojects {
     }
 }
 
+// Root verification tasks consume published runtime variants rather than resolving another
+// project's runtimeClasspath while its tasks may be executing in parallel.
+val verificationClasspaths = subprojects.associate { module ->
+    module.path to configurations.create("verificationRuntime" + module.name.replace("-", "_")) {
+        isCanBeConsumed = false
+        isCanBeResolved = true
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+            attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+            attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+        }
+        dependencies.add(rootProject.dependencies.project(mapOf("path" to module.path, "configuration" to "runtimeElements")))
+    }
+}
+extra["verificationClasspaths"] = verificationClasspaths
+
 // Enforce the supported API and an acyclic terminal package graph from bytecode.
 val terminalProject = project(":jasper-terminal")
 val appProject = project(":jasper-app")
 val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
     dependsOn(":jasper-terminal:classes", ":jasper-app:classes")
+    inputs.files(verificationClasspaths.getValue(terminalProject.path))
     doLast {
         val toolchains = terminalProject.extensions.getByType<JavaToolchainService>()
         val launcher = toolchains.launcherFor {
@@ -63,7 +82,7 @@ val verifyTerminalArchitecture = tasks.register("verifyTerminalArchitecture") {
         }
         val terminalClasses = terminalProject.layout.buildDirectory.dir("classes/java/main").get().asFile
         val appClasses = appProject.layout.buildDirectory.dir("classes/java/main").get().asFile
-        val runtime = terminalProject.configurations.getByName("runtimeClasspath").asPath
+        val runtime = verificationClasspaths.getValue(terminalProject.path).asPath
         val output = tool("jdeps", listOf("--multi-release", "25", "--ignore-missing-deps", "-verbose:class", "-filter:none",
             "--class-path", runtime, terminalClasses.absolutePath))
         val edgePattern = Regex("^\\s*(dev\\.jasper\\.terminal\\.\\S+)\\s+->\\s+(\\S+).*$")

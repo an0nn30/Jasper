@@ -50,7 +50,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
       - name: Check
         shell: bash
-        run: ./gradlew check --continue --stacktrace
+        # Parallelize independent projects; bound CPU/memory contention to two workers.
+        # Each project keeps its default single test JVM and sequential JUnit execution.
+        run: ./gradlew check --parallel --max-workers=2 --continue --stacktrace
       # check built the release jars; the example plugin must keep building from them.
       - name: Example external plugin
         if: runner.os == 'Linux'
