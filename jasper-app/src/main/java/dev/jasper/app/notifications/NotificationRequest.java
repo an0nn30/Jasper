@@ -12,7 +12,7 @@ import javax.swing.Icon;
  * its line breaks and is cut to {@value #MAX_CONTENT}. {@code source} is {@value #JASPER} or a plugin id; {@code target}
  * names the window whose card it is, empty for the window the user used last. {@code incident} names the incident it
  * announces, if any: the operating system then shows only its title, since an incident's details can name paths and
- * hosts and banners show on a locked screen (spec section 11), and a click on that banner opens the Errors window at it.
+ * hosts and banners show on a locked screen (spec section 11), and a click on that banner opens the Errors tab at it.
  */
 public record NotificationRequest(String group, Severity severity, String title, String content, Optional<Icon> icon,
                                   List<NotificationAction> actions, Optional<Runnable> activate, String source,

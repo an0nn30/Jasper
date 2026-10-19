@@ -135,7 +135,7 @@ class SystemNoticesTest {
         assertThat(ran).containsExactly("focus the pane");
     }
 
-    @Test void aClickOnAnIncidentOpensTheErrorsWindowAtIt() {
+    @Test void aClickOnAnIncidentOpensTheErrorsTabAtIt() {
         var notices = notices();
         UUID incident = UUID.randomUUID();
         UUID id = post(request(Severity.ERROR, "Unexpected error in Jasper").withIncident(incident));

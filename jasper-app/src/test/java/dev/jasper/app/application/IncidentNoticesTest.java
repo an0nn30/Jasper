@@ -268,7 +268,7 @@ class IncidentNoticesTest {
             clock.advance(Duration.ofMillis(200));
             notices.jasperFailure("thread worker", burst.get(i));
         }
-        assertThat(incidents.list().getFirst().count()).as("the Errors window counts each at once").isEqualTo(5);
+        assertThat(incidents.list().getFirst().count()).as("the Errors tab counts each at once").isEqualTo(5);
         assertThat(changes).as("the notification waits for the second to pass").isEmpty();
         assertThat(scheduler.waiting()).as("one update, due when the second is over").containsExactly(Duration.ofMillis(800));
         clock.advance(Duration.ofMillis(200));
@@ -375,7 +375,7 @@ class IncidentNoticesTest {
         notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.notificationui.CardLayer"));
         notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.notifications.NotificationCenter"));
         notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.IncidentNotices"));
-        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.ErrorsWindow$1"));
+        notices.jasperFailure("thread AWT-EventQueue-0", thrownIn("dev.jasper.app.application.ErrorsTab$1"));
         notices.jasperFailure("a notification action",
             new IllegalStateException("wrapped", thrownIn("dev.jasper.app.application.NotificationsFeature")));
         assertThat(incidents.list()).isEmpty();

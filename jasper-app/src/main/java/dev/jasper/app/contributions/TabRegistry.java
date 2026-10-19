@@ -35,6 +35,8 @@ public final class TabRegistry {
     /** The tabs asked for while the main window was being composed, in the order they were asked for. */
     private final List<Tab> waiting = new ArrayList<>();
     private final Map<String, BiFunction<List<Tab>, Boolean, CompletableFuture<Boolean>>> guards = new HashMap<>();
+    /** The owner of Jasper's own content tabs, such as the Errors tab; a plugin's id is never {@code jasper}. */
+    public static final String APP_OWNER = "jasper";
     private Windows windows;
     private List<Tab> pending = List.of();
     private CompletableFuture<Boolean> decision;

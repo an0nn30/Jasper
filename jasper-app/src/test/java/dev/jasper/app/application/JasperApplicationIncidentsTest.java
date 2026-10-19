@@ -106,7 +106,7 @@ class JasperApplicationIncidentsTest {
                 .filter(entry -> entry.request().group().equals("jasper.plugins")).findFirst().orElseThrow();
             assertThat(notice.request().title()).isEqualTo("dev.example.boom failed to start");
             assertThat(notice.request().actions()).extracting(NotificationAction::label).containsExactly("Disable Plugin", "Show more…");
-            assertThat(application[0].contributions().action(ErrorsWindow.SHOW_ERRORS)).isPresent();
+            assertThat(application[0].contributions().action(ErrorsTab.SHOW_ERRORS)).isPresent();
         });
         edt(application[0]::quit);
         assertThat(terminated.await(5, TimeUnit.SECONDS)).isTrue();

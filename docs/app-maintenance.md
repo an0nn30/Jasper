@@ -182,7 +182,7 @@ A `Capture` takes the trace once, on the thread that caught the failure (trace a
 and the root cause's top five frames; at most 100 are kept, and a repeating incident's notification is updated at
 most once a second (its count catches up). Capture never throws and does not re-enter on the same thread. A failure
 whose first Jasper frame lies in `dev.jasper.app.notifications`, `dev.jasper.app.notificationui`,
-`IncidentNotices`, `NotificationsFeature`, `ErrorsWindow` or `ConfigProblemNotices` is left to the log, so the
+`IncidentNotices`, `NotificationsFeature`, `ErrorsTab` or `ConfigProblemNotices` is left to the log, so the
 notification system can never report its own failures in a loop; a launch failure rejected that way still gets its
 plain "Could not start the terminal" notification. The log is unchanged: incidents add no messages or traces to it.
 

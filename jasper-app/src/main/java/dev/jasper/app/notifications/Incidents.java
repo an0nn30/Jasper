@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 
 /**
- * This session's incidents, the Errors window's model (spec section 5): at most {@value #LIMIT}, the oldest dropped.
+ * This session's incidents, the Errors tab's model (spec section 5): at most {@value #LIMIT}, the oldest dropped.
  * A failure from the same source, of the same class and with the same root-cause frames is a repeat of an earlier
  * incident. Nothing is written to disk. EDT-confined.
  */
@@ -119,7 +119,7 @@ public final class Incidents {
         return newestFirst;
     }
 
-    /** The Errors window's Clear. */
+    /** The Errors tab's Clear. */
     public void clear() {
         requireEdt();
         if (byKey.isEmpty()) return;

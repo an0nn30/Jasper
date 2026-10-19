@@ -55,8 +55,8 @@ class Task9cNoticeEvidenceTest {
                         assertThat(history.clearAllButton().isFocusable()).isTrue();
                     } finally {site.notifyClosed();}
                     var incidents=new Incidents(clock);
-                    var errors=new ErrorsView(kit,incidents,new ErrorsView.Hooks(id->"Example plugin",id->"1.0.0",
-                        new IncidentReport.Environment("task9c","Headless","JBR25"),text->{},id->{},()->{}),ZoneOffset.UTC,()->{});
+                    var errors=new ErrorsView(themes.appearance().context(ThemeRoute.WORKSPACE),incidents,new ErrorsView.Hooks(id->"Example plugin",id->"1.0.0",
+                        new IncidentReport.Environment("task9c","Headless","JBR25"),text->{},id->{},()->{}),ZoneOffset.UTC);
                     try {
                         save(errors,family,"errors-empty",900,540);
                         var failure=new IllegalStateException("Literal <html> problem\nA second line remains selectable");

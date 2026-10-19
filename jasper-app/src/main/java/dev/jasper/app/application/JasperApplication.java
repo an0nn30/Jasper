@@ -193,9 +193,9 @@ public final class JasperApplication {
     private final NotificationsFeature notificationViews;
     private final Incidents incidents;
     private final IncidentNotices incidentNotices;
-    /** Built once plugins start, with the auxiliary windows it opens in. */
-    private ErrorsWindow errorsWindow;
-    /** Built with the errors window, once plugins start. */
+    /** Built once plugins start; its tab opens in the main window. */
+    private ErrorsTab errorsTab;
+    /** Built with the Errors tab, once plugins start. */
     private AboutWindows aboutWindows;
     /** Where Open Log Folder points, known once plugins start. */
     private Path logFolder;
@@ -1174,10 +1174,10 @@ public final class JasperApplication {
         };
         auxiliary.onFirstOpened = this::windowOpening;
         logFolder = dirs.logs();
-        errorsWindow = new ErrorsWindow(contributions, auxiliary, incidents, new ErrorsView.Hooks(this::pluginName,
+        errorsTab = new ErrorsTab(contributions, incidents, new ErrorsView.Hooks(this::pluginName,
             id -> plugins == null ? "" : plugins.pluginVersions().getOrDefault(id, ""), IncidentReport.Environment.current(),
             this::copyReport, incidentNotices::disablePlugin, this::openLogFolder), notificationCenter.clock().getZone(),
-            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME));
+            () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.WORKSPACE));
         aboutWindows = new AboutWindows(contributions, auxiliary, () -> themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME),
             new AboutWindows.Hooks(dev.jasper.app.platform.BuildInfo.current(), IncidentReport.Environment.current(),
                 notificationCenter.clock().getZone(), this::copyBuildInformation, this::browse, JasperApplication::afterDelay));
@@ -1519,9 +1519,9 @@ public final class JasperApplication {
             : Optional.of(outcome.message() == null ? "" : outcome.message())));
     }
 
-    /** Show more… on an incident's notification: the Errors window, with that incident selected. */
+    /** Show more… on an incident's notification: the Errors tab, in the main window, with that incident selected. */
     private void showErrors(UUID incident) {
-        if (errorsWindow != null && !quitting && !stopped) errorsWindow.show(Optional.of(incident));
+        if (errorsTab != null && !quitting && !stopped) errorsTab.show(Optional.of(incident));
     }
 
     /** Jasper › About Jasper on macOS: the About window, once the auxiliary windows exist. */

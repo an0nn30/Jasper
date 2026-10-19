@@ -19,7 +19,7 @@ import java.util.function.Function;
  * Jasper's notifications in the operating system (spec sections 7, 9 and 11). What the center asks the operating
  * system to show while Jasper is not focused goes to the system notifier when {@code notifications.system} is on, an
  * incident's with its title only; what the operating system shows is withdrawn once it is read, expires or is removed
- * in Jasper; and a click on one raises its window and does what a click on its card would, or opens the Errors window
+ * in Jasper; and a click on one raises its window and does what a click on its card would, or opens the Errors tab
  * for an incident, or shows the Notifications panel. EDT only; it owns the notifier it is given, and the application
  * closes it at shutdown.
  */
@@ -30,7 +30,7 @@ final class SystemNotices implements AutoCloseable {
      * @param raise brings the notification's window (empty: the one used last) to the front, opening one when none is
      *     open, and names it; empty while Jasper quits
      * @param showHistory shows the Notifications panel in that window
-     * @param showErrors opens the Errors window at that incident
+     * @param showErrors opens the Errors tab at that incident
      * @param holder the window that holds what a notification is about now (a command's pane, whose tab may have moved
      *     since it posted), resolved when the click arrives; empty to use the notification's own target
      */
@@ -85,7 +85,7 @@ final class SystemNotices implements AutoCloseable {
 
     /**
      * A click on the operating system's notification: its window comes to the front, then its default action runs; with
-     * none (or once it has expired) the notification is read and the Errors window opens at its incident, or the
+     * none (or once it has expired) the notification is read and the Errors tab opens at its incident, or the
      * Notifications panel shows. While Jasper quits nothing opens.
      */
     void clicked(UUID id) {
