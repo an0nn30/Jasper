@@ -1,8 +1,6 @@
 package dev.jasper.app.residency;
 
-import dev.jasper.app.workspace.DesktopTestSupport;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
@@ -11,10 +9,10 @@ import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class HandoffSocketTest {
     @TempDir Path dir;
@@ -29,13 +27,21 @@ class HandoffSocketTest {
         return endpoint;
     }
 
+    /** A plain launch of build {@code /app.jar} at {@code modified}, run in this test's folder. */
+    private LaunchRequest launch(long modified) { return LaunchRequest.of(Path.of("/app.jar"), modified, dir, List.of(), List.of()); }
+
+    private LaunchRequest.Response handOff(LaunchRequest request) { return HandoffSocket.handOff(socket(), token(), request); }
+
     @Test void anAcceptedRequestReachesTheHandlerAndTheTokenFileIsOwnerOnly() throws Exception {
-        List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
-            assertThat(seen).hasSize(1);
-            assertThat(seen.get(0).codeLocation()).isEqualTo(Path.of("/app.jar"));
-            assertThat(seen.get(0).codeLocationModified()).isEqualTo(7L);
+            assertThat(handOff(launch(7L))).isEqualTo(LaunchRequest.Response.OK);
+            assertThat(seen).singleElement().satisfies(request -> {
+                assertThat(request.codeLocation()).isEqualTo(Path.of("/app.jar"));
+                assertThat(request.codeLocationModified()).isEqualTo(7L);
+                assertThat(request.intent()).isEqualTo(LaunchRequest.Intent.RAISE);
+                assertThat(request.workingDirectory()).isEqualTo(dir);
+            });
             if (token().getFileSystem().supportedFileAttributeViews().contains("posix")) {
                 assertThat(java.nio.file.attribute.PosixFilePermissions
                     .toString(Files.getPosixFilePermissions(token()))).isEqualTo("rw-------");
@@ -45,13 +51,21 @@ class HandoffSocketTest {
         assertThat(token()).doesNotExist();
     }
 
+    @Test void aPathsRequestArrivesWhole() throws Exception {
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
+        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir.resolve("notes ü.txt"), dir), List.of("--safe-mode"));
+        try (HandoffSocket endpoint = bind(received -> { seen.add(received); return LaunchRequest.Response.OK; })) {
+            assertThat(handOff(request)).isEqualTo(LaunchRequest.Response.OK);
+            assertThat(seen).containsExactly(request.withToken(Files.readString(token()).strip()));
+        }
+    }
+
     @Test void theOwnerRecordsItsProcessIdBesideTheTokenUntilItCloses() throws Exception {
         assertThat(HandoffSocket.ownerPid(token())).as("nothing bound yet").isEqualTo(-1);
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
             assertThat(HandoffSocket.ownerPid(token())).isEqualTo(ProcessHandle.current().pid());
-            // The token file itself is unchanged: a launcher from another build still reads it whole.
             assertThat(Files.readString(token()).strip()).doesNotContain("\n").hasSizeGreaterThan(20);
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isTrue();
+            assertThat(handOff(launch(7L))).isEqualTo(LaunchRequest.Response.OK);
         }
         assertThat(HandoffSocket.ownerPid(token())).as("released with the endpoint").isEqualTo(-1);
         assertThat(dir.resolve("token.pid")).doesNotExist();
@@ -60,44 +74,72 @@ class HandoffSocketTest {
     }
 
     @Test void aWrongTokenIsRefusedWithoutReachingTheHandler() throws Exception {
-        List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
             Files.writeString(token(), "not-the-real-token\n");
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 7L)).isFalse();
+            assertThat(handOff(launch(7L))).isEqualTo(LaunchRequest.Response.TOKEN);
             assertThat(seen).as("the handler never saw it").isEmpty();
         }
     }
 
-    @Test void aStaleOwnerRefusesAndReleasesTheEndpointSoTheNewBuildCanTakeIt() throws Exception {
-        try (HandoffSocket ignored = bind(request -> LaunchRequest.Response.STALE)) {
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/new.jar"), 9L)).isFalse();
-            // Releasing is the point: the launcher that was refused must be able to become the owner.
-            DesktopTestSupport.until(() -> !Files.exists(socket()));
+    @Test void anUpdatedAnswerReachesTheLaunchAndTheEndpointStays() throws Exception {
+        try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.UPDATED)) {
+            assertThat(handOff(launch(9L))).isEqualTo(LaunchRequest.Response.UPDATED);
+            assertThat(handOff(launch(9L))).as("an update never releases the endpoint").isEqualTo(LaunchRequest.Response.UPDATED);
+            assertThat(socket()).exists();
         }
-        try (HandoffSocket second = bind(request -> LaunchRequest.Response.OK)) {
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/new.jar"), 9L)).isTrue();
+    }
+
+    @Test void theOwnersAnswerIsUpdatedForAnotherBuildAndProtocolWhenItDidNotTakeTheRequest() {
+        var seen = new ConcurrentLinkedQueue<String>();
+        var answer = HandoffSocket.answering((request, updated) -> seen.add(request.intent() + " " + updated), Path.of("/app.jar"), 7L);
+        assertThat(answer.apply(LaunchRequest.of(Path.of("/app.jar"), 7L, dir, List.of(dir), List.of())))
+            .isEqualTo(LaunchRequest.Response.OK);
+        assertThat(answer.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of("--safe-mode"))))
+            .isEqualTo(LaunchRequest.Response.UPDATED);
+        assertThat(seen).containsExactly("OPEN_PATHS false", "RAISE true");
+        var declined = HandoffSocket.answering((request, updated) -> false, Path.of("/app.jar"), 7L);
+        assertThat(declined.apply(LaunchRequest.of(Path.of("/new.jar"), 9L, dir, List.of(), List.of())))
+            .as("an owner that did not take the request has not answered (spec 5.3)").isEqualTo(LaunchRequest.Response.PROTOCOL);
+    }
+
+    @Test void aRequestNearTheLineLimitArrivesWhole() throws Exception {
+        // The owner reads in chunks as they come: only 500 ms without progress ends a read, never its total time.
+        var paths = new java.util.ArrayList<Path>();
+        int encoded = 0;
+        for (int i = 0; encoded < LaunchRequest.MAX_LINE_BYTES - 64 * 1024; i++) {
+            Path path = dir.resolve("a-file-with-a-rather-long-name-to-fill-the-line-" + i + ".txt");
+            paths.add(path);
+            encoded += java.util.Base64.getEncoder().encodeToString(path.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).length() + 1;
+        }
+        var request = LaunchRequest.of(Path.of("/app.jar"), 7L, dir, paths, List.of());
+        assertThat(request.encode().length()).isBetween(LaunchRequest.MAX_LINE_BYTES - 64 * 1024, LaunchRequest.MAX_LINE_BYTES);
+        assertThat(request.fits()).isTrue();
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
+        try (HandoffSocket endpoint = bind(received -> { seen.add(received); return LaunchRequest.Response.OK; })) {
+            assertThat(handOff(request)).isEqualTo(LaunchRequest.Response.OK);
+            assertThat(seen).hasSize(1);
+            assertThat(seen.peek().paths()).isEqualTo(paths);
         }
     }
 
     @Test void handingOffToNothingFailsQuietly() {
-        // The missing-token case: no socket, no token, nothing was ever bound here. Contrast with
-        // aTokenWhoseOwnerWasKilledFailsAtTheConnectRatherThanTheToken below, the dead-listener case.
-        assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+        // No socket, no token, nothing was ever bound here. Contrast with the killed owner below.
+        assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.PROTOCOL);
     }
 
     @Test void aTokenWhoseOwnerWasKilledFailsAtTheConnectRatherThanTheToken() throws Exception {
         // The post-SIGKILL state: the token and the socket file both survived, nothing is listening.
         Files.createFile(socket());
         Files.writeString(token(), "left-over-token\n");
-        assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+        assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.PROTOCOL);
     }
 
     @Test void anUnknownCodeLocationHandsOffInsteadOfCrashingTheLauncher() throws Exception {
-        List<LaunchRequest> seen = new CopyOnWriteArrayList<>();
+        var seen = new ConcurrentLinkedQueue<LaunchRequest>();
         try (HandoffSocket endpoint = bind(request -> { seen.add(request); return LaunchRequest.Response.OK; })) {
-            assertThat(HandoffSocket.handOff(socket(), token(), null, 0L)).isTrue();
-            assertThat(seen).singleElement()
-                .extracting(LaunchRequest::codeLocation).isEqualTo(Path.of(""));
+            assertThat(handOff(LaunchRequest.of(null, 0L, dir, List.of(), List.of()))).isEqualTo(LaunchRequest.Response.OK);
+            assertThat(seen).singleElement().extracting(LaunchRequest::codeLocation).isEqualTo(Path.of(""));
         }
     }
 
@@ -105,30 +147,23 @@ class HandoffSocketTest {
         // The token gates every request, so an endpoint without one must not exist at all.
         assertThat(HandoffSocket.bind(socket(), dir.resolve("absent/directory/token"), lock(),
             request -> LaunchRequest.Response.OK)).isNull();
-        assertThat(socket()).as("a half-built endpoint is cleaned up, not left to confuse the next bind")
-            .doesNotExist();
+        assertThat(socket()).as("a half-built endpoint is cleaned up, not left to confuse the next bind").doesNotExist();
     }
 
     @Test void aSocketFileLeftByACrashIsReplacedButALiveOwnerIsNot() throws Exception {
         Files.createFile(socket());
         Files.writeString(token(), "left-over\n");
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L))
-                .as("the stale file was replaced by a working endpoint").isTrue();
-            // A second bind must decline rather than steal a live endpoint.
+            assertThat(handOff(launch(1L))).as("the stale file was replaced by a working endpoint").isEqualTo(LaunchRequest.Response.OK);
             assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK)).isNull();
         }
     }
 
     @Test void aLivenessProbeLogsQuietlyRatherThanAlarmingly() throws Exception {
-        // The second bind() above finding a live owner is the ordinary upgrade path, and it always
-        // probes with owned(): connect and disconnect without writing. From the live owner's side
-        // that is indistinguishable from a peer that hung up before the reply arrived, and must not
-        // read like a real failure.
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(HandoffSocket.class.getName());
         java.util.logging.Level previousLevel = logger.getLevel();
         boolean previousUseParentHandlers = logger.getUseParentHandlers();
-        List<java.util.logging.LogRecord> records = new CopyOnWriteArrayList<>();
+        var records = new ConcurrentLinkedQueue<java.util.logging.LogRecord>();
         java.util.logging.Handler handler = new java.util.logging.Handler() {
             @Override public void publish(java.util.logging.LogRecord record) { records.add(record); }
             @Override public void flush() { }
@@ -139,19 +174,15 @@ class HandoffSocketTest {
         logger.addHandler(handler);
         try {
             try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-                assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK))
-                    .isNull();
-                // One acceptor serves in order: a real reply proves the probe was served. Only POSIX reports the
-                // reply to the vanished probe as a failed write; Windows AF_UNIX may log nothing at all.
-                assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+                assertThat(HandoffSocket.bind(socket(), token(), lock(), request -> LaunchRequest.Response.OK)).isNull();
+                // One acceptor serves in order: a real reply proves the probe was served.
+                assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
             }
         } finally {
             logger.removeHandler(handler);
             logger.setLevel(previousLevel);
             logger.setUseParentHandlers(previousUseParentHandlers);
         }
-        // DEBUG bridges to FINE through java.util.logging; a WARNING (with a stack trace) is what
-        // the ordinary path used to log before this fix.
         assertThat(records).as("a normal liveness probe must not log an alarming, stack-trace-bearing WARNING")
             .allSatisfy(record -> {
                 assertThat(record.getLevel()).isEqualTo(java.util.logging.Level.FINE);
@@ -163,26 +194,15 @@ class HandoffSocketTest {
         var callCount = new java.util.concurrent.atomic.AtomicInteger();
         int failuresBeforeSuccess = 2;
         try (HandoffSocket endpoint = bind(request -> {
-            if (callCount.incrementAndGet() <= failuresBeforeSuccess) {
-                // Exercises the same acceptLoop catch block a persistently failing accept() would
-                // (e.g. file descriptors exhausted), without needing a fake ServerSocketChannel:
-                // the handler throwing before serve() replies is indistinguishable to that loop
-                // from accept() itself throwing.
-                throw new RuntimeException("simulated failure");
-            }
+            if (callCount.incrementAndGet() <= failuresBeforeSuccess) throw new RuntimeException("simulated failure");
             return LaunchRequest.Response.OK;
         })) {
             long started = System.nanoTime();
-            for (int i = 0; i < failuresBeforeSuccess; i++) {
-                assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
-            }
+            for (int i = 0; i < failuresBeforeSuccess; i++)
+                assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.PROTOCOL);
             long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
-            // Two failures means one backoff sleep must land strictly between them. The bound is
-            // well under the 50ms configured sleep to absorb scheduling jitter, while still failing
-            // clearly if the loop is not backing off at all (which completes in a few ms here).
             assertThat(elapsedMillis).as("the loop must back off between failures, not spin").isGreaterThanOrEqualTo(40);
-            // And the loop survived the failures: it is still serving, not spun out or wedged.
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+            assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
             assertThat(callCount.get()).isEqualTo(failuresBeforeSuccess + 1);
         }
     }
@@ -194,6 +214,10 @@ class HandoffSocketTest {
         assertThat(deep.toString().length()).isGreaterThan(104);
         assertThat(HandoffSocket.bind(deep.resolve("socket"), deep.resolve("token"), deep.resolve("lock"),
             request -> LaunchRequest.Response.OK)).isNull();
+        assertThat(HandoffSocket.pathFits(deep.resolve("socket"))).isFalse();
+        assertThat(HandoffSocket.pathFits(socket())).isTrue();
+        assertThat(HandoffSocket.tooLong(deep.resolve("socket")))
+            .isEqualTo("Jasper's home folder path is too long for its socket: " + deep.resolve("socket"));
     }
 
     @Test void theCodeLocationOfThisBuildIsResolvableAndItsTimestampIsReadable() {
@@ -206,35 +230,32 @@ class HandoffSocketTest {
 
     @Test void theAcceptLoopSurvivesAConnectionThatSendsNothingUsable() throws Exception {
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-            try (var junk = java.nio.channels.SocketChannel.open(UnixDomainSocketAddress.of(socket()))) {
+            try (var junk = SocketChannel.open(UnixDomainSocketAddress.of(socket()))) {
                 junk.write(java.nio.ByteBuffer.wrap("nonsense\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
             }
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L))
-                .as("still serving after junk").isTrue();
+            assertThat(handOff(launch(1L))).as("still serving after junk").isEqualTo(LaunchRequest.Response.OK);
         }
     }
 
     @Test void aClientThatConnectsAndSaysNothingCannotHoldTheEndpoint() throws Exception {
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK);
              SocketChannel silent = SocketChannel.open(UnixDomainSocketAddress.of(socket()))) {
-            // The silent peer occupies the accept thread until its read deadline expires. Without
-            // that deadline this request is never served and the endpoint is wedged for good.
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+            // The silent peer occupies the accept thread until its read deadline expires.
+            assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
         }
-        // And the endpoint is still usable once the silent peer is gone.
         try (HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK)) {
-            assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+            assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
         }
     }
 
     @Test void afterClosingNoFurtherRequestIsAccepted() throws Exception {
         HandoffSocket endpoint = bind(request -> LaunchRequest.Response.OK);
-        assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isTrue();
+        assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.OK);
         endpoint.close();
         endpoint.close(); // Idempotent.
         // Re-create the token, so the refusal comes from the dead listener rather than a missing file.
         Files.writeString(token(), "left-over-token\n");
-        assertThat(HandoffSocket.handOff(socket(), token(), Path.of("/app.jar"), 1L)).isFalse();
+        assertThat(handOff(launch(1L))).isEqualTo(LaunchRequest.Response.PROTOCOL);
         try (ServerSocketChannel proof = ServerSocketChannel.open(StandardProtocolFamily.UNIX)) {
             proof.bind(UnixDomainSocketAddress.of(socket()));  // The path was released.
         }

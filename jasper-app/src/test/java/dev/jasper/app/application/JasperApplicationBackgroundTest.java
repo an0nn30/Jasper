@@ -752,6 +752,38 @@ class JasperApplicationBackgroundTest {
         }
     }
 
+    @Test @DisabledOnOs(OS.WINDOWS) void anUpdatedLaunchWithAWindowOpenSaysSoAndRelaunchesNothing() throws Exception {
+        // Spec 5.3: with windows open the owner carries the request out itself and says it was updated.
+        AppDirs dirs = new AppDirs(home, home.resolve("config.toml"), home.resolve("logs"));
+        Path dev = home.resolve("dev-plugin");
+        PluginJars.build(dev, "guard.jar", PluginJars.descriptor("dev.example.guard", "1.0.0", "fix.guard.Main"),
+            Map.of("fix.guard.Main", GUARD_FIXTURE), List.of());
+        var spawned = new CopyOnWriteArrayList<List<String>>();
+        var planned = new AtomicInteger();
+        var terminated = new CountDownLatch(1);
+        JasperApplication application = settled(terminated::countDown, true);
+        try {
+            edt(() -> {
+                application.startPlugins(null, dev, false, dirs);
+                application.restartPlanner = mode -> {
+                    planned.incrementAndGet();
+                    return Optional.of(List.of("/Applications/Jasper.app/Contents/MacOS/Jasper"));
+                };
+                application.spawner = spawned::add;
+                application.staleBuild(() -> true);
+            });
+            // The plugin's window is open; the request then opens a terminal window, which cannot be composed headlessly.
+            assertThatThrownBy(() -> edt(() -> application.handedOff(List.of(), List.of(), true))).hasRootCauseInstanceOf(HeadlessException.class);
+            assertThat(planned).as("an update never takes an open window down").hasValue(0);
+            assertThat(spawned).isEmpty();
+            edt(() -> assertThat(application.notificationCenter().history()).extracting(entry -> entry.request().title())
+                .contains("Jasper was updated"));
+        } finally {
+            edt(application::quitNow);
+            assertThat(terminated.await(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @Test void anOrdinaryNativeQuitRequestIsCancelledAndGoesToTheBackground() throws Exception {
         var terminations = new AtomicInteger();
         var answer = new Answer();

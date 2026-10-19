@@ -273,7 +273,10 @@ public final class ApplicationBootstrap {
                     if (!residentRole(options, resident)) return null;
                     Path source = HandoffSocket.codeLocation();
                     var bound = HandoffSocket.bind(dirs.daemonSocket(), dirs.daemonToken(), dirs.daemonLock(),
-                        handoffHandler(application, source, HandoffSocket.lastModified(source)));
+                        HandoffSocket.answering((request, updated) -> {
+                            SwingUtilities.invokeLater(() -> handoffHandler(application).accept(request, updated));
+                            return true;
+                        }, source, HandoffSocket.lastModified(source)));
                     endpoint.set(bound);
                     return bound;
                 }, application -> {
@@ -522,8 +525,9 @@ public final class ApplicationBootstrap {
         // time it shows its window. Grant before sending, including when an existing window can be raised immediately.
         WindowsForeground.allow(System.getProperty("os.name"), HandoffSocket.ownerPid(dirs.daemonToken()));
         Path source = HandoffSocket.codeLocation();
-        boolean handed = HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), source, HandoffSocket.lastModified(source));
-        return handed;
+        var answer = HandoffSocket.handOff(dirs.daemonSocket(), dirs.daemonToken(), LaunchRequest.of(source,
+            HandoffSocket.lastModified(source), options.workingDirectory(), options.paths(), java.util.List.of()));
+        return answer == LaunchRequest.Response.OK || answer == LaunchRequest.Response.UPDATED;
     }
 
     /**
@@ -606,13 +610,6 @@ public final class ApplicationBootstrap {
         grace.start();
     }
 
-    /** True when a request comes from a different build than this one. A resident process must not
-     *  serve windows built from code it is not running. */
-    static boolean stale(LaunchRequest request, Path source, long modified) {
-        return !request.codeLocation().equals(source == null ? Path.of("") : source)
-            || request.codeLocationModified() != modified;
-    }
-
     /**
      * True once the application jar this process was loaded from has changed on disk (a new build was installed under
      * it) or gone. An unknown code location never counts. Any thread; one file stat per call.
@@ -621,21 +618,9 @@ public final class ApplicationBootstrap {
         return () -> source != null && HandoffSocket.lastModified(source) != modified;
     }
 
-    /**
-     * The resident process's side of a handoff. A stale request also ends residency: the endpoint
-     * goes away with the reply, so the last window closing must run the normal bounded shutdown
-     * rather than leaving a process with nothing to reach it and no cleanup on the way out.
-     */
-    static java.util.function.Function<LaunchRequest, LaunchRequest.Response> handoffHandler(
-            JasperApplication application, Path source, long modified) {
-        return request -> {
-            if (stale(request, source, modified)) {
-                SwingUtilities.invokeLater(() -> application.endpointReleased());
-                return LaunchRequest.Response.STALE;
-            }
-            SwingUtilities.invokeLater(() -> application.open(java.util.List.of(), JasperApplication.HANDOFF));
-            return LaunchRequest.Response.OK;
-        };
+    /** The owner's side of a handoff (workspace-tabs spec 5.3): carries the request out. EDT. */
+    static BiConsumer<LaunchRequest, Boolean> handoffHandler(JasperApplication application) {
+        return (request, updated) -> application.handedOff(request.paths(), request.ignoredFlags(), updated);
     }
 
     /**

@@ -804,22 +804,6 @@ public final class JasperApplication {
     }
 
     /**
-     * The handoff endpoint is gone, so nothing can reach this process any more. It stops being
-     * resident, and with no windows left there is nothing to wait for: shut down properly rather
-     * than letting the JVM starve once the accept thread ends, which skips every close.
-     * Distinct from {@link #residency} because that is also how startup reports a failed bind,
-     * before any window exists.
-     *
-     * <p>When windows are still open, this only clears residency and shutdown waits for the last
-     * one to close, the same path {@link #windowClosed} already takes. That branch needs a live
-     * window and is not covered by a headless test — a known gap, not an oversight.
-     */
-    public void endpointReleased() {
-        residency(false);
-        if (windows.isEmpty()) requestShutdown();
-    }
-
-    /**
      * Who reconciles the user's login items with the setting. Injected, because reconciling from
      * here would have these tests write into the developer's real login items. Setting it replays
      * the current value at once: the constructor's own listener registration has already fired by
@@ -870,6 +854,50 @@ public final class JasperApplication {
         if (target == null) return;
         for (Path directory : plan.tabs()) target.content().newTab(directory);
         for (Path file : plan.files()) openRequestedFile(file, target.content().id());
+    }
+
+    /**
+     * A second launch handed its request to this process (workspace-tabs spec 5.3). The start-up flags it could not
+     * apply are named in a notice. When it ran another build ({@code updated}) and this process's own jar has changed on
+     * disk since it started, a process with no window open restarts into the new build, the replacement opening
+     * {@code paths}; one with windows open opens them itself and says "Jasper was updated" with a Restart action.
+     * Otherwise, or when the restart cannot happen, the paths open as {@link #open} opens them. EDT.
+     *
+     * @param paths the launch's absolute paths; none raises
+     * @param ignoredFlags the start-up flags the launch could not apply
+     * @param updated whether the launch ran another build
+     */
+    public void handedOff(List<Path> paths, List<String> ignoredFlags, boolean updated) {
+        if (quitting || stopped) return;
+        if (!ignoredFlags.isEmpty())
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, ignoredFlagsTitle(ignoredFlags)));
+        boolean newBuild = updated && staleBuild.getAsBoolean();
+        boolean windowsWereOpen = windowsOpen();
+        if (newBuild && !windowsWereOpen) {
+            restart(RestartMode.SAME, paths);
+            if (quitting || stopped) return;
+            LOG.log(System.Logger.Level.WARNING,
+                "Jasper was updated on disk but could not relaunch as the new build; the request opens in the running build");
+        }
+        if (newBuild && windowsWereOpen)
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.INFO, "Jasper was updated")
+                .withContent("Restart Jasper to run the new build.")
+                .withAction(dev.jasper.app.notifications.NotificationAction.of("Restart", this::restartForUpdate)));
+        open(paths, HANDOFF);
+    }
+
+    /** The notice for start-up flags a second launch could not apply (spec 5.2), naming them in the order given. */
+    static String ignoredFlagsTitle(List<String> flags) {
+        String named = flags.size() == 1 ? flags.getFirst()
+            : String.join(", ", flags.subList(0, flags.size() - 1)) + " and " + flags.getLast();
+        return "Jasper is already running: quit it first to start with " + named;
+    }
+
+    /** The "Jasper was updated" notice's Restart. EDT. */
+    private void restartForUpdate() {
+        if (!restart(RestartMode.SAME))
+            notificationCenter.post(NotificationRequest.of(NotificationsFeature.GENERAL.id(), Severity.ERROR, "Jasper could not restart")
+                .withContent("Jasper could not work out how it was started. Quit and reopen it to run the new build."));
     }
 
     /**

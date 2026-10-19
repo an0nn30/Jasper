@@ -17,14 +17,16 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 
 /**
- * The single-instance endpoint. One resident process owns it; every other launch hands off to it
+ * The handoff endpoint (workspace-tabs spec 5.3). The home's owner serves it; every other launch hands its request to it
  * and exits.
  *
  * <p>The accept loop runs on a <strong>non-daemon</strong> platform thread, and that is deliberate:
@@ -34,14 +36,16 @@ import java.util.function.Function;
  */
 public final class HandoffSocket implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger(HandoffSocket.class.getName());
-    /** A request is five short fields; anything longer is not one of ours. */
-    private static final int MAX_LINE_BYTES = 8 * 1024;
     /** macOS caps sun_path at 104 bytes; a long home directory can reach it. */
     private static final int MAX_SOCKET_PATH_BYTES = 100;
-    private static final long HANDOFF_TIMEOUT_MILLIS = 2_000;
-    /** How long one stalled peer may hold the accept thread. Deliberately far below the launcher's
-     *  own wait (HANDOFF_TIMEOUT_MILLIS), so a request queued behind such a peer is still served
-     *  inside its budget. A real client writes its line immediately. */
+    /** An answer is a word or two. */
+    private static final int MAX_REPLY_BYTES = 256;
+    /** The launch's wait for an answer: the owner reads until its peer has been silent for READ_TIMEOUT_MILLIS, then
+     *  gives its event thread up to a second to take the request (spec 5.3), so a request queued behind one stalled
+     *  peer is still answered inside it. */
+    private static final long HANDOFF_TIMEOUT_MILLIS = 3_000;
+    /** How long a peer may stay silent while the accept thread reads from it, so one stalled peer holds the endpoint
+     *  for at most this long. A real client writes its line at once; a long line arrives in chunks, each resetting it. */
     private static final long READ_TIMEOUT_MILLIS = 500;
     /** Backoff after an accept-loop failure, so a persistent error (e.g. exhausted file
      *  descriptors) cannot spin the loop at 100% CPU retrying instantly. */
@@ -73,9 +77,8 @@ public final class HandoffSocket implements AutoCloseable {
      */
     public static HandoffSocket bind(Path socketPath, Path tokenPath, Path lockPath,
                               Function<LaunchRequest, LaunchRequest.Response> handler) {
-        if (socketPath.toString().getBytes(StandardCharsets.UTF_8).length > MAX_SOCKET_PATH_BYTES) {
-            LOG.log(System.Logger.Level.WARNING,
-                "Background residency is off: " + socketPath + " is too long for a Unix socket path");
+        if (!pathFits(socketPath)) {
+            LOG.log(System.Logger.Level.WARNING, tooLong(socketPath));
             return null;
         }
         ServerSocketChannel opened = null;
@@ -111,31 +114,28 @@ public final class HandoffSocket implements AutoCloseable {
     }
 
     /**
-     * Asks a resident process to reveal a window. True only when it replied {@code ok}; no daemon,
-     * a stale build, a bad token or a wedged process all return false and leave the caller to start
-     * normally.
+     * Hands {@code request} to the home's owner, signed with the token beside its socket, and returns the owner's
+     * answer: OK or UPDATED when it took the request; TOKEN or PROTOCOL otherwise, including when nothing answers or no
+     * token can be read. Blocks, bounded.
+     *
+     * @param socketPath the owner's endpoint
+     * @param tokenPath the token beside it
+     * @param request the launch's request; its token is replaced
+     * @return the answer
      */
-    public static boolean handOff(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
-        return exchange(socketPath, tokenPath, codeLocation, modified) == LaunchRequest.Response.OK;
-    }
-
-    /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
-    public static boolean live(Path socketPath) { return owned(socketPath); }
-
-    private static LaunchRequest.Response exchange(Path socketPath, Path tokenPath, Path codeLocation, long modified) {
+    public static LaunchRequest.Response handOff(Path socketPath, Path tokenPath, LaunchRequest request) {
         String token = readToken(tokenPath);
         if (token == null) return LaunchRequest.Response.PROTOCOL;
-        // codeLocation() is nullable; an unknown location compares equal to itself and to nothing else.
-        var request = new LaunchRequest(token, codeLocation == null ? Path.of("") : codeLocation, modified);
+        LaunchRequest signed = request.withToken(token);
         var answer = new CompletableFuture<LaunchRequest.Response>();
         // A wedged owner must not hang the caller, so the exchange is bounded from outside it.
         Thread worker = Thread.ofPlatform().daemon().name("jasper-handoff").start(() -> {
             try (SocketChannel client = SocketChannel.open(UnixDomainSocketAddress.of(socketPath))) {
-                write(client, request.encode());
+                write(client, signed.encode());
                 // The launcher's own budget, not the server's silent-peer tolerance: this reply may
                 // legitimately be queued behind a stalled peer, and must not give up just as it
                 // is about to be served. The future below is the hard outer bound either way.
-                answer.complete(LaunchRequest.Response.of(readLine(client, HANDOFF_TIMEOUT_MILLIS)));
+                answer.complete(LaunchRequest.Response.of(readLine(client, HANDOFF_TIMEOUT_MILLIS, MAX_REPLY_BYTES)));
             } catch (IOException | RuntimeException failure) {
                 answer.complete(LaunchRequest.Response.PROTOCOL);
             }
@@ -152,9 +152,53 @@ public final class HandoffSocket implements AutoCloseable {
     }
 
     /**
+     * The owner's answer (spec 5.3): {@code taker} is offered each request and whether the launch ran another build than
+     * {@code source} at {@code modified}. When it takes the request the answer is UPDATED for another build and OK
+     * otherwise; when it does not, PROTOCOL, which the launch treats as no answer and tries again.
+     *
+     * @param taker takes a request, or declines it; bounded, since the accept thread waits for it
+     * @param source this build's code location, or null when unknown
+     * @param modified its modification time
+     * @return the endpoint's handler
+     */
+    public static Function<LaunchRequest, LaunchRequest.Response> answering(BiPredicate<LaunchRequest, Boolean> taker,
+                                                                            Path source, long modified) {
+        Objects.requireNonNull(taker, "taker");
+        return request -> {
+            boolean updated = request.anotherBuild(source, modified);
+            if (!taker.test(request, updated)) return LaunchRequest.Response.PROTOCOL;
+            return updated ? LaunchRequest.Response.UPDATED : LaunchRequest.Response.OK;
+        };
+    }
+
+    /**
+     * Whether {@code socketPath} fits a Unix socket address: macOS allows 104 bytes and Jasper keeps to 100.
+     *
+     * @param socketPath an endpoint's path
+     * @return true when it can be bound
+     */
+    public static boolean pathFits(Path socketPath) {
+        return socketPath.toString().getBytes(StandardCharsets.UTF_8).length <= MAX_SOCKET_PATH_BYTES;
+    }
+
+    /**
+     * What a launch says, and an owner logs, when its home's socket path is too long to bind (plan Ruling 15).
+     *
+     * @param socketPath the endpoint's path
+     * @return the message
+     */
+    public static String tooLong(Path socketPath) {
+        return "Jasper's home folder path is too long for its socket: " + socketPath;
+    }
+
+    /** True while some process accepts connections on the endpoint: a plain launch would hand off to it. */
+    public static boolean live(Path socketPath) { return owned(socketPath); }
+
+    /**
      * The process id the current owner recorded beside its token, or -1 when there is none or it cannot be read. A
      * hint, not proof: an owner that died without closing leaves its id behind, so only a successful
-     * {@link #handOff} shows the owner was live. Windows needs it before the handoff, to pass on the foreground right.
+     * {@link #handOff} shows the owner was live. Windows needs it before the handoff, to pass on the foreground right,
+     * and the not-responding error names it.
      */
     public static long ownerPid(Path tokenPath) {
         try {
@@ -234,7 +278,7 @@ public final class HandoffSocket implements AutoCloseable {
     }
 
     private void serve(SocketChannel client) throws IOException {
-        LaunchRequest request = LaunchRequest.decode(readLine(client, READ_TIMEOUT_MILLIS));
+        LaunchRequest request = LaunchRequest.decode(readLine(client, READ_TIMEOUT_MILLIS, LaunchRequest.MAX_LINE_BYTES));
         LaunchRequest.Response response;
         if (request == null) response = LaunchRequest.Response.PROTOCOL;
         else if (!MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),
@@ -245,16 +289,12 @@ public final class HandoffSocket implements AutoCloseable {
         try {
             write(client, response.line());
         } catch (IOException peerGone) {
-            // owned() probes for a live owner by connecting and disconnecting without writing:
-            // from here that looks identical to a peer that hung up before the reply arrived. It
-            // runs on every upgrade check, so it is ordinary traffic, not a stack-trace-worthy
-            // failure -- a genuine failure earlier in this method (reading the request) still
+            // A launch that gave up waiting, or a liveness probe that connects and disconnects without writing: from
+            // here both look like a peer that hung up before the reply arrived. Ordinary traffic, not a
+            // stack-trace-worthy failure; a genuine failure earlier in this method (reading the request) still
             // propagates and is logged as one by acceptLoop.
             LOG.log(System.Logger.Level.DEBUG, "Could not reply to a handoff request; the peer had already gone");
         }
-        // An older build must release the endpoint so the newer launcher can own it. The reply is
-        // already written, and the caller starts normally once it reads the refusal.
-        if (response == LaunchRequest.Response.STALE) close();
     }
 
     /** True when something is listening: a connect that succeeds proves a live owner. */
@@ -275,15 +315,21 @@ public final class HandoffSocket implements AutoCloseable {
         }
     }
 
-    /** Bounded read of one line. A peer that connects and says nothing must not hold the endpoint. */
-    private static String readLine(SocketChannel channel, long timeoutMillis) throws IOException {
+    /**
+     * Bounded read of one line of at most {@code limit} bytes: it ends when the peer has sent nothing for
+     * {@code timeoutMillis}, so a peer that connects and says nothing cannot hold the endpoint, while a long line that
+     * keeps arriving is read whole.
+     */
+    private static String readLine(SocketChannel channel, long timeoutMillis, int limit) throws IOException {
         channel.configureBlocking(false);
-        ByteBuffer buffer = ByteBuffer.allocate(MAX_LINE_BYTES);
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        ByteBuffer buffer = ByteBuffer.allocate(limit);
+        long silence = TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        long deadline = System.nanoTime() + silence;
         int scanned = 0;
         while (buffer.hasRemaining()) {
             int read = channel.read(buffer);
             if (read < 0) break;
+            if (read > 0) deadline = System.nanoTime() + silence;
             for (; scanned < buffer.position(); scanned++) {
                 if (buffer.get(scanned) == '\n') {
                     return new String(buffer.array(), 0, scanned, StandardCharsets.UTF_8);

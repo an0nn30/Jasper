@@ -155,15 +155,6 @@ class ApplicationBootstrapTest {
         assertThat(ApplicationBootstrap.residentRole(new AppArguments(null, false, false, false, null, true), true)).isFalse();
     }
 
-    @Test void staleFlagsADifferentPathOrModificationTimeButNotAMatchingUnresolvedSource() {
-        Path source = Path.of("/app.jar");
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 100L), source, 100L)).isFalse();
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of("/other.jar"), 100L), source, 100L)).isTrue();
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", source, 999L), source, 100L)).isTrue();
-        // An unresolvable code source normalises to the same empty path on both sides.
-        assertThat(ApplicationBootstrap.stale(new LaunchRequest("t", Path.of(""), 0L), null, 0L)).isFalse();
-    }
-
     @Test void loginItemReconcilerDedupesAndRunsOffTheCallingThread() throws Exception {
         var applied = new java.util.concurrent.LinkedBlockingQueue<Boolean>();
         var threadNames = new java.util.concurrent.LinkedBlockingQueue<String>();

@@ -1,14 +1,11 @@
 package dev.jasper.app.application;
 
-import dev.jasper.app.bootstrap.BootstrapTestSupport;
 import dev.jasper.app.commands.CommandHistory;
 import dev.jasper.app.platform.ResidentTray;
-import dev.jasper.app.residency.LaunchRequest;
 import dev.jasper.app.startup.StartupTrace;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.concurrent.CountDownLatch;
@@ -219,19 +216,6 @@ class ResidentIndicatorTest {
         edt(() -> indicator.actions().get().quit().run());
         assertThat(terminated.await(5, TimeUnit.SECONDS)).as("Quit Jasper Completely always exits").isTrue();
         assertThat(indicator.removed()).hasValue(1);
-    }
-
-    @Test void losingTheEndpointRemovesTheIndicator() throws Exception {
-        var indicator = new Indicator();
-        var terminations = new AtomicInteger();
-        JasperApplication application = application(terminations::incrementAndGet, indicator, settled());
-        resident(application);
-        var handler = BootstrapTestSupport.handoffHandler(application, Path.of("/old.jar"), 1L);
-        assertThat(handler.apply(new LaunchRequest("t", Path.of("/new.jar"), 2L))).isEqualTo(LaunchRequest.Response.STALE);
-        edt(() -> { });
-        assertThat(indicator.removed()).as("not resident any more").hasValue(1);
-        DesktopTestSupport.until(() -> terminations.get() == 1);
-        assertThat(indicator.removed()).as("removed once").hasValue(1);
     }
 
     @Test void openAfterQuitIsHarmless() throws Exception {
