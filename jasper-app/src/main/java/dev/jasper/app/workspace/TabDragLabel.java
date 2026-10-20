@@ -19,6 +19,9 @@ import javax.swing.JWindow;
  * animated. A headless JVM has no windows: there the label keeps its text and place alone, which tests read. EDT only.
  */
 final class TabDragLabel {
+    /** The most characters of a title the label shows, near a tab's width, as VS Code's and IntelliJ's drag images do. */
+    static final int TITLE_LIMIT = 40;
+
     private final JLabel label = new JLabel();
     private JWindow window;
     private Point location;
@@ -29,11 +32,15 @@ final class TabDragLabel {
         label.setOpaque(true);
     }
 
-    /** Shows {@code text} and {@code icon}, the label's top-left corner at {@code screen}. */
+    /**
+     * Shows {@code text}, past {@value #TITLE_LIMIT} characters its start and an ellipsis, and {@code icon}, the label's
+     * top-left corner at {@code screen}.
+     */
     void show(String text, Icon icon, Point screen) {
-        label.setText(text);
+        String shown = WindowTabs.capped(text, TITLE_LIMIT);
+        label.setText(shown);
         label.setIcon(icon);
-        label.setFont(ThemeZone.font(Typography.Role.BODY, text));
+        label.setFont(ThemeZone.font(Typography.Role.BODY, shown));
         label.setForeground(ThemeZone.color(label, SemanticColor.TEXT_PRIMARY));
         label.setBackground(ThemeZone.color(label, SemanticColor.SURFACE_CARD));
         int vertical = UIScale.scale(4), horizontal = UIScale.scale(8);

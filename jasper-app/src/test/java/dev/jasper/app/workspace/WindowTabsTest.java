@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.commands.ActionId;
 import java.awt.*;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
@@ -198,7 +199,8 @@ class WindowTabsTest {
             JComponent one = named(strip, "select:first"), two = named(strip, "select:second");
             Point target = SwingUtilities.convertPoint(two, two.getWidth() - 10, 10, one);
             mouse(one, MouseEvent.MOUSE_PRESSED, 10, 10, MouseEvent.BUTTON1);
-            mouse(one, MouseEvent.MOUSE_DRAGGED, target.x, target.y, MouseEvent.NOBUTTON);
+            // A drag event names the button it holds: only the left one drags a tab.
+            mouse(one, MouseEvent.MOUSE_DRAGGED, target.x, target.y, MouseEvent.NOBUTTON, InputEvent.BUTTON1_DOWN_MASK);
             mouse(one, MouseEvent.MOUSE_RELEASED, target.x, target.y, MouseEvent.BUTTON1);
             assertThat(owner.tabs().get(1).component()).isSameAs(first);
             assertThat(owner.currentTerminal()).isSameAs(first);
@@ -223,7 +225,10 @@ class WindowTabsTest {
         for (Component child : component.getComponents()) if (child instanceof Container container) layoutTree(container);
     }
     private static void mouse(Component component, int id, int x, int y, int button) {
-        component.dispatchEvent(new MouseEvent(component, id, 1, 0, x, y, 1, false, button));
+        mouse(component, id, x, y, button, 0);
+    }
+    private static void mouse(Component component, int id, int x, int y, int button, int modifiers) {
+        component.dispatchEvent(new MouseEvent(component, id, 1, modifiers, x, y, 1, false, button));
     }
     private static Color pixel(Container entry, int x, int y) { return new Color(render(entry).getRGB(x, y)); }
     private static BufferedImage render(Container entry) {

@@ -142,10 +142,10 @@ public final class WindowFrame {
     /**
      * Puts the frame, before it first shows, so that its workspace takes {@code workspace} on screen: the workspace
      * grown by the chrome the packed frame has around it (its title bar: the system's, the unified macOS bar or
-     * FlatLaf's title pane), then kept on the usable part of the display the workspace overlaps most, the default display
-     * when it overlaps none. A torn-out tab's window (workspace tabs plan 5).
+     * FlatLaf's title pane), then kept on the usable part of the display under {@code cursor}, the default display when
+     * the cursor is on none. A torn-out tab's window (workspace tabs plan 5).
      */
-    private void placeWorkspace(Rectangle workspace) {
+    private void placeWorkspace(Rectangle workspace, Point cursor) {
         // Laid out at the frame's present size: the constructor may have resized it after pack().
         frame.validate();
         JComponent area = content.workspace();
@@ -156,10 +156,10 @@ public final class WindowFrame {
         var environment = GraphicsEnvironment.getLocalGraphicsEnvironment();
         var displays = java.util.Arrays.stream(environment.getScreenDevices())
             .map(java.awt.GraphicsDevice::getDefaultConfiguration).toList();
-        // The workspace's corner can lie on the display left of the cursor's: the one it overlaps most takes it.
-        java.util.OptionalInt most = TabDrag.displayFor(workspace,
+        // The workspace reaches right of and below the cursor, across a display's edge: the cursor's display takes it.
+        java.util.OptionalInt under = TabDrag.displayFor(cursor,
             displays.stream().map(java.awt.GraphicsConfiguration::getBounds).toList());
-        java.awt.GraphicsConfiguration display = most.isPresent() ? displays.get(most.getAsInt())
+        java.awt.GraphicsConfiguration display = under.isPresent() ? displays.get(under.getAsInt())
             : environment.getDefaultScreenDevice().getDefaultConfiguration();
         frame.setBounds(TabDrag.fitted(bounds, usableBounds(display)));
     }

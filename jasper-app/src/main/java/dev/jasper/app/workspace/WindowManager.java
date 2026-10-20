@@ -3,6 +3,7 @@ package dev.jasper.app.workspace;
 import dev.jasper.app.contributions.Contributions;
 import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,13 +33,17 @@ public final class WindowManager {
      * @param emptied what its content runs when its last tab has gone
      * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty
      *     for where the platform puts it
+     * @param cursor where the cursor released that tab on screen, present with the bounds: the window opens on the
+     *     display there
      */
     public record Opening(WindowRole role, boolean empty, Path directory, String trigger, Runnable emptied,
-                          Optional<Rectangle> bounds) {
-        /** Requires the role, the trigger, the callback and the bounds. */
+                          Optional<Rectangle> bounds, Optional<Point> cursor) {
+        /** Requires the role, the trigger, the callback, and the bounds with the cursor or neither. */
         public Opening {
             Objects.requireNonNull(role, "role"); Objects.requireNonNull(trigger, "trigger"); Objects.requireNonNull(emptied, "emptied");
-            Objects.requireNonNull(bounds, "bounds");
+            Objects.requireNonNull(bounds, "bounds"); Objects.requireNonNull(cursor, "cursor");
+            if (bounds.isPresent() != cursor.isPresent())
+                throw new IllegalArgumentException("A child window's bounds come with the cursor");
         }
     }
 
@@ -83,7 +88,7 @@ public final class WindowManager {
     private final List<JasperWindow> activations = new ArrayList<>();
     /** The one tab drag of every window this manager opens (workspace tabs spec 12): it reaches them all, top first. */
     private final TabDrag tabDrag = new TabDrag(() -> windowsByActivation().stream().map(JasperWindow::content).toList(),
-        (tab, bounds) -> moveToNewWindow(tab, bounds));
+        (tab, out) -> moveToNewWindow(tab, out.bounds(), out.cursor()));
     private MainWindow main;
     private JasperWindow lastActive;
     private int openings;
@@ -190,8 +195,8 @@ public final class WindowManager {
         openingMain = true;
         Optional<MainWindow> opened;
         try {
-            opened = open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty()),
-                content -> main = new MainWindow(this, content));
+            opened = open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty(),
+                Optional.empty()), content -> main = new MainWindow(this, content));
         } catch (RuntimeException | Error failure) {
             // Still opening: a waiting tab's close listener cannot ask for another main window.
             model.tabs().mainFailed(failure);
@@ -214,7 +219,7 @@ public final class WindowManager {
     public Optional<ChildWindow> openTerminalWindow(Path directory) {
         requireEdt();
         if (ensureMain("menu", null).isEmpty()) return Optional.empty();
-        return openChild(false, directory, null);
+        return openChild(false, directory, null, null);
     }
 
     /**
@@ -224,23 +229,23 @@ public final class WindowManager {
      * @param tab a tab of one of these windows
      * @return the new child window; empty when the tab stayed
      */
-    public Optional<ChildWindow> moveToNewWindow(Tab tab) { return moveToNewWindow(tab, null); }
+    public Optional<ChildWindow> moveToNewWindow(Tab tab) { return moveToNewWindow(tab, null, null); }
 
     /**
-     * As {@link #moveToNewWindow(Tab)}, the new child window's workspace at {@code bounds} on screen: a tab torn out of
-     * its window
-     * (workspace tabs plan 5).
+     * As {@link #moveToNewWindow(Tab)}, the new child window's workspace at {@code bounds} on screen, on the display under
+     * {@code cursor}: a tab torn out of its window (workspace tabs plan 5).
      *
      * @param tab a tab of one of these windows
      * @param bounds where the new window's workspace goes on screen; null for where the platform puts it
+     * @param cursor where the cursor released the tab on screen; null exactly when {@code bounds} is
      * @return the new child window; empty when the tab stayed
      */
-    public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds) {
+    public Optional<ChildWindow> moveToNewWindow(Tab tab, Rectangle bounds, Point cursor) {
         requireEdt();
         if (tab == null || tab.closed() || tab.pinned()) return Optional.empty();
         Optional<JasperWindow> from = window(tab.window());
         if (from.isEmpty() || !from.get().isMain() && from.get().content().tabCount() < 2) return Optional.empty();
-        Optional<ChildWindow> opened = openChild(true, null, bounds);
+        Optional<ChildWindow> opened = openChild(true, null, bounds, cursor);
         if (opened.isEmpty()) return opened;
         ChildWindow child = opened.get();
         Throwable failure = null;
@@ -316,12 +321,12 @@ public final class WindowManager {
         return all;
     }
 
-    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds) {
+    private Optional<ChildWindow> openChild(boolean empty, Path directory, Rectangle bounds, Point cursor) {
         // A closing tab's listener asking for a window while every window closes gets none (spec 6.4).
         if (closingAll) return Optional.empty();
         ChildWindow[] made = new ChildWindow[1];
         return open(new Opening(WindowRole.CHILD, empty, directory, "menu", () -> { if (made[0] != null) made[0].emptied(); },
-            Optional.ofNullable(bounds).map(Rectangle::new)), content -> {
+            Optional.ofNullable(bounds).map(Rectangle::new), Optional.ofNullable(cursor).map(Point::new)), content -> {
             made[0] = new ChildWindow(this, content);
             children.add(made[0]);
             return made[0];
@@ -340,8 +345,9 @@ public final class WindowManager {
             content.tabDrag(tabDrag);
             window = make.apply(content);
             window.shell(hooks.frames().apply(window));
-            // A torn-out tab's window opens where it was dropped (workspace tabs plan 5).
-            opening.bounds().ifPresent(window.shell().place());
+            // A torn-out tab's window opens where it was dropped, on the cursor's display (workspace tabs plan 5).
+            if (opening.bounds().isPresent())
+                window.shell().place().accept(opening.bounds().get(), opening.cursor().orElseThrow());
             window.shell().show().run();
             hooks.opened().accept(window);
             return Optional.of(window);
@@ -387,7 +393,7 @@ public final class WindowManager {
     private UUID emptyWindow() {
         if (openingMain) return null;
         if (ensureMain("plugin", null).isEmpty()) throw new IllegalStateException("The main window is closing or Jasper is quitting");
-        return openChild(true, null, null).map(JasperWindow::id)
+        return openChild(true, null, null, null).map(JasperWindow::id)
             .orElseThrow(() -> new IllegalStateException("The main window is closing or Jasper is quitting"));
     }
 

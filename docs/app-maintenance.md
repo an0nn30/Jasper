@@ -694,12 +694,12 @@ windows the `WindowManager` lists, most recently active first, with `TabDragLabe
 the target window's `DockDropOverlay`. Where a tab would drop is `WorkspaceDropResolver`'s job, over
 `WorkspaceView.dropAreas`: change the zones in the resolver and its tests first. A drop within a window is
 `WorkspaceView.drop`; one into another window goes through the tab registry first, and a tear-out through the window
-manager. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in full
-screen other than the drag's own takes no drop (`TabDrag.dropFrame`). Esc, a plain move or a press anywhere (a lost
-release), the source window losing the focus and the dragged tab closing or leaving its window or group end a drag.
-`TabDragTest` and `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen
+manager. A child window's only tab and a pinned tab have no tear-out target, and a pinned tab takes targets in its own
+window only. A release over another window of Jasper's (`TabDrag.otherWindows`) drops nothing, and on macOS a window in
+full screen on the drag's display, other than the drag's own, takes no drop (`TabDrag.dropFrame`). Esc, a plain move or
+a press anywhere (a lost release), the source window losing the focus and the dragged tab closing or leaving its window
+or group end a drag. `TabDragTest` and `TabDragWindowsTest` drive it headlessly over stand-in frames on a pretend screen
 (`TabDragTestSupport`).
-
 
 Startup keyboard focus belongs to the active terminal. `WindowContent` provides the
 native frame's default focus traversal target: the pending `TerminalPane` until its

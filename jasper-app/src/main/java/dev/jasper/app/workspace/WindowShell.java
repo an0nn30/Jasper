@@ -1,10 +1,11 @@
 package dev.jasper.app.workspace;
 
 import java.awt.Component;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Window;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -18,11 +19,11 @@ import java.util.function.Supplier;
  * @param discard disposes the frame and remembers nothing: a window that failed to open
  * @param window the frame, for parenting dialogs; null in a headless test
  * @param owns whether a component is the frame or sits inside it
- * @param place puts the frame, before it first shows, so that its workspace takes screen bounds: a torn-out tab's
- *     window (workspace tabs plan 5)
+ * @param place puts the frame, before it first shows, so that its workspace takes screen bounds, on the display under a
+ *     screen point, the cursor's: a torn-out tab's window (workspace tabs plan 5)
  */
 public record WindowShell(Runnable show, Runnable toFront, Runnable dispose, Runnable discard, Supplier<Window> window,
-                          Predicate<Component> owns, Consumer<Rectangle> place) {
+                          Predicate<Component> owns, BiConsumer<Rectangle, Point> place) {
     /** Requires every function. */
     public WindowShell {
         Objects.requireNonNull(show, "show"); Objects.requireNonNull(toFront, "toFront"); Objects.requireNonNull(dispose, "dispose");
@@ -42,6 +43,6 @@ public record WindowShell(Runnable show, Runnable toFront, Runnable dispose, Run
      */
     public WindowShell(Runnable show, Runnable toFront, Runnable dispose, Runnable discard, Supplier<Window> window,
                        Predicate<Component> owns) {
-        this(show, toFront, dispose, discard, window, owns, bounds -> { });
+        this(show, toFront, dispose, discard, window, owns, (bounds, cursor) -> { });
     }
 }

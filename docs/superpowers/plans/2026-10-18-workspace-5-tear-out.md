@@ -1,6 +1,7 @@
 # Workspace tabs 5: tear-out and drag-back Implementation Plan
 
-**Status: executed on 2026-10-19** (`e2294085b..49f5b7a84`, then the documentation commit); see `docs/STATUS.md`.
+**Status: executed on 2026-10-19** (`e2294085b..49f5b7a84`, then the documentation commit and the final review's fixes);
+see `docs/STATUS.md`.
 Deviations from the plan's text: (a) before Task 1 the plan was replayed on `094729d08` and refreshed in `e2294085b`, with
 the pre-flight's rulings F1 to F9 (STATUS lists them: F1 the tear-out names the new window's workspace and
 `WindowFrame.placeWorkspace` grows it by its own measured chrome; F2 no split-from group, the left/up round-trip halving
@@ -10,9 +11,19 @@ opening mid-drag does not end the drag; F9 five anchors and seven text fixes, an
 and `WindowShell` under Task 4); (b) Task 3 (controller ruling after review 1): `WorkspaceView.apply` refocuses when the
 active group changes under `holdsFocus`, so a tab dropped into another group keeps the focus, `GroupView.pressed` cancels
 a dock drag whose release was lost, and the exit-path tests assert the Esc dispatcher and the AWT listener are gone
-(`f01f025cf`); (c) Task 4 (controller ruling after review 1): `TabDrag.displayFor` picks the display the new workspace
-overlaps most, in place of the display holding its top-left corner, with two more tests and a comment on `WindowContent`'s
-own drag (`49f5b7a84`).
+(`f01f025cf`); (c) Task 4 (controller ruling after review 1): `TabDrag.displayFor` chooses a tear-out's display, in
+place of the display holding the workspace's top-left corner (then the one the workspace overlaps most; since the final
+review, (d), the one under the cursor), with its test, two more (a drop into another window's inactive group, a refused
+or failed registry move) and a comment on `WindowContent`'s own drag (`49f5b7a84`); (d) final review: a tear-out opens
+on the display under the cursor, which `TabDrag.Target.TearOut`, `WindowManager.moveToNewWindow(Tab, Rectangle, Point)`,
+`Opening.cursor` and `WindowShell.place` (now a `BiConsumer<Rectangle, Point>`) carry to `WindowFrame.placeWorkspace`
+and `TabDrag.displayFor(Point, List)` picks, so a display left of or above another keeps a release near its edge; on
+macOS only a window in full screen on the display of the drag's own window takes no drop (`TabDrag.dropFrame`'s
+`onSourceDisplay`), as each display shows a Space of its own; the drag label shows at most 40 characters of a title, the
+last an ellipsis (`TabDragLabel.TITLE_LIMIT`); tests for the drag's own window closing mid-drag, the target window
+closing under the landing and a drop into another window's empty main workspace; a drag starts on the left button only;
+and Javadoc and documentation corrections (`WindowManager`, `DockDropOverlay`, `WindowContent`, `README.md`,
+`docs/app-maintenance.md`).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

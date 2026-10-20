@@ -24,6 +24,7 @@ import java.awt.Component;
 import java.awt.KeyboardFocusManager;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayDeque;
@@ -94,6 +95,35 @@ class TabDragTest {
             assertThat(owner.selectedTab()).as("the press selected it").isSameAs(a);
             assertThat(owner.tabDrag().label().showing()).isFalse();
         });
+    }
+
+    /**
+     * Swing sends the pressed component a drag with any button held. A left press whose release never came is still
+     * pending when a right press (which hands the drag nothing) drags on: only the left button drags a tab.
+     */
+    @Test void aRightButtonDragOnATabStartsNothing() throws Exception {
+        edt(() -> {
+            Component source = entry(owner, a);
+            Point press = middle(source);
+            mouse(source, MouseEvent.MOUSE_PRESSED, press);
+            right(source, MouseEvent.MOUSE_PRESSED, press);
+            Point pastC = onTab(owner, c, 0.75);
+            right(source, MouseEvent.MOUSE_DRAGGED, pastC);
+            assertThat(owner.tabDrag().active()).isFalse();
+            assertThat(owner.tabDrag().label().showing()).isFalse();
+            assertThat(keys.dispatchers).isEmpty();
+            right(source, MouseEvent.MOUSE_RELEASED, pastC);
+            assertThat(owner.tabs()).containsExactly(a, b, c);
+        });
+    }
+
+    /** A right-button event at {@code screen}, sent to {@code source} as Swing sends it to the pressed component. */
+    private static void right(Component source, int id, Point screen) {
+        Point at = new Point(screen);
+        SwingUtilities.convertPointFromScreen(at, source);
+        int modifiers = id == MouseEvent.MOUSE_RELEASED ? 0 : InputEvent.BUTTON3_DOWN_MASK;
+        int button = id == MouseEvent.MOUSE_DRAGGED ? MouseEvent.NOBUTTON : MouseEvent.BUTTON3;
+        source.dispatchEvent(new MouseEvent(source, id, System.currentTimeMillis(), modifiers, at.x, at.y, 1, false, button));
     }
 
     @Test void draggingATabAlongItsStripReordersIt() throws Exception {

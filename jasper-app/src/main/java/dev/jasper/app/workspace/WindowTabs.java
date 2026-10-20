@@ -151,9 +151,12 @@ final class WindowTabs extends JPanel implements TabStrip {
     }
 
     /** {@code title}, or past {@code TITLE_LIMIT} characters its start and an ellipsis within that limit, for tips and menus. */
-    static String capped(String title) {
-        if (title.length() <= TITLE_LIMIT) return title;
-        int end = TITLE_LIMIT - 1;
+    static String capped(String title) { return capped(title, TITLE_LIMIT); }
+
+    /** {@code title}, or past {@code limit} characters its start and an ellipsis within that limit. */
+    static String capped(String title, int limit) {
+        if (title.length() <= limit) return title;
+        int end = limit - 1;
         if (Character.isHighSurrogate(title.charAt(end - 1))) end--; // never split an emoji
         return title.substring(0, end) + "\u2026";
     }

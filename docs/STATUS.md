@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Workspace tabs, plan 5: tear-out and drag-back — 2026-10-19** (`claude/workspace-tabs`, worktree
-`.claude/worktrees/workspace-tabs`, `e2294085b..49f5b7a84` (Tasks 1 to 4, after the plan refresh), then this
-documentation commit; [plan](superpowers/plans/2026-10-18-workspace-5-tear-out.md),
+`.claude/worktrees/workspace-tabs`, `e2294085b..49f5b7a84` (Tasks 1 to 4, after the plan refresh), then the
+documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-5-tear-out.md),
 [spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md)). One tab drag (`workspace.TabDrag`, the window
 manager's, shared by every window it opens) replaces the strips' release-to-reorder: a left press on a tab of either
 strip face that moves past the kit's `TAB_REORDER_THRESHOLD` (5 px) drags it on plain mouse events in screen
@@ -10,12 +10,14 @@ coordinates, with its label in a small undecorated window beside the cursor (`Ta
 target window's `DockDropOverlay`. `dock.WorkspaceDropResolver` (pure; `dock` may now name the layout's group ids and
 sides) maps the cursor to a drop: a place in a strip, a group's centre, a group's outer quarter on a side (the empty
 main workspace is all centre), and picks the most recently active window under the cursor; on macOS a window in full
-screen other than the drag's own takes no drop. Within a window `WorkspaceView.drop` reorders, moves or splits; into
+screen on the drag's display, other than the drag's own, takes no drop. Within a window `WorkspaceView.drop` reorders,
+moves or splits; into
 another window the tab registry moves the tab (TAB_MOVED, both maximizes end, an emptied child window closes after it)
 and the drop places it, an edge drop beside the target group directly (`TabRegistry.move(Tab, UUID, GroupId, Side)`);
 outside every window the tab tears out into a new child window whose workspace is its old group's size with the tab
-under the cursor, its frame grown by its own title bar (`WindowFrame` measures it) and kept on the display the workspace
-covers most (none for a child window's only tab or a pinned tab, which moves within its window only). A release over a
+under the cursor, its frame grown by its own title bar (`WindowFrame` measures it) and kept on the display under the
+cursor (none for a child window's only tab, which can still move into another window, or for a pinned tab, which moves
+within its window only). A release over a
 window's dock, chrome or title bar or over another window of Jasper's (Settings, About), a drop that would change
 nothing, Esc, a lost release, the source window losing the focus (a modal dialog, another application) and the dragged
 tab closing or leaving its window or group do nothing. Sessions and content are never touched. `GroupView.reorder` is
@@ -57,19 +59,33 @@ refocuses when the active group changes under the workspace's `holdsFocus` rule,
 into another group keeps the focus once (a test counts `focusTarget` calls, and `RecordingFocusManager` gains
 `own(Component)`), `GroupView.pressed` cancels a dock drag whose release was lost, and the exit-path tests assert the
 Esc dispatcher and the AWT listener are gone (`f01f025cf`); (c) Task 4, controller ruling after review 1:
-`TabDrag.displayFor` picks the display the new workspace overlaps most, the default screen only when none does, in place
-of the display holding its top-left corner, so a tear-out near a monitor's edge opens where the cursor is, with two more
-tests (a drop into another window's inactive group, a refused or failed registry move) and a comment on
-`WindowContent`'s own drag (`49f5b7a84`). Left for plan 6: saving a child window's bounds, which a tear-out now chooses,
+`TabDrag.displayFor` chooses a tear-out's display, the default screen only when it finds none, in place of the display
+holding the workspace's top-left corner (then the one the workspace overlaps most; since the final review, (d), the one
+under the cursor), so a tear-out near a monitor's edge opens where the cursor is, with its test and two more (a drop
+into another window's inactive group, a refused or failed registry move) and a comment on `WindowContent`'s own drag
+(`49f5b7a84`); (d) final review: a tear-out opens on the display under the cursor, which `TabDrag.Target.TearOut`,
+`WindowManager.moveToNewWindow(Tab, Rectangle, Point)`, `Opening.cursor` and `WindowShell.place` (now a
+`BiConsumer<Rectangle, Point>`) carry to `WindowFrame.placeWorkspace` and `TabDrag.displayFor(Point, List)` picks, so a
+display left of or above another keeps a release near its edge; on macOS only a window in full screen on the display of
+the drag's own window takes no drop (`TabDrag.dropFrame`'s `onSourceDisplay`), as each display shows a Space of its own;
+the drag label shows at most 40 characters of a title, the last an ellipsis (`TabDragLabel.TITLE_LIMIT`); tests for the
+drag's own window closing mid-drag, the target window closing under the landing and a drop into another window's empty
+main workspace; a drag starts on the left button only; and Javadoc and documentation corrections (`WindowManager`,
+`DockDropOverlay`, `WindowContent`, `README.md`, `docs/app-maintenance.md`). Left for plan 6: saving a child window's
+bounds, which a tear-out now chooses,
 and the layout after every drag, through the debounced save; from plan 4b, `AppContractTest`'s `emptyWindow` (it makes
 the main window when none is open) and panel routing (it bypasses `panelRoute`) before the first contract case that
 needs either, and `FakeWorkspace.closeWindow` closing and nulling `Panel.instance`, with `AppContractTest` clearing its
-panel caches, once a fake main window can close. Deferred: plan 2's Rulings 8 limit, now reachable by a drag: a tab
-dropped on a group's left or upper edge and dragged back gives the new group's space to the sibling before it, so the
-group it came from halves on each round trip. `./gradlew check --continue`: **11,752 tests, 0 failures, 0 errors, 25
-skipped** (from the XML in `*/build/test-results/test/`; `jasper-app` 3,797, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
-`jasper-plugin-editor` 4,912, `WorkspaceDropResolverTest` 10, `WorkspaceDropTest` 8, `TabDragTest` 15,
-`TabDragWindowsTest` 18, `TabRegistryTest` 34, `WindowManagerTest` 33; the build passed on its first run,
+panel caches, once a fake main window can close; and, as `Opening.bounds` and `WindowShell.place` now mean a tear-out's
+workspace bounds, restoring child windows' saved frame bounds through a frame-bounds path (`WindowPlacement`, as
+`restoreLayout` does for the main window), with the keep-on-screen helpers (`TabDrag.fitted`, the display choice) moved
+beside `WindowPlacement` first so that the main and child windows restore by one algorithm. Deferred: plan 2's Rulings 8
+limit, now reachable by a drag: when a group has a sibling before it in a split of the same orientation, a tab dropped
+on its left or upper edge and dragged back gives the new group's space to that sibling, so the group that was split
+halves on each round trip. `./gradlew check --continue`: **11,757 tests, 0 failures, 0 errors, 25 skipped** (from the
+XML in `*/build/test-results/test/`; `jasper-app` 3,802, `jasper-sdk` 94, `jasper-sdk-testkit` 204,
+`jasper-plugin-editor` 4,912, `WorkspaceDropResolverTest` 10, `WorkspaceDropTest` 8, `TabDragTest` 16,
+`TabDragWindowsTest` 22, `TabRegistryTest` 34, `WindowManagerTest` 33; the build passed on its first run,
 `StagedTransferLifecycleTest` included). GUI checks for the user: a tab dragged along its strip, onto another group's
 tabs and middle, and onto each outer quarter of a group, in both tab faces (equal tabs and the Enterprise look's classic
 tabs), with the landing shown and no motion, and a tab dropped into another group takes the focus (no flash of a
@@ -77,12 +93,16 @@ neighbouring tab); a tab dragged into another Jasper window's strip, middle and 
 dragged into the main window (the child closes cleanly, the shell keeps running); a tab released on the desktop opens a
 child window under the cursor whose workspace is the size of its old group, the tab under the cursor and the title bar
 above it (the unified macOS bar, FlatLaf's title pane on Windows and Linux, and the system's: `placeWorkspace` sizes it
-for each), also on a second display, near a display's edge (the window opens on the display the workspace covers most,
-moved onto it) and across displays with different scales; a child window's only tab released on the desktop stays;
-releases over the dock, the toolbar, a title bar and the Settings window change nothing; Esc, Cmd+Tab (Alt+Tab) to
+for each), also on a second display, near a display's edge (the window opens on the display under the cursor, moved onto
+it), on a display left of another and on one above another, and across displays with different scales; a child window's
+only tab released on the desktop stays; releases over the dock, the toolbar, a title bar and the Settings window change
+nothing, and a release over the Settings window where it sits over a main window's workspace is noted as it behaves
+(Ruling 9: Settings shields no window, so the tab drops into the workspace beneath it); Esc, Cmd+Tab (Alt+Tab) to
 another application and a modal dialog (a plugin's) during a drag end it with no label left on screen; overlapping
 windows take the drop in the most recently active one; on macOS, a Jasper window in full screen takes no drop from a
-window on the desktop, and a window on another Space (not in full screen), which Java cannot tell apart, is noted as it
+window on the desktop of the same display, one in full screen on a second display takes drops, a drag within a window in
+full screen shows its label without switching Spaces, and a window on another Space (not in full screen),
+which Java cannot tell apart, is noted as it
 behaves; on Windows and Linux, the label window stays above other windows and takes no focus, including under a
 focus-follows-mouse window manager on Linux (the label must not take focus as the pointer crosses it). Not merged, not
 pushed.

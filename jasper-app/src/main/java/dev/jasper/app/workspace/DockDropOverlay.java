@@ -14,9 +14,10 @@ import javax.swing.JComponent;
 
 /**
  * The drag guides of a dock drag and of a tab drag ({@link TabDrag}: the area the tab would take as the highlight, its
- * place in a strip as the placeholder), on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border where the dragged tool
- * window would land (for a second slot, always that slot's half; see {@link dev.jasper.app.dock.DockGeometry#landing}),
- * a highlighted rounded square in the stripe's gap, and the window's icon at the cursor. It takes no mouse input.
+ * place in a strip as the placeholder), on the layered pane's DRAG_LAYER: a translucent highlight with a 1px border
+ * where the dragged tool window would land (for a second slot, always that slot's half; see
+ * {@link dev.jasper.app.dock.DockGeometry#landing}), a highlighted rounded square in the stripe's gap, and the window's
+ * icon at the cursor. It takes no mouse input.
  * Colours: the canonical accent role at the named module alphas (25 % fill, 60 % border); vendor DragAndDrop.* keys
  * have no canonical role and do not bypass it. Both the highlight and the
  * placeholder draw their fill inside their 1px border, so the translucent colours never stack. {@link #show} repaints

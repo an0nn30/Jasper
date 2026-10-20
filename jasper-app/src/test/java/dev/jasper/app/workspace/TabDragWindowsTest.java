@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
+import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.AfterEach;
@@ -51,8 +53,9 @@ class TabDragWindowsTest {
     private final List<TerminalEvent> facts = new ArrayList<>();
     /** Each window's stand-in frame, by window id. */
     private final Map<UUID, JPanel> frames = new HashMap<>();
-    /** Where the window manager put tear-out windows' frames on the pretend screen. */
+    /** Where the window manager put tear-out windows' frames on the pretend screen, and the cursor it gave with each. */
     private final List<Rectangle> placed = new ArrayList<>();
+    private final List<Point> cursors = new ArrayList<>();
     private WindowManager manager;
     private MainWindow main;
     private ChildWindow child;
@@ -100,7 +103,10 @@ class TabDragWindowsTest {
         JPanel shell = TabDragTestSupport.frame(window.content(), 5000, 5000, 800, 600);
         frames.put(window.id(), shell);
         return new WindowShell(() -> { }, () -> { }, () -> { }, () -> { }, () -> null,
-            component -> SwingUtilities.isDescendingFrom(component, shell), placed::add);
+            component -> SwingUtilities.isDescendingFrom(component, shell), (bounds, cursor) -> {
+                placed.add(bounds);
+                cursors.add(cursor);
+            });
     }
 
     private JPanel frameOf(JasperWindow window) { return frames.get(window.id()); }
@@ -245,7 +251,7 @@ class TabDragWindowsTest {
                 size.width, size.height);
             facts.clear();
             Component source = start(from, tab, outside);
-            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected));
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.TearOut(expected, outside));
             assertThat(manager.tabDrag().overlay().getParent()).as("no landing in any window").isNull();
             mouse(source, MouseEvent.MOUSE_RELEASED, outside);
             ChildWindow torn = manager.children().getLast();
@@ -253,6 +259,7 @@ class TabDragWindowsTest {
             assertThat(tab.window()).isEqualTo(torn.id());
             assertThat(torn.content().tabs()).containsExactly(tab);
             assertThat(placed).as("its workspace, which its frame grows by its title bar").containsExactly(expected);
+            assertThat(cursors).as("on the display under the cursor").containsExactly(outside);
             assertThat(session(tab)).isSameAs(session);
             assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(tab.id().value(), main.id(), torn.id()));
             assertThat(facts).as("the window opens empty, then the tab moves in")
@@ -277,6 +284,19 @@ class TabDragWindowsTest {
             assertThat(SwingUtilities.isDescendingFrom(view, main.content())).isTrue();
             assertThat(view.isVisible()).as("shown again").isTrue();
             assertThat(notes.closed()).isFalse();
+        });
+    }
+
+    /** A tab's title can run to 200 characters: the label keeps near a tab's width, as VS Code's and IntelliJ's drag images do. */
+    @Test void theDragLabelCapsALongTitleWithAnEllipsis() throws Exception {
+        edt(() -> {
+            String title = "quarterly-report-final-revision-".repeat(5) + "notes.txt";
+            Tab notes = model.tabs().open("dev.example.editor", "notes", title, main.id(), new JPanel());
+            relayout(frameOf(main));
+            assertThat(main.content().tabTitle(notes)).isEqualTo(title);
+            start(main.content(), notes, new Point(3000, 1200));
+            assertThat(manager.tabDrag().label().text()).as("40 characters, the last an ellipsis")
+                .isEqualTo(title.substring(0, 39) + "\u2026");
         });
     }
 
@@ -426,6 +446,90 @@ class TabDragWindowsTest {
         });
     }
 
+    /** The drag's own window closing (Close Window, its last shell exiting) ends the drag clean, its landing elsewhere too. */
+    @Test void theDragsOwnWindowClosingMidDragEndsItClean() throws Exception {
+        edt(() -> recordingKeys(keys -> {
+            int listeners = motionListeners();
+            Tab tab = child.content().tabs().get(0);
+            Point there = inside(cards(main.content(), activeGroup(main)), 0.5, 0.5);
+            Component source = start(child.content(), tab, there);
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing shows in the main window")
+                .isSameAs(SwingUtilities.getRootPane(main.content()).getLayeredPane());
+            child.requestClose();
+            assertThat(child.closed()).isTrue();
+            assertEnded(keys, listeners);
+            mouse(source, MouseEvent.MOUSE_RELEASED, there);
+            assertThat(main.content().tabs()).as("nothing dropped").hasSize(2);
+            assertThat(moves()).isEmpty();
+        }));
+    }
+
+    /**
+     * The target window closing while it holds the landing leaves the drag running: at the next event the landing leaves
+     * that window, which takes no drop any more, and the drag goes on to its release.
+     */
+    @Test void theTargetWindowClosingUnderTheLandingLeavesTheDragRunning() throws Exception {
+        edt(() -> recordingKeys(keys -> {
+            int listeners = motionListeners();
+            WindowContent from = main.content();
+            Tab tab = from.tabs().get(0), other = from.tabs().get(1);
+            Point there = onTab(child.content(), child.content().tabs().get(0), 0.25);
+            Component source = start(from, tab, there);
+            JLayeredPane layers = SwingUtilities.getRootPane(child.content()).getLayeredPane();
+            assertThat(manager.tabDrag().overlay().getParent()).isSameAs(layers);
+            child.requestClose();
+            assertThat(child.closed()).isTrue();
+            assertThat(manager.tabDrag().active()).as("another window closing leaves the drag alone").isTrue();
+            mouse(source, MouseEvent.MOUSE_DRAGGED, there);
+            assertThat(manager.tabDrag().overlay().getParent()).as("the landing leaves the closed window").isNull();
+            assertThat(manager.tabDrag().target()).as("where it stood, outside every open window")
+                .hasValueSatisfying(target -> assertThat(target).isInstanceOf(TabDrag.Target.TearOut.class));
+            Point past = onTab(from, other, 0.75);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, past);
+            mouse(source, MouseEvent.MOUSE_RELEASED, past);
+            assertThat(from.tabs()).as("the drag went on to its drop").containsExactly(other, tab);
+            assertThat(manager.children()).isEmpty();
+            assertEnded(keys, listeners);
+        }));
+    }
+
+    /** The empty main workspace is all centre: a tab dropped there from another window moves in through the registry. */
+    @Test void aTabDroppedIntoAnotherWindowsEmptyMainWorkspaceLandsThereSelected() throws Exception {
+        edt(() -> {
+            WindowContent to = main.content();
+            for (Tab open : List.copyOf(to.tabs())) to.closeTab(open);
+            relayout(frameOf(main));
+            assertThat(to.tabs()).isEmpty();
+            assertThat(main.closed()).as("the main window stays, its workspace empty").isFalse();
+            Tab tab = child.content().tabs().get(0);
+            Object session = session(tab);
+            Point centre = middle(to.workspace());
+            facts.clear();
+            Component source = start(child.content(), tab, centre);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Into(to, new Drop.Centre(activeGroup(main))));
+            mouse(source, MouseEvent.MOUSE_RELEASED, centre);
+            assertThat(tab.window()).isEqualTo(main.id());
+            assertThat(to.tabs()).containsExactly(tab);
+            assertThat(to.selectedTab()).isSameAs(tab);
+            assertThat(to.workspace().model().activeTab()).contains(tab.id());
+            assertThat(session(tab)).isSameAs(session);
+            assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(tab.id().value(), child.id(), main.id()));
+            assertThat(child.closed()).as("its last tab moved out").isTrue();
+        });
+    }
+
+    /** Runs {@code test} with a focus manager that records the drag's Esc dispatcher, then puts the previous one back. */
+    private static void recordingKeys(Consumer<CommandPaletteShortcutsTest.RecordingFocusManager> test) {
+        KeyboardFocusManager previous = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        var keys = new CommandPaletteShortcutsTest.RecordingFocusManager();
+        KeyboardFocusManager.setCurrentKeyboardFocusManager(keys);
+        try {
+            test.accept(keys);
+        } finally {
+            KeyboardFocusManager.setCurrentKeyboardFocusManager(previous);
+        }
+    }
+
     /** The drag ended clean: no Esc dispatcher, lost-release listener, landing or label is left. */
     private void assertEnded(CommandPaletteShortcutsTest.RecordingFocusManager keys, int listeners) {
         assertThat(manager.tabDrag().active()).isFalse();
@@ -451,15 +555,22 @@ class TabDragWindowsTest {
         });
     }
 
-    @Test void onMacOsAWindowInFullScreenOtherThanTheDragsOwnTakesNoDrop() {
+    /**
+     * The stand-in frames are no native windows, so the drag reaches this rule only through its helper; a full-screen
+     * window on a second display is a GUI check.
+     */
+    @Test void onMacOsAWindowInFullScreenOnTheDragsDisplayOtherThanTheDragsOwnTakesNoDrop() {
         Rectangle display = new Rectangle(0, 0, 1512, 982);
-        assertThat(TabDrag.dropFrame(display, display, false, true)).as("full screen: a Space of its own").isEqualTo(new Rectangle());
-        assertThat(TabDrag.dropFrame(display, display, true, true)).as("the drag's own window is in sight").isEqualTo(display);
-        assertThat(TabDrag.dropFrame(new Rectangle(0, 25, 1512, 957), display, false, true)).as("zoomed, under the menu bar")
+        assertThat(TabDrag.dropFrame(display, display, false, true, true)).as("full screen: a Space of its own").isEqualTo(new Rectangle());
+        assertThat(TabDrag.dropFrame(display, display, true, true, true)).as("the drag's own window is in sight").isEqualTo(display);
+        assertThat(TabDrag.dropFrame(new Rectangle(0, 25, 1512, 957), display, false, true, true)).as("zoomed, under the menu bar")
             .isEqualTo(new Rectangle(0, 25, 1512, 957));
-        assertThat(TabDrag.dropFrame(display, display, false, false)).as("elsewhere a window covering its display is in sight")
+        Rectangle second = new Rectangle(1512, 0, 1920, 1080);
+        assertThat(TabDrag.dropFrame(second, second, false, false, true))
+            .as("full screen on another display, which shows a Space of its own: in sight").isEqualTo(second);
+        assertThat(TabDrag.dropFrame(display, display, false, true, false)).as("elsewhere a window covering its display is in sight")
             .isEqualTo(display);
-        assertThat(TabDrag.dropFrame(display, null, false, true)).as("no display known").isEqualTo(display);
+        assertThat(TabDrag.dropFrame(display, null, false, false, true)).as("no display known").isEqualTo(display);
     }
 
     @Test void aTearOutWindowIsKeptOnTheDisplayUnderTheCursor() {
@@ -472,12 +583,25 @@ class TabDragWindowsTest {
             .isEqualTo(new Rectangle(5, 5, 800, 600));
     }
 
-    @Test void aTearOutWindowOpensOnTheDisplayItsWorkspaceMostlyCovers() {
+    /**
+     * A tear-out's workspace reaches right of and below the cursor by most of a group, so near the edge of a display left
+     * of or above another it mostly covers that other one: the display under the cursor takes the window all the same.
+     */
+    @Test void aTearOutWindowOpensOnTheDisplayUnderTheCursor() {
         List<Rectangle> displays = List.of(new Rectangle(0, 0, 1440, 900), new Rectangle(1440, 0, 1920, 1080));
-        assertThat(TabDrag.displayFor(new Rectangle(1300, 200, 800, 600), displays))
-            .as("its corner on the left display, the cursor and most of it on the right").hasValue(1);
-        assertThat(TabDrag.displayFor(new Rectangle(100, 100, 800, 600), displays)).as("wholly on the left").hasValue(0);
-        assertThat(TabDrag.displayFor(new Rectangle(5000, 5000, 800, 600), displays)).as("on none: the default display")
-            .isEmpty();
+        assertThat(TabDrag.displayFor(new Point(1500, 220), displays)).as("its corner on the left display, the cursor on the right")
+            .hasValue(1);
+        assertThat(TabDrag.displayFor(new Point(130, 120), displays)).as("on the left").hasValue(0);
+        assertThat(TabDrag.displayFor(new Point(1440, 0), displays)).as("on the edge: the display it begins").hasValue(1);
+        assertThat(TabDrag.displayFor(new Point(5000, 5000), displays)).as("on none: the default display").isEmpty();
+        List<Rectangle> left = List.of(new Rectangle(0, 0, 1920, 1080), new Rectangle(-1440, 0, 1440, 900));
+        Rectangle workspace = new Rectangle(-80, 280, 800, 600);
+        assertThat(workspace.intersection(left.get(0)).width).as("the workspace is mostly on the primary").isGreaterThan(700);
+        assertThat(TabDrag.displayFor(new Point(-50, 300), left)).as("the cursor on the display left of the primary").hasValue(1);
+        List<Rectangle> above = List.of(new Rectangle(0, 0, 1920, 1080), new Rectangle(0, -900, 1440, 900));
+        assertThat(TabDrag.displayFor(new Point(400, -40), above)).as("the cursor on the display above the primary").hasValue(1);
+        List<Rectangle> mirrored = List.of(new Rectangle(0, 0, 1440, 900), new Rectangle(0, 0, 1440, 900));
+        assertThat(TabDrag.displayFor(new Point(100, 100), mirrored)).as("displays that overlap: the first").hasValue(0);
+        assertThat(TabDrag.displayFor(new Point(100, 100), List.of())).as("no display known: the default").isEmpty();
     }
 }
