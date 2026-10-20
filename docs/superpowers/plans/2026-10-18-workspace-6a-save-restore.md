@@ -33,14 +33,13 @@ follows it. Plans [1](2026-10-17-workspace-1-single-instance.md), [2](2026-10-17
 
 **Workspace:** worktree `/Users/RQ7RQVF/projects/moray/.claude/worktrees/workspace-tabs`, branch
 `claude/workspace-tabs`, after plan 5's last commit. Run every command from the worktree root. Every anchor below was
-taken from, and every edit script of Tasks 1-7 replayed on, a copy of `22b702456` with the edit scripts and created
-files of plans 1, 2, 3a, 3b (as committed in `17830fac6`), 4a and 4b (as committed in `68e1bbb80` and `ef9ab4523`) and 5
-(as committed in `7d79fdffb`) applied in order (plan 1's later `onQuitting` Javadoc line, `fe8488bb6`, is quoted by no
-anchor here); nothing was compiled or run. Every edit quotes the text it replaces, and the scripts stop with a message
-when that text is not found the stated number of times: re-find the quoted text (a plan before this one may have
-reworded it), adjust the anchor, re-run, and record it in this plan's banner; never edit around a missing anchor. No
-anchor here is in plan 5's drag code, and nothing here depends on how a child window got its bounds. Later tasks anchor
-on text earlier tasks of this plan wrote, and quote it as those tasks leave it.
+re-taken from, and every edit script of Tasks 1-7 replayed on, plan 5's last commit `5b1ad0093` (the pre-flight's
+refresh: `.superpowers/sdd/2026-10-18-workspace-6a-save-restore/preflight.md`); nothing was compiled or run. Every
+edit quotes the text it replaces, and the scripts stop with a message when that text is not found the stated number of
+times: re-find the quoted text (a plan before this one may have reworded it), adjust the anchor, re-run, and record it
+in this plan's banner; never edit around a missing anchor. No anchor here is in plan 5's drag code, and nothing here
+depends on how a child window got its bounds. Later tasks anchor on text earlier tasks of this plan wrote, and quote it
+as those tasks leave it.
 
 ## Spec issues
 
@@ -141,45 +140,51 @@ through the first `end` after it, both included) and `regex(path, pattern, repla
 
 ## Verified facts
 
-From a replay of plans 1, 2, 3a, 3b, 4a and 4b on `22b702456` (see Workspace); line numbers are 4b's, and fact 9 is
-plan 5's.
+Line numbers are from `5b1ad0093`, plan 5's last commit (see Workspace).
 
-1. Plan 2's codec: `WorkspaceFile.read(Path)` returns `Loaded.Restore(Snapshot)` or `Loaded.Fresh(Optional<Path>
-   setAside)` (`persistence/WorkspaceFile.java:159`, `:172`, `:196`), setting an unreadable file aside as
-   `workspace.toml.bad`; `write(Path, Snapshot)` (`:410`) writes atomically. `WindowRecord` requires exactly one record
-   per layout tab and a non-empty child layout; `Snapshot` puts the main window first. `TabRecord.Terminal(title,
-   directory, profile)` and `TabRecord.Content(title, pluginId, restorer, state)`. `AppDirs.workspaceState()`
-   (`platform/AppDirs.java:60`) is `<home>/workspace.toml`; nothing reads or writes it yet.
+1. Plan 2's codec: `WorkspaceFile.read(Path)` (`persistence/WorkspaceFile.java:208`) returns `Loaded.Restore(Snapshot,
+   Optional<Path> keptAside)` (`:169`) or `Loaded.Fresh(Optional<Path> setAside)` (`:183`), moving an unreadable file
+   aside as `workspace.toml.bad`, and copying a readable one there (`keptAside`) when it dropped a window or a tab entry;
+   `write(Path, Snapshot)` (`:458`) writes atomically. `WindowRecord` requires exactly one record per layout tab and a
+   non-empty child layout; `Snapshot` puts the main window first. `TabRecord.Terminal(title, directory, profile)` and
+   `TabRecord.Content(title, pluginId, restorer, state)`. `AppDirs.workspaceState()` (`platform/AppDirs.java:60`) is
+   `<home>/workspace.toml`; nothing reads or writes it yet.
 2. `UiState.MainWindow` and `[main_window]` (`persistence/UiState.java:75`, `:185`, `:306-307`, `:336`) are read only by
-   `WindowPlacement` (`workspace/WindowPlacement.java:19-30`), which `WindowFrame.restoreLayout(UiState)` (`:91`) builds
-   for the main window alone (`application/JasperApplication.java:562`); `WindowFrame.dispose` saves the main window's
-   bounds into `ui-state.toml` (`:173-177`).
-3. `WindowManager.ensureMain` (`workspace/WindowManager.java:172`) is the only place a main window opens, and it hands
-   out no main window that is closing; every request (`JasperApplication.java:870`, `:906`, `:923`, `:1776`, and the tab
-   registry's `Windows.main`, which waits while the main window is being composed) goes through it. `open(Opening,
-   make)` (`:292`) composes, frames, shows and reports a window (an `Opening` may carry a torn-out tab's screen bounds)
-   and discards it on a failure; `closeAll` (`:251`) serves closing the main window, `toBackground`
-   (`JasperApplication.java:2014`) and `quitNow` (`:2049`), and runs the closing-all hook once, while every window is
-   whole, before it closes any; the application's `closing` and `closingAll` hooks are empty (`:190`).
-   `closed(JasperWindow)` (`:361`) forgets a window, closed or discarded.
-4. `WindowContent`'s constructor opens one terminal tab unless `empty` (`workspace/WindowContent.java:338`); every
-   layout change goes through `WorkspaceView.apply`, which calls `WindowContent.workspaceChanged` (`:1036`).
-   `TabRegistry.add(TabId, Tab.Kind, TabContent, UUID)` (`contributions/TabRegistry.java:146`) registers a tab under a
+   `WindowPlacement` (`workspace/WindowPlacement.java:17-33`), which `WindowFrame.restoreLayout(UiState)` (`:121`)
+   builds for the main window alone (`application/JasperApplication.java:565`); `WindowFrame.dispose` saves the main
+   window's bounds into `ui-state.toml` (`:225-235`).
+3. `WindowManager.ensureMain` (`workspace/WindowManager.java:188`) is the only place a main window opens, and it hands
+   out no main window that is closing, nor any while `closeAll` runs; every request (`JasperApplication.java:902`,
+   `:939`, `:956`, `:1821`, and the tab registry's `Windows.main`, whose tabs wait while the main window is being
+   composed and open there through `TabRegistry.mainOpened` once it shows, or go with it through `mainFailed`) goes
+   through it. `open(Opening, make)` (`:337`) composes, frames, shows and reports a window (an `Opening` may carry a
+   torn-out tab's workspace bounds with its cursor) and discards it on a failure; `closeAll` (`:275`) serves closing the
+   main window, `toBackground` (`JasperApplication.java:2055`) and `quitNow` (`:2112`), runs the closing-all hook once,
+   while every window is whole, before it closes any, and closes every window whatever one throws, the first failure
+   rethrown; the application's `closing` and `closingAll` hooks are empty (`:188-190`). `closed(JasperWindow)` (`:415`)
+   forgets a window, closed or discarded, and then runs the closed hook, which (`JasperApplication.windowClosed`,
+   `:1770`) requests shutdown when no window is left, the process is not resident and no auxiliary window is open.
+4. `WindowContent`'s constructor opens one terminal tab unless `empty` (`workspace/WindowContent.java:345`); every
+   layout change goes through `WorkspaceView.apply`, which calls `WindowContent.workspaceChanged` (`:1059`).
+   `TabRegistry.add(TabId, Tab.Kind, TabContent, UUID)` (`contributions/TabRegistry.java:167`) registers a tab under a
    given id ("Workspace plan 6 restores saved ids through here"); `TerminalContent(TabId, …)`
    (`workspace/TerminalContent.java:46`) takes the id; `renamed()` (`:71`) is "what workspace plan 6 saves".
 5. `TerminalPane.start()` (`workspace/TerminalPane.java:247`) launches at once; `localDirectory()` (`:500`) is empty for
    a remote OSC 7 report; `inheritableDirectory()` (`:513`) and `profile()` (`:537`). `ShellLauncher.launch` (`launch/
    ShellLauncher.java:138`) fails an explicit directory that is missing.
 6. `StartupTrace.Milestone.FIRST_PAINT` is marked only by a window's first terminal painting
-   (`JasperApplication.java:1688`); the presentation's proof and residency's settle fallback wait for it.
-7. The warm-up rehearsal builds its window and frame in `rehearsalWindow` (`JasperApplication.java:1056`) and never
+   (`JasperApplication.java:1729-1735`); the presentation's proof and residency's settle fallback wait for it.
+7. The warm-up rehearsal builds its window and frame in `rehearsalWindow` (`JasperApplication.java:1089`) and never
    calls `WindowManager`.
-8. `JasperApplication.afterDelay(Duration, Runnable)` (`:442`) is a one-shot Swing timer returning its cancel;
-   `shutdown.await(pending)` (`:2111`) waits for a list of futures under the exit deadline.
+8. `JasperApplication.afterDelay(Duration, Runnable)` (`:441`) is a one-shot Swing timer returning its cancel;
+   `shutdown.await(pending)` (`:2181`) waits for a list of futures under the exit deadline.
 9. Plan 5 gives every window `WindowManager.open` opens the manager's shared `TabDrag` (`content.tabDrag(tabDrag)`,
-   before `make`); a tear-out opens its child window with `Opening.bounds`, which `WindowShell.place` sets on the frame
-   before it shows; every drop is a layout change through `WorkspaceView.apply` or the registry's `move`, in one window or
-   two, within one EDT turn. It touches neither `WindowFrame` nor `WindowPlacement`.
+   before `make`); a tear-out opens its child window with `Opening.bounds` and `Opening.cursor`, the new window's
+   workspace bounds and the release point, which `WindowShell.place` hands to `WindowFrame.placeWorkspace`
+   (`WindowFrame.java:148`): it grows them by the chrome measured in the packed frame and keeps the frame on the
+   display under the cursor (`TabDrag.fitted`, `TabDrag.displayFor`); every drop is a layout change through
+   `WorkspaceView.apply` or the registry's `move`, in one window or two, within one EDT turn. It does not touch
+   `WindowPlacement` or `WindowFrame.restoreLayout`.
 10. THD Sourcing Crypto (read only, `~/projects/thd-sourcing-crypto-jasper-plugin`, branch `jasper-sdk-0.17.1` at
    `3740e4e`) names `SessionState.RUNNING` in one test fixture (`CryptoPluginTest.java:35`) and switches over no
    `SessionState`; it opens only a dialog.
@@ -228,7 +233,8 @@ Record them in `docs/STATUS.md` (Task 7). "What — why".
     spec 6.4 ("every request restores it first") and 13.
 13. **Saved windows that do not all come back are kept as `workspace.toml.bad`, with a WARNING notice "Jasper could not
     restore your windows" that names it ("Jasper opened what it could and kept the saved windows in …"): an unreadable
-    file (plan 2's codec sets it aside), or a readable one holding a window that cannot be restored
+    file (plan 2's codec sets it aside), a readable one whose reader dropped a window or a tab entry (the codec copies it
+    there, `Loaded.Restore.keptAside`, and that copy stands), or a readable one holding a window that cannot be restored
     (`WorkspaceStore.setAside(Snapshot)`, which writes it there before the next save would replace it)** — spec 15's
     set-aside; a vanished workspace with no word would look like a bug.
 14. **The snapshot takes out every tab that cannot come back with `Layout.remove` and leaves out a child window left
@@ -243,14 +249,16 @@ Record them in `docs/STATUS.md` (Task 7). "What — why".
 18. **The rehearsal never touches the store: the store is created in `startPlugins` and read only in `ensureMain`,
     which the rehearsal never calls** — spec 13; fact 7.
 19. **Shutdown waits for the last write (`WorkspaceStore.written()` joins `shutdown.await`)** — Quit saves, then exits.
-20. **A child window that cannot be restored is logged and left out; a main window that cannot be restored is
-    discarded and a new main window opens; either way the saved windows are kept aside (Rulings 13), and a restored
-    terminal tab that fails to register closes its pane** — one bad record must not keep Jasper from opening, nor cost
-    the user the windows it could not show.
+20. **A child window that cannot be restored is logged and left out; a main window that cannot be restored opens as a
+    new main window with one terminal tab, in place and never discarded (the closed hook of the last window ends a
+    Jasper that is not resident); either way the saved windows are kept aside (Rulings 13), and a restored terminal tab
+    that fails to register closes its pane** — one bad record must not keep Jasper from opening, nor cost the user the
+    windows it could not show.
 21. **A restored window's place reaches its frame through `JasperWindow.placement`, checked against today's displays
-    with its maximized bits, never through `Opening.bounds`, which stays plan 5's screen point for a torn-out tab; a
+    with its maximized bits, never through `Opening.bounds`, which stays plan 5's workspace bounds for a torn-out tab; a
     torn-out window's bounds are saved as its frame reports them when it shows, like any window's** — spec 13 and 15
-    ("checked against the current displays"); a screen point carries neither check nor maximize. Restored windows open
+    ("checked against the current displays"); workspace bounds carry no maximize, and `WindowFrame.placeWorkspace` grows
+    them by the frame's chrome, which would grow a restored frame on every restore. Restored windows open
     through `WindowManager.open`, so they share plan 5's tab drag (fact 9), and a drop's one or two layout changes join
     one save (Rulings 9).
 22. **A snapshot that throws costs only that save, logged; every write runs after the one before it however that ended
@@ -272,11 +280,13 @@ Record them in `docs/STATUS.md` (Task 7). "What — why".
   `WindowManager`, `JasperWindow` (Task 4); `workspace.TerminalContent`, `WorkspaceView`, `WindowContent`,
   `WindowManager`, `JasperWindow` (Task 5); `workspace.WindowContent`, `application.JasperApplication` (Task 6).
 - Plugins: every `plugin.toml` (Task 1).
-- Tests: the SDK's version tests and `TerminalValuesTest`, `VersionRangeTest`, `KitCompatibilityTest`, `LookFixtures`,
-  `TerminalFixture`, `AppContractTest`, `HostedTerminalsTest`, `ShellLauncherTest`, `RestoredPaneTest` (new) (Task 1);
+- Tests: the SDK's version tests and `TerminalValuesTest`, `VersionRangeTest`, `KitCompatibilityTest`,
+  `PluginStateStoreOptInTest`, `PresentationSelectionTest`, `LookFixtures`, `TerminalFixture`, `AppContractTest`,
+  `HostedTerminalsTest`, `ShellLauncherTest`, `RestoredPaneTest` (new) (Task 1);
   `WindowPlacementTest` (whole file), `UiStateTest`, `WindowManagerTest` (Task 2); `TestWindows` and
   `WorkspaceSnapshotTest` (new) (Task 3); `WorkspaceStoreTest` and `WorkspaceSavingTest` (new) (Task 4);
-  `WorkspaceRestoreTest` (new) (Task 5); `JasperApplicationWorkspaceTest` (new) (Task 6).
+  `WorkspaceRestoreTest` (new) (Task 5); `JasperApplicationWorkspaceTest` (new) and `WorkspaceRestoreTest` (one case)
+  (Task 6).
 - Documents: `docs/plugin-authoring.md`, `jasper-sdk/README.md`, `docs/sdk-icons.md`, the external example (Task 1);
   `docs/configuration.md`, `docs/app-architecture.md`, `docs/app-maintenance.md`, `docs/plugin-authoring.md`,
   `jasper-sdk/README.md`, `docs/STATUS.md` (Task 7); the ledger in Tasks 3 to 6.
@@ -318,8 +328,9 @@ gone by then starts the shell where a new shell starts (Rulings 5). The SDK vers
 - Create: `jasper-app/src/test/java/dev/jasper/app/workspace/RestoredPaneTest.java`
 - Test: `CapabilitiesTest`, `FilesValuesTest`, `PaletteValuesTest`, `KitBoundaryTest`, `TerminalValuesTest` (SDK);
   `testFixtures/.../contract/ContractHarness.java`, `PluginContractTest.java`, `src/test/.../FakeContractTest.java`
-  (testkit); `VersionRangeTest`, `KitCompatibilityTest`, `testsupport/LookFixtures.java`, `TerminalFixture`,
-  `AppContractTest`, `HostedTerminalsTest`, `ShellLauncherTest` (application)
+  (testkit); `VersionRangeTest`, `KitCompatibilityTest`, `PluginStateStoreOptInTest`, `PresentationSelectionTest`,
+  `testsupport/LookFixtures.java`, `TerminalFixture`, `AppContractTest`, `HostedTerminalsTest`, `ShellLauncherTest`
+  (application)
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -590,6 +601,13 @@ edit("jasper-sdk/README.md", [(
     "(0.20.0 is a breaking boundary, described under Main and child windows below; 0.19.0 is one too,",
     "(0.21.0 is a breaking boundary for saved workspaces; 0.20.0 is one too, described under Main and child windows\n"
     "below; 0.19.0 is one too,", 1)])
+# The tests that pin the current SDK by hand follow it, as plan 4b moved them to 0.20.
+T = "jasper-app/src/test/java/dev/jasper/app/plugins/"
+edit(T + "KitCompatibilityTest.java", [('var current=candidate(">=0.20.0, <0.21",', 'var current=candidate(">=0.21.0, <0.22",', 1)])
+edit(T + "PluginStateStoreOptInTest.java", [('Version.parse("0.20.0");', 'Version.parse("0.21.0");', 1),
+    ('VersionRange.parse(">=0.20.0, <0.21")', 'VersionRange.parse(">=0.21.0, <0.22")', 1)])
+edit(T + "PresentationSelectionTest.java", [('Version.parse("0.20.0");', 'Version.parse("0.21.0");', 1),
+    ('VersionRange.parse(">=0.20.0, <0.21")', 'VersionRange.parse(">=0.21.0, <0.22")', 2)])
 PY
 ```
 
@@ -1156,17 +1174,23 @@ edit("jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java
      * which saves the windows there; until then each frame keeps what it keeps when it closes.""",
     """     * Every window: the main window and the child windows (workspace tabs spec 6.1). EDT. Its closing hooks are empty: no
      * frame keeps where its window was, the window does (workspace plan 6a Rulings 7 and 10).""", 1), (
-    """    /** A window's native frame under this process's look: the main window's at its saved bounds. EDT. */
-    private WindowShell frameOnScreen(JasperWindow window) {
-        var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
-        if (window.isMain()) frame.restoreLayout(uiState);""",
     """    /**
-     * A window's native frame under this process's look, where the window was saved or, for a new window, where the
-     * platform puts it; it reports where the window is from then on (workspace tabs spec 13). EDT.
+     * A window's native frame under this process's look: the main window's at its saved bounds. A failure after the
+     * frame is built disposes it, since its window never gets its shell to dispose it through, and propagates. EDT.
      */
     private WindowShell frameOnScreen(JasperWindow window) {
         var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
-        frame.place(window.placement(), window::placed);""", 1)])
+        try {
+            if (window.isMain()) frame.restoreLayout(uiState);""",
+    """    /**
+     * A window's native frame under this process's look, where the window was saved or, for a new window, where the
+     * platform puts it; it reports where the window is from then on (workspace tabs spec 13). A failure after the frame
+     * is built disposes it, since its window never gets its shell to dispose it through, and propagates. EDT.
+     */
+    private WindowShell frameOnScreen(JasperWindow window) {
+        var frame = new WindowFrame(window.content(), windowLook(), configuration == null ? null : windowConfiguration(), window.events());
+        try {
+            frame.place(window.placement(), window::placed);""", 1)])
 PY
 ```
 
@@ -1485,14 +1509,16 @@ edit(W + "WindowContent.java", [
     ("""    void workspaceChanged(boolean refocus) {
         if (closed) return;
         if (terminals != null) terminals.tabSelected();
-        if (commandPalette != null) commandPalette.tabChanged();
+        Tab now = selectedTab();
+        if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
         update();
         if (refocus) focusSelected();
     }
 """, """    void workspaceChanged(boolean refocus) {
         if (closed) return;
         if (terminals != null) terminals.tabSelected();
-        if (commandPalette != null) commandPalette.tabChanged();
+        Tab now = selectedTab();
+        if (commandPalette != null && now != paletteTab) { paletteTab = now; commandPalette.tabChanged(); }
         update();
         if (refocus) focusSelected();
         layoutChanged();
@@ -1518,7 +1544,8 @@ edit(M, [
      "import dev.jasper.app.contributions.TabRegistry;\nimport dev.jasper.app.layout.Layout;\nimport dev.jasper.app.layout.TabId;\n"
      "import dev.jasper.app.persistence.WorkspaceFile;\n", 1),
     ("import java.util.ArrayList;\n", "import java.util.ArrayList;\nimport java.util.HashMap;\n", 1),
-    ("""    /** A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. */""",
+    ("""    /**
+     * A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. A""",
      """    /**
      * What {@code workspace.toml} saves now (workspace tabs spec 8 and 13): the main window and its child windows, each
      * with where it is, its layout and what each of its tabs needs to come back. A tab that cannot come back is taken out
@@ -1556,7 +1583,8 @@ edit(M, [
         return Optional.empty();
     }
 
-    /** A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. */""", 1)])
+    /**
+     * A child window's panel request goes to the main window, which has the dock, and brings it forward to show it. A""", 1)])
 PY
 ```
 
@@ -1748,7 +1776,7 @@ class WorkspaceStoreTest {
         assertThat(writes).as("closing the windows' tabs is not saved").isEmpty();
         Files.delete(file());
         edt(() -> {
-            assertThat(store.load()).as("what this process saved last, not the file").isEqualTo(new WorkspaceFile.Loaded.Restore(open));
+            assertThat(store.load()).as("what this process saved last, not the file").isEqualTo(new WorkspaceFile.Loaded.Restore(open, Optional.empty()));
             assertThat(store.held()).isFalse();
             store.changed();
         });
@@ -1762,7 +1790,7 @@ class WorkspaceStoreTest {
         WorkspaceFile.Snapshot saved = workspace("/work");
         WorkspaceFile.write(file(), saved);
         store();
-        edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(saved)));
+        edt(() -> assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(saved, Optional.empty())));
         Files.writeString(file(), "version = 1\n[[windows]]\nrole = ");
         store();
         Path bad = dir.resolve("workspace.toml.bad");
@@ -1816,7 +1844,7 @@ class WorkspaceStoreTest {
         WorkspaceFile.Snapshot loaded = workspace("/work");
         WorkspaceFile.write(file(), loaded);
         edt(() -> {
-            assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(loaded));
+            assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(loaded, Optional.empty()));
             store.setAside(loaded);
         });
         Path bad = dir.resolve("workspace.toml.bad");
@@ -1827,6 +1855,25 @@ class WorkspaceStoreTest {
         edt(() -> store.save());
         write();
         assertThat(onDisk()).as("the next save writes the windows as they are").isEqualTo(current.get());
+    }
+
+    /** Workspace plan 2's keptAside: a file whose reader dropped a window is kept aside as it was, and told once. */
+    @Test void aFileThatDroppedAWindowOnReadingIsKeptAsideAsItWasAndToldOnce() throws Exception {
+        WorkspaceFile.Snapshot kept = workspace("/work");
+        TabId away = TabId.random();
+        WorkspaceFile.write(file(), new WorkspaceFile.Snapshot(java.util.List.of(kept.main(), new WorkspaceFile.WindowRecord(
+            WorkspaceFile.Role.CHILD, Optional.empty(), 0, Layout.of(away), Map.of(away, new WorkspaceFile.TabRecord.Terminal("", "/away", ""))))));
+        String original = Files.readString(file()).replace("role = \"child\"", "role = \"side\"");
+        Files.writeString(file(), original);
+        store();
+        Path bad = dir.resolve("workspace.toml.bad");
+        edt(() -> {
+            assertThat(store.load()).isEqualTo(new WorkspaceFile.Loaded.Restore(kept, Optional.of(bad)));
+            store.setAside(kept);
+        });
+        write();
+        assertThat(setAside).as("told once, for the notice").containsExactly(bad);
+        assertThat(Files.readString(bad)).as("the original text, with the window the reader dropped").isEqualTo(original);
     }
 
     @Test void theStoreBelongsToTheEdt() throws Exception {
@@ -2032,6 +2079,8 @@ public final class WorkspaceStore {
     private boolean held;
     /** What this process saved last: what reopening the main window restores. */
     private WorkspaceFile.Snapshot saved;
+    /** Whether the reader kept the file {@link #load()} read last aside already ({@code Loaded.Restore.keptAside}). */
+    private boolean keptOnLoad;
     private volatile CompletableFuture<Void> writes = CompletableFuture.completedFuture(null);
 
     /**
@@ -2042,7 +2091,8 @@ public final class WorkspaceStore {
      * @param schedule runs a task on the EDT after a delay and returns how to cancel it
      * @param writer where writes run, off the EDT
      * @param setAside told where saved windows that could not be restored were kept ({@code workspace.toml.bad}): an
-     *     unreadable file {@link #load()} read, or a workspace {@link #setAside(WorkspaceFile.Snapshot)} keeps
+     *     unreadable file {@link #load()} read, a file whose reader dropped a window or a tab entry, or a workspace
+     *     {@link #setAside(WorkspaceFile.Snapshot)} keeps
      */
     public WorkspaceStore(Path file, Supplier<Optional<WorkspaceFile.Snapshot>> snapshot, BiFunction<Duration, Runnable, Runnable> schedule,
                           Executor writer, Consumer<Path> setAside) {
@@ -2055,32 +2105,40 @@ public final class WorkspaceStore {
 
     /**
      * What the main window restores, and saving starts again: what this process saved last, else the file. A file that
-     * cannot be read was set aside ({@code workspace.toml.bad}) and {@code setAside} hears where.
+     * cannot be read was set aside ({@code workspace.toml.bad}) and {@code setAside} hears where; so does a file whose
+     * reader dropped a window or a tab entry, which the reader copied there (workspace plan 2).
      *
      * @return the windows to restore, or that the main window opens fresh
      */
     public WorkspaceFile.Loaded load() {
         requireEdt();
         held = false;
-        if (saved != null) return new WorkspaceFile.Loaded.Restore(saved);
+        keptOnLoad = false;
+        if (saved != null) return new WorkspaceFile.Loaded.Restore(saved, Optional.empty());
         WorkspaceFile.Loaded loaded = WorkspaceFile.read(file);
         if (loaded instanceof WorkspaceFile.Loaded.Fresh fresh) fresh.setAside().ifPresent(setAside);
+        if (loaded instanceof WorkspaceFile.Loaded.Restore restore && restore.keptAside().isPresent()) {
+            keptOnLoad = true;
+            setAside.accept(restore.keptAside().get());
+        }
         return loaded;
     }
 
     /**
      * Keeps {@code windows}, which {@link #load()} gave and which did not all come back, as {@code workspace.toml.bad}
-     * (spec 15's set-aside: the next save would otherwise overwrite them), and {@code setAside} hears where. The next save
-     * writes the windows as they are then.
+     * (spec 15's set-aside: the next save would otherwise overwrite them), and {@code setAside} hears where. When the
+     * reader kept the file they came from aside already, that copy, which holds them and what the reader dropped, stays
+     * and nothing more is said. The next save writes the windows as they are then.
      *
      * @param windows the workspace as loaded
      */
     public void setAside(WorkspaceFile.Snapshot windows) {
         requireEdt();
         Objects.requireNonNull(windows, "windows");
+        saved = null;
+        if (keptOnLoad) return;
         // Named as WorkspaceFile names an unreadable file it sets aside.
         Path kept = file.resolveSibling(file.getFileName() + ".bad");
-        saved = null;
         writeLater(kept, windows);
         setAside.accept(kept);
     }
@@ -2215,27 +2273,44 @@ edit(M, [
      *     does: plan 6 saves the main window and its child windows here""",
      """     * @param closingAll every window is about to close (closing the main window, Quit, going to the background), before any
      *     does, and the workspace store has saved them as they are""", 1),
-    ("""     * first. The closing-all hook hears of it once before anything closes, while every window is whole.
+    ("""     * first. The closing-all hook hears of it once before anything closes, while every window is whole. Every window
+     * closes whatever closing another one throws, and no child window opens meanwhile; the first failure is rethrown once
+     * the main window has closed, the others suppressed under it.
      */
     public void closeAll() {
         requireEdt();
+        boolean nested = closingAll;
+        closingAll = true;
+        Throwable failure = null;
         try {
-            if (!isEmpty()) hooks.closingAll().run();
-        } finally {""", """     * first. While every window is whole, the workspace store saves them all and then holds until they are restored, and
-     * the closing-all hook hears of it, once, before anything closes (workspace tabs spec 6.4 and 13).
+            try {
+                if (!isEmpty()) hooks.closingAll().run();
+            } catch (RuntimeException | Error thrown) {
+                failure = thrown;
+            }""", """     * first. While every window is whole, the workspace store saves them all and then holds until they are restored, and
+     * the closing-all hook hears of it, once, before anything closes (workspace tabs spec 6.4 and 13). Every window
+     * closes whatever closing another one throws, and no child window opens meanwhile; the first failure is rethrown once
+     * the main window has closed, the others suppressed under it.
      */
     public void closeAll() {
         requireEdt();
+        boolean nested = closingAll;
+        closingAll = true;
+        Throwable failure = null;
         try {
             if (!isEmpty()) {
                 try {
                     // Closing the windows closes their tabs: that is not saved, or nothing would come back.
                     if (store != null) store.hold();
-                } finally {
-                    hooks.closingAll().run();
+                } catch (RuntimeException | Error thrown) {
+                    failure = thrown;
                 }
-            }
-        } finally {""", 1),
+                try {
+                    hooks.closingAll().run();
+                } catch (RuntimeException | Error thrown) {
+                    failure = keep(failure, thrown);
+                }
+            }""", 1),
     ("""        if (lastActive == window) lastActive = null;
         hooks.closed().accept(window);""", """        if (lastActive == window) lastActive = null;
         try {
@@ -2252,10 +2327,12 @@ edit(W + "JasperWindow.java", [("""        if (closed) return;
         manager.changed();
     }""", 1), (
     """     * Closes the content, which closes the tabs it still holds, then the frame; the manager forgets the window. The
-     * manager's closing hook hears of it first, while its content is whole (plan 6 saves the layout there).""",
+     * manager's closing hook hears of it first, while its content is whole (plan 6 saves the layout there). Every step
+     * runs whatever an earlier one throws; the first failure is rethrown at the end, the others suppressed under it.""",
     """     * Closes the content, which closes the tabs it still holds, then the frame; the manager forgets the window, which
      * saves the windows left (workspace tabs spec 13). The manager's closing hook hears of it first, while its content is
-     * whole.""", 1)])
+     * whole. Every step runs whatever an earlier one throws; the first failure is rethrown at the end, the others
+     * suppressed under it.""", 1)])
 PY
 ```
 
@@ -2511,7 +2588,8 @@ class WorkspaceRestoreTest {
             MainWindow main = windows.manager.ensureMain("cold", work).orElseThrow();
             assertThat(main.content().tabs()).hasSize(1);
             assertThat(main.content().tabs().getFirst().id()).isNotEqualTo(tab);
-            assertThat(windows.events).as("the window that failed closed unshown").containsExactly("closed main", "show main", "opened main");
+            assertThat(windows.events).as("it opens as a new main window, never closed: the last window's closed hook can end Jasper")
+                .containsExactly("show main", "opened main");
         });
         assertThat(setAside).as("told, for the notice").containsExactly(folder.resolve("workspace.toml.bad"));
         assertThat(keptAside()).as("not lost to the next save").isEqualTo(saved);
@@ -2703,34 +2781,56 @@ W = "jasper-app/src/main/java/dev/jasper/app/workspace/"
 M = W + "WindowManager.java"
 edit(M, [
     ("import java.util.function.Function;\n", "import java.util.function.Function;\nimport java.util.function.Predicate;\n", 1),
+    ("""     * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty
+     *     for where the platform puts it""",
+     """     * @param bounds where a child window's workspace opens on screen, a torn-out tab's (workspace tabs plan 5); empty
+     *     for where the platform puts a new window, or where a restored window's saved place puts it""", 1),
     ("""    private final Contributions model;
     private final Hooks hooks;""", """    private static final System.Logger LOG = System.getLogger(WindowManager.class.getName());
     private final Contributions model;
     private final Hooks hooks;""", 1),
     ("""    /**
-     * The main window, opened first when none is open (workspace tabs spec 6.4: every request restores it first).
+     * The main window, opened first when none is open (workspace tabs spec 6.4: every request restores it first). The
+     * tabs a plugin asked for while it was being composed open in it once it shows, or go with it when it fails to
+     * open, their failures under its own.
      *
      * @param trigger what asked, for the new window's start-up timing line
      * @param directory where a new main window's terminal tab starts; null for where a new shell starts""",
      """    /**
      * The main window, restored first when none is open (workspace tabs spec 6.4 and 13: every request restores it first):
-     * as the store has it, with its child windows, else a new main window with one terminal tab.
+     * as the store has it, with its child windows, else a new main window with one terminal tab. The tabs a plugin asked
+     * for while it was being composed open in it once it shows, or go with it when it fails to open, their failures under
+     * its own.
      *
      * @param trigger what asked, for the new window's start-up timing line
      * @param directory where a new main window's terminal tab starts, or, when the main window is restored, a terminal tab it
      *     opens after its own; null for where a new shell starts, or no tab""", 1),
     ("""        try {
-            return open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty()),
-                content -> main = new MainWindow(this, content));
+            opened = open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty(),
+                Optional.empty()), content -> main = new MainWindow(this, content));
+        } catch (RuntimeException | Error failure) {
+            // Still opening: a waiting tab's close listener cannot ask for another main window.
+            model.tabs().mainFailed(failure);
+            throw failure;
         } finally {
             openingMain = false;
         }
+        // A main window its own opening closed again leaves the waiting tabs to the next one.
+        opened.filter(window -> !window.closed()).ifPresent(window -> model.tabs().mainOpened(window.id()));
+        return opened;
     }
 """, """        try {
-            return openMain(trigger, directory);
+            opened = openMain(trigger, directory);
+        } catch (RuntimeException | Error failure) {
+            // Still opening: a waiting tab's close listener cannot ask for another main window.
+            model.tabs().mainFailed(failure);
+            throw failure;
         } finally {
             openingMain = false;
         }
+        // A main window its own opening closed again leaves the waiting tabs to the next one.
+        opened.filter(window -> !window.closed()).ifPresent(window -> model.tabs().mainOpened(window.id()));
+        return opened;
     }
 
     /**
@@ -2744,17 +2844,23 @@ edit(M, [
         WorkspaceFile.Loaded loaded = store == null ? new WorkspaceFile.Loaded.Fresh(Optional.empty()) : store.load();
         if (!(loaded instanceof WorkspaceFile.Loaded.Restore restore)) return openNewMain(trigger, directory);
         WorkspaceFile.Snapshot saved = restore.snapshot();
-        Optional<MainWindow> opened;
-        try {
-            opened = open(new Opening(WindowRole.MAIN, true, null, trigger, () -> { }, Optional.empty()),
-                content -> main = new MainWindow(this, content), window -> { window.restore(saved.main()); return true; });
-        } catch (RuntimeException failure) {
-            // The window that failed was discarded; the saved windows are kept before a new main window's save replaces them.
-            LOG.log(System.Logger.Level.WARNING, "Could not restore the main window; a new one opens", failure);
-            store.setAside(saved);
-            return openNewMain(trigger, directory);
-        }
-        if (opened.isEmpty()) return opened;
+        boolean[] restored = new boolean[1];
+        Optional<MainWindow> opened = open(new Opening(WindowRole.MAIN, true, null, trigger, () -> { }, Optional.empty(),
+            Optional.empty()), content -> main = new MainWindow(this, content), window -> {
+                try {
+                    window.restore(saved.main());
+                    restored[0] = true;
+                } catch (RuntimeException failure) {
+                    // It opens as a new main window instead, never discarded: the closed hook of the last window ends a
+                    // Jasper that is not resident. Its restore closed what it made; the saved windows are kept before this
+                    // window's first save replaces them.
+                    LOG.log(System.Logger.Level.WARNING, "Could not restore the main window; it opens as a new one", failure);
+                    store.setAside(saved);
+                    window.content().newTab(directory);
+                }
+                return true;
+            });
+        if (opened.isEmpty() || !restored[0]) return opened;
         boolean whole = true;
         for (WorkspaceFile.WindowRecord child : saved.children()) {
             try {
@@ -2772,7 +2878,7 @@ edit(M, [
     }
 
     private Optional<MainWindow> openNewMain(String trigger, Path directory) {
-        return open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty()),
+        return open(new Opening(WindowRole.MAIN, false, directory, trigger, () -> { }, Optional.empty(), Optional.empty()),
             content -> main = new MainWindow(this, content));
     }
 
@@ -2782,8 +2888,10 @@ edit(M, [
      */
     private void restoreChild(WorkspaceFile.WindowRecord record) {
         ChildWindow[] made = new ChildWindow[1];
-        // Its saved place reaches its frame through its placement, checked against today's displays, not as a screen point.
-        open(new Opening(WindowRole.CHILD, true, null, "restore", () -> { if (made[0] != null) made[0].emptied(); }, Optional.empty()), content -> {
+        // Its saved place reaches its frame through its placement, checked against today's displays, never as a tear-out's
+        // workspace bounds, which its frame would grow by its chrome.
+        open(new Opening(WindowRole.CHILD, true, null, "restore", () -> { if (made[0] != null) made[0].emptied(); }, Optional.empty(),
+            Optional.empty()), content -> {
             made[0] = new ChildWindow(this, content);
             children.add(made[0]);
             return made[0];
@@ -2862,10 +2970,11 @@ warm-up rehearsal never touches it, and a main window restored with no terminal 
 - Create: `jasper-app/src/test/java/dev/jasper/app/application/JasperApplicationWorkspaceTest.java`
 - Modify: `jasper-app/src/main/java/dev/jasper/app/application/JasperApplication.java`, `workspace/WindowContent.java`,
   `docs/design/theme-engine/migration.csv` (one row)
+- Test: `jasper-app/src/test/java/dev/jasper/app/workspace/WorkspaceRestoreTest.java` (one case)
 
 **Interfaces:**
 - Consumes: `WorkspaceStore` (Task 4), `WindowManager.workspace`, `snapshot` (Tasks 3 and 4), `AppDirs.workspaceState()`
-  (plan 2), `TerminalPane.waiting()` (Task 1).
+  (plan 2).
 - Produces: package `void JasperApplication.workspace(Path file)` and `WorkspaceStore JasperApplication.workspaceStore()`;
   `public boolean WindowContent.showsNoTerminal()`, `public void WindowContent.afterNextPaint(Runnable task)`.
 
@@ -3359,7 +3468,7 @@ PY
 Then check that no guide still describes the main window's bounds in `ui-state.toml`:
 
 ```bash
-git grep -n -i -E "main_window|main-window size|restoreLayout|mainWindow\(\)" -- README.md jasper-sdk/README.md docs ':!docs/superpowers' ':!docs/STATUS.md' ':!docs/design' || echo "none left"
+git grep -n -i -E "main_window|main-window size|restoreLayout|[^a-z]mainWindow\(\)" -- README.md jasper-sdk/README.md docs ':!docs/superpowers' ':!docs/STATUS.md' ':!docs/design' || echo "none left"
 ```
 
 Expected: `none left`.
@@ -3427,7 +3536,12 @@ shows it and reports `NOT_STARTED`, in the testkit's fake too (`FakePluginHost.h
 The SDK is 0.21.0, a breaking boundary: `SessionState.NOT_STARTED`; every bundled manifest, the external example and
 every guide range declare `sdk = ">=0.21.0, <0.22"`. Rulings (plan, "Rulings"): <one clause each, 1 to 23>. Deviations:
 <none, or each with its reason>. Left for plan 6b: plugins' tabs (restore state, restorers, placeholders), which add to
-SDK 0.21.0; THD Sourcing Crypto is rebuilt after 6b, against 0.21.0. `./gradlew check --continue`: **<counts>**. GUI
+SDK 0.21.0, restored with their saved ids straight into their windows, never through `TabRegistry.open` (a random id,
+and a placement lost while the main window is composed), and never saving Jasper's own tabs (`TabRegistry.APP_OWNER`);
+`ContentTab.window()` names a never-open window for a tab that waits for the main window, which now waits through every
+child window's restore; from plans 4b and 5, `AppContractTest`'s `emptyWindow` and panel routing and
+`FakeWorkspace.closeWindow` closing and nulling `Panel.instance`, before the first contract case that needs them; THD
+Sourcing Crypto is rebuilt after 6b, against 0.21.0. `./gradlew check --continue`: **<counts>**. GUI
 checks for the user: quit with a split main window and a child window, start again: both come back where they were, with
 their groups, tab order, selection and names, and only the shown tabs' shells start; a background tab starts when
 clicked; a renamed tab keeps its name; maximize a window, quit, start: it comes back maximized; unplug a display between
@@ -3468,8 +3582,8 @@ EOF
   be restored (Tasks 2, 4, 5 and 6); 16's `[main_window]` (Task 2); 17's "restore lazily starts unselected terminals"
   (Task 5) and SDK line (Task 1's contract test on both runtimes). Out of scope here: 13's content tabs and placeholders, 14's
   `ContentSpec` restore state and `Windows.restorer`, and 15's disabled-plugin row, all plan 6b's.
-- Every quoted anchor was matched, at its stated count, in a replay of plans 1, 2, 3a, 3b, 4a and 4b and of Tasks 1-7 in
-  order; nothing was compiled. The ledger rows were checked with a Python copy of `ThemeMigrationCoverageTest`'s
+- Every quoted anchor was matched, at its stated count, in a replay of Tasks 1-7 in order on `5b1ad0093` (the
+  pre-flight); nothing was compiled. The ledger rows were checked with a Python copy of `ThemeMigrationCoverageTest`'s
   pattern, and the documents' links with a Python copy of `AppDocumentationTest`'s rules.
 - Type consistency: `JasperWindow.Placement`, `WindowFrame.place`, `WindowManager.snapshot`/`workspace`/`changed`,
   `WorkspaceStore` (`DELAY`, `load`, `changed`, `save`, `hold`, `held`, `written`), `WindowContent.restore`/
