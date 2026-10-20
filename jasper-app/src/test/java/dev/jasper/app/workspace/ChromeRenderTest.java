@@ -91,8 +91,18 @@ class ChromeRenderTest {
         cases.add(new Case("complement", () -> slateCobalt(KitFixtures.complement()), Projections.of(ChromeSpec.DEFAULT, true, true, "dev.example", HOST)));
         cases.add(new Case("fallback", () -> slateCobalt(Kit.DEFAULT), Projections.fallback(new DesktopFlags(false, true), HOST)));
         var rows = covering();
-        for (int i = 0; i < rows.size(); i++)
-            cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(rows.get(i), true, true, "dev.jasper.enterprise", HOST)));
+        for (int i = 0; i < rows.size(); i++) {
+            var row = rows.get(i);
+            if (row.titleBar() != ChromeSpec.TitleBar.CLASSIC) {
+                cases.add(new Case("covering-" + i, () -> EnterpriseLook.controller(false), Projections.of(row, true, true, "dev.jasper.enterprise", HOST)));
+                continue;
+            }
+            // A classic title is the system's on Linux (a native row there), so its rows render as macOS and Windows on every host.
+            cases.add(new Case("covering-" + i + "-mac", () -> EnterpriseLook.controller(false),
+                Projections.of(row, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.MAC, true)), Projections.Platform.MAC));
+            cases.add(new Case("covering-" + i + "-windows", () -> EnterpriseLook.controller(false),
+                Projections.of(row, true, true, "dev.jasper.enterprise", new Projections.Host(Projections.Platform.WINDOWS, false)), Projections.Platform.WINDOWS));
+        }
         return cases;
     }
 
@@ -222,24 +232,35 @@ class ChromeRenderTest {
 
     @Test void theCoveringArrayHasStrengthTwoOverTheChromePoints() {
         var rows = covering();
-        assertThat(rows).hasSize(8);
+        assertThat(rows).hasSize(10);
         // Plan 12 E5: every row renders the classic icon set, so row 0 is the default look in its nine table points.
         assertThat(rows.getFirst()).as("row 0 is the default look").usingRecursiveComparison().ignoringFields("icons")
             .isEqualTo(ChromeSpec.DEFAULT);
         var seen = new HashSet<String>();
         for (var row : rows) {
-            boolean[] values = flags(row);
+            String[] values = values(row);
             for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) seen.add(i + ":" + j + ":" + values[i] + ":" + values[j]);
         }
-        for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) for (boolean a : new boolean[] {false, true}) for (boolean b : new boolean[] {false, true}) {
-            if (i == 0 && j == 1 && !a && b) continue; // spec 5.3: window menus need a native title
+        String[][] domains = new String[KEYS.length][];
+        for (int i = 0; i < KEYS.length; i++) domains[i] = i == 0 ? new String[] {"UNIFIED", "NATIVE", "CLASSIC"} : new String[] {"false", "true"};
+        for (int i = 0; i < KEYS.length; i++) for (int j = i + 1; j < KEYS.length; j++) for (String a : domains[i]) for (String b : domains[j]) {
+            if (i == 0 && j == 1 && a.equals("UNIFIED") && b.equals("true")) continue; // spec 5.3: window menus need a native or classic title
             assertThat(seen).as(KEYS[i] + "=" + a + " with " + KEYS[j] + "=" + b).contains(i + ":" + j + ":" + a + ":" + b);
         }
     }
 
-    /** A row's points as "is the Enterprise value". */
+    /** A row's points: title_bar by its value, the others as "is the Enterprise value". */
+    static String[] values(ChromeSpec row) {
+        boolean[] flags = flags(row);
+        String[] values = new String[KEYS.length];
+        values[0] = row.titleBar().name();
+        for (int i = 1; i < KEYS.length; i++) values[i] = String.valueOf(flags[i]);
+        return values;
+    }
+
+    /** A row's points as "is the Enterprise value"; {@link #values} reads title_bar by its value instead. */
     static boolean[] flags(ChromeSpec row) {
-        return new boolean[] {row.titleBar() == ChromeSpec.TitleBar.NATIVE, row.menuBar() == ChromeSpec.MenuBar.WINDOW,
+        return new boolean[] {row.titleBar() == ChromeSpec.TitleBar.CLASSIC, row.menuBar() == ChromeSpec.MenuBar.WINDOW,
             !row.windowTitle().equals("{context}"), row.toolWindows() == ChromeSpec.ToolWindows.STRIPES, row.editorTabs() == ChromeSpec.EditorTabs.CLASSIC,
             row.statusBar() == ChromeSpec.StatusBar.CELLS, row.palette() == ChromeSpec.PaletteKind.RUN_WINDOW,
             row.dialogs() == ChromeSpec.DialogKind.CLASSIC, row.motion() == ChromeSpec.MotionKind.NONE};

@@ -15,10 +15,13 @@ import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
 import dev.jasper.app.testsupport.MockProfile;
 import dev.jasper.ui.swing.FlatLafInstaller;
+import dev.jasper.ui.theme.JasperTheme;
 import dev.jasper.ui.theme.SemanticColor;
 import dev.jasper.ui.theme.SurfaceContrast;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -132,6 +135,68 @@ class ClassicWindowsTitleTest {
         });
     }
 
+    /** Review Focus 1: a theme with its own title bar colour, picked later, still gives the title bar the toolbar's. */
+    @Test void anotherThemeKeepsTheTitleBarInTheToolbarsColour() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, true, 1440);
+                String json;
+                // edt takes a Runnable, so the read's IOException is caught here, as ClassicMacTitleTest does.
+                try (var in = JasperTheme.class.getResourceAsStream("/dev/jasper/ui/theme/slate-cobalt.json")) {
+                    json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+                var titled = JasperTheme.parse(json.replace("\"accent\": \"#2563C9\"",
+                    "\"surface.titlebar\": \"#27282E\", \"text.titlebar\": \"#DFE1E5\", \"accent\": \"#2563C9\""), "header").generated(false);
+                FlatLafInstaller.install(titled, EnterpriseLook.kit());
+                m.owner().onThemeChanged.accept(themes.current());
+                assertThat(m.root().getClientProperty(FlatClientProperties.TITLE_BAR_BACKGROUND))
+                    .isEqualTo(titled.semantic().color(SemanticColor.SURFACE_APP)).isNotEqualTo(new Color(0x27282E));
+                assertThat(m.owner().classicWindowTitle().getForeground()).isEqualTo(SurfaceContrast.painted(titled, WindowPairs.TITLE));
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** IntelliJ's title shares the menus' baseline: with the same capitals, the title's ink ends on the last menu's row. */
+    @Test void theTitleSharesTheMenusBaseline() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var m = mount(themes, true, 1440);
+                var menus = m.owner().chrome().menuBar();
+                JMenu last = null;
+                for (var menu : menus.menus()) if (menu.isVisible()) last = menu;
+                var title = m.owner().classicWindowTitle();
+                // Capitals only, no descenders, in both: the last ink row is the baseline.
+                last.setText("HELP"); title.setText("HELP");
+                for (int i = 0; i < 3; i++) LayoutTestSupport.layoutTree(m.root());
+                var image = MockProfile.print(m.root(), 1440, 800);
+                int[] menuInk = inkRows(image, SwingUtilities.convertRectangle(last.getParent(), last.getBounds(), m.root()));
+                int[] titleInk = inkRows(image, SwingUtilities.convertRectangle(title.getParent(), title.getBounds(), m.root()));
+                assertThat(titleInk[1]).as("the title's baseline, device rows").isEqualTo(menuInk[1]);
+                assertThat(titleInk[0]).as("the title's cap height, device rows").isEqualTo(menuInk[0]);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** The first and last device rows in {@code bounds} (logical, in the root) with a pixel unlike the area's top-left one. */
+    static int[] inkRows(java.awt.image.BufferedImage image, java.awt.Rectangle bounds) {
+        int left = 2 * bounds.x, top = 2 * bounds.y, right = Math.min(image.getWidth(), 2 * (bounds.x + bounds.width)), bottom = Math.min(image.getHeight(), 2 * (bounds.y + bounds.height));
+        var background = MockProfile.at(image, left, top);
+        int first = -1, end = -1;
+        for (int y = top; y < bottom; y++)
+            for (int x = left; x < right; x++) {
+                var at = MockProfile.at(image, x, y);
+                if (Math.abs(at.getRed() - background.getRed()) + Math.abs(at.getGreen() - background.getGreen()) + Math.abs(at.getBlue() - background.getBlue()) > 96) {
+                    if (first < 0) first = y;
+                    end = y;
+                    break;
+                }
+            }
+        assertThat(first).as("ink in %s", bounds).isNotNegative();
+        return new int[] {first, end};
+    }
+
     @Test void aNarrowWindowFoldsTheMenusAndClipsTheTitle() throws Exception {
         edt(() -> {
             var themes = EnterpriseLook.controller(false);
@@ -141,8 +206,11 @@ class ClassicWindowsTitleTest {
                 assertThat(menus.fold()).isNotEqualTo(CollapsingMenuBar.Fold.NONE);
                 var title = m.owner().classicWindowTitle();
                 assertThat(title.getWidth()).isNotNegative();
-                assertThat(title.getX() + title.getWidth()).as("inside the bar, clear of the window buttons")
+                assertThat(title.getX() + title.getWidth()).as("inside the bar")
                     .isLessThanOrEqualTo(menus.getWidth() - menus.getInsets().right);
+                var close = windowButtons(m.root()).stream().filter(button -> "Close".equals(button.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                int titleEnd = SwingUtilities.convertPoint(title, title.getWidth(), 0, m.root()).x;
+                assertThat(titleEnd).as("clear of the window buttons").isLessThanOrEqualTo(SwingUtilities.convertPoint(close, 0, 0, m.root()).x);
                 assertFullWindowButtons(m.root(), 480);
                 var wider = mount(themes, true, 800);
                 assertThat(wider.owner().classicWindowTitle().getWidth()).isNotNegative();

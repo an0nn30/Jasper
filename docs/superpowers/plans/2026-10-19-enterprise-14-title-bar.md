@@ -1,6 +1,6 @@
 # Enterprise presentation 14: title bar Implementation Plan
 
-> **Status (2026-10-19): executed on `claude/enterprise-title-bar` (`200367316..98dedc443`, then the Task 8 documentation commit).** Deviations from this plan's text: the execution rulings E1 to E13 and the Task 7 record under "Execution notes", and the Task 8 record there. Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
+> **Status (2026-10-19): executed on `claude/enterprise-title-bar` (`200367316..98dedc443`, then the Task 8 documentation commit).** Deviations from this plan's text: the execution rulings E1 to E13 and the Task 7 record under "Execution notes", and the Task 8 record and the final review record there. Deviation from the approved design: W1's `centerTitleIfMenuBarEmbedded` is replaced by `ClassicWindowTitle` (Rulings 13) because the key is process-wide and FlatLaf's title does not dim.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -244,7 +244,7 @@ Each is "what — why — cost if wrong".
 16. **Windows auxiliary frames and dialogs take FlatLaf's title panes,** as in the default look on Windows: `TitleBarStyle.CUSTOM` is process-wide, the per-root opt-out cannot override it (Verified 6), and they show no menu row (plan 10b). — Cost: keeping native auxiliary bars on Windows needs a `TitleBarStyle` change, as a follow-up.
 17. **`window.native_decorations = true` on Windows under Enterprise** gives `TitleBarStyle.NATIVE`: the system title bar, the in-window classic row and no title inset, exactly as Linux. Settings shows the row there. — Cost: none.
 18. **Compact under a classic title keeps the system title bar on macOS and Windows,** as the default look's Compact does (`TitleBarStyle.NATIVE`), with no band. macOS keeps the screen menu bar; Windows shows the in-window row. — Cost: none.
-19. **`TitleInset`, a root client property published only by the band and by the Windows classic decoration.**
+19. **`TitleInset`, a root client property published only by the band, the Windows classic decoration and, under the classic title on Windows, the FlatLaf title panes of auxiliary frames and dialogs.**
     - It is the band's height, or the content pane's top under FlatLaf's title pane.
     - The overlay layer starts below it.
     - A classic dialog's `windowTitleHeight` is the frame's top inset plus it, so CENTERED stays centred on the whole window and a SHEET hangs under the title.
@@ -1819,3 +1819,24 @@ Tasks, in order: 1 the model (`title_bar = "classic"`, `Projections.Platform`, f
   jasper-app renders; `CustomTitleBarTest`, `MacTitleBarTest` and `DefaultDockPixelsTest` are unedited.
   `check_pairs.py` exits 0 with 101 of 101 PASS and the baseline's verdicts; only two lines changed:
   `chrome-toolbar-light` 0.674 to 0.581 and `chrome-toolbar-dark` 0.670 to 0.577 (floor 0.30).
+
+### Final review record
+
+- **Windows auxiliary windows publish their title inset.** Under the classic title on Windows, `NativeShells` frames
+  and dialogs (Settings, the Vault manager, plugin windows) have FlatLaf's title pane (Rulings 16), so they publish the
+  content pane's top as their `TitleInset` and announce it once decorations arrive; classic sheets and centred dialogs
+  in them start below the pane. `ShellChrome` gains `classicTitle`. Rulings 19 is corrected in place.
+- **The Windows title is laid out at its text height**, centred as FlatLaf centres a menu's text, so it shares the
+  menus' baseline (it was 1 px lower). `CollapsingMenuBarTest`'s title bounds follow.
+- **Under the classic title on macOS the menu bar never folds** (`CollapsingMenuBar.screenMenuBar`): AppKit lays out the
+  screen menu bar, and the root still gives the bar the window's width. The default look is unchanged; its unified
+  bar's menu bar shares the older risk, recorded in STATUS as a follow-up.
+- **The chrome covering array has 10 rows**: `classic` with every other point at its default value and at its Enterprise
+  value, each rendered as macOS and as Windows on every host; the strength check counts `title_bar`'s three values.
+- **Tests added:** `NativeShellsChromeTest.aWindowsClassicTitleStartsAnAuxiliaryWindowsSheetsBelowItsTitlePane`,
+  `ClassicWindowsTitleTest.anotherThemeKeepsTheTitleBarInTheToolbarsColour` and `theTitleSharesTheMenusBaseline`,
+  `ClassicMacTitleTest.aNarrowWindowKeepsEveryMenuInTheScreenMenuBar` and
+  `CollapsingMenuBarTest.aBarTheScreenMenuBarShowsNeverFolds`; `aNarrowWindowFoldsTheMenusAndClipsTheTitle` now checks
+  the title against the Close button.
+- **Smaller fixes:** `MacTitleDoubleClick` closes the process's streams (stdin from `/dev/null`); the platform
+  package-info and the guide name its virtual thread; spec 4.7, 5.1, 10.8 and 16.1 item 4 are corrected.

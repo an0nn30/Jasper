@@ -15,9 +15,11 @@ import javax.swing.JRootPane;
  * @param unifiedTitle whether frames and dialogs draw the unified macOS title bar
  * @param classicMenus whether the look's terminal windows show the classic menu row; its auxiliary frames show none
  * @param followTheme whether a frame with the system's title bar follows the theme's darkness
+ * @param classicTitle whether the look draws IntelliJ Classic's title: on Windows its auxiliary frames and dialogs have
+ *     FlatLaf's title panes, and in-window dialogs start below them
  * @param macOs whether this is macOS
  */
-public record ShellChrome(boolean unifiedTitle, boolean classicMenus, boolean followTheme, boolean macOs) {
+public record ShellChrome(boolean unifiedTitle, boolean classicMenus, boolean followTheme, boolean classicTitle, boolean macOs) {
     /**
      * The shells of {@code look} on this host.
      *
@@ -28,7 +30,7 @@ public record ShellChrome(boolean unifiedTitle, boolean classicMenus, boolean fo
 
     /** The shells of {@code look} as on macOS or not; for tests. */
     static ShellChrome of(ShellLook look, boolean macOs) {
-        return new ShellChrome(look.unifiedTitle(), look.windowMenus(), look.followThemeAppearance(), macOs);
+        return new ShellChrome(look.unifiedTitle(), look.windowMenus(), look.followThemeAppearance(), look.classicTitle(), macOs);
     }
 
     /**
@@ -36,7 +38,7 @@ public record ShellChrome(boolean unifiedTitle, boolean classicMenus, boolean fo
      *
      * @return the default look's shells
      */
-    public static ShellChrome standard() { return new ShellChrome(MacTitleBar.isSupported(), false, false, SystemInfo.isMacOS); }
+    public static ShellChrome standard() { return new ShellChrome(MacTitleBar.isSupported(), false, false, false, SystemInfo.isMacOS); }
 
     /**
      * Gives {@code root}'s frame the theme's macOS appearance when this look follows the theme and the frame has the

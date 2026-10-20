@@ -353,6 +353,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * the band.
      */
     static void installMacTitleBand(JRootPane root, WindowContent content) {
+        // Under a classic title macOS always shows the menus in the screen menu bar (Rulings 5 and 18), Compact included.
+        content.chrome.menuBar().screenMenuBar(true);
         if (content.viewMode == ViewMode.COMPACT) return;
         content.titleBand = MacTitleBand.install(root, () -> ThemeZone.color(content.chrome().header(), SemanticColor.SURFACE_APP));
         content.onThemeChanged = theme -> content.titleBand.setDark(theme.chrome().dark());

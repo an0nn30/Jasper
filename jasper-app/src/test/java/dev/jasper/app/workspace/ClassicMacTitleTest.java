@@ -74,6 +74,29 @@ class ClassicMacTitleTest {
         });
     }
 
+    /** GUI check 3: a narrow window keeps every menu in the screen menu bar, with no stray "…" or ☰ menu. */
+    @Test void aNarrowWindowKeepsEveryMenuInTheScreenMenuBar() throws Exception {
+        edt(() -> {
+            var themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, look().chrome(), true);
+                owner.connectContributions(EnterpriseMenuRowMockTest.workstation());
+                var root = new JRootPane();
+                WindowContent.mount(root, owner, look(), title -> { });
+                var menus = owner.chrome().menuBar();
+                assertThat(root.getJMenuBar()).isSameAs(menus);
+                // Visible, as AppKit keeps it; at 400 px the classic and plugin menus are wider than the window.
+                root.setSize(400, 700);
+                for (int i = 0; i < 2; i++) LayoutTestSupport.layoutTree(root);
+                assertThat(menus.getWidth()).isPositive();
+                assertThat(menus.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
+                assertThat(menus.menus()).allMatch(java.awt.Component::isVisible);
+                assertThat(menus.overflowMenu().isVisible()).isFalse();
+                assertThat(menus.hamburgerMenu().isVisible()).isFalse();
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
     @Test void aDarkThemeGivesTheVibrantDarkAppearance() throws Exception {
         edt(() -> {
             var themes = EnterpriseLook.controller(true);

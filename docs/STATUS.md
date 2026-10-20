@@ -1,8 +1,8 @@
 # Jasper — Status and Handoff
 
 **Enterprise presentation, plan 14: IntelliJ Classic's title bar at the user's direction — 2026-10-19** (`claude/enterprise-title-bar`, worktree `.claude/worktrees/enterprise-14`, from `main` at `3a36993ba`; [plan](superpowers/plans/2026-10-19-enterprise-14-title-bar.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
-Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.8, 5.1 to
-5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
+Commits `200367316..98dedc443`, then this documentation commit; spec 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1
+to 5.3, 5.9, 9.1, 10.1 to 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1 amended, and the app architecture guide
 corrected. The user asked: "Next, on MacOS and Windows only - the enterprise theme uses a custom title bar that looks
 like the IntelliJ title bar, using the same color as the toolbar so it looks cohesive. Mac also moves the menu bar to
 the global mac menu bar area instead of using built-in, and on windows the title bar contains the file menu bar like in
@@ -22,8 +22,9 @@ title pane, in the toolbar's colour, embeds the classic menus and then `ClassicW
 left-aligned 22 px after them in `text.secondary` and dimmed to `text.tertiary` while the window is inactive, over the
 classic menu row's 1 px `border.divider` rule; `CollapsingMenuBar` folds the menus into "…" and then ☰ before the title
 shrinks below 60 px, and `window.native_decorations = true` and Compact give the system title bar and the in-window menu
-row. Linux is unchanged. `TitleInset` (platform), published only by the band and by the Windows classic decoration,
-keeps classic in-window dialogs and overlays below the title and announces each change (`TitleInset.CHANGED`). The
+row. Linux is unchanged. `TitleInset` (platform), published only by the band, the Windows classic decoration and, under
+the classic title on Windows, the FlatLaf title panes of auxiliary frames and dialogs, keeps classic in-window dialogs
+and overlays below the title and announces each change (`TitleInset.CHANGED`). The
 Enterprise toolbar is 28 px (`window.toolbar_height`), IntelliJ's, on every platform. No SDK, plugin or Enterprise
 version changes. Rulings (plan, "Rulings"): (1) one plan of eight tasks; (2) a third `title_bar` value, `classic`,
 rather than a per-host meaning of `native`; (3) `Projections.Platform` read from `os.name` without AWT, every other
@@ -39,7 +40,8 @@ not FlatLaf's label, in a 28 px bar; (14) its colours are `text.secondary` under
 under the indicator guard; (15) the Windows rule is the classic menu row's own `border.divider`; (16) Windows auxiliary
 frames and dialogs take FlatLaf's title panes without a menu row; (17) `window.native_decorations = true` on Windows
 gives Linux's frame with no title inset; (18) Compact under a classic title keeps the system title bar without the band;
-(19) `TitleInset` is a root client property only the band and the Windows decoration publish; (20) the toolbar is 28 px
+(19) `TitleInset` is a root client property only the band, the Windows decoration and the Windows auxiliary title panes
+publish; (20) the toolbar is 28 px
 as the kit's default, a saved value still overriding it; (21) the mock tests render under a Linux host and shift for the
 28 px row; (22) `ChromeRenderTest` gains `enterprise-mac` and `enterprise-windows`, `enterprise` moving to the Linux
 host; (23) no version bump; (24) the workspace-tabs reconciliation below. The execution rulings E1 to E13 and the Task 7
@@ -81,10 +83,20 @@ the Vault manager, a plugin window): their system title bars, the screen menu ba
 closing it; (6) classic in-window dialogs and the Vault's sheets below the band; (7) Windows: the menus in the title bar
 after the icon; the title left after them, dimming when another window is active; the rule under the bar; a narrow
 window folding to "…" and ☰; maximise and restore; dragging and double-clicking empty title-bar space and the title;
-in-window dialogs below the bar; `window.native_decorations = true` giving the system title bar and the menu row;
+in-window dialogs below the bar, and the Vault manager's and Settings' sheets below their own title bars;
+`window.native_decorations = true` giving the system title bar and the menu row;
 Compact; (8) Linux: unchanged apart from the 28 px toolbar. Reconciliation: the unmerged `claude/workspace-tabs` series
 rules that a child window has no menu bar under Enterprise; whichever of it and this plan merges second reconciles them,
-and on macOS a child window then needs the screen menu bar's menus. Not merged, not pushed.
+and on macOS a child window then needs the screen menu bar's menus. Final review fixes ("Plan 14: final review fixes";
+the plan's "Final review record"): Windows auxiliary windows under the classic title publish their title pane's inset,
+so classic sheets hang below it; the Windows title shares the menus' baseline; the macOS classic menu bar never folds
+against the window's width, as AppKit lays out the screen menu bar; the chrome covering array gains two `classic` rows,
+rendered as macOS and Windows, and its strength check counts `title_bar`'s three values; the double-click reader closes
+its process streams. They add 5 tests; the windows, workspace, platform, presentation and documentation test packages
+(1,158 tests) and `javadoc` pass, the 11 default-look jasper-app renders still equal the baseline, and `check` was
+not rerun after them. Follow-up: the
+default look's macOS menu bar (in the unified bar) still folds against the window's width, a risk older than this plan.
+Not merged, not pushed.
 
 **Enterprise presentation, plan 13: stripe icons at the user's direction — 2026-10-19** (`claude/enterprise-stripe-icons`, worktree `.claude/worktrees/enterprise-13`, from `main` at `2c065f8cd`; [plan](superpowers/plans/2026-10-19-enterprise-13-stripe-icons.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md)).
 Commits `eca2feca8..2606d5633`, then this documentation commit; spec 5.2, 10.7, 16.1 and 19.1 amended. After trying

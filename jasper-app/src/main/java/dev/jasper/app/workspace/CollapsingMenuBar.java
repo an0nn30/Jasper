@@ -34,6 +34,7 @@ final class CollapsingMenuBar extends JMenuBar {
     private Fold fold = Fold.NONE;
     private int kept;
     private boolean moving;
+    private boolean screenMenuBar;
 
     CollapsingMenuBar() {
         setLayout(new Layout());
@@ -56,6 +57,15 @@ final class CollapsingMenuBar extends JMenuBar {
             @Override public void menuDeselected(MenuEvent event) { SwingUtilities.invokeLater(CollapsingMenuBar.this::restoreMenus); }
             @Override public void menuCanceled(MenuEvent event) { SwingUtilities.invokeLater(CollapsingMenuBar.this::restoreMenus); }
         });
+    }
+
+    /**
+     * Marks the bar as shown by macOS's screen menu bar (plan 14, the classic title): AppKit lays its menus out, so the bar
+     * never folds against the window's width, which the root still gives it.
+     */
+    void screenMenuBar(boolean value) {
+        screenMenuBar = value;
+        revalidate();
     }
 
     Fold fold() { return fold; }
@@ -229,8 +239,11 @@ final class CollapsingMenuBar extends JMenuBar {
                 int keep = Math.min(title.getPreferredSize().width, UIScale.scale(ClassicWindowTitle.MINIMUM));
                 int used = fit(inner - gap - keep);
                 int x = insets.left + used + gap;
-                title.setBounds(x, insets.top, Math.max(0, insets.left + inner - x), height);
+                // At its text height, centred as FlatLaf centres a menu's text, so the title shares the menus' baseline.
+                int text = title.getPreferredSize().height;
+                title.setBounds(x, insets.top + (height - text) / 2, Math.max(0, insets.left + inner - x), text);
             }
+            else if (screenMenuBar) apply(Fold.NONE, menus.size());
             else fit(getWidth() - insets.left - insets.right);
             double run = 0;
             for (Component child : getComponents()) {

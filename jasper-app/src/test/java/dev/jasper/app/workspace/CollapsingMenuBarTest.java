@@ -133,6 +133,18 @@ class CollapsingMenuBarTest {
     }
 
     /** Plan 14 (Rulings 13): the Windows classic title follows the menus; they fold before it shrinks past its minimum. */
+    /** Plan 14: AppKit lays out the screen menu bar, so a bar it shows never folds against the window's width. */
+    @Test void aBarTheScreenMenuBarShowsNeverFolds() {
+        var bar = bar();
+        bar.screenMenuBar(true);
+        // AquaMenuBarUI asks for no height; the root still gives the bar the window's width.
+        bar.setSize(100, 0); bar.doLayout();
+        assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
+        assertThat(shown(bar)).containsExactly(true, true, true, true, true);
+        assertThat(bar.overflowMenu().isVisible()).isFalse();
+        assertThat(bar.hamburgerMenu().isVisible()).isFalse();
+    }
+
     @Test void aClassicTitleFollowsTheMenusAndTheMenusFoldBeforeItShrinksPastItsMinimum() {
         var bar = bar();
         bar.setBorder(BorderFactory.createEmptyBorder());
@@ -146,7 +158,7 @@ class CollapsingMenuBarTest {
         assertThat(bar.getComponent(bar.getComponentCount() - 1)).as("the glue FlatLaf stretches the bar by").isInstanceOf(Box.Filler.class);
         bar.setSize(800, 28); bar.doLayout();
         assertThat(bar.fold()).isEqualTo(CollapsingMenuBar.Fold.NONE);
-        assertThat(title.getBounds()).isEqualTo(new Rectangle(220 + gap, 0, 800 - 220 - gap, 28));
+        assertThat(title.getBounds()).as("at its text height, centred in the bar").isEqualTo(new Rectangle(220 + gap, 4, 800 - 220 - gap, 20));
         bar.setSize(220 + gap + minimum, 28); bar.doLayout();
         assertThat(bar.fold()).as("the title at its minimum keeps every menu").isEqualTo(CollapsingMenuBar.Fold.NONE);
         assertThat(title.getWidth()).isEqualTo(minimum);

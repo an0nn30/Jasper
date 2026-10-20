@@ -19,7 +19,7 @@ Amended on 2026-10-18 by the series' final alignment pass, recording rulings app
 Amended on 2026-10-18 at the user's direction after trying Enterprise: 10.7 (side stripes fit their labels, centred, not resizable; the second group stands at the stripe's bottom), with 3, 9.1, 12.1 and 12.2 (Settings hides the Panel rail width).
 Amended on 2026-10-18 at the user's direction after trying Enterprise (plan 12): 1 (decisions 4 and 14), 4.1, 5.1, 5.2, 5.8, 6.4, 7.6 (the theme ports IntelliJ Light and New UI Dark; plan 5b's accent ruling is superseded), 7.7, 8.2, 8.6, 9.1, 10.3, 10.7, 10.8, 11.5, 14.4, 16.1, 17 and 19.1.
 Amended on 2026-10-19 at the user's direction after trying plan 12 (plan 13): 5.2, 10.7, 16.1 and 19.1 (every labelled stripe button starts with its tool window's icon, IntelliJ's classic tool-window icons under Enterprise, over the mocks' text-only labels).
-Amended on 2026-10-19 at the user's direction (plan 14): 1 (decision 8), 3 (principles 5 and 8), 4.8, 5.1, 5.2, 5.3, 5.9, 9.1, 10.1, 10.2, 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1. On macOS and Windows the Enterprise look draws IntelliJ Classic's title bar (`title_bar = "classic"`): on macOS a band in the toolbar's colour under its own traffic lights and title, with the menus in the screen menu bar; on Windows a custom title bar holding the menus and the title. Linux keeps the system title bar and the in-window menu row, and the toolbar is 28 px; these override the mocks' native title bar, in-window menu row and 34 px toolbar.
+Amended on 2026-10-19 at the user's direction (plan 14): 1 (decision 8), 3 (principles 5 and 8), 4.7, 4.8, 5.1, 5.2, 5.3, 5.9, 9.1, 10.1, 10.2, 10.3, 10.8, 10.10, 12.1, 16.1, 16.2, 18 and 19.1. On macOS and Windows the Enterprise look draws IntelliJ Classic's title bar (`title_bar = "classic"`): on macOS a band in the toolbar's colour under its own traffic lights and title, with the menus in the screen menu bar; on Windows a custom title bar holding the menus and the title. Linux keeps the system title bar and the in-window menu row, and the toolbar is 28 px; these override the mocks' native title bar, in-window menu row and 34 px toolbar.
 Branch: `claude/enterprise-presentation`, from `main` at `3c6e9dcc3`.
 
 This amends the [single layout specification](2026-09-25-jasper-single-layout-design.md): its "a single layout and a
@@ -438,8 +438,9 @@ compares (`:446-448`). `state` is `pending`, `proven` or `failed`. The store, `A
 4. Slate Cobalt Dark under `Kit.DEFAULT`, blaming the kit; a failure here propagates, as today's fallback's does.
 
 With the default kit, steps 2 and 4 do not exist and the behaviour is today's. Blaming the kit replaces the chosen
-`Presentation` with one explicit fallback value, `Presentation.fallback(DesktopFlags committed)`: the native title and
-in-window menus already committed before AWT, with the default kit; 9.1 gives the value of every projection field. The
+`Presentation` with one explicit fallback value, `Presentation.fallback(DesktopFlags committed)`: the title and menus
+already committed before AWT (the native title and in-window menus, or the default look's under the classic title on
+macOS and Windows), with the default kit; 9.1 gives the value of every projection field. The
 fallback is handed to every consumer before `startPlugins`, and the provider is marked SKIPPED in the `PluginSelection`
 so no `Workstation` is published. `ThemeController.startup` returns which step succeeded, and `JasperApplication`
 records `failed` through `AttemptStore` (the `appearance` package has no `presentation` edge). The fallback session
@@ -590,6 +591,7 @@ splash_art = "splash/art.svg"
 Top-level keys: `kit` (required, the integer 1), `base` (required, `"default"` or `"classic"`, the host catalog that
 supplies every private role table and a default for every variant point), and the tables `chrome`, `controls`,
 `metrics`, `type`, `colors`, `branding` and `defaults`, each optional. A key left out takes the base's value.
+`base = "classic"` leaves `title_bar` at `native`; the Enterprise kit names `classic`.
 `branding` has no base value: a look without it keeps Jasper's icon and shows no splash (10.11). `icons` names a
 directory holding `icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-64.png`, `icon-128.png`, `icon-256.png` and
 `icon-1024.png`; `splash_art` names a 718 × 250 SVG; `product` is the name the splash shows. Enterprise lists every
@@ -1361,8 +1363,9 @@ visible = true
 the 07 Credential Vault mocks show them:
 
 - a card with the catalog's dialog radius on `surface.dialog`, a 1 px `border.hover` frame and the catalog's popup
-  shadow, over a still `surface.scrim` covering the window below its title bar (and below macOS's classic band or
-  Windows' classic title bar, which `TitleInset` publishes);
+  shadow, over a still `surface.scrim` covering the window below its title bar (and below macOS's classic band or,
+  under the classic title on Windows, the FlatLaf title pane of the terminal window or an auxiliary window, which
+  `TitleInset` publishes);
 - a 26 px header strip on `surface.header.active` above a `border.window` rule, holding the `DialogSpec.swatch` and the
   title in the semibold UI face; the form below it does not repeat the title;
 - the footer on `surface.footer` under a `border.window` rule, `Form.footnote` at its leading edge and the actions at
@@ -1771,7 +1774,8 @@ Everything below runs headlessly inside `./gradlew check` on every OS unless not
    `settingsPreview` render under the default, Enterprise and complement kits, both palette views and the fallback
    combination (native title, window menus, default kit), the shipped look on each platform (`enterprise` on Linux,
    `enterprise-mac` with the band, `enterprise-windows` with FlatLaf's title pane), and over a checked-in strength-2
-   array of `ChromeSpec` values across 9 of the ten chrome points (`window_title` as its two shipped templates; `icons`
+   array of `ChromeSpec` values across 9 of the ten chrome points (`window_title` as its two shipped templates;
+   `title_bar` over its three values, its `classic` rows rendered as macOS and as Windows; `icons`
    is held at `classic` in every row and covered by `ChromeArtworkTest`, `ZoneIconsTest`, `StripeIconTest` and
    `StripeIconsTest`) honouring the `menu_bar`/`title_bar` constraint, asserting painted pairs and structure (a flush
    header, no gutter, the stripe labels) and writing images under `build/` for inspection. The opt-in `JavaExec` tasks

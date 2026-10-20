@@ -47,14 +47,16 @@ public final class MacTitleDoubleClick {
     private static void read() {
         try {
             Process process = new ProcessBuilder("/usr/bin/defaults", "read", "-g", "AppleActionOnDoubleClick")
-                .redirectErrorStream(true).start();
-            if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                return;
+                .redirectErrorStream(true).redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null"))).start();
+            try (var out = process.getInputStream()) {
+                if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    return;
+                }
+                String output = new String(out.readAllBytes(), StandardCharsets.UTF_8);
+                // A non-zero exit means the key is unset.
+                if (process.exitValue() == 0) current = parse(output);
             }
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            // A non-zero exit means the key is unset.
-            if (process.exitValue() == 0) current = parse(output);
         } catch (IOException ignored) {
             // No defaults tool: keep zooming.
         } catch (InterruptedException interrupted) {

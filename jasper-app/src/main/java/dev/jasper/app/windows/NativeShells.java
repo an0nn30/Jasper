@@ -319,7 +319,7 @@ public final class NativeShells {
         var resources = new ShellResources(surface, frame);
         try {
             frame.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(frame.getRootPane(), surface, shell.unifiedTitle());
+            resources.layout = installChrome(frame.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
             // The minimal File menu is a row of this frame (spec 10.1); a classic look's frames show no menu row, as the 07
             // Credential Vault mocks draw them, and bind Close Window's key themselves (plan 10b Rulings 14).
@@ -436,7 +436,7 @@ public final class NativeShells {
             dialog.setResizable(resizable(surface));
             dialog.getAccessibleContext().setAccessibleName(surface.title());
             dialog.setIconImages(ApplicationIcon.images());
-            resources.layout = installChrome(dialog.getRootPane(), surface, shell.unifiedTitle());
+            resources.layout = installChrome(dialog.getRootPane(), surface, shell);
             MacTitleBar bar = resources.layout.bar();
             shell.followTheme(dialog.getRootPane(), bar, themes.current().chrome().dark());
             // Spec 10.8: under the classic mapping the footer is the band, and the title bar the system draws titles the
@@ -521,6 +521,35 @@ public final class NativeShells {
     record ShellLayout(MacTitleBar bar, dev.jasper.app.platform.WindowBody body, AuxiliarySurface surface) implements AutoCloseable {
         @Override public void close() { surface.onTitleActionsChanged(() -> {}); body.close(); if (bar != null) bar.close(); }
     }
+    /**
+     * {@link #installChrome(JRootPane, AuxiliarySurface, boolean)} under the look's shells. Under a classic title on Windows
+     * the root also publishes its {@link dev.jasper.app.platform.TitleInset}: FlatLaf gives it a title pane (plan 14
+     * Rulings 16), and classic dialogs drawn in this window start below it (spec 10.8).
+     */
+    static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, ShellChrome shell) {
+        var layout = installChrome(root, surface, shell.unifiedTitle());
+        if (shell.classicTitle() && !shell.macOs()) publishTitlePaneInset(root);
+        return layout;
+    }
+
+    /**
+     * Publishes the content pane's top as {@code root}'s title inset while FlatLaf decorates it, and announces the inset
+     * once decorations arrive and the root is laid out: FlatLaf decorates a Windows 10 or 11 frame only when its native
+     * peer is created.
+     */
+    private static void publishTitlePaneInset(JRootPane root) {
+        dev.jasper.app.platform.TitleInset.publish(root, () -> root.getWindowDecorationStyle() == JRootPane.NONE || root.getContentPane() == null
+            ? 0 : root.getContentPane().getY());
+        if (root.getWindowDecorationStyle() != JRootPane.NONE) return;
+        root.addPropertyChangeListener("windowDecorationStyle", new java.beans.PropertyChangeListener() {
+            @Override public void propertyChange(java.beans.PropertyChangeEvent event) {
+                if (root.getWindowDecorationStyle() == JRootPane.NONE) return;
+                root.removePropertyChangeListener("windowDecorationStyle", this);
+                SwingUtilities.invokeLater(() -> dev.jasper.app.platform.TitleInset.changed(root, 0));
+            }
+        });
+    }
+
     /** The one production chrome/body registration path for auxiliary windows and immediate dialog owners. */
     static ShellLayout installChrome(JRootPane root, AuxiliarySurface surface, boolean supported) {
         MacTitleBar bar;
