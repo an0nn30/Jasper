@@ -5,6 +5,8 @@ import java.awt.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.*;
 import static dev.jasper.editor.testsupport.PreviewFixture.layout;
 
@@ -64,6 +66,46 @@ class ScrollLinkTest {
                 catch(IllegalAccessException e){throw new AssertionError(e);}
             });
         }
+    }
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void newerScrollDuringEmptyMapSurvivesGeometryRestart(boolean linked) throws Exception {
+        String text=java.util.stream.IntStream.range(0,600)
+            .mapToObj(i -> "paragraph "+i+"\n\n").collect(java.util.stream.Collectors.joining());
+        try(var f=new Fixture(text)) {
+            var queued=ScrollLink.class.getDeclaredField("queued");queued.setAccessible(true);
+            var geometry=ScrollLink.class.getDeclaredField("geometry");geometry.setAccessible(true);
+            awaitGeometry(f,queued);
+            int[] latest={0},sourceBefore={0};
+            var interleaving=new java.util.concurrent.FutureTask<Void>(() -> {
+                assertThat(queued.getBoolean(f.area.scrollLink)).as("first slice must yield").isTrue();
+                assertThat((java.util.List<?>)geometry.get(f.area.scrollLink)).as("map is unpublished between slices").isEmpty();
+                latest[0]=f.py("paragraph 300\n");f.preview(latest[0]);
+                f.area.scrollLink.geometryChanged();
+                return null;
+            });
+            edt(() -> {
+                f.area.scrollLink.linked(linked);f.preview(f.py("paragraph 100\n"));
+                assertThat(f.preview()).isPositive();sourceBefore[0]=f.source();
+                f.area.scrollLink.geometryChanged();
+                // The first rebuild dispatch queues its continuation behind this user event.
+                SwingUtilities.invokeLater(interleaving);
+            });
+            interleaving.get(10,java.util.concurrent.TimeUnit.SECONDS);
+            awaitGeometry(f,queued);
+            edt(() -> {
+                assertThat(f.preview()).as("latest user position survives the restarted rebuild").isEqualTo(latest[0]);
+                if(linked)assertThat(f.source()).isCloseTo(f.sy("paragraph 300\n"),within(2));
+                else assertThat(f.source()).isEqualTo(sourceBefore[0]);
+            });
+        }
+    }
+    private static void awaitGeometry(Fixture f,java.lang.reflect.Field queued) throws Exception {
+        var pending=new java.util.concurrent.atomic.AtomicBoolean(true);
+        for(int i=0;i<1000 && pending.get();i++)edt(() -> {
+            try {pending.set(queued.getBoolean(f.area.scrollLink));}
+            catch(IllegalAccessException e){throw new AssertionError(e);}
+        });
+        assertThat(pending.get()).as("geometry rebuild completed").isFalse();
     }
     @Test void actualWrappedNestedTableAndCodePassagesMapInBothDirections() throws Exception {
         try(var f=new Fixture(TEXT)) {

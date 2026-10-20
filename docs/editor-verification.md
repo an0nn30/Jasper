@@ -187,9 +187,11 @@ per-document retained memory nor a process RSS limit.
 The vendor's single bulk Java-tokenizer call remains noninterruptible: the 2 MiB `int ` fixture measured
 about 27 seconds from interruption to return. It runs on the render worker with one replaceable pending snapshot.
 
-Final headless `check` passed on October 20 with the installed Python 3.13 override: 11,843 tests, zero failures/errors,
-29 skips (25 existing platform skips and four opt-in performance cases, which passed separately). `sdkRelease`,
-`packageApp` and `verifyPackage` passed; the macOS arm64 image has no trained AOT cache.
+Before the scroll-restart review fix, headless `check` passed on October 20 with the installed Python 3.13 override:
+11,843 tests, zero failures/errors, 29 skips (25 existing platform skips and four opt-in performance cases, which passed separately). `sdkRelease`,
+`packageApp` and `verifyPackage` passed; the macOS arm64 image has no trained AOT cache. After that fix,
+107 focused scroll/controller/tab/window/integration tests and the plugin architecture gate passed; the full
+check and packaging have not been repeated.
 
 User-run desktop acceptance remains pending:
 

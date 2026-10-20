@@ -95,8 +95,9 @@ final class ScrollLink implements AutoCloseable {
         geometryRevision++;
         if (queued) return;
         queued = true;
-        long token = epoch, installedGeneration = generation;
-        long sourceSequence = source.sequence, previewSequence = rendered.sequence;
+        rebuild(epoch, generation, source.sequence, rendered.sequence);
+    }
+    private void rebuild(long token, long installedGeneration, long sourceSequence, long previewSequence) {
         SwingUtilities.invokeLater(() -> {
             if (closed || token != epoch || installedGeneration != generation) return;
             adjusting = true;
@@ -123,7 +124,10 @@ final class ScrollLink implements AutoCloseable {
         }
         void step() {
             if(closed || token!=epoch || installedGeneration!=generation) return;
-            if(revision!=geometryRevision) {queued=false;geometryChanged();return;}
+            if(revision!=geometryRevision) {
+                // A no-map user scroll cannot update its reading; retain the original restoration guards.
+                rebuild(token,installedGeneration,sourceSequence,previewSequence);return;
+            }
             long deadline=System.nanoTime()+4_000_000L;
             for(int count=0;index<knots.size() && count<128;count++,index++) {
                 var knot=knots.get(index);
