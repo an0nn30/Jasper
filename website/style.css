@@ -31,7 +31,7 @@
 /* Guided tour: real app frames, one demonstrative pointer, no input interception. */
 #plugin-image-link{position:relative;overflow:hidden;aspect-ratio:3200/1528}
 #plugin-image-next{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 220ms ease;pointer-events:none}
-.demo-pointer{position:absolute;left:80%;top:40%;width:28px;height:36px;pointer-events:none;opacity:0;z-index:2;transform:translate(-3px,-3px)}
+.demo-pointer{position:absolute;left:80%;top:40%;width:28px;height:36px;pointer-events:none;opacity:0;z-index:2;transform:translate(-3px,-3px);transition:opacity .18s ease}
 .demo-pointer>img{width:25px;height:auto;filter:drop-shadow(0 2px 3px #302f2840)}
 .demo-click{position:absolute;width:34px;height:34px;border:2px solid #52643f;border-radius:50%;left:-14px;top:-14px;opacity:0;transform:scale(.5)}
 .demo-pointer.is-clicking .demo-click{opacity:.65;transform:scale(1);transition:transform .3s ease,opacity .3s ease}

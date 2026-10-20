@@ -46,6 +46,8 @@
     [15500,39,82],[17500,2.2,5],[19200,2.2,5],[20000,65,60],
     [20900,65,60],[21800,2.2,5],[22800,2.2,5],[23800,80,3.5],
     [25300,80,3.5],[26600,80,37],[28000,80,37]];
+  // Start fading before the first character; return after the completed text settles.
+  const typing = t => (t >= 2300 && t < 5700) || (t >= 9300 && t < 13400);
   function tick(now) {
     if (!last) last = now;
     elapsed = (elapsed + Math.min(now-last, 100)) % duration; last = now;
@@ -63,6 +65,7 @@
     let i = 0; while (i < points.length-2 && t > points[i+1][0]) i++;
     const a=points[i], b=points[i+1], f=(t-a[0])/(b[0]-a[0]);
     const ease=f*f*(3-2*f);
+    pointer.style.opacity = typing(t) ? '0' : '1';
     pointer.style.left=`${a[1]+(b[1]-a[1])*ease}%`;
     pointer.style.top=`${a[2]+(b[2]-a[2])*ease}%`;
     pointer.classList.toggle('is-clicking',[2200,7850,9300,17850,21850,23850].some(c => t>=c && t<c+400));
@@ -93,7 +96,7 @@
     cancelAnimationFrame(raf); last=0;
     const running = ready && wantsPlayback();
     if (!ready && wantsPlayback()) preparePlayback();
-    pointer.style.opacity = running ? '1' : '0';
+    pointer.style.opacity = running && !typing(elapsed) ? '1' : '0';
     caption.setAttribute('aria-live', running ? 'off' : 'polite');
     toggle.hidden = reduced.matches;
     toggle.textContent = paused ? 'Play tour' : 'Pause tour';
