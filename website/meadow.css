@@ -149,3 +149,11 @@ html.meadow-cinematic { scroll-snap-type: y mandatory; scroll-padding-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   .button .arrow-icon, .nav-download .arrow-icon { transition: none; }
 }
+
+.platform-viewport, .workspace-viewport { position: relative; overflow: hidden; }
+.platform-viewport { max-width: 1000px; margin-inline: auto; border-radius: 8px; }
+.workspace-viewport > .tour-outgoing { border-radius: 0; }
+
+.snapshot-plugin-image-link { display: block; aspect-ratio: 3200 / 1528; background: #FFFEFA; border-block: 1px solid #DADCCF; overflow: hidden; }
+.snapshot-plugin-image { display: block; width: 100%; height: auto; aspect-ratio: 3200 / 1528; }
+.snapshot-plugin-image-next, .snapshot-plugin-image-link .demo-pointer { display: none; }

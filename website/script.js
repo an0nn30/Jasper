@@ -1,3 +1,49 @@
+// One motion language for every segmented view switch.
+const activePanelMotions = new Map();
+function slidePanel(panel, update) {
+ const viewport = panel.parentElement;
+ activePanelMotions.get(panel)?.();
+ const animate = !reducedMotion.matches && typeof panel.animate === 'function';
+ const previousHeight = panel.getBoundingClientRect().height;
+ const previous = animate ? panel.cloneNode(true) : null;
+ if (previous) {
+   if (previous.id) previous.classList.add(`snapshot-${previous.id}`);
+   previous.querySelectorAll('[id]').forEach(node => node.classList.add(`snapshot-${node.id}`));
+   previous.removeAttribute('id');
+   previous.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+   previous.querySelectorAll('[aria-live]').forEach(node => node.removeAttribute('aria-live'));
+   previous.setAttribute('aria-hidden', 'true');
+   previous.inert = true;
+   previous.classList.add('tour-outgoing');
+ }
+
+ update();
+ if (!previous) return;
+ const nextHeight = panel.getBoundingClientRect().height;
+ viewport.append(previous);
+ const easing = 'cubic-bezier(.16, 1, .3, 1)';
+ const outgoing = previous.animate([
+   { transform: 'translateX(0)', opacity: 1 },
+   { transform: 'translateX(-72px)', opacity: 0 }
+ ], { duration: 280, easing, fill: 'forwards' });
+ const incoming = panel.animate([
+   { transform: 'translateX(72px)', opacity: 0 },
+   { transform: 'translateX(0)', opacity: 1 }
+ ], { duration: 460, easing });
+ const resize = viewport.animate([
+   { height: `${previousHeight}px` }, { height: `${nextHeight}px` }
+ ], { duration: 460, easing });
+ let finished = false;
+ const cleanup = () => {
+   if (finished) return;
+   finished = true;
+   previous.remove();
+   if (activePanelMotions.get(panel) === cleanup) activePanelMotions.delete(panel);
+   outgoing.cancel(); incoming.cancel(); resize.cancel();
+ };
+ activePanelMotions.set(panel, cleanup);
+ incoming.finished.then(cleanup, cleanup);
+}
 const platforms = {
   windows: { name: 'Windows 11', width: 3200, height: 1920, theme: 'Jasper Meadow Light' },
   macos: { name: 'macOS', width: 3200, height: 1920, theme: 'Jasper Meadow Light' },
@@ -6,16 +52,27 @@ const platforms = {
 const image = document.querySelector('#platform-image');
 const caption = document.querySelector('#platform-caption');
 const buttons = [...document.querySelectorAll('[data-platform]')];
+let platformRequest = 0;
+let activePlatform = 'windows';
 for (const button of buttons) {
-  button.addEventListener('click', () => {
+  button.addEventListener('click', async () => {
+    const request = ++platformRequest;
     const key = button.dataset.platform;
+    if (key === activePlatform) return;
+    const ready = new Image();
+    ready.src = `assets/${key}.png?v=hires-2`;
+    try { await ready.decode(); } catch { return; }
+    if (request !== platformRequest) return;
+    activePlatform = key;
     const platform = platforms[key];
+    slidePanel(image.parentElement, () => {
     image.src = `assets/${key}.png?v=hires-2`;
     image.alt = `Jasper on ${platform.name} using ${platform.theme}, showing sample infrastructure commands and output`;
     image.width = platform.width;
     image.height = platform.height;
     caption.textContent = `Jasper on ${platform.name} · ${platform.theme}`;
     for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
+    });
   });
 }
 
@@ -31,7 +88,6 @@ const tourViewport = document.querySelector('.tour-viewport');
 const tourPanel = tourViewport.querySelector('.tool-tour');
 let tourRequest = 0;
 let activeTool = 'vault';
-let finishTourMotion = () => {};
 for (const button of toolButtons) button.addEventListener('click', async () => {
  const request = ++tourRequest;
  const key = button.dataset.tool, view = tour[key];
@@ -41,18 +97,7 @@ for (const button of toolButtons) button.addEventListener('click', async () => {
  ready.src = source;
  try { await ready.decode(); } catch { return; }
  if (request !== tourRequest) return; // A newer click owns the next panel.
- finishTourMotion();
- const animate = !reducedMotion.matches && typeof tourPanel.animate === 'function';
- const previousHeight = tourPanel.getBoundingClientRect().height;
- const previous = animate ? tourPanel.cloneNode(true) : null;
- if (previous) {
-   previous.removeAttribute('id');
-   previous.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-   previous.querySelectorAll('[aria-live]').forEach(node => node.removeAttribute('aria-live'));
-   previous.setAttribute('aria-hidden', 'true');
-   previous.inert = true;
-   previous.classList.add('tour-outgoing');
- }
+ slidePanel(tourPanel, () => {
  activeTool = key;
  const introductions = {
   sessions: 'Start with your connections. Keep your regular hosts close at hand.',
@@ -67,30 +112,7 @@ for (const button of toolButtons) button.addEventListener('click', async () => {
  img.src = source; img.alt = view[4];
  document.querySelector('#tour-link').href = img.src;
  for (const other of toolButtons) other.setAttribute('aria-pressed', String(other === button));
- if (!previous) return;
- const nextHeight = tourPanel.getBoundingClientRect().height;
- tourViewport.append(previous);
- const easing = 'cubic-bezier(.16, 1, .3, 1)';
- const outgoing = previous.animate([
-   { transform: 'translateX(0)', opacity: 1 },
-   { transform: 'translateX(-72px)', opacity: 0 }
- ], { duration: 280, easing, fill: 'forwards' });
- const incoming = tourPanel.animate([
-   { transform: 'translateX(72px)', opacity: 0 },
-   { transform: 'translateX(0)', opacity: 1 }
- ], { duration: 460, easing });
- const resize = tourViewport.animate([
-   { height: `${previousHeight}px` }, { height: `${nextHeight}px` }
- ], { duration: 460, easing });
- let finished = false;
- const cleanup = () => {
-   if (finished) return;
-   finished = true;
-   previous.remove();
-   outgoing.cancel(); incoming.cancel(); resize.cancel();
- };
- finishTourMotion = cleanup;
- incoming.finished.then(cleanup, cleanup);
+ });
 });
 
 // Animate only while Jasper is visible, the tab is active, and motion is welcome.
@@ -112,7 +134,6 @@ new IntersectionObserver(([entry]) => {
 }, { threshold: 0.25 }).observe(buddy);
 document.addEventListener('visibilitychange', syncJasperMotion);
 reducedMotion.addEventListener('change', () => {
-  if (reducedMotion.matches) finishTourMotion();
-  syncJasperMotion();
+  if (reducedMotion.matches)  syncJasperMotion();
 });
 syncJasperMotion();

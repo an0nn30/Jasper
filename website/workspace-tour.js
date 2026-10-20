@@ -103,8 +103,18 @@
     toggle.setAttribute('aria-pressed',String(paused));
     if (running) raf=requestAnimationFrame(tick);
   }
-  buttons.forEach(b => b.addEventListener('click', () => {paused=true;show(b.dataset.workflow,false);sync();}));
-  toggle.addEventListener('click',()=>{paused=!paused;if(!paused){elapsed=0;show('editor',false);}sync();});
+  let selectionRequest = 0;
+  buttons.forEach(b => b.addEventListener('click', async () => {
+    const request = ++selectionRequest;
+    paused = true; sync();
+    const key = b.dataset.workflow;
+    if (key === current) return;
+    const ready = new Image(); ready.src = capture(defaults[key]);
+    try { await ready.decode(); } catch { return; }
+    if (request !== selectionRequest) return;
+    slidePanel(link, () => show(key, false));
+  }));
+  toggle.addEventListener('click',()=>{selectionRequest++;activePanelMotions.get(link)?.();paused=!paused;if(!paused){elapsed=0;show('editor',false);}sync();});
   new IntersectionObserver(([entry])=>{visible=entry.isIntersecting;sync();},{threshold:.35}).observe(root);
   document.addEventListener('visibilitychange',sync);
   reduced.addEventListener('change',()=>{if(reduced.matches)paused=true;sync();});
