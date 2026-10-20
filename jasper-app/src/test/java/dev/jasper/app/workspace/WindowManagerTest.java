@@ -13,6 +13,8 @@ import dev.jasper.app.contributions.Tab;
 import dev.jasper.app.contributions.TabRegistry;
 import dev.jasper.app.dock.Slot;
 import dev.jasper.app.launch.ShellLauncher;
+import dev.jasper.app.layout.ParentTabId;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.testsupport.IdleTerminalSession;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
@@ -298,6 +300,30 @@ class WindowManagerTest {
             assertThat(manager.children().getFirst().content().tabCount()).isEqualTo(1);
             assertThat(main.content().workspace().model().groups()).as("the main window is not touched").hasSize(2);
             assertThat(main.content().selectedTab()).isSameAs(selected);
+        });
+        launch();
+    }
+
+    /** Parent tabs spec 8 and 10: a plugin's tab goes to the main window's shown parent tab; new windows are full windows. */
+    @Test void aPluginsTabLandsInTheShownParentTabAndNewWindowsTakeParentTabs() throws Exception {
+        edt(() -> {
+            MainWindow main = manager.ensureMain("cold", null).orElseThrow();
+            var content = main.content();
+            ParentTabId first = content.activeParentTab();
+            content.newParentTab(HOME);
+            content.selectParentTab(first);
+            Tab notes = model.tabs().open("dev.example.editor", "notes", "notes.txt", null, new JPanel());
+            assertThat(content.parentTabOf(notes)).as("a plugin's tab with no window: the main window's shown parent tab")
+                .contains(first);
+            Tab away = model.tabs().open("dev.example.editor", "away", "away.txt", null, new JPanel(), TabRegistry.Placement.NEW_WINDOW);
+            ChildWindow child = manager.children().getFirst();
+            assertThat(child.content().windowLayout()).as("TabPlacement.NEW_WINDOW opens a full window").isInstanceOf(ParentTabs.class);
+            assertThat(child.content().parentTabOf(away)).isPresent();
+            child.content().newParentTab(HOME);
+            assertThat(child.content().parentTabCount()).as("which opens parent tabs of its own").isEqualTo(2);
+            ChildWindow terminal = manager.openTerminalWindow(null).orElseThrow();
+            assertThat(terminal.content().windowLayout()).as("New Terminal Window too").isInstanceOf(ParentTabs.class);
+            assertThat(content.parentTabCount()).as("the main window is not touched").isEqualTo(2);
         });
         launch();
     }

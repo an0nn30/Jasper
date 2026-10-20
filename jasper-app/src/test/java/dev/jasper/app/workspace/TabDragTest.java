@@ -316,6 +316,22 @@ class TabDragTest {
         });
     }
 
+    /** Review Focus 4 (workspace plan 7a): a drag ends when its parent tab stops showing; nothing lands in the one that shows. */
+    @Test void aDragEndsWhenItsParentTabStopsShowing() throws Exception {
+        edt(() -> {
+            Point pastC = onTab(owner, c, 0.75);
+            Component source = start(owner, a, pastC);
+            assertThat(owner.tabDrag().active()).isTrue();
+            owner.newParentTab(HOME);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, pastC);
+            assertThat(owner.tabDrag().active()).as("the dragged tab's pane no longer shows").isFalse();
+            mouse(source, MouseEvent.MOUSE_RELEASED, pastC);
+            assertThat(owner.parentTabCount()).isEqualTo(2);
+            assertThat(owner.parentTabOf(a)).as("the tab stays where it was").isNotEqualTo(Optional.of(owner.activeParentTab()));
+            assertThat(owner.tabs().subList(0, 3)).as("in its order").containsExactly(a, b, c);
+        });
+    }
+
     @Test void escEndsTheDragWithoutADrop() throws Exception {
         edt(() -> {
             Point pastC = onTab(owner, c, 0.75);

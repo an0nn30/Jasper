@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.jasper.app.commands.CommandHistory;
+import dev.jasper.app.layout.ParentTabs;
 import dev.jasper.app.workspace.DesktopTestSupport;
 import dev.jasper.app.workspace.JasperWindow;
 import dev.jasper.app.workspace.MainWindow;
@@ -104,6 +105,26 @@ class JasperApplicationWindowsTest {
         assertThat(sites.get("dev/jasper/app/workspace/WindowFrame")).hasSize(2)
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(frameOnScreen|lambda\\$frameOnScreen\\$\\d+)"))
             .anyMatch(site -> site.matches("dev/jasper/app/application/JasperApplication\\.(rehearsalWindow|lambda\\$rehearsalWindow\\$\\d+)"));
+    }
+
+    /** Parent tabs spec 11: a request opens in the main window's shown parent tab, and no parent tab opens for it. */
+    @Test void aRequestOpensInTheMainWindowsShownParentTab() throws Exception {
+        JasperApplication application = application(() -> { });
+        try {
+            edt(() -> {
+                application.residency(true);
+                application.open(List.of(), JasperApplication.HANDOFF);
+                var main = application.windows().main().orElseThrow().content();
+                main.newParentTab(HOME);
+                application.open(List.of(HOME), JasperApplication.HANDOFF);
+                var parents = (ParentTabs) main.windowLayout();
+                assertThat(parents.parentTabs()).hasSize(2);
+                assertThat(parents.activeParentTab().layout().tabs()).as("the folder's tab joins the shown parent tab").hasSize(2);
+                assertThat(parents.parentTabs().getFirst().layout().tabs()).hasSize(1);
+            });
+        } finally {
+            edt(application::quitNow);
+        }
     }
 
     /** Rulings 20: an outside request raises the main window and opens there, though a child window was used last. */

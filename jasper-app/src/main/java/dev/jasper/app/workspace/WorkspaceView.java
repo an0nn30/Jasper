@@ -10,6 +10,7 @@ import dev.jasper.app.layout.Group;
 import dev.jasper.app.layout.GroupId;
 import dev.jasper.app.layout.Layout;
 import dev.jasper.app.layout.Node;
+import dev.jasper.app.layout.ParentTabId;
 import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.layout.TabId;
@@ -31,7 +32,8 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
 /**
- * One window's workspace (workspace tabs spec 10): its {@link Layout} and the tabs the layout places, drawn as
+ * One parent tab's workspace (workspace tabs spec 10; parent tabs spec 4), under the parent tab's id: its
+ * {@link Layout} and the tabs the layout places, drawn as
  * {@link SplitContainer}s over {@link GroupView}s, or the maximized group alone. Every change is a layout operation; the
  * view renders the selection, the active group and the maximize the layout holds and never picks them itself. It
  * rebuilds its splits only when the layout's shape changes (orientation, children, groups, maximize); otherwise it moves
@@ -41,6 +43,7 @@ import javax.swing.SwingUtilities;
  */
 final class WorkspaceView extends JPanel {
     private final WindowContent owner;
+    private final ParentTabId id;
     private final Map<GroupId, GroupView> groups = new LinkedHashMap<>();
     private final Map<TabId, Tab> tabs = new HashMap<>();
     private final Map<List<Integer>, SplitContainer> splits = new HashMap<>();
@@ -54,15 +57,18 @@ final class WorkspaceView extends JPanel {
     private EmptyWorkspace empty;
     private boolean glass, closed;
 
-    WorkspaceView(WindowContent owner) {
+    WorkspaceView(WindowContent owner, ParentTabId id) {
         super(new BorderLayout());
         this.owner = Objects.requireNonNull(owner, "owner");
+        this.id = Objects.requireNonNull(id, "id");
         setName("workspace");
         render();
     }
 
     /** The layout this view renders. */
     Layout model() { return layout; }
+    /** The parent tab this workspace is. */
+    ParentTabId id() { return id; }
     boolean isEmpty() { return layout.isEmpty(); }
     boolean contains(Tab tab) { return tab != null && tabs.get(tab.id()) == tab; }
     /** Every tab in workspace order: the groups in tree order, each group's tabs in strip order. */
@@ -212,19 +218,22 @@ final class WorkspaceView extends JPanel {
         boolean held = refocus && holdsFocus();
         layout = next;
         render();
-        owner.workspaceChanged(held
+        owner.workspaceChanged(this, held
             && (selected() != before || !layout.activeGroup().equals(group) || !Objects.equals(previous, shape)));
     }
 
+    private boolean holdsFocus() { return holdsFocus(owner, this); }
+
     /**
-     * Whether focus may follow a change of this workspace: the palette's card does not hold the window's input, and the
-     * permanent focus owner is in this workspace or nowhere a person sees it (a closed terminal, or the palette that just
-     * closed to run a command). Focus in the open palette, the Run window or a tool window stays there.
+     * Whether focus may follow a change of {@code area}, a workspace or a window's parent tabs: the palette's card does not
+     * hold the window's input, and the permanent focus owner is in {@code area} or nowhere a person sees it (a closed
+     * terminal, or the palette that just closed to run a command). Focus in the open palette, the Run window or a tool
+     * window stays there.
      */
-    private boolean holdsFocus() {
+    static boolean holdsFocus(WindowContent owner, Component area) {
         if (owner.commandPalette() != null && owner.commandPalette().blocksActions()) return false;
         Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getPermanentFocusOwner();
-        return focus == null || !focus.isShowing() || SwingUtilities.isDescendingFrom(focus, this);
+        return focus == null || !focus.isShowing() || SwingUtilities.isDescendingFrom(focus, area);
     }
 
     private void render() {
