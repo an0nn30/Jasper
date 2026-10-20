@@ -105,7 +105,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
 
    `Projections.fallback` (`:98-110`) builds from the committed flags. `fallback(DesktopFlags.STANDARD, host)` equals the default look (`ProjectionsTest.java:62-64`).
 3. `ChromeSpec.TitleBar { UNIFIED, NATIVE }` (`presentation/ChromeSpec.java:23`). `CLASSIC` is the classic base, with title `NATIVE` (`:45-46`). The constraint is at `:56-57` and its parser copy at `presentation/KitParser.java:307-308`. `KitParser.point` lists values in enum order in its error (`:286-292`).
-4. `ShellLook(unifiedTitle, windowMenus, followThemeAppearance)` (`presentation/ShellLook.java:10`) is constructed 14 times (`git grep -n "new ShellLook("`). `WindowLook(chrome, unifiedTitle, followThemeAppearance)` (`workspace/WindowLook.java:15`, `of` `:25-28`, `standard()` `:35`) is constructed 13 times in tests.
+4. `ShellLook(unifiedTitle, windowMenus, followThemeAppearance)` (`presentation/ShellLook.java:10`) is constructed 14 times (`git grep -n "new ShellLook("`). `WindowLook(chrome, unifiedTitle, followThemeAppearance)` (`workspace/WindowLook.java:15`, `of` `:25-28`, `standard()` `:35`) is constructed 12 times in tests (14 with `of` and `standard()`).
 5. The shipped kit: `plugins/enterprise/src/main/resources/presentation/enterprise.kit.toml:5` `title_bar = "native"` and `:72` `"window.toolbar_height" = 34`.
    - `EnterpriseLook.CHROME` (`jasper-app/src/test/java/dev/jasper/app/testsupport/EnterpriseLook.java:19-22`) must equal the shipped table (`EnterpriseFixtureTest.java:28-29`).
    - `PresentationConformanceTest.java:84`, `application/EnterpriseFirstWindowTest.java:40` and `plugins/EnterpriseHomeTest.java:36` assert the shipped 34.
@@ -118,7 +118,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
    - It sets `apple.laf.useScreenMenuBar` from the committed flags (`:233-238`).
    - It then picks the title style with `TitleBarStyle.choose(mac, nativeDecorations, compact, nativeTitle)`, which gives `MAC_UNIFIED` on macOS, `CUSTOM` elsewhere, or `NATIVE` for a native title, Compact or native decorations (`platform/TitleBarStyle.java:16-36`).
    - `configure()` sets `flatlaf.useWindowDecorations` process-wide (`:39-45`). FlatLaf's per-root `JRootPane.useWindowDecorations` cannot override that system property: `FlatUIUtils.getBoolean` checks the system property first (FlatLaf 3.7 `FlatUIUtils.java:275-289`).
-7. About Jasper goes to the application menu when the screen menu bar is on: `AboutWindows.aboutInApplicationMenu(macOs, screenMenuBar)` (`application/AboutWindows.java:71`), fed `presentation.committedDesktop().screenMenuBar()` at `application/JasperApplication.java:1082`. The Desktop About and Preferences handlers are installed whatever the look (`:392-411`).
+7. About Jasper goes to the application menu when the screen menu bar is on: `AboutWindows.aboutInApplicationMenu(macOs, screenMenuBar)` (`application/AboutWindows.java:71`), fed `presentation.committedDesktop().screenMenuBar()` at `application/JasperApplication.java:1082`. The Desktop About and Preferences handlers are installed whatever the look (`:403-410`).
 8. Auxiliary frames get the minimal File menu when `bar != null || shell.frameMenuRow()` (`windows/NativeShells.java:307-310`). `frameMenuRow = !classicMenus` (`windows/ShellChrome.java:54`), and `classicMenus` is `ShellLook.windowMenus` (`:31`).
 
 **The terminal window today**
@@ -136,7 +136,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
 11. `installCustomTitleBar` (`:397-411`) decorates now, or when FlatLaf's decorations arrive with the peer. `decorateTitleBar` (`:413-428`):
     - moves the header into the menu bar (`CollapsingMenuBar.setHeader`, `workspace/CollapsingMenuBar.java:64-71`, which adds a trailing glue);
     - sets `TITLE_BAR_SHOW_TITLE=false`, `TITLE_BAR_HEIGHT=toolbarHeight`, `TITLE_BAR_BACKGROUND=ThemeZone.color(null, SURFACE_APP)` and `TITLE_BAR_FOREGROUND=TEXT_SECONDARY`, refreshed through `content.onThemeChanged`.
-12. The header's fill is `ThemeZone.color(header, SURFACE_APP)` (`workspace/WindowChrome.java:586-590`). `chromeRow()` (`:185-190`) makes it chrome, not a title-bar zone. `ThemeZone.titleBar` paints with `TitleBarTheme` (`platform/ThemeZone.java:31-38`).
+12. The header's fill is `ThemeZone.color(header, SURFACE_APP)` (`workspace/WindowChrome.java:588`, in `refreshTheme` `:586-594`). `chromeRow()` (`:185-192`) makes it chrome, not a title-bar zone. `ThemeZone.titleBar` paints with `TitleBarTheme` (`platform/ThemeZone.java:31-38`).
 13. The classic menu row style (`platform/ClassicMenuRow.java:49-69`):
     - 24 px items on `surface.app`, with a `CompoundBorder(MatteBorder(bottom = HAIRLINE, border.divider), EmptyBorder(MENU_BAR_SIDE))`;
     - opaque;
@@ -146,7 +146,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
     - `layoutContainer` folds against the bar's own width when it has no header (`:196-209`);
     - the glue goes last (`:68`, `:208`);
     - `shownWidth` skips the header and the glue (`:121-126`).
-15. `WindowContent.setActive` (`:1491-1495`) is called from `TerminalWindow` on activation (`workspace/TerminalWindow.java:39-40,150-153`). The field `active` starts `true` (`:133`). `close()` clears `onThemeChanged` (`:1541`).
+15. `WindowContent.setActive` (`:1491-1496`) is called from `TerminalWindow` on activation (`workspace/TerminalWindow.java:39-40,150-153`). The field `active` starts `true` (`:133`). `close()` clears `onThemeChanged` (`:1541`).
 
 **Dialogs and overlays**
 
@@ -161,7 +161,7 @@ At `3a36993ba`. Paths are under `jasper-app/src/main/java/dev/jasper/app/` unles
     - `windowAppearance` takes an `NSAppearance` name as a `String` (`:289-294`).
     - IntelliJ Classic sets the first two on the root pane and `NSAppearanceNameVibrantLight`/`NSAppearanceNameVibrantDark` by theme (`intellij.md` 1.1 and 1.3).
     - These are the Java-side properties. What AppKit then draws was verified by the lights checkpoint: IntelliJ's lights and leading title in the packaged app, the legacy ones under `bin/java`.
-19. FlatLaf republishes the root's `FlatLaf.fullWindowContent.buttonsBounds` (`FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS`) whenever macOS full screen toggles (`FullWindowContentSupport.java:134-173`, installed for every FlatLaf root on macOS, `FlatRootPaneUI.java:197-204`). In full screen its width is 0: the placeholder option `zeroInFullScreen` keys on `width == 0` (`FullWindowContentSupport.java:75-77`; `FlatClientProperties.java:334`). `MacTitleBar` already listens to that property (`MacTitleBar.java:105`).
+19. FlatLaf republishes the root's `FlatLaf.fullWindowContent.buttonsBounds` (`FlatClientProperties.FULL_WINDOW_CONTENT_BUTTONS_BOUNDS`) whenever macOS full screen toggles (`FullWindowContentSupport.java:134-173`, installed for every FlatLaf root on macOS, `FlatRootPaneUI.java:197-204`). In full screen its width is 0: the placeholder option `zeroInFullScreen` keys on `width == 0` (`FullWindowContentSupport.java:75-77`; `FlatClientProperties.java:335`). `MacTitleBar` already listens to that property (`MacTitleBar.java:105`).
 20. FlatLaf's title pane (`FlatTitlePane.java`):
     - `activeChanged` gives a client `TITLE_BAR_FOREGROUND` to the title in both states, so FlatLaf's own title would not dim (`:456-470`).
     - With leading embedded menus the title is centred unless `centerTitleIfMenuBarEmbedded` is off, and starts `menuBarTitleGap` 40 after them (`:1329-1368`; `FlatLaf.properties:828-831`).
@@ -1448,11 +1448,11 @@ Every changed line carries the comment `// The user's 2026-10-19 direction: Inte
 
 - **`EnterpriseWorkstationMockTest`:**
   - Add the two constants. `workstation()` calls `owner.setToolbarHeight(TOOLBAR)`, and its comment says "the 28 px toolbar row".
-  - `theRowsDownTheWindowAreTheMocks`: before the comparison loop, `expected.set(2, new MockProfile.Run(expected.get(2).start(), expected.get(2).length() - SHORTER, expected.get(2).color()));`. Runs are compared by length, so the rows below need nothing more.
+  - `theRowsDownTheWindowAreTheMocks`: `expected` becomes `new ArrayList<>(MockProfile.solid(...))`, because `solid` returns an unmodifiable `toList()`; then, before the comparison loop, `expected.set(2, new MockProfile.Run(expected.get(2).start(), expected.get(2).length() - SHORTER, expected.get(2).color()));`. Runs are compared by length, so the rows below need nothing more.
   - `theToolbarRowIsTheMocks`:
     - the ink top assertion becomes `isCloseTo(expected.get(i).top() - rise - SHORTER / 2, within(3))`;
     - the field top becomes `isCloseTo(122 - SHORTER / 2, within(2))`;
-    - the ink rectangles are unchanged (the render's row, 50 to 106, lies inside them).
+    - the mock's two ink rectangles are unchanged; the render's two (`new Rectangle(4, 112 - Y, 400, 64)` and `new Rectangle(2722 - 44 - X, 112 - Y, 160 + 44, 64)`) take the height `64 - SHORTER`, so they stay inside the render's 56-row toolbar row (device rows 52 to 103 of 50 to 105). `MockProfile.inks` counts a column as ink wherever any pixel differs from the region's top-left one, and a 64-row region would reach the toolbar rule and the tab strip and read every column as ink.
   - `theTabsAreTheMocks`: replace each `25 + 35` with `25 + TOOLBAR + 1`, at `underline`, the active-tab probe and the `-tabs` cut.
   - `theStatusCellsAreTheMocks` is unchanged: it measures from the window's bottom.
 - **`ClassicHeaderTest`:**
@@ -1751,3 +1751,52 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 Expected: the hygiene script prints nothing, `AppDocumentationTest` passes and the commit succeeds.
+
+## Execution notes (2026-10-19)
+
+**Refresh.** The branch's code equals `3a36993ba` (`git diff --quiet 3a36993ba HEAD -- . ':(exclude)docs'` holds; the three plan-14 commits touch only this file), and `main` is still `3a36993ba`. The five refresh greps give `1`, `1`, `1`, `1` and `0`. Every anchor in Verified facts, the task file lists, the spec and `docs/app-architecture.md` was re-read against the worktree, and the FlatLaf ones against `flatlaf-3.7-sources.jar`. Five were imprecise and are corrected in place: Verified 4 (`WindowLook` is constructed 12 times in tests, not 13), 7 (the Desktop handlers are at `:403-410`), 12 (the header fill is `WindowChrome.java:588`, `chromeRow()` `:185-192`), 15 (`setActive` ends at `:1496`) and 19 (`zeroInFullScreen` is documented at `FlatClientProperties.java:335`). Task 7 Step 1 is corrected in place by Rulings E9 and E10. The lights checkpoint is done (`2060c1ae9`); no task launches a window.
+
+Tasks, in order: 1 the model (`title_bar = "classic"`, `Projections.Platform`, four-part `ShellLook`); 2 `MacTitleBand`, `MacTitleDoubleClick`, `TitleInset`; 3 macOS windows take the band; 4 the Windows classic title bar (`ClassicWindowTitle`, `CollapsingMenuBar.setTitle`, two pairs); 5 classic dialogs and overlays below the title inset; 6 the kit ships `classic` and 28 px, `ChromeRenderTest`'s two new cases; 7 the mock tests and toolbar pairs at 28 px; 8 documentation, STATUS, the byte-identity proof and the whole build.
+
+### Pre-flight scan
+
+| Tasks | Shared file or interface | Agrees? |
+|---|---|---|
+| 1 and 3 | `ShellLook.classicTitle()` read by `WindowLook.of`; `Projections.Platform` in `ClassicMacTitleTest` | yes |
+| 1 and 4 | the same, under the Windows host in `ClassicWindowsTitleTest` | yes |
+| 1 and 6 | `EnterpriseLook.java` (1 adds `titled`, 6 changes `CHROME`); `ChromeRenderTest` (1 adds `HOST`'s platform and `LINUX`, re-hosts `enterprise`; 6 adds `Case.platform`, two cases and the `check` branch) | yes: different members; 6's three-argument `Case` uses 1's `HOST.platform()` (E3) |
+| 1 and 7 | the mock tests' Linux host (1) that keeps them on the system title and in-window menus while 7 moves them to 28 px | yes |
+| 2 and 3 | `MacTitleBand.install(JRootPane, Supplier<Color>)`, `setDark`, `fill`, `HEIGHT`, `TitleInset.of`; `migration.csv` | yes (E6) |
+| 2 and 4 | `TitleInset.publish`; `migration.csv` | yes |
+| 2 and 5 | `TitleInset.of`, `publish`, `CHANGED`, `changed` | yes |
+| 3 and 4 | `WindowContent.mount`'s branch (4 restates 3's two branches and adds its own), `onThemeChanged`, `close()`, `DesktopTestSupport.content(..., boolean macOs)`, `migration.csv` | yes: separate branches; append-only rows |
+| 3 and 6 | `WindowContent.titleBand()`, `MacTitleBand.HEIGHT`, the four-argument `DesktopTestSupport.content` in `ChromeRenderTest` | yes (E8) |
+| 4 and 6 | the decorated Windows root in `ChromeRenderTest`; its content top is the content pane's y, which `TitleInset` publishes | yes |
+| 3, 4 and 5 | the band and the Windows decoration publish the inset the overlay and `followTitleBar` read | yes |
+| 6 and 7 | 6 Step 5 relies on the mock tests setting their toolbar height (34) explicitly; 7 changes them to 28 | yes |
+| 1, 6 and 8 | the Step 0 baseline (`$base`) and the after-renders (`$out`) across separate shells | ruled (E4) |
+| 7 and 8 | the pairs' verdicts; 8 Step 5 expects only the two `chrome-toolbar-*` lines to differ | yes |
+| 1 | its own text | ruled (E1, E2, E3) |
+| 2 | its own text | yes; E6 |
+| 3 | its own text | yes |
+| 4 | its own text | ruled (E5) |
+| 5 | its own text | ruled (E7) |
+| 6 | its own text | ruled (E8) |
+| 7 | its own text | ruled (E9, E10) |
+| 8 | its own text | ruled (E4, E11, E12) |
+
+### Rulings
+
+- **E1. Task 1 updates two more `ChromeSpec` comments.** Besides `@param menuBar`, the class comment ("nine two-valued points") becomes "eight two-valued points, the three-valued `title_bar` and the window title template", and the constructor comment ("window menus need a native title bar") becomes "a native or classic title bar". — Why: the third value makes both false, and doclint does not catch it. — Cost if wrong: two comment lines.
+- **E2. Task 1's `ShellChromeTest` addition imports `dev.jasper.app.presentation.ChromeSpec` and `Projections`** (the file imports only `ShellLook`). `ClassicWindowTitle` (Task 4) imports `dev.jasper.ui.metrics.Typography`. — Why: the plan's code names them unqualified. — Cost if wrong: a compile error the executor fixes at once.
+- **E3. `ChromeRenderTest.HOST` drops `SystemInfo`; `PageContext.standard()` reads the platform from `os.name`.** `HOST` today reads `SystemInfo.isMacOS`; Task 1's replacement uses `Projections.Platform.of(System.getProperty("os.name", ""))`, so the now-unused `com.formdev.flatlaf.util.SystemInfo` import goes. `PageContext.standard()` takes `PluginSelection.host()`'s form (`Platform.of(os.name)`, unified only on MAC with full-window content), and `SettingsChromeTest:73` keeps its `mac` local for the second argument. — Why: `SettingsChromeTest` asserts `PageContext.standard()` equals its own host's projections, so both must read the same facts; `os.name` and `SystemInfo.isMacOS` agree. — Cost if wrong: one failing equality on an exotic JVM.
+- **E4. Shell variables do not survive between steps.** Task 1 Step 8 and Task 6 Step 6 first set `base=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan14-baseline`. Task 8 Step 3 uses `out=/private/tmp/claude-501/-Users-RQ7RQVF-projects-moray/819d407c-0391-424d-8db0-7177b2d3e0e0/scratchpad/plan14-after` (`rm -rf` then `mkdir -p`) instead of `mktemp -d`, and Step 5 sets the same `base` and `out`. — Why: each command runs in a fresh shell, and Step 5 writes `$out/pairs.txt`. — Cost if wrong: a comparison against an empty path, caught by the steps' expected output.
+- **E5. Task 4's `CollapsingMenuBar` keeps every title-free path byte-for-byte.** `preferredLayoutSize` and `layoutContainer` take the title branch only when `title != null`; the header branch, the no-header `fit` and the placing loop are unchanged apart from also skipping `title`. The class comment gains one sentence for the title. — Why: the default look's Windows and Linux bar must not move (Global Constraints). — Cost if wrong: `CustomTitleBarTest` and the gallery catch it.
+- **E6. `MacTitleBand.install`'s two-argument form runs `MacTitleDoubleClick.prefetch()` on macOS, also under tests** (`ClassicMacTitleTest`, `ChromeRenderTest`'s `enterprise-mac`). Accepted: it starts one virtual thread per process that runs `/usr/bin/defaults read -g AppleActionOnDoubleClick` with a 2 s limit and changes nothing. `MacTitleBandTest` uses the three-argument form. — Why: the interface is the plan's, and a read-only system query is harmless headless. — Cost if wrong: a 2 s idle thread in the test JVM.
+- **E7. Task 5's `WindowOverlay` imports `dev.jasper.app.platform.TitleInset`** (its `show()` text names `TitleInset.CHANGED` unqualified), and `NativeShells`' close action removes both the component listener and the `TitleInset.CHANGED` listener. — Why: the plan's excerpts mix qualified and short names. — Cost if wrong: a compile error.
+- **E8. In `everyLookBuildsItsChromeFlush` the macOS case hides the root's menu bar between `mount` and the first `MockProfile.print`.** — Why: the loop prints right after `mount` (`:167-168`), so "after `mount`" must mean before that print, or the `enterprise-mac` image would show a menu row AppKit never draws in the window. — Cost if wrong: a wrong image and a failing flush check.
+- **E9. `theRowsDownTheWindowAreTheMocks` copies `expected` into an `ArrayList` before `expected.set(2, …)`** (corrected in Task 7 Step 1). — Why: `MockProfile.solid` returns `toList()`, which is unmodifiable, so the plan's `set` would throw in Light (Dark copies only later, at `:77`). — Cost if wrong: an `UnsupportedOperationException`.
+- **E10. The render's ink rectangles in `theToolbarRowIsTheMocks` shrink to `64 - SHORTER` rows** (corrected in Task 7 Step 1); the mock's stay. — Why: `MockProfile.inks` treats a column as ink when any pixel in it differs from the region's top-left pixel; at 28 px the render's 64-row regions (device rows 52 to 115) cross the toolbar rule (106) and the tab strip, so every column would be ink and the two clusters would merge. 52 rows (52 to 103) sit inside the 56-row toolbar row with the mock's 2-row insets, and the shifted ink tops (`- SHORTER / 2`) are unchanged by it. — Cost if wrong: if a cluster still merges, the executor measures and records it under these notes; the tolerances never widen.
+- **E11. Task 8 Step 2 keeps the guide's paragraph whole.** The replacement goes where the old sentence was; the remaining sentences of that paragraph ("A native-titled macOS frame's appearance follows the theme; …" to its end) follow the `TitleInset` sentence as their own paragraph. — Why: the plan's text ends in a list, and Markdown would otherwise run the next sentence into the last bullet. — Cost if wrong: a cosmetic re-wrap.
+- **E12. Two spec phrases Task 8 Step 1 replaces wrap across lines:** 16.1 item 4's "the fallback combination (native title, window menus, default kit)," (`:1741-1742`) and 16.2's "the macOS in-window menu bar and native title, and Windows and Linux NATIVE with the caption colour;" (`:1809-1810`). Edit them across the wrap and re-wrap at 120 columns. — Why: a single-line search would miss them. — Cost if wrong: the Step 1 check's counts expose a missed edit.
+- **E13. The relayed request "run the 6-second traffic-light test now" is satisfied by the recorded checkpoint** (`2060c1ae9`, run with the user's yes). Execution launches no window, and GUI check 1 stays in the packaged app. — Why: AGENTS.md forbids unattended GUI launches, and the result is already in the plan. — Cost if wrong: the user asks for another run.
