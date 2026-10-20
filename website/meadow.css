@@ -1,0 +1,159 @@
+/* The splash's pixel landscape, separated into distance planes. No scroll interception. */
+body { isolation: isolate; background: #f3f2e9; }
+.meadow-world { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #f3f2e9; }
+.meadow-layer { overflow: visible; position: absolute; width: 120%; height: 140%; left: -10%; bottom: -14%; }
+.meadow-far { transform: translateY(-7vh); }
+.meadow-middle { transform: translateY(0); }
+.meadow-near { transform: translateY(7vh); }
+.meadow-light { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #faf9f5b8 24%, #faf9f5c9 50%, #faf9f5b8 76%, transparent); }
+.nav { background: #faf9f5ed; padding-inline: 22px; border-radius: 0 0 12px 12px; }
+.hero-line { position: relative; }
+.hero-line::before { content: ''; position: absolute; inset: -36px -30px; background: radial-gradient(ellipse, #faf9f5ef 30%, #faf9f500 72%); z-index: -1; pointer-events: none; }
+.capabilities { background: #faf9f5eb; padding-inline: 16px; border-radius: 0 0 12px 12px; }
+.plugins-section, .platform-section { background: #faf9f5f5; padding: 48px; margin-block: 100px; border: 1px solid #dadccf; border-radius: 16px; }
+.developer { background: #f3f2e9f7; }
+.download { margin-top: 100px; padding: 64px 40px; background: #faf9f5f2; border: 1px solid #dadccf; border-radius: 16px; }
+footer { margin-top: 64px; background: #faf9f5ed; padding-inline: 24px; border-radius: 12px 12px 0 0; }
+.meadow-motion { position: fixed; right: 16px; bottom: 16px; z-index: 5; border: 1px solid #a7b88d; border-radius: 6px; padding: 9px 12px; background: #faf9f5f5; color: #52643f; font: 12px Arial, sans-serif; cursor: pointer; box-shadow: 0 2px 10px #302f2810; }
+@media (max-width: 640px) {
+  .hero-line::before { inset: -24px 0; }
+  .nav { padding-inline: 0; background: transparent; }
+  .meadow-layer { width: 220%; left: -60%; height: 110%; }
+  .meadow-light { background: #faf9f566; }
+  .plugins-section, .platform-section { padding: 26px 18px; margin-block: 64px; }
+  .download { margin-top: 64px; padding: 40px 18px; }
+  footer { padding-inline: 10px; padding-bottom: 68px; }
+  .meadow-motion { right: 10px; bottom: 10px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .meadow-layer, .buddy-guide img, main > section { animation: none !important; }
+  .meadow-motion { display: none; }
+}
+
+/* Each section is a stop in one landscape. Native snapping retains touch, keyboard and scrollbar input. */
+html.meadow-cinematic { scroll-snap-type: y mandatory; scroll-padding-top: 0; }
+.meadow-cinematic main > section { scroll-snap-align: start; scroll-snap-stop: always; scroll-margin-top: 0; min-height: 100svh; margin-block: 0; padding-block: 100px 72px; }
+.meadow-cinematic .nav { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 2; height: 80px; }
+.meadow-cinematic .hero { display: flex; flex-direction: column; justify-content: center; padding-top: 125px; }
+.meadow-cinematic .hero-line { margin-bottom: 0; }
+.workspace-scene { padding-block: 70px; }
+.meadow-cinematic .workspace-scene { display: flex; flex-direction: column; justify-content: center; }
+.meadow-cinematic .plugins-section, .meadow-cinematic .platform-section, .meadow-cinematic .developer, .meadow-cinematic .download { border: 0; border-radius: 0; background: transparent; }
+.meadow-cinematic .plugins-intro, .meadow-cinematic .tour-controls, .meadow-cinematic .plugins-bridge, .meadow-cinematic .tour-footnote { position: relative; }
+.meadow-cinematic .plugins-section::before, .meadow-cinematic .platform-section::before, .meadow-cinematic .developer::before, .meadow-cinematic .download::before { content: ''; position: absolute; inset: 45px -24px; background: #faf9f5ed; border-radius: 16px; z-index: -1; }
+.meadow-cinematic main > section { position: relative; isolation: isolate; }
+.meadow-cinematic .download { display: flex; flex-direction: column; justify-content: center; }
+.meadow-cinematic .developer { align-content: center; }
+.meadow-cinematic footer { scroll-snap-align: end; margin-top: 0; }
+.meadow-world { --camera-x: 0vw; --camera-y: 0vh; --camera-zoom: 1; --camera-roll: 0deg; }
+.meadow-layer { transform-origin: 50% 85%; transition: transform 1500ms cubic-bezier(.22,.7,.15,1); }
+.meadow-far { transform: translate(calc(var(--camera-x) * .3), calc(-7vh + var(--camera-y) * .3)) scale(calc(1 + (var(--camera-zoom) - 1) * .35)) rotate(var(--camera-roll)); }
+.meadow-middle { transform: translate(calc(var(--camera-x) * .65), calc(var(--camera-y) * .65)) scale(calc(1 + (var(--camera-zoom) - 1) * .7)) rotate(var(--camera-roll)); }
+.meadow-near { transform: translate(var(--camera-x), calc(7vh + var(--camera-y))) scale(var(--camera-zoom)) rotate(var(--camera-roll)); }
+.meadow-light { background: linear-gradient(90deg, transparent, #faf9f560 24%, #faf9f595 50%, #faf9f560 76%, transparent); }
+.meadow-cinematic .scene-content { transition: opacity 700ms ease, transform 1000ms cubic-bezier(.22,.7,.15,1); }
+.meadow-cinematic .scene-pending > .scene-content { opacity: .2; transform: translateY(36px) scale(.98); }
+.meadow-cinematic .scene-current > .scene-content, .meadow-cinematic main > section:focus-within > .scene-content { opacity: 1; transform: none; }
+@media (max-width: 640px) {
+  .meadow-cinematic main > section { padding-block: 70px; }
+  .meadow-cinematic .hero { padding-top: 115px; }
+  .meadow-cinematic .plugins-section::before, .meadow-cinematic .platform-section::before, .meadow-cinematic .developer::before, .meadow-cinematic .download::before { inset: 30px 0; }
+  .meadow-cinematic .plugins-section, .meadow-cinematic .platform-section, .meadow-cinematic .developer, .meadow-cinematic .download { padding-inline: 18px; }
+  .meadow-layer { transition-duration: 1200ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.meadow-cinematic { scroll-snap-type: none; }
+  .meadow-layer, .scene-content { transition: none !important; }
+  .meadow-cinematic .scene-pending > .scene-content { opacity: 1; transform: none; }
+}
+
+/* Fit the two screenshot-heavy scenes to the viewport before shrinking their actual captures. */
+.meadow-cinematic .plugins-section,
+.meadow-cinematic .platform-section { padding-block: 32px 48px; display: flex; flex-direction: column; justify-content: center; }
+.meadow-cinematic .plugins-section::before,
+.meadow-cinematic .platform-section::before { inset-block: 16px; }
+.meadow-cinematic :is(.plugins-section, .platform-section) .plugins-intro { margin-bottom: 16px; gap: 24px; }
+.meadow-cinematic :is(.plugins-section, .platform-section) .eyebrow { margin-bottom: 12px; }
+.meadow-cinematic :is(.plugins-section, .platform-section) h2 { font-size: clamp(26px, 3vw, 36px); }
+.meadow-cinematic .plugins-section .buddy-guide img { width: 80px; flex-basis: 80px; }
+.meadow-cinematic .plugins-section .buddy-guide p { font-size: 14px; line-height: 1.4; }
+.meadow-cinematic .tour-controls { margin: 0 0 14px; gap: 6px; }
+.meadow-cinematic .tour-controls button { padding: 9px 13px; }
+.meadow-cinematic .tool-tour { min-height: 0; }
+.meadow-cinematic .tool-tour .tour-copy { padding: 18px 24px; }
+.meadow-cinematic .tool-tour .tour-copy h3 { font-size: 25px; margin-bottom: 8px; }
+.meadow-cinematic .tool-tour .tour-copy > p:not(.eyebrow) { font-size: 14px; line-height: 1.5; margin: 8px 0; }
+.meadow-cinematic .tool-tour .tour-copy > span { margin-top: 8px; }
+.meadow-cinematic .tour-stage,
+.meadow-cinematic .tour-stage:has(img[src*="vault"]) { min-height: 0; height: clamp(150px, calc(100svh - 500px), 340px); padding: 16px; }
+.meadow-cinematic .tour-stage:has(img[src*="vault"]) img { width: auto; max-width: 100%; height: auto; max-height: 100%; }
+.meadow-cinematic .tour-footnote { margin: 8px 0; }
+.meadow-cinematic .plugins-bridge { margin-top: 8px; font-size: 12px; line-height: 1.5; }
+.meadow-cinematic .platform-section .showcase { padding-inline: 16px; }
+.meadow-cinematic .platform-section .showcase-bar { min-height: 56px; }
+.meadow-cinematic .platform-section .screenshot-stage { aspect-ratio: 5 / 3; height: auto; max-height: min(540px, calc(100svh - 320px)); }
+.meadow-cinematic .platform-section .shot-caption { margin-top: 8px; }
+@media (max-width: 640px) {
+  .meadow-cinematic :is(.plugins-section, .platform-section) .plugins-intro { gap: 12px; }
+  .meadow-cinematic .plugins-section .buddy-guide img { width: 58px; flex-basis: 58px; }
+  .meadow-cinematic .plugins-section .buddy-byline { margin-bottom: 4px; }
+  .meadow-cinematic .tool-tour .tour-copy { padding: 14px 16px; }
+  .meadow-cinematic .tool-tour .tour-copy h3 { font-size: 23px; }
+  .meadow-cinematic .tour-controls button { padding: 8px 10px; }
+  .meadow-cinematic .tour-stage,
+  .meadow-cinematic .tour-stage:has(img[src*="vault"]) { height: clamp(150px, calc(100svh - 520px), 260px); padding: 12px; }
+  .meadow-cinematic .platform-section .screenshot-stage { height: auto; max-height: calc(100svh - 350px); }
+  .meadow-cinematic .platform-section .showcase { padding-inline: 10px; }
+}
+
+/* Jasper welcomes the visitor as part of the landscape, rather than annotating a slogan. */
+.hero .welcome-home { grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr); gap: 40px; max-width: 1020px; width: 100%; margin-inline: auto; align-items: center; }
+.hero .buddy-welcome { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0; position: relative; }
+.hero .buddy-welcome::before { content: ''; position: absolute; width: 62%; height: 20px; bottom: 42px; border-radius: 50%; background: #68784820; filter: blur(8px); z-index: -1; }
+.hero .buddy-welcome .buddy-art { width: 100%; max-width: 370px; flex: none; margin: 0; }
+.hero .buddy-welcome figcaption { text-align: center; }
+.hero .buddy-motion { margin-top: 0; }
+.hero .hero-copy { max-width: 570px; margin: 0; }
+.hero h1 { font-size: clamp(40px, 4.4vw, 62px); letter-spacing: -2.5px; line-height: 1.1; margin-bottom: 12px; }
+.hero .hero-copy .welcome-invitation { font-size: clamp(28px, 3vw, 42px); line-height: 1.15; letter-spacing: -1.3px; color: var(--accent); margin: 0 0 25px; }
+.hero .hero-copy .welcome-description { font-size: 17px; line-height: 1.7; max-width: 490px; margin-bottom: 28px; }
+.hero .hero-copy .platform-note { font-size: 12px; letter-spacing: 0; margin-top: 20px; }
+.hero .actions { gap: 24px; flex-wrap: wrap; }
+@media (max-width: 750px) {
+  .hero .welcome-home { grid-template-columns: 1fr; gap: 18px; text-align: center; }
+  .hero .buddy-welcome .buddy-art { width: 200px; }
+  .hero .buddy-welcome::before { width: 110px; }
+  .hero .hero-copy { margin-inline: auto; }
+  .hero .hero-copy .welcome-description { font-size: 15px; margin: 0 auto 22px; max-width: 430px; }
+  .hero .hero-copy .welcome-invitation { font-size: 28px; margin-bottom: 18px; }
+  .hero .actions { justify-content: center; gap: 18px; }
+  .hero h1 { font-size: 40px; letter-spacing: -1.8px; }
+  .meadow-cinematic .hero { padding-top: 100px; padding-bottom: 48px; }
+}
+@media (max-width: 750px) and (max-height: 740px) {
+  .hero .buddy-welcome .buddy-art { width: 150px; }
+  .hero .welcome-home { gap: 12px; }
+  .hero h1 { font-size: 36px; }
+  .hero .hero-copy .welcome-invitation { font-size: 25px; }
+}
+
+/* Consistent rounded vector arrows, independent of the page's text font. */
+.arrow-icon { display: inline-block; width: 20px; height: 20px; flex: 0 0 20px; vertical-align: middle; }
+.nav nav .arrow-icon, footer .arrow-icon { width: 16px; height: 16px; }
+.text-link { display: inline-flex; align-items: center; gap: 9px; }
+.button .arrow-icon, .nav-download .arrow-icon { transition: transform 180ms ease; }
+.button:hover .arrow-icon, .nav-download:hover .arrow-icon { transform: translateY(-1px); }
+.tour-viewport { position: relative; overflow: hidden; border-radius: 12px; }
+.tour-outgoing { position: absolute; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .button .arrow-icon, .nav-download .arrow-icon { transition: none; }
+}
+
+.platform-viewport, .workspace-viewport { position: relative; overflow: hidden; }
+.platform-viewport { max-width: 1000px; margin-inline: auto; border-radius: 8px; }
+.workspace-viewport > .tour-outgoing { border-radius: 0; }
+
+.snapshot-plugin-image-link { display: block; aspect-ratio: 3200 / 1528; background: #FFFEFA; border-block: 1px solid #DADCCF; overflow: hidden; }
+.snapshot-plugin-image { display: block; width: 100%; height: auto; aspect-ratio: 3200 / 1528; }
+.snapshot-plugin-image-next, .snapshot-plugin-image-link .demo-pointer { display: none; }

@@ -60,6 +60,12 @@ distributions { main { contents {
 } } }
 // Jasper's own license has one copy, at the root; the Licenses window reads it from the jar.
 tasks.named<ProcessResources>("processResources") {
+    // Package the same approved artwork as the companion, without importing Buddy internals.
+    from(rootProject.file("jasper-buddy/src/main/resources/dev/jasper/buddy/internal/presentation/jasper-buddy.png")) {
+        into("dev/jasper/app/splash")
+        rename { "jasper-pixel.png" }
+    }
+
     from(rootProject.file("LICENSE.md")) {
         into("dev/jasper/app/about/licenses")
         rename { "jasper.md" }
@@ -67,7 +73,7 @@ tasks.named<ProcessResources>("processResources") {
 }
 // A development launch keeps its own home (plugins, consent, data, history, snippets, logs, socket)
 // under build/, apart from the installed app's ~/.config/jasper. The IntelliJ run configuration in
-// .run/ sets the same two properties. Override with -Pjasper.home=<dir> or the JASPER_HOME variable.
+// .run/ sets the same two properties. Override with -Pjasper.home=<dir>; this property wins over JASPER_HOME.
 tasks.named<JavaExec>("run") {
     dependsOn(stagePlugins)
     systemProperty("jasper.plugins.bundled", layout.buildDirectory.dir("plugins").get().asFile.absolutePath)
@@ -148,23 +154,16 @@ tasks.register<JavaExec>("settingsPreview") {
 // Explicit opt-in verification tools. They use real app components from the test
 // runtime, but check never runs them and they never create a native window.
 for ((taskName, entryPoint) in listOf(
-    "hostedContentPreview" to "HostedContentPreview",
-    "commandPalettePreview" to "CommandPalettePreview",
-    "titleBarPreview" to "TitleBarPreview",
-    "commandSearchMeasurement" to "CommandSearchMeasurement",
-    "shellHistorySearchMeasurement" to "ShellHistorySearchMeasurement",
+    "hostedContentPreview" to "dev.jasper.app.workspace.HostedContentPreview",
+    "commandPalettePreview" to "dev.jasper.app.workspace.CommandPalettePreview",
+    "titleBarPreview" to "dev.jasper.app.workspace.TitleBarPreview",
+    "commandSearchMeasurement" to "dev.jasper.app.commands.CommandSearchMeasurement",
 )) {
     tasks.register<JavaExec>(taskName) {
         group = "verification"
         dependsOn(tasks.testClasses)
         classpath = sourceSets["test"].runtimeClasspath
-        mainClass = when (entryPoint) {
-            "HostedContentPreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "CommandPalettePreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "TitleBarPreview" -> "dev.jasper.app.workspace.$entryPoint"
-            "CommandSearchMeasurement" -> "dev.jasper.app.commands.$entryPoint"
-            else -> "dev.jasper.app.history.$entryPoint"
-        }
+        mainClass = entryPoint
         jvmArgs("-Djava.awt.headless=true", "--enable-native-access=ALL-UNNAMED")
         providers.gradleProperty("jasper.uiScale").orNull?.let {
             systemProperty("flatlaf.uiScale", it)

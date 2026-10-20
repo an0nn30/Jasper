@@ -11,3 +11,6 @@ __pycache__/
 .worktrees/
 
 .superpowers/
+
+# Standalone icon exploration exports; the approved source is tracked separately.
+/packaging/icons/shell-prompt-preview/

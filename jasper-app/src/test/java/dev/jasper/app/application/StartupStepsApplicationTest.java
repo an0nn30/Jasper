@@ -22,7 +22,7 @@ import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Spec 10.11: the application reports each plugin to a branded look's splash; a look without branding ends the steps. */
+/** Startup progress remains alive for both branded and standard looks until the workspace is visible. */
 class StartupStepsApplicationTest {
     @TempDir Path home;
 
@@ -58,8 +58,8 @@ class StartupStepsApplicationTest {
         }
     }
 
-    /** Review Focus 3: the presentation of a look that fell back at start has no branding, so its splash closes. */
-    @Test void aLookWithoutBrandingEndsTheStepsAtOnce() throws Exception {
+    /** The default Meadow splash also stays alive throughout application composition. */
+    @Test void aLookWithoutBrandingKeepsTheMeadowSplashUntilVisible() throws Exception {
         Path dev = LookFixtures.plugin(home.resolve("dev"), "dev.example.look", LookFixtures.descriptor("dev.example.look", "Example")
             + LookFixtures.provider("look.kit.toml"), Map.of("look.kit.toml", LookFixtures.KIT));
         var selection = PluginSelection.of(dirs(), null, "", dev, false);
@@ -74,7 +74,14 @@ class StartupStepsApplicationTest {
                 application[0] = new JasperApplication(null, launcher(new ArrayDeque<>()), new CommandHistory(), null, terminated::countDown, null, null, selection);
                 application[0].startupSteps(steps);
             });
-            assertThat(closed).hasValue(1);
+            assertThat(closed).hasValue(0);
+            assertThat(steps.active()).isTrue();
+            edt(() -> {
+                application[0].residency(true);
+                // Simulate the last native window closing before its queued paint notification.
+                application[0].windowClosed(null);
+            });
+            assertThat(closed).as("abandoning the workspace closes the splash even while resident").hasValue(1);
             assertThat(steps.active()).isFalse();
         } finally {
             try {

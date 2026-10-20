@@ -26,5 +26,13 @@ final class SplashColors {
     /** The fill gradient's top, its stop at 60 % and its bottom. */
     static final Color FILL_TOP = new Color(0x5A8BE0), FILL_MIDDLE = new Color(0x2F65CA), FILL_BOTTOM = new Color(0x1F4C9E);
 
+    static final Color MEADOW_PAPER = new Color(0xFAF9F5);
+    static final Color MEADOW_PANEL = new Color(0xF3F2E9);
+    static final Color MEADOW_INK = new Color(0x302F28);
+    static final Color MEADOW_MUTED = new Color(0x676B5C);
+    static final Color MEADOW_MOSS = new Color(0x52643F);
+    static final Color MEADOW_BORDER = new Color(0xDADCCF);
+    static final Color MEADOW_TRACK = new Color(0xE8ECDF);
+
     private SplashColors() { }
 }

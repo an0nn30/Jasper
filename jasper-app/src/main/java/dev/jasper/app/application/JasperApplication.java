@@ -209,19 +209,17 @@ public final class JasperApplication {
     /** The presentation this process runs. EDT. */
     public dev.jasper.app.presentation.Presentation presentation() { return presentation; }
 
-    /** The steps a branded look's splash shows (spec 10.11); none until the bootstrap hands them over. EDT. */
+    /** The startup splash's steps; none until the bootstrap hands them over. EDT. */
     private dev.jasper.app.startup.StartupSteps startupSteps = dev.jasper.app.startup.StartupSteps.NONE;
 
     /**
-     * The steps this application reports to a branded look's splash (spec 10.11): each plugin as it starts, then the
-     * first window as it is composed and shown. A presentation without branding, as a look that fell back at start has
-     * (spec 4.7), ends them at once. Before {@link #startPlugins(AppDirs)}. EDT.
+     * The startup splash's progress through plugins and window composition. It closes after the first visible
+     * workspace paint, or when startup is abandoned. Before {@link #startPlugins(AppDirs)}. EDT.
      *
      * @param steps the bootstrap's steps
      */
     public void startupSteps(dev.jasper.app.startup.StartupSteps steps) {
         startupSteps = java.util.Objects.requireNonNull(steps, "steps");
-        if (!presentation.branding().present()) steps.done();
     }
 
     /** What terminal windows and the rehearsal's are made of under this process's presentation. */
@@ -530,7 +528,9 @@ public final class JasperApplication {
                     }
                 }
             });
-            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation(); window.show();
+            windows.add(window); window.restoreLayout(uiState); startupSteps.workstation();
+            window.afterFirstVisiblePaint(startupSteps::done);
+            window.show();
             memoryIndicator.windows(windows.size());
         } catch (RuntimeException | Error failure) {
             // A half-composed window must not outlive the failure, nor keep Jasper in the Dock with nothing open.
@@ -543,7 +543,6 @@ public final class JasperApplication {
         }
         windowTrace.mark(WindowTrace.Milestone.SHOWN);
         trace.mark(StartupTrace.Milestone.WINDOW_SHOWN);
-        startupSteps.done();
         return window;
     }
 
@@ -1564,6 +1563,7 @@ public final class JasperApplication {
 
     void windowClosed(TerminalWindow window) {
         forget(window);
+        if (windows.isEmpty()) startupSteps.done();
         // Residency keeps the warm process: the command history, the plugins and the configuration
         // watcher are precisely what makes the next window fast, and shutdown would close all of them.
         // Quit still terminates.
@@ -1890,6 +1890,7 @@ public final class JasperApplication {
     }
 
     private void requestShutdown() {
+        startupSteps.done();
         quitting = true;
         if (shutdownQueued || stopped) return;
         shutdownQueued = true;

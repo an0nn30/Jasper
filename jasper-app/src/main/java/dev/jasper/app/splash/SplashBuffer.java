@@ -14,7 +14,7 @@ import java.util.Objects;
  * reaches the window as one copy. Windows and Linux show a window's pixels as they are drawn, so a splash painted on
  * screen showed its bare gradient at every step until the art and the text were drawn over it again; from the buffer
  * each pixel goes straight from one step's value to the next. A step draws again, and copies, only what it changes: the
- * step's line and the bar. EDT.
+ * step's line and the bar for branded art; Meadow redraws its whole frame for mascot poses. Access is serialized by Splash.
  */
 final class SplashBuffer {
     private static final Rectangle WHOLE = new Rectangle(0, 0, SplashPainter.WIDTH, SplashPainter.HEIGHT);
@@ -93,6 +93,7 @@ final class SplashBuffer {
 
     /** What showing {@code step} changes after the step drawn. */
     private List<Rectangle> changes(StartupSteps.Step step) {
+        if (painter.animated()) return List.of(WHOLE);
         var changes = new ArrayList<Rectangle>(2);
         if (!step.text().equals(drawn.text())) changes.add(LINE);
         if (SplashPainter.fillWidth(step.fraction()) != SplashPainter.fillWidth(drawn.fraction())) changes.add(BAR);
@@ -109,7 +110,7 @@ final class SplashBuffer {
         try {
             Rectangle pixels = pixels(area);
             g.clip(pixels);
-            g.setColor(SplashColors.TOP);
+            g.setColor(painter.background());
             g.fill(pixels);
             g.scale(scaleX, scaleY);
             painter.paint(g, step.text(), step.fraction());

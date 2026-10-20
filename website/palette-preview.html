@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jasper — Accent studies</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px Arial,Helvetica,sans-serif;background:#faf9f5;color:#302f28}.controls{padding:20px 32px 16px;border-bottom:1px solid #dadccf}.top{display:flex;justify-content:space-between;gap:20px;align-items:center}h1{font-size:18px;letter-spacing:-.4px;margin:0}a{color:inherit;text-underline-offset:3px}.note{color:#676b5c;font-size:12px}.choices{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 12px}button{display:flex;align-items:center;gap:9px;font:inherit;padding:10px 14px;border:1px solid #c6c9bb;border-radius:6px;background:transparent;color:#302f28;cursor:pointer}button[aria-pressed=true]{background:#302f28;border-color:#302f28;color:white}button:focus-visible,a:focus-visible{outline:3px solid #687848;outline-offset:3px}.swatch{width:14px;height:14px;border-radius:3px;background:var(--swatch);border:1px solid #ffffff70}#description{margin:0;line-height:1.5;font-size:13px}#palette{font:11px ui-monospace,monospace;color:#676b5c;margin-left:8px}.references{font-size:11px;color:#676b5c;margin:10px 0 0;line-height:1.5}iframe{display:block;width:100%;height:calc(100dvh - 220px);min-height:560px;border:0}#error{padding:30px} @media(max-width:640px){.controls{padding:16px}.top{align-items:start;flex-direction:column;gap:6px}.choices{gap:6px}button{font-size:12px;padding:9px}#palette{display:block;margin:5px 0 0}iframe{height:75dvh}.references{font-size:10px}}
+</style>
+</head>
+<body>
+<header class="controls">
+<div class="top"><h1>Finding Jasper’s accent</h1><span class="note">Local design study · <a href="/">Original homepage</a></span></div>
+<div class="choices" role="group" aria-label="Accent direction">
+<button data-theme="moss" aria-pressed="true" style="--swatch:#52643f"><span class="swatch"></span>Moss · recommended</button>
+<button data-theme="graphite" aria-pressed="false" style="--swatch:#302f28"><span class="swatch"></span>Warm graphite</button>
+<button data-theme="copper" aria-pressed="false" style="--swatch:#a35434"><span class="swatch"></span>Copper</button>
+<button data-theme="blue" aria-pressed="false" style="--swatch:#1a73e8"><span class="swatch"></span>Previous blue</button>
+</div>
+<p id="description" aria-live="polite"></p>
+<p class="references">Reference approaches: <a href="https://www.warp.dev/" target="_blank" rel="noopener">Warp: neutral headline & primary actions</a> · <a href="https://zed.dev/" target="_blank" rel="noopener">Zed: one accent on a quiet canvas</a> · <a href="https://ghostty.org/" target="_blank" rel="noopener">Ghostty: sparse color around the product</a>. App screenshots retain their real Meadow colors.</p>
+</header>
+<iframe id="preview" title="Jasper homepage accent preview"></iframe><p id="error" hidden></p>
+<script>
+const themes={
+ moss:{accent:'#52643f',hover:'#3f5030',soft:'#e8ecdf',headline:'#52643f',description:'Moss — warm, confident, and closest to Jasper’s shell. Cream surfaces and olive details read as one family.'},
+ graphite:{accent:'#302f28',hover:'#454638',soft:'#e8ecdf',headline:'#302f28',description:'Warm graphite — the quietest option. Neutral headlines and buttons let the app and Jasper carry the color.'},
+ copper:{accent:'#a35434',hover:'#87432b',soft:'#f4e7df',headline:'#a35434',description:'Copper — a warmer, more expressive direction, echoing Jasper’s shell and glasses. A second hue alongside Meadow’s olive.'},
+ blue:{accent:'#1a73e8',hover:'#1765cc',soft:'#e8eff9',headline:'#1a73e8',description:'Previous blue — the baseline. Its cooler, brighter accents stand apart from the cream surfaces and olive character.'}
+};
+const frame=document.querySelector('#preview');let current='moss';
+function apply(){const t=themes[current];document.querySelectorAll('[data-theme]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===current)));const p=document.querySelector('#description');p.textContent=t.description;const code=document.createElement('span');code.id='palette';code.textContent=t.accent.toUpperCase()+' / #FAF9F5';p.append(code);const doc=frame.contentDocument;if(!doc?.querySelector('#accent-study'))return;doc.querySelector('#accent-study').textContent=`:root{--accent:${t.accent};--accent-hover:${t.hover};--soft-accent:${t.soft}}h1 span{color:${t.headline}}.dark{background:var(--accent)}.download h2 code{background:var(--soft-accent)}`;}
+document.querySelectorAll('[data-theme]').forEach(b=>b.addEventListener('click',()=>{current=b.dataset.theme;apply()}));
+frame.addEventListener('load',()=>{apply();frame.contentDocument?.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',event=>{event.preventDefault();const id=a.getAttribute('href').slice(1);const target=id?frame.contentDocument.getElementById(id):frame.contentDocument.body;target?.scrollIntoView({behavior:'instant'});}));});apply();
+fetch('index.html').then(r=>{if(!r.ok)throw Error('Homepage unavailable');return r.text()}).then(html=>{const doc=new DOMParser().parseFromString(html,'text/html');const base=doc.createElement('base');base.href=new URL('./',location.href).href;doc.head.prepend(base);const style=doc.createElement('style');style.id='accent-study';doc.head.append(style);frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML}).catch(()=>{const error=document.querySelector('#error');error.hidden=false;error.textContent='The homepage preview could not load. Check that the local server is running, then reload.'});
+</script>
+</body></html>
