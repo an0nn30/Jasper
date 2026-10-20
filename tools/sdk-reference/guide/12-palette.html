@@ -30,7 +30,7 @@ shortcut switches to the scope's chip; while it is closed the action runs and us
 
     @Override public void start(PluginContext context) {
         // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
-        context.actions().register(ActionSpec.of(OPEN, "Greetings…").withDefaultBinding("cmd+alt+g"),
+        context.actions().register(ActionSpec.of(OPEN, "Greetings…").withDefaultBinding("cmd+alt+y"),
             invoked -&gt; context.palette().open(invoked.window(), SCOPE, Optional.empty(), Optional.empty()));
         context.palette().register(new PaletteScope() {
             @Override public ScopeSpec spec() {

@@ -55,10 +55,9 @@ undo history and unsaved changes. Right-click the text for Undo, Redo, Cut, Copy
 **Save**, **Find…**, **Go to Line…** and **Toggle Comment**.
 
 While an Editor tab is selected its own shortcuts take precedence over the window's: on macOS Cmd+N makes a new file
-instead of a new window, and on Linux and Windows Ctrl+Shift+G, the window's Find Next, is the Editor's Find Previous.
-The Edit menu's **Copy**, **Paste**, **Find**, **Find Next** and **Find Previous**, and the File menu's **Close Tab**
-and **Close Pane**, act on the Editor tab. **Next Tab**, **Previous Tab** and **Select Tab 1**–**9** count Editor tabs
-with terminal tabs.
+instead of a new window. The Edit menu's **Copy**, **Paste**, **Find**, **Find Next** and **Find Previous**, and the
+File menu's **Close Tab** and **Close Pane**, act on the Editor tab. **Next Tab**, **Previous Tab** and
+**Select Tab 1**–**9** count Editor tabs with terminal tabs.
 
 Jasper does not reopen Editor tabs when it starts again; **Recent Files…** reopens them.
 
@@ -92,11 +91,11 @@ Vim mode, `:action id` and `<Action>(id)` run them by the id in the last column.
 | Save All | Cmd+Option+S | Ctrl+Alt+S | `save-all` |
 | Open… | | | `open` |
 | New File | Cmd+N | Ctrl+N | `new` |
-| Close Tab | Cmd+W | Ctrl+W | `close-tab` |
+| Close Tab | | | `close-tab` |
 | Find… | Cmd+F | Ctrl+F | `find` |
 | Replace… | Cmd+Option+F | Ctrl+Alt+F | `replace` |
-| Find Next | Cmd+G | Ctrl+G | `find-next` |
-| Find Previous | Cmd+Shift+G | Ctrl+Shift+G | `find-previous` |
+| Find Next | Cmd+G | F3 | `find-next` |
+| Find Previous | Cmd+Shift+G | Shift+F3 | `find-previous` |
 | Go to Line… | Cmd+L | Ctrl+L | `go-to-line` |
 | Toggle Comment | Cmd+/ | Ctrl+/ | `toggle-comment` |
 | Revert to Saved | | | `revert` |
@@ -461,12 +460,12 @@ you turned it off).
   area's own [editing keys](#commands-and-shortcuts): Shift+Tab and, on Linux and Windows, Alt+Up flash the Vim bar
   and change nothing. The Editor's commands, Jasper's window shortcuts (such as Ctrl+Shift+T on Linux and Windows) and
   keys a `sethandler` entry gives the Editor still work; a key nothing takes flashes the Vim bar.
-- On Linux and Windows several of the Editor's shortcuts are Vim keys, and Vim reads Ctrl+Shift with a letter as Ctrl
-  with that letter: in Normal mode Ctrl+F scrolls, Ctrl+G and Ctrl+Shift+G show the file's position, Ctrl+L does
-  nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert mode Ctrl+W deletes a
-  word, Ctrl+V inserts the next key literally and Ctrl+C returns to Normal mode, so neither Ctrl+V nor Ctrl+Shift+V
-  pastes there. Ctrl+S and Ctrl+Shift+S still save (Vim has no `<C-s>`). Use the tab's menu, `:action find` or a
-  `sethandler` entry such as `sethandler <C-f> n:ide` for the others.
+- On Linux and Windows several of the Editor's and the window's shortcuts are Vim keys, and Vim reads Ctrl+Shift with a
+  letter as Ctrl with that letter: in Normal mode Ctrl+F scrolls, Ctrl+Shift+G (the window's Find Next) shows the file's
+  position, Ctrl+L does nothing (Vim's redraw), Ctrl+N moves down and Ctrl+V starts blockwise Visual mode; in Insert
+  mode Ctrl+Shift+W (the window's Close Pane) deletes a word, Ctrl+V inserts the next key literally and Ctrl+C returns
+  to Normal mode, so neither Ctrl+V nor Ctrl+Shift+V pastes there. Ctrl+S and Ctrl+Shift+S still save (Vim has no
+  `<C-s>`). Use the tab's menu, `:action find` or a `sethandler` entry such as `sethandler <C-f> n:ide` for the others.
 - `sethandler <C-f> n:vim i:ide` decides who gets a key in each mode (`n i v x o c`, or `a` for all, joined by `-`), as
   in IdeaVim.
 

@@ -142,13 +142,11 @@ them under each plugin's name.
 
 The Sample plugin registers its demo actions only when its demo settings are on: **Run Sample Activity**
 (`dev.jasper.sample.demo`, Cmd+Option+J; Ctrl+Alt+Shift+J) and **Sample Greetings…**
-(`dev.jasper.sample.greetings.open`, Cmd+Option+G). On Linux and Windows the latter's default would be
-Ctrl+Alt+Shift+G, which Find Previous holds, so it has none there.
+(`dev.jasper.sample.greetings.open`, Cmd+Option+Y; Ctrl+Alt+Shift+Y).
 
-While an Editor tab is selected, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save and
-Cmd+W (Ctrl+W) to close the tab; on Linux and Windows, Ctrl+Shift+G is then the Editor's Find Previous rather than the
-window's Find Next. They are listed in the Editor tab's right-click menu and in
-[Editor](editor.md#commands-and-shortcuts), and are not part of the keymap.
+While an Editor tab is selected, the Editor's own commands take their keys, for example Cmd+S (Ctrl+S) to save. They
+are listed in the Editor tab's right-click menu and in [Editor](editor.md#commands-and-shortcuts), and are not part of
+the keymap. The window's Close Pane, Cmd+W (Ctrl+Shift+W), closes an Editor tab.
 
 ## Fixed keys
 

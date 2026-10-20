@@ -150,8 +150,8 @@ disabled. Openers are actions, rebindable in Settings › Keymap; "none" means n
   are searched only with the Vault chip. History, Vault and File Servers never appear among the empty query's rows.
 - The Tunnels scope is not tied to its opener: a shortcut you bind to Start or Stop a Tunnel... opens the palette on
   the Tunnels chip, but does nothing while the card is open, and the Run window's ▼ menu shows no shortcut for Tunnels.
-- The Sample plugin adds a Greetings scope (Paste, Paste and run; opener Sample Greetings…, Cmd+Option+G on macOS and none
-  on Linux and Windows) only when its `demo_scope` setting is on.
+- The Sample plugin adds a Greetings scope (Paste, Paste and run; opener Sample Greetings…, Cmd+Option+Y on macOS and
+  Ctrl+Alt+Shift+Y on Linux and Windows) only when its `demo_scope` setting is on.
 
 What each scope lists and does is described with its plugin: [Shell History and Snippets](history-and-snippets.md),
 [Project Index](project-index.md), [Editor](editor.md), [Credential Vault](credential-vault.md), [Remote](remote.md)

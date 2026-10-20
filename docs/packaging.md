@@ -111,7 +111,8 @@ or `rpm-work/` under `jasper-app/build/packaging/`) for diagnosis and publishes 
 
 The `jasper` command has a `bin` folder of its own because the macOS and Windows file systems ignore case, so it
 cannot sit beside the `Jasper` launcher. `README.txt` is the package guide (`packaging/README.txt`);
-`config.example.toml` is a reference copy that is not installed into Jasper home.
+`config.example.toml` is a reference copy that is not installed into Jasper home. On Windows, `Jasper.exe`'s file
+description, which Task Manager shows as the process name, is "Jasper DevOps workstation".
 
 The app folder holds `jasper-app.jar`, `jasper-ui.jar`, `jasper-terminal.jar`, `jasper-buddy.jar`, `jasper-sdk.jar`
 and their libraries. `stagePackage` removes package sealing from any sealed jar (today `jbr-api`) and adds
@@ -350,9 +351,9 @@ in the Gradle tool window; from a shell:
 `stageWindowsUser` stages the application jar, its runtime libraries, the bundled plugins and `config.example.toml` in
 `jasper-app/build/packaging/windows-user/input/`, and `packageWindowsUser` builds an app image from them in
 `windows-user/image/Jasper` on every run. It has the trimmed runtime, JVM options, native libraries and plugin-free
-class path of `packageApp`'s image, but jpackage's standard launcher in place of Jasper's and neither `jasper-watch` nor
-the `jasper` command, so this installation ignores `jasper.vmoptions` and has no
-[start-up recovery](diagnostics.md#start-up-recovery).
+class path of `packageApp`'s image, but jpackage's standard launcher in place of Jasper's, with jpackage's default file
+description (`Jasper`, the name Task Manager shows), and neither `jasper-watch` nor the `jasper` command, so this
+installation ignores `jasper.vmoptions` and has no [start-up recovery](diagnostics.md#start-up-recovery).
 
 A Java helper in `packaging/windows/user-install/` (compiled against JNA by `compileWindowsUserInstaller`) then installs
 the image as `%APPDATA%\JasperApp` and creates the Start menu shortcut `Jasper.lnk`, through Windows APIs rather than
@@ -384,8 +385,9 @@ sudo apt-get install fakeroot rpm cpio binutils g++
 ```
 
 Both packages are named `jasper` and install the image to `/opt/jasper`, with the launcher at `/opt/jasper/bin/Jasper`
-and a desktop menu entry (`/opt/jasper/lib/jasper-Jasper.desktop`, categories `System;TerminalEmulator;`, icon
-`/opt/jasper/lib/Jasper.png`) registered through `xdg-desktop-menu`. The package description is "Jasper terminal" and
+and a desktop menu entry (`/opt/jasper/lib/jasper-Jasper.desktop`, categories
+`System;TerminalEmulator;Network;RemoteAccess;`, icon `/opt/jasper/lib/Jasper.png`) registered through
+`xdg-desktop-menu`. The package description, which is also the menu entry's comment, is "Jasper DevOps workstation" and
 the home page `https://github.com/an0nn30/Jasper`. The `.deb` depends on the Debian packages that jpackage finds for
 the runtime's shared libraries on the build machine. The `.rpm` requires, by soname, every shared library the image
 needs but does not bundle (for example `libX11.so.6()(64bit)`), which every RPM distribution resolves: jpackage's own

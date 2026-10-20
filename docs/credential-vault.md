@@ -112,9 +112,8 @@ Under a classic look, one whose [kit file starts from the classic base](looks.md
 [Enterprise look](enterprise.md)'s does, the manager is laid out classically:
 
 - A toolbar row: **New** (the add menu), **Edit…**, **Delete**, **Copy Username** (a login), **Copy Password** (a login
-  with a password), **Lock Vault** with a fixed shortcut caption, Cmd+Shift+L on macOS and Ctrl+Shift+L on Linux and
-  Windows, which does not follow a rebinding (Lock Vault's Linux and Windows default is Ctrl+Alt+Shift+L), and **Search vault**
-  at the trailing edge.
+  with a password), **Lock Vault** with its default shortcut as a caption, Cmd+Shift+L on macOS and Ctrl+Alt+Shift+L on
+  Linux and Windows, which does not follow a rebinding, and **Search vault** at the trailing edge.
 - A Categories tree, All Items over Logins, SSH Keys and Secure Notes, with counts.
 - A table with **Name**, **Username** ("—" for other entries), **Type** (a login's sign-in method, else the kind) and
   **Modified** (a key's creation date). Click a header to sort by it, again to reverse. The footer counts what shows,

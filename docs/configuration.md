@@ -146,7 +146,7 @@ the reason in the footer.
 | System Settings | Appearance & Behavior | **General**: Run in background; **Java Virtual Machine**; **Command line**; **Configuration file**: Location (**Open in Editor**, **Reveal**), Reload from disk (**Reload**), Migrate old settings (**Migrate…**) | [Background residency](#background-residency) |
 | Keymap | | Every shortcut | [Shortcuts](#shortcuts) |
 | Plugins | | Installed plugins ([Plugins](plugins.md)) | [Plugins](#plugins) |
-| Terminal | | Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta, Dim inactive panes | [Supported settings](#supported-settings) |
+| Terminal | | Scrollback lines, Bell, When the shell exits, Copy on select, Option key as Meta (macOS), Dim inactive panes | [Supported settings](#supported-settings) |
 | Font & Colors | Terminal | **Font**: Font, Font size, Fallback fonts, Ligatures, Line height; **Colors**: Terminal colors (**Choose Scheme…** opens Appearance) | [Terminal colors](#terminal-colors) |
 | Cursor | Terminal | Cursor shape, Blinking cursor | [Supported settings](#supported-settings) |
 | Shell | Terminal | Shell profile, Shell program, Shell arguments, Environment variables, Shell integration | [Shell, environment and history](#shell-environment-and-history) |
@@ -180,7 +180,7 @@ those opened afterwards, *Restart* at the next start. **Settings** names the pag
 | `system.run_in_background` | boolean | `true` on macOS and Windows, `false` on Linux | [Background residency](#background-residency) | Restart; the login item at once | System Settings › Run in background |
 | `palette.visible_rows` | integer | `5`, or the [look's](#look-dependent-defaults) | 1–20 rows | Live | Command Palette › Visible rows |
 | `terminal.scrollback` | integer | `10000` | 0–1000000 lines; `0` keeps no scrollback | New panes | Terminal › Scrollback lines |
-| `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither) |
+| `terminal.option_as_meta` | string | `"left"` | `"left"`, `"right"`, `"both"`, `"none"`: which Option key sends Meta, on macOS only | Live | Terminal › Option key as Meta (Left Option, Right Option, Both, Neither); hidden on Linux and Windows |
 | `terminal.dim_inactive_panes` | number | `0.3` | 0–1: `0` does not dim panes without focus, `1` dims them fully | Live | Terminal › Dim inactive panes |
 | `terminal.copy_on_select` | boolean | `false` | Copies a finished selection to the clipboard | Live | Terminal › Copy on select |
 | `terminal.bell` | string | `"visual"` | `"visual"` (a short flash), `"sound"` (the system beep), `"none"` | Live | Terminal › Bell |

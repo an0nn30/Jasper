@@ -6,15 +6,20 @@ Jasper is a pluggable DevOps workstation for macOS, Linux and Windows. Its core 
 and tool windows), the terminal, the command palette, notifications, Settings, themes and looks; most features are
 bundled plugins on the public plugin SDK. The [documentation index](README.md) lists every current guide.
 
-- **Branches.** `origin/main` is at `34aa868fe`, with Enterprise plans 13 (stripe icons), 14 (IntelliJ Classic's title
-  bar), 15a (the look query) and 15b (look polish), Jasper Meadow Light, the Windows user installation, Desk Buddy's
-  shaded pixel sprites, the boot splash fix and PR #1's CI, Windows and Linux fixes; entries below that end "merged to
-  local `main`, not pushed" were written before the push, and the Ubuntu Yaru, plan 10b, series and side-stripes
-  entries, which end "Not merged", before their merge (the side stripes as the rebased `e8ecfdcf2` to `faeec76f3`, which
-  plan 15a's E15 leaves to confirm). The V1 documentation overhaul is on `claude/v1-docs`, with
-  `origin/main` merged in. Also unmerged: `claude/workspace-tabs` (workspace tabs and single instance, in progress; its
-  STATUS entries are on that branch, and plan 14's entry says what it must reconcile with the classic title bar) and
-  `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
+- **Branches.** `origin/main` at `c6bb59fdd` has the V1 code fixes (`claude/v1-code-fixes`, the code problems the
+  V1 documentation audit found: the package description and Linux menu categories, setting descriptions, Option key as
+  Meta shown only on macOS, the Sample's Greetings… shortcut (Cmd+Option+Y; Ctrl+Alt+Shift+Y), the Editor's F3 and
+  Shift+F3 off macOS and one Close Tab in its tab menu, Vault's classic Lock Vault caption, the
+  `shellHistorySearchMeasurement` task's removal and the vimrc byte order mark written as a Java escape), Enterprise
+  plans 13 (stripe icons), 14 (IntelliJ Classic's title bar), 15a (the look query) and 15b (look polish), Jasper Meadow
+  Light, the Windows user installation, Desk Buddy's shaded pixel sprites, the boot splash fix and PR #1's CI, Windows
+  and Linux fixes; entries below that end "merged to local `main`, not pushed" were written before the push, and the
+  Ubuntu Yaru, plan 10b, series and side-stripes entries, which end "Not merged", before their merge (the side stripes
+  as the rebased `e8ecfdcf2` to `faeec76f3`, which plan 15a's E15 leaves to confirm). The V1 documentation overhaul
+  (`claude/v1-docs`, with `origin/main` at `c6bb59fdd` merged in) is merged into `main`; its entry below, which ends
+  "Not merged into `main`", was written before the merge. Unmerged: `claude/workspace-tabs` (workspace tabs and single
+  instance, in progress; its STATUS entries are on that branch, and plan 14's entry says what it must reconcile with
+  the classic title bar) and `claude/test-isolation-leaks` (the Swing test-isolation guard, 3 commits).
 - **Modules.** `jasper-ui`, `jasper-terminal`, `jasper-app`, `jasper-buddy`, `jasper-sdk` and `jasper-sdk-testkit`, plus
   one `:jasper-plugin-<dir>` for each directory under `plugins/`.
 - **SDK** `0.18.2` (`JasperSdk.VERSION`); Credential Vault, Enterprise, File Server, Remote and Sample declare

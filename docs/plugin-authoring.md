@@ -679,7 +679,7 @@ private static void installPaletteDemo(PluginContext context) {
     }
     // Register the action first: the scope names it, and its shortcut then reaches the scope both ways.
     // Closed, this handler opens the palette on the scope; open, the palette switches to it or dismisses.
-    context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+g"), invoked ->
+    context.actions().register(ActionSpec.of(GREETINGS_OPEN, "Sample Greetings…").withDefaultBinding("cmd+alt+y"), invoked ->
         context.palette().open(invoked.window(), GREETINGS, Optional.empty(), Optional.empty()));
     List<String> greetings = List.of("good morning", "hello", "hi there");
     context.palette().register(new PaletteScope() {

@@ -2331,7 +2331,7 @@ shortcut switches to the scope's chip; while it is closed the action runs and us
 
     <span class="a">@Override</span> <span class="k">public</span> <span class="k">void</span> start(<span class="t">PluginContext</span> context) {
         <span class="c">// Register the action first: the scope names it, and its shortcut then reaches the scope both ways.</span>
-        context.actions().register(<span class="t">ActionSpec</span>.of(<span class="t">OPEN</span>, <span class="s">&quot;Greetings…&quot;</span>).withDefaultBinding(<span class="s">&quot;cmd+alt+g&quot;</span>),
+        context.actions().register(<span class="t">ActionSpec</span>.of(<span class="t">OPEN</span>, <span class="s">&quot;Greetings…&quot;</span>).withDefaultBinding(<span class="s">&quot;cmd+alt+y&quot;</span>),
             invoked -&gt; context.palette().open(invoked.window(), <span class="t">SCOPE</span>, <span class="t">Optional</span>.empty(), <span class="t">Optional</span>.empty()));
         context.palette().register(<span class="k">new</span> <span class="t">PaletteScope</span>() {
             <span class="a">@Override</span> <span class="k">public</span> <span class="t">ScopeSpec</span> spec() {
