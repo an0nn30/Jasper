@@ -26,7 +26,6 @@ import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -213,10 +212,12 @@ public final class NativeShells {
         classicContent(surface);
         var dialog = new dev.jasper.ui.swing.ClassicDialog(themes.appearance().context(dev.jasper.ui.theme.ThemeRoute.CHROME), surface.holder(),
             surface.title(), surface.swatch(), placement);
-        dialog.windowTitleHeight(owner.getInsets().top);
-        var titleBar = followTitleBar(owner, dialog);
+        var root = container.getRootPane();
+        dialog.windowTitleHeight(owner.getInsets().top + dev.jasper.app.platform.TitleInset.of(root));
+        var titleBar = followTitleBar(owner, root, dialog);
         owner.addComponentListener(titleBar);
-        var overlay = WindowOverlay.classic(container.getRootPane(), dialog);
+        root.addPropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar);
+        var overlay = WindowOverlay.classic(root, dialog);
         surface.holder().getAccessibleContext().setAccessibleName(surface.title());
         var close = new WindowAdapter() {
             @Override public void windowClosed(WindowEvent event) { surface.close(); }
@@ -232,7 +233,8 @@ public final class NativeShells {
             try { if (!surface.closed()) loop.enter(); } finally { closed.close(); }
         };
         return new AuxiliarySurface.Shell(show, overlay::focus, () -> {
-                drawnInWindow.remove(surface); owner.removeWindowListener(close); owner.removeComponentListener(titleBar); overlay.close();
+                drawnInWindow.remove(surface); owner.removeWindowListener(close); owner.removeComponentListener(titleBar);
+                root.removePropertyChangeListener(dev.jasper.app.platform.TitleInset.CHANGED, titleBar); overlay.close();
             },
             title -> { dialog.setTitle(title); surface.holder().getAccessibleContext().setAccessibleName(title); }, overlay::cardBounds,
             (title, initial) -> chooseFile(TopModal.over(owner), title, initial, Optional.empty()));
@@ -240,12 +242,29 @@ public final class NativeShells {
 
     /**
      * Keeps a centred classic dialog centred on its whole window as the window's title bar (its top inset) changes under
-     * it, as macOS full screen hides it: added to the owner window, it re-reads the inset on every resize.
+     * it, as macOS full screen hides it, and the classic title chrome inside the root (macOS's band, Windows' classic
+     * title bar), which can change without a resize: added to the owner window and as the root's
+     * {@link dev.jasper.app.platform.TitleInset#CHANGED} listener, it re-reads both on every resize and inset change.
      */
-    static ComponentListener followTitleBar(java.awt.Container window, dev.jasper.ui.swing.ClassicDialog dialog) {
-        return new ComponentAdapter() {
-            @Override public void componentResized(ComponentEvent event) { dialog.windowTitleHeight(window.getInsets().top); }
-        };
+    static TitleFollower followTitleBar(java.awt.Container window, javax.swing.JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog) {
+        return new TitleFollower(window, root, dialog);
+    }
+
+    /** {@link NativeShells#followTitleBar}'s listener: the window's top inset plus the root's title inset is the dialog's title height. */
+    static final class TitleFollower extends ComponentAdapter implements java.beans.PropertyChangeListener {
+        private final java.awt.Container window;
+        private final javax.swing.JRootPane root;
+        private final dev.jasper.ui.swing.ClassicDialog dialog;
+
+        private TitleFollower(java.awt.Container window, javax.swing.JRootPane root, dev.jasper.ui.swing.ClassicDialog dialog) {
+            this.window = window; this.root = root; this.dialog = dialog;
+        }
+
+        private void follow() { dialog.windowTitleHeight(window.getInsets().top + dev.jasper.app.platform.TitleInset.of(root)); }
+
+        @Override public void componentResized(ComponentEvent event) { follow(); }
+
+        @Override public void propertyChange(java.beans.PropertyChangeEvent event) { follow(); }
     }
 
     /**
