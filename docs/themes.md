@@ -1,6 +1,8 @@
 # Themes
 
-Jasper's default theme is **Slate Cobalt**, in Dark and Light, with three terminal colour schemes: **Slate Cobalt
+Jasper defaults to **Jasper Meadow Light** (`jasper-meadow`) in Light appearance and **Slate Cobalt** in Dark.
+Meadow pairs warm cream and olive surfaces with blue actions and matching editor and terminal colours.
+Slate Cobalt remains available in Dark and Light, with three terminal colour schemes: **Slate Cobalt
 Dark**, **Slate Cobalt Light** and **High Contrast**. Its colours are defined once, in
 [the Slate Cobalt colour reference](design/theme-engine/slate-cobalt.md), and bundled as `slate-cobalt.json`. Catppuccin's
 four flavours are built in too, converted from [its IntelliJ plugin](https://github.com/catppuccin/jetbrains) 3.6.1:
@@ -19,7 +21,7 @@ appearance = "system" # or "dark", "light"
 
 [ui.theme]
 dark = "slate-cobalt"  # the theme the Dark appearance shows
-light = "slate-cobalt" # the theme the Light appearance shows
+light = "jasper-meadow" # the theme the Light appearance shows
 
 [terminal]
 scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
@@ -29,7 +31,7 @@ scheme = "match" # or a scheme id such as "slate-cobalt/high-contrast"
 setting live; with `system`, Jasper uses Dark when it cannot read the operating system's setting, and an
 operating-system change never writes `config.toml`. `ui.theme.dark` and `ui.theme.light` name, by id, the theme each
 appearance shows: `slate-cobalt`, another built-in theme's id (`catppuccin-latte`, `catppuccin-frappe`,
-`catppuccin-macchiato`, `catppuccin-mocha`, `ubuntu-yaru`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
+`catppuccin-macchiato`, `catppuccin-mocha`, `ubuntu-yaru`, `jasper-meadow`), or an installed theme's id. A theme has a Dark variant, a Light variant or both; with
 `system`, Jasper switches between the two picks as the operating system does.
 
 `terminal.scheme` colours the terminal panes: `match` uses the shown theme's own scheme, and a scheme id,
@@ -50,9 +52,9 @@ be copied in by hand. It holds one Jasper theme file per theme, named after the 
 when `config.toml` changes; a theme changed on disk is shown again then. A file named after a built-in theme's id,
 such as `slate-cobalt.json` or `catppuccin-mocha.json`, is ignored, and so is one named after a theme an installed
 plugin ships, such as `enterprise.json`, even while that plugin is off. Dropdowns list the built-in themes first, Slate
-Cobalt then the Catppuccin flavours and Ubuntu Yaru, then the plugins' themes by name, captioned with their plugin, then the installed
+Cobalt then the Catppuccin flavours, Ubuntu Yaru and Jasper Meadow Light, then the plugins' themes by name, captioned with their plugin, then the installed
 themes by name; two themes with the same name show their ids. A setting that names the theme of a plugin that is off
-uses Slate Cobalt without a warning and keeps the name, so turning the plugin on again restores it.
+uses the appearance’s default without a warning and keeps the name, so turning the plugin on again restores it.
 
 ## What the terminal scheme colours
 
@@ -79,7 +81,7 @@ Apply; a failure is shown in a sheet.
   imported theme already has asks before replacing it; a built-in theme or a plugin's theme cannot be replaced.
 - **Remove** removes the theme the dropdown shows; for the Terminal scheme gear, the theme the scheme belongs to. It is
   unavailable for a built-in theme, a plugin's theme and Same as UI theme. It asks first and says what will change. The file is deleted, and
-  every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-cobalt` or
+  every setting that names the theme or one of its schemes, saved or staged, returns to its default (`slate-cobalt` for Dark, `jasper-meadow` for Light, or
   `match`): saved ones are written at once, and other staged changes stay staged. If the file cannot be deleted,
   nothing changes and the sheet says why.
 
@@ -173,7 +175,7 @@ same roles through the SDK. Installed themes live in the themes folder, outside 
 ## When something is wrong
 
 - A value that is not a valid `ui.appearance`, theme id or scheme id is reported ("Use …; using the default.") and
-  the default is used (`system`, `slate-cobalt`, `match`).
+  the default is used (`system`, `slate-cobalt` for Dark, `jasper-meadow` for Light, `match`).
 - A theme file that cannot be used is skipped and reported with the configuration's warnings, naming the file, the
   line when known and the entry, for example
   `/Users/you/.config/jasper/themes/dracula.json: warning: ui.dark: Missing colour "accent"`.

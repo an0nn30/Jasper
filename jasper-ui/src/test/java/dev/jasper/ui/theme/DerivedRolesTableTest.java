@@ -15,7 +15,11 @@ import org.junit.jupiter.api.Test;
  */
 class DerivedRolesTableTest {
     @Test void theBuiltInVariantsDerivedRolesAreFrozen() throws IOException {
-        assertThat(table(JasperTheme.builtIns())).isEqualTo(expected("derived-roles.tsv"));
+        String actual = table(JasperTheme.builtIns());
+        Path written = Path.of("build/derived-roles/derived-roles.tsv");
+        Files.createDirectories(written.getParent());
+        Files.writeString(written, actual);
+        assertThat(actual).isEqualTo(expected("derived-roles.tsv"));
     }
 
     @Test void theEnterpriseVariantsDerivedRolesAreFrozen() throws IOException {

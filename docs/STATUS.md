@@ -1,5 +1,21 @@
 # Jasper — Status and Handoff
 
+**Local Meadow/mascot update — 2026-10-19** (`codex/product-homepage`): Jasper Meadow Light is the
+default light theme, matching the homepage palette. Its local moss revision uses #52643F for
+buttons, selections, focus and tab indicators, with matching cream/olive hover and selection surfaces.
+The homepage has a pausable cursor-guided workspace tour from real captures, including terminal command entry and Editor typing; demo-only rail/tab/status
+sizes are 52/40/34 px. Moss validation: 931 UI tests and 80 appearance/demo tests passed;
+script syntax, desktop/mobile preview and independent review passed. Saved theme choices, Enterprise look defaults
+and the Slate Cobalt dark default are retained. The app now uses the approved shaded pixel-art Jasper:
+20 frames at 84 × 96, nearest-neighbor rendering, and a larger 105 × 120 default display
+(42 × 48 base frame at scale 2.5). Animation timing is unchanged.
+The homepage retains its dimensional illustration. The editable master, exporter and app preview match.
+Pixel revision validation: 154 mascot tests and 12 app integration/resource/documentation tests passed,
+plus architecture, JavaDoc, export verification and independent review. The preceding Meadow full
+headless `check` passed (11,504 Java tests, zero failures/errors, 25 existing platform skips), plus 71
+theme-tool tests. Commit verification passed: 931 UI, 154 mascot, 127 affected app and 71 theme-tool tests;
+sprite export verification, website script syntax and local asset links passed. The site remains local and unpublished.
+
 **CI runtime optimization — 2026-10-19** (PR #1): CI runs independent Gradle projects with
 `--parallel`, two workers on Unix and one on Windows; each project's tests remain sequential. Root verifiers consume
 root-owned runtime dependencies, and plugin staging consumes producer task outputs. Full local

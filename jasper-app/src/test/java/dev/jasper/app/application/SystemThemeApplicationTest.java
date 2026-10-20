@@ -32,8 +32,8 @@ class SystemThemeApplicationTest {
             var draft = new dev.jasper.app.settingsui.SettingsDraft(service.initialState().values());
             draft.stage(dev.jasper.app.config.CoreSettings.WINDOW_TAB_HEIGHT, java.util.Optional.of(44));
             controller.systemAppearanceChanged(Observation.light());
-            assertThat(themes.current().chrome()).isSameAs(COBALT.generated(false));
-            assertThat(themes.current().palette().background()).isEqualTo(COBALT.matching(false).colors().background());
+            assertThat(themes.current().chrome()).isSameAs(JasperTheme.builtIn("jasper-meadow").orElseThrow().generated(false));
+            assertThat(themes.current().palette().background()).isEqualTo(JasperTheme.builtIn("jasper-meadow").orElseThrow().matching(false).colors().background());
             assertThat(states).as("no configuration state reaches an open Settings draft").isEmpty();
             assertThat(Files.readString(file)).isEqualTo(text);
             assertThat(draft.modified()).isTrue();
