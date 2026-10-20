@@ -77,7 +77,7 @@ a second View › Transfers or ⌘⌥3 keeps it open and activates it again; (3)
 header `+` in IntelliJ's classic art: authored, in the strip's 10 px glyph box beside ⋯ and − in the strip's ink; judge
 its size and ink against IntelliJ Classic; (4) Remote's session view's Run button unchanged; (5) the
 default look: the title field, the rails, the headers and the shortcuts as before (a toggle shortcut opens without the
-tint). Not merged, not pushed.
+tint). Merged to local main, not pushed.
 
 **Enterprise presentation, plan 15a: the look query at the user's direction — 2026-10-19** (`claude/enterprise-look-query`, worktree `.claude/worktrees/enterprise-15`, from `main` at `f78bb0385`; [plan](superpowers/plans/2026-10-19-enterprise-15a-look-query.md), [spec](superpowers/specs/2026-10-15-jasper-enterprise-presentation-design.md))
 Commits `2ad889b0b..23796aaa9`, then this documentation commit and the final review fixes; spec 1 (decisions 1, 4 and 19), 3 (principle 6), 4.1,
