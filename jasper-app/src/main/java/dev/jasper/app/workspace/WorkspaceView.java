@@ -196,13 +196,24 @@ final class WorkspaceView extends JPanel {
     /**
      * Gives this workspace {@code arranged}: its own tabs in another arrangement, as panes come back or a parent tab moves
      * between windows (workspace plan 7b Rulings 6). Tabs {@code arranged} names that this workspace does not hold leave it
-     * first; nothing changes when it would still leave out a tab this workspace holds. Every tab takes its place at once,
-     * without the open motion, as a moved tab does.
+     * first, and a tab it holds that {@code arranged} lacks, such as one a listener opened here meanwhile, joins the end of
+     * its active pane, so no tab is lost and {@code arranged}'s active tab still shows. Nothing changes when
+     * {@code arranged} names none of this workspace's tabs. Every tab takes its place at once, without the open motion, as
+     * a moved tab does.
      */
     void rearrange(Layout arranged) {
         Layout next = arranged;
         for (TabId tab : arranged.tabs()) if (!tabs.containsKey(tab)) next = next.remove(tab);
-        if (!Set.copyOf(next.tabs()).equals(tabs.keySet())) return;
+        if (next.isEmpty()) return;
+        Optional<TabId> shown = next.activeTab();
+        boolean joined = false;
+        for (TabId tab : layout.tabs()) {
+            if (next.contains(tab)) continue;
+            Group active = next.group(next.activeGroup()).orElseThrow();
+            next = next.open(tab, active.id(), active.tabs().size());
+            joined = true;
+        }
+        if (joined && shown.isPresent()) next = next.select(shown.get());
         moved.addAll(tabs.keySet());
         apply(next);
     }

@@ -1328,9 +1328,10 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * Takes {@code moving}, other windows' tabs, into this window's parent tab {@code parentTab} through the tab registry,
      * one move each, so each keeps its content and session and reports {@code TAB_MOVED} once (parent tabs spec 5;
      * workspace plan 7b Rulings 6). A parent tab this window lacks opens under that id at {@code index} of the bar, in
-     * place of the main window's empty workspace. That parent tab then takes {@code arranged}
-     * ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused and raised. A tab
-     * the registry does not move stays where it was; the first failure propagates once the others have moved.
+     * place of the window's empty workspace (the main window's, or a new full window's). That parent tab then takes
+     * {@code arranged} ({@link WorkspaceView#rearrange}) and shows, and {@code arranged}'s active tab is selected, focused
+     * and raised. A tab the registry does not move stays where it was; the first failure propagates once the others have
+     * moved. A receive that runs within another one, from a listener say, leaves the outer one's landing as it was.
      *
      * @param moving the tabs, in the order they move
      * @param parentTab the parent tab they land in
@@ -1341,6 +1342,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
     boolean receive(java.util.List<Tab> moving, ParentTabId parentTab, int index, Layout arranged) {
         if (closed) return false;
         Throwable failure = null;
+        Landing outer = landing;
         landing = new Landing(parentTab, index);
         try {
             for (Tab tab : moving) {
@@ -1351,7 +1353,7 @@ public final class WindowContent extends JPanel implements AutoCloseable {
                 }
             }
         } finally {
-            landing = null;
+            landing = outer;
         }
         WorkspaceView view = closed ? null : parentTabs.view(parentTab).orElse(null);
         boolean arrived = view != null && moving.stream().anyMatch(view::contains);

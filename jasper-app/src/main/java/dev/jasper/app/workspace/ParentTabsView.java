@@ -105,9 +105,9 @@ final class ParentTabsView extends JPanel {
 
     /**
      * A new parent tab holding {@code tab}, at the end of the bar and shown (New Tab, parent tabs spec 8; workspace plan
-     * 7a Rulings 3). The window's only parent tab must not be empty: the empty workspace takes a first tab itself. Its
-     * workspace takes the window's theme and glass first, so the splits it builds take them too. The tab takes the focus
-     * when the window's parent tabs held it.
+     * 7a Rulings 3). While the window's only parent tab is empty, the new one takes its place. Its workspace takes the
+     * window's theme and glass first, so the splits it builds take them too. The tab takes the focus when the window's
+     * parent tabs held it.
      */
     WorkspaceView openParentTab(Tab tab) { return openParentTab(tab, ParentTabId.random(), count()); }
 
@@ -119,11 +119,9 @@ final class ParentTabsView extends JPanel {
     WorkspaceView openParentTab(Tab tab, ParentTabId id, int index) {
         boolean held = WorkspaceView.holdsFocus(owner, this);
         WorkspaceView empty = isEmpty() ? active() : null;
-        var view = new WorkspaceView(owner, id);
+        var view = workspace(id);
         int at = empty != null ? 0 : Math.max(0, Math.min(index, count()));
         try {
-            view.applyTheme(owner.theme(), false);
-            view.setGlass((float) owner.backgroundOpacity() < 1f);
             view.open(tab);
             var opened = new ParentTab(id, view.model());
             model = empty != null ? ParentTabs.of(opened) : model.open(opened, at);
@@ -193,7 +191,7 @@ final class ParentTabsView extends JPanel {
         WorkspaceView emptied = views.get(id);
         if (closed || emptied == null || count() != 1 || !emptied.isEmpty()) return;
         boolean held = WorkspaceView.holdsFocus(owner, this);
-        var fresh = new WorkspaceView(owner, ParentTabId.random());
+        var fresh = workspace(ParentTabId.random());
         views.remove(emptied.id());
         super.remove(emptied);
         emptied.close();
@@ -202,6 +200,22 @@ final class ParentTabsView extends JPanel {
         model = ParentTabs.of(new ParentTab(fresh.id(), fresh.model()));
         reveal(fresh);
         owner.workspaceChanged(fresh, held);
+    }
+
+    /**
+     * A new parent tab's workspace under {@code id}, with the window's theme and glass, so the splits it builds take them
+     * too.
+     */
+    private WorkspaceView workspace(ParentTabId id) {
+        var view = new WorkspaceView(owner, id);
+        try {
+            view.applyTheme(owner.theme(), false);
+            view.setGlass((float) owner.backgroundOpacity() < 1f);
+        } catch (RuntimeException | Error failure) {
+            view.close();
+            throw failure;
+        }
+        return view;
     }
 
     /** A parent tab's layout changed: the model takes it. A workspace that is not, or no longer, a parent tab's is ignored. */

@@ -264,6 +264,8 @@ class BringBackTest {
             windows.manager.moveToMainWindow(full.content());
             assertThat(((ParentTabs) main.windowLayout()).parentTabs()).extracting(ParentTab::id).containsExactly(p1);
             assertThat(main.tabCount()).isEqualTo(1);
+            assertThat(full.closed()).as("the full window closes with its last tab").isTrue();
+            assertThat(main.activeParentTab()).as("the parent tab it showed").isEqualTo(p1);
         });
         windows.launch();
     }
@@ -288,6 +290,112 @@ class BringBackTest {
             heldHere.close();
             heldThere.close();
             assertThat(windows.manager.bringBack(pane.content())).isPresent();
+        });
+        windows.launch();
+    }
+
+    /** Workspace plan 7b Rulings 9 and 10: a whole parent tab never moves into or out of a pane window, nor within its window. */
+    @Test void aParentTabMovesNeitherIntoAPaneWindowNorWithinItsWindow() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            ParentTabId first = content.activeParentTab();
+            content.split(Side.RIGHT);
+            ChildWindow pane = windows.manager.popOutPane(content, content.workspace().model().activeGroup()).orElseThrow();
+            content.newParentTab(HOME);
+            windows.facts.clear();
+            assertThat(windows.manager.moveParentTab(content, first, pane.content(), 0)).as("into a pane window").isFalse();
+            assertThat(windows.manager.moveParentTab(pane.content(), pane.content().activeParentTab(), content, 0))
+                .as("out of a pane window").isFalse();
+            assertThat(windows.manager.moveParentTab(content, first, content, 0)).as("within its own window").isFalse();
+            assertThat(windows.tabFacts()).isEmpty();
+            assertThat(content.parentTabCount()).isEqualTo(2);
+            assertThat(pane.content().tabCount()).isEqualTo(1);
+        });
+        windows.launch();
+    }
+
+    /** Spec 5 and 11: Bring Back into a hidden parent tab shows it, the panes beside the origin pane. */
+    @Test void bringBackShowsTheHiddenParentTabItGoesTo() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            ParentTabId first = content.activeParentTab();
+            GroupId left = content.workspace().model().activeGroup();
+            content.split(Side.RIGHT);
+            ChildWindow pane = windows.manager.popOutPane(content, content.workspace().model().activeGroup()).orElseThrow();
+            Tab back = pane.content().selectedTab();
+            content.newParentTab(HOME);
+            assertThat(content.activeParentTab()).as("another parent tab shows").isNotEqualTo(first);
+            assertThat(windows.manager.bringBack(pane.content())).containsSame(windows.main());
+            assertThat(content.activeParentTab()).as("the parent tab the panes went to").isEqualTo(first);
+            Layout layout = content.workspace().model();
+            assertThat(layout.root()).isInstanceOfSatisfying(Split.class, split -> {
+                assertThat(split.orientation()).isEqualTo(Orientation.HORIZONTAL);
+                assertThat(split.children().get(0).node()).isEqualTo(layout.group(left).orElseThrow());
+                assertThat(((Group) split.children().get(1).node()).tabs()).containsExactly(back.id());
+            });
+            assertThat(content.selectedTab()).isSameAs(back);
+            assertThat(content.parentTabCount()).isEqualTo(2);
+        });
+        windows.launch();
+    }
+
+    /** Workspace plan 7b Rulings 10: a parent tab moving whole keeps its layout, its maximize included. */
+    @Test void aMaximizedParentTabPopsOutStillMaximized() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            ParentTabId first = content.activeParentTab();
+            content.split(Side.RIGHT);
+            content.toggleMaximize();
+            Layout before = content.workspace().model();
+            GroupId maximized = before.maximized().orElseThrow();
+            content.newParentTab(HOME);
+            ChildWindow full = windows.manager.popOutParentTab(content, first).orElseThrow();
+            assertThat(full.content().workspace().model().maximized()).as("on the same pane").contains(maximized);
+            assertThat(full.content().workspace().model()).isEqualTo(before);
+        });
+        windows.launch();
+    }
+
+    /** The empty workspace a parent tab moving whole leaves behind takes the window's theme and glass, as a new one does. */
+    @Test void theRenewedEmptyWorkspaceTakesTheWindowsThemeAndGlass() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.applyBackgroundOpacity(0.5);
+            ParentTabId only = content.activeParentTab();
+            content.split(Side.RIGHT);
+            windows.manager.popOutParentTab(content, only).orElseThrow();
+            WorkspaceView renewed = content.workspace();
+            assertThat(renewed.id()).as("the renewed workspace").isNotEqualTo(only);
+            assertThat(renewed.isOpaque()).as("under glass it paints nothing behind its tabs").isFalse();
+            assertThat(renewed.getBackground()).as("the theme's surface").isEqualTo(content.theme().surface());
+            content.split(Side.RIGHT);
+            content.split(Side.RIGHT);
+            SplitContainer split = renewed.split(List.of());
+            assertThat(split).as("a split it builds later").isNotNull();
+            assertThat(split.isOpaque()).isFalse();
+            assertThat(split.getBackground()).isEqualTo(content.theme().surface());
+        });
+        windows.launch();
+    }
+
+    /** A tab the planned layout lacks, one that came in meanwhile, joins its active pane; the plan still lands. */
+    @Test void rearrangingKeepsATabThePlanLacks() throws Exception {
+        edt(() -> {
+            var content = windows.main().content();
+            content.split(Side.RIGHT);
+            WorkspaceView workspace = content.workspace();
+            Tab planned = content.selectedTab();
+            Layout plan = workspace.model().resize(List.of(), List.of(0.3, 0.7));
+            content.newTab(HOME);
+            Tab extra = content.selectedTab();
+            workspace.rearrange(plan);
+            Layout layout = workspace.model();
+            assertThat(layout.root()).isInstanceOfSatisfying(Split.class, split ->
+                assertThat(split.children()).extracting(Child::weight).as("the plan landed").containsExactly(0.3, 0.7));
+            assertThat(layout.group(plan.activeGroup()).orElseThrow().tabs()).as("in its active pane")
+                .containsExactly(planned.id(), extra.id());
+            assertThat(content.selectedTab()).as("the plan's active tab").isSameAs(planned);
+            assertThat(content.tabs()).hasSize(3).contains(extra);
         });
         windows.launch();
     }

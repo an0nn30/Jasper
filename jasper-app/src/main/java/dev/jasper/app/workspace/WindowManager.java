@@ -340,7 +340,8 @@ public final class WindowManager {
      * layout (parent tabs spec 5 and 11; workspace plan 7b Rulings 6 and 10): through the tab registry, one
      * {@code TAB_MOVED} per tab, every session untouched. It shows there, raised, and a full window it empties closes; the
      * main window it empties shows an empty workspace under a new id. Both windows are main or full windows; a parent tab
-     * holding a tab that is pinned or being closed stays.
+     * holding a tab that is pinned or being closed stays. It keeps its maximize too: spec 15 ends a maximize for a tab
+     * that joins a layout, and a parent tab moving whole brings its own (Rulings 10).
      *
      * @param from the window holding the parent tab
      * @param parentTab the parent tab
@@ -424,10 +425,17 @@ public final class WindowManager {
         return main;
     }
 
-    /** The main or full window holding the parent tab {@code id}, which follows it between windows (parent tabs spec 11). */
+    /**
+     * The open main or full window holding the parent tab {@code id}, which follows it between windows (parent tabs spec
+     * 11).
+     */
     private Optional<JasperWindow> holderOf(ParentTabId id) {
-        for (JasperWindow candidate : windows())
-            if (!candidate.content().isPaneWindow() && candidate.content().parentTabs().view(id).isPresent()) return Optional.of(candidate);
+        for (JasperWindow candidate : windows()) {
+            WindowContent content = candidate.content();
+            // A window that is closing holds its parent tabs no more.
+            if (!content.closed() && !content.isPaneWindow() && content.parentTabs().view(id).isPresent())
+                return Optional.of(candidate);
+        }
         return Optional.empty();
     }
 
