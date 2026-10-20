@@ -162,7 +162,8 @@ final class MarkdownController implements AutoCloseable {
                 installing = job;
                 try {
                     job.result = prepared.result();
-                    var style = job.style;
+                    // Source and syntax belong to the job; geometry-only inputs may have changed while it ran.
+                    var style = tab.surface().previewStyle();
                     tab.surface().preview().install(prepared, style.typography(), style.palette(), style.syntax(), tab.surface().getFont(), tab.surface().opacity());
                 } catch (RuntimeException installError) { installing = null; fail(installError.getMessage()); }
             }

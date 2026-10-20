@@ -38,7 +38,7 @@ final class ScrollLink implements AutoCloseable {
     private boolean linked = true, split, closed, adjusting, queued, replacing;
     private Pane leader;
     private Integer replacementY;
-    private long generation, epoch, userSequence, savedSequence, adjustmentToken;
+    private long generation, epoch, adjustmentToken;
     private record Knot(Position position, int previewOffset) { }
     private record Geometry(int offset, double sourceY, double previewY) { }
     private record Reading(Position start, Position end, double fraction, boolean bottom) { }
@@ -74,7 +74,7 @@ final class ScrollLink implements AutoCloseable {
     /** Positions were captured while the old geometry was current, before document listeners run. */
     void invalidate() {
         if (closed) return;
-        if (result != null) savedSequence = userSequence;
+        if (result != null) { source.savedSequence = source.sequence; rendered.savedSequence = rendered.sequence; }
         result = null; knots = List.of(); geometry = List.of(); epoch++; queued = false; replacing = false;
     }
 
@@ -93,7 +93,8 @@ final class ScrollLink implements AutoCloseable {
     void geometryChanged() {
         if (closed || result == null || queued) return;
         queued = true;
-        long token = epoch, installedGeneration = generation, sequence = userSequence;
+        long token = epoch, installedGeneration = generation;
+        long sourceSequence = source.sequence, previewSequence = rendered.sequence;
         SwingUtilities.invokeLater(() -> {
             if (closed || token != epoch || installedGeneration != generation) return;
             queued = false;
@@ -101,14 +102,12 @@ final class ScrollLink implements AutoCloseable {
             try {
                 area.scroll.getViewport().doLayout(); area.previewScroll.getViewport().doLayout();
                 rebuild();
-                if (sequence == userSequence) {
-                    if (savedSequence == userSequence) { restore(source); restore(rendered); }
-                    else if (replacementY != null) move(rendered, replacementY);
-                }
+                restoreIfCurrent(source, sourceSequence);
+                restoreIfCurrent(rendered, previewSequence);
                 replacementY = null;
                 if (linked && split) align();
                 remember(source); remember(rendered);
-                savedSequence = userSequence;
+                source.savedSequence = source.sequence; rendered.savedSequence = rendered.sequence;
             } finally { adjusting = false; }
         });
     }
@@ -155,9 +154,9 @@ final class ScrollLink implements AutoCloseable {
         if (adjusting || replacing || pane.expected != null && pane.expected == y) return;
         pane.expected = null;
         if (resized) return; // Layout clamping is not user motion.
-        leader = pane; userSequence++;
+        leader = pane; pane.sequence++;
         if (result == null) return;
-        savedSequence = userSequence;
+        pane.savedSequence = pane.sequence;
         remember(pane);
         if (linked && split) align();
     }
@@ -179,6 +178,11 @@ final class ScrollLink implements AutoCloseable {
         var low = geometry.get(index); var high = geometry.get(nextRow(index, pane == source));
         pane.reading = new Reading(position(low.offset), position(high.offset),
             fraction(pane.y(), coordinate(low,pane==source), coordinate(high,pane==source)), pane.max()>0 && pane.y()>=pane.max()-1);
+    }
+    private void restoreIfCurrent(Pane pane, long sequence) {
+        if (sequence != pane.sequence) return;
+        if (pane.savedSequence == pane.sequence) restore(pane);
+        else if (pane == rendered && replacementY != null) move(pane, replacementY);
     }
     private void restore(Pane pane) {
         var reading = pane.reading;
@@ -252,7 +256,7 @@ final class ScrollLink implements AutoCloseable {
         final ChangeListener listener = e -> moved(this);
         int lastY;
         Integer expected;
-        long adjustment;
+        long adjustment, sequence, savedSequence;
         Dimension extent, size;
         Reading reading;
         Pane(JViewport viewport) {

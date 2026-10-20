@@ -50,8 +50,10 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private PreviewStyle previewStyle;
     PreviewStyle previewStyle() { return previewStyle; }
     void previewStyle(TerminalTypography type, dev.jasper.sdk.ui.WorkspacePalette palette, SyntaxPalette syntax) {
+        var previous = previewStyle;
         previewStyle = new PreviewStyle(type, palette, syntax);
-        styleChanged.run();
+        if (getFont() != null) preview.restyle(type, palette, syntax, getFont(), opacity);
+        if (previous == null || !previous.syntax().equals(syntax)) styleChanged.run();
     }
 
     PreviewPane preview() { return preview; }
@@ -100,7 +102,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
             int extent=split.getWidth()-split.getDividerSize();
             if(!restoringDivider && mode==MarkdownMode.SPLIT && extent>0)dividerRatio=Math.max(0,Math.min(1,split.getDividerLocation()/(double)extent));
         });
-        addPropertyChangeListener("font",event -> {if(getFont()!=null){preview.bodyFont(getFont());styleChanged.run();}});
+        addPropertyChangeListener("font",event -> {if(getFont()!=null){preview.bodyFont(getFont());}});
         area.setCodeFoldingEnabled(true);
         area.setMarkOccurrences(true);
         area.setBracketMatchingEnabled(true);
@@ -157,8 +159,7 @@ final class DocumentArea extends JComponent implements AutoCloseable {
     private void refreshAppearance() {
         if (!closed && appearance != null && settings != null)
             { apply(settings, theme, appearance.editorPalette(), appearance.syntaxPalette(), appearance.workspaceOpacity(this));
-                if(typography!=null)previewStyle(typography,appearance.workspacePalette(),appearance.syntaxPalette());
-                if(typography!=null && getFont()!=null)preview.restyle(typography,appearance.workspacePalette(),appearance.syntaxPalette(),getFont(),appearance.workspaceOpacity(this)); }
+                if(typography!=null)previewStyle(typography,appearance.workspacePalette(),appearance.syntaxPalette()); }
     }
 
     void apply(EditorSettings settings, EditorTheme theme, EditorPalette editor, SyntaxPalette syntax, double opacity) {

@@ -94,6 +94,26 @@ class ScrollLinkTest {
         PreviewPaneTest.await(f.area.preview(),prepared.result());
         edt(() -> { f.prepared=prepared;f.layout();f.area.scrollLink.install(2,prepared.result()); });drain();
     }
+    @Test void independentSourceMotionCannotCancelPreviewPositionAfterInsertion() throws Exception {
+        try(var f=new Fixture(TEXT)) {
+            edt(() -> {f.area.scrollLink.linked(false);f.preview(f.py("# Target"));});
+            String prefix="new paragraph\n\n".repeat(60);
+            edt(() -> f.area.area.insert(prefix,0));drain();
+            edt(() -> layout(f.area.scroll,240,140));drain();
+            replace(f,prefix+TEXT,() -> f.source(50));
+            edt(() -> {assertThat(f.preview()).isCloseTo(f.py("# Target"),within(2));assertThat(f.source()).isEqualTo(50);});
+        }
+    }
+    @Test void independentSourceMotionCannotCancelPreviewBottomAfterAppend() throws Exception {
+        try(var f=new Fixture(TEXT)) {
+            edt(() -> {f.area.scrollLink.linked(false);f.preview(f.area.previewScroll.getViewport().getViewSize().height-140);});
+            String tail="new tail\n\n".repeat(30);
+            edt(() -> f.area.area.append(tail));drain();
+            edt(() -> layout(f.area.scroll,240,140));drain();
+            replace(f,TEXT+tail,() -> f.source(50));
+            edt(() -> {assertThat(f.preview()).isEqualTo(f.area.previewScroll.getViewport().getViewSize().height-140);assertThat(f.source()).isEqualTo(50);});
+        }
+    }
     @Test void bottomIsRetainedThroughReplacementAndImageGrowth() throws Exception {
         try(var f=new Fixture("![image](image.png)\n\n"+TEXT)) {
             edt(() -> {f.preview(f.area.previewScroll.getViewport().getViewSize().height-140);});

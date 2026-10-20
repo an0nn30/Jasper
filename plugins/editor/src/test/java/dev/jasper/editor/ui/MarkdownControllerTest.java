@@ -64,6 +64,69 @@ class MarkdownControllerTest {
         });
     }
 
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path home;
+    @Test void ownerFontAndWorkspaceChangesKeepInstalledDocumentReadingAnchorAndImages() throws Exception {
+        try(var host=new dev.jasper.sdk.testing.FakePluginHost(home)) {
+            dev.jasper.sdk.ui.Appearance[] appearance={null};
+            edt(() -> {
+                appearance[0]=host.start(new dev.jasper.sdk.PluginInfo("dev.jasper.editor","Editor","0.1.0",java.util.Set.of()),java.util.Set.of(),java.util.Set.of(),c -> {}).appearance();
+                tab.appearance(appearance[0]);
+                tab.settings(new EditorSettings("Monospaced",16,java.util.List.of(),false,1.3,false,4,false,10,false));
+                tab.typography(PreviewPaneTest.TYPE);
+                tab.area().setText("![image](relative.png)\n\n# Target\n\n"+"tail paragraph\n\n".repeat(60));
+                controller.mode(MarkdownMode.SPLIT);
+            });complete();
+            Object[] installed={null},document={null};int[] marker={0};
+            edt(() -> {
+                var result=controller.currentResult().orElseThrow();installed[0]=result;document[0]=tab.surface().preview().editor().getDocument();
+                var block=result.blocks().stream().filter(b -> b.sourceStart()==tab.area().getText().indexOf("# Target")).findFirst().orElseThrow();
+                marker[0]=tab.surface().preview().anchor(block.id()).orElseThrow();
+                dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().scroll,250,140);
+                dev.jasper.editor.testsupport.PreviewFixture.layout(tab.surface().previewScroll,350,140);
+                tab.surface().preview().image(0,new java.awt.image.BufferedImage(80,500,java.awt.image.BufferedImage.TYPE_INT_ARGB));
+                dev.jasper.editor.testsupport.Kits.click(tab.view(),"markdown.scroll-sync");
+            });for(int i=0;i<8;i++)edt(() -> {});
+            edt(() -> {
+                tab.surface().previewScroll.getViewport().setViewPosition(new java.awt.Point(0,previewY(marker[0])));
+                var settings=new EditorSettings("Serif",22,java.util.List.of(),false,1.8,false,4,false,10,false);
+                tab.settings(settings);tab.typography(EditorTypography.effective(settings,appearance[0].terminalTypography()));
+                assertThat(worker.size()).isZero();assertThat(controller.currentResult().orElseThrow()).isSameAs(installed[0]);
+                assertThat(tab.surface().preview().editor().getDocument()).isSameAs(document[0]);
+            });for(int i=0;i<8;i++)edt(() -> {});
+            edt(() -> {
+                assertThat(tab.surface().previewScroll.getViewport().getViewPosition().y).isCloseTo(previewY(marker[0]),within(2));
+                assertThat(previewY(marker[0])).isGreaterThan(400);
+                tab.surface().setFont(new java.awt.Font("Dialog",java.awt.Font.PLAIN,18));
+                host.setWorkspace(dev.jasper.sdk.Variant.DARK,PreviewPaneTest.palette(true),appearance[0].editorPalette(),appearance[0].syntaxPalette());host.flush();
+                assertThat(worker.size()).isZero();assertThat(controller.currentResult().orElseThrow()).isSameAs(installed[0]);
+                assertThat(tab.surface().preview().editor().getDocument()).isSameAs(document[0]);
+            });for(int i=0;i<8;i++)edt(() -> {});
+            edt(() -> {assertThat(tab.surface().previewScroll.getViewport().getViewPosition().y).isCloseTo(previewY(marker[0]),within(2));
+                assertThat(previewY(marker[0])).isGreaterThan(400);
+                host.setWorkspace(dev.jasper.sdk.Variant.DARK,PreviewPaneTest.palette(true),appearance[0].editorPalette(),EditorThemeTest.syntax(0x882200));host.flush();
+                assertThat(worker.size()).isEqualTo(1);assertThat(controller.currentResult()).isEmpty();});
+            complete();
+            edt(() -> assertThat(controller.currentResult().orElseThrow()).isNotSameAs(installed[0]));
+        }
+    }
+    private int previewY(int offset) {
+        try{return (int)tab.surface().preview().editor().modelToView2D(offset).getY();}
+        catch(javax.swing.text.BadLocationException e){throw new AssertionError(e);}
+    }
+    @Test void typographyChangeWhileWorkerRunsUsesLatestGeometryButSyntaxChangeRendersAgain() throws Exception {
+        var larger=new dev.jasper.sdk.ui.TerminalTypography("Serif",24,java.util.List.of(),false,1.8);
+        preview("```java\nint value = 1;\n```\n");
+        edt(() -> {tab.surface().previewStyle(larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(1));assertThat(worker.size()).isEqualTo(1);});
+        complete();
+        Object[] initial={null};
+        edt(() -> {assertThat(worker.size()).isZero();assertThat(tab.surface().preview().editor().getFont().getSize2D()).isEqualTo(24f);
+            initial[0]=controller.currentResult().orElseThrow();
+            tab.surface().previewStyle(larger,PreviewPaneTest.palette(true),EditorThemeTest.syntax(0x882200));
+            assertThat(worker.size()).isEqualTo(1);assertThat(controller.currentResult()).isEmpty();});
+        complete();
+        edt(() -> {assertThat(controller.currentResult().orElseThrow()).isNotSameAs(initial[0]);assertThat(visible()).contains("#8822");});
+    }
+
     @Test void resourceControlsAppearOnlyAfterMatchingPreviewInstall() throws Exception {
         try (var loader = new dev.jasper.editor.markdown.resources.ImageLoader(new dev.jasper.editor.markdown.resources.ImageBudget(1024))) {
             edt(() -> { controller.close(); controller = new MarkdownController(tab, worker, ui, tab::render, loader); controller.active(true); });
@@ -180,7 +243,7 @@ class MarkdownControllerTest {
         var broken = new java.util.concurrent.atomic.AtomicBoolean();
         edt(() -> {tab.surface().setFont(new java.awt.Font("Serif",0,12) {
             @Override public java.awt.Font deriveFont(float size) { if (broken.get()) throw new IllegalStateException("font failure"); return super.deriveFont(size); }
-        }); broken.set(true);});
+        }); broken.set(true);controller.retry();});
         complete();
         edt(() -> {assertThat(controller.failure()).contains("font failure");assertThat(visible()).contains("Old content");
             tab.surface().setFont(new java.awt.Font("Serif",0,12));controller.retry();});
