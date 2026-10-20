@@ -88,6 +88,7 @@ user's authorization.
 - [App icon assets](../packaging/icons/README.md) and [Buddy sprite assets](../packaging/buddy/README.md): sources and
   regeneration.
 - [Mock comparison tools](../tools/visual/README.md): comparing rendered surfaces with design references.
+- [Website](../website/README.md): the homepage, previewing it locally and its manual GitHub Pages deployment.
 
 ## Project records
 

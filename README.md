@@ -219,10 +219,11 @@ start-up recovery and no native `jasper` command.
 | `packaging/` | Jasper's launcher and launch watcher, the native `jasper` command, icons, Buddy sprites, and the Linux and Windows packaging scripts |
 | `tools/` | Benchmark runners, the theme converter, the SDK reference generator, icon and tab previews, and the mock comparison tools |
 | `docs/` | The documentation, the external plugin example, and dated design records |
+| `website/` | Jasper's homepage: static HTML, CSS and JavaScript, its screenshots and the script that packages it for GitHub Pages |
 | `gradle/` | The build's shared scripts: architecture checks, packaging, launcher, SDK release |
 | `config.example.toml` | The core settings at their defaults, as a starting `config.toml` |
 | `design/` | The app icon's exploration rounds |
-| `.github/workflows/` | CI, the Linux package checks, the Release workflow and the SDK jar upload |
+| `.github/workflows/` | CI, the Linux package checks, the Release workflow, the SDK jar upload and the manual website deployment |
 
 ## License
 
