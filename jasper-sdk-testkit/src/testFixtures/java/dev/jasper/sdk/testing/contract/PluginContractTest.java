@@ -1341,6 +1341,9 @@ public abstract class PluginContractTest {
         h.ui(() -> {
             PaneHandle pane = alpha.get().terminals().pane(only).orElseThrow();
             assertThat(pane.info().state()).isEqualTo(SessionState.NOT_STARTED);
+            assertThat(pane.info().columns()).as("no grid until it starts").isZero();
+            assertThat(pane.info().rows()).isZero();
+            assertThat(pane.info().shellIntegration()).isFalse();
             pane.sendText("dropped");
         });
         h.flush();
@@ -1353,6 +1356,38 @@ public abstract class PluginContractTest {
         });
         h.flush();
         assertThat(h.sentToPane(only)).containsExactly("write:kept");
+    }
+
+    /** Workspace tabs spec 13: a held pane starts when its tab is selected, once, after the selection is reported. */
+    @Test void aRestoredPaneStartsWhenItsTabIsSelected() {
+        UUID window = h.addTerminalWindow(), build = h.addTerminalTab(window, "build"), only = h.addTerminalPane(build, "make", Path.of("/src"));
+        UUID logs = h.addTerminalTab(window, "logs");
+        h.addTerminalPane(logs, "zsh", Path.of("/"));
+        List<Object> ordered = Collections.synchronizedList(new ArrayList<>());
+        var alpha = new AtomicReference<PluginContext>();
+        h.start(info("test.alpha", Capabilities.TERMINAL_OBSERVE), Set.of(), Set.of(), context -> {
+            alpha.set(context);
+            for (var topic : List.of(TerminalEvents.TAB_SELECTED, TerminalEvents.SESSION_STATE_CHANGED))
+                context.events().subscribe(topic, event -> ordered.add(Map.entry(topic, event)));
+        });
+        h.holdTerminalPane(only);
+        h.flush();
+        ordered.clear();
+        h.ui(() -> alpha.get().terminals().pane(only).orElseThrow().tab().select());
+        h.flush();
+        assertThat(ordered).as("Jasper selects the tab first and starts its pane after").containsExactly(
+            Map.entry(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window, build)),
+            Map.entry(TerminalEvents.SESSION_STATE_CHANGED,
+                new TerminalEvents.SessionStateChanged(only, SessionState.RUNNING, java.util.OptionalInt.empty())));
+        h.ui(() -> {
+            var started = alpha.get().terminals().pane(only).orElseThrow().info();
+            assertThat(started.state()).isEqualTo(SessionState.RUNNING);
+            assertThat(started.columns()).as("started, it has a grid").isPositive();
+        });
+        ordered.clear();
+        h.ui(() -> alpha.get().terminals().pane(only).orElseThrow().tab().select());
+        h.flush();
+        assertThat(ordered).as("selected again, it starts nothing more").isEmpty();
     }
 
     @Test void injectionArrivesInOrderFromAnyThreadAndAClosedPaneIgnoresIt() throws Exception {

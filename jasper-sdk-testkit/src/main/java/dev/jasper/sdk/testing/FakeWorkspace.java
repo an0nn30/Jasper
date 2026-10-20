@@ -25,8 +25,11 @@ final class FakeWorkspace {
     static final class Pane {
         final UUID id = UUID.randomUUID(); final Tab tab; PaneInfo info; String selection; String job; boolean open = true;
         FakeSessions.Session session;
-        /** Restored and not shown yet: it reports NOT_STARTED, drops what is sent to it, and starts when its tab is shown. */
-        boolean held;
+        /**
+         * Set while the pane is held (restored and not shown yet): the snapshot it starts with. A held pane reports
+         * NOT_STARTED with no grid, drops what is sent to it, and starts on its tab's next selection or focus.
+         */
+        PaneInfo held;
         final List<String> sent = new ArrayList<>();
         Pane(Tab tab, PaneInfo info) { this.tab = tab; this.info = info; }
     }
@@ -150,22 +153,23 @@ final class FakeWorkspace {
         tab.group.recent.addFirst(tab);
         window.recent.remove(tab.group);
         window.recent.addFirst(tab.group);
-        // A held pane starts when its tab is shown, as a restored terminal tab does (workspace tabs spec 13).
-        if (tab.pane != null && tab.pane.held) start(tab.pane);
-        if (window.selected == tab) return;
-        window.selected = tab;
-        host.publishApp(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window.id, tab.id));
-        refreshActive();
-        // As the application's window does on every selection: each content tab is active while it is its window's selected tab.
-        for (var content : host.contentTabs())
-            if (content instanceof FakeContent shown && !shown.closed && shown.tab.window == window) shown.active(shown.tab == tab);
+        if (window.selected != tab) {
+            window.selected = tab;
+            host.publishApp(TerminalEvents.TAB_SELECTED, new TerminalEvents.TabEvent(window.id, tab.id));
+            refreshActive();
+            // As the application's window does on every selection: each content tab is active while it is its window's selected tab.
+            for (var content : host.contentTabs())
+                if (content instanceof FakeContent shown && !shown.closed && shown.tab.window == window) shown.active(shown.tab == tab);
+        }
+        // A held pane starts once its tab is shown, after the selection, as Jasper starts a restored terminal tab at the
+        // end of the turn that shows it (workspace tabs spec 13).
+        if (tab.pane != null && tab.pane.held != null) start(tab.pane);
     }
 
-    /** A held pane starts: a provided session connects, a local shell runs. */
+    /** A held pane starts: its local shell runs, with the grid it had before it was held. */
     private void start(Pane pane) {
-        pane.held = false;
-        if (pane.session != null) { sessions.connect(pane.session.owner, pane, pane.session.spec); return; }
-        pane.info = FakeTerminals.withState(pane.info, dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty());
+        pane.info = FakeTerminals.withState(pane.held, dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty());
+        pane.held = null;
         host.publishApp(TerminalEvents.SESSION_STATE_CHANGED,
             new TerminalEvents.SessionStateChanged(pane.id, dev.jasper.sdk.terminal.SessionState.RUNNING, java.util.OptionalInt.empty()));
     }

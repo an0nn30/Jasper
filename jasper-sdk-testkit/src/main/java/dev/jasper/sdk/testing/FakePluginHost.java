@@ -1279,17 +1279,23 @@ public final class FakePluginHost implements AutoCloseable {
      */
     public void setPaneInfo(UUID paneId, dev.jasper.sdk.terminal.PaneInfo info) { workspace.pane(paneId).ifPresent(pane -> pane.info = Objects.requireNonNull(info, "info")); }
     /**
-     * Holds a pane as Jasper holds a restored terminal tab it has not shown yet (workspace tabs spec 13): it reports
-     * {@code SessionState.NOT_STARTED} and drops what plugins send it until its tab is shown ({@link #focusTerminalPane}
-     * or its {@code TabHandle.select()}), when it starts.
+     * Holds a local pane as Jasper holds a restored terminal tab it has not shown yet (workspace tabs spec 13): it reports
+     * {@code SessionState.NOT_STARTED} with no grid (0 columns, 0 rows, no shell integration) and drops what plugins send
+     * it, and it starts on its tab's next selection or focus ({@link #focusTerminalPane}, or its {@code TabHandle.select()}),
+     * after the selection is reported, with the snapshot it had when it was held. Only a local pane can be held; a pane
+     * that shows a provided session is refused.
      *
      * @param paneId the pane
+     * @throws IllegalArgumentException if the pane shows a provided session
      * @since 0.21.0
      */
     public void holdPane(UUID paneId) {
         workspace.pane(paneId).ifPresent(pane -> {
-            pane.held = true;
-            pane.info = FakeTerminals.withState(pane.info, dev.jasper.sdk.terminal.SessionState.NOT_STARTED, java.util.OptionalInt.empty());
+            if (pane.session != null)
+                throw new IllegalArgumentException("Only a local pane can be held: pane " + paneId + " shows a provided session");
+            if (pane.held != null) return;
+            pane.held = pane.info;
+            pane.info = FakeTerminals.notStarted(pane.info);
         });
     }
 

@@ -56,14 +56,16 @@ final class TerminalFixture {
 
     private PaneEntry entry(Pane pane) {
         return new PaneEntry(pane.id, pane.tab.id,
-            () -> new PaneSnapshot(pane.title, pane.remote == null ? Optional.ofNullable(pane.directory) : Optional.empty(), 80, 24, true,
-                pane.state.equals("NOT_STARTED") ? PaneSnapshot.State.NOT_STARTED : pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING
+            // A pane that has not started has no grid and no shell integration yet, as the application's reports.
+            () -> new PaneSnapshot(pane.title, pane.remote == null ? Optional.ofNullable(pane.directory) : Optional.empty(),
+                held(pane) ? 0 : 80, held(pane) ? 0 : 24, !held(pane),
+                held(pane) ? PaneSnapshot.State.NOT_STARTED : pane.state.equals("CONNECTING") ? PaneSnapshot.State.STARTING
                     : pane.state.equals("EXITED") ? PaneSnapshot.State.EXITED : PaneSnapshot.State.RUNNING,
                 OptionalInt.empty(), Optional.ofNullable(pane.request).map(SessionRequest::providerId), Optional.ofNullable(pane.remote), pane.shell),
             () -> CompletableFuture.completedFuture(Optional.of("vim")),
             // A pane that has not started drops what is sent to it (workspace tabs spec 13).
-            bytes -> { if (!pane.state.equals("NOT_STARTED")) pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)); },
-            text -> { if (!pane.state.equals("NOT_STARTED")) pane.sent.add("paste:" + text); },
+            bytes -> { if (!held(pane)) pane.sent.add("write:" + new String(bytes, StandardCharsets.UTF_8)); },
+            text -> { if (!held(pane)) pane.sent.add("paste:" + text); },
             () -> Optional.ofNullable(pane.selection), () -> focusPane(pane.id),
             (side, spec) -> {
                 // A split is a terminal tab of its own, in a new group beside the pane's group (spec 9.4).
@@ -165,10 +167,19 @@ final class TerminalFixture {
         tab.group.recent.addFirst(tab);
         window.recent.remove(tab.group);
         window.recent.addFirst(tab.group);
-        if (window.selected == tab) return;
-        window.selected = tab;
-        registry.publish(new TerminalEvent.TabSelected(window.id, tab.id));
+        if (window.selected != tab) {
+            window.selected = tab;
+            registry.publish(new TerminalEvent.TabSelected(window.id, tab.id));
+        }
+        // A held pane starts once its tab is shown, after the selection, as the application starts a restored terminal
+        // tab at the end of the turn that shows it (workspace tabs spec 13).
+        if (tab.pane != null && held(tab.pane)) {
+            tab.pane.state = "";
+            registry.publish(new TerminalEvent.SessionStarted(tab.pane.id));
+        }
     }
+
+    private static boolean held(Pane pane) { return pane.state.equals("NOT_STARTED"); }
 
     /** Takes {@code tab} out of its window's groups; true when it was the window's selected tab. */
     private boolean takeOut(Tab tab) {
@@ -251,8 +262,6 @@ final class TerminalFixture {
     void focusPane(UUID paneId) {
         Pane pane = panes.get(paneId);
         if (pane == null) return;
-        // A held pane starts when its tab is shown, as a restored terminal tab does.
-        if (pane.state.equals("NOT_STARTED")) pane.state = "";
         registry.atomically(() -> { select(pane.tab); registry.publish(new TerminalEvent.PaneFocused(pane.tab.id, pane.id)); });
     }
 
@@ -368,8 +377,16 @@ final class TerminalFixture {
         } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
     }
 
-    /** The pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13). */
-    void holdPane(UUID paneId) { panes.get(paneId).state = "NOT_STARTED"; }
+    /**
+     * The local pane waits, as a restored terminal tab not yet shown does (workspace tabs spec 13): it starts on its tab's
+     * next selection or focus. A pane that shows a provided session is refused, as the testkit's fake refuses it.
+     */
+    void holdPane(UUID paneId) {
+        Pane pane = panes.get(paneId);
+        if (pane.request != null)
+            throw new IllegalArgumentException("Only a local pane can be held: pane " + paneId + " shows a provided session");
+        pane.state = "NOT_STARTED";
+    }
 
     /** What the pane's shell reports: a local directory when {@code hostOrEmpty} is empty, a remote one otherwise. */
     void reportDirectory(UUID paneId, String hostOrEmpty, String path) {

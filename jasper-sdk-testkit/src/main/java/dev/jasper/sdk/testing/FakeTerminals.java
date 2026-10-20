@@ -125,7 +125,7 @@ final class FakeTerminals implements Terminals {
             require(Capabilities.TERMINAL_INJECT);
             if (context.state == FakePluginContext.State.CLOSED) return;
             // A pane that has not started drops what is sent to it, as Jasper's does (workspace tabs spec 13).
-            synchronized (workspace) { model().filter(pane -> !pane.held).ifPresent(pane -> pane.sent.add(line)); }
+            synchronized (workspace) { model().filter(pane -> pane.held == null).ifPresent(pane -> pane.sent.add(line)); }
         }
         @Override public Optional<String> selection() {
             require(Capabilities.TERMINAL_SELECTION);
@@ -252,6 +252,12 @@ final class FakeTerminals implements Terminals {
     private PaneInfo sessionInfo(OpenRequest.Session session) {
         return new PaneInfo(session.spec().title(), Optional.empty(), Optional.empty(), 80, 24, false, SessionKind.PLUGIN,
             Optional.of(context.plugin().id()), SessionState.CONNECTING, OptionalInt.empty(), session.spec().title());
+    }
+
+    /** A held pane's snapshot: not started, with no grid and no shell integration, as Jasper reports a restored pane. */
+    static PaneInfo notStarted(PaneInfo info) {
+        return new PaneInfo(info.title(), info.workingDirectory(), info.remoteDirectory(), 0, 0, false, info.kind(),
+            info.providerPluginId(), SessionState.NOT_STARTED, OptionalInt.empty(), info.shell());
     }
 
     /** A copy of a snapshot in another session state; an exit status is kept only for an exited session. */

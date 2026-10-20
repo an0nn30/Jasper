@@ -19,8 +19,26 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FakeSessionsTest {
+    /** Workspace tabs plan 6a: the fake holds a local pane only; a provided session's attempt goes on untouched. */
+    @Test void aPaneShowingAProvidedSessionCannotBeHeld() {
+        try (var host = new FakePluginHost()) {
+            UUID window = host.addTerminalWindow();
+            var attempts = new ArrayList<PendingSession>();
+            PluginContext context = host.start(new PluginInfo("dev.x.ssh", "SSH", "1.0.0",
+                Set.of(Capabilities.SESSION_PROVIDE, Capabilities.TERMINAL_OBSERVE)), Set.of(), Set.of(), plugin -> { });
+            PaneHandle pane = context.terminals().openTab(context.terminals().window(window).orElseThrow(),
+                OpenRequest.session(SessionSpec.of("build-host", attempts::add))).orElseThrow();
+            assertThatThrownBy(() -> host.holdPane(pane.id())).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Only a local pane can be held: pane " + pane.id() + " shows a provided session");
+            assertThat(host.sessionState(pane.id())).as("its attempt goes on").isEqualTo("CONNECTING|");
+            assertThat(pane.info().state()).isEqualTo(dev.jasper.sdk.terminal.SessionState.CONNECTING);
+            assertThat(attempts).hasSize(1);
+        }
+    }
+
     @Test void providerDirectoryIsAFallbackScopedToTheAttachedAttempt() {
         try (var host = new FakePluginHost()) {
             UUID window = host.addTerminalWindow();

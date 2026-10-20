@@ -129,8 +129,8 @@ public interface ContractHarness extends AutoCloseable {
     java.util.UUID addTerminalPane(java.util.UUID tabId, String title, java.nio.file.Path directory);
 
     /**
-     * UI thread: the pane waits as a restored terminal tab not yet shown does (workspace tabs spec 13): not started, dropping
-     * what is sent to it, until its tab is shown.
+     * UI thread: the local pane waits as a restored terminal tab not yet shown does (workspace tabs spec 13): not started,
+     * with no grid, dropping what is sent to it; it starts on its tab's next selection or focus.
      */
     void holdTerminalPane(java.util.UUID paneId);
 

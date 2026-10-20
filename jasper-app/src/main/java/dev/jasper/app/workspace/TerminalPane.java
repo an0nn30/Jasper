@@ -57,6 +57,8 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     private boolean waiting;
     /** Jasper restored this pane with its tab: a saved directory gone by the time it starts starts it where a new shell starts. */
     private boolean restored;
+    /** {@link #start()} ran: a pane starts once. */
+    private boolean started;
     private final ShellLauncher launcher;
     private final AtomicBoolean updateQueued = new AtomicBoolean();
     private volatile String shellLabel;
@@ -258,7 +260,10 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** Whether this pane is restored and waits for its tab to be shown. */
     boolean waiting() { return waiting; }
 
+    /** Starts the pane's shell, or connects its provided session; a pane starts once, and a closed one never. */
     void start() {
+        if (closed || started) return;
+        started = true;
         waiting = false;
         if (request != null) { connect(); return; }
         ShellLauncher.Launch launched = launcher.launch(defaultDirectory ? Optional.empty() : Optional.of(launchDirectory), restored,
@@ -473,13 +478,13 @@ public final class TerminalPane extends JPanel implements AutoCloseable {
     /** What this pane is right now, for the terminal registry. */
     PaneSnapshot snapshot() {
         Optional<String> provider = request == null ? Optional.empty() : Optional.of(request.providerId());
-        if (waiting) return new PaneSnapshot(title(), request == null ? Optional.of(launchDirectory) : Optional.empty(), 0, 0, false,
-            PaneSnapshot.State.NOT_STARTED, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
         boolean connecting = attempt != null && attempt.state() == SessionAttempt.State.PENDING;
-        if (session == null || connecting) {
-            boolean failedBeforeAnySession = request != null && !connecting;
+        if (waiting || session == null || connecting) {
+            boolean failedBeforeAnySession = !waiting && request != null && !connecting;
+            PaneSnapshot.State state = waiting ? PaneSnapshot.State.NOT_STARTED
+                : failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING;
             return new PaneSnapshot(title(), request == null ? Optional.of(launchDirectory) : Optional.empty(), 0, 0, false,
-                failedBeforeAnySession ? PaneSnapshot.State.EXITED : PaneSnapshot.State.STARTING, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
+                state, OptionalInt.empty(), provider, Optional.empty(), shellLabel);
         }
         CompletableFuture<Integer> exit = session.exitFuture();
         boolean exited = exit.isDone();

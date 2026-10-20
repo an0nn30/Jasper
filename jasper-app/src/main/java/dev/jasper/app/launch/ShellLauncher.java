@@ -142,7 +142,8 @@ public final class ShellLauncher {
 
     /**
      * As above; with {@code anyDirectory}, a {@code directory} that is not there once the shell starts counts as empty, so
-     * the shell starts where a new shell starts instead of failing: a restored terminal tab's (workspace tabs spec 13).
+     * the shell starts where a new shell starts instead of failing: a restored terminal tab's (workspace tabs spec 13). A
+     * WSL share is exempt: it is never probed here, and {@code LaunchSettings.at} decides where the profile's shell starts.
      */
     public Launch launch(Optional<Path> directory, boolean anyDirectory, Optional<String> profile, Optional<List<String>> program,
                          Optional<UUID> pane, Consumer<Launch> replaced, BiConsumer<TerminalSession, Throwable> completion) {

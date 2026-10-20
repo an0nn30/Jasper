@@ -24,7 +24,7 @@ public interface WindowHandle extends WindowOwner {
     List<TabHandle> tabs();
 
     /**
-     * The active tab: the selected tab of the active pane of the window's shown parent tab, terminal or content.
+     * The active tab: the selected tab of the active group of the window's shown parent tab, terminal or content.
      *
      * @return the tab, or empty in an empty workspace and once the window is closed
      */

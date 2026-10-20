@@ -3,8 +3,9 @@ package dev.jasper.sdk.terminal;
 /** Where a pane's session is in its life. */
 public enum SessionState {
     /**
-     * Not started: the pane of a terminal tab Jasper restored at start and has not shown yet. Its shell starts, or its
-     * plugin's session connects, when the tab is first shown; until then nothing runs and text sent to it is dropped.
+     * Not started: the pane of a terminal tab Jasper restored (at start, or when the main window reopens) and has not
+     * shown yet. Its shell starts, or its plugin's session connects, when the tab is first shown; until then nothing runs
+     * and text sent to it is dropped.
      *
      * @since 0.21.0
      */

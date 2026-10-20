@@ -1,5 +1,6 @@
 package dev.jasper.app.workspace;
 
+import dev.jasper.app.appearance.ThemeTestSupport;
 import dev.jasper.app.application.ApplicationTestSupport;
 import dev.jasper.app.testsupport.ConfigTestSupport;
 import dev.jasper.app.launch.ShellLauncher;
@@ -15,6 +16,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import javax.swing.SwingUtilities;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -30,6 +32,9 @@ class ShellLauncherTest {
     private static final ShellProfile UBUNTU =
         new ShellProfile("wsl:Ubuntu", "Ubuntu", ShellProfile.Kind.WSL, Optional.empty(), List.of("wsl.exe", "-d", "Ubuntu"));
     @TempDir Path directory;
+
+    /** Two cases build a TerminalPane, whose labels need an installed theme whatever ran before. */
+    @BeforeAll static void theme() throws Exception { edt(() -> ThemeTestSupport.install(true)); }
 
     @Test @DisabledOnOs(OS.WINDOWS)
     void queuedRequestsCaptureSettingsAndPaneLabelsBeforeWorkerRuns() throws Exception {
@@ -147,6 +152,22 @@ class ShellLauncherTest {
         assertThat(errors.remove()).isEqualTo("started");
         assertThat(errors.remove()).isEqualTo("started");
         assertThat(errors.remove()).as("any other launch still needs its directory").contains("Directory is unavailable");
+    }
+
+    /** Workspace tabs plan 6a: a restored tab's saved directory that is still there is where its shell starts. */
+    @Test void anyDirectoryKeepsADirectoryThatIsThere() throws Exception {
+        Queue<Runnable> pending = new ArrayDeque<>();
+        var settings = LaunchSettings.resolve(ConfigSnapshot.defaults(), "Linux", Map.of(), 150, 45);
+        Queue<Path> started = new ArrayDeque<>();
+        BiConsumer<TerminalSession, Throwable> completion = (session, error) -> { };
+        edt(() -> {
+            new ShellLauncher(pending::add, () -> settings, (path, launch) -> { started.add(path); throw new IllegalStateException("started"); })
+                .launch(Optional.of(directory), true, Optional.empty(), Optional.empty(), Optional.empty(), replaced -> { }, completion);
+            new ShellLauncher(pending::add, path -> { started.add(path); throw new IllegalStateException("started"); }, "sh")
+                .launch(Optional.of(directory), true, Optional.empty(), Optional.empty(), Optional.empty(), replaced -> { }, completion);
+        });
+        while (!pending.isEmpty()) pending.remove().run(); edt(() -> {});
+        assertThat(started).containsExactly(directory, directory);
     }
 
     @Test @DisabledOnOs(OS.WINDOWS)
