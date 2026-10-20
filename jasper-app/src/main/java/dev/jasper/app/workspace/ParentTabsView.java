@@ -24,15 +24,17 @@ import javax.swing.JPanel;
 /**
  * A window's parent tabs (parent tabs spec 4 and 7): a {@link WorkspaceView} for each, and the {@link ParentTabs} they
  * make up, which every layout change keeps current. It stands where the terminal column stood, in the dock's centre,
- * and paints nothing itself. Only the shown parent tab's workspace is visible; the others stay in the tree, hidden, with
- * their groups, tabs and sessions as they were, so a switch restarts nothing. A parent tab joins holding its first tab
- * and leaves with its last one, except the window's only parent tab, which the main window keeps as its empty
- * workspace. EDT only.
+ * with the parent-tab bar ({@link ParentTabBar}) on top, and paints nothing itself. Only the shown parent tab's
+ * workspace is visible; the others stay in the tree, hidden, with their groups, tabs and sessions as they were, so a
+ * switch restarts nothing. A parent tab joins holding its first tab and leaves with its last one, except the window's
+ * only parent tab, which the main window keeps as its empty workspace. EDT only.
  */
 final class ParentTabsView extends JPanel {
     private final WindowContent owner;
     /** Each parent tab's workspace; the model gives their order. */
     private final Map<ParentTabId, WorkspaceView> views = new HashMap<>();
+    /** The bar over the parent tabs (parent tabs spec 7), the view's last child (workspace plan 7a Rulings 19). */
+    private final ParentTabBar bar;
     private ParentTabs model;
     private boolean closed;
 
@@ -45,10 +47,14 @@ final class ParentTabsView extends JPanel {
         views.put(first.id(), first);
         add(first);
         model = ParentTabs.of(new ParentTab(first.id(), first.model()));
+        bar = new ParentTabBar(owner, this);
+        add(bar.strip().component());
     }
 
     /** The parent tabs in bar order with their layouts, and the one that shows. */
     ParentTabs model() { return model; }
+    /** The parent-tab bar. */
+    ParentTabBar bar() { return bar; }
     /** The shown parent tab's workspace. */
     WorkspaceView active() { return views.get(model.active()); }
     /** Every parent tab's workspace, in bar order. */
@@ -166,15 +172,18 @@ final class ParentTabsView extends JPanel {
         repaint();
     }
 
-    /** Refreshes every parent tab's strips. */
+    /** Refreshes the bar and every parent tab's strips. */
     void refresh() {
         if (closed) return;
+        bar.refresh();
         for (WorkspaceView view : views.values()) view.refresh();
     }
 
     /** Every parent tab takes the theme; a hidden one is in the tree, so the window's tree update reaches its delegates. */
     void applyTheme(ResolvedTheme theme, boolean updateDelegates) {
         for (WorkspaceView view : views.values()) view.applyTheme(theme, updateDelegates);
+        WorkspaceTheme.apply(bar.strip().component(), theme);
+        bar.refresh();
     }
 
     void setGlass(boolean value) {
@@ -184,10 +193,13 @@ final class ParentTabsView extends JPanel {
 
     void setAnimations(AnimationSettings settings) {
         for (WorkspaceView view : views.values()) view.setAnimations(settings);
+        bar.strip().setAnimations(settings);
     }
 
-    /** Every strip takes a new tab height. */
+    /** Every strip, the bar's too, takes a new tab height. */
     void revalidateStrips() {
+        bar.strip().component().revalidate();
+        bar.strip().component().repaint();
         for (WorkspaceView view : views.values())
             for (GroupView group : view.groupViews()) {
                 group.strip().component().revalidate();
@@ -199,27 +211,46 @@ final class ParentTabsView extends JPanel {
     void close() {
         if (closed) return;
         closed = true;
+        bar.close();
         for (WorkspaceView view : views.values()) view.close();
     }
 
-    /** Every parent tab's workspace fills the view; only the shown one is visible. */
+    /** The bar on top at its preferred height while it shows; every parent tab's workspace fills the rest. */
     private static final class Stack implements LayoutManager {
         @Override public void addLayoutComponent(String name, Component component) { }
         @Override public void removeLayoutComponent(Component component) { }
-        @Override public Dimension preferredLayoutSize(Container parent) { return largest(parent, false); }
-        @Override public Dimension minimumLayoutSize(Container parent) { return largest(parent, true); }
+        @Override public Dimension preferredLayoutSize(Container parent) { return size(parent, false); }
+        @Override public Dimension minimumLayoutSize(Container parent) { return size(parent, true); }
         @Override public void layoutContainer(Container parent) {
             Insets insets = parent.getInsets();
+            int width = parent.getWidth() - insets.left - insets.right, top = insets.top;
+            Component bar = bar(parent);
+            if (bar != null) {
+                int height = bar.isVisible() ? bar.getPreferredSize().height : 0;
+                bar.setBounds(insets.left, top, width, height);
+                top += height;
+            }
             for (Component child : parent.getComponents())
-                child.setBounds(insets.left, insets.top, parent.getWidth() - insets.left - insets.right,
-                    parent.getHeight() - insets.top - insets.bottom);
+                if (child != bar) child.setBounds(insets.left, top, width, Math.max(0, parent.getHeight() - top - insets.bottom));
         }
-        private static Dimension largest(Container parent, boolean minimum) {
+        /** The bar's strip; null while the view is being built. */
+        private static Component bar(Container parent) {
+            ParentTabBar bar = ((ParentTabsView) parent).bar;
+            return bar == null ? null : bar.strip().component();
+        }
+        private static Dimension size(Container parent, boolean minimum) {
+            Component bar = bar(parent);
             int width = 0, height = 0;
             for (Component child : parent.getComponents()) {
+                if (child == bar) continue;
                 Dimension size = minimum ? child.getMinimumSize() : child.getPreferredSize();
                 width = Math.max(width, size.width);
                 height = Math.max(height, size.height);
+            }
+            if (bar != null && bar.isVisible()) {
+                Dimension size = minimum ? bar.getMinimumSize() : bar.getPreferredSize();
+                width = Math.max(width, size.width);
+                height += size.height;
             }
             Insets insets = parent.getInsets();
             return new Dimension(width + insets.left + insets.right, height + insets.top + insets.bottom);

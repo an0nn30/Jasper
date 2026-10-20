@@ -954,6 +954,11 @@ public final class WindowContent extends JPanel implements AutoCloseable {
         ActionId id = ActionId.valueOf("SELECT_TAB_" + (index + 1));
         return CommandsScope.shortcutText(action(id).getValue(Action.ACCELERATOR_KEY), macOs);
     }
+    /** Select Parent Tab {@code index + 1}'s shortcut as this platform writes it; "" past 9 or while it has none. */
+    String parentTabShortcut(int index) {
+        if (index < 0 || index >= 9) return "";
+        return shortcutText(ActionId.valueOf("SELECT_PARENT_TAB_" + (index + 1)));
+    }
     WindowCommandPalette commandPalette() { return commandPalette; }
     /** The title field's bounds in {@code target}'s coordinates while the palette can drop from it; null otherwise. */
     java.awt.Rectangle paletteAnchor(Component target) {
@@ -1207,6 +1212,8 @@ public final class WindowContent extends JPanel implements AutoCloseable {
      * @return the parent tabs
      */
     public WindowLayout windowLayout() { return parentTabs.model(); }
+    /** The parent-tab bar's strip (parent tabs spec 7). */
+    TabStrip parentTabBar() { return parentTabs.bar().strip(); }
     TabRegistry tabRegistry() { return registry; }
     boolean windowActive() { return active; }
     dev.jasper.app.config.AnimationSettings animations() { return animations; }
@@ -1243,6 +1250,18 @@ public final class WindowContent extends JPanel implements AutoCloseable {
             item.addActionListener(event -> command.run().run());
             menu.add(item);
         }
+        dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
+        return menu;
+    }
+
+    /**
+     * A parent tab's menu in the bar (parent tabs spec 6 and 8; workspace plan 7a Rulings 16): Close Parent Tab, for the
+     * parent tab {@code tab} shows as its active tab.
+     */
+    JPopupMenu parentTabMenu(Tab tab) {
+        var menu = new JPopupMenu();
+        parentTabOf(tab).ifPresent(parent ->
+            menu.add(tabMenuItem("Close Parent Tab", ActionId.CLOSE_PARENT_TAB, () -> closeParentTab(parent))));
         dev.jasper.ui.swing.NativeStyles.installed().menuTree(menu, dev.jasper.ui.swing.FlatLafInstaller::installedTheme);
         return menu;
     }

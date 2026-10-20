@@ -7,10 +7,11 @@ import javax.swing.JComponent;
 import javax.swing.JPopupMenu;
 
 /**
- * One tab group's strip (workspace tabs spec 10; Enterprise presentation spec 10.5): today's equal tabs, hidden while
- * their pane holds a single tab (parent tabs spec 7), or the classic tabs, always shown. It lists, selects, closes and
- * opens tabs in its group view only, its presses start the tab drag (workspace tabs spec 12), and it shows as active while
- * that group is the active group of an active window. EDT only.
+ * One tab group's strip, or a window's parent-tab bar (workspace tabs spec 10; parent tabs spec 7; Enterprise presentation
+ * spec 10.5): today's equal tabs, hidden while their pane holds a single tab or their window a single parent tab, or the
+ * classic tabs, always shown. It lists, selects, closes and opens through its {@link StripSource} only, a group's presses
+ * start the tab drag (workspace tabs spec 12), and it shows as active while its group is the active group of an active
+ * window, or while the bar's window is active. EDT only.
  */
 sealed interface TabStrip extends AutoCloseable permits WindowTabs, ClassicTabs {
     /** The component mounted above the group's cards. */

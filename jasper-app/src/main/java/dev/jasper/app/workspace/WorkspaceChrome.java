@@ -22,7 +22,7 @@ public final class WorkspaceChrome {
     private final TitleFormat title;
     /** The header's composition, made for each window by {@link #header()}. */
     private final WorkspaceLook.Header header;
-    /** The editor tabs, made for each tab group by {@link #tabs(GroupView)}. */
+    /** The editor tabs, made for each tab group and each window's parent-tab bar by {@link #tabs(StripSource)}. */
     private final WorkspaceLook.Tabs tabs;
     /** The status bar's layout, and whether it leads with the run item: made for each window by {@link #statusBar}. */
     private final WorkspaceLook.Status status;
@@ -104,11 +104,11 @@ public final class WorkspaceChrome {
         };
     }
 
-    /** One tab group's strip (spec 10.5; workspace tabs spec 10). */
-    TabStrip tabs(GroupView group) {
+    /** One tab group's strip, or a window's parent-tab bar (spec 10.5; workspace tabs spec 10; parent tabs spec 7). */
+    TabStrip tabs(StripSource source) {
         return switch (tabs) {
-            case EQUAL -> new WindowTabs(group);
-            case CLASSIC -> new ClassicTabs(group);
+            case EQUAL -> new WindowTabs(source);
+            case CLASSIC -> new ClassicTabs(source);
         };
     }
 
@@ -119,6 +119,17 @@ public final class WorkspaceChrome {
     boolean showsStrip(int count) {
         return switch (tabs) {
             case EQUAL -> count != 1;
+            case CLASSIC -> true;
+        };
+    }
+
+    /**
+     * Whether a window holding {@code count} parent tabs shows its parent-tab bar (parent tabs spec 7): the classic tabs
+     * (Enterprise) always; the equal tabs from two parent tabs.
+     */
+    boolean showsParentTabBar(int count) {
+        return switch (tabs) {
+            case EQUAL -> count > 1;
             case CLASSIC -> true;
         };
     }

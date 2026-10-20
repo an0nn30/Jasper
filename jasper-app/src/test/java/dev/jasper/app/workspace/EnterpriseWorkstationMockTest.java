@@ -151,19 +151,20 @@ class EnterpriseWorkstationMockTest {
         var render = mounted.image();
         assertThat(mounted.firstTab().isEmpty()).as(what + "classic tabs").isFalse();
         int left = 2 * mounted.firstTab().x;
+        // The pane's strip, under the parent-tab bar Enterprise always shows (parent tabs spec 7; workspace plan 7a Rulings 18).
         // The underline row: mock y 233 (the indicator 232-235 above the rule at 236); the render's strip is 2 px taller.
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        int underline = 2 * (25 + TOOLBAR + 1 + 29) - 3;
+        int underline = 2 * (mounted.firstTab().y + 29) - 3;
         var expected = MockProfile.solid(MockProfile.row(mock, 233, 650, 1100), 4);
         var actual = MockProfile.solid(MockProfile.row(render, underline, left, left + 450), 4);
         same(what + "the first tab and its divider on the strip", actual.get(0), expected.get(0), 6, MockProfile.role(dark, "surface.tabstrip"));
         same(what + "the active tab's tab.indicator underline", actual.get(1), expected.get(1), 6, MockProfile.painted(dark, WindowPairs.TAB_INDICATOR));
         // The active tab on surface.card, inside its 12 px leading padding (mock x 850, mid-strip y 208).
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (25 + TOOLBAR + 1 + 14)), MockProfile.role(dark, "surface.card")))
+        assertThat(MockProfile.deltaE(MockProfile.at(render, left + 200, 2 * (mounted.firstTab().y + 14)), MockProfile.role(dark, "surface.card")))
             .as(what + "the active tab's ground").isLessThanOrEqualTo(2.5);
         // The user's 2026-10-19 direction: IntelliJ's 28 px toolbar, where the mocks draw 34.
-        MockProfile.write(render.getSubimage(left, 2 * (25 + TOOLBAR + 1), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
+        MockProfile.write(render.getSubimage(left, 2 * (mounted.firstTab().y), 700, 58), "enterprise-" + (dark ? "dark" : "light") + "-tabs");
     }
 
     @ParameterizedTest @ValueSource(booleans = {false, true})

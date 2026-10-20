@@ -23,11 +23,12 @@ import javax.swing.*;
  * Equal-width, centered tabs of one tab group (workspace tabs spec 10), hidden by their group view while their pane
  * holds a single tab (parent tabs spec 7). A tab that opens or closes moves into or out of its place; one that joins or
  * leaves the group by a move, or is reordered, or arrives while the strip is hidden, takes its place at once (spec 4,
- * Rulings 27). EDT only.
+ * Rulings 27). It shows a window's parent tabs too, each as its active tab, and those never move (parent tabs spec 7).
+ * EDT only.
  */
 final class WindowTabs extends JPanel implements TabStrip {
     static final int TITLE_LIMIT = 200;
-    private final GroupView group;
+    private final StripSource source;
     private final LongSupplier clock;
     private final List<Slot> slots = new ArrayList<>();
     private final IdentityHashMap<Tab, Entry> entries = new IdentityHashMap<>();
@@ -39,10 +40,10 @@ final class WindowTabs extends JPanel implements TabStrip {
     private int layoutWidth = -1, layoutHeight = -1;
     private boolean active = true, disposed;
 
-    WindowTabs(GroupView group) { this(group, System::nanoTime); }
-    WindowTabs(GroupView group, LongSupplier clock) {
+    WindowTabs(StripSource source) { this(source, System::nanoTime); }
+    WindowTabs(StripSource source, LongSupplier clock) {
         super(null);
-        this.group = group; this.clock = clock;
+        this.source = source; this.clock = clock;
         setName("windowTabs"); setOpaque(false);
         viewport.setOpaque(false); viewport.setName("tabViewport"); add(viewport);
     }
@@ -52,12 +53,12 @@ final class WindowTabs extends JPanel implements TabStrip {
     @Override public void refresh() {
         if (disposed) return;
         long now = clock.getAsLong(); sample(now);
-        var updated = new ArrayList<>(group.tabs());
+        var updated = new ArrayList<>(source.tabs());
         boolean changed = !updated.equals(order);
         boolean added = updated.stream().anyMatch(tab -> !entries.containsKey(tab));
         boolean removed = order.stream().anyMatch(tab -> !updated.contains(tab));
         // Only an open or a close moves: a tab that arrives or leaves by a move does not (Rulings 27).
-        boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !group.moved(tab));
+        boolean opened = updated.stream().anyMatch(tab -> !entries.containsKey(tab) && !source.moved(tab));
         boolean closing = order.stream().anyMatch(tab -> !updated.contains(tab) && tab.closed());
         if (changed) {
             for (Tab tab : List.copyOf(order)) if (!updated.contains(tab)) {
@@ -80,13 +81,13 @@ final class WindowTabs extends JPanel implements TabStrip {
             int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
             // A strip that does not show, hidden itself or in a hidden parent tab, takes its tabs at once, so it shows and
             // hides settled.
-            if (order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !group.owner().lookAnimates()
+            if (order.size() <= 1 || !opened && !closing || !shown() || !animations.enabled() || !source.animates()
                 || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
             sample(now);
         }
-        selected = group.selected();
-        setBackground(group.owner().theme().surface());
+        selected = source.selected();
+        setBackground(source.owner().theme().surface());
         for (Tab tab : order) entries.get(tab).refresh();
         doLayout(); syncTimer(); revalidate(); repaint();
     }
@@ -109,9 +110,9 @@ final class WindowTabs extends JPanel implements TabStrip {
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Tab tab : order) {
-            var item = new JCheckBoxMenuItem(capped(group.title(tab)), group.icon(tab), tab == selected);
+            var item = new JCheckBoxMenuItem(capped(source.title(tab)), source.icon(tab), tab == selected);
             item.putClientProperty("html.disable", true);
-            item.addActionListener(event -> { if (!disposed) group.select(tab); });
+            item.addActionListener(event -> { if (!disposed) source.select(tab); });
             menu.add(item);
         }
         NativeStyles.installed().menuTree(menu, FlatLafInstaller::installedTheme);
@@ -124,7 +125,7 @@ final class WindowTabs extends JPanel implements TabStrip {
         return bounds;
     }
 
-    @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(group.owner().tabHeight())); }
+    @Override public Dimension getMinimumSize() { return new Dimension(0, UIScale.scale(source.owner().tabHeight())); }
     @Override public Dimension getPreferredSize() { return getMinimumSize(); }
 
     @Override public void doLayout() {
@@ -157,11 +158,11 @@ final class WindowTabs extends JPanel implements TabStrip {
             if (slot.entry != null && slot.entry.hovered) hovered = bounds.size();
             bounds.add(slot.bounds);
         }
-        ChromePainter.installed().tabStrip(this, graphics, group.owner().theme().workspace(), group.owner().workspaceSurface(), bounds, chosen, hovered, active);
+        ChromePainter.installed().tabStrip(this, graphics, source.owner().theme().workspace(), source.owner().workspaceSurface(), bounds, chosen, hovered, active);
     }
 
     private Color surface(boolean selected) {
-        return ChromePainter.installed().tabSurface(group.owner().theme().workspace(), group.owner().workspaceSurface(), selected);
+        return ChromePainter.installed().tabSurface(source.owner().theme().workspace(), source.owner().workspaceSurface(), selected);
     }
 
     /** {@code title}, or past {@code TITLE_LIMIT} characters its start and an ellipsis within that limit, for tips and menus. */
@@ -268,12 +269,12 @@ final class WindowTabs extends JPanel implements TabStrip {
         Entry(Tab tab) {
             super(null); this.tab = tab; slot = new Slot(this); setOpaque(false);
             flat(select); flat(close); select.setHorizontalAlignment(SwingConstants.CENTER);
-            select.addActionListener(event -> { if (!disposed) group.select(tab); });
+            select.addActionListener(event -> { if (!disposed) source.select(tab); });
             close.setRolloverEnabled(true); close.setToolTipText("Close tab");
             close.getAccessibleContext().setAccessibleName("Close tab");
-            close.addActionListener(event -> { if (!disposed) group.close(tab); });
+            close.addActionListener(event -> { if (!disposed) source.close(tab); });
             MouseAdapter gestures = new MouseAdapter() {
-                private void popup(MouseEvent event) { group.menu(tab).show(event.getComponent(), event.getX(), event.getY()); }
+                private void popup(MouseEvent event) { source.menu(tab).show(event.getComponent(), event.getX(), event.getY()); }
                 @Override public void mouseEntered(MouseEvent event) { hover(true); }
                 @Override public void mouseExited(MouseEvent event) {
                     hover(contains(SwingUtilities.convertPoint(event.getComponent(), event.getPoint(), Entry.this)));
@@ -281,17 +282,17 @@ final class WindowTabs extends JPanel implements TabStrip {
                 @Override public void mousePressed(MouseEvent event) {
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    if (SwingUtilities.isMiddleMouseButton(event)) { group.close(tab); return; }
+                    if (SwingUtilities.isMiddleMouseButton(event)) { source.close(tab); return; }
                     if (SwingUtilities.isLeftMouseButton(event) && event.getComponent() != close) {
-                        group.select(tab);
+                        source.select(tab);
                         // The tab drag may start here (workspace tabs spec 12).
-                        group.pressed(tab, event);
+                        source.pressed(tab, event);
                     }
                 }
-                @Override public void mouseDragged(MouseEvent event) { group.dragged(event); }
+                @Override public void mouseDragged(MouseEvent event) { source.dragged(event); }
                 @Override public void mouseReleased(MouseEvent event) {
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    group.released(event);
+                    source.released(event);
                 }
             };
             addMouseListener(gestures); select.addMouseListener(gestures); close.addMouseListener(gestures);
@@ -300,13 +301,13 @@ final class WindowTabs extends JPanel implements TabStrip {
         }
         private void hover(boolean value) { hovered = value; doLayout(); repaint(); }
         void refresh() {
-            String text = group.title(tab);
+            String text = source.title(tab);
             select.setText(text); select.getAccessibleContext().setAccessibleName(text);
             select.setName("select:" + text); close.setName("close:" + text);
-            String shortcut = group.shortcut(order.indexOf(tab));
-            String tip = capped(group.tooltip(tab));
+            String shortcut = source.shortcut(order.indexOf(tab));
+            String tip = capped(source.tooltip(tab));
             select.setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
-            select.getAccessibleContext().setAccessibleDescription(group.running(tab) ? "Session running" : null);
+            select.getAccessibleContext().setAccessibleDescription(source.running(tab) ? "Session running" : null);
             Color surface = surface(tab == selected), ink = ThemeZone.color(this, SemanticColor.TEXT_PRIMARY);
             close.setIcon(AppIcons.forSurface(AppIcons.named("CLOSE"), surface, ink));
             close.setRolloverIcon(AppIcons.forSurface(AppIcons.named("CLOSE_HOVERED"), surface, ink));

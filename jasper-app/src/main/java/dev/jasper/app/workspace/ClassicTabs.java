@@ -40,18 +40,21 @@ import javax.swing.UIManager;
  * status dot for a terminal tab, its label and a persistent ×, a "+" after the last one (at the trailing edge, over the
  * tabs a crowded strip clips) that opens a tab in this group; the active tab on {@code surface.card} with a 2 px
  * {@code tab.indicator} underline; 1 px {@code border.window} dividers and the strip's rule on {@code surface.tabstrip}.
- * Never moves.
+ * Never moves. It shows a window's parent tabs too, each as its active tab (parent tabs spec 7).
  */
 final class ClassicTabs extends JPanel implements TabStrip {
-    private final GroupView group;
+    private final StripSource source;
     private final List<Entry> entries = new ArrayList<>();
     private final Add add = new Add();
     private Tab selected;
     private boolean active = true, disposed;
 
-    ClassicTabs(GroupView group) {
+    ClassicTabs(StripSource source) {
         super(null);
-        this.group = group;
+        this.source = source;
+        // The "+" says what it opens: New Tab in Pane in a pane's strip, New Tab in the parent-tab bar.
+        add.setToolTipText(source.newTabName());
+        add.getAccessibleContext().setAccessibleName(source.newTabName());
         setName("classicTabs");
         setOpaque(true);
         add(add);
@@ -63,13 +66,13 @@ final class ClassicTabs extends JPanel implements TabStrip {
 
     @Override public void refresh() {
         if (disposed) return;
-        var current = group.tabs();
+        var current = source.tabs();
         if (!current.equals(entries.stream().map(entry -> entry.tab).toList())) {
             entries.forEach(this::remove);
             entries.clear();
             for (Tab tab : current) { var entry = new Entry(tab); entries.add(entry); add(entry); }
         }
-        selected = group.selected();
+        selected = source.selected();
         for (Entry entry : entries) entry.refresh();
         setBackground(ThemeZone.color(this, SemanticColor.SURFACE_TABSTRIP));
         revalidate(); repaint();
@@ -81,9 +84,9 @@ final class ClassicTabs extends JPanel implements TabStrip {
     @Override public JPopupMenu tabList() {
         var menu = new JPopupMenu();
         for (Entry entry : entries) {
-            var item = new JCheckBoxMenuItem(WindowTabs.capped(group.title(entry.tab)), group.icon(entry.tab), entry.tab == selected);
+            var item = new JCheckBoxMenuItem(WindowTabs.capped(source.title(entry.tab)), source.icon(entry.tab), entry.tab == selected);
             item.putClientProperty("html.disable", true);
-            item.addActionListener(event -> { if (!disposed) group.select(entry.tab); });
+            item.addActionListener(event -> { if (!disposed) source.select(entry.tab); });
             menu.add(item);
         }
         NativeStyles.installed().menuTree(menu, FlatLafInstaller::installedTheme);
@@ -97,7 +100,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
     List<Entry> entries() { return List.copyOf(entries); }
     JComponent add() { return add; }
 
-    @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(group.owner().tabHeight())); }
+    @Override public Dimension getPreferredSize() { return new Dimension(0, UIScale.scale(source.owner().tabHeight())); }
     @Override public Dimension getMinimumSize() { return getPreferredSize(); }
 
     @Override public void doLayout() {
@@ -166,7 +169,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             putClientProperty("html.disable", true);
             setFont(ThemeZone.font(Typography.Role.BODY));
             var mouse = new MouseAdapter() {
-                private void popup(MouseEvent event) { group.menu(tab).show(Entry.this, event.getX(), event.getY()); }
+                private void popup(MouseEvent event) { source.menu(tab).show(Entry.this, event.getX(), event.getY()); }
                 private void hover(MouseEvent event) {
                     boolean over = closeTarget().contains(event.getPoint());
                     if (over != closeHover) { closeHover = over; repaint(); }
@@ -174,13 +177,13 @@ final class ClassicTabs extends JPanel implements TabStrip {
                 @Override public void mousePressed(MouseEvent event) {
                     if (disposed) return;
                     if (event.isPopupTrigger()) { popup(event); return; }
-                    if (SwingUtilities.isMiddleMouseButton(event)) { group.close(tab); return; }
+                    if (SwingUtilities.isMiddleMouseButton(event)) { source.close(tab); return; }
                     if (!SwingUtilities.isLeftMouseButton(event)) return;
                     // A press on the × neither selects nor drags; dragging off it before the release cancels the close.
                     if (closeTarget().contains(event.getPoint())) { closePressed = true; return; }
-                    group.select(tab);
+                    source.select(tab);
                     // The tab drag may start here (workspace tabs spec 12).
-                    group.pressed(tab, event);
+                    source.pressed(tab, event);
                 }
                 @Override public void mouseReleased(MouseEvent event) {
                     boolean closing = closePressed;
@@ -190,11 +193,11 @@ final class ClassicTabs extends JPanel implements TabStrip {
                         if (SwingUtilities.isLeftMouseButton(event) && closeTarget().contains(event.getPoint())) closeClicked();
                         return;
                     }
-                    group.released(event);
+                    source.released(event);
                 }
                 @Override public void mouseMoved(MouseEvent event) { hover(event); }
                 // While the × is held, its hover shows whether a release would close; otherwise the tab drag follows the cursor.
-                @Override public void mouseDragged(MouseEvent event) { if (closePressed) hover(event); else group.dragged(event); }
+                @Override public void mouseDragged(MouseEvent event) { if (closePressed) hover(event); else source.dragged(event); }
                 @Override public void mouseExited(MouseEvent event) { if (closeHover) { closeHover = false; repaint(); } }
             };
             addMouseListener(mouse); addMouseMotionListener(mouse);
@@ -226,7 +229,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             }
             @Override public boolean doAccessibleAction(int index) {
                 if (disposed || index < 0 || index > 1) return false;
-                if (index == 0) group.select(tab); else closeClicked();
+                if (index == 0) source.select(tab); else closeClicked();
                 return true;
             }
         }
@@ -237,8 +240,8 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
 
         void refresh() {
-            String title = group.title(tab), shortcut = group.shortcut(entries.indexOf(this));
-            String tip = WindowTabs.capped(group.tooltip(tab));
+            String title = source.title(tab), shortcut = source.shortcut(entries.indexOf(this));
+            String tip = WindowTabs.capped(source.tooltip(tab));
             setToolTipText(shortcut.isEmpty() ? tip : tip + " (" + shortcut + ")");
             getAccessibleContext().setAccessibleName(title);
             getAccessibleContext().setAccessibleDescription(running() ? "Session running" : null);
@@ -247,9 +250,9 @@ final class ClassicTabs extends JPanel implements TabStrip {
             repaint();
         }
 
-        private boolean dotted() { return group.terminal(tab); }
-        boolean running() { return group.running(tab); }
-        private String label() { return WindowTabs.capped(group.title(tab)); }
+        private boolean dotted() { return source.terminal(tab); }
+        boolean running() { return source.running(tab); }
+        private String label() { return WindowTabs.capped(source.title(tab)); }
         int labelWidth() { return getFontMetrics(getFont()).stringWidth(label()); }
         /** Everything but the label: the leading inset, the dot and its gap, the gap, the ×, the trailing inset. */
         int chromeWidth() {
@@ -275,7 +278,7 @@ final class ClassicTabs extends JPanel implements TabStrip {
             return new Rectangle(glyph.x + glyph.width / 2 - side / 2, (getHeight() - side) / 2, side, side);
         }
 
-        void closeClicked() { if (!disposed) group.close(tab); }
+        void closeClicked() { if (!disposed) source.close(tab); }
 
         @Override protected void paintComponent(Graphics graphics) {
             var g = (Graphics2D) graphics.create();
@@ -305,16 +308,14 @@ final class ClassicTabs extends JPanel implements TabStrip {
         }
     }
 
-    /** The "+" after the last tab: a flat, unfocusable button that opens a new tab in this group on a release over it. */
+    /** The "+" after the last tab: a flat, unfocusable button that runs its source's {@link StripSource#newTab} on a release. */
     final class Add extends JButton {
         /** Whether the + stands over clipped tabs; it then hides them under the strip's fill and a divider before it. */
         private boolean covering;
 
         Add() {
             setFocusable(false); setOpaque(false); setContentAreaFilled(false); setBorderPainted(false);
-            setToolTipText("New Tab");
-            getAccessibleContext().setAccessibleName("New Tab");
-            addActionListener(event -> { if (!disposed) group.newTab(); });
+            addActionListener(event -> { if (!disposed) source.newTab(); });
         }
 
         @Override protected void paintComponent(Graphics graphics) {

@@ -26,7 +26,7 @@ import javax.swing.SwingUtilities;
  * and out of the group, so a tab moved to another group leaves one group view for the other with its session untouched
  * (spec 2.3). EDT only.
  */
-final class GroupView extends JPanel {
+final class GroupView extends JPanel implements StripSource {
     private final WindowContent owner;
     private final WorkspaceView workspace;
     private final GroupId id;
@@ -54,11 +54,11 @@ final class GroupView extends JPanel {
 
     GroupId id() { return id; }
     TabStrip strip() { return strip; }
-    WindowContent owner() { return owner; }
+    @Override public WindowContent owner() { return owner; }
     /** The group's tabs in strip order. */
-    List<Tab> tabs() { return tabs; }
+    @Override public List<Tab> tabs() { return tabs; }
     /** The group's selected tab; null in the empty workspace. */
-    Tab selected() { return selected; }
+    @Override public Tab selected() { return selected; }
     /** Whether this is its window's active group. */
     boolean activeGroup() { return workspace.model().activeGroup().equals(id); }
 
@@ -85,33 +85,37 @@ final class GroupView extends JPanel {
     /** Refreshes the strip, which shows as active while the window is active and this is its active group. */
     void refresh() { if (!closed) strip.setActive(owner.windowActive() && activeGroup()); }
 
-    String title(Tab tab) { return owner.tabTitle(tab); }
-    Icon icon(Tab tab) { return owner.tabIcon(tab); }
-    String tooltip(Tab tab) { return owner.tabTooltip(tab); }
+    @Override public String title(Tab tab) { return owner.tabTitle(tab); }
+    @Override public Icon icon(Tab tab) { return owner.tabIcon(tab); }
+    @Override public String tooltip(Tab tab) { return owner.tabTooltip(tab); }
     /** The Select Tab shortcut for the tab at {@code index} of this group while it is the active group, or empty. */
-    String shortcut(int index) { return activeGroup() ? owner.tabShortcut(index) : ""; }
+    @Override public String shortcut(int index) { return activeGroup() ? owner.tabShortcut(index) : ""; }
     /** Whether the tab is a terminal tab, which the classic tabs mark with a status dot. */
-    boolean terminal(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL; }
-    boolean running(Tab tab) { return owner.running(tab); }
-    JPopupMenu menu(Tab tab) { return owner.tabMenu(tab); }
-    void select(Tab tab) { owner.selectTab(tab); }
-    void close(Tab tab) { owner.closeTab(tab); }
+    @Override public boolean terminal(Tab tab) { return tab.kind() == Tab.Kind.TERMINAL; }
+    @Override public boolean running(Tab tab) { return owner.running(tab); }
+    @Override public JPopupMenu menu(Tab tab) { return owner.tabMenu(tab); }
+    @Override public void select(Tab tab) { owner.selectTab(tab); }
+    @Override public void close(Tab tab) { owner.closeTab(tab); }
     /**
      * A left press on {@code tab}'s entry in the strip: the tab drag may start from it (workspace tabs spec 12). A dock
      * drag still running lost its release, so it ends first.
      */
-    void pressed(Tab tab, MouseEvent event) {
+    @Override public void pressed(Tab tab, MouseEvent event) {
         owner.dockDrag().cancel();
         owner.tabDrag().pressed(this, tab, event);
     }
     /** A drag event from the strip, which the tab drag follows. */
-    void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
+    @Override public void dragged(MouseEvent event) { owner.tabDrag().dragged(event); }
     /** A release on the strip, which ends the tab drag. */
-    void released(MouseEvent event) { owner.tabDrag().released(event); }
+    @Override public void released(MouseEvent event) { owner.tabDrag().released(event); }
     /** The classic tabs' "+": a new terminal tab in this group. */
-    void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
+    @Override public void newTab() { workspace.activate(id); owner.invoke(ActionId.NEW_TAB_IN_PANE); }
+    /** New Tab in Pane: this pane's + stacks a tab in it. */
+    @Override public String newTabName() { return ActionId.NEW_TAB_IN_PANE.label(); }
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */
-    boolean moved(Tab tab) { return workspace.moved(tab); }
+    @Override public boolean moved(Tab tab) { return workspace.moved(tab); }
+    /** The look's motion, which the equal tabs follow as tabs open and close. */
+    @Override public boolean animates() { return owner.lookAnimates(); }
 
     /** The strip's rectangle in {@code target}'s coordinates (workspace plan 5 resolves drops over it); empty while it is hidden. */
     Rectangle stripBounds(Component target) {

@@ -4,6 +4,9 @@ import static dev.jasper.app.workspace.DesktopTestSupport.edt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.jasper.app.appearance.ThemeController;
+import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.layout.GroupId;
+import dev.jasper.app.layout.Side;
 import dev.jasper.app.platform.ThemeZone;
 import dev.jasper.app.presentation.TitleFormat;
 import dev.jasper.app.presentation.WorkspaceLook;
@@ -20,6 +23,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
 import javax.accessibility.AccessibleRole;
 import javax.accessibility.AccessibleState;
+import javax.swing.AbstractButton;
 import javax.swing.JMenuItem;
 import javax.swing.JToolTip;
 import javax.swing.plaf.basic.BasicHTML;
@@ -238,8 +242,32 @@ class ClassicTabsTest {
                 assertThat(owner.tabCount()).as("the second is the x").isEqualTo(1);
                 var button = plus.getAccessibleContext();
                 assertThat(button.getAccessibleRole()).isEqualTo(AccessibleRole.PUSH_BUTTON);
-                assertThat(button.getAccessibleName()).isEqualTo("New Tab");
+                assertThat(button.getAccessibleName()).as("a pane's + stacks in its pane").isEqualTo("New Tab in Pane");
                 assertThat(button.getAccessibleAction().getAccessibleActionCount()).as("the + can be pressed").isEqualTo(1);
+            } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
+        });
+    }
+
+    /** Workspace plan 7a Rulings 16: a pane's "+" is New Tab in Pane, a tab stacked in that pane, active or not. */
+    @Test void aPanesPlusStacksATabInThatPane() throws Exception {
+        edt(() -> {
+            ThemeController themes = EnterpriseLook.controller(false);
+            try {
+                var owner = DesktopTestSupport.content(DesktopTestSupport.idleLauncher(new ArrayDeque<>()), themes, classic());
+                Tab first = owner.selectedTab();
+                GroupId left = owner.workspace().activeGroupView().id();
+                owner.split(Side.RIGHT);
+                GroupId right = owner.workspace().activeGroupView().id();
+                assertThat(right).as("the split's pane is the active one").isNotEqualTo(left);
+                ((AbstractButton) ((ClassicTabs) owner.workspace().groupView(left).strip()).add()).doClick();
+                assertThat(owner.parentTabCount()).as("no parent tab opens").isEqualTo(1);
+                assertThat(owner.workspace().groupViews()).as("nor a pane").hasSize(2);
+                Tab added = owner.selectedTab();
+                assertThat(added).as("the + opens a tab").isNotSameAs(first);
+                assertThat(owner.workspace().groupView(left).tabs()).as("a second tab stacks in the pane whose + it is")
+                    .containsExactly(first, added);
+                assertThat(owner.workspace().groupView(right).tabs()).as("the other pane keeps its one tab").hasSize(1);
+                assertThat(owner.workspace().activeGroupView().id()).as("and that pane is active").isEqualTo(left);
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
