@@ -456,19 +456,21 @@ class ClassicHeaderTest {
     }
 
     /**
-     * Final review: Enterprise's own default toolbar (icons, the classic set, the Enterprise kit and theme, with a toolbar view),
-     * in Light and Dark; the renders are written under build/ for inspection.
+     * Final review: Enterprise's own default toolbar (icons, the classic set, the Search Everywhere icon, the Enterprise kit and
+     * theme, with a toolbar view), in Light and Dark; the renders are written under build/ for inspection.
      */
     @Test void enterprisesDefaultToolbarIsClassicIconSquares() throws Exception {
         for (boolean dark : new boolean[] {false, true})
             edt(() -> {
                 var themes = EnterpriseLook.controller(dark);
                 try {
-                    var window = window(themes, true, WorkspaceLook.Icons.CLASSIC);
+                    var window = window(themes, true, WorkspaceLook.Icons.CLASSIC, WorkspaceLook.Search.ICON);
                     window.owner().setToolbarMode(ToolbarMode.ICONS);
                     window.width(1440);
                     var bar = window.owner().chrome().windowToolbar();
                     assertThat(labels(bar)).containsExactly("New Session", "Split", "Maximize");
+                    assertThat(searchButton(window).getText()).as("the Search Everywhere icon, not the field").isNull();
+                    assertPaintsClassic(searchButton(window), "search");
                     for (Component child : bar.getComponents())
                         if (child instanceof ClassicToolbarButton button) {
                             assertThat(button.getText()).as("icons only").isNull();
