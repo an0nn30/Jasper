@@ -2,6 +2,7 @@ package dev.jasper.app.workspace;
 
 import dev.jasper.app.appearance.ThemeController;
 import dev.jasper.app.contributions.Tab;
+import dev.jasper.app.dock.WorkspaceDropResolver;
 import dev.jasper.app.dock.WorkspaceDropResolver.Area;
 import dev.jasper.app.dock.WorkspaceDropResolver.Drop;
 import dev.jasper.app.layout.GroupId;
@@ -11,6 +12,7 @@ import dev.jasper.app.layout.Side;
 import dev.jasper.app.layout.Split;
 import dev.jasper.app.testsupport.EnterpriseLook;
 import dev.jasper.app.testsupport.LayoutTestSupport;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -124,6 +126,37 @@ class WorkspaceDropTest {
             assertThat(whole.strip().isEmpty()).as("no strip").isTrue();
             assertThat(whole.splits()).isFalse();
             assertThat(whole.content()).isEqualTo(new Rectangle(workspace.getSize()));
+        });
+    }
+
+    /**
+     * In the standard look a window's only tab shows no strip: its group reports none and no tab places, so a drop near
+     * its top splits the group or joins it, never its strip.
+     */
+    @Test void aWindowsOnlyTabHasNoStripToDropIn() throws Exception {
+        edt(() -> {
+            var owner = content(idleLauncher(new ArrayDeque<>()));
+            owner.newTab(HOME);
+            layout(owner);
+            owner.closeTab(owner.tabs().get(1));
+            layout(owner);
+            Tab elsewhere = content(idleLauncher(new ArrayDeque<>())).selectedTab();
+            var workspace = owner.workspace();
+            var view = workspace.activeGroupView();
+            List<Area> areas = workspace.dropAreas(elsewhere);
+            assertThat(areas).hasSize(1);
+            Area area = areas.getFirst();
+            assertThat(area.strip().isEmpty()).as("a hidden strip is no drop target").isTrue();
+            assertThat(area.tabs()).isEmpty();
+            assertThat(area.splits()).isTrue();
+            assertThat(area.content()).as("the card area is the whole group")
+                .isEqualTo(SwingUtilities.convertRectangle(view.getParent(), view.getBounds(), workspace));
+            GroupId group = view.id();
+            Rectangle whole = area.content();
+            var top = new Point(whole.x + whole.width / 2, whole.y + 2);
+            assertThat(WorkspaceDropResolver.resolve(top, areas)).as("where a strip would be").contains(new Drop.Edge(group, Side.UP));
+            var below = new Point(whole.x + whole.width / 2, whole.y + whole.height / 2);
+            assertThat(WorkspaceDropResolver.resolve(below, areas)).contains(new Drop.Centre(group));
         });
     }
 

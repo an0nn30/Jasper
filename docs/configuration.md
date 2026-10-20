@@ -877,7 +877,8 @@ turning it off and clicking Apply finishes running transitions immediately in op
 use the same `ui.animations.enabled` policy. Tab content and keyboard focus change immediately even when motion is on.
 
 Tab motion follows the [Alacritty reference](design/alacritty-tabs.md): opening takes 475 ms and
-closing 425 ms. Selection is immediate. A tab group's strip shows even with a single tab.
+closing 425 ms. Selection is immediate. A window holding a single tab shows no tab strip, and its second tab shows the
+strip at once, without motion; under the Enterprise look the strip always shows.
 
 The command palette drips open: over 300 ms its bottom edge eases down from the top of the card (quartic ease-out,
 fast then slow) while its rows stay in place, so the query field takes typing at once. Only a fresh open animates;

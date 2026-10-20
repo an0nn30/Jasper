@@ -20,9 +20,10 @@ import java.util.function.LongSupplier;
 import javax.swing.*;
 
 /**
- * Equal-width, centered tabs of one tab group, always shown (workspace tabs spec 10). A tab that opens or closes moves
- * into or out of its place; one that joins or leaves the group by a move, or is reordered, takes its place at once
- * (spec 4, Rulings 27). EDT only.
+ * Equal-width, centered tabs of one tab group (workspace tabs spec 10), hidden by their group view while their window
+ * holds a single tab (spec 1, decision 4). A tab that opens or closes moves into or out of its place; one that joins or
+ * leaves the group by a move, or is reordered, or arrives while the strip is hidden, takes its place at once (spec 4,
+ * Rulings 27). EDT only.
  */
 final class WindowTabs extends JPanel implements TabStrip {
     static final int TITLE_LIMIT = 200;
@@ -77,7 +78,9 @@ final class WindowTabs extends JPanel implements TabStrip {
             }
             Curve curve = added ? Curve.OPEN : Curve.CLOSE;
             int millis = added ? animations.tabOpenMillis() : animations.tabCloseMillis();
-            if (order.size() <= 1 || !opened && !closing || !animations.enabled() || !group.owner().lookAnimates() || layoutWidth <= 0) millis = 0;
+            // A hidden strip takes its tabs at once, so it shows and hides settled.
+            if (order.size() <= 1 || !opened && !closing || !isVisible() || !animations.enabled() || !group.owner().lookAnimates()
+                || layoutWidth <= 0) millis = 0;
             for (Slot slot : slots) slot.width.target(slot.entry == null ? 0 : 1.0 / order.size(), now, millis, curve);
             sample(now);
         }

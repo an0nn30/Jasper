@@ -64,7 +64,7 @@ class WindowTabMotionTest {
             assertThat(f.entry("second").getBounds()).isEqualTo(new Rectangle(400, 0, 400, 30));
             assertThat(f.strip.motionRunning()).isFalse();
             f.owner.closeTab(f.owner.currentTerminal()); f.strip.refresh();
-            assertThat(f.strip.isVisible()).as("one tab keeps its strip").isTrue();
+            assertThat(f.strip.isVisible()).as("its group view, not the strip, hides it for a window's only tab").isTrue();
             assertThat(f.strip.getPreferredSize().height).isEqualTo(30);
             assertThat(f.strip.motionRunning()).isFalse();
         });
@@ -112,11 +112,14 @@ class WindowTabMotionTest {
         });
     }
 
-    @Test void aSecondTabAnimatesInTheMountedStrip() throws Exception {
+    @Test void aSecondTabShowsTheMountedStripSettledAndAThirdAnimates() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             owner.setSize(800, 500); WindowTabsTest.layoutTree(owner);
+            assertThat(owner.windowTabs().isVisible()).as("a window's only tab shows no strip").isFalse();
+            owner.newTab(HOME); WindowTabsTest.layoutTree(owner);
             assertThat(owner.windowTabs().isVisible()).isTrue();
+            assertThat(owner.windowTabs().motionRunning()).as("the strip shows with its tabs in place").isFalse();
             owner.newTab(HOME); WindowTabsTest.layoutTree(owner);
             assertThat(owner.windowTabs().motionRunning()).isTrue();
             owner.setAnimations(new AnimationSettings(false, 475, 425, 0));

@@ -51,11 +51,15 @@ class ClassicTabsTest {
                 owner.setSize(800, 600);
                 LayoutTestSupport.layoutTree(owner);
                 var strip = (ClassicTabs) owner.tabBar();
+                assertThat(strip.isVisible()).as("the classic tabs show for a window's only tab").isTrue();
                 assertThat(strip.entries()).hasSize(1);
                 assertThat(owner.tabBar().component().getHeight()).as("the mounted strip at one tab: window.tab_height with its rule")
                     .isEqualTo(owner.tabHeight());
                 assertThat(strip.getWidth()).as("across the terminal column").isPositive();
                 assertThat(strip.entries().getFirst().getWidth()).as("its one tab laid out").isPositive();
+                owner.newTab(DesktopTestSupport.HOME);
+                owner.closeTab(owner.selectedTab());
+                assertThat(strip.isVisible()).as("and again when the count drops back to one").isTrue();
             } finally { DesktopTestSupport.closeOwnersNow(); themes.close(); EnterpriseLook.restoreDefault(); }
         });
     }
@@ -268,7 +272,8 @@ class ClassicTabsTest {
             assertThat(owner.tabBar()).isInstanceOf(WindowTabs.class).isSameAs(owner.windowTabs());
             owner.setSize(800, 600);
             LayoutTestSupport.layoutTree(owner);
-            assertThat(owner.tabBar().component().getHeight()).as("like the classic tabs, the equal tabs show at one tab").isEqualTo(owner.tabHeight());
+            assertThat(owner.tabBar().component().isVisible()).as("unlike the classic tabs, the equal tabs hide at one tab").isFalse();
+            assertThat(owner.tabBar().component().getHeight()).isZero();
         });
     }
 

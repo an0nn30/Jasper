@@ -57,6 +57,20 @@ class WindowRolesTest {
         launch();
     }
 
+    /** In the standard look a child window holding one tab shows no strip, as the main window does; a second tab shows it. */
+    @Test void aChildWindowsOnlyTabShowsNoStrip() throws Exception {
+        WindowContent[] child = new WindowContent[1];
+        edt(() -> child[0] = content(idleLauncher(pending), WindowRole.CHILD, HOME, false, () -> { }));
+        launch();
+        edt(() -> {
+            assertThat(child[0].tabCount()).isEqualTo(1);
+            assertThat(child[0].windowTabs().isVisible()).as("one tab, no strip").isFalse();
+            child[0].newTab(HOME);
+            assertThat(child[0].windowTabs().isVisible()).as("two tabs show it").isTrue();
+        });
+        launch();
+    }
+
     /** Workspace tabs spec 6.3: a child window's workspace has the same translucency as the main window's. */
     @Test void aChildWindowsWorkspaceIsGlassAsTheMainWindowsIs() throws Exception {
         edt(() -> {

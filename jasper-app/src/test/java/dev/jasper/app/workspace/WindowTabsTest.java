@@ -16,17 +16,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WindowTabsTest {
     @AfterEach void cleanup() throws Exception { closeOwners(); }
 
-    @Test void oneTabStillShowsTheStrip() throws Exception {
+    @Test void oneTabHidesTheStripAndASecondTabShowsIt() throws Exception {
         edt(() -> {
             var owner = content(launcher(new ArrayDeque<>()));
             var strip = owner.windowTabs();
-            assertThat(strip.isVisible()).as("workspace tabs spec 1, decision 4").isTrue();
-            assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
+            assertThat(strip.isVisible()).as("workspace tabs spec 1, decision 4: a window's only tab shows no strip").isFalse();
             owner.invoke(ActionId.NEW_TAB);
             assertThat(strip.isVisible()).isTrue();
-            owner.closeTab(owner.currentTerminal());
-            assertThat(strip.isVisible()).isTrue();
+            assertThat(strip.getPreferredSize().height).isEqualTo(owner.tabHeight());
             assertThat(strip.getMinimumSize().height).isEqualTo(owner.tabHeight());
+            owner.closeTab(owner.currentTerminal());
+            assertThat(strip.isVisible()).isFalse();
             assertThat(named(strip, "newTab")).isNull();
             assertThat(named(strip, "tabList")).isNull();
         });
@@ -93,7 +93,7 @@ class WindowTabsTest {
             assertThat(label.getBounds()).isEqualTo(before);
             label.doClick(); assertThat(owner.currentTerminal()).isSameAs(first);
             close.doClick(); assertThat(owner.terminalTabs()).doesNotContain(first);
-            assertThat(strip.isVisible()).as("one tab keeps its strip").isTrue();
+            assertThat(strip.isVisible()).as("one tab hides its strip").isFalse();
         });
     }
 

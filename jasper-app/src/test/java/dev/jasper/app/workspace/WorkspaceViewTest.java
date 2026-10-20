@@ -56,15 +56,16 @@ class WorkspaceViewTest {
 
     private static void layout(WindowContent owner) { LayoutTestSupport.layoutTree(owner); LayoutTestSupport.layoutTree(owner); }
 
-    @Test void oneTabFillsTheWorkspaceUnderItsAlwaysVisibleStrip() throws Exception {
+    @Test void aWindowsOnlyTabFillsTheWorkspaceWithNoStrip() throws Exception {
         edt(() -> {
             var owner = window(1);
             var workspace = owner.workspace();
             assertThat(workspace.groupViews()).hasSize(1);
             var group = workspace.activeGroupView();
             assertThat(workspace.getComponent(0)).as("one group fills the workspace").isSameAs(group);
-            assertThat(group.strip().component().isVisible()).isTrue();
-            assertThat(group.strip().component().getHeight()).isEqualTo(owner.tabHeight());
+            assertThat(group.strip().component().isVisible()).as("the standard look: a window's only tab shows no strip").isFalse();
+            assertThat(group.getHeight()).as("laid out").isPositive();
+            assertThat(group.contentBounds(group)).as("the card area fills the group").isEqualTo(new Rectangle(group.getSize()));
             var tab = owner.selectedTab();
             assertThat(group.tabs()).containsExactly(tab);
             assertThat(group.selected()).isSameAs(tab);
@@ -73,6 +74,35 @@ class WorkspaceViewTest {
             assertThat(owner.tabRegistry().inWindow(owner.id())).as("the window's terminal tab is a registry tab").containsExactly(tab);
             assertThat(tab.kind()).isEqualTo(Tab.Kind.TERMINAL);
             assertThat(tab.group()).contains(workspace.model().activeGroup());
+        });
+    }
+
+    /** The strip follows the window's tab count in the same EDT turn, shown and hidden at once, without motion. */
+    @Test void theStripShowsWithASecondTabAndHidesWithTheLastButOne() throws Exception {
+        edt(() -> {
+            var owner = window(2);
+            var group = owner.workspace().activeGroupView();
+            var strip = (WindowTabs) group.strip();
+            assertThat(strip.isVisible()).as("two tabs show the strip").isTrue();
+            assertThat(strip.getWidth()).as("laid out, so a change could move").isPositive();
+            owner.closeTab(owner.tabs().get(1));
+            assertThat(strip.isVisible()).as("one tab: the strip hides at once").isFalse();
+            assertThat(strip.motionRunning()).as("without the close motion").isFalse();
+            layout(owner);
+            assertThat(group.contentBounds(group)).as("the card area fills the group").isEqualTo(new Rectangle(group.getSize()));
+            owner.newTab(HOME);
+            assertThat(strip.isVisible()).as("a second tab shows the strip at once").isTrue();
+            assertThat(strip.motionRunning()).as("its tabs settled: the new tab has no open motion").isFalse();
+            layout(owner);
+            Rectangle bar = group.stripBounds(group);
+            assertThat(bar.height).isEqualTo(owner.tabHeight());
+            assertThat(group.contentBounds(group).y).as("the cards start under the strip").isEqualTo(bar.height);
+            List<Rectangle> places = group.tabBounds(group);
+            assertThat(places).hasSize(2);
+            assertThat(places).as("each tab in its place").allSatisfy(place -> assertThat(place.width).isCloseTo(bar.width / 2, within(1)));
+            owner.closeTab(owner.tabs().get(0));
+            assertThat(strip.isVisible()).as("one tab again: the strip hides again").isFalse();
+            assertThat(strip.motionRunning()).isFalse();
         });
     }
 
@@ -90,6 +120,8 @@ class WorkspaceViewTest {
             assertThat(split.orientation()).isEqualTo(Orientation.HORIZONTAL);
             var right = workspace.model().groupOf(second.id()).orElseThrow();
             assertThat(split.children()).containsExactly(workspace.groupView(left), workspace.groupView(right));
+            assertThat(workspace.groupViews()).as("a split holds two tabs: every group shows its strip")
+                .allSatisfy(view -> assertThat(view.strip().component().isVisible()).isTrue());
             assertThat(workspace.groupView(left).tabs()).containsExactly(first);
             assertThat(workspace.groupView(right).tabs()).containsExactly(second);
             assertThat(SwingUtilities.isDescendingFrom(second.component(), workspace.groupView(right)))

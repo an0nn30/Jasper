@@ -30,16 +30,15 @@ class MockUiTest {
                 int toolbar = owner.toolbar().getHeight(), tabs = owner.windowTabs().getHeight();
                 assertThat(toolbar).isEqualTo(30);
                 assertThat(title.getHeight()).isEqualTo(30);
-                assertThat(tabs).as("a single tab keeps its strip").isEqualTo(owner.tabHeight());
-                assertThat(owner.windowTabs().isVisible()).isTrue();
+                assertThat(tabs).as("a window's only tab shows no strip").isZero();
+                assertThat(owner.windowTabs().isVisible()).isFalse();
                 assertThat(owner.status().getHeight()).isEqualTo(24);
                 assertThat(owner.currentPane().getSize()).isEqualTo(new Dimension(958, 958 - toolbar - tabs - 24));
                 var image = new BufferedImage(958, 958, BufferedImage.TYPE_INT_RGB);
                 var g = image.createGraphics(); root.printAll(g); g.dispose();
                 assertThat(new Color(image.getRGB(650, toolbar - 1))).as("continuous header surface").isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
                 assertThat(image.getRGB(20, toolbar / 2) & 0xffffff).as("toolbar surface").isEqualTo(dev.jasper.app.appearance.ThemeTestSupport.color(true, dev.jasper.ui.theme.SemanticColor.SURFACE_APP).getRGB() & 0xffffff);
-                assertThat(javax.swing.SwingUtilities.convertPoint(owner.windowTabs(), 0, 0, root).y).as("the strip begins immediately below the header").isEqualTo(toolbar);
-                assertThat(new Color(image.getRGB(650, toolbar + tabs))).as("the terminal begins under the strip").isEqualTo(owner.theme().palette().background());
+                assertThat(new Color(image.getRGB(650, toolbar))).as("single terminal begins immediately below the header").isEqualTo(owner.theme().palette().background());
                 assertThat(new Color(image.getRGB(500, 940))).isEqualTo(dev.jasper.app.platform.ThemeZone.color(null, dev.jasper.ui.theme.SemanticColor.SURFACE_APP));
             }
         });

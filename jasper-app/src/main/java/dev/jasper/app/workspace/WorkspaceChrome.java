@@ -99,6 +99,17 @@ public final class WorkspaceChrome {
         };
     }
 
+    /**
+     * Whether a group shows its strip in a window holding {@code count} tabs (workspace tabs spec 1, decision 4): the
+     * classic tabs always show; the equal tabs show unless the window holds a single tab.
+     */
+    boolean showsStrip(int count) {
+        return switch (tabs) {
+            case EQUAL -> count != 1;
+            case CLASSIC -> true;
+        };
+    }
+
     /** A status bar for one window, led by "▶ Run…" ({@code open}, active while {@code paletteOpen}) when the look has it. */
     WindowStatusBar statusBar(javax.swing.Action open, java.util.function.BooleanSupplier paletteOpen) {
         StatusCells cells = switch (status) {

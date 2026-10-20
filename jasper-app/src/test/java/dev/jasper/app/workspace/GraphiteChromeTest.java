@@ -38,7 +38,7 @@ class GraphiteChromeTest {
                         int terminal = owner.theme().palette().background().getRGB();
                         for (int x : new int[]{0, image.getWidth() - 1}) for (int y : new int[]{0, image.getHeight() - 1}) {
                             assertThat(image.getRGB(x, y)).as("square workspace corner (%s,%s), %s", x, y, (themeDark ? "dark" : "light"))
-                                .isEqualTo(y == 0 ? stripTop(owner, x == 0 ? 0 : owner.windowTabs().getWidth() - 1) : terminal);
+                                .isEqualTo(terminal);
                             assertThat(column.getParent().contains(x, y)).as("edge receives input").isTrue();
                         }
                         var output = java.nio.file.Path.of("build/render-preview"); java.nio.file.Files.createDirectories(output);
@@ -47,15 +47,6 @@ class GraphiteChromeTest {
                 }
             }
         }
-    }
-
-    /** The strip's top row at {@code x}: the workspace's top edge, now that a single tab keeps its strip. */
-    private static int stripTop(WindowContent owner, int x) {
-        var strip = owner.windowTabs();
-        var image = new java.awt.image.BufferedImage(strip.getWidth(), strip.getHeight(), 2);
-        var g = image.createGraphics();
-        try { strip.paint(g); } finally { g.dispose(); }
-        return image.getRGB(x, 0);
     }
 
     /** A window on each stripe, so both show: an empty stripe stays hidden. */

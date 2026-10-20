@@ -19,10 +19,12 @@ import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 
 /**
- * One tab group of a window's workspace (workspace tabs spec 10): the look's tab strip, always shown, over a card area
- * showing the group's selected tab. The strip lists, selects, closes and opens tabs in this group only and starts the tab
- * drag (spec 12). A tab's component enters and leaves the card area as the layout puts the tab in and out of the group,
- * so a tab moved to another group leaves one group view for the other with its session untouched (spec 2.3). EDT only.
+ * One tab group of a window's workspace (workspace tabs spec 10): the look's tab strip over a card area showing the
+ * group's selected tab. The strip shows unless its workspace hides it (spec 1, decision 4: a window's single tab in the
+ * standard look), and the card area then fills the group. The strip lists, selects, closes and opens tabs in this group
+ * only and starts the tab drag (spec 12). A tab's component enters and leaves the card area as the layout puts the tab in
+ * and out of the group, so a tab moved to another group leaves one group view for the other with its session untouched
+ * (spec 2.3). EDT only.
  */
 final class GroupView extends JPanel {
     private final WindowContent owner;
@@ -60,8 +62,12 @@ final class GroupView extends JPanel {
     /** Whether this is its window's active group. */
     boolean activeGroup() { return workspace.model().activeGroup().equals(id); }
 
-    /** Takes the group's tabs and selection from the layout: mounts the tabs it gained, drops the others, shows the selected one. */
-    void display(List<Tab> next, Tab chosen) {
+    /**
+     * Takes the group's tabs and selection from the layout: mounts the tabs it gained, drops the others, shows the selected
+     * one. The strip shows when {@code stripShown}, at once: it takes the tabs while hidden, so the tab that brings it
+     * back has no open motion and the tab that hides it no close motion.
+     */
+    void display(List<Tab> next, Tab chosen, boolean stripShown) {
         if (closed) return;
         for (Component child : cards.getComponents())
             if (next.stream().noneMatch(tab -> tab.component() == child)) cards.remove(child);
@@ -71,7 +77,9 @@ final class GroupView extends JPanel {
         selected = chosen;
         cards.revalidate();
         cards.repaint();
+        if (!stripShown) strip.component().setVisible(false);
         refresh();
+        strip.component().setVisible(stripShown);
     }
 
     /** Refreshes the strip, which shows as active while the window is active and this is its active group. */
@@ -105,14 +113,21 @@ final class GroupView extends JPanel {
     /** Whether {@code tab} joined this group by a move: the strip shows it at once, without the open motion (Rulings 27). */
     boolean moved(Tab tab) { return workspace.moved(tab); }
 
-    /** The strip's rectangle in {@code target}'s coordinates (workspace plan 5 resolves drops over it). */
-    Rectangle stripBounds(Component target) { return SwingUtilities.convertRectangle(this, strip.component().getBounds(), target); }
+    /** The strip's rectangle in {@code target}'s coordinates (workspace plan 5 resolves drops over it); empty while it is hidden. */
+    Rectangle stripBounds(Component target) {
+        return stripShown() ? SwingUtilities.convertRectangle(this, strip.component().getBounds(), target) : new Rectangle();
+    }
     /** The card area's rectangle in {@code target}'s coordinates. */
     Rectangle contentBounds(Component target) { return SwingUtilities.convertRectangle(this, cards.getBounds(), target); }
-    /** Each tab's rectangle in the strip, in strip order, in {@code target}'s coordinates: a tab drag drops between them. */
+    /**
+     * Each tab's rectangle in the strip, in strip order, in {@code target}'s coordinates: a tab drag drops between them.
+     * None while the strip is hidden.
+     */
     List<Rectangle> tabBounds(Component target) {
+        if (!stripShown()) return List.of();
         return strip.tabBounds().stream().map(bounds -> SwingUtilities.convertRectangle(strip.component(), bounds, target)).toList();
     }
+    private boolean stripShown() { return strip.component().isVisible(); }
 
     /** The group left the layout: its strip is released and its card area keeps no tab. */
     void close() {

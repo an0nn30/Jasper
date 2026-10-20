@@ -1,5 +1,27 @@
 # Jasper — Status and Handoff
 
+**Workspace tabs: a window's only tab shows no strip — 2026-10-19** (`claude/workspace-tabs`, worktree
+`.claude/worktrees/workspace-tabs`, one commit on `4a3bbd01a`, between plans 5 and 6a;
+[spec](superpowers/specs/2026-10-16-jasper-workspace-tabs-design.md), amended). The user asked on 2026-10-19: "in
+normal mode (not enterprise mode), if there is only one tab in the main window (or in a mini window created by a new
+Terminal window or editor window or plugin window), then I do not want to show the tab bar. this is only in normal
+mode." Under the standard look's equal tabs a window holding exactly one tab (the main window or any child window: New
+Terminal Window, New Editor Window, a plugin's new window, a tear-out, Move Tab to New Window) shows no tab strip, and its
+group's card area fills the group; a split holds at least two tabs, so each of its groups shows its strip; the Enterprise
+look's classic tabs always show. `WorkspaceChrome.showsStrip(count)` decides, and `WorkspaceView.render`, which every
+layout change runs, hands the answer to each `GroupView.display`, which hides the strip before it takes its tabs and
+shows it after: the strip follows the count in the same EDT turn, at once and settled (a hidden `WindowTabs` takes its
+tabs without motion). A hidden strip reports an empty rectangle and no tab places to `WorkspaceView.dropAreas`, so a tab
+dropped near a one-tab window's top splits that edge or joins the group; that window's own tab has no strip to start a
+drag from. Files: `GroupView`, `WorkspaceView`, `WorkspaceChrome`, `WindowTabs`, `TabStrip`; tests in
+`WorkspaceViewTest`, `WindowRolesTest`, `WorkspaceDropTest`, `WindowTabsTest`, `ClassicTabsTest`, `TabDragWindowsTest`
+(its child window holds two tabs; the tests that drag a window's only tab give it the classic tabs), `WindowTabMotionTest`,
+`TabHeightTest`, `MockUiTest`, `GraphiteChromeTest` and `ChromeRenderTest`; spec section 1 decision 4 and section 10,
+`README.md`, `docs/configuration.md` and `docs/app-maintenance.md`. `:jasper-app:check` passes: 3806 app tests (four new), 0 failures, 19 skipped. GUI check for the user:
+in the standard look one tab shows no strip, and a second tab (New Tab, a split, a tab moved in) shows it at once, with
+both tabs in place; closing back to one tab hides it at once; under the Enterprise look the strip always shows. Not
+merged, not pushed.
+
 **Workspace tabs, plan 5: tear-out and drag-back — 2026-10-19** (`claude/workspace-tabs`, worktree
 `.claude/worktrees/workspace-tabs`, `e2294085b..49f5b7a84` (Tasks 1 to 4, after the plan refresh), then the
 documentation commit and the final review's fixes; [plan](superpowers/plans/2026-10-18-workspace-5-tear-out.md),

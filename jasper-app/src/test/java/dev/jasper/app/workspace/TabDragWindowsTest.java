@@ -43,8 +43,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Workspace tabs spec 12, 15 and 17: one tab drag across Jasper's windows, on synthetic events, headless. The window
  * manager's windows stand in stand-in frames on a pretend screen, each under a 28 px title bar: the main window, with
- * two terminal tabs, at 0,0 (1208 x 800), a child window, with one, beside it at 1400,100 (800 x 600), and a new window
- * far away until a test places it.
+ * two terminal tabs, at 0,0 (1208 x 800), a child window, with two too, beside it at 1400,100 (800 x 600), and a new
+ * window far away until a test places it. Under the standard look a window's only tab shows no strip (spec 1, decision
+ * 4), so it has none to drag from or drop on; a test that drags a window's only tab gives its child window the classic
+ * tabs, which always show.
  */
 class TabDragWindowsTest {
     private final ArrayDeque<Runnable> pending = new ArrayDeque<>();
@@ -59,6 +61,8 @@ class TabDragWindowsTest {
     private WindowManager manager;
     private MainWindow main;
     private ChildWindow child;
+    /** The look the manager's next window opens under. */
+    private WorkspaceChrome look = WorkspaceChrome.STANDARD;
 
     @BeforeEach void windows() throws Exception {
         edt(() -> {
@@ -69,6 +73,7 @@ class TabDragWindowsTest {
             main = manager.ensureMain("cold", null).orElseThrow();
             main.content().newTab(HOME);
             child = manager.openTerminalWindow(null).orElseThrow();
+            child.content().newTab(HOME);
             place(frames.get(main.id()), 0, 0, 1208, 800);
             place(frames.get(child.id()), 1400, 100, 800, 600);
         });
@@ -90,7 +95,7 @@ class TabDragWindowsTest {
         boolean macOs = System.getProperty("os.name").startsWith("Mac");
         var content = DesktopTestSupport.track(new WindowContent(opening.role(), launcher, opening.directory(), opening.empty(),
             directory -> manager.openTerminalWindow(directory), () -> { }, opening.emptied(), ThemeTestSupport.controller(true),
-            KeyBindings.defaults(macOs), new CommandHistory(), macOs, WorkspaceChrome.STANDARD));
+            KeyBindings.defaults(macOs), new CommandHistory(), macOs, look));
         content.connectContributions(model);
         content.connectTerminals(terminals, () -> { });
         // A tab opening in a laid-out strip would move into its place over several EDT turns: tests take it at once.
@@ -110,6 +115,21 @@ class TabDragWindowsTest {
     }
 
     private JPanel frameOf(JasperWindow window) { return frames.get(window.id()); }
+
+    /**
+     * Swaps the child window for one with a single tab under the classic tabs, in its place: their strip shows for a
+     * window's only tab, so a drag can start from it. Its shell starts at the next launch.
+     */
+    private void classicChild() {
+        child.requestClose();
+        look = ClassicTabsTest.classic();
+        try {
+            child = manager.openTerminalWindow(null).orElseThrow();
+        } finally {
+            look = WorkspaceChrome.STANDARD;
+        }
+        place(frames.get(child.id()), 1400, 100, 800, 600);
+    }
 
     private static GroupId activeGroup(JasperWindow window) { return window.content().workspace().model().activeGroup(); }
 
@@ -136,7 +156,7 @@ class TabDragWindowsTest {
     @Test void aTabDroppedOnAnotherWindowsStripMovesThereWithItsSession() throws Exception {
         edt(() -> {
             WindowContent from = main.content(), to = child.content();
-            Tab tab = from.tabs().get(0), there = to.tabs().get(0);
+            Tab tab = from.tabs().get(0), there = to.tabs().get(0), last = to.tabs().get(1);
             Object session = session(tab);
             assertThat(session).as("its shell started").isNotNull();
             facts.clear();
@@ -147,7 +167,7 @@ class TabDragWindowsTest {
                 .isSameAs(SwingUtilities.getRootPane(to).getLayeredPane());
             mouse(source, MouseEvent.MOUSE_RELEASED, before);
             assertThat(tab.window()).isEqualTo(child.id());
-            assertThat(to.tabs()).as("before the child window's tab").containsExactly(tab, there);
+            assertThat(to.tabs()).as("before the child window's first tab").containsExactly(tab, there, last);
             assertThat(to.selectedTab()).isSameAs(tab);
             assertThat(from.tabs()).hasSize(1);
             assertThat(session(tab)).as("the same session").isSameAs(session);
@@ -172,6 +192,31 @@ class TabDragWindowsTest {
             assertThat(layout.groupOf(tab.id())).isNotEqualTo(layout.groupOf(there.id()));
             assertThat(layout.activeTab()).contains(tab.id());
             assertThat(moves()).hasSize(1);
+        });
+    }
+
+    /** A window's only tab shows no strip: a tab dragged onto that window near its top splits it, its middle takes it in. */
+    @Test void aWindowWhoseOnlyTabShowsNoStripTakesDropsAtItsEdgesAndCentre() throws Exception {
+        edt(() -> {
+            WindowContent from = main.content(), to = child.content();
+            to.closeTab(to.tabs().get(1));
+            relayout(frameOf(child));
+            assertThat(to.windowTabs().isVisible()).isFalse();
+            GroupId group = activeGroup(child);
+            Rectangle whole = cards(to, group);
+            assertThat(whole).as("its card area fills its workspace")
+                .isEqualTo(onScreen(to.workspace(), new Rectangle(to.workspace().getSize())));
+            Tab tab = from.tabs().get(0);
+            Point top = new Point(whole.x + whole.width / 2, whole.y + 2);
+            Component source = start(from, tab, top);
+            assertThat(manager.tabDrag().target()).as("where a strip would be").contains(new TabDrag.Target.Into(to, new Drop.Edge(group, Side.UP)));
+            Point middle = inside(whole, 0.5, 0.5);
+            mouse(source, MouseEvent.MOUSE_DRAGGED, middle);
+            assertThat(manager.tabDrag().target()).contains(new TabDrag.Target.Into(to, new Drop.Centre(group)));
+            mouse(source, MouseEvent.MOUSE_RELEASED, middle);
+            assertThat(tab.window()).isEqualTo(child.id());
+            assertThat(to.tabs()).hasSize(2);
+            assertThat(to.windowTabs().isVisible()).as("its second tab shows the strip").isTrue();
         });
     }
 
@@ -218,6 +263,8 @@ class TabDragWindowsTest {
     }
 
     @Test void aChildWindowsLastTabDraggedBackClosesItAfterTheMoveReportsItself() throws Exception {
+        edt(this::classicChild);
+        launch();
         edt(() -> {
             Tab tab = child.content().tabs().get(0);
             Object session = session(tab);
@@ -277,10 +324,12 @@ class TabDragWindowsTest {
             assertThat(notes.window()).isEqualTo(torn.id());
             assertThat(notes.component()).as("the same view").isSameAs(view);
             assertThat(view.isVisible()).as("shown in its new window").isTrue();
+            // A second tab shows the torn-out window's strip, to drag the tab back from.
+            torn.content().newTab(HOME);
             relayout(frameOf(torn));
             drop(torn.content(), notes, inside(cards(main.content(), activeGroup(main)), 0.5, 0.5));
             assertThat(notes.window()).isEqualTo(main.id());
-            assertThat(torn.closed()).isTrue();
+            assertThat(torn.content().tabs()).doesNotContain(notes);
             assertThat(SwingUtilities.isDescendingFrom(view, main.content())).isTrue();
             assertThat(view.isVisible()).as("shown again").isTrue();
             assertThat(notes.closed()).isFalse();
@@ -301,6 +350,8 @@ class TabDragWindowsTest {
     }
 
     @Test void theOnlyTabOfAChildWindowDraggedOutsideEveryWindowStays() throws Exception {
+        edt(this::classicChild);
+        launch();
         edt(() -> {
             Tab only = child.content().tabs().get(0);
             Point outside = new Point(3000, 1500);
@@ -321,12 +372,12 @@ class TabDragWindowsTest {
             Component source = start(main.content(), tab, title);
             assertThat(manager.tabDrag().target()).as("over the child window's title bar").isEmpty();
             mouse(source, MouseEvent.MOUSE_RELEASED, title);
-            Tab only = child.content().tabs().get(0);
+            Tab theirs = child.content().tabs().get(0);
             Rectangle workspace = onScreen(main.content().workspace(), new Rectangle(main.content().workspace().getSize()));
             Point chrome = new Point(workspace.x + workspace.width / 2, workspace.y - 3);
-            drop(child.content(), only, chrome);
+            drop(child.content(), theirs, chrome);
             assertThat(tab.window()).isEqualTo(main.id());
-            assertThat(only.window()).as("over the main window's chrome").isEqualTo(child.id());
+            assertThat(theirs.window()).as("over the main window's chrome").isEqualTo(child.id());
             assertThat(manager.children()).containsExactly(child);
             assertThat(placed).isEmpty();
             assertThat(moves()).isEmpty();
@@ -389,7 +440,7 @@ class TabDragWindowsTest {
             assertThat(manager.tabDrag().overlay().getParent()).isNull();
             mouse(source, MouseEvent.MOUSE_RELEASED, there);
             assertThat(tab.window()).as("where the command put it").isEqualTo(moved.id());
-            assertThat(child.content().tabs()).hasSize(1);
+            assertThat(child.content().tabs()).hasSize(2);
         });
     }
 
@@ -436,7 +487,7 @@ class TabDragWindowsTest {
                 assertThat(thrown[0]).isTrue();
                 assertThat(tab.window()).as("back in the window it left").isEqualTo(main.id());
                 assertThat(from.tabs()).contains(tab);
-                assertThat(to.tabs()).doesNotContain(tab).hasSize(1);
+                assertThat(to.tabs()).doesNotContain(tab).hasSize(2);
                 assertThat(session(tab)).as("the same session").isSameAs(session);
                 assertThat(((TerminalContent) tab.content()).pane().session().exitFuture()).isNotDone();
                 assertEnded(keys, listeners);
@@ -514,7 +565,7 @@ class TabDragWindowsTest {
             assertThat(to.workspace().model().activeTab()).contains(tab.id());
             assertThat(session(tab)).isSameAs(session);
             assertThat(moves()).containsExactly(new TerminalEvent.TabMoved(tab.id().value(), child.id(), main.id()));
-            assertThat(child.closed()).as("its last tab moved out").isTrue();
+            assertThat(child.closed()).as("its other tab keeps it open").isFalse();
         });
     }
 

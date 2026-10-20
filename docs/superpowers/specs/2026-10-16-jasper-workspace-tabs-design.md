@@ -8,8 +8,9 @@ and a quitting owner refuses handoffs (section 5.3, plan 1 review). Amended 2026
 menus a child window has no menu bar (section 6.3, plan 4a review); sessions carry restore state too (section 14, plan
 6b). Amended 2026-10-19 after plan 1's execution: outside files are revealed rather than desktop-opened, an UPDATED
 owner restarts only for its own new build, the replacement hands off once its predecessor has gone, and a second
-process's Apple-event files are not opened (sections 5.2 to 5.4). Branch: `claude/workspace-tabs`, from `main` at
-`2bc30401c`.
+process's Apple-event files are not opened (sections 5.2 to 5.4). Amended 2026-10-19 (user request): in the standard
+look a window holding a single tab shows no tab strip; Enterprise's classic tabs always show theirs (section 1, decision
+4, and section 10). Branch: `claude/workspace-tabs`, from `main` at `2bc30401c`.
 Planned **after the Enterprise presentation series** (its plans 6–11) has merged: the implementation plans are written
 then, against the code as it stands, and every line reference in section 2 is re-verified at that point.
 
@@ -45,7 +46,8 @@ The user's decisions (2026-10-16):
 3. **Closing the main window closes its child windows too**, after the usual close guards, and saves the whole layout;
    residency then decides, as today, whether Jasper stays in the background or quits. Reopening restores the layout,
    child windows included.
-4. **Tab strips are always shown**, one per group, even for a single tab filling the workspace (VS Code).
+4. **Each group shows its tab strip**, except that in the standard look a window holding a single tab shows none
+   (Enterprise's classic tabs always show).
 5. **Relaunch restores the layout with fresh content:** windows, splits, groups and tab order; terminal tabs start fresh
    shells in their last local directory with their profile and renamed title; editors reopen their files; plugin tabs
    come back if their plugin can restore them, otherwise as a placeholder. No scrollback.
@@ -444,7 +446,8 @@ terminal tab in a new group beside the pane's group. `SplitAxis` is replaced by 
 - `WorkspaceView` renders a `Layout`. Splits use one `SplitContainer` with draggable dividers for any number of children;
   divider drags write weights back to the layout. The theme-update divider handling `TerminalTab` does today moves into
   it.
-- `GroupView` is an always-visible tab strip over a card area showing the selected tab. The strip is Enterprise's
+- `GroupView` is a tab strip over a card area showing the selected tab; in the standard look a window holding a single
+  tab hides it (Enterprise's classic tabs always show). The strip is Enterprise's
   `TabStrip` (its plan 6b), so the active kit supplies `EqualTabs` or `ClassicTabs`; the strip is the drag source for
   tab drags.
 - The active group's strip shows as active; `terminal.dim_inactive_panes` dims every terminal tab outside the active
