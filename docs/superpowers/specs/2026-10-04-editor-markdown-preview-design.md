@@ -2,11 +2,11 @@
 
 **Date:** 2026-10-04; amended 2026-10-20
 
-**Status:** Conversational design and October 20 font/toolbar additions approved; amended written specification awaiting user review. Implementation has not started.
+**Status:** Written specification approved October 20, including font/toolbar additions. Implementation plan written for review; implementation has not started.
 
-**Baseline:** Original design at `d82efd6a`, on `codex/editor-markdown-preview`. Implementation planning must refresh against current main, including SDK 0.18.2 presentation queries and kit-provided Editor font defaults.
+**Baseline:** Refreshed against local main `34aa868fe` by merge `c74465f5d` on `codex/editor-markdown-preview`; SDK 0.18.2, Editor 0.10.0 and Remote 0.15.0. Original design baseline was `d82efd6a`.
 
-**Delivery:** One runnable deliverable and one subsequent implementation plan.
+**Delivery:** One runnable deliverable; [implementation plan](../plans/2026-10-20-editor-fonts-markdown-preview.md) awaiting review.
 
 ## 1. Intent and authority
 
@@ -76,15 +76,15 @@ switching back in the same tab restores that tab's previous Markdown mode.
 Place a compact document toolbar inside the Editor tab directly below the outer tab strip, above any file-change
 banner and the editor content. Its first action group is the right-aligned Markdown view controls; later Editor
 actions can occupy the same toolbar without changing the content layout. It remains reachable in all three modes.
-Use the existing SDK icon catalog roles below, selecting their classic or modern IntelliJ artwork according to
-the active presentation. Planning must verify both catalog variants and the supported SDK icon access path:
+Use semantic icon names in the current SDK, selecting the classic suffix when the active presentation uses
+classic artwork. Add these meanings to the host catalog and fake registry; retain the original IntelliJ art:
 
 | Action | Catalog icon | Tooltip / accessible name |
 | --- | --- | --- |
-| Source | `GENERAL_EDITOR_ONLY` | Source |
-| Split | `GENERAL_EDITOR_PREVIEW` | Source and preview |
-| Preview | `GENERAL_PREVIEW_ONLY` | Preview |
-| Linked scrolling | `ACTIONS_SYNCHRONIZE_SCROLLING` | Synchronize scrolling |
+| Source | `editor.source` / `editor.source.classic` | Source |
+| Split | `editor.split` / `editor.split.classic` | Source and preview |
+| Preview | `editor.preview` / `editor.preview.classic` | Preview |
+| Linked scrolling | `editor.scroll-sync` / `editor.scroll-sync.classic` | Synchronize scrolling |
 
 Mode buttons are mutually exclusive toggles with a visible selected state, keyboard focus and accessible names.
 The scroll toggle is shown only in Split. Tooltips spell out the meaning rather than relying on icons alone.
@@ -194,8 +194,9 @@ Expose an immutable terminal typography value and a change subscription through 
 surface, implemented by the application and testkit. The value carries family, fractional size, ordered fallback,
 ligatures and line height. Notifications arrive on the UI thread after the current value is updated. The Editor
 reads this surface and owns/disposes its subscription with the plugin; it does not read app configuration files or
-import app/terminal internals. Independent mode ignores terminal font changes. Final API names, SDK release and
-consumer compatibility are determined against current main in the implementation plan.
+import app/terminal internals. Independent mode ignores terminal font changes. The implementation plan defines `TerminalTypography`, its
+appearance getter/subscription, SDK 0.18.3 and
+Editor 0.11.0 requiring that SDK release.
 
 Apply typography consistently to source text, gutter, caret geometry, selection, hit testing, wrapping, folds and
 scroll mapping. A multiplier of 1.0 uses natural font metrics; lower values tighten rows, with the same potential
@@ -413,6 +414,7 @@ Reviewed inline for scope, contradictory mode persistence, source/preview focus,
 ownership, render bounds, unsupported destinations and missing test evidence. The file-chooser route mismatch is
 addressed by provider-relative document resolution. Dependency and visual-rendering feasibility remain validations
 for the implementation plan, not unverified claims in this design. There are no unresolved product choices; the
-amended written specification awaits user review before planning. The October 20 self-review checked font precedence,
+amended written specification was approved October 20; its implementation plan awaits review.
+The October 20 self-review checked font precedence,
 SDK boundaries, toolbar/banner ordering and removal of stale fixed-version assumptions. Synchronized scrolling and
 remembered view mode retain their original semantics.

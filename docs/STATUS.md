@@ -3620,16 +3620,13 @@ are ledgered in [the plan](superpowers/plans/2026-10-12-jasper-compact-density.m
   Previews are preserved in the main checkout under `jasper-app/build/flat-tabs-preview/`.
   The managed worktree is archived after verification. No push performed.
 
-- **Editor fonts and Markdown preview design** (2026-10-04, amended 2026-10-20; `codex/editor-markdown-preview`): conversational design approved;
-  [written spec](superpowers/specs/2026-10-04-editor-markdown-preview-design.md) awaits user review before the
-  implementation plan. October 20 adds family/size/fallback/ligatures/line height, opt-in live following of saved
-  terminal fonts through the SDK, and a document toolbar directly below tabs with classic/modern artwork.
-  Implementation planning must refresh this branch against current main. CommonMark plus native Swing, Source/Split/Preview controls, remembered default mode,
-  live unsaved preview and bidirectional linked scrolling; local/SFTP-relative images load automatically and web
-  images load on demand per document. Scope includes tables, task lists, strikethrough, highlighted code and raster
-  images; excludes browser runtime, embedded HTML layouts, SVG, diagrams and math. A small EditorDocument hook
-  preserves the original SFTP route/login for relative resources. The spec defines focus/find behavior, worker
-  lifetimes, bounds and verification. No implementation or tests run; no GUI, AOT training, merge or push.
+- **Editor fonts and Markdown preview** (2026-10-20; `codex/editor-markdown-preview`): written spec approved.
+  Local main `34aa868fe` merged as `c74465f5d`; the [implementation plan](superpowers/plans/2026-10-20-editor-fonts-markdown-preview.md)
+  is written for review and execution-method selection. Thirteen tasks cover SDK typography, independent/followed
+  fonts and source geometry, current semantic-icon toolbar, native Markdown rendering, provider-relative resources,
+  mode persistence, focus/search/navigation and linked scrolling. Refresh replaces the removed icon enums with
+  semantic names and targets SDK 0.18.3, Editor 0.11.0 and Remote 0.15.1. Product implementation and runtime tests
+  have not started; plan/spec/link/whitespace checks only. No GUI, AOT training, merge into main or push.
 
 - **Populated plugin panel reference follow-up** (2026-10-04; `codex/plugin-panel-redesign`): implements the
   second user-supplied mock for connected SFTP, listed Tunnels/File Servers, and the Sessions header correction.
