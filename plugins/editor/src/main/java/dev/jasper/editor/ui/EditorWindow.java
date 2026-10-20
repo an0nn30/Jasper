@@ -762,7 +762,9 @@ public final class EditorWindow {
         session.setWrap(settings.softWrap());
         var tab = new EditorTab(context.kit(), session, this::closeTab, environment.timers());
         tab.previews(context.background(), environment.ui());
-        tab.markdownPreferences(environment.markdownPreferences());
+        tab.markdownPreferences(environment.markdownPreferences(), failed -> environment.ui().execute(() -> {
+            if (!disposed) context.notifications().group().error("Could not save the Markdown default view", failed);
+        }));
         tab.modeChanged(() -> activate(tab));
         tab.appearance(context.appearance());
         tab.settings(settings);

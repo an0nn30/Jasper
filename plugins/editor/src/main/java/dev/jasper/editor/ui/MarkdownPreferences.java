@@ -14,7 +14,7 @@ public final class MarkdownPreferences {
     private MarkdownMode selected, observed;
 
     /** @param saved reads the declared setting
-     * @param write saves a choice through the existing settings error path */
+     * @param write saves a choice; failures are returned to the caller for presentation */
     public MarkdownPreferences(Supplier<MarkdownMode> saved, Function<MarkdownMode, CompletableFuture<Void>> write) {
         this.saved = Objects.requireNonNull(saved); this.write = Objects.requireNonNull(write);
         selected = observed = Objects.requireNonNull(saved.get());

@@ -193,6 +193,64 @@ class EditorWindowTest {
         Kits.press(tab.view(), "markdown.preview");
         assertThat(host.contentStatus(handle)).anySatisfy(item -> assertThat(item.text()).startsWith("Source Ln "));
     }
+    @Test void failedMarkdownPreferenceWritesAreReportedOnUiOnceAndLaterChoicesStillSave() {
+        var ui = new ArrayList<Runnable>();
+        var writes = new ArrayList<dev.jasper.editor.markdown.MarkdownMode>();
+        var saves = new ArrayList<CompletableFuture<Void>>();
+        var preferences = new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.SOURCE, mode -> {
+            writes.add(mode); var save = new CompletableFuture<Void>(); saves.add(save); return save;
+        });
+        var documents = preferenceWindow(preferences, ui);
+        try {
+            documents.newUntitled(); var tab = documents.selected().orElseThrow();
+            tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(tab.view(), "markdown.preview"); Kits.press(tab.view(), "markdown.split");
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(writes).containsExactly(dev.jasper.editor.markdown.MarkdownMode.PREVIEW);
+            CompletableFuture.runAsync(() -> saves.getFirst().completeExceptionally(new java.io.IOException("read-only settings"))).join();
+            assertThat(host.notifications().lines()).isEmpty();
+            assertThat(ui).as("the worker hands error presentation to the UI executor").hasSize(1);
+            ui.removeFirst().run();
+            assertThat(host.notifications().lines()).singleElement().asString()
+                .startsWith("dev.jasper.editor|ERROR|Could not save the Markdown default view|").contains("read-only settings");
+            assertThat(writes).containsExactly(dev.jasper.editor.markdown.MarkdownMode.PREVIEW, dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            saves.get(1).complete(null);
+            assertThat(ui).isEmpty(); assertThat(host.notifications().lines()).hasSize(1);
+            assertThat(tab.markdown().mode()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+            assertThat(preferences.current()).isEqualTo(dev.jasper.editor.markdown.MarkdownMode.SPLIT);
+        } finally { documents.dispose(); }
+    }
+
+    @Test void failedMarkdownSaveReportsAfterTabCloseButNotAfterWindowDisposal() {
+        var ui = new ArrayList<Runnable>(); var saves = new ArrayList<CompletableFuture<Void>>();
+        var preferences = new MarkdownPreferences(() -> dev.jasper.editor.markdown.MarkdownMode.SOURCE, mode -> {
+            var save = new CompletableFuture<Void>(); saves.add(save); return save;
+        });
+        var documents = preferenceWindow(preferences, ui);
+        try {
+            documents.newUntitled(); var tab = documents.selected().orElseThrow();
+            tab.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(tab.view(), "markdown.preview"); host.contentTabs().getLast().close();
+            CompletableFuture.runAsync(() -> saves.getFirst().completeExceptionally(new IllegalStateException("after tab close"))).join();
+            assertThat(ui).hasSize(1); ui.removeFirst().run();
+            assertThat(host.notifications().lines()).singleElement().asString().contains("after tab close");
+            documents.newUntitled(); var other = documents.selected().orElseThrow();
+            other.session().setStyle(org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_MARKDOWN);
+            Kits.press(other.view(), "markdown.source");
+            CompletableFuture.runAsync(() -> saves.get(1).completeExceptionally(new IllegalStateException("after disposal"))).join();
+            assertThat(ui).hasSize(1);
+            documents.dispose(); ui.removeFirst().run();
+            assertThat(host.notifications().lines()).hasSize(1); assertThat(host.failures()).isEmpty();
+        } finally { documents.dispose(); }
+    }
+
+    private EditorWindow preferenceWindow(MarkdownPreferences preferences, List<Runnable> ui) {
+        return new EditorWindow(new EditorEnvironment(context, ui::add, owner -> question -> {
+            throw new AssertionError("Preference failures must not open an owner-bound dialog");
+        }, owner -> (message, saves) -> false, settings::get, on -> CompletableFuture.completedFuture(null), false, preferences), () -> {});
+    }
+
     @Test void aPendingTabFinishingInAnotherWindowEnablesItsOwnCommands() throws Exception {
         window.openLocal(file("pending-separate.md", "# Separate"));
         var first = window.selected().orElseThrow(); var a = host.contentTabs().getFirst();

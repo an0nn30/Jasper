@@ -43,20 +43,26 @@ public final class EditorTab {
     private FindBar find;
     private MarkdownController markdown;
     private MarkdownPreferences markdownPreferences;
+    private Consumer<Throwable> markdownSaveFailed = failure -> {};
     private MarkdownMode retainedMarkdownMode;
     private boolean wasMarkdown;
     private boolean linkedScrolling = true;
     private Runnable modeChanged = () -> {};
     void modeChanged(Runnable value) { modeChanged = value; }
     private Presentation.Icons icons = Presentation.Icons.NEW_UI;
-    void markdownPreferences(MarkdownPreferences value) { markdownPreferences = value; updateMarkdownEligibility(); render(); }
+    void markdownPreferences(MarkdownPreferences value) { markdownPreferences(value, failure -> {}); }
+    void markdownPreferences(MarkdownPreferences value, Consumer<Throwable> failed) {
+        markdownPreferences = value; markdownSaveFailed = failed; updateMarkdownEligibility(); render();
+    }
     boolean markdownEligible() { return SYNTAX_STYLE_MARKDOWN.equals(session.style()); }
     boolean linkedScrolling() { return linkedScrolling; }
     void markdownMode(MarkdownMode mode, boolean explicit) {
         if (closed || !showingText() || !markdownEligible() || markdown == null) return;
         retainedMarkdownMode = mode;
         markdown.mode(mode);
-        if (explicit && markdownPreferences != null) markdownPreferences.select(mode);
+        if (explicit && markdownPreferences != null) markdownPreferences.select(mode).whenComplete((ignored, failure) -> {
+            if (failure != null) markdownSaveFailed.accept(failure);
+        });
         document.focusSource(mode != MarkdownMode.PREVIEW);
         focusContent(); render(); modeChanged.run();
     }
